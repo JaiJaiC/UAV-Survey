@@ -226,6 +226,7 @@
     <button class="tab" data-panel="fetch">🔍 Fetch arXiv</button>
     <button class="tab" data-panel="add">➕ Add Paper</button>
     <button class="tab" data-panel="export">📤 Export</button>
+    <button class="tab" data-panel="crawled">📡 Auto-Crawled</button>
   </div>
 
   <!-- Library Panel -->
@@ -320,6 +321,23 @@
       <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
       <button class="btn" onclick="document.getElementById('importFile').click()">Import JSON File</button>
       <button class="btn danger" onclick="clearLibrary()" style="margin-left:8px;">Clear All Papers</button>
+    </div>
+  </div>
+
+  <!-- Crawled Papers Panel -->
+  <div class="panel" id="panel-crawled">
+    <div style="margin-bottom:16px;">
+      <h3 style="margin-bottom:8px;">🤖 Auto-Crawled Papers <span style="font-size:0.75rem;color:var(--text-dim);">(refreshed weekly)</span></h3>
+      <p style="font-size:0.82rem;color:var(--text-dim);">Papers automatically fetched from arXiv & Semantic Scholar based on lab research keywords.</p>
+    </div>
+    <div class="paper-list" id="crawledPaperList">
+      <div class="empty-state"><div class="icon">⏳</div><div>Loading crawled papers...</div></div>
+    </div>
+    <div style="margin-top:28px;">
+      <h3 style="margin-bottom:12px;">📰 Lab News <span style="font-size:0.75rem;color:var(--text-dim);">(auto-scraped)</span></h3>
+      <div id="crawledNews">
+        <div class="empty-state"><div class="icon">📡</div><div>Loading news...</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -694,7 +712,89 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('arxivQuery')?.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') fetchArxiv();
   });
+  // Load crawled papers
+  loadCrawledPapers();
+  loadCrawledNews();
 });
+
+// ── Crawled Papers Loader ──
+async function loadCrawledPapers() {
+  try {
+    const resp = await fetch('papers.json');
+    if (!resp.ok) throw new Error('Not found');
+    const papers = await resp.json();
+    const container = document.getElementById('crawledPaperList');
+    if (!papers.length) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div>No crawled papers yet. Check back after the next weekly update!</div></div>';
+      return;
+    }
+    container.innerHTML = papers.slice(0, 50).map(p => {
+      const statusLabels = {'to-read':'To Read','reading':'Reading','read':'Read'};
+      return `
+      <div class="paper-card">
+        <div class="title"><a href="${escHtml(p.url || '#')}" target="_blank">${escHtml(p.title)}</a></div>
+        <div class="meta">${escHtml(p.authors || 'Unknown')} — ${p.year || p.date || 'N/A'} ${p.citations ? '· cited '+p.citations+'×' : ''}</div>
+        <div class="bottom">
+          <span class="tag" style="background:#1e3a5f;color:#60a5fa;">${p.source||'arxiv'}</span>
+          ${p.arxiv_id ? `<span class="tag" style="font-family:monospace;">arXiv:${escHtml(p.arxiv_id)}</span>` : ''}
+          <div class="paper-actions">
+            <button onclick="event.stopPropagation();addCrawledToLibrary('${escHtml(p.arxiv_id||'')}','${escHtml(p.title).replace(/'/g,"\\'")}','${escHtml(p.authors||'').replace(/'/g,"\\'")}','${p.year||''}','${escHtml(p.url||'').replace(/'/g,"\\'")}','${p.arxiv_id||''}')" title="Save to My Library">💾 Save</button>
+            ${p.arxiv_id ? `<button onclick="event.stopPropagation();window.open('https://arxiv.org/pdf/${p.arxiv_id}.pdf','_blank')" title="Download PDF">📥 PDF</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    const container = document.getElementById('crawledPaperList');
+    container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div>Crawl data not yet available. Data will appear after the weekly auto-crawl runs.</div></div>';
+  }
+}
+
+function addCrawledToLibrary(arxivId, title, authors, year, url, arxivId) {
+  const papers = getPapers();
+  if (arxivId && papers.some(p => p.arxiv_id === arxivId)) {
+    alert('Already in your library!');
+    return;
+  }
+  papers.push({
+    id: generateId(),
+    title: title,
+    authors: authors,
+    year: year,
+    arxiv_id: arxivId,
+    url: url,
+    tags: [],
+    notes: '',
+    status: 'to-read',
+    added: Date.now()
+  });
+  savePapers(papers);
+  alert('Added to library!');
+}
+
+async function loadCrawledNews() {
+  try {
+    const resp = await fetch('news.json');
+    if (!resp.ok) throw new Error('Not found');
+    const news = await resp.json();
+    const container = document.getElementById('crawledNews');
+    if (!news.length) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📡</div><div>No recent news. Updates come weekly.</div></div>';
+      return;
+    }
+    container.innerHTML = news.map(n => `
+      <div class="paper-card" style="padding:12px 18px;">
+        <div style="font-weight:500;font-size:0.9rem;">
+          ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" style="color:inherit;text-decoration:none;">${escHtml(n.title)}</a>` : escHtml(n.title)}
+        </div>
+        ${n.date ? `<div style="font-size:0.78rem;color:var(--text-dim);margin-top:4px;">${n.date}</div>` : ''}
+      </div>
+    `).join('');
+  } catch(e) {
+    const container = document.getElementById('crawledNews');
+    container.innerHTML = '<div class="empty-state"><div class="icon">📡</div><div>News data not available yet.</div></div>';
+  }
+}
 
 // ── Helpers ──
 function escHtml(s) {

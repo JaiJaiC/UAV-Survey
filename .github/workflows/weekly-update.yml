@@ -1,0 +1,46 @@
+name: Weekly Paper & News Crawl
+
+on:
+  schedule:
+    # Every Monday at 9:37 AM Beijing time (1:37 UTC)
+    - cron: "37 1 * * 1"
+  workflow_dispatch:  # allow manual trigger
+    inputs:
+      days:
+        description: 'Days back to search'
+        required: false
+        default: '30'
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run crawler
+        run: |
+          python crawl_labs.py --days ${{ github.event.inputs.days || 30 }}
+        timeout-minutes: 15
+
+      - name: Commit & push changes
+        run: |
+          git config user.name "0Survey-Bot"
+          git config user.email "bot@0survey.dev"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "🤖 Auto-crawl: weekly paper & news update ($(date '+%Y-%m-%d'))"
+            git push
+          fi

@@ -254,15 +254,21 @@ def search_arxiv(query, max_results=MAX_RESULTS_PER_QUERY, days_back=90):
             summary_el = entry.find("a:summary", ns)
             summary = summary_el.text.strip()[:300] if summary_el is not None and summary_el.text else ""
 
+            # Journal reference from arXiv metadata
+            journal_ref_el = entry.find("a:journal_ref", ns)
+            journal_ref = journal_ref_el.text.strip() if journal_ref_el is not None and journal_ref_el.text else ""
+
             papers.append({
                 "title": title,
-                "authors": ", ".join(authors[:8]),  # cap authors
+                "authors": ", ".join(authors[:8]),
                 "year": published[:4] if published else "",
                 "date": published,
                 "arxiv_id": arxiv_id if not arxiv_id.startswith("http") else "",
                 "url": paper_url if not paper_url.startswith("http://arxiv.org/abs/http") else paper_url.replace("http://arxiv.org/abs/http://", "http://"),
                 "summary": summary,
                 "source": "arxiv",
+                "journal_ref": journal_ref,
+                "citations": 0,
             })
     except ET.ParseError as e:
         log(f"  XML parse error: {e}")
@@ -403,12 +409,91 @@ def deduplicate_papers(papers):
     seen = set()
     unique = []
     for p in papers:
-        # Use arxiv_id if available, else title hash
         key = p.get("arxiv_id") or hashlib.md5(p["title"].lower().encode()).hexdigest()[:12]
         if key and key not in seen:
             seen.add(key)
             unique.append(p)
     return unique
+
+
+def load_journal_metrics():
+    """Load journal quality database."""
+    metrics_path = SCRIPT_DIR / "journal_metrics.json"
+    if metrics_path.exists():
+        with open(metrics_path, "r", encoding="utf-8") as f:
+            return json.load(f).get("journals", {})
+    return {}
+
+
+def match_journal(title, arxiv_journal_ref, journal_db):
+    """Match a paper to a known journal/conference. Returns (name, metrics) or (None, None)."""
+    # 1. Check arXiv journal reference first
+    if arxiv_journal_ref:
+        ref_lower = arxiv_journal_ref.lower()
+        for jname, metrics in journal_db.items():
+            if jname.lower() in ref_lower:
+                return jname, metrics
+            for alias in metrics.get("aliases", []):
+                if alias.lower() in ref_lower:
+                    return jname, metrics
+
+    # 2. Check title for conference abbreviations (e.g. "NeurIPS 2025")
+    if title:
+        for jname, metrics in journal_db.items():
+            if metrics.get("type") == "conference" and jname.lower() in title.lower():
+                return jname, metrics
+
+    return None, None
+
+
+def enrich_papers(papers, journal_db):
+    """Add journal quality metrics and format fields for display."""
+    for p in papers:
+        # Journal matching
+        arxiv_ref = p.get("journal_ref", "")
+        jname, jmetrics = match_journal(p.get("title", ""), arxiv_ref, journal_db)
+        if jmetrics:
+            p["journal"] = jname
+            p["journal_if"] = jmetrics.get("if")
+            p["journal_cas"] = jmetrics.get("cas")
+            p["journal_ccf"] = jmetrics.get("ccf")
+            p["journal_type"] = jmetrics.get("type", "journal")
+            p["journal_publisher"] = jmetrics.get("publisher")
+            p["journal_full_name"] = jmetrics.get("full_name", jname)
+
+        # Add quality badge
+        badges = []
+        if p.get("journal_ccf"):
+            badges.append(f"CCF-{p['journal_ccf']}")
+        if p.get("journal_cas"):
+            badges.append(f"CAS {p['journal_cas']}")
+        if p.get("journal_if"):
+            badges.append(f"IF {p['journal_if']}")
+        p["quality_badges"] = badges
+        p["quality_score"] = compute_quality_score(p)
+
+    return papers
+
+
+def compute_quality_score(paper):
+    """Compute a 0-10 quality score based on venue and citations."""
+    score = 0
+    # CCF rank
+    ccf_scores = {"A": 4, "B": 2.5, "C": 1}
+    score += ccf_scores.get(paper.get("journal_ccf"), 0)
+    # CAS quartile
+    cas_scores = {"Q1": 3, "Q2": 1.5, "Q3": 0.5}
+    score += cas_scores.get(paper.get("journal_cas"), 0)
+    # Impact factor contribution (capped)
+    if_val = paper.get("journal_if") or 0
+    score += min(if_val / 5, 3)  # max 3 points from IF
+    # Citation bonus
+    citations = paper.get("citations", 0)
+    if citations >= 100:
+        score += 1
+    elif citations >= 10:
+        score += 0.5
+    return round(min(score, 10), 1)
 
 
 # ── Main crawl logic ──
@@ -440,6 +525,10 @@ def crawl_lab(lab, days_back):
     all_papers = deduplicate_papers(all_papers)
     log(f"  Found {len(all_papers)} unique papers")
 
+    # Enrich with journal metrics
+    journal_db = load_journal_metrics()
+    all_papers = enrich_papers(all_papers, journal_db)
+
     # Sort by recency
     all_papers.sort(key=lambda p: p.get("date", ""), reverse=True)
 
@@ -455,7 +544,6 @@ def crawl_lab(lab, days_back):
         if html:
             news = scrape_news_from_html(html, lab.get("news_selector", ""))
             if not news:
-                # Fallback: generate news from latest papers
                 news = [
                     {"title": f"📄 New paper: {p['title'][:100]}", "url": p["url"], "date": p.get("date", "")}
                     for p in all_papers[:5]
@@ -478,6 +566,8 @@ def crawl_survey(survey, days_back):
         time.sleep(REQUEST_DELAY)
 
     all_papers = deduplicate_papers(all_papers)
+    journal_db = load_journal_metrics()
+    all_papers = enrich_papers(all_papers, journal_db)
     all_papers.sort(key=lambda p: p.get("date", ""), reverse=True)
     log(f"  Found {len(all_papers)} papers")
     return all_papers

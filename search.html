@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search — UAV-Survey</title>
+<style>
+  :root { --bg:#0f1117; --bg-card:#1a1d27; --text:#e1e4ea; --text-dim:#8b8fa3; --border:#2a2d3a; --accent:#60a5fa; --radius:8px; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  .header { background:var(--bg-card); border-bottom:1px solid var(--border); padding:16px 24px; position:sticky; top:0; z-index:10; }
+  .header-inner { max-width:1400px; margin:0 auto; display:flex; align-items:center; gap:16px; }
+  .header a { color:var(--text-dim); text-decoration:none; font-size:0.85rem; white-space:nowrap; }
+  .header h2 { font-size:1.2rem; color:var(--accent); white-space:nowrap; }
+  .search-box { flex:1; padding:12px 18px; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:1rem; outline:none; max-width:500px; }
+  .search-box:focus { border-color:var(--accent); }
+  .main { max-width:1400px; margin:0 auto; padding:20px 24px; }
+  .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+  .toolbar select { padding:8px 14px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:0.82rem; }
+  .stats { font-size:0.85rem; color:var(--text-dim); margin-bottom:12px; }
+  .result-list { display:flex; flex-direction:column; gap:8px; }
+  .result-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; transition:all 0.2s; }
+  .result-card:hover { border-color:#555; }
+  .result-card .rtitle { font-weight:600; font-size:0.95rem; margin-bottom:4px; }
+  .result-card .rtitle a { color:var(--text); text-decoration:none; }
+  .result-card .rtitle a:hover { color:var(--accent); }
+  .result-card .rmeta { font-size:0.8rem; color:var(--text-dim); margin-bottom:6px; }
+  .result-card .badges { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .badge { font-size:0.7rem; padding:2px 8px; border-radius:10px; font-weight:600; }
+  .badge-ccfa { background:#1a0a0a; color:#ff6b6b; border:1px solid #ff6b6b44; }
+  .badge-ccfb { background:#1a1408; color:#fbbf24; border:1px solid #fbbf2444; }
+  .badge-ccfc { background:#0a1a10; color:#4ade80; border:1px solid #4ade8044; }
+  .badge-q1 { background:#1a0a1a; color:#c084fc; border:1px solid #c084fc44; }
+  .badge-q2 { background:#0a141a; color:#38bdf8; border:1px solid #38bdf844; }
+  .badge-if { background:#0a0a1a; color:#60a5fa; border:1px solid #60a5fa44; }
+  .badge-cite { background:#0a1a0a; color:#34d399; border:1px solid #34d39944; }
+  .badge-venue { background:#252836; color:var(--text-dim); }
+  .empty-state { text-align:center; padding:60px; color:var(--text-dim); }
+  .load-indicator { text-align:center; padding:40px; color:var(--text-dim); }
+  .footer { text-align:center; padding:24px; color:var(--text-dim); font-size:0.78rem; border-top:1px solid var(--border); margin-top:24px; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-inner">
+    <a href="index.html">← UAV-Survey</a>
+    <h2>🔍 Search</h2>
+    <input type="text" class="search-box" id="searchInput" placeholder="Search across all crawled papers... (title, author, keyword)" autofocus>
+  </div>
+</div>
+<div class="main">
+  <div class="toolbar">
+    <select id="filterLab"><option value="all">All Labs & Topics</option></select>
+    <select id="filterVenue"><option value="all">All Venues</option><option value="journal">Journals</option><option value="conference">Conferences</option></select>
+    <select id="filterCCF"><option value="all">All CCF</option><option value="A">CCF-A</option><option value="B">CCF-B</option><option value="C">CCF-C</option></select>
+    <select id="filterCAS"><option value="all">All CAS</option><option value="Q1">Q1</option><option value="Q2">Q2</option></select>
+    <select id="filterYear"><option value="all">All Years</option></select>
+    <select id="sortBy"><option value="date">Sort: Newest</option><option value="quality">Sort: Quality Score</option><option value="citations">Sort: Citations</option><option value="title">Sort: Title</option></select>
+  </div>
+  <div class="stats" id="statsBar">Loading papers...</div>
+  <div class="result-list" id="results">
+    <div class="load-indicator">⏳ Loading paper index...</div>
+  </div>
+</div>
+<div class="footer">UAV-Survey — Global Paper Search · <span id="clock"></span></div>
+
+<script>
+var ALL_PAPERS = [];
+var LABS = [];
+
+var SOURCES = [
+  {name:"ETH-ASL", path:"3.Lab/ETH-ASL/papers.json"},
+  {name:"UZH-RPG", path:"3.Lab/UZH-RPG/papers.json"},
+  {name:"UPenn-Kumar-GRASP", path:"3.Lab/UPenn-Kumar-GRASP/papers.json"},
+  {name:"CMU-AirLab", path:"3.Lab/CMU-AirLab/papers.json"},
+  {name:"MIT-ACL", path:"3.Lab/MIT-ACL/papers.json"},
+  {name:"TUDelft-MAVLab", path:"3.Lab/TUDelft-MAVLab/papers.json"},
+  {name:"Imperial-ARL", path:"3.Lab/Imperial-ARL/papers.json"},
+  {name:"ZJU-FAST", path:"3.Lab/ZJU-FAST/papers.json"},
+  {name:"BUAA-RFLY", path:"3.Lab/BUAA-RFLY/papers.json"},
+  {name:"Unitree", path:"4.Company/Unitree/papers.json"},
+  {name:"DJI", path:"4.Company/DJI/papers.json"},
+  {name:"Anti-UAV", path:"5.UAV Field/Anti-UAV/papers.json"},
+  {name:"Swarm Intelligence", path:"5.UAV Field/Swarm Intelligence/papers.json"},
+  {name:"UAV+RL", path:"5.UAV Field/UAV+RL/papers.json"}
+];
+
+async function loadAll() {
+  var results = [];
+  var labNames = [];
+  for (var s of SOURCES) {
+    try {
+      var resp = await fetch(s.path);
+      if (!resp.ok) continue;
+      var papers = await resp.json();
+      papers.forEach(function(p){ p._lab = s.name; });
+      results = results.concat(papers);
+      labNames.push(s.name);
+    } catch(e) {}
+  }
+  ALL_PAPERS = results;
+  LABS = labNames;
+
+  // Populate filters
+  var sel = document.getElementById('filterLab');
+  LABS.forEach(function(l){ sel.innerHTML += '<option value="'+l+'">'+l+'</option>'; });
+
+  var years = [...new Set(results.map(function(p){ return p.year||p.date?.slice(0,4)||'?'; }))].sort().reverse();
+  var ysel = document.getElementById('filterYear');
+  years.forEach(function(y){ ysel.innerHTML += '<option value="'+y+'">'+y+'</option>'; });
+
+  document.getElementById('statsBar').textContent = results.length + ' papers indexed across ' + LABS.length + ' sources';
+  render();
+}
+
+function render() {
+  var q = (document.getElementById('searchInput').value || '').toLowerCase();
+  var lab = document.getElementById('filterLab').value;
+  var venue = document.getElementById('filterVenue').value;
+  var ccf = document.getElementById('filterCCF').value;
+  var cas = document.getElementById('filterCAS').value;
+  var year = document.getElementById('filterYear').value;
+  var sort = document.getElementById('sortBy').value;
+
+  var filtered = ALL_PAPERS.filter(function(p){
+    if (lab !== 'all' && p._lab !== lab) return false;
+    if (venue !== 'all' && p.journal_type !== venue) return false;
+    if (ccf !== 'all' && p.journal_ccf !== ccf) return false;
+    if (cas !== 'all' && p.journal_cas !== cas) return false;
+    if (year !== 'all' && (p.year||p.date?.slice(0,4)) !== year) return false;
+    if (q) {
+      var hay = [p.title, p.authors, p.summary, p.journal||'', p._lab||'', (p.tags||[]).join(' ')].join(' ').toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+
+  if (sort === 'quality') filtered.sort(function(a,b){ return (b.quality_score||0) - (a.quality_score||0); });
+  else if (sort === 'citations') filtered.sort(function(a,b){ return (b.citations||0) - (a.citations||0); });
+  else if (sort === 'title') filtered.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
+  else filtered.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  var container = document.getElementById('results');
+  document.getElementById('statsBar').textContent = filtered.length + ' results' + (q ? ' for "' + q + '"' : '');
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state"><div style="font-size:2rem;margin-bottom:8px;">🔍</div><div>No papers match your search.</div></div>';
+    return;
+  }
+
+  container.innerHTML = filtered.slice(0, 200).map(function(p){
+    var badges = '';
+    if (p.journal_ccf) badges += '<span class="badge badge-ccf'+p.journal_ccf.toLowerCase()+'">CCF-'+p.journal_ccf+'</span>';
+    if (p.journal_cas) badges += '<span class="badge badge-q'+p.journal_cas.slice(1).toLowerCase()+'">CAS '+p.journal_cas+'</span>';
+    if (p.journal_if) badges += '<span class="badge badge-if">IF '+p.journal_if+'</span>';
+    if (p.citations) badges += '<span class="badge badge-cite">📊 '+p.citations+'×</span>';
+    if (p.journal) badges += '<span class="badge badge-venue">'+escHtml(p.journal)+'</span>';
+    if (p._lab) badges += '<span class="badge badge-venue">'+escHtml(p._lab)+'</span>';
+
+    return '<div class="result-card">'+
+      '<div class="rtitle"><a href="'+escHtml(p.url||'#')+'" target="_blank">'+escHtml(p.title)+'</a></div>'+
+      '<div class="rmeta">'+escHtml(p.authors||'Unknown')+' · '+(p.year||p.date||'N/A')+'</div>'+
+      '<div class="badges">'+badges+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+function escHtml(s) { var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+document.addEventListener('DOMContentLoaded', function(){
+  loadAll();
+  document.getElementById('searchInput').addEventListener('input', render);
+  ['filterLab','filterVenue','filterCCF','filterCAS','filterYear','sortBy'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', render);
+  });
+});
+
+setInterval(function(){
+  document.getElementById('clock').textContent = new Date().toLocaleString('en-CN',{timeZone:'Asia/Shanghai',hour12:false});
+}, 1000);
+</script>
+</body>
+</html>

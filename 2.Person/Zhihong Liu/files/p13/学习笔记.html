@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学习笔记 — Multi-UAV Formation Control via DRL + Affine Transformations</title>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe; --blue-stroke: #3b82f6; --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee; --green-stroke: #10b981; --green-strong: #047857;
+    --amber-fill: #fef7ed; --amber-stroke: #f59e0b; --amber-strong: #b45309;
+    --purple-fill: #f0ebfd; --purple-stroke: #8b5cf6; --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0; --rose-stroke: #f43f5e; --rose-strong: #be123c;
+    --gray-fill: #f3f4f6; --gray-stroke: #9ca3af; --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8; --cyan-stroke: #14b8a6; --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height: 1.7;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12.5px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 12px; border-radius: 5px;
+    transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 12px; font-size: 14px; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.2px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--border); margin-bottom: 22px;
+  }
+  h3 { font-size: 15.5px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p { font-size: 14px; color: #334155; margin-bottom: 10px; }
+  ul, ol { margin: 6px 0 14px 20px; font-size: 14px; color: #334155; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 5px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1e293b; color: #e2e8f0; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12px; line-height: 1.55; padding: 16px 20px; border-radius: 8px;
+    overflow-x: auto; margin: 10px 0 16px;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 14px 0; font-size: 13.5px;
+  }
+  .callout.info  { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip   { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn  { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger{ background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea  { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 4px; margin-right: 4px;
+  }
+  .tag-blue { background:#dbeafe; color:#1d4ed8; }
+  .tag-green { background:#d1fae5; color:#047857; }
+  .tag-amber { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red { background:#ffe4e6; color:#be123c; }
+  .tag-cyan { background:#cffafe; color:#155e75; }
+  .tag-indigo { background:#e0e7ff; color:#3730a3; }
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0; }
+  .cmp-col {
+    flex: 1; min-width: 240px; border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; background: #fafbfc;
+  }
+  .cmp-col h4 { margin-top: 0; }
+  .fig-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 22px; margin: 16px 0;
+  }
+  .fig-box .fig-title { font-weight: 700; font-size: 14px; color: #1e293b; margin-bottom: 10px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0;
+  }
+  .symbol-table { margin: 10px 0; }
+  .symbol-table td:first-child {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 14px; font-weight: 600; color: #1d4ed8; white-space: nowrap; padding-right: 14px;
+  }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Zhihong Liu 学习笔记</span>
+  <a href="#overview">概述</a>
+  <a href="#background">研究背景</a>
+  <a href="#method">方法论</a>
+  <a href="#affine">仿射变换框架</a>
+  <a href="#significance">应用与意义</a>
+  <a href="../../学习笔记目录.html" style="margin-left:auto;">&larr; 返回目录</a>
+</nav>
+
+<div class="container">
+
+<!-- Hero / 论文信息 -->
+<section>
+  <h1>融合深度强化学习与仿射变换的灵活多无人机编队控制</h1>
+  <p style="font-size:15px; color:var(--text-secondary); margin-bottom:8px;">
+    Flexible Multi-UAV Formation Control via Integrating Deep Reinforcement Learning and Affine Transformations
+  </p>
+  <div style="margin:10px 0;">
+    <span class="tag tag-amber">Multi-UAV</span>
+    <span class="tag tag-indigo">Affine Transform</span>
+    <span class="tag tag-red">Deep RL</span>
+    <span class="tag tag-purple">Formation Control</span>
+    <span class="tag tag-blue">NUDT</span>
+    <span class="tag tag-cyan">Chao Yan 合作</span>
+  </div>
+  <table style="margin-top:14px;">
+    <tr><td style="width:80px;font-weight:700;">作者</td><td>Yunhao Liu, <strong>Zhihong Liu</strong>, Guanzheng Wang, <strong>Chao Yan</strong>, Xiangke Wang, Zhiping Huang</td></tr>
+    <tr><td style="font-weight:700;">期刊</td><td>Aerospace Science and Technology, Vol.157, 109812, 2025</td></tr>
+    <tr><td style="font-weight:700;">DOI</td><td><a href="https://www.sciencedirect.com/science/article/pii/S1270963824009416">10.1016/j.ast.2024.109812</a></td></tr>
+    <tr><td style="font-weight:700;">领域</td><td>多无人机系统 — 深度强化学习 — 编队控制 &nbsp;|&nbsp; IF~5.5</td></tr>
+  </table>
+</section>
+
+<!-- 概述 -->
+<section id="overview">
+  <h2>一、论文概述</h2>
+
+  <p>本文提出了一种将<strong>深度强化学习 (DRL)</strong> 与<strong>仿射变换 (Affine Transformations)</strong> 深度融合的多无人机编队控制方法。该方法利用仿射变换作为编队机动的数学描述框架（平移、旋转、缩放、剪切），由 DRL 学习最优控制策略，实现了比传统刚性编队更灵活的队形变换能力。</p>
+
+  <div class="callout idea">
+    <div class="callout-title">与 Chao Yan 的直接合作</div>
+    本文是 Zhihong Liu 与 <strong>Chao Yan（闫超）</strong> 直接合作的论文，两人均为国防科技大学 (NUDT) 学者。Chao Yan 的研究聚焦于视觉运动策略与多智能体协同控制，Zhihong Liu 在 DRL 加速训练方面有深厚积累（ACM Computing Surveys 综述一作），两人的技术互补构成了本文的学术基础。
+  </div>
+
+  <h3>核心研究问题</h3>
+  <p>传统多 UAV 编队控制多采用刚性几何约束（如 leader-follower、虚拟结构法），一旦队形需要变换（如避障时缩放、转向时旋转），往往需要重新规划或切换控制器，缺乏灵活性。本文的核心问题是：<strong>能否利用仿射变换统一描述编队的各种机动，并让 DRL 学习在此框架下输出平滑、鲁棒的控制指令？</strong></p>
+
+  <div class="fig-box">
+    <div class="fig-title">图1: 多UAV编队仿射变换示意图</div>
+    <pre style="background:#f0f4f8; color:#1e293b; font-size:12px; border:none;">
+             仿射变换 T = {A, b} 作用于编队参考形状
+    ┌─────────────────────────────────────────────────────────────┐
+    │                                                             │
+    │   参考编队 P_ref             仿射变换 T(P_ref)               │
+    │                                                             │
+    │      UAV₁                      UAV₁'                        │
+    │       ·                          ·  ·                       │
+    │      / \                        /    \                      │
+    │     /   \       T={A,b}       /      \      UAV₃'           │
+    │  UAV₂───UAV₃  ─────────→  UAV₂'        ·                   │
+    │                                                             │
+    │   平移 translation  →  b (位移向量)                         │
+    │   旋转 rotation     →  A = R(θ) (旋转矩阵)                  │
+    │   缩放 scaling      →  A = s·I  (均匀缩放)                  │
+    │   剪切 shear        →  A with off-diagonal elements         │
+    └─────────────────────────────────────────────────────────────┘
+    </pre>
+  </div>
+</section>
+
+<!-- 研究背景 -->
+<section id="background">
+  <h2>二、研究背景与相关工作</h2>
+
+  <h3>2.1 多UAV编队控制的主流方法</h3>
+  <table>
+    <thead>
+      <tr><th>方法</th><th>核心思想</th><th>优势</th><th>局限</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Leader-Follower</strong></td><td>一架领航机引导，其他跟随</td><td>结构简单、工程成熟</td><td>单点故障、灵活性差</td></tr>
+      <tr><td><strong>Virtual Structure</strong></td><td>编队视为刚体，各机刚性锚定</td><td>队形保持精度高</td><td>无法变形、避障困难</td></tr>
+      <tr><td><strong>Behavior-Based</strong></td><td>规则组合驱动行为</td><td>分布式、可扩展</td><td>理论分析困难、无法保证收敛</td></tr>
+      <tr><td><strong>Consensus-Based</strong></td><td>基于图论的多智能体一致协议</td><td>理论完善、可证明收敛</td><td>队形变换需重新定义拓扑</td></tr>
+      <tr><td><strong>DRL-Based</strong></td><td>数据驱动学习控制策略</td><td>灵活适应、端到端</td><td>训练开销大、可解释性差</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 仿射变换的引入动机</h3>
+  <p>仿射变换 <code>T(x) = Ax + b</code> 是计算机视觉和计算机图形学中的标准工具（图像配准、形状匹配），但在多无人机编队中的应用尚少见。其关键优势在于：</p>
+  <ul>
+    <li><strong>统一框架</strong>：平移、旋转、缩放、剪切——四种基本机动被一个 2x2 矩阵 <code>A</code> 和位移向量 <code>b</code> 统一刻画</li>
+    <li><strong>平滑变换</strong>：通过连续改变 <code>A</code> 和 <code>b</code> 即可实现编队的平滑形变，无需切换控制器</li>
+    <li><strong>DRL 友好</strong>：<code>A</code> 和 <code>b</code> 的参数空间维度低 (2D: 6 个自由度)，适合作为 DRL 动作空间的输出</li>
+  </ul>
+
+  <h3>2.3 DRL 在编队控制中的角色</h3>
+  <p>DRL 的优势在于处理<strong>高维、非线性、模型不确定</strong>的控制问题。在本文中，DRL 策略网络以编队状态（各 UAV 位置、速度）和环境感知（障碍物、目标点）作为输入，直接输出仿射变换参数 <code>{A, b}</code>，然后通过仿射映射计算各 UAV 的目标位置，最终由底层飞行控制器执行。</p>
+</section>
+
+<!-- 方法论 -->
+<section id="method">
+  <h2>三、方法论：DRL + 仿射变换融合架构</h2>
+
+  <h3>3.1 系统架构</h3>
+  <p>整体架构分为三层：</p>
+  <ol>
+    <li><strong>感知层 (Perception)</strong>：多 UAV 状态汇聚 + 环境感知（通过板载传感器或仿真环境获取）</li>
+    <li><strong>策略层 (Policy)</strong>：DRL 策略网络输出仿射变换参数 <code>{A, b}</code></li>
+    <li><strong>执行层 (Execution)</strong>：仿射映射生成各 UAV 目标位姿 → 底层姿态/位置控制器执行</li>
+  </ol>
+
+  <div class="fig-box">
+    <div class="fig-title">图2: 系统架构流程</div>
+    <pre style="background:#f0f4f8; color:#1e293b; font-size:12px; border:none;">
+    ┌─────────────────────────────────────────────────────────────┐
+    │                    DRL Policy Network                        │
+    │  Input:  [formation_state, env_obs, goal]                   │
+    │                   ↓                                          │
+    │  Output: {A (2×2 matrix), b (2×1 vector)}                  │
+    └─────────────────────────┬───────────────────────────────────┘
+                              ↓
+    ┌─────────────────────────────────────────────────────────────┐
+    │                Affine Transformation Layer                   │
+    │                                                             │
+    │   p_i^target = A · p_i^ref + b    (for each UAV i)          │
+    │                                                             │
+    │   where p_i^ref = 第 i 架 UAV 在参考编队中的坐标             │
+    │         p_i^target = 第 i 架 UAV 的目标位置                  │
+    └─────────────────────────┬───────────────────────────────────┘
+                              ↓
+    ┌─────────────────────────────────────────────────────────────┐
+    │                   Low-Level Flight Controller                │
+    │   各 UAV 独立执行位置/姿态控制 → 到达目标位置                  │
+    └─────────────────────────────────────────────────────────────┘
+    </pre>
+  </div>
+
+  <h3>3.2 状态空间与动作空间设计</h3>
+  <table>
+    <thead>
+      <tr><th>空间</th><th>内容</th><th>维度</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>状态空间 (State)</td><td>编队中心位置、各UAV相对位置偏差、速度、障碍物距离向量、目标方向</td><td>取决于 UAV 数量和感知信息量</td></tr>
+      <tr><td>动作空间 (Action)</td><td>仿射矩阵 A 的 4 个元素 + 平移向量 b 的 2 个分量</td><td>6 (连续动作空间)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.3 奖励函数设计</h3>
+  <p>多目标奖励函数指导 DRL 学习期望的编队行为：</p>
+  <div class="formula-block">
+    <p style="font-weight:700; margin-bottom:6px;">奖励函数结构</p>
+    <p style="font-size:14px; text-align:center;">
+      <code>R = w₁·R_formation + w₂·R_goal + w₃·R_obstacle + w₄·R_smooth</code>
+    </p>
+    <table class="symbol-table" style="margin-top:10px;">
+      <tr><td>R_formation</td><td>编队形状保持奖励（实际队形与目标队形的相似度）</td></tr>
+      <tr><td>R_goal</td><td>向目标点靠近的奖励</td></tr>
+      <tr><td>R_obstacle</td><td>避障惩罚（与障碍物距离越近惩罚越大）</td></tr>
+      <tr><td>R_smooth</td><td>动作平滑性惩罚（抑制控制指令突变）</td></tr>
+    </table>
+  </div>
+
+  <h3>3.4 训练策略</h3>
+  <ul>
+    <li><strong>算法选择</strong>：基于 PPO (Proximal Policy Optimization) 或 SAC (Soft Actor-Critic)，适合连续动作空间</li>
+    <li><strong>集中式训练、分布式执行 (CTDE)</strong>：训练时使用全局信息（集中式 critic），执行时各 UAV 仅使用本地观测（分布式 actor）</li>
+    <li><strong>课程学习 (Curriculum Learning)</strong>：从简单场景（无障碍、固定目标）逐步增加复杂度（动态障碍、移动目标）</li>
+  </ul>
+</section>
+
+<!-- 仿射变换框架 -->
+<section id="affine">
+  <h2>四、仿射变换编队框架详解</h2>
+
+  <h3>4.1 数学形式</h3>
+  <p>对于由 <code>n</code> 架 UAV 组成的编队，设参考编队中各 UAV 的参考坐标为 <code>p_i^ref = (x_i^ref, y_i^ref)</code>，则目标坐标由仿射变换给出：</p>
+  <div class="formula-block">
+    <p style="font-size:14px; text-align:center;"><code>
+      p_i^target = A · p_i^ref + b
+    </code></p>
+    <p style="font-size:13px; color:var(--text-secondary); margin-top:6px;">
+      where <code>A = [[a₁₁, a₁₂], [a₂₁, a₂₂]]</code>, <code>b = [b₁, b₂]</code>
+    </p>
+  </div>
+
+  <h3>4.2 四种基本仿射变换与编队机动对应关系</h3>
+  <table>
+    <thead>
+      <tr><th>变换类型</th><th>A 矩阵形式</th><th>编队机动含义</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>平移</strong></td><td><code>A = I (单位阵)</code></td><td>编队整体平移到新位置</td></tr>
+      <tr><td><strong>均匀缩放</strong></td><td><code>A = s·I</code>, s&gt;0</td><td>编队整体放大/缩小（如过狭窄通道时收缩）</td></tr>
+      <tr><td><strong>旋转</strong></td><td><code>A = [[cosθ, -sinθ], [sinθ, cosθ]]</code></td><td>编队整体旋转（如转向新航向）</td></tr>
+      <tr><td><strong>剪切</strong></td><td><code>A = [[1, k], [0, 1]]</code></td><td>非均匀变形（较少使用，但可用于特殊机动）</td></tr>
+      <tr><td><strong>一般仿射</strong></td><td>A 为一般 2×2 可逆矩阵</td><td>上述变换的任意组合</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.3 编队灵活性体现</h3>
+  <p>与刚性编队方法相比，仿射变换框架的核心优势在于<strong>连续参数空间</strong>：</p>
+  <ul>
+    <li>DRL 输出的是 6 个连续值（<code>a₁₁, a₁₂, a₂₁, a₂₂, b₁, b₂</code>），而非离散的编队模式选择</li>
+    <li>队形可以在任意两种形状之间平滑过渡，中间不存在控制律切换</li>
+    <li>编队可以同时进行缩放+旋转+平移（如绕过障碍物转角时自然缩小并旋转）</li>
+  </ul>
+
+  <div class="fig-box">
+    <div class="fig-title">图3: 仿射变换编队 vs 刚性编队对比</div>
+    <pre style="background:#f0f4f8; color:#1e293b; font-size:12px; border:none;">
+      刚性编队（传统）:               仿射变换编队（本文）:
+      ┌──────────────────┐          ┌──────────────────┐
+      │  编队模式 1      │          │                  │
+      │  (巡航 V 字)     │          │  一个连续的      │
+      │       ↓          │          │  仿射参数空间    │
+      │  手动切换        │          │  {A ∈ R²ˣ²,     │
+      │       ↓          │          │   b ∈ R²}        │
+      │  编队模式 2      │          │       ↓          │
+      │  (避障纵列)      │          │  DRL 输出连续    │
+      │       ↓          │          │  仿射参数        │
+      │  手动切换        │          │       ↓          │
+      │  编队模式 3      │          │  任意编队形状    │
+      └──────────────────┘          └──────────────────┘
+    </pre>
+  </div>
+</section>
+
+<!-- 应用与意义 -->
+<section id="significance">
+  <h2>五、应用场景与学术意义</h2>
+
+  <h3>5.1 典型应用场景</h3>
+  <table>
+    <thead>
+      <tr><th>场景</th><th>编队需求</th><th>仿射变换的具体运用</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>协同侦察/监视</strong></td><td>大范围覆盖 → 重点区域聚焦</td><td>缩放 + 平移：广域扫描时编队拉大，发现目标后收缩聚焦</td></tr>
+      <tr><td><strong>空中加油</strong></td><td>精确编队保持 + 对接</td><td>高精度平移跟踪 + 微小旋转校正</td></tr>
+      <tr><td><strong>协同攻击/饱和突防</strong></td><td>密集编队 → 分散突防 → 重新聚合</td><td>缩放 + 剪切：收缩穿越防空区，展开分配目标</td></tr>
+      <tr><td><strong>城市峡谷飞行</strong></td><td>根据街道宽窄动态调整</td><td>各向异性缩放：横向收缩（适应街道宽度），纵向维持或拉长</td></tr>
+      <tr><td><strong>无人机灯光秀</strong></td><td>复杂图案平滑变换</td><td>一般仿射：每个图案即为一种 A 的配置</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 学术贡献</h3>
+  <ul>
+    <li><strong>框架创新</strong>：首次将仿射变换作为 DRL 与编队控制之间的<strong>结构化接口</strong>，将无结构的端到端 DRL 转化为有数学约束的优化问题</li>
+    <li><strong>灵活性与安全的平衡</strong>：仿射变换保证了编队的基本几何约束（直线保持为直线、平行保持为平行），避免 DRL 输出"奇形怪状"的不安全编队</li>
+    <li><strong>跨合作网络</strong>：体现了 NUDT 内部 Zhihong Liu (DRL 加速) 与 Chao Yan (多智能体/UAV) 两个方向的融合</li>
+  </ul>
+
+  <h3>5.3 局限与改进方向</h3>
+  <ul>
+    <li>仿射变换限于线性变换，无法表达弯曲或扭曲的编队形状</li>
+    <li>2D 仿射变换可直接推广至 3D (Affine(3) = 12 个自由度)，但维度增加导致 DRL 训练难度急剧上升</li>
+    <li>真实环境中的通信延迟、GPS 拒止等问题在仿真中难以充分建模</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="callout-title">与 Chao Yan 研究方向的互补性</div>
+    Chao Yan 在视觉运动策略与多智能体协同方面的工作（如视觉 servoing、多机协同感知）可以与本文的编队框架结合——例如，利用视觉信息直接估计目标编队的仿射变换参数，实现"看到即编队"的视觉引导编队控制。这是一个值得关注的交叉方向。
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">NUDT 身份确认</div>
+    本文作者包含 Yunhao Liu、Zhihong Liu、Guanzheng Wang、<strong>Chao Yan</strong>、Xiangke Wang、Zhiping Huang，全部来自国防科技大学 (NUDT)。这确认了 Zhihong Liu (DRL/多UAV方向) 的 NUDT 学术身份，与半导体器件方向的 Zhihong Liu 是不同的人。
+  </div>
+</section>
+
+</div>
+
+<footer>
+  <p>Zhihong Liu 论文学习笔记 · Paper p13 · Aerospace Science and Technology (2025) · DRL + 仿射变换多UAV编队</p>
+  <p style="margin-top:4px;"><a href="../../学习笔记目录.html" style="color:var(--blue-strong);">&larr; 返回学习笔记目录</a></p>
+</footer>
+
+</body>
+</html>

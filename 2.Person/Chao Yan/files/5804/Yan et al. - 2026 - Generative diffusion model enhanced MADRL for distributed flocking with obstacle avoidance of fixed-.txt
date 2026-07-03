@@ -1,0 +1,1083 @@
+IEEE/ASME TRANSACTIONS ON MECHATRONICS 1
+Generative Diffusion Model Enhanced MADRL
+for Distributed Flocking With Obstacle
+Avoidance of Fixed-Wing AAV Swarms
+Chao Y an , Member, IEEE , Yuna Jiang , Member, IEEE , Mou Chen , Fellow, IEEE , Xiaojia Xiang ,
+and Xiangke Wang , Senior Member, IEEE
+Abstract —The distributed ﬂocking control of ﬁxed-wing
+autonomous aerial vehicle (AAV) swarms in unknown andcluttered environments poses signiﬁcant challenges dueto their complex dynamics and nonholonomic constraints.While multiagent deep reinforcement learning (MADRL) hasshown success in coordinating AAVs, existing approachesoften struggle to capture the multimodal action distribu-tions essential for robust obstacle avoidance under uncer-tainty. In this article, we propose a novel generative dif-fusion model enhanced MADRL approach for distributedﬂocking control and obstacle avoidance in ﬁxed-wing AAVswarms. Speciﬁcally, we design a diffusion-based policynetwork, where individual observations are processed viaa graph attention network and used as conditions for gen-erating optimal actions in the reverse denoising process.To update the diffusion policy, a graph attention networkis also incorporated into the value network to effectivelyextract relevant information from all agents, thereby im-proving the accuracy of the Q-value estimation. The resultsof numerical simulations and hardware-in-the-loop experi-ments demonstrate that our approach signiﬁcantly outper-forms existing baselines in terms of ﬂocking stability and
+collision rate, highlighting the potential of diffusion models
+for scalable and robust AAV ﬂocking control.
+Index Terms —Fixed-wing autonomous aerial vehicle
+(AAV) swarm, ﬂocking control, generative diffusion model(GDM), multiagent deep reinforcement learning (MADRL),obstacle avoidance.
+Received 22 May 2025; revised 14 October 2025; accepted 27 De-
+cember 2025. Recommended by Technical Editor Z. Ji and Senior Editor
+H. Fujimoto. This work was supported in part by the National Natural
+Science Foundation of China under Grant 62403240, Grant 62533012,and Grant T2521006 and in part by the Natural Science Foundation ofJiangsu Province under Grant BK20241396. (Corresponding author:
+Mou Chen.)
+Chao Y an and Mou Chen are with the College of Automation En-
+gineering, Nanjing University of Aeronautics and Astronautics, Nan-
+jing 211106, China (e-mail: yanchao@nuaa.edu.cn; chenmou@nuaa.
+edu.cn).
+Yuna Jiang is with the School of Communications and Information En-
+gineering, Nanjing University of Posts and Telecommunications, Nanjing
+210003, China (e-mail: yunajiang@njupt.edu.cn).
+Xiaojia Xiang and Xiangke Wang are with the College of Intelli-
+gence Science and Technology, National University of Defense Tech-nology, Changsha 410073, China (e-mail: xiangxiaojia@nudt.edu.cn;
+xkwang@nudt.edu.cn).
+Color versions of one or more ﬁgures in this article are available at
+https://doi.org/10.1109/TMECH.2026.3652629.
+Digital Object Identiﬁer 10.1109/TMECH.2026.3652629I. INTRODUCTION
+AUTONOMOUS aerial vehicle (AA V) swarms show im-
+mense promise across a wide range of critical applications,
+from security patrol [1]and emergency communication [2]to
+urban air mobility [3]and advanced air mobility [4],[5]. Hence,
+cooperative control techniques that coordinate a swarm of in-
+dividual AA Vs to accomplish complex tasks in a decentralized
+manner have become a hot research topic [6],[7]. Among the
+various approaches to cooperative control, distributed ﬂocking
+offers a scalable and decentralized solution for maintaining
+formation coherence [8],[9], while obstacle avoidance ensures
+mission safety in complex environments. However, achieving
+ﬂocking control with obstacle avoidance remains a huge chal-
+lenge for AA V swarms, particularly when the sensing capabilityof each AA V is limited.
+Traditional methods for achieving ﬂocking and obstacle
+avoidance in AA V swarms, such as those based on Reynolds’
+rules [10],[11] or potential ﬁeld methods [9],[12], often suf-
+fer from several limitations. These methods typically rely onhandcrafted rules and parameters that can be challenging to
+tune optimally for complex and unknown environments. Fur-
+thermore, traditional methods can be brittle when faced withunforeseen situations, such as novel obstacle conﬁgurations
+or environmental changes. These methods often struggle with
+adaptability, resulting in issues, such as convergence to localminima, oscillatory behaviors, or even collisions. These chal-
+lenges motivate the adoption of more adaptive, learning-based
+approaches that can continuously optimize swarm behavior inresponse to environmental changes.
+In recent years, deep reinforcement learning (DRL), including
+multiagent deep reinforcement learning (MADRL) [13],[14],
+has become increasingly popular because of its superiority in
+model-free, ﬂexibility, and computational costs [15]. Many re-
+searchers have successfully applied DRL for ﬂocking control.For example, Shi et al. [16] designed a ﬂocking controller for
+multiple AA Vs in network-constrained environments by inte-
+grating heuristic guides with the twin delayed deep deterministic
+policy gradient (DDPG) algorithm. Xiao et al. [17] proposed the
+multiagent cooperative soft actor–critic algorithm for ﬂockingcontrol with obstacle avoidance under stochastic communica-
+tion conditions. Jia et al. [18] developed an asymmetric self-
+play-empowered DRL framework for robust multirobot ﬂocking
+1083-4435 © 2026 IEEE. All rights reserved, including rights for text and data mining, and training of artiﬁcial intelligence and similar technologi es.
+Personal use is permitted, but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index. html
+for more information.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+2 IEEE/ASME TRANSACTIONS ON MECHATRONICS
+control in dynamic scenarios with environmental interferes.
+However, the above-mentioned studies only focus on particle-
+based agents, such as rotary AA Vs or omnidirectional robots,which can hover or maneuver freely. Consequently, their meth-
+ods are not applicable for ﬁxed-wing AA Vs that operate under
+more restrictive dynamics [19].
+Fixed-wing AA Vs present unique challenges due to their
+nonholonomic motion constraints, high-speed dynamics, and
+limited maneuverability [20],[21]. As a result, learning reliable
+ﬂocking and obstacle avoidance policies becomes signiﬁcantly
+more complicated. DRL has shown promise in achieving cooper-
+ative control of ﬁxed-wing AA Vs in related tasks. For example,Ma et al. [22] developed a DDPG-based control framework,
+enabling ﬁxed-wing AA Vs to adapt to complex formations
+while avoiding collisions. Zhuang et al. [23] proposed a proxi-
+mal policy optimization based autonomous penetration method
+for high-speed ﬁxed-wing AA Vs against multiple interceptors.
+However, few efforts have been dedicated speciﬁcally to ﬂockingcontrol for ﬁxed-wing AA V swarms. Notable exceptions include
+our previous work [24],[25], where we designed a multiagent
+DDPG based distributed ﬂocking framework with attention
+mechanisms for ﬁxed-wing AA Vs in cluttered environments.
+Nevertheless, the aforementioned methods typically rely oneither deterministic policies or unimodal Gaussian policies. This
+reliance limits their ability to learn diverse and adaptive ﬂocking
+behaviors in complex environments, especially when multiplefeasible paths or maneuvers are available around obstacles.
+Motivated by these limitations, we turn our attention to gener-
+ative diffusion models (GDMs) as a potential solution. Diffusionmodels have recently emerged as powerful generative models
+capable of capturing complex, multimodal distributions by pro-
+gressively denoising random noise into structured outputs [26],
+[27]. Unlike unimodal Gaussian policies, diffusion models nat-
+urally support multimodal action generation, enabling agents
+to explore and exploit multiple plausible behaviors conditionedon the environment [28],[29]. This property is particularly
+advantageous for ﬂocking control of ﬁxed-wing AA V swarms,
+where AA Vs may need to consider diverse maneuver options in
+the presence of dynamic obstacles and limited maneuverability.
+In this article, we propose a novel GDM enhanced MADRL
+approach for distributed ﬂocking control and obstacle avoid-
+ance of ﬁxed-wing AA V swarms. The core insight behind the
+proposed approach is the design of a generative diffusion pol-icy model that conditions on local observations and generates
+diverse, coordinated actions for each AA V in a decentralized
+manner. By integrating the generative capability of diffusionmodels into the policy learning process, our approach enables
+ﬁxed-wing AA Vs to maintain cohesive ﬂocks while navigating
+safely through complex, cluttered environments. Extensive ex-periments validate the superiority of our approach over existing
+MADRL baselines in terms of ﬂocking stability and collision
+rate.
+To the best of our knowledge, we are the ﬁrst to address the
+distributed ﬂocking control problem for a scalable ﬁxed-wing
+AA V swarm in unknown and obstacle-rich environments using
+the GDMs. The main contributions of this article are summarized
+as follows.Fig. 1. Scalable swarm of ﬁxed-wing AAVs consisting of one unique
+leader and nidentical followers. d1,...,d 9denote the distances be-
+tween the follower and the surrounding obstacles in nine directions
+measured by the distance sensor.
+1) A novel multiagent actor–critic reinforcement learning
+approach enhanced by a GDM is proposed for achieving
+robust distributed ﬂocking control and effective obstacleavoidance with a scalable ﬁxed-wing AA V swarm.
+2) A generative diffusion policy model is designed to gener-
+ate diverse and coordinated actions, where local neighborinformation is processed by a graph attention network
+(GAT) and utilized as the conditional input to the diffusion
+model.
+3) Hardware-in-the-loop (HITL) experiments and extensive
+numerical simulations are conducted to comprehensivelyvalidate the effectiveness and robustness of the proposed
+approach for ﬂocking control.
+The rest of this article is organized as follows. Section II
+formulates the distributed ﬂocking control and obstacle avoid-
+ance problem. Section IIIproposes the GDM enhanced MADRL
+approach, followed by the experiment results in Section IV.
+Finally, Section Vconcludes this article.
+II. P
+ROBLEM FORMULATION
+In this section, we ﬁrst describe the distributed ﬂocking and
+obstacle avoidance problem for a scalable swarm of ﬁxed-wing
+AA Vs, and then formulate it as a decentralized partially observ-able Markov decision process (Dec-POMDP).
+A. Problem Statement
+In the considered ﬂocking scenario, a scalable swarm of
+ﬁxed-wing AA Vs operates within a 2-D environment clutteredwith multiple obstacles (see Fig. 1). The swarm consists of a
+unique leader followed by a dynamic set of identical followers
+denoted by I:={1,2,...,n}, where the number of followers n
+is variable. The state of the follower ican be described by the tu-
+pleξ
+i:= (xi,yi,ψi,φi,vi), representing the plane coordinates,
+heading angle, roll angle, and airspeed, respectively. Similarly,the leader’s state can be denoted as ξ
+l:= (xl,yl,ψl,φl,vl).T h e
+objective is to design a distributed ﬂocking control policy that
+allows a ﬂexible number of followers to ﬂock with the leaderwhile actively avoiding collisions with obstacles.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+YAN et al.: GDM ENHANCED MADRL FOR DISTRIBUTED FLOCKING WITH OBSTACLE AVOIDANCE OF FIXED-WING AAV SWARMS 3
+We assumed that all followers are equipped with identical and
+limited sensing capabilities. Each follower can only perceive the
+states of nearby agents within its sensing range Rc. Accordingly,
+the neighbor set of follower iis deﬁned as
+Ni:={j|ρi,j<Rc,j∈I,j/negationslash=i} (1)
+whereρi,jis the distance between follower iand follower j.
+In addition, each follower carries a nine-beam sparse distance
+sensor covering a 180◦ﬁeld-of-view to detect nearby obstacles.
+Denote the information measured by the distance sensor offollowerias
+d
+i:= [di,1,...,d i,m,...,d i,9] (2)
+wheredi,mis the distance in the mth beam direction.
+B. Dec-POMDP Model
+1) Observation Space: All the followers have the same ob-
+servation space. The observation of each follower i∈I can be
+deﬁned as
+oi:= (ξl,ξi,ξNi,di) (3)
+whereξlis the leader’s state; ξiis the follower i’s state;ξNi:=
+{ξj|j∈Ni}is the set of states of follower i’s neighbors; di
+indicates the distance information measured by the follower i.
+2) Action Space: All follower share the same continuous
+action space. For each follower i, the action is deﬁned as ai=
+(ωi,ui), whereωi∈[−ωmax,ωmax]represents the roll com-
+mand, and ui∈[−umax,umax]denotes the speed command.
+These high-level control commands are subsequently executedby the AA V’s low-level autopilot according to the following
+dynamics [24],[30]:
+˙ξ
+i=d
+dt⎧
+⎪⎪⎪⎪⎨
+⎪⎪⎪⎪⎩x
+i
+yi
+ψi
+φi
+vi⎫
+⎪⎪⎪⎪⎬
+⎪⎪⎪⎪⎭=⎧
+⎪⎪⎪⎪⎨
+⎪⎪⎪⎪⎩v
+icosψi+ηx
+visinψi+ηy
+−αg
+vitanφi+ηψ
+fφ(φi,ωi)
+fv(vi,ui)⎫
+⎪⎪⎪⎪⎬
+⎪⎪⎪⎪⎭(4)
+whereα
+gdenotes the gravitational acceleration, and ηx,ηy,
+ηψrepresent the environmental disturbances in the x,y, and
+heading angle channels, respectively. The functions fφ(·)and
+fv(·)describe the closed-loop roll and airspeed dynamics [31].
+3) Reward Function: In the ﬂocking with obstacle avoidance
+task, each follower aims to minimize its distance to the leader
+while avoiding collisions with neighboring AA Vs and surround-
+ing obstacles [24]. Accordingly, the reward function is designed
+as a weighted sum of multiple objectives
+ri=rfol
+i+|Ni|/summationdisplay
+j=1rcol
+i,j+9/summationdisplay
+m=1robs
+i,m (5)
+where
+rfol
+i=⎧
+⎪⎪⎨
+⎪⎪⎩−Pρ
+i,l≤Rs
+λ1/parenleftbig
+1−ep1(Ra−ρi,l)/parenrightbig
+Rs<ρi,l≤Ra
+λ2/parenleftbig
+1−ep2(ρi,l−Ra)/parenrightbig
+Ra<ρi,l≤Rl
+−Kρ i,l>Rl(6)rcol
+i,j=⎧
+⎨
+⎩−Pρ i,j≤Rs
+λ1/parenleftbig
+1−ep1(Ra−ρi,j)/parenrightbig
+Rs<ρi,j≤Ra
+0 ρi,j>Ra(7)
+robs
+i,m=⎧
+⎨
+⎩−Pd i,m≤Rs
+λ1/parenleftbig
+1−ep1(Ra−di,m)/parenrightbig
+Rs<di,m≤Ra
+0 di,m>Ra(8)
+denote the following reward ,inter-AAV collision avoidance
+reward , and environmental obstacle avoidance reward , respec-
+tively. Here, ρi,lis the distance from the leader to follower i,Rl
+is the maximum communication range of the leader, RaandRs
+are the alert radius and minimum safety radius of followers,
+respectively. λ1>0 and λ2>0 are two weight coefﬁcients;
+k1andk2are two small positive constants, while Kis a large
+positive constant.
+III. M ETHODOLOGY
+To address the distributed ﬂocking with obstacle avoidance
+problem, we propose a novel generative diffusion model en-hanced multiagent actor–critic (GDMAAC) algorithm. As illus-
+trated in Fig. 2, the GDMAAC algorithm comprises two main
+components: the diffusion-based policy network (actor) and thegraph-based value network (critic). The actor is responsible for
+learning the individual policies for each agent (follower) by
+leveraging the GDM [26], while the critic is used to evalu-
+ate the joint actions of all agents by utilizing the GAT [32].
+The policy and value networks operate under the centralizedtraining with decentralized execution paradigm [33].D u r i n g
+training, global state from all agents is utilized to learn optimal
+policies and value functions. However, during execution, eachagent acts independently based on its own local observations
+and its learned decentralized policy. In the following, we ﬁrst
+introduce the diffusion-based policy network (see Section III-A )
+and the graph-based value network (see Section III-B ), respec-
+tively. Afterward, we describe the learning process in detail
+(see Section III-C ).
+A. Diffusion-Based Policy Network
+In order to enhance exploration and robustness in dynamic and
+uncertain environments, we design the diffusion-based policy
+network to generate optimal actions based on the observationsof each agent. Speciﬁcally, the policy network utilizes a GDM
+to generate diverse actions through a denoising process, con-
+ditioned on the observations processed by a GAT. Below, weﬁrst introduce the GAT-based observation encoder and then the
+reverse denoising process in GDM.
+1) Observation Encoder: In the policy network, the obser-
+vation encoder is designed to process the observation of each
+agent. As indicated by (3), the length of the agent’s observation
+is positively correlated with the number of its neighbors within
+the observation range. Since the number of neighbors is dynamic
+and varies over time, it is crucial to develop a network modulethat can handle these varying numbers of neighbors and convert
+them into a ﬁxed-length feature vector. To achieve this, we design
+an observation encoder based on GAT, which allows for thedynamic processing of the agent’s observation while ensuringThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+4 IEEE/ASME TRANSACTIONS ON MECHATRONICS
+Fig. 2. Framework of GDMAAC. The actor leverages the GDM to generate diverse actions, while the critic utilizes the GAT to process and
+aggregate information from all agents. Here, the symbol Cdenotes the concatenation operation.
+that the output embedding remains of a ﬁxed size regardless of
+the number of neighbors.
+We detail here the implementation process of the observation
+encoder. We ﬁrst use four embedding layers to separately extractthe features of the leader’s state, ego state, neighbors’ states, and
+the distance sensor’s information
+e
+t
+l=F C (ξt
+l),et
+i=F C (ξt
+i)
+et
+j=F C (ξt
+i),j∈Nt
+i
+et
+d= FC(Flatten( dt
+i)) (9)
+where FC(·)represents a fully connected layer, Flatten(·)
+denotes the ﬂatten operation.
+We then aggregate the embedding of neighbors’ states into
+a ﬁxed-length vector through a GAT layer. Mathematically, the
+aggregation process can be formulated as
+ht
+i=/summationdisplay
+j∈Niαt
+ijWneietj(10)
+whereht
+irepresents the aggregated embedding of the neighbors’
+states for agent iat timestep t.Wneiis the learnable weight ma-
+trix that projects each et
+jinto a higher dimensional feature space,
+αt
+ijis the attention weight between agent iand its neighbor j,
+indicating the importance of j’s state in the aggregation process.
+Formally, the attention weight αt
+ijis computed by the following
+attention mechanism [32]:
+αt
+ij=exp(st
+ij)/summationtext
+j∈Niexp(st
+ij)
+st
+ij=a/latticetopLeakyReLU/parenleftbig/bracketleftbig
+Wegoet
+i+Wneiet
+j/bracketrightbig/parenrightbig
+(11)wherest
+ijdenote the similarity score; ais the learnable attention
+weight vector; Wegois the learnable weight matrix that projects
+et
+iinto a higher dimensional feature space; LeakyReLU( ·)
+represents the LeakyReLU activation function used to introduce
+nonlinearity.
+After aggregating the neighbors’ states, the ﬁnal feature vec-
+tor for agent i’s observation is obtained by concatenating the
+following embedding vectors:
+ct
+i=et
+l||et
+i||ht
+i||et
+d (12)
+where||denotes the concatenation operation, ct
+iis the ﬁnal
+aggregated feature vector for agent i, which is used as the
+conditional input for the diffusion model to generate actions.
+2) Reverse Denoising Process: After encoding the agent’s
+observation information, the policy network generates actions
+using a diffusion model, such as the denoising diffusion prob-abilistic model [26]. As a class of generative models, diffusion
+models have shown strong generative capabilities across various
+domains by progressively reﬁning random noise into structured
+outputs. By leveraging these capabilities, the diffusion-based
+policy network can generate diverse and high-quality actionsfor complex multiagent coordination tasks.
+In the proposed GDMAAC framework, only the reverse de-
+noising process is adopted to serve as the policy generator. Inconventional diffusion models, the forward process is a ﬁxed,
+nonlearnable Markov chain used to progressively add Gaussian
+noise to a dataset of expert samples, providing supervision forlearning the reverse process. However, in our online multiagent
+reinforcement learning setting, such expert data are unavailable,
+as optimal actions must be discovered through continuous inter-action with the environment. Consequently, the forward processThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+YAN et al.: GDM ENHANCED MADRL FOR DISTRIBUTED FLOCKING WITH OBSTACLE AVOIDANCE OF FIXED-WING AAV SWARMS 5
+is omitted [34],[35]. Instead, the reverse process is directly em-
+ployed to iteratively reﬁne Gaussian noise into optimal actions.
+This design allows the diffusion-based policy network to actas a generative policy model that learns through trial-and-error
+optimization rather than supervised reconstruction.
+Formally, the reverse denoising process aims to generate the
+optimal action a
+t
+i,0by iteratively reﬁning the Gaussian noise
+at
+i,K∼N(0,I)throughKdenoising step, conditional on the
+observation encoder’s output ct
+i. Speciﬁcally, this process is
+modeled as follows [26]:
+pθ/parenleftbig
+at
+i,k−1|at
+i,k/parenrightbig
+=N/parenleftBig
+at
+i,k−1;μθ(at
+i,k,k,cti),˜βtI/parenrightBig
+(13)
+wherek=K,..., 1 represents the reverse diffusion timestep
+(distinct from the trajectory timestep, which is indicated by
+the subscript t),pθ(at
+i,k−1|at
+i,k)denotes a Gaussian distribution
+deﬁning the transition from at
+i,ktoat
+i,k−1. The adjusted variance
+of the distribution pθ(at
+i,k−1|at
+i,k)is calculated by
+˜βk=1−¯αk−1
+1−¯αkβk (14)
+whereβk∈(0,1)is a predetermined variance factor which con-
+trols the noise scale at timestep k,αk=1−βk,¯αk=/producttextk
+s=1αs.
+The mean μθ(at
+i,k,k,ct
+i)of the reverse transition distribution can
+be constructed leveraging a noise prediction network
+μθ(at
+i,k,k,cti)=1√αk/parenleftbigg
+at
+i,k−βk√1−¯αk/epsilon1θ/parenleftbig
+at
+i,k,k,cti/parenrightbig/parenrightbigg
+.
+(15)
+The noise prediction network /epsilon1θapproximates the noise com-
+ponent conditioned on ct
+i
+/epsilon1θ(at
+i,k,k,cti)=M L P /epsilon1/parenleftbig
+at
+i,k||PE(k)||ct
+i/parenrightbig
+(16)
+where MLP(·)denotes a multilayer perceptron (MLP), PE(k)
+denotes the sinusoidal positional encoding of timestep k.
+Finally, we can obtain an action by drawing samples from the
+learned reverse transition distribution with the reparameteriza-
+tion trick
+at
+i,k−1=μθ(at
+i,k,k,cti)+/radicalBig
+˜βt/epsilon1 (17)
+where/epsilon1∼N(0,I)is a noise term drawn from a normal distri-
+bution. By iterating through this sample process, the agent cangenerate the optimal action (denoised action a
+t
+i,0).
+B. Graph-Based Value Network
+To evaluate the actions of all agents and promote cooperative
+behavior, we construct a centralized value network based on
+GAT. The graph-based value network can effectively capturethe relational dependencies among agents by modeling them
+as nodes in an interaction graph. Each node encodes its own
+observation and action information, and the GAT module ag-gregates messages from neighbors to compute the ﬁnal Q-value
+estimation. In this section, we detail the design of the value
+network, which comprises two modules: the observation–actionencoder and Q-value estimation with GAT.1) Observation-Action Encoder: The input to the value net-
+work consists of each agent’s local observation and its executed
+action. To construct a meaningful representation that capturesboth the state and action information, we design an encoder that
+processes these inputs and maps them into a ﬁxed-dimensional
+embedding.
+For each agent iat timestep t, we ﬁrst encode the observation
+o
+t
+iand the action at
+iindependently. As discussed in Section
+III-A1 , the observation ot
+ihas variable length. Thus, the same
+GAT-based observation encoder introduced in Section III-A1
+is used to transform ot
+iinto a ﬁxed-size embedding. The action
+embedding can be easily obtained through an FC layer. Formally,the observation embedding c
+t
+iand the action embedding bt
+ican
+be expressed as follows:
+ct
+i=OE(ot
+i),bt
+i=FC(at
+i) (18)
+where OE (·)denotes the observation encoder deﬁned in
+Section III-A1 . The outputs of the observation encoder and the
+action encoder are then concatenated and passed through an FC
+layer to obtain the initial feature representation
+zt
+i=F C (ct
+i||bt
+i). (19)
+This representation zt
+iserves as the input node feature in the sub-
+sequent GAT, which enables the agent to aggregate contextual
+information from its neighbors in the multiagent system.
+2) Q-Value Estimation With GAT: When estimating the state-
+action value (Q-value) for each agent, it is beneﬁcial to selec-
+tively focus on the most relevant information from other agents
+rather than treating all agents equally [36]. In light of this, we
+utilize a GAT layer to capture the inﬂuence of other agents on
+the agent’s Q-value.
+Similar to the observation encoder for agent i, the feature
+aggregation process is computed based on the importance of all
+agents
+vt
+i=/summationdisplay
+j∈I/iβt
+ijWrzt
+j (20)
+where the importance coefﬁcient βt
+ijis calculated as
+βt
+ij=exp(b/latticetopLeakyReLU/parenleftbig
+Wlzt
+i+Wrzt
+j/parenrightbig
+)/summationtext
+j∈I/iexp(b/latticetopLeakyReLU/parenleftbig
+Wlzt
+i+Wrzt
+j/parenrightbig
+)(21)
+wherebis a learnable attention vector, WlandWrare learnable
+weight matrices, j∈I/imeansj∈I butj/negationslash=i.
+This selective aggregation allows the agent to focus on the
+most important neighboring agents for estimating its Q-value.
+Formally, the aggregated feature vt
+iis combined with agent i’s
+own feature zt
+ito approximate the ﬁnal Q-value through a three-
+layer MLP
+Qt
+i=MLPQ/parenleftbig
+zt
+i||vt
+i/parenrightbig
+. (22)
+C. Learning Process
+In this section, we present the training procedure of the pro-
+posed GDMAAC algorithm for solving the distributed ﬂocking
+with obstacle avoidance task. Unlike conventional multiagentactor–critic approaches that learn independent policies for eachThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+6 IEEE/ASME TRANSACTIONS ON MECHATRONICS
+agent [33], GDMAAC adopts the parameter sharing mecha-
+nism [37] to exploit the homogeneity among agents, thereby
+improving scalability and sample efﬁciency. As a result, onlyone shared diffusion-based actor and one centralized GAT-based
+critic are trained for all agents.
+To train the actor and critic networks, we maintain a shared
+replay buffer D, which stores the experiences collected from
+all agents. At each training iteration, a minibatch of transitions
+is randomly sampled from Dto update the networks. The
+GAT-based critic network is updated by minimizing the temporal
+difference loss [30],[33]
+L(θ
+Q
+l)=E(ot,at,rt,ot+1)∼D/bracketleftbigg1
+nn/summationdisplay
+i=1/parenleftbig
+Ql(ot,at)−yt
+i/parenrightbig2/bracketrightbigg
+(23)
+whereθQ
+l=1,2denotes the parameters of the critic network; yt
+iis
+the target Q-value; ot=(ot
+1,...,ot
+n),at=(at
+1,...,at
+n), and
+rt=(rt
+1,...,rt
+n)represents the joint observations, actions, and
+rewards for all agents at timestep t, respectively.
+To mitigate overestimation bias in computing the target Q-
+value, we incorporate the double Q-learning technique [38].
+Speciﬁcally, two independent critic networks Q1andQ2are
+trained, and the minimum of them is used to calculate the targetQ-value
+y
+t
+i=rt
+i+γmin
+l=1,2Q−
+l(ot+1,˜at+1
+1,..., ˜at+1
+n) (24)
+whereQ−
+ldenotes the target critic network, γ∈[0,1)is the
+discounted factor, and ˜at+1
+iindicates the action generated from
+the target actor network with smoothing noise [38]
+˜at+1
+i=π−(ot+1
+i)+/epsilon1a,/epsilon1a∼clip/parenleftbig
+N(0,σ2
+a),−c,c/parenrightbig
+(25)
+whereπ−denotes the target actor network, σ2
+aindicates the
+variance of Gaussian noise /epsilon1a, and clip (·,−c,c)represents the
+clip operation, which limits values to the range [−c,c].
+The diffusion-based policy network is optimized to maximize
+the expected Q-value, with gradients computed via backpropa-
+gation through the reverse denoising steps
+∇θπJ(θπ)=E(ot,at,rt,ot+1)∼D/bracketleftbigg1
+nn/summationdisplay
+i=1(∇θππ/parenleftbig
+ot
+i/parenrightbig
+×∇at
+iQ1(ot,at
+1,...,atn)|at
+i=π(ot
+i)/bracketrightbigg
+.(26)
+To stabilize the learning process, we employ the target actor
+networkπ−and target critic networks Q−
+l=1,2in GDMAAC.
+Their parameters θπ−andθQ−
+l=1,2are updated as follows:
+θπ−←τθπ+(1−τ)θπ−
+θQ−
+l←τθQ
+l+(1−τ)θQ−
+l(27)
+whereτ/lessmuch1 is the soft update rate.
+The complete learning pipeline of the proposed GDMAAC
+algorithm is summarized in Algorithm 1.Algorithm 1: GDMAAC.
+Input: Maximum training episodes M, maximum timestep
+per episode Ns, update frequency C, target update rate τ,
+replay buffer maximum capacity N, batch size Nb, noise
+parameters σ2
+a,c
+1: Initialize diffusion-based actor with parameters θμand
+and two graph-based critics with parameters θQ
+l=1,2
+randomly
+2: Initialize target networks: θπ−←θπ;θQ−
+l=1,2←θQ
+l=1,2
+3: Initialize replay buffer Dwith maximum capacity N
+4:forepisode =1t oMdo
+5: Receive initial observations o1
+6: fort=1t oNsdo
+7: Generate action at
+ifor each agent with reverse
+denoising process
+8: Execute joint actions at=(at
+1,...,at
+n), compute
+immediate reward rt
+i, and receive new observations
+ot+1
+9: Store transition (ot,at,rt,ot+1)inD, delete the
+oldest transition if /bardblD/bardbl>N
+10:ot←ot+1
+11: Sample a minibatch of Nbtuples from D
+12: Update θQ
+l=1,2by minimizing L(θQ
+l)in(23)
+13: iftmodCthen
+14: Update θπvia gradient in (26)
+15: Update θπ−andθQ−
+l=1,2with (27)
+16: end if
+17: end for
+18:end for
+IV. S IMULATION AND EXPERIMENT
+This section validates the proposed approach in numerical
+simulations and HITL experiments.
+A. Implementation Details
+We now detail the parameter settings of the proposed
+GDMAAC algorithm. For the diffusion-based policy network,
+the four FC layers in (9)for embedding all contained 64 neurons.
+When computing the attention weight in (11),Wnei∈R64×64,
+Wego∈R64×64,a∈R64×1. The MLP in the noise prediction
+network (16) contained three FC hidden layers, each of which
+had 256 neurons. For the graph-based value network, the FC
+layers in (18) and (19) had 64 and 256 neurons, respectively.
+In(21),Wl∈R256×256,Wr∈R256×256, andb∈R256×1.T h e
+two hidden layers of the three-layer MLP in (22) for estimating
+the Q-value both had 256 neurons, but the output layers had
+one neuron activated by the linear functions. All other FC layerswere followed by the Mish activation function [39].
+In the diffusion-based policy network, the reverse step was
+set toK=5. The predetermined variance factor β
+k=1−
+e−βmin
+K−2k−1
+2K2(βmax−βmin)was controlled by the variational pos-
+terior scheduler [26], whereβminandβmax were set to 0.1 and
+10, respectively. The output of the diffusion-based policy wasclipped into the interval [−1,1]. We used the Adam optimizerThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+YAN et al.: GDM ENHANCED MADRL FOR DISTRIBUTED FLOCKING WITH OBSTACLE AVOIDANCE OF FIXED-WING AAV SWARMS 7
+TABLE I
+PARAMETER SETTINGS
+to update all network parameters of GDMAAC. The learning
+rates for updating the policy and the value network were set to
+0.0001 and 0.0005, respectively [33]. The maximum training
+episode was set to M=10 000. In general, the parameter
+settings were set with reference to empirical tests and previous
+works [24],[26],[33]. The empirical values of other parameters
+in GDMAAC are presented in Table I.
+B. Numerical Simulation Results
+1) Training Results: We ﬁrst compared our algorithm with
+several existing state-of-the-art baselines, i.e., MADDPG [33],
+AMADDPG, ARMADDPG, HRAMAAC, and HRAMATD3.
+To enable scalability of the learned ﬂocking policies to different
+AA V swarm sizes, the ﬁve baseline algorithms also adopted the
+parameter sharing mechanism [37] as in GDMAAC, and utilized
+the self-attention mechanism [40] as the observation encoder
+following [30]. The ﬁve baselines also adopted the parameter
+sharing mechanism [37], consistent with GDMAAC, and uti-
+lized self-attention [40] as the observation encoder, following
+the approach in [30]. In addition, AMADDPG applied the self-
+attention mechanism in the critic to selectively aggregate infor-mation from other agents [36]. ARMADDPG further introduced
+the recurrent actor-critic framework, such as RMADDPG [41].
+Compared with ARMADDPG, HRAMAAC incorporated thegroup-level attention mechanism consistent with [24].O nt h i s
+basis, HRAMATD3 further enhanced the learning process with
+the MATD3 algorithm [42].
+We trained the ﬁve baseline algorithms and our GDMAAC
+algorithm independently to acquire ﬂocking policies. In the
+training scenario, ten follower AA Vs navigated alongside a
+leader within a rectangular area measuring 1200 m ×200 m.
+The scenario included twenty randomly placed obstacles, ei-ther convex polygons or circles. For each training episode, the
+obstacle conﬁgurations and the leader’s planned trajectory were
+randomly generated. The radius of the obstacles were randomlygenerated from the predeﬁned set {10, 15, 20, 25, 30, 35,
+40} (m). This conﬁguration ensures that obstacles are large
+enough to be detected by the AA V’s distance sensor.
+Fig. 3presents the average rewards obtained by the follow-
+ers with the ﬁve baselines and our GDMAAC algorithm. As
+observed, all learning curves exhibit a steep increase duringthe early training phase. After approximately 4000 episodes,
+Fig. 3. Learning curves of MADDPG, AMADDPG, ARMADDPG, HRA-
+MAAC, HRAMATD3, and GMMAAC. Note that the reward values are
+averaged every 25 episodes.
+all of them begin to stabilize and reach convergence (about 3.5 h
+of wall-clock time with NVIDIA GeForce RTX 4090D GPU).Although the learning efﬁciency is similar, the ﬁnal convergence
+values vary signiﬁcantly among the algorithms. The ﬁnal re-
+wards of AMADDPG and ARMADDPG are higher than thatof MADDPG. The explanation for performance improvement
+is that selecting relevant information from other agents and
+encoding historical information are very useful. Compared withARMADDPG, HRAMAAC and HRAMATD3 achieve a higher
+average reward. This means that it is more effective to use
+group-level attention to discriminatively aggregate embeddingsof different groups than to concatenate them directly. In addition,
+GDMAAC achieves a higher average reward compared to HRA-
+MAAC and HRAMATD3. The above-mentioned results demon-
+strate that the proposed GDMAAC algorithm outperforms all
+ﬁve existing baselines.
+2) Testing Results: After the training phase, we tested the
+ﬂocking control with obstacle avoidance policy acquired by the
+proposed GDMAAC algorithm in a representative task scenario.Thirty-six convex polygonal and circular obstacles were evenly
+distributed across the rectangular mission area. The leader
+followed a predeﬁned path without considering environmen-tal obstacles, aiming to evaluate whether the followers would
+collide with the obstacles as the leader passed through them.
+Meanwhile, ten follower AA Vs executed the learned GDMAAC
+policy to track the leader over 180 timesteps.
+The trajectories and performance of the followers are depicted
+in Figs. 4and5, respectively. The followers can keep up with
+the leader and keep away from the surrounding obstacles at the
+same time, whether the leader ﬂies in a straight line or in violentmotion. More precisely, the distances between the leader and
+the followers ( ρ) are predominantly maintained within the range
+of 50–150 meters during the evaluation. Furthermore, both theminimum interfollower distance ( D
+nei
+min) and the minimum dis-
+tance between the followers and surrounding obstacles ( Doba
+min)
+consistently exceed the follower safety threshold Rs=5mat
+all timesteps. These results indicate that no collisions occurThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+8 IEEE/ASME TRANSACTIONS ON MECHATRONICS
+Fig. 4. Trajectories of ten followers employing the learned GDMAAC policy in a typical obstacle-cluttered environment.
+Fig. 5. Performance of the learned GDMAAC policy. (a) Distances
+from the leader to the followers. (b) Minimum interfollower distance.
+(c) Minimum distance between followers and surrounding obstacles.
+among followers or between any follower and environmental
+obstacles throughout the entire testing process. In addition,
+we also conducted two testing experiments with ﬁve and 20
+followers under the same environmental settings. Because of
+the limitation of length, the testing results are available in the
+supplemental movie at.1
+3) Generalization Results: To evaluate the generalization
+and scalability of the learned ﬂocking control with obstacle
+1[Online]. Available: https://youtu.be/OfCYR3KYc2Qavoidance policies, we directly applied it to AA V swarms com-
+prising varying numbers of follower agents. Speciﬁcally, gener-
+alization evaluations were conducted with swarm sizes of ten, 15,
+and 20 followers. Each evaluation consisted of 20 episodes, with
+each episode running for 60 timesteps. We deﬁned the following
+metrics to evaluate the policy performance: the average reward
+of each follower at each timestep G, the average collision rate F,
+and the average distance between the leader and the followers
+¯ρ.
+Table IIreports the zero-shot generalization results on the
+AA V swarms with different numbers of followers. It is not sur-
+prising that MADDPG achieves the worst performance across
+three scenarios. Compared with MADDPG, AMADDPG and
+ARMADDPG perform better in terms of the three metrics.
+We note that HRAMAAC and HRAMATD3 achieve better and
+similar performance. Although the collision rate of HRAMAAC
+is lower than that of HRAMATD3, HRAMATD3 performs
+better in terms of the average distance to the leader and the
+average reward. In contrast, our proposed GDMAAC algorithm
+signiﬁcantly outperforms all baselines in terms of average re-
+ward and collision rate. More importantly, GDMAAC shows
+a signiﬁcant advantage in reducing collision rate. Speciﬁcally,
+GDMAAC reduces the collision rate from 1.85% to 1.42% at
+n=10, representing a relative reduction of 23.24% . Similarly,
+atn=20, the collision rate decreases from 2.38% to 1.72% ,
+corresponding to a 27.73% reduction. These results indicate that
+GDMAAC produces safer and more reliable policies, especially
+in dense swarm scenarios.
+It is worth noting that the generalization simulations were
+conducted using the same trained GDMAAC model, without any
+retraining for different swarm sizes. This scalability stems from
+the parameter sharing mechanism, which enables the learned
+policy to generalize directly to swarms of arbitrary sizes, and
+from the GAT, which allows the policy and value networksThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+YAN et al.: GDM ENHANCED MADRL FOR DISTRIBUTED FLOCKING WITH OBSTACLE AVOIDANCE OF FIXED-WING AAV SWARMS 9
+TABLE II
+GENERALIZATION RESULTS OF THE LEARNED FLOCKING POLICIES ON THE AAV S WARMS WITHDIFFERENT NUMBERS OF FOLLOWERS
+Fig. 6. Bar charts of ablation results of the proposed algorithms for
+ﬂocking control with different numbers of followers. (a) Average reward.
+(b) Collision rate. (c) Average distance.
+to process information from a variable number of neighbors.
+Overall, we can conclude from Table IIthat regardless of the size
+of AA V ﬂeets, the proposed GDMAAC algorithm outperforms
+the four baselines and achieves the best tradeoff between theaverage reward Fand the average distance ¯ρ.
+4) Ablation Studies: To validate the effectiveness of each key
+component in the proposed GDMAAC algorithm, we conductedablation studies by systematically removing the GDM and the
+GAT from the policy and value networks, respectively. Specif-
+ically, we designed the following two ablation variants. 1) w/o
+GDM: The diffusion-based policy network is replaced with a
+deterministic policy network as in the standard MADDPG algo-rithm. 2) w/o GAT: The graph attention mechanism is removed
+from the Q-value estimator. Instead, a simple concatenation
+operation is adopted for feature aggregation. The simulationsettings of the ablation studies were the same as in Section IV-B3 .
+Fig. 6illustrates the performance of the ablation variants
+across different swarm sizes. As shown, removing the GAT mod-ule (w/o GAT) results in signiﬁcant performance degradation.
+For example, when n=15, the average reward Gdecreases
+from−332.76 to −475.42, corresponding to a relative drop
+of 42.81% . Meanwhile, the collision rate Fincreases from1.45% to 2.73% , reﬂecting an 88.28% rise. These results
+highlight the critical role of the graph-based value network
+in effectively capturing inter-agent interactions and enhancingpolicy evaluation accuracy. On the other hand, removing the
+GDM module (w/o GDM) also leads to noticeable performance
+deterioration, though its impact is less severe compared to theremoval of GAT. For instance, when n=20, the average reward
+Gdeclines from −421.75 to −436.46, and the collision rate
+increases from 1.72% to 1.88% , indicating a relative rewarddecrease of 3.49% and a collision rate increase of 9.30% . This
+conﬁrms that GDM contributes to improving policy diversity
+and robustness. Overall, GDMAAC consistently achieves thebest performance across all metrics and scenarios. The ablation
+studies demonstrate that both the diffusion-based policy and
+the graph-based value network are indispensable components,jointly contributing to superior ﬂocking stability, lower collision
+rates, and better scalability of the proposed approach.
+C. HITL Experiment Results
+To validate the practicability of the proposed approach for
+ﬂocking control with obstacle avoidance, we built a high-ﬁdelityHITL experiment system [30],[43]. As illustrated in Fig. 7,t h e
+X-Plane ten ﬂight simulator provided a realistic virtual envi-
+ronment for testing the control and coordination of ﬁxed-wingAA Vs. Each onboard Jetson TX2 computer, running Ubuntu
+18.04 LTS and robot operating system, was responsible for
+executing the learned policy and generating high-level controlcommands in real time. These commands were transmitted to
+the PX4/Pixhawk autopilot for low-level ﬂight control. The
+ground control station was used for monitoring and centralized
+management of the entire AA V swarm.
+In the HITL experiment, four follower AA Vs deployed the
+ﬂocking policy learned from numerical simulations without any
+parameter tuning to follow a predeﬁned leader. The task area
+contained nine circular obstacles of varying radii, as illustratedin Fig. 8. The leader’s trajectory was preplanned based on
+the positions of the destination and surrounding obstacles. The
+entire evaluation was conducted over a duration of 180 timesteps(i.e., seconds). Fig. 8presents the trajectories of the leader and
+the four followers in this HITL experiment. The four followers
+can autonomously keep up with the leader while successfullyavoiding environmental obstacles, even in a narrow corridorThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+10 IEEE/ASME TRANSACTIONS ON MECHATRONICS
+Fig. 7. High-ﬁdelity HITL experiment system for ﬂocking control with
+ﬁxed-wing AAV swarms.
+Fig. 8. Trajectories of four followers and the leader in the HITL experi-
+ment. (a) t=0∼110s.( b ) t=110∼130s.( c ) t=130∼180s.
+with dense obstacles [see Fig. 8(b)-II]. A video about this HITL
+experiment is available at.2
+The performance metrics of the learned GDMAAC ﬂocking
+policy in this HITL experiment were also recorded. As illustrated
+in Fig. 9(a), the distances between the leader and the followers
+(ρ) remain within the range of 5–200 m, indicating stable leader–
+following behavior and effective avoidance of collisions with
+the leader. More importantly, as shown in Fig. 9(b) and(c), both
+the minimum interfollower distance ( Dnei
+min) and the minimum
+distance between followers and nearby obstacles ( Dobs
+min) consis-
+tently exceeded the predeﬁned safety threshold Rs=5m. These
+results conﬁrm that the learned GDMAAC policy enables each
+follower to successfully avoid collisions with both teammates
+and environmental obstacles while maintaining a ﬂock.
+2[Online]. Available: https://youtu.be/OfCYR3KYc2QFig. 9. Performance of the learned GDMAAC policy in the HITL exper-
+iment. (a) Distances to the leader. (b) Minimum interfollower distance.
+(c) Minimum distance between the followers and surrounding obstacles.
+V. C ONCLUSION
+In this article, we propose the GDMAAC algorithm to address
+the distributed ﬂocking control and obstacle avoidance problem
+for scalable ﬁxed-wing AA V swarms. By integrating a GDM into
+the policy network, GDMAAC enhances agents’ ability to gen-
+erate diverse and multimodal actions. In addition, a GAT-based
+centralized value network is introduced to improve the accuracy
+of Q-value estimation by extracting relevant interagent features.
+These designs enable each AA V to explore multiple feasible
+maneuver strategies for ﬂocking and obstacle avoidance, en-
+hancing the robustness and ﬂexibility of swarm coordination.
+Numerical simulations and HITL experiments demonstrate that
+GDMAAC signiﬁcantly outperforms existing baselines in terms
+of ﬂocking stability and collision avoidance, while maintaining
+strong generalization to varying swarm sizes. In future work,
+we plan to extend the GDMAAC framework to tackle more
+challenging scenarios, such as 3-D dynamic environments and
+heterogeneous AA V swarms.
+REFERENCES
+[1] Y . Wang, Y . Yue, M. Shan, L. He, and D. Wang, “Formation reconstruc-
+tion and trajectory replanning for multi-UA V patrol,” IEEE/ASME Trans.
+Mechatron. , vol. 26, no. 2, pp. 719–729, Apr. 2021.
+[2] X. Zhang, H. Zhao, J. Wei, C. Yan, J. Xiong, and X. Liu, “Coopera-
+tive trajectory design of multiple UA V base stations with heterogeneous
+graph neural networks,” IEEE Trans. Wireless Commun. , vol. 22, no. 3,
+pp. 1495–1509, Mar. 2023.
+[3] L. Zewde and I. A. Raptis, “Conceptualizing UAM: Technologies and
+methods for safe and efﬁcient urban air transportation,” Green Energy
+Intell. Transp. , vol. 5, no. 1, 2026, Art. no. 100265.
+[4] M. Zhang, C. Yan, W. Dai, X. Xiang, and K. H. Low, “Tactical conﬂict
+resolution in urban airspace for unmanned aerial vehicles operations
+using attention-based deep reinforcement learning,” Green Energy Intell.
+Transp. , vol. 2, no. 4, 2023, Art. no. 100107.
+[5] S. Deniz, Y . Wu, Y . Shi, and Z. Wang, “A reinforcement learning approach
+to vehicle coordination for structured advanced air mobility,” Green Energy
+Intell. Transp. , vol. 3, no. 2, 2024, Art. no. 100157.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+YAN et al.: GDM ENHANCED MADRL FOR DISTRIBUTED FLOCKING WITH OBSTACLE AVOIDANCE OF FIXED-WING AAV SWARMS 11
+[6] Y . Deng, B. Zhu, and H. Duan, “Bioinspired bearing–based target
+enclosing control for unmanned aerial vehicle swarm,” IEEE/ASME
+Trans. Mechatron. , vol. 30, no. 4, pp. 2699–2709, Aug. 2025,
+doi: 10.1109/TMECH.2024.3457826 .
+[7] P.-X. Wu, C.-C. Yang, and T.-H. Cheng, “Cooperative transportation of
+UA Vs without inter-UA V communication,” IEEE/ASME Trans. Mecha-
+tron. , vol. 28, no. 4, pp. 2340–2351, Aug. 2023.
+[8] S. Dey and H. Xu, “Distributed adaptive ﬂocking control for large-scale
+multiagent systems,” IEEE Trans. Neural Netw. Learn. Syst. , vol. 36, no. 2,
+pp. 3126–3135, Feb. 2025.
+[9] G. Zhu, Q. Zhang, B. Zhu, and T. Hu, “Heuristic predictive control
+for multirobot ﬂocking in congested environments,” IEEE/ASME Trans.
+Mechatron. , vol. 30, no. 2, pp. 1435–1446, Apr. 2025.
+[10] F. Wang, J. Huang, K. H. Low, and T. Hu, “Collective navigation of aerial
+vehicle swarms: A ﬂocking inspired approach,” IEEE Trans. Intell. Veh. ,
+vol. 9, no. 1, pp. 1040–1053, Jan. 2024.
+[11] C. Li et al., “Flocking navigation and obstacle avoidance for UA V swarms
+via adaptive risk avoidance willingness mechanism,” IET Cyber- Syst.
+Robot. , vol. 7, no. 1, 2025, Art. no. e70009.
+[12] S. Shao, J. Zhang, T. Wang, A. Shankar, and C. Maple, “Dynamic
+obstacle-avoidance algorithm for multi-robot ﬂocking based on improved
+artiﬁcial potential ﬁeld,” IEEE Trans. Consum. Electron. , vol. 70, no. 1,
+pp. 4388–4399, Feb. 2024.
+[13] T. T. Nguyen, N. D. Nguyen, and S. Nahavandi, “Deep reinforcement
+learning for multiagent systems: A review of challenges, solutions, and ap-
+plications,” IEEE Trans. Cybern. , vol. 50, no. 9, pp. 3826–3839, Sep. 2020.
+[14] W. Du and S. Ding, “A survey on multi-agent deep reinforcement learning:
+From the perspective of challenges and applications,” Artif. Intell. Rev. ,
+vol. 54, no. 5, pp. 3215–3238, 2021.
+[15] J. Kober, J. A. Bagnell, and J. Peters, “Reinforcement learning in robotics:
+A survey,” Int. J. Robot. Res. , vol. 32, no. 11, pp. 1238–1274, 2013.
+[16] J. Shi et al., “Multi-UA Vs ﬂocking for navigation and obstacle avoidance
+in network-constrained environments,” IEEE Internet Things J. , vol. 12,
+no. 7, pp. 8931–8946, Apr. 2025.
+[17] J. Xiao, C. Huang, G. Yuan, Y . Wang, H. Jia, and Z. Wang, “A model learn-
+ing based multiagent ﬂocking collaborative control method for stochastic
+communication environment,” IEEE Trans. Ind. Informat. , vol. 20, no. 6,
+pp. 8896–8906, Jun. 2024.
+[18] Y . Jia et al., “A deep reinforcement learning approach using asymmetric
+self-play for robust multirobot ﬂocking,” IEEE Trans. Ind. Informat. ,
+vol. 21, no. 4, pp. 3266–3275, Apr. 2025.
+[19] S.-M. Hung and S. N. Givigi, “A Q-learning approach to ﬂocking with
+UA Vs in a stochastic environment,” IEEE Trans. Cybern. , vol. 47, no. 1,
+pp. 186–197, Jan. 2017.
+[20] Y . Song et al., “Distributed swarm system with hybrid-ﬂocking control for
+small ﬁxed-wing UA Vs: Algorithms and ﬂight experiments,” Expert Syst.
+with Appl. , vol. 229, 2023, Art. no. 120457.
+[21] H. Li, Z. Sun, H. Chen, X. Wang, and L. Shen, “Bearing-based simulta-
+neous localization and afﬁne formation tracking for ﬁxed-wing unmannedaerial vehicles,” Aerosp. Sci. Technol. , vol. 157, 2025, Art. no. 109840.
+[22] B. Ma et al., “Reinforcement learning based UA V formation con-
+trol in GPS-denied environment,” Chin. J. Aeronaut. , vol. 36, no. 11,
+pp. 281–296, 2023.
+[23] X. Zhuang, D. Li, Y . Wang, X. Liu, and H. Li, “Optimization of high-
+speed ﬁxed-wing UA V penetration strategy based on deep reinforcement
+learning,” Aerosp. Sci. Technol. , vol. 148, 2024, Art. no. 109089.
+[24] C. Yan et al., “Collision-avoiding ﬂocking with multiple ﬁxed-wing
+UA Vs in obstacle-cluttered environments: A task-speciﬁc curriculum-based MADRL approach,” IEEE Trans. Neural Netw. Learn. Syst. , vol. 35,
+no. 8, pp. 10894–10908, Aug. 2024.
+[25] C. Yan, C. Wang, H. Zhou, X. Xiang, X. Wang, and L. Shen, “Multi-agent
+reinforcement learning with spatial–temporal attention for ﬂocking with
+collision avoidance of a scalable ﬁxed-wing UA V ﬂeet,”
+IEEE Trans. Intell.
+Transp. Syst. , vol. 26, no. 2, pp. 1769–1782, Feb. 2025.
+[26] J. Ho, A. Jain, and P. Abbeel, “Denoising diffusion probabilistic models,”
+inProc. Adv. Neural Informat. Process. Syst. , 2020, pp. 6840–6851.
+[27] J. Song, C. Meng, and S. Ermon, “Denoising diffusion implicit models,”
+inProc. Int. Conf. Learn. Representations , 2021.
+[28] L. Yang et al., “Policy representation via diffusion probability model for
+reinforcement learning,” 2023, arXiv:2305.13122 .
+[29] M. Psenka, A. Escontrela, P. Abbeel, and Y . Ma, “Learning a diffusion
+model policy from rewards via Q-score matching,” in Proc. Int. Conf.
+Mach. Learn. , 2024, pp. 41163–41182.
+[30] C. Yan et al., “PASCAL: Population-speciﬁc curriculum-based MADRL
+for collision-free ﬂocking with large-scale ﬁxed-wing UA V swarms,”
+Aerosp. Sci. Technol. , vol. 133, 2023, Art. no. 108091.[31] C. Yan, X. Xiang, and C. Wang, “Fixed-wing UA Vs ﬂocking in continuous
+spaces: A deep reinforcement learning approach,” Robot. Auton. Syst. ,
+vol. 131, 2020, Art. no. 103594.
+[32] S. Brody, U. Alon, and E. Yahav, “How attentive are graph attention
+networks?,” in Proc. Int. Conf. Learn. Representations , 2022.
+[33] R. Lowe, Y . Wu, A. Tamar, J. Harb, P. Abbeel, and I. Mordatch, “Multi-
+agent actor-critic for mixed cooperative-competitive environments,” in
+Proc. Int. Conf. Neural Inf. Process. Syst. , 2017, pp. 6382–6393.
+[34] H. Du et al., “Diffusion-based reinforcement learning for edge-enabled
+AI-generated content services,” IEEE Trans. Mobile Comput. , vol. 23,
+no. 9, pp. 8902–8918, Sep. 2024.
+[35] X. Tang et al., “Task assignment and exploration optimization for low
+altitude UA V rescue via generative AI enhanced multi-agent reinforcement
+learning,” IEEE Trans. Mobile Comput. , vol. 25, no. 1, pp. 627–643,
+Jan. 2026, doi: 10.1109/TMC.2025.3594188 .
+[36] S. Iqbal and F. Sha, “Actor-attention-critic for multi-agent reinforcement
+learning,” in Proc. Int. Conf. Mach. Learn. , 2019, pp. 2961–2970.
+[37] J. K. Gupta, M. Egorov, and M. Kochenderfer, “Cooperative multi-agent
+control using deep reinforcement learning,” in Proc. Int. Conf. Auton.
+Agents Multiagent Syst. , 2017, pp. 66–83.
+[38] S. Fujimoto, H. Hoof, and D. Meger, “Addressing function approximation
+error in actor-critic methods,” in Proc. Int. Conf. Mach. Learn. , 2018,
+pp. 1587–1596.
+[39] D. Misra, “Mish: A self regularized non-monotonic activation function,”
+inProc. Brit. Mach. Vis. Conf. , 2020.
+[40] A. Vaswani et al., “Attention is all you need,” in Proc. Adv. Neural Inf.
+Process. Syst. , 2017, pp. 5998–6008.
+[41] R. E. Wang, M. Everett, and J. P. How, “R-MADDPG for partially observ-
+able environments and limited communication,” 2020, arXiv:2002.06684 .
+[42] X. Xing, Z. Zhou, Y . Li, B. Xiao, and Y . Xun, “Multi-UA V adaptive
+cooperative formation trajectory planning based on an improved MATD3algorithm of deep reinforcement learning,” IEEE Trans. Veh. Technol. ,
+vol. 73, no. 9, pp. 12484–12 499, Sep. 2024.
+[43] C. Yan, C. Wang, X. Xiang, Z. Lan, and Y . Jiang, “Deep reinforcement
+learning of collision-free ﬂocking policies for multiple ﬁxed-wing UA Vsusing local situation maps,” IEEE Trans. Ind. Informat. , vol. 18, no. 2,
+pp. 1260–1270, Feb. 2022.
+Chao Yan (Member, IEEE) received the B.E.
+degree in electrical engineering and automa-tion from the China University of Mining and
+Technology, Xuzhou, China, in 2017, and the
+M.S. and Ph.D. degrees in control science andengineering from the National University of De-
+fense Technology, Changsha, China, in 2019
+and 2023, respectively.
+From 2021 to 2022, he was a Visiting Ph.D.
+Student with the School of Mechanical and
+Aerospace Engineering, Nanyang Technologi-
+cal University, Singapore. He is currently an Associate Professor with theCollege of Automation Engineering, Nanjing University of Aeronauticsand Astronautics, Nanjing, China. His research interests include deep
+reinforcement learning and cooperative control of AAV swarms.
+Yuna Jiang (Member, IEEE) received the B.E.
+degree in information engineering from theChina University of Mining and Technology,Xuzhou, China, in 2017, and the Ph.D. degree
+in information and communication engineering
+from the Huazhong University of Science andTechnology, Wuhan, China, in 2023.
+From 2021 to 2022, she was a Visiting
+Ph.D. Student with the School of Computer
+Science and Engineering, Nanyang Techno-logical University, Singapore. She is currently
+an Associate Professor with the School of Communications and In-
+formation Engineering, Nanjing University of Posts and Telecommu-
+nications, Nanjing, China. Her research interests include multime-dia communication, wireless resource allocation, game theory, andmetaverse.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 
+12 IEEE/ASME TRANSACTIONS ON MECHATRONICS
+Mou Chen (Fellow, IEEE) received the B.Sc.
+degree in material science and engineering and
+the Ph.D. degree in automatic control engineer-
+ing from the Nanjing University of Aeronauticsand Astronautics (NUAA), Nanjing, China, in1998 and 2004, respectively.
+From 2007 to 2008, he was an Academic
+Visitor with the Department of Aeronautical andAutomotive Engineering, Loughborough Univer-
+sity, Loughborough, U.K. From 2008 to 2009, he
+was a Research Fellow with the Department of
+Electrical and Computer Engineering, National University of Singapore,Singapore. From May to November 2014, he was a Senior Academic
+Visitor with the School of Electrical and Electronic Engineering, The
+University of Adelaide, Adelaide, SA, Australia. He is currently a Pro-fessor with the College of Automation Engineering, NUAA. His researchinterests include nonlinear system control, intelligent control, and ﬂight
+control.
+Xiaojia Xiang received the B.E., M.S., and
+Ph.D. degrees in automatic control from theNational University of Defense Technology
+(NUDT), Changsha, China, in 2003, 2007, and
+2016, respectively.
+He is currently a Professor with the College of
+Intelligence Science and Technology, NUDT. His
+research interest include mission planning, and
+cooperative control of autonomous systems.
+Xiangke Wang (Senior Member, IEEE) re-
+ceived the B.E., M.E., and Ph.D. degrees in con-
+trol science and engineering from the National
+University of Defense Technology (NUDT),Changsha, China, in 2004, 2006, and 2012,respectively.
+He is currently a Professor with the College
+of Intelligence Science and Technology, NUDT.He has authored or coauthored three books and
+more than 100 publications in peer-reviewed
+journals and international conferences. His re-
+search interests include the control of multiagent systems and theirapplications on autonomous aerial vehicles.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:03:10 UTC from IEEE Xplore.  Restrictions apply. 

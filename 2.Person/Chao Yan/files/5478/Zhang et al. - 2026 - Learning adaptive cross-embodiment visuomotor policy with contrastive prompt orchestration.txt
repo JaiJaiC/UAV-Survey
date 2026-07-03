@@ -1,0 +1,1835 @@
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 1
+Learning Adaptive Cross-Embodiment Visuomotor
+Policy with Contrastive Prompt Orchestration
+Yuhang Zhang,Student Member, IEEE, Chao Yan,Member, IEEE, Yu Jiaxi, Jiaping Xiao,Member, IEEE, and
+Mir Feroskhan,Member, IEEE
+Abstract—Learning adaptive visuomotor policies for embodied
+agents remains a formidable challenge, particularly when facing
+cross-embodiment variations such as diverse sensor configura-
+tions and dynamic properties. Conventional learning approaches
+often struggle to separate task-relevant features from domain-
+specific variations (e.g., lighting, field-of-view, and rotation),
+leading to poor sample efficiency and catastrophic failure in
+unseen environments. To bridge this gap, we propose ContrAstive
+Prompt Orchestration (CAPO), a novel approach for learning
+visuomotor policies that integrates contrastive prompt learning
+and adaptive prompt orchestration. For prompt learning, we
+devise a hybrid contrastive learning strategy that integrates
+visual, temporal action, and text objectives to establish a pool
+of learnable prompts, where each prompt induces a visual rep-
+resentation encapsulating fine-grained domain factors. Based on
+these learned prompts, we introduce an adaptive prompt orches-
+tration mechanism that dynamically aggregates these prompts
+conditioned on current observations. This enables the agent
+to adaptively construct optimal state representations by iden-
+tifying dominant domain factors instantaneously. Consequently,
+the policy optimization is effectively shielded from irrelevant
+interference, preventing the common issue of overfitting to source
+domains. Extensive experiments demonstrate that CAPO signifi-
+cantly outperforms state-of-the-art baselines in sample efficiency
+and asymptotic performance. Crucially, it exhibits superior zero-
+shot adaptation across unseen target domains characterized by
+drastic environmental (e.g., illumination) and physical shifts (e.g.,
+field-of-view and rotation), validating its effectiveness as a viable
+solution for cross-embodiment visuomotor policy adaptation.
+Index Terms—Embodied artificial intelligence, visuomotor pol-
+icy learning, cross-embodiment adaptation, contrastive learning,
+prompt orchestration
+I. INTRODUCTION
+Recent advances in embodied artificial intelligence (AI)
+have served as a solid bedrock for robot learning, enabling
+embodied agents to perform various real-time decision-making
+tasks in complex environments, such as navigation [1], manip-
+ulation [2], and locomotion [3]. As a promising paradigm,
+vision-based embodied agents have received increasing at-
+tention in the past few years, relying on onboard cameras
+to perceive the surrounding environment and generate ac-
+tion commands. However, as illustrated in Fig. 1, visual
+observations are inherently entangled with both environmental
+Y . Zhang, J. Yu, J. Xiao, and M. Feroskhan are with the School of
+Mechanical and Aerospace Engineering, Nanyang Technological Univer-
+sity, Singapore 639798, Singapore (e-mail: yuhang004@e.ntu.edu.sg; jiap-
+ing001@e.ntu.edu.sg; jiaxi002@e.ntu.edu.sg; mir.feroskhan@ntu.edu.sg). C.
+Yan is with the College of Automation Engineering, Nanjing University
+of Aeronautics and Astronautics, Nanjing, 211106, China (e-mail: yan-
+chao@nuaa.edu.cn).(Corresponding authors: Mir Feroskhan, and Jiaping
+Xiao.)
+Normal
+Normal
+NormalIllumination
+Embodiment
+Illumination & Embodiment(a) Illumination Sensitivity
+Normal
+Normal
+NormalIllumination
+Embodiment
+Illumination & Embodiment
+(b) Embodiment Sensitivity
+Normal
+Normal
+NormalIllumination
+Embodiment
+Illumination & Embodiment
+(c) Joint Illumination and Embodiment Adaptation
+Fig. 1: Illustration of domain sensitivity in visuomotor policy
+learning and the adaptability of the proposed CAPO approach.
+(a) Conventional learning-based policies are highly sensitive
+to illumination. An agent trained in a standard environment
+fails to adapt when facing drastic illumination shifts, even if
+the underlying scene layout remains unchanged. (b) Similarly,
+standard approaches struggle with embodiment variations. A
+policy trained on a specific robot configuration fails when
+deployed on a different embodiment (e.g., varying FOV). (c)
+In contrast, CAPO synergizes representation learning and pol-
+icy optimization via the adaptive orchestration of contrastive
+prompts. This design enables superior zero-shot adaptability,
+allowing the agent to successfully navigate in unseen target
+domains with joint illumination and embodiment variations.
+conditions and the agent’s physical configuration, introducing
+significant uncertainty into perception and decision-making.
+In particular, agents’ sensory inputs are highly sensitive to
+environmental and physical factors, such as illumination, field
+of view (FOV), and stride length, which can substantially
+alter the agent’s visual observations. These factors, known as
+domain factors, pose major challenges to learning adaptive
+visuomotor policies. This raises a fundamental question: How
+can we develop a policy that enables an agent to adapt toarXiv:2602.01040v1  [cs.RO]  1 Feb 2026
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 2
+varying domain factors?
+A prevalent paradigm for visuomotor policy learning relies
+on large-scale expert demonstrations and imitation learning
+(IL), where policies are trained to replicate expert behavior
+in tasks such as autonomous driving [4] and robotic ma-
+nipulation [5]. However, collecting high-quality real-world
+demonstrations is costly, labor-intensive, and difficult to scale.
+Reinforcement learning (RL) offers a scalable alternative by
+enabling policy training through interaction in high-fidelity
+simulators, allowing efficient data collection and rapid iteration
+[6]. Many RL approaches learn policies in an end-to-end
+manner by directly mapping raw visual inputs to actions [4],
+[7], [8]. Despite their effectiveness, they often require millions
+of interactions to converge and commonly suffer from sample
+inefficiency. Moreover, learning directly from raw visual inputs
+makes them highly sensitive to domain-induced variations in
+pixel distributions, commonly referred to asdomain gaps.
+As a result, policies learned under specific visual conditions
+often fail to generalize to unseen environments, even when
+the underlying task structure remains unchanged. Some re-
+search resorts to domain randomization [9]–[11], synthesizing
+diverse visual and physical variations in simulation to promote
+adaptation. While effective, such methods often require careful
+manual design of randomization distributions and tend to
+yield policies that trade optimality for adaptation, performing
+suboptimally in specific environments [12].
+To address these challenges, prior work has increasingly
+turned to decoupled architectures [13]–[15] for policy adapta-
+tion under domain shifts, where visual representation learning
+is separated from policy optimization. In particular, more
+recent efforts focus on visual representation learning, either by
+training generalized visual encoders [16]–[18] or leveraging
+large-scale pretrained models [19]–[21] to extract domain-
+invariant features. Although these approaches improve ro-
+bustness to distributional shifts, they typically produce static
+representations [22], limiting their ability to adaptively empha-
+size task-relevant features under unseen domain factors. This
+lack of adaptive flexibility often leads to inconsistent visual
+embeddings and subsequent policy degradation.
+In this paper, we proposeContrAstivePromptOrchestration
+(CAPO), an adaptive cross-embodiment visuomotor policy
+learning apporach, to improve zero-shot adaptation under
+unseen domains. Our approach is motivated by combining
+the complementary strengths of end-to-end and decoupled
+paradigms, aiming to retain sample-efficient learning while
+overcoming the rigidity of static state representations to enable
+more effective adaptation under domain shifts. To achieve this,
+CAPO combines a contrastive prompt learning strategy with
+an adaptive orchestration mechanism, balancing representation
+robustness and policy adaptability. In the contrastive prompt
+learning, we employ CLIP [23] as a vision-language backbone
+and introduce learnable prompts to extract multiple domain-
+aware visual representations from the same observation, with-
+out fine-tuning the encoder. These prompt-induced represen-
+tations are trained using a hybrid contrastive strategy, where
+visual, temporal action, and text contrastive objectives are
+applied across different prompts to guide their optimization.
+After this, to enable adaptation to dynamic domain factors,we design an adaptive orchestration mechanism based on a
+dual-branch attention architecture that dynamically aggregates
+prompted embeddings conditioned on the current observation.
+The aggregated representation is then fed into the policy net-
+work, where both the orchestration parameters and the policy
+network are jointly optimized via RL. This design allows the
+trained policy to adapt seamlessly from thesource domain
+(where the policy is trained) to thetarget domain(where
+the policy is deployed). By synergizing the stability of pre-
+learned prompts with the flexibility of adaptive orchestration,
+our approach significantly enhances sample efficiency and
+adaptation performance.
+The contributions of this paper are summarized below.
+1) We propose CAPO, a novel visuomotor policy learning
+approach that addresses the limitations of end-to-end
+and decoupled RL by retaining sample-efficient learn-
+ing while overcoming static representations through in-
+tegrated prompt learning and adaptive orchestration. It
+enables the dynamic construction of visual embeddings,
+allowing effective adaptation to unseen domain factors
+without fine-tuning.
+2) We design a hybrid contrastive learning strategy that
+integrates visual, temporal action, and text supervision
+for contrastive prompt learning. This hybrid formulation
+allows the encoder to extract richer and more adap-
+tive features than standard single-objective approaches,
+forcing the encoder to encapsulate fine-grained domain
+factors.
+3) We introduce a dual-branch attention-based orchestration
+mechanism that dynamically re-weights prompt-induced
+embeddings conditioned on the current observation, en-
+abling effective adaptation to unseen target domains and
+embodiment variations.
+4) We conduct extensive experiments to evaluate CAPO.
+The results show that it outperforms state-of-the-art
+baselines in terms of sample efficiency and asymptotic
+performance. Moreover, CAPO exhibits superior zero-
+shot policy adaptation when deployed in target domains,
+involving unseen embodiment or environmental factors.
+The remainder of this paper is organized as follows. Section
+II reviews related work on visuomotor policy learning, policy
+adaptation for embodied agents, and prompt learning. Section
+III presents the problem formulation and preliminaries. Section
+IV describes the proposed CAPO approach in detail. Section
+V outlines the experimental setup. Section VI reports the
+results in simulated environments and discusses the ablation
+studies. Finally, Section VII concludes the paper and discusses
+directions for future research.
+II. RELATEDWORK
+This section categorizes related work into three primary
+areas: visuomotor policy learning, policy adaptation for em-
+bodied agents, and prompt learning.
+A. Visuomotor Policy Learning
+Visuomotor policy learning is a popular task for embod-
+ied agents, where the objective is to map high-dimensional
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 3
+visual inputs to low-dimensional, executable actions. Exist-
+ing approaches can be broadly categorized into IL and RL
+paradigms. IL methods [24]–[27] typically rely on large-scale
+and high-quality datasets collected from real-world environ-
+ments, where DNNs are trained to imitate expert demon-
+strations and approximate the pixel-to-action mapping. For
+instance, prior works have leveraged human trajectories in
+photorealistic simulators [26], accident datasets [24], and tele-
+operated robot demonstrations [27] to train agents that imitate
+human-like navigation strategies. However, collecting such
+datasets is time-consuming, costly, and inherently difficult to
+scale. Moreover, IL methods are often plagued by distribution
+shift [28], where minor deviations from the expert distribution
+lead to compounding errors, resulting in poor adaptation to
+unseen environments.
+To mitigate these limitations, RL-based approaches have
+gained increasing attraction [7], [8], [29]–[31], which can be
+broadly divided into end-to-end and decoupled paradigms. By
+interacting with the environment and learning from trial-and-
+error feedback, RL enables agents to learn policies that are
+more adaptive to diverse and dynamic settings. End-to-end
+learning approaches directly map visual inputs to action com-
+mands. For instance, Kaufmann et al. [29] developed a deep
+RL framework for autonomous drone racing that learns agile
+visuomotor policies directly from raw pixel input, achieving
+champion-level performance. Zhang et al. [8] further improved
+sample efficiency and control accuracy by integrating dif-
+ferentiable physics into the RL training loop. Despite their
+success, such approaches often suffer from prohibitive sample
+complexity, as learning rich visual representations solely from
+sparse scalar rewards is notoriously inefficient [14]. Further-
+more, these coupled architectures struggle to adapt when there
+are shifts in embodiment or sensor configurations.
+To alleviate this inefficiency, a distinct line of research
+advocates for decoupled visuomotor learning [13]–[15]. In
+this paradigm, visual encoders are typically pre-trained via
+self-supervised objectives, and subsequently frozen to provide
+stable state representations for downstream policy optimiza-
+tion. While these decoupled architectures significantly improve
+sample efficiency by isolating representation learning from
+control dynamics, they often result in rigid and static represen-
+tations. Since the encoder is agnostic to the downstream task
+dynamics and remains fixed during deployment, it lacks the
+flexibility to adapt when there are drastic shifts in environment
+or embodiment configurations.
+In contrast to these efforts, our approach bridges visual rep-
+resentation learning and policy optimization via an adaptive or-
+chestration mechanism, effectively synergizing the stability of
+decoupled RL architectures with the flexibility of end-to-end
+optimization. We aim to extract adaptive visual features that
+are conditioned on domain factors, which are then dynamically
+composited for policy learning. This design facilitates better
+sample efficiency and enables improved adaptation across
+previously unseen visual domains or embodiment variations.
+B. Policy Adaptation for Embodied Agents
+For embodied agents, policy adaptation techniques aim to
+adapt the learned policy to environments with varying domainfactors. Early approaches [9]–[11] extensively employ domain
+randomization for end-to-end learning to synthesize visual
+textures and physical parameters within simulation. These
+methods expose agents to various randomized scenarios in
+an attempt to promote generalizable behaviors, but they often
+require substantial manual tuning and tend to adopt overly
+conservative behaviors in the specific scenario [12].
+Consequently, a growing body of research has shifted focus
+towards the decoupled paradigm of visual representation learn-
+ing, which strives to extract domain-invariant features offline
+to be resilient to distributional shifts. Current approaches
+generally fall into two categories: learning generalized vi-
+sual encoders [16]–[18] or leveraging large-scale pretrained
+models [19]–[21]. The first category involves training cus-
+tom encoders, often utilizing contrastive learning paradigms.
+The core mechanism involves optimizing the latent space by
+aligning embeddings of semantically related samples (positive
+pairs) while distancing unrelated ones (negative pairs), thereby
+enhancing the discriminative capacity of the representation.
+Alternatively, recent works have sought to harness the rich
+semantic priors of large-scale pretrained models (e.g., CLIP
+[23]) directly. Compared to training custom encoders from
+scratch, these large models offer superior zero-shot robustness
+and data efficiency. For instance, Zhang et al. [21] utilized
+CLIP as a goal retrieval module to align agent observations
+with human language instructions. This alignment enables the
+agent to identify task-relevant targets in complex, unstructured
+environments, effectively facilitating open-vocabulary naviga-
+tion tasks without extensive task-specific fine-tuning.
+Despite their effectiveness, both paradigms exhibit limita-
+tions in dynamic adaptation. Custom encoders and frozen pre-
+trained backbones typically yield static representations [22],
+and the feature extraction process remains fixed regardless
+of the domain shifts encountered during policy learning.
+In contrast, our approach integrates the strengths of both
+approaches. While we build upon the robust foundation of
+large-scale pretrained models, we introduce learnable prompts
+optimized via contrastive learning. This design allows our
+system to adaptively generate representations, thereby address-
+ing the adaptability deficiency of static encoders when facing
+significant domain gaps.
+C. Prompt Learning
+Prompt learning provides a parameter-efficient alternative
+to full model fine-tuning by introducing lightweight, learn-
+able prompts that condition large pretrained models toward
+downstream tasks. It is initially explored in language models
+through optimizing a small set of textual prompt vectors [32].
+It is also extended to vision transformers, where inserting
+learnable prompts into transformer layers enables broad task
+adaptation without modifying backbone weights [33], which
+is recognized as visual prompting. Recently, this concept has
+expanded to visual–textual prompting in multi-modal embed-
+ding spaces, demonstrating that prompts can encode comple-
+mentary task-specific cues [34], [35]. For instance, Khattak
+et al. [34] proposed multi-modal prompt learning, which
+introduces learnable prompts into both vision and language
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 4
+branches to ensure mutual synergy and improve the alignment
+between multi-modal representations. Similarly, Yang et al.
+[35] investigated fine-grained visual prompting for instance-
+level perception, devising a blur reverse mask strategy that
+suppresses background noise while retaining spatial coherence
+to enhance zero-shot comprehension. Despite these successes
+in static vision tasks, the application of prompt learning in
+embodied agents remains underexplored.
+In this paper, we bridge this gap by adopting visual prompt-
+ing techniques to explicitly address the perceptual challenges
+faced by embodied agents. Unlike prior work, we exploit di-
+verse hybrid contrastive prompts to fundamentally restructure
+the representation space, enabling zero-shot adaptation in com-
+plex cross-embodiment visuomotor policy learning scenarios.
+III. PRELIMINARIES ANDPROBLEMFORMULATION
+This section outlines the preliminaries of CAPO, providing
+the problem formulation and the contrastive learning objective
+designed to facilitate visuomotor policy training.
+A. Problem Formulation
+We formulate the visuomotor task for embodied agents as
+a Partially Observable Markov Decision Process (POMDP),
+defined by a tupleM= (S,O,A,T,R, γ). Here,Srepre-
+sents the underlying state space of the environment, which
+is not directly accessible to the agent.Odenotes the high-
+dimensional observation space, where the agent receives an
+egocentric visual observationo t∈ Oat each time stept, de-
+termined by the conditional observation probabilityP(o t|st)
+given the hidden states t∈ S. The action spaceAconsists
+of the navigation commands executable by the agent. The
+transition dynamicsT(s t+1|st, at)govern the evolution of
+the environment state given the current state and the executed
+actiona t∈ A. The objective is defined by a reward function
+R:S×A →R, which provides a scalar feedbackr treflecting
+the task progress, andγ∈[0,1)is the discount factor.
+Unlike mainstream end-to-end approaches that train a visual
+encoderf θfrom scratch [7], [30], [31], we decouple visual
+representation learning from policy optimization by leveraging
+CLIP as the image encoder, denoted asΦ. To adapt this
+fixed backbone to the dynamic domain factors of embodied
+navigation, we introduce a set ofKlearnable visual prompts,
+denoted asP={p1,p2, . . . ,pK}. Each promptpkis defined
+as a sequence of continuous learnable vectors:
+pk= [vk
+1,vk
+2, . . . ,vk
+L],vk
+i∈RD,(1)
+whereLrepresents the prompt length andDis the embedding
+dimension. These prompts are prepended to the input obser-
+vationo tand processed by the encoderΦto extract context-
+aware visual features.
+To construct the final state representation from these mul-
+tiple prompted embeddings, we employ an attention-based
+prompt orchestration mechanismG attn. Letzv
+t= Φ(o t,∅)
+be the vanilla embedding using the frozen CLIP encoderΦ
+without prompts andzk
+t= Φ(o t,pk)be the feature embed-
+ding derived from thek-th prompt. The final fused featurerepresentationzf
+tis computed as a weighted combination of
+these embeddings:
+zf
+t=zv
+t+G attn({z1
+t, . . . ,zK
+t}),(2)
+where the attention weights are dynamically determined based
+on the current visual observation (the details will be introduced
+in the subsequent section). This fused representationzf
+tthen
+serves as the input to the policy networkπ ψ, parameterized
+byψ. The goal of the agent is to learn an optimal policyπ∗
+ψ
+that maximizes the expected discounted cumulative reward:
+J(πψ) =E πψ[PT
+t=0γtrt].
+B. Contrastive Learning
+Contrastive learning has emerged as a dominant paradigm
+in self-supervised representation learning, which is pivotal for
+effective policy adaptation, aimed at extracting discriminative
+features by maximizing the mutual information between se-
+mantically similar instances. Instead of relying on manual
+annotations, it treats instance discrimination as a dictionary
+look-up task. Formally, given a batch of sampled observations,
+we employ a query encoderf qand a key encoderf kto
+map inputs into a shared latent space, producing feature
+vectorsqandk. The training objective optimizes the alignment
+between a positive pair(q i, ki)while contrasting it against
+negative samples. Consequently, the optimization is performed
+by minimizing the contrastive loss [13]:
+LNCE=−E"
+logsim(q i, ki)PN
+j=1sim(q i, kj)#
+,(3)
+where the similarity function is defined assim(u, v) =
+exp(uTv), withuandvdenotingℓ 2-normalized feature vec-
+tors. Here, we extend this formulation to the navigation task
+by employing a hybrid contrastive strategy (see Section IV-B).
+IV. METHODOLOGY
+This section details the proposed Contrastive Prompt Or-
+chestration (CAPO) approach, including contrastive prompt
+learning, hybrid contrastive learning, adaptive prompt orches-
+tration, and visuomotor policy learning.
+A. Overview
+We introduce CAPO, a novel visuomotor policy learning
+approach for embodied agents, aiming to enable zero-shot
+adaptation under unseen domain factors and cross-embodiment
+configurations. As illustrated in Fig. 2, the overall training
+pipeline is organized into two tightly coordinated phases: (a)
+contrastive prompt learning and (b) adaptive prompt orchestra-
+tion. In the prompt learning phase illustrated in Section IV-B,
+we adopt a pretrained CLIP model [23] as the visual feature
+extractor and, instead of fine-tuning the entire backbone,
+freeze its image encoder while introducing a set of learnable
+visual prompts. Prompt learning is realized through a hybrid
+contrastive learning strategy that integrates visual, temporal
+action, and text contrastive learning objectives. This hybrid
+contrastive formulation forms a diverse prompt pool. In the
+prompt orchestration phase presented in Section IV-C, we
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 5
+Observationto
+Attention Map
+Features
+Fused Features
+Policy Networkψπ
+(b) Adaptive Prompt Orchestration
+Unseen Target Domains
+Visual Interference
+Cross Embodiment Policy Adaptation
+Policy NetworkψπObservationto
+Normal
+Small FOVDim Light
+1p
+1p
+1piz
+iz+
+jz+
+NCE(, )v
+iizz+
+iziz+
+jz+
+Pos Neg
+Move Ahead
+Move Ahead2p
+2pon tgt(, )aq kzz
+Posonqz
+tgtkzonqztgtkz
+A photo of Apple
+A photo of Peach
+3pt
+iz
+g
+it
+g
+jtNCE(,)t tg
+iizt
+Pos Negt
+izg
+itg
+jt
+(a) Contrastive Prompt LearningVisual Text Prompt Temporal Action
+With Gradient Frozen Prompt Element -wise multiplication CLIP Encoder Image Feature Text Feature
+Training Deployment
+Prompt Pool P
+Fig. 2: The framework of contrastive prompt orchestration (CAPO). (a) Contrastive Prompt Learning. We employ a hybrid
+contrastive learning strategy (incorporating visual, temporal action, and text objectives) to learn a pool of domain-specific visual
+promptsPfor the frozen CLIP encoderΦ. (b) Adaptive Prompt orchestration. We introduce an adaptive prompt orchestration
+mechanism that dynamically aggregates these frozen prompts based on the observationo t, generating context-aware features for
+the policy networkπ ψ. The trained policy achieves zero-shot cross-embodiment adaptation in unseen domains by automatically
+re-weighting prompts to handle visual interference and embodiment variations without fine-tuning.
+freeze the learned prompt pool and introduce an adaptive
+prompt orchestration mechanism coupled with policy learn-
+ing. Given the current observation, this mechanism dynami-
+cally constructs a state representation by adaptively weighting
+prompt-conditioned features. The resulting representation is
+then fed into a policy network, which is trained via an RL
+algorithm to perform the visuomotor task. After training,
+the learned policy can be directly deployed for zero-shot
+cross-embodiment visuomotor adaptation by dynamically re-
+weighting prompt-induced embeddings conditioned on the
+observation. As a result, the policy can adjust the fused visual
+representation to domain-specific variations without requiring
+additional fine-tuning. The complete algorithm and the sup-
+porting theoretical analysis are summarized in Section IV-D.
+B. Contrastive Prompt Learning
+Here, we detail the prompt learning phase of our approach,
+which learns domain-specific visual prompts through hybrid
+contrastive learning. This phase produces a collection of
+visual promptsP={p1,p2, . . . ,pK}, each specialized for
+invariance to a particular domain factor. These prompts aresubsequently frozen and utilized in the adaptive prompt or-
+chestration phase. We describe this process from three aspects:
+data collection, visual prompt learning, and hybrid contrastive
+learning. Here, contrastive prompt learning focuses on opti-
+mizing prompt parameters, while hybrid contrastive learning
+serves as the training objective by computing contrastive losses
+over visual embeddings induced by different prompts.
+Data Collection.We collect our training datasetDby
+executing expert navigation policies within the AI2-THOR
+simulation environment [36] under a range of domain and
+embodiment configurations. Each domain factorF iis charac-
+terized by a tuple of environment and embodiment parameters:
+Fi= (ϕ i, ψi, θi, δi, ℓb
+i, ℓc
+i, ℓs
+i, ℓh
+i),(4)
+whereϕ idenotes the horizontal FOV parameter,ψ irefers to
+the rotation angle,θ iis the look-up/down angle,δ ispecifies the
+translational step size, andℓb
+i, ℓc
+i, ℓs
+i, ℓh
+irepresent lighting pa-
+rameters controlling brightness, contrast, saturation, and hue.
+These factors are systematically varied to generate trajectories
+under diverse visual and embodiment conditions.
+Specifically, for each configurationF i, a pretrained expert
+policyπ eis deployed to navigate towards randomly sampled
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 6
+target objects. Each navigation episode yields a temporally
+ordered trajectoryτj
+i={(oi,j
+t, ai,j
+t, ri,j
+t, gj)}Ti,j
+t=1, whereoi,j
+t∈
+RC×H×Wdenotes the RGB observation at timestept,ai,j
+t∈
+Arepresents the executed action,ri,j
+t∈Rspecifies the reward
+value, andgj∈ Cis the target category associated with the
+j-th trajectory.
+To facilitate cross-domain contrastive prompt learning, we
+establish correspondence between trajectories collected under
+different factors that share the same navigation objective.
+Given a reference factorF band an alternative factorF i,
+we identify aligned trajectory pairs(τj
+b, τj
+i)corresponding to
+the same target objectgj. Alignment is determined based
+on semantic similarity of the initial observations. For each
+trajectory, we compute an object presence vector as follows:
+m= (m 1, m2, . . . , m |C|)∈ {0,1}|C|,(5)
+where each element indicates the presence of a corresponding
+object category in the agent’s initial semantic observation. Two
+trajectories are considered aligned if the F1-score between
+their object presence vectors exceeds a predefined threshold
+κ, ensuring that paired trajectories originate from semantically
+similar states under different domain factors. This alignment
+procedure yields a refined dataset organized as
+D=K[
+i=1Di,D i={τ1
+i, τ2
+i, . . . , τN
+i},(6)
+where each subsetD icontains trajectories collected under the
+same domain factor, andNis the number of trajectories.
+Visual Prompt Learning.We leverage the rich semantic
+priors embedded in a pretrained CLIP model [23] to extract
+visual features from RGB observations. To adapt this pre-
+trained visual encoder to domain-specific visuomotor tasks in a
+parameter-efficient manner, instead of updating all parameters
+of the pretrained model, we introduces a set of learnable
+prompt embeddings [33] that modulate the visual represen-
+tations while keeping the CLIP image encoder frozen.
+Formally, as mentioned before, we define a set of visual
+promptsP={p1,p2, . . . ,pK}, where each promptpkis
+a sequence of learnable vectorspk= [vk
+1,vk
+2, . . . ,vk
+L]with
+vk
+i∈RD. Given an RGB observationo t∈RC×H×W
+corresponding to thek-th domain factor, the CLIP encoder
+Φfirst applies a patch embedding operation to map the image
+into a sequence ofN pvisual tokens:
+xpatch= PatchEmbed(o t)∈RNp×d,(7)
+whereddenotes the hidden feature dimension. A class token
+xcls∈R1×dis prepended to the patch sequence, and positional
+embeddingsE pos∈R(Np+1)×dare added to incorporate
+sequential structure:
+X0= [x cls;xpatch] +E pos∈R(Np+1)×d.(8)
+Then, we insert the prompt embeddingspkcorresponding
+to the current domain factor into the token sequence after the
+class token. Specifically, the prompt tokens are first projected
+from dimensionDto the hidden dimensiondvia a learnable
+linear transformationW p∈RD×d:
+˜pk=pkWp∈RL×d,(9)and then concatenated with the visual tokens, yielding the
+augmented input sequence:
+XP
+0= [x cls;˜pk;xpatch] +EP
+pos∈R(1+L+N p)×d,(10)
+whereEP
+posrepresents the positional embeddings extended to
+accommodate the inserted prompt lengthL.
+The augmented token sequence is processed by a Trans-
+former encoderξconsisting ofJlayers, producing a sequence
+of representations:
+XP
+j=ξj(XP
+j−1), j= 1, . . . , J.(11)
+Finally, the output representation is extracted from the
+class token position, projected via the CLIP projection head
+Wproj∈Rd×d out, andℓ 2-normalized to obtain the domain-
+adapted visual embedding:
+zk
+t=XP
+J[0]W proj
+∥XP
+J[0]W proj∥2∈Rdout.(12)
+The embeddingzk
+tserves as the input to the subsequent
+hybrid contrastive learning. Specifically, it is used to compute
+the contrastive losses, whose gradients are back-propagated to
+update the corresponding prompt embeddingspk. Through this
+optimization, the prompts progressively capture task-relevant
+invariances across domain factors, forming a robust set of basis
+representations.
+Hybrid Contrastive Learning.To build a diverse prompt
+poolPcapable of handling diverse domain changes, we
+propose a hybrid contrastive learning strategy comprising three
+distinct objectives, namely visual contrastive learning, tempo-
+ral action contrastive learning, and text contrastive learning.
+(i) Visual Contrastive Learning.It aims to enable the em-
+bodied agent to be robust against visual appearance changes,
+such as variations in brightness, contrast, saturation, and
+hue, which are distinct from physical embodiment changes.
+Specifically, we optimize the subset of prompts associated
+with lighting domain factors, denoted as{pℓb
+i,pℓc
+i,pℓs
+i,pℓh
+i},
+to extract invariant representations despite visual perturbations.
+Here,ℓb
+i, ℓc
+i, ℓs
+i, ℓh
+idenote continuous vectors representing the
+lighting configuration of thei-th domain factor.
+For a promptpℓb
+icorresponding to a specific lighting factor
+(e.g., brightness), we illustrate the construction of contrastive
+pairs; the same procedure applies to other lighting factors
+ℓc
+i, ℓs
+i, ℓh
+i. Given an anchor observationo isampled from the
+datasetD, we generate an augmented viewo+
+i=Vℓb
+i(oi)by
+perturbing the image according to the parameter space ofℓb
+i.
+Subsequently, we extract features for the anchor and positive
+samples using the frozen CLIP encoderΦconditioned on the
+promptpℓb
+ifollowing Eqs. (7)–(12). The extracted features can
+be expressed as follows:
+zi= Φ(o i,pℓb
+i),z+
+i= Φ(o+
+i,pℓb
+i),(13)
+wherez iandz+
+idenote the visual embeddings of the orig-
+inal observationo iand its augmented viewo+
+i, respectively,
+encoded with the same promptpℓb
+i.
+To optimize the prompt, we employ a symmetric InfoNCE
+(Information Noise-Contrastive Estimation) objective follow-
+ing Eq. (3), treating the augmented view as the positive key
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 7
+and other samples in the batchBas negatives. The symmetric
+InfoNCE loss is defined by averaging both directions:
+Lv
+NCE=1
+2Ei∈B
+Luni
+NCE(zi,z+
+i) +Luni
+NCE(z+
+i,zi)
+,(14)
+where the single-direction InfoNCE loss is given by
+Luni
+NCE(zi,z+
+i) =−logsim(z i,z+
+i)
+P|B|
+j=1sim(z i,z+
+j).(15)
+Furthermore, to enforce tighter feature alignment, we incor-
+porate a Mean Squared Error (MSE) regularization term:
+Lv
+MSE=1
+|B||B|X
+i=1∥zi−z+
+i∥2
+2.(16)
+The final visual contrastive objective for promptpℓb
+iis a
+weighted sum:
+Lvisual=Lv
+NCE+λvLv
+MSE,(17)
+whereλ vis a scaling hyperparameter that balances the align-
+ment regularization strength.
+(ii) Temporal Action Contrastive Learning.This objective
+is designed to learn behavioral invariances across variations in
+agent configuration parameters, specifically the FOV , rotation
+angle, look-up angle, and step size. Accordingly, we optimize
+the subset of prompts associated with action execution factors,
+denoted as{pui|ui∈ {ϕ i, ψi, θi, δi}}, where these variables
+correspond to the aforementioned embodiment parameters.
+Unlike the visual contrastive learning approach which relies
+on negative samples, we adopt the BYOL self-distillation
+paradigm [37] to avoid the difficulty of defining semantically
+meaningful negatives in the temporal action space.
+For a specific action-conditioned promptpui, we sample
+positive pairs(o q, ok)fromDthat correspond to the same
+action types but are observed under different temporal contexts
+and embodiment configurations. To introduce view diversity,
+we apply stochastic image augmentations to generate aug-
+mented views˜o qand˜o k. The learning framework consists
+of two parallel networks: an online network parametrized
+byωand a target network parametrized byν. The online
+network comprises three components: the prompted encoder
+Φ, a projectorρ ω, and a predictorf ω. The target network
+mirrors the encoder and projector architecture but excludes the
+predictor. The target parametersνare updated as a momentum
+update rule [13] of the online parametersω:
+ν←βν+ (1−β)ω,(18)
+whereβ∈[0,1]is a decay rate.
+We extract projected representations for the query and
+key views. The online network predicts the target repre-
+sentation of the cross-view sample. Specifically, letzq
+on=
+fω(ρω(Φ(˜o q,pui)))be the online prediction when the query
+view is input, andzk
+tgt=SG(h ν(Φ(˜o k,pui)))be the target
+projection for the key view, whereSG(·)denotes the stop-
+gradient operator. The asymmetric regression loss is defined
+as the MSE between the normalized prediction and target:
+La(˜oq,˜ok) =zq
+on
+∥zq
+on∥2−zk
+tgt
+∥zk
+tgt∥22
+2.(19)To enforce symmetry, we explicitly compute the loss in both
+directions: one where the online network processes˜o qto
+predict the target representation of˜o k, and the other where
+the roles are swapped (i.e., the online network processes˜o k):
+Laction=1
+2E(˜oq,˜ok)∼B[La(˜oq,˜ok) +La(˜ok,˜oq)],(20)
+this symmetric objective encourages the promptpuito capture
+consistent action-relevant features invariant to temporal shifts
+and augmentation noise.
+(iii) Text Contrastive Learning.While the aforementioned
+visual and temporal action objectives address environmental
+and embodiment variations, they do not explicitly enforce the
+semantic alignment required for visuomotor tasks. To bridge
+the modality gap between visual observations and semantic
+goal specifications, we introduce a text contrastive learning
+objective. We define a distinct learnable text promptpt,
+structurally identical to the visual prompts, which conditions
+the frozen CLIP encoderΦto extract semantically grounded
+features. Unlike domain-specific prompts that adapt to chang-
+ing environments,pttargets task-level semantic invariances
+orthogonal to domain shifts.
+Specifically, for each navigation goal categoryg∈ C,
+we generate a text description using the template “a photo
+of a [CLASS]” and encode it via the frozen CLIP text
+encoderΨto obtain the category-specific text embedding
+tg
+i= Ψ(template(g))∈Rdout. These embeddings are precom-
+puted and fixed to serve as semantic anchors. Given a batch of
+observationsB={(o i, gi)}|B|
+i=1, we extract the text-prompted
+visual embeddingzt
+i= Φ(o i,pt). Furthermore, to enhance
+the adaptation of the learned representations, we introduce
+a semantic regularization mechanism. Specifically, we inject
+Gaussian noise into the visual embeddingzt
+ito obtain a
+perturbed representation:
+˜zt
+i=zt
+i+ζ,ζ∼ N(0, σ2I).(21)
+We enforce that this perturbed representation maintains high
+semantic similarity with the corresponding text anchortg
+i.
+This strategy prevents feature collapse and ensures robustness
+against feature-level perturbations. We then maximize the
+mutual information between the visual embedding and the
+corresponding text embedding following Eq. (3):
+Lt
+NCE(˜zt
+i,tg
+i) =−logsim(˜zt
+i,tg
+i)
+P|B|
+j=1sim(˜zt
+i,tg
+j).(22)
+Similar to visual contrastive learning, we also incorporate an
+MSE regularization term between matched image-text pairs:
+Lt
+MSE=1
+|B||B|X
+i=1∥˜zt
+i−tg
+i∥2
+2.(23)
+The final text objective is a weighted sum:
+Ltext=Lt
+NCE+λtLt
+MSE,(24)
+whereλ tbalances the regularization strength. By optimizing
+Eq. (24) alongside this regularization,ptlearns to steer the
+visual encoder to highlight goal-relevant semantics, provid-
+ing a stable grounding signal that complements the adaptive
+domain-specific features.
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 8
+MLP
+ObservationtoImage Patches
+Transformer 
+Encoder Layers
+Prompt Pool P
+MLP
+MLP
+MLP
+MLP
+Visual
+Temporal
+Action
+TextPolicy Networkψπ
+SoftmaxAttention
+Map Transformer 
+Encoder Layers
+Cosine 
+Similarity
+Element -wise 
+AdditionPositional 
+Embedding
+Inner 
+ProductVanilla 
+Feature
+Prompted 
+FeatureFused Features
+Fig. 3: Architecture of the adaptive prompt orchestration mechanism. The frozen CLIP encoder extracts features from
+observationo tusing the prompt poolP. A dual-branch attention mechanism (combining learnable MLP projections and cosine
+similarity) dynamically re-weights the domain-specific features based on context. Crucially, the text-prompted feature bypasses
+this attention module and is fused directly. This design explicitly preserves goal-oriented semantics, which are invariant to
+domain factors, before feeding the policy networkπ ψ.
+Consequently, through the joint optimization of this hybrid
+contrastive learning strategy, we derive a set of domain-
+specific visual prompts, denoted asP={p1,p2, . . . ,pK}.
+Each promptpkis optimized to encapsulate distinct invari-
+ances regarding environmental or embodiment factors. This
+learned prompt pool is subsequently utilized in a frozen state
+to facilitate policy learning.
+C. Adaptive Prompt Orchestration
+In this subsection, we detail the adaptive prompt orches-
+tration phase of our approach, where the frozen domain-
+specific visual promptsP={p1,p2, . . . ,pK}are adaptively
+composited and leveraged to train the visuomotor policy. We
+describe this process from two aspects: dual-branch attention
+mechanism and policy learning.
+Dual-Branch Attention Mechanism.While each prompt
+pkexcels at capturing invariances specific to a single domain
+factor, a robust embodied visuomotor policy requires simul-
+taneous adaptability to multiple changing conditions. A naive
+aggregation of prompted features ignores the varying relevance
+of different domain factors for a given observation. To address
+this, we propose an adaptive prompt orchestration mechanism,
+denoted asG attn, that dynamically weights prompts based on
+semantic relevance, as depicted in Fig. 3.
+Given an RGB observationo tat timestept, we first extract
+a vanilla embedding using the frozen CLIP encoderΦwithout
+prompts, denoted aszv
+t= Φ(o t,∅). Meanwhile, we obtain the
+set of domain-adapted embeddings{zk
+t}K
+k=1using the learned
+prompts, wherezk
+t= Φ(o t,pk). Notably, the text-prompted
+embeddingzt
+t= Φ(o t,pt)is excluded from the orchestration
+mechanism, as it encodes task-level semantic invariances. To
+fuse these representations, we employ a dual-guided attention
+mechanism driven by both learnable projections and semantic
+consistency. To fuse these representations, we employ a dual-
+guided attention mechanism driven by both learnable projec-
+tions and semantic consistency.On one hand, we compute a learnable attention scoresa
+kfor
+each prompt by projecting the embedding into an attention key
+kk:
+sa
+k=(zv
+t)⊤kk√dout, k k=fp(zk
+t),(25)
+wheref p(·)is a projection network consisting of two linear
+layers with a SiLU activation [38], andd outrepresents the
+output dimension ofΦwith prompts.
+On the other hand, to prevent the orchestration mechanism
+from focusing on irrelevant features, we introduce a regu-
+larization term based on the cosine similarity between the
+ℓ2-normalized vanilla and prompted embeddings to ensure
+semantic fidelity.
+sc
+k= (zv
+t)⊤zk
+t.(26)
+The final attention weightsα kare derived via a mul-
+tiplicative fusion of these scores, followed by a softmax
+normalization:
+αk=exp(sa
+k·sc
+k)PK
+j=1exp(sa
+j·sc
+j).(27)
+The aggregated context representationzf
+tis computed via
+Gattnas a weighted sum of the prompted embeddings, enhanced
+by a residual connection to the vanilla feature to preserve
+original semantic information:
+zf
+t=zv
+t+zt
+t+G attn({z1
+t, . . . ,zK
+t}) =zv
+t+zt
+t+KX
+k=1αkzk
+t.
+(28)
+This fused representationzf
+tadaptively integrates domain-
+specific invariances while maintaining task-relevant semantics,
+serving as a robust input for policy learning.
+Policy Learning.Given the fused representationzf
+t, we
+construct the comprehensive observation embeddingo tby
+incorporating task-specific semantic and history information.
+Specifically, the target object categoryg∈ Cis encoded as a
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 9
+Algorithm 1:Training Pipeline of CAPO
+Input:Trajectory datasetD, frozen CLIP encoderΦ,
+learnable prompt poolP
+Output:Optimized navigation policyπ ψ
+1// Contrastive Prompt Learning
+2foreachiterationdo
+3Sample minibatchB ∼ D
+4// Visual Contrastive Learning:
+5Generate augmented viewso i, o+
+iforo i∈ B
+6ComputeL visual via Eq. (17)
+7P←P−η v∇PLvisual
+8// Temporal Action Contrastive Learning:
+9Sample(o q, ok)fromB
+10Generate augmented views(˜o q,˜ok)
+11Computezq
+on=fω(ρω(Φ(˜o q,pui)))
+12Computezk
+tgt=SG(h ν(Φ(˜o k,pui)))
+13ComputeL action via Eq. (20)
+14P←P−η a∇PLaction,ω←ω−η a∇ωLaction
+15ν←βν+ (1−β)ω
+16// Text Contrastive Learning:
+17Sample(o i, gi)fromB
+18ComputeL textvia Eq. (24)
+19P←P−η t∇PLtext
+20end
+21// Adaptive Prompt Orchestration
+22FreezePandΦ, initializeG attnandπ ψ
+23foreachiterationdo
+24Sample rollout trajectoryτ={o t, at, rt, g}T
+t=1
+25Computezv
+t= Φ(o t,∅),zt
+t= Φ(o t,pt),{zk
+t}K
+k=1
+26Computezf
+tvia Eq. (28)
+27Computeˆo t= [zf
+t,g,e at−1],ht=GRU(ˆo t, ht−1)
+28Output actiona t∼πψ(·|ht)
+29Compute PPO objectivesL PPOvia Eq. (29)
+30ψ←ψ−η ψ∇ψLPPO
+31end
+one-hot vectorg, and the action taken at the previous timestep
+at−1∈ Ais mapped to a learnable embeddinge at−1. These
+components are concatenated with the visual feature to form
+the policy input:ˆo t= [zf
+t,g,e at−1].
+To mitigate the partial observability inherent in embodied
+navigation, we employ a Gated Recurrent Unit (GRU) [39] to
+model temporal dependencies. The GRU processes the current
+observation embeddingˆo talongside the previous hidden state
+ht−1to generate the current hidden stateh t, which serves as
+the shared representation for the Actor-Critic architecture. The
+actor head predicts the action distributionπ ψ(at|ht), while
+the critic head estimates the state valueV(h t). We optimize
+the policyπ ψusing the Proximal Policy Optimization (PPO)
+algorithm [40], which trains the entire network architecture
+(including the GRU and embeddings) with the objective as:
+LPPO=−E th
+min
+rtˆAt,clip(r t,1−ϵ,1 +ϵ) ˆAti
+,(29)
+wherer tdenotes the probability ratio between the current
+policy and the previous policy, ˆAtis the advantage estimateat time stept, andϵis the clipping hyperparameter.
+D. Summary and Theoretical Justification
+Algorithm Summary.We summarize the overall training
+pipeline of CAPO in Algorithm 1. In the contrastive prompt
+learning, the agent learns a diverse set of domain-specific
+visual prompts through a hybrid contrastive learning strategy,
+capturing invariances across visual, temporal, and semantic
+dimensions. In the adaptive prompt orchestration, these learned
+prompts are frozen, and a visuomotor policy is optimized
+using the adaptive prompt orchestration mechanism, enabling
+dynamic adaptation to unseen domain factors.
+Theoretical Justification.The core objective of CAPO
+is to construct a visuomotor policyπ ψthat minimizes the
+expected risk across a distribution of domain factorsF. We
+posit that for any contextc∈ F, there exists an optimal oracle
+representationz⋆
+c. The goal is to approximate this oracle via
+the adaptive prompt orchestration mechanismG attn.
+LetR E(π) =E c[Ltask(π(zf(c)), y⋆
+c)]be the expected risk,
+whereL taskdenotes the task-specific loss function (e.g., PPO
+objective) andy⋆
+crepresents the optimal action or value for the
+given contextc. LetR⋆be the minimum risk achievable by the
+oracle. We define theexcess riskas the difference between the
+learned policy’s performance and the oracle’s performance.
+Theorem 1.LetH Pbe the hypothesis space spanned by
+the convex hull of the learned prompt poolP. Assuming the
+task loss isL ℓ-Lipschitz and the policy isλ π-Lipschitz, with
+probability at least1−δ, the excess risk is bounded by:
+RE(ˆπ)−R⋆≤˜O r
+1
+N!
++Lℓλπ·Ec"
+min
+α∈∆ KKX
+k=1αkzk−(z⋆
+c−zv)
+2#
+.
+(30)
+Proof.We decompose the excess risk into estimation error
+and approximation error, and bound them simultaneously [41].
+Assuming the loss isL ℓ-Lipschitz andπ ψisλπ-Lipschitz
+continuous [42], we have:
+RE(ˆπ)−R⋆= (R E(ˆπ)−inf
+π∈HPRE(π))
+| {z }
+Estimation Error
++ ( inf
+π∈HPRE(π)−R⋆)
+| {z }
+Approximation Error
+≤ 
+2R(Π) +r
+log(1/δ)
+2N!
+| {z }
+Bound via Uniform Convergence
++Lℓλπ·Ech
+min
+α∥zf−z⋆
+c∥2i
+| {z }
+Bound via Lipschitz Continuity.(31)
+Substituting the definition of the fused representationzf=
+zv+Pαkzkinto the second term yields the stated bound.
+SeeSupplementary Materialfor the detailed derivation.
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 10
+Remark.Theorem 1 decomposes the excess risk into esti-
+mation and approximation terms. The bound implies that the
+risk is controlled by the feature distance to the oracle (scaled
+byL ℓλπ). This justifies our design: hybrid contrastive learning
+ensures the prompt poolPis sufficiently diverse to reduce
+the approximation gap, while the attention mechanismG attn
+dynamically optimizesαfor precise alignment.
+V. EXPERIMENTALSETUP
+This section presents the experimental setup of CAPO,
+covering the simulation environments and domain configura-
+tions, evaluation metrics and baselines, as well as network
+architectures and hyperparameter settings.
+A. Simulation Setup
+We conduct experiments in the AI2-THOR [36] environ-
+ment. We specifically utilizeFloorPlan21for both training
+and evaluation on theObjectNavtask, where the data
+splits are distinguished by different combinations of domain
+factors. Success is defined as reaching within 1.0 meters of
+one of 12 target categories within a maximum horizon of
+Tmax= 500. For contrastive prompt learning, we collect an
+expert dataset covering diverse domain configurations defined
+byF= (ϕ, ψ, θ, δ, ℓb, ℓc, ℓs, ℓh). We treat lighting parameters
+ℓb, ℓc, ℓs, ℓh(brightness, contrast, saturation, hue) as continu-
+ous variables, while rotationψ, look angleθ, and step sizeδ
+are discrete. The FOVϕis categorized into three groups to
+mitigate training instability, resulting in a total of 10 distinct
+domain factors. These domain factors are randomly sampled
+from a uniform distribution to construct the source domain,
+seen target domain, and unseen target domain settings for
+training and evaluation. The collected dataset comprises 1,468
+expert trajectories with 22,754 samples, where cross-domain
+trajectory pairs are aligned based on a semantic similarity
+thresholdκ≥0.7. The agent operates with a discrete action
+space consisting of move ahead, rotate left, rotate right, look
+up, look down, and end.
+B. Metrics
+To quantitatively evaluate our approach, we report results
+on several standard metrics widely adopted [36]:
+•Success Rate (SR) (%): The percentage of evaluation
+episodes where the agent successfully navigates to within
+1.0m of the target and executes the termination action.
+•Success weighted by Path Length (SPL): A composite
+metric balancing task completion with trajectory effi-
+ciency, defined as SPL=1
+NPN
+i=1Ii·d⋆
+i
+max(d⋆
+i,pi), where
+Ii∈ {0,1}indicates whether episodeiis successful,d⋆
+i
+denotes the optimal geodesic distance to the goal, andp i
+is the actual path length traversed by the agent.
+•Navigation Error (NE)(m): The average Euclidean dis-
+tance between the agent’s final position and the nearest
+goal object upon episode termination.
+•Episode Length (EL): The average number of time steps
+consumed per episode.C. Baselines
+To comprehensively validate the effectiveness of CAPO, we
+compare against five representative baselines:
+•CURL [13]: A representative visual contrastive learning
+approach that learns state representations by constructing
+positive and negative pairs through data augmentation on
+the same observation.
+•ACO [43]: An action-conditioned contrastive learning
+baseline that treats observations associated with the same
+executed action as positive pairs, while regarding others
+as negatives to capture action-relevant features.
+•ATC [14]: A temporal contrastive learning approach that
+encourages temporal consistency by treating adjacent
+frames as positive pairs and distant frames as negatives.
+•ConPE [44]: A state-of-the-art baseline that utilizes CLIP
+to facilitate both visual and action-conditioned contrastive
+learning, while employing a unimodal attention mecha-
+nism for policy adaptation.
+•PPO [40]: A standard RL baseline that modifies the
+vanilla PPO algorithm by replacing the visual backbone
+with a frozen CLIP encoder for a fair comparison.
+D. Parameter and Architecture Configuration
+Contrastive Prompt Learning.We utilize the CLIP ViT-
+B/32 model as the frozen backboneΦ, which takes RGB
+images of size3×224×224as input. The learnable prompt
+poolPconsists ofK= 10domain-specific prompts (4 for
+appearance, 5 for action attributes, and 1 for text). Each prompt
+pkhas a length ofL= 8with an embedding dimension of
+D= 768, initialized via Xavier uniform initialization.
+For visual contrastive learning, we use a batch size of|B|=
+256and train for 500 epochs. The loss scaling hyperparameters
+λvandλ tare set to 1.0. We use an SGD optimizer with
+momentum 0.9, weight decay10−3, and a polynomial decay
+schedule with an initial learning rate of 0.001. For temporal
+action contrastive learning, we employ a batch size of 64
+and train for 500 epochs. The online network comprises the
+prompted encoderΦ, followed by a two-layer MLP projector
+ρω(dout= 512→4096→16) and a two-layer MLP predictor
+fω(16→512→16), both utilizing ReLU activations and
+batch normalization. The target network is updated via an
+exponential moving average of the online network with a
+momentum coefficient ofβ= 0.99. The optimizer settings
+follow the same schedule as visual contrastive learning. For
+text contrastive learning, we employ a batch size of 256 and
+train for 500 epochs. We use an SGD optimizer with Nesterov
+momentum 0.9, weight decay10−3, and a polynomial decay
+schedule with an initial learning rate of 0.002.
+Adaptive Prompt Orchestration.Here, the prompt pool
+Pand encoderΦare frozen. The attention mechanismG attn
+utilizes a projection networkf pto compute attention keys,
+which is implemented as a two-layer MLP (512→128→
+512) with SiLU activation. The policy networkπ ψreceives a
+concatenated input of the fused visual featurezf
+t∈R512and
+the one-hot goal vectorg∈R12. The temporal dependencies
+are modeled by a single-layer GRU with a hidden state size of
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 11
+512. The actor and critic heads are linear layers mapping the
+GRU output to action logits and value estimates, respectively.
+We optimize the policy using PPO with 48 parallel environ-
+ments. The training spans3×106environment steps. In each
+update cycle, we collect a rollout buffer of 4,800 transitions
+(rollout length of 100 per environment). Key hyperparameters
+are as follows: the learning rate is set to3×10−4and linearly
+decayed to10−5; the PPO clipping range isϵ= 0.2, and the
+discount factor isγ= 0.99. We set the GAE parameter to 0.95
+and the value loss coefficient to 0.5. Regarding the reward
+function design, we employ a composite reward function.
+Specifically, the agent receives +10.0 for successfully reaching
+the target object and -0.01 per time step to promote efficiency.
+Additionally, distance-based reward shaping is applied: the
+agent receivesr=d t−1−dtat each step, whered tdenotes the
+geodesic distance to the target, with the magnitude clamped to
+the actual distance traveled to prevent reward exploitation. All
+training and evaluation experiments are conducted on a single
+NVIDIA GeForce RTX 4090 GPU.
+VI. RESULTS ANDANALYSIS
+This section presents the experimental results and key
+analyses validating the effectiveness of CAPO. We evaluate
+its performance and adaptability across diverse domain factors
+and embodiment configurations in simulation, benchmarking
+it against various baselines. Furthermore, we conduct ablation
+studies to examine the contribution of each core component.
+A. Comparison with Baselines
+The training process is conducted on the 4 source domains,
+each characterized by a unique combination of domain factors.
+For evaluation, we utilize a comprehensive set comprising the
+4 source domains, 30 seen target domains, and 10 unseen
+target domains to rigorously assess adaptation. The primary
+distinction lies in whether the domain configurations were
+encountered during the representation learning phase.
+The reward curves of the training process are illustrated
+in Fig. 4. As illustrated, our approach (CAPO) achieves the
+fastest convergence and the strongest asymptotic performance,
+consistently outperforming all baselines. This significant ad-
+vantage stems from three pivotal design choices: (i) a syn-
+ergized training paradigm, where the prompt basis is frozen
+while the orchestration weights and the policy are jointly
+optimized, effectively combining the stability of decoupled
+representations with the flexibility of end-to-end learning. This
+hybrid paradigm bypasses the sample inefficiency typically
+associated with end-to-end methods, while simultaneously
+overcoming the rigidity of static representations induced by
+fully decoupled pipelines; (ii) text contrastive learning, unlike
+baselines relying solely on visual features, CAPO leverages
+the rich semantic priors embedded in the CLIP model. By
+incorporating learnable text prompts, we explicitly align visual
+representations with goal-oriented semantics. This alignment
+not only enhances sample efficiency but also provides a more
+robust feature space, allowing the policy to converge to a
+higher optimal performance; (iii) adaptive prompt orchestra-
+tion, instead of utilizing static feature representations, we
+0 1.0 2.0 3.0
+Training Steps (×106)0.00.20.40.60.81.0Episode RewardCAPO (Ours) 
+ConPE 
+PPO 
+ACO
+ATC
+CURLFig. 4: Training curves of episodic reward for all baselines.
+All results are averaged over three random seeds, with shaded
+regions indicating confidence intervals. CAPO demonstrates
+superior sample efficiency and asymptotic performance, con-
+verging faster and achieving higher rewards than all baselines.
+introduce a dynamic attention mechanism that adaptively ag-
+gregates domain-specific prompts based on the current context.
+This enables the policy to rapidly identify and upweight the
+most relevant features, effectively accelerating the learning
+process and achieving better performance.
+Regarding the baselines, ConPE achieves the second-best
+performance. However, it falls short of CAPO due to its
+reliance on unimodal representation learning and the lack
+of explicit cross-modal semantic grounding, which limits its
+ability to fully capture goal-relevant cues. Notably, PPO,
+which simply utilizes a frozen CLIP encoder, outperforms
+some contrastive learning baselines. We attribute this to the
+robust adaptation capability of the pre-trained CLIP encoder,
+which provides superior initial features compared to mod-
+els trained from scratch. Conversely, while ATC and ACO
+attempt to capture temporal or action-relevant features, they
+converge more slowly and underperform PPO. This counter-
+intuitive result indicates that their coarse-grained modeling
+and the absence of semantic guidance fail to capture the fine-
+grained environmental dynamics essential for precise naviga-
+tion. CURL exhibits the weakest performance, which suggests
+that performing instance-level contrastive learning on limited
+interaction data leads to catastrophic forgetting of pre-trained
+general knowledge and suffers significantly from distribution
+shift during fine-tuning.
+Quantitative results across all domains are summarized
+in Table I. The results demonstrate that CAPO maintains
+consistently strong adaptation capabilities across all domain
+factors. In contrast, most baselines exhibit significant perfor-
+mance degradation, particularly in unseen domains, indicating
+a failure to handle distribution shifts effectively. While ConPE
+demonstrates a certain level of adaptability, it still falls short of
+CAPO. This performance gap further highlights the limitation
+of relying solely on unimodal visual cues. By integrating text
+contrastive learning with a dynamic adaptive prompt orchestra-
+tion, CAPO effectively bridges the gap between visual features
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 12
+TABLE I: Performance of Baselines in Simulation Environments
+ApproachSource Domains Seen Target Domains Unseen Target Domains
+SR↑SPL↑NE↓EL↓SR↑SPL↑NE↓EL↓SR↑SPL↑NE↓EL↓
+CURL [13] 52.0±1.9 0.32±0.07 0.48±0.08 32±6 15.5±7.0 0.12±0.07 0.93±0.15 55±13 10.3±4.5 0.07±0.03 1.06±0.05 70±11
+ACO [43] 79.1±22.8 0.51±0.16 0.15±0.05 40±21 59.5±17.1 0.37±0.12 0.17±0.07 49±11 42.6±28.1 0.27±0.20 0.17±0.11 53±9
+ATC [14] 82.1±8.1 0.53±0.10 0.12±0.04 27±6 70.4±8.8 0.44±0.08 0.15±0.09 41±16 51.1±11.2 0.31±0.09 0.15±0.08 46±11
+ConPE [44] 96.1±2.3 0.64±0.06 0.03±0.01 20±4 83.3±3.9 0.53±0.09 0.06±0.08 33±6 80.5±6.2 0.52±0.09 0.07±0.07 36±4
+PPO [40] 86.5±5.9 0.53±0.10 0.17±0.08 25±7 77.7±3.6 0.48±0.09 0.15±0.07 38±16 59.8±8.1 0.35±0.10 0.19±0.06 43±8
+CAPO (Ours) 97.9±1.2 0.66±0.04 0.02±0.01 18±3 90.9±3.4 0.61±0.05 0.04±0.06 29±5 86.4±5.7 0.54±0.06 0.06±0.07 32±3
+CAPO ConPE PPO CAPO CAPO ConPE ConPE PPO PPO
+t = 0 t = 0 t = 0
+t = 2 t = 2 t = 2
+t = 4
+t = 6
+t = 10t = 4
+t = 6
+t = 10t = 4
+t = 6
+t = 10Illumination Smaller FOV Normal
+Fig. 5: Visualization of navigation episodes for the goal “Bowl” under diverse domain shifts. The columns display egocentric
+frame sequences from CAPO, ConPE, and PPO across three scenarios: Normal, Illumination Change, and Cross-Embodiment
+(Smaller FOV). CAPO rapidly identifies and approaches the target in all conditions, demonstrating robust zero-shot adaptation.
+ConPE exhibits partial adaptability but suffers from delayed target lock-on, requiring more steps to complete the task. In
+contrast, PPO fails to adapt to environmental interference, resulting in disorientation and task failure.
+and goal semantics while selectively aggregating domain-
+specific features. This multi-modal alignment allows the policy
+to maintain robustness against visual distractions and adapt
+flexibly to unseen embodiment configurations, whereas base-
+lines constrained by fixed or unimodal representations fail to
+generalize.
+B. Cross-Embodiment Policy Adaptation
+Egocentric sequences of the agent under different domain
+factors and embodiment configuration are visualized in Fig. 5.
+It is shown that CAPO exhibits the most decisive navigation
+behaviors across evaluation domains. Specifically, our agent
+maintains stable visual focus on the target “Bowl” despite
+drastic lighting or FOV changes, whereas baselines often
+perform redundant actions or lose tracking. This suggests theeffectiveness of our text contrastive learning and multi-modal
+prompt orchestration mechanism. By explicitly grounding vi-
+sual features in invariant language semantics and dynamically
+filtering domain noise, CAPO ensures the policy remains
+robustly aligned with the task goal, avoiding the degradation
+seen in approaches lacking this cross-modal grounding.
+Furthermore, to rigorously validate the effectiveness of
+CAPO beyond sensor parameter shifts (e.g., FOV), we ex-
+tended our evaluation to physical cross-embodiment adapta-
+tion. As illustrated in Fig. 6, we directly deployed the policy
+trained solely on the ManipulaTHOR source agent onto two
+heterogeneous robot platforms: Stretch RE1 and LoCoBot.
+These embodiments introduce drastic variations in camera
+mounting heights and kinematic constraints, which typically
+disrupt the state distribution for conventional agents. However,
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 13
+(a) ManipulaTHOR
+(b) Stretch RE1
+(c) LoCoBot
+Fig. 6: Zero-shot policy adaptation across distinct unseen
+robot embodiments. The policy, trained on a standard agent
+(a) ManipulaTHOR, is directly deployed onto (b) Stretch
+RE1, and (c) LoCoBot. Despite significant discrepancies in
+embodiment configurations compared to the source domain,
+CAPO successfully adapts to these heterogeneous embodi-
+ments, enabling effective navigation without any fine-tuning.
+CAPO exhibits remarkable adaptability in this challenging
+setting. By leveraging the learned prompts, the orchestration
+mechanism effectively compensates for the discrepancies in
+egocentric views caused by different physical configurations.
+This allows the agent to execute coherent navigation actions
+across diverse embodiments, further verifying CAPO’s poten-
+tial for cross-embodiment deployment.
+To further analyze the internal representations, we visual-
+ize the t-SNE embeddings [45] in Fig. 7. The visualization
+reveals that the visual representations extracted by prompts
+corresponding to the same domain factor cluster tightly to-
+gether, while those associated with distinct domain factors
+are well-separated. This clear clustering structure confirms the
+effectiveness of our hybrid contrastive learning strategy. Addi-
+tionally, Fig. 8 displays the domain-prompt correlation matrix,
+which demonstrates that the adaptive prompt orchestration
+Brightness
+Contrast
+SaturationHueFOV 39 -79 FOV 89 -139
+Step Size Look Up / Down
+TextRotate
+Inter-domain
+Features
+Intra-domain
+FeaturesDegree 
+= 45 ° / 30 ° Fig. 7: t-SNE visualization of learned prompt representations.
+The plot reveals that prompts across different domains are
+well-separated, while features within the same domain form
+tight clusters. This demonstrates that CAPO effectively disen-
+tangles visual and embodiment features.
+0.210.230.320.160.020.020.010.020.01
+0.220.250.280.180.020.010.010.030.01
+0.270.270.180.190.030.020.010.020.01
+0.240.210.190.180.050.030.030.040.02
+0.180.170.160.140.090.070.060.080.05
+0.080.080.070.070.200.140.130.130.10
+0.030.050.030.030.240.160.110.230.11
+0.030.030.020.020.300.170.120.190.11
+0.020.030.020.020.210.140.120.300.16
+0.010.020.010.010.270.160.150.230.13
+0.000.050.100.150.200.250.30
+Lighting PromptEpisode11 2 3 4 5 6 7 8 9
+Embodiment PromptEpisode2Unseen Illumination
+Unseen EmbodimentChanging 
+Domain Factors
+Fig. 8: Visualization of attention weights during different
+navigation episodes. Note that the text prompt is excluded here
+as it is fused directly. The heatmap shows dynamic shifts in
+attention distribution over time, indicating that the agent adap-
+tively re-weights prompts to prioritize relevant features as the
+domain factor changes. This validates the effectiveness of our
+adaptive prompt orchestration mechanism during deployment.
+mechanism correctly activates specific prompts corresponding
+to the dominant domain factors in real-time.
+C. Ablation Studies
+To better interpret the contributions of each component in
+CAPO, we conduct a series of ablation studies and analyses.
+(1) Hybrid Contrastive Learning Strategy.We dismantle
+the training objective to verify the necessity of each contrastive
+loss component. We evaluate variants of CAPO trained without
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 14
+TABLE II: Ablation on Hybrid Contrastive Learning Strategy for Visuomotor Policy Learning
+ApproachSource Domains Seen Target Domains Unseen Target Domains
+SR↑SPL↑NE↓EL↓SR↑SPL↑NE↓EL↓SR↑SPL↑NE↓EL↓
+CAPO w/o visual 92.1±2.8 0.62±0.04 0.04±0.02 20±4 84.5±4.6 0.55±0.05 0.06±0.03 31±5 81.2±6.8 0.50±0.07 0.09±0.07 36±6
+CAPO w/o action 89.8±3.0 0.59±0.04 0.04±0.03 23±5 83.1±3.9 0.53±0.06 0.07±0.03 34±5 78.2±5.7 0.47±0.06 0.08±0.07 41±10
+CAPO w/o text 87.4±3.3 0.56±0.06 0.07±0.04 26±5 80.5±3.8 0.50±0.06 0.08±0.06 37±5 72.3±6.8 0.45±0.07 0.08±0.07 45±12
+CAPO 97.9±1.2 0.66±0.04 0.02±0.01 18±3 90.9±3.4 0.61±0.05 0.04±0.06 29±5 86.4±5.7 0.54±0.06 0.06±0.07 32±3
+40 50 60 70 80 90 100
+SR
+CAPO-AvgCAPO-CosCAPO-AttCAPO
+0.000 0.025 0.050 0.075 0.100 0.125 0.150
+NE
+0.2 0.3 0.4 0.5 0.6 0.7
+SPL
+CAPO-AvgCAPO-CosCAPO-AttCAPO
+10 20 30 40 50 60
+EL
+Source Seen Target Unseen Target
+Fig. 9: Ablation study on the attention mechanism. We
+compare the full model against uniform averaging (CAPO-
+Avg) and single-branch variants (CAPO-Att, CAPO-Cos). The
+results demonstrate that the full CAPO consistently outper-
+forms all alternatives, confirming the necessity of combining
+learnable projections with cosine similarity for feature fusion.
+the text contrastive loss (w/o text), without the action temporal
+loss (w/o action), and without the visual contrastive loss
+(w/o visual). As shown in Table II, w/o text results in the
+most significant performance drop, highlighting the critical
+importance of semantic alignment provided by the language
+priors for adaptation. w/o action leads to the second-largest
+decline. Given that our evaluation involves diverse cross-
+embodiment configurations, this performance drop confirms
+that modeling action-conditioned temporal consistency is es-
+sential for adapting to varying agent dynamics. Notably, w/o
+visual shows the least performance degradation. We attribute
+this to the fact that the other two objectives also incorporate
+moderate data augmentation during training, which implicitly
+imparts a degree of visual invariance even without the explicit
+visual contrastive loss. However, the full hybrid objective still
+yields the best performance, demonstrating that these three
+components are complementary.
+(2) Effectiveness of Attention Mechanism.We analyze the
+contribution of the adaptive prompt orchestration mechanism
+by comparing it with three alternative fusion strategies: (i)
+CAPO-Avg, where the final state representation is simply
+the uniform mean of all prompted embeddings; (ii) CAPO-
+Att, which utilizes only the learnable projection network to
+2 4 6 8 10 12020406080100SR
+2 4 6 8 10 120.00.20.40.60.8NE
+2 4 6 8 10 12
+Number of Visual Prompts (K)0.00.10.20.30.40.50.60.70.8 SPL
+2 4 6 8 10 12
+Number of Visual Prompts (K)0255075100125150175EL
+Source Seen Target Unseen TargetFig. 10: Sensitivity Analysis on the Prompt Pool SizeK.
+Performance consistently improves asKincreases, peaking
+atK= 10which aligns with the distinct domain factors.
+IncreasingKfurther to 12 leads to degradation, indicating
+that excessive prompts introduce redundancy and overfitting.
+compute attention weights, disregarding the cosine similarity
+calculation; and (iii) CAPO-Cos, which relies solely on the
+cosine similarity between prompted and vanilla embeddings
+to determine weights without learnable projections. The com-
+parative results are presented in Fig. 9. We observe that CAPO-
+A VG lags significantly behind the full approach. Both CAPO-
+Att and CAPO-Cos exhibit performance drops compared to
+the full CAPO. This decline indicates that neither the learnable
+projection nor the semantic similarity calculation is sufficient
+on its own. The superior performance of the full CAPO
+confirms the necessity of our hybrid design, where learnable
+attention captures task-relevant features while cosine similarity
+acts as a semantic anchor.
+D. Parameter Sensitivity Analysis
+To assess the performance of CAPO under different hyper-
+parameter settings, we further conduct a sensitivity analysis.
+(1) Sensitivity to Prompt Number.We investigate the im-
+pact of the number of visual promptsKon the policy’s success
+rate. Specifically, we train the CAPO approach with varying
+prompt pool sizesK∈ {2,4,6,8,10,12}, where the setting
+ofK= 12is obtained by subdividing the FOV parameter
+into finer intervals. The evaluation results are summarized in
+Fig. 10. As shown, the performance improves consistently
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 15
+TABLE III: Sensitivity Analysis on Semantic Regularization for Visuomotor Policy Learning
+ApproachSource Domains Seen Target Domains Unseen Target Domains
+SR↑SPL↑NE↓EL↓SR↑SPL↑NE↓EL↓SR↑SPL↑NE↓EL↓
+σ= 092.6±1.9 0.63±0.04 0.03±0.02 20±3 85.4±3.8 0.56±0.05 0.06±0.03 32±5 81.8±5.9 0.51±0.07 0.08±0.08 35±5
+σ= 0.1 97.9±1.2 0.66±0.04 0.02±0.01 18±3 90.9±3.4 0.61±0.05 0.04±0.06 29±5 86.4±5.7 0.54±0.06 0.06±0.07 32±3
+σ= 0.387.1±2.1 0.56±0.07 0.04±0.04 27±5 78.7±4.2 0.47±0.06 0.08±0.08 38±6 70.5±6.6 0.42±0.08 0.10±0.08 45±8
+σ= 0.583.5±3.0 0.53±0.06 0.08±0.06 25±6 73.2±5.2 0.46±0.08 0.09±0.08 39±6 65.6±6.9 0.38±0.08 0.11±0.08 47±11
+CAPO-Reg 80.2±3.9 0.49±0.07 0.13±0.06 37±6 69.8±6.3 0.41±0.08 0.11±0.09 47±8 57.4±7.7 0.32±0.09 0.15±0.09 72±13
+100 50 0 50 100
+SR
+L=4L=8L=16L=24
+0.16 0.08 0 0.08 0.16
+NE
+L=4L=8L=16L=24
+0.8 0.4 0 0.4 0.8
+SPL
+L=4L=8L=16L=24
+60 40 20 0 20 40 60
+EL
+L=4L=8L=16L=24Source Seen Target Unseen Target
+Fig. 11: Sensitivity analysis on the visual prompt length
+L. We evaluate performance across varying lengthsL∈
+{4,8,16,24}. The results indicate thatL= 8achieves the
+optimal trade-off between feature expressivity and adaptability.
+Shorter prompts (L= 4) lead to underfitting, while longer
+prompts (L= 24) result in overfitting to source domains,
+thereby degrading adaptability in unseen target domains.
+asKincreases. A small number of prompts yields limited
+improvement, as the capacity is insufficient to capture the
+diverse domain factors present in the environment. However,
+the performance saturates aroundK= 10, which aligns with
+the total number of distinct domain factors defined in our data
+collection phase. This suggests that matching the prompt pool
+size to the underlying domain variations is optimal, while an
+excessive number of prompts may lead to redundancy without
+providing distinct performance gains. Based on this, we adopt
+K= 10as the default setting.
+(2) Sensitivity to Prompt Length.We examine the sensi-tivity of CAPO to the length of the learnable visual prompts
+L, testingL∈ {4,8,16,24}. The results in Fig. 11 indicate
+thatL= 8provides the optimal balance. Shorter prompts
+(L= 4) lack the expressivity to encode complex domain-
+specific features, resulting in underfitting. Conversely, longer
+prompts (L= 24) tend to overfit the specific visual textures of
+the source domains, hampering zero-shot adaptation to unseen
+target domains. This suggests that a moderate prompt length is
+sufficient and effective for steering the frozen CLIP encoder.
+(3) Sensitivity to Semantic Regularization.We examine
+the sensitivity of CAPO to the noise scaleσused in the
+semantic regularization mechanismζ∼ N(0, σ2I). As shown
+in Table III, introducing a moderate amount of noise (σ= 0.1)
+yields the highest performance, outperforming other settings.
+This suggests that appropriate regularization helps prevent
+overfitting to source domains. However, performance degrades
+whenσis increased from 0.3 to 0.5, indicating that excessive
+perturbation disrupts feature integrity. Additionally, removing
+text prompts while relying solely on regularization (CAPO-
+Reg) results in significant performance drops, confirming that
+noise injection is complementary to, but cannot replace, the
+explicit semantic guidance from text prompts.
+VII. CONCLUSION
+In this work, we propose CAPO, a novel approach that
+integrates contrastive prompt learning with adaptive prompt
+orchestration to enhance the sample efficiency and cross-
+embodiment adaptation of navigation policies. For contrastive
+prompt learning, a hybrid contrastive strategy incorporating
+visual, action, and text objectives is employed to learn a
+diverse pool of domain-specific visual prompts. These prompts
+effectively capture fine-grained environmental and embod-
+iment variations. After this, the visual encoder is frozen,
+and a dynamic prompt orchestration mechanism is introduced
+to adaptively aggregate these prompts based on the current
+observation context. CAPO allows the agent to dynamically re-
+weight visual features under domain variations, enabling rapid
+adaptation to unseen configurations. Extensive simulation
+experiments demonstrate that CAPO significantly improves
+sample efficiency and asymptotic performance, while enabling
+robust zero-shot adaptation across diverse unseen domains.
+However, the approach’s adaptability is bounded by the di-
+versity of source domains, potentially limiting performance
+under extreme distribution shifts orthogonal to the learned
+prompt pool. Future work will address this via online prompt
+adaptation. Moreover, while the current approach utilizes
+semantic priors primarily for the ObjectNav task, we plan to
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 16
+extend this semantic alignment capability to more complex
+vision-language navigation tasks.
+REFERENCES
+[1] J. Xiao, R. Zhang, Y . Zhang, and M. Feroskhan, “Vision-based learning
+for drones: A survey,”IEEE Transactions on Neural Networks and
+Learning Systems, vol. 36, no. 9, pp. 15 601–15 621, 2025.
+[2] C. Kong, A. Luo, S. Wang, H. Li, A. Rocha, and A. C. Kot, “Pixel-
+inconsistency modeling for image manipulation localization,”IEEE
+Transactions on Pattern Analysis and Machine Intelligence, vol. 47,
+no. 6, pp. 4455–4472, 2025.
+[3] A. Srisuchinnawong and P. Manoonpong, “An interpretable neural
+control network with adaptable online learning for sample efficient
+robot locomotion learning,”IEEE Transactions on Neural Networks and
+Learning Systems, vol. 36, no. 9, pp. 16 143–16 155, 2025.
+[4] J. Wu, Y . Zhou, H. Yang, Z. Huang, and C. Lv, “Human-guided
+reinforcement learning with sim-to-real transfer for autonomous naviga-
+tion,”IEEE Transactions on Pattern Analysis and Machine Intelligence,
+vol. 45, no. 12, pp. 14 745–14 759, 2023.
+[5] S. Belkhale, Y . Cui, and D. Sadigh, “Hydra: Hybrid robot actions for
+imitation learning,” inConference on Robot Learning (CoRL). PMLR,
+2023, pp. 2113–2133.
+[6] M. Zare, P. M. Kebria, A. Khosravi, and S. Nahavandi, “A survey of
+imitation learning: Algorithms, recent developments, and challenges,”
+IEEE Transactions on Cybernetics, vol. 54, no. 12, pp. 7173–7186, 2024.
+[7] Y . Zhang, C. Yan, J. Xiao, and M. Feroskhan, “Npe-drl: Enhancing
+perception constrained obstacle avoidance with non-expert policy guided
+reinforcement learning,”IEEE Transactions on Artificial Intelligence,
+vol. 6, no. 1, pp. 184–198, 2024.
+[8] Y . Zhang, Y . Hu, Y . Song, D. Zou, and W. Lin, “Learning vision-based
+agile flight via differentiable physics,”Nature Machine Intelligence, pp.
+1–13, 2025.
+[9] J. Tobin, R. Fong, A. Ray, J. Schneider, W. Zaremba, and P. Abbeel,
+“Domain randomization for transferring deep neural networks from sim-
+ulation to the real world,” in2017 IEEE/RSJ International Conference
+on Intelligent Robots and Systems (IROS). IEEE, 2017, pp. 23–30.
+[10] J. Tobin, L. Biewald, R. Duan, M. Andrychowicz, A. Handa, V . Ku-
+mar, B. McGrew, A. Ray, J. Schneider, P. Welinderet al., “Domain
+randomization and generative models for robotic grasping,” in2018
+IEEE/RSJ International Conference on Intelligent Robots and Systems
+(IROS). IEEE, 2018, pp. 3482–3489.
+[11] D. Horv ´ath, G. Erd ˝os, Z. Istenes, T. Horv ´ath, and S. F ¨oldi, “Object
+detection using sim2real domain randomization for robotic applications,”
+IEEE Transactions on Robotics, vol. 39, no. 2, pp. 1225–1243, 2022.
+[12] A. Kumar, Z. Fu, D. Pathak, and J. Malik, “Rma: Rapid motor adaptation
+for legged robots,”Robotics: Science and Systems (RSS), pp. 1–11, 2021.
+[13] M. Laskin, A. Srinivas, and P. Abbeel, “Curl: Contrastive unsupervised
+representations for reinforcement learning,” inInternational Conference
+on Machine Learning (ICML). PMLR, 2020, pp. 5639–5650.
+[14] A. Stooke, K. Lee, P. Abbeel, and M. Laskin, “Decoupling representation
+learning from reinforcement learning,” inInternational Conference on
+Machine Learning (ICML). PMLR, 2021, pp. 9870–9879.
+[15] Y . Zhang, J. Xiao, and M. Feroskhan, “Learning cross-modal visuo-
+motor policies for autonomous drone navigation,”IEEE Robotics and
+Automation Letters, vol. 10, no. 6, pp. 5425–5432, 2025.
+[16] J. Zhao, Y . Wang, Z. Cai, N. Liu, K. Wu, and Y . Wang, “Learning visual
+representation for autonomous drone navigation via a contrastive world
+model,”IEEE Transactions on Artificial Intelligence, vol. 5, no. 3, pp.
+1263–1276, 2023.
+[17] J. Xing, L. Bauersfeld, Y . Song, C. Xing, and D. Scaramuzza, “Con-
+trastive learning for enhancing robust scene transfer in vision-based
+agile flight,” in2024 IEEE International Conference on Robotics and
+Automation (ICRA). IEEE, 2024, pp. 5330–5337.
+[18] Y . Zhang, J. Xiao, C. Yan, and M. Feroskhan, “Oracle-guided masked
+contrastive reinforcement learning for visuomotor policies,”arXiv
+preprint arXiv:2510.05692, 2025.
+[19] A. Majumdar, G. Aggarwal, B. Devnani, J. Hoffman, and D. Batra,
+“Zson: Zero-shot object-goal navigation using multimodal goal embed-
+dings,”Advances in Neural Information Processing Systems (NeurIPS),
+vol. 35, pp. 32 340–32 352, 2022.
+[20] D. Shah, B. Osi ´nski, S. Levineet al., “Lm-nav: Robotic navigation with
+large pre-trained models of language, vision, and action,” inConference
+on Robot Learning (CoRL). PMLR, 2023, pp. 492–504.[21] Y . Zhang, H. Yu, J. Xiao, and M. Feroskhan, “Grounded vision-language
+navigation for uavs with open-vocabulary goal understanding,”arXiv
+preprint arXiv:2506.10756, 2025.
+[22] V . S. Dorbala, J. F. Mullen, and D. Manocha, “Can an embodied agent
+find your cat-shaped mug? llm-based zero-shot object navigation,”IEEE
+Robotics and Automation Letters, vol. 9, no. 5, pp. 4083–4090, 2023.
+[23] A. Radford, J. W. Kim, C. Hallacy, A. Ramesh, G. Goh, S. Agarwal,
+G. Sastry, A. Askell, P. Mishkin, J. Clarket al., “Learning transferable
+visual models from natural language supervision,” inInternational
+Conference on Machine Learning (ICML). PMLR, 2021, pp. 8748–
+8763.
+[24] A. Loquercio, A. I. Maqueda, C. R. Del-Blanco, and D. Scaramuzza,
+“Dronet: Learning to fly by driving,”IEEE Robotics and Automation
+Letters, vol. 3, no. 2, pp. 1088–1095, 2018.
+[25] Y . Pan, C.-A. Cheng, K. Saigol, K. Lee, X. Yan, E. A. Theodorou,
+and B. Boots, “Imitation learning for agile autonomous driving,”The
+International Journal of Robotics Research, vol. 39, no. 2-3, pp. 286–
+302, 2020.
+[26] R. Ramrakhya, E. Undersander, D. Batra, and A. Das, “Habitat-web:
+Learning embodied object-search strategies from human demonstrations
+at scale,” inProceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition (CVPR), 2022, pp. 5173–5183.
+[27] T. Z. Zhao, V . Kumar, S. Levine, and C. Finn, “Learning fine-grained
+bimanual manipulation with low-cost hardware,”Robotics: Science and
+Systems (RSS), pp. 1–18, 2023.
+[28] S. Ross, G. Gordon, and D. Bagnell, “A reduction of imitation learning
+and structured prediction to no-regret online learning,” inProceedings
+of the Fourteenth International Conference on Artificial Intelligence and
+Statistics (AISTATS). JMLR Workshop and Conference Proceedings,
+2011, pp. 627–635.
+[29] E. Kaufmann, L. Bauersfeld, A. Loquercio, M. M ¨uller, V . Koltun, and
+D. Scaramuzza, “Champion-level drone racing using deep reinforcement
+learning,”Nature, vol. 620, no. 7976, pp. 982–987, 2023.
+[30] J. Xiao, P. Pisutsin, and M. Feroskhan, “Collaborative target search with
+a visual drone swarm: An adaptive curriculum embedded multistage re-
+inforcement learning approach,”IEEE Transactions on Neural Networks
+and Learning Systems, vol. 36, no. 1, pp. 313–327, 2023.
+[31] C. Yan, C. Wang, X. Xiang, K. H. Low, X. Wang, X. Xu, and
+L. Shen, “Collision-avoiding flocking with multiple fixed-wing uavs
+in obstacle-cluttered environments: A task-specific curriculum-based
+madrl approach,”IEEE Transactions on Neural Networks and Learning
+Systems, vol. 35, no. 8, pp. 10 894–10 908, 2023.
+[32] K. Zhou, J. Yang, C. C. Loy, and Z. Liu, “Learning to prompt for vision-
+language models,”International Journal of Computer Vision, vol. 130,
+no. 9, pp. 2337–2348, 2022.
+[33] L. Yang, Y . Wang, X. Li, X. Wang, and J. Yang, “Fine-grained
+visual prompting,”Advances in Neural Information Processing Systems
+(NeurIPS), vol. 36, pp. 24 993–25 006, 2023.
+[34] M. U. Khattak, H. Rasheed, M. Maaz, S. Khan, and F. S. Khan,
+“Maple: Multi-modal prompt learning,” inProceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition (CVPR), 2023,
+pp. 19 113–19 122.
+[35] L. Yang, X. Li, Y . Wang, X. Wang, and J. Yang, “Fine-grained visual
+text prompting,”IEEE Transactions on Pattern Analysis and Machine
+Intelligence, vol. 47, no. 3, pp. 1594–1609, 2024.
+[36] E. Kolve, R. Mottaghi, W. Han, E. VanderBilt, L. Weihs, A. Herrasti,
+M. Deitke, K. Ehsani, D. Gordon, Y . Zhuet al., “Ai2-thor: An interactive
+3d environment for visual ai,”arXiv preprint arXiv:1712.05474, 2017.
+[37] J.-B. Grill, F. Strub, F. Altch ´e, C. Tallec, P. Richemond, E. Buchatskaya,
+C. Doersch, B. Avila Pires, Z. Guo, M. Gheshlaghi Azaret al.,
+“Bootstrap your own latent-a new approach to self-supervised learning,”
+Advances in Neural Information Processing Systems (NeurIPS), vol. 33,
+pp. 21 271–21 284, 2020.
+[38] P. Ramachandran, B. Zoph, and Q. V . Le, “Searching for activation
+functions,” inInternational Conference on Learning Representations
+(ICLR), 2018, pp. 1–13.
+[39] M. O. Turkoglu, S. D’Aronco, J. D. Wegner, and K. Schindler, “Gating
+revisited: Deep multi-layer rnns that can be trained,”IEEE Transactions
+on Pattern Analysis and Machine Intelligence, vol. 44, no. 8, pp. 4081–
+4092, 2021.
+[40] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Prox-
+imal policy optimization algorithms,”arXiv preprint arXiv:1707.06347,
+2017.
+[41] C. Feng and I. Patras, “Maskcon: Masked contrastive learning for
+coarse-labelled dataset,” inProceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition (CVPR), 2023, pp. 19 913–
+19 922.
+JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 17
+[42] Y . Lei, T. Yang, Y . Ying, and D.-X. Zhou, “Generalization analysis
+for contrastive representation learning,” inInternational Conference on
+Machine Learning (ICML). PMLR, 2023, pp. 19 200–19 227.
+[43] Q. Zhang, Z. Peng, and B. Zhou, “Learning to drive by watching youtube
+videos: Action-conditioned contrastive policy pretraining,” inEuropean
+Conference on Computer Vision (ECCV). Springer, 2022, pp. 111–128.
+[44] W. Choi, W. K. Kim, S. Kim, and H. Woo, “Efficient policy adaptation
+with contrastive prompt ensemble for embodied agents,”Advances in
+Neural Information Processing Systems (NeurIPS), 2024.
+[45] L. Van der Maaten and G. Hinton, “Visualizing data using t-sne.”Journal
+of Machine Learning Research, vol. 9, no. 11, 2008.
+Yuhang Zhang(graduate student member, IEEE)
+received the B.E. degree in flight vehicle propulsion
+engineering from Harbin Engineering University,
+Harbin, China, in 2021 and the M.Eng. degree from
+the School of Mechanical & Aerospace Engineering
+at Nanyang Technological University (NTU), Singa-
+pore, in 2023. Currently, he is pursuing his Ph.D.
+degree at the School of Mechanical & Aerospace
+Engineering at NTU, Singapore.
+His research primarily focuses on unmanned
+aerial vehicles, deep reinforcement learning, and
+vision-and-language navigation.
+Chao Yan(member, IEEE) received the B.E. degree
+in electrical engineering and automation from China
+University of Mining and Technology, Xuzhou,
+China, in 2017, and the M.S. and Ph.D. degrees in
+control science and engineering from the National
+University of Defense Technology, Changsha, China,
+in 2019, and 2023, respectively. He was a visit-
+ing Ph.D. student with the School of Mechanical
+and Aerospace Engineering, Nanyang Technological
+University, Singapore, from 2021 to 2022.
+He is currently an Associate Professor with the
+College of Automation Engineering, Nanjing University of Aeronautics and
+Astronautics, Nanjing, China. His research interests include deep reinforce-
+ment learning and coordination control of UA V swarms.
+Jiaxi Yureceived the B.E. degree in Mechanical De-
+sign, Manufacturing and Automation from Shandong
+University, Jinan, China, in 2025. She is presently
+enrolled in the M.SC. program at the School of
+Mechanical and Aerospace Engineering, Nanyang
+Technological University (NTU), Singapore.
+Her research interests are mainly oriented toward
+reinforcement learning.
+Jiaping Xiao(member, IEEE) received the B.E.
+degree in aircraft design and engineering and the
+M.S. degree in flight dynamics and control from
+Beihang University, Beijing, China, in 2014 and
+2017, and the Ph.D. degree in intelligent systems
+from Nanyang Technological University (NTU), Sin-
+gapore, in 2024. He is currently a research fellow
+with the School of Mechanical and Aerospace En-
+gineering, NTU.
+His research interests include cyber-physical sys-
+tems, reinforcement learning, machine vision, and
+aerial robotics.
+Mir Feroskhan(member, IEEE) received B.E. de-
+gree (Hons.) in aerospace engineering from Nanyang
+Technological University, Singapore, in 2011, and
+the Ph.D. degree in aerospace engineering from the
+Florida Institute of Technology, Melbourne, FL, in
+2016. He is currently an assistant professor with the
+School of Mechanical & Aerospace Engineering at
+NTU.
+His research interests include nonlinear control
+systems, multi-agent systems, flight dynamics and
+control, and aerial robotics.

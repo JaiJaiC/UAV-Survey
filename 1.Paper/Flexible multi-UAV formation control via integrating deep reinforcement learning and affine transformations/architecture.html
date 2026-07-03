@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-UAV Flexible Formation Control — System Architecture</title>
+<style>
+  :root {
+    --bg: #f8f9fb;
+    --surface: #ffffff;
+    --border: #e2e5ea;
+    --text: #1a1d23;
+    --text-secondary: #5f6b7a;
+    --blue-fill: #e8f0fe;
+    --blue-stroke: #3b82f6;
+    --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;
+    --green-stroke: #10b981;
+    --green-strong: #047857;
+    --amber-fill: #fef7ed;
+    --amber-stroke: #f59e0b;
+    --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;
+    --purple-stroke: #8b5cf6;
+    --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;
+    --rose-stroke: #f43f5e;
+    --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;
+    --gray-stroke: #9ca3af;
+    --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;
+    --cyan-stroke: #14b8a6;
+    --cyan-strong: #0f766e;
+    --indigo-fill: #eef2ff;
+    --indigo-stroke: #6366f1;
+    --indigo-strong: #4338ca;
+    --yellow-fill: #fefce8;
+    --yellow-stroke: #eab308;
+    --yellow-strong: #a16207;
+    --teal-fill: #f0fdf4;
+    --teal-stroke: #22c55e;
+    --teal-strong: #166534;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 24px;
+    color: var(--text);
+  }
+  .container {
+    max-width: 1400px;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 28px 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+  }
+  svg { display: block; width: 100%; height: auto; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .legend-swatch {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Multi-UAV Flexible Formation Control — System Architecture</h1>
+  <p class="subtitle">Model-Data Hybrid-Driven Framework · Two-Layer Control (Decision + Execution) · Affine Transformations + DRL (PPO) · NUDT 2025 · Aerospace Science &amp; Technology</p>
+
+  <svg viewBox="0 0 1320 1020" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow-blue" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#3b82f6"/>
+      </marker>
+      <marker id="arrow-green" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/>
+      </marker>
+      <marker id="arrow-amber" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#f59e0b"/>
+      </marker>
+      <marker id="arrow-purple" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#8b5cf6"/>
+      </marker>
+      <marker id="arrow-rose" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#f43f5e"/>
+      </marker>
+      <marker id="arrow-gray" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#9ca3af"/>
+      </marker>
+      <marker id="arrow-cyan" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#14b8a6"/>
+      </marker>
+      <marker id="arrow-indigo" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#6366f1"/>
+      </marker>
+
+      <filter id="shadow" x="-4%" y="-4%" width="108%" height="112%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.08"/>
+      </filter>
+      <filter id="shadow-light" x="-4%" y="-4%" width="108%" height="112%">
+        <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.05"/>
+      </filter>
+    </defs>
+
+    <!-- ============================================================ -->
+    <!-- SECTION BACKGROUNDS -->
+    <!-- ============================================================ -->
+
+    <!-- Section 1: Training Orchestration -->
+    <rect x="20" y="20" width="1280" height="195" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="36" y="46" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">TRAINING ORCHESTRATION — Two-Stage Curriculum Learning + PPO + Multi-UAV Parallel Training</text>
+
+    <!-- Section 2: Decision Layer -->
+    <rect x="20" y="235" width="490" height="420" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="36" y="261" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">DECISION LAYER — Model-Based (Affine Transformations) ⚙</text>
+
+    <!-- Section 3: Execution Layer -->
+    <rect x="530" y="235" width="450" height="420" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="546" y="261" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">EXECUTION LAYER — Data-Driven (DRL per UAV) 🤖</text>
+
+    <!-- Section 4: UAV Model + Reward -->
+    <rect x="1000" y="235" width="300" height="420" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="1016" y="261" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">UAV MODEL · REWARD · SIM</text>
+
+    <!-- Section 5: Evaluation & Inference -->
+    <rect x="20" y="675" width="1280" height="185" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="36" y="701" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">EVALUATION · INFERENCE · CLOSED-LOOP DATA FLOW</text>
+
+    <!-- ============================================================ -->
+    <!-- ROW 1: TRAINING ORCHESTRATION (y: 20-215) -->
+    <!-- ============================================================ -->
+
+    <!-- PPO Algorithm -->
+    <rect x="44" y="60" width="195" height="78" rx="8" fill="var(--blue-fill)" stroke="var(--blue-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="141" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="var(--blue-strong)">PPO Algorithm</text>
+    <text x="141" y="104" text-anchor="middle" font-size="10" fill="#5b6e8c">Proximal Policy Optimization</text>
+    <text x="141" y="120" text-anchor="middle" font-size="9" fill="#7b8da6">γ=0.99 · λ=0.95 · K_epoch=20</text>
+    <text x="141" y="134" text-anchor="middle" font-size="9" fill="#7b8da6">lr=5e-5(S1)/2e-5(S2) · KL_target</text>
+
+    <!-- Two-Stage Curriculum Learning -->
+    <rect x="260" y="52" width="230" height="48" rx="8" fill="var(--indigo-fill)" stroke="var(--indigo-stroke)" stroke-width="1.5" filter="url(#shadow-light)"/>
+    <text x="375" y="72" text-anchor="middle" font-size="11" font-weight="700" fill="var(--indigo-strong)">Two-Stage Curriculum Learning</text>
+    <text x="375" y="90" text-anchor="middle" font-size="9" fill="#6366f1">Stage 1: Obstacle-free → Stage 2: Complex obstacles</text>
+
+    <!-- Stage boxes -->
+    <rect x="260" y="108" width="108" height="30" rx="4" fill="white" stroke="#a5b4fc" stroke-width="1"/>
+    <text x="314" y="122" text-anchor="middle" font-size="9" font-weight="600" fill="#4338ca">Stage 1 (70k iter)</text>
+    <text x="314" y="134" text-anchor="middle" font-size="8" fill="#6366f1">Nav + inter-UAV avoidance</text>
+
+    <text x="376" y="126" text-anchor="middle" font-size="13" fill="#6366f1">→</text>
+
+    <rect x="390" y="108" width="108" height="30" rx="4" fill="white" stroke="#a5b4fc" stroke-width="1"/>
+    <text x="444" y="122" text-anchor="middle" font-size="9" font-weight="600" fill="#4338ca">Stage 2 (converge)</text>
+    <text x="444" y="134" text-anchor="middle" font-size="8" fill="#6366f1">Complex obstacle env</text>
+
+    <!-- Arrow: Curriculum → PPO -->
+    <line x1="260" y1="76" x2="239" y2="76" stroke="var(--indigo-stroke)" stroke-width="1.5" marker-end="url(#arrow-indigo)"/>
+
+    <!-- PPO → parallel envs -->
+    <line x1="141" y1="138" x2="141" y2="172" stroke="var(--blue-stroke)" stroke-width="1.5"/>
+    <line x1="141" y1="172" x2="516" y2="172" stroke="var(--blue-stroke)" stroke-width="2" marker-end="url(#arrow-blue)"/>
+    <text x="328" y="166" text-anchor="middle" font-size="9" fill="#3b82f6">distribute policy θ → each UAV (decentralized execution)</text>
+
+    <!-- N Parallel UAV Environments -->
+    <rect x="524" y="56" width="440" height="86" rx="8" fill="var(--green-fill)" stroke="var(--green-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+
+    <!-- Mini UAV boxes -->
+    <rect x="538" y="70" width="60" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/>
+    <text x="568" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">UAV ₁</text>
+    <rect x="604" y="70" width="60" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/>
+    <text x="634" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">UAV ₂</text>
+    <rect x="670" y="70" width="60" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/>
+    <text x="700" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">UAV ₃</text>
+    <text x="753" y="87" text-anchor="middle" font-size="12" fill="#047857">···</text>
+    <rect x="538" y="104" width="60" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/>
+    <text x="568" y="121" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">UAV N</text>
+
+    <text x="744" y="156" text-anchor="middle" font-size="9.5" fill="#047857">Each UAV: independent policy π_θ · neighbors = dynamic obstacles</text>
+
+    <!-- Experience return loop -->
+    <path d="M 744 142 L 744 202 L 141 202 L 141 138" stroke="var(--green-stroke)" stroke-width="1.5" fill="none" marker-end="url(#arrow-green)"/>
+    <text x="442" y="216" text-anchor="middle" font-size="9" fill="#10b981">collect {o_i, a_i, r_i, o_i'} for all UAVs → compute advantages (GAE) → PPO update</text>
+
+    <!-- CTDE + Sim info -->
+    <rect x="980" y="52" width="305" height="22" rx="4" fill="#e8f0fe" stroke="#93c5fd" stroke-width="1"/>
+    <text x="1132" y="68" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">CTDE: Centralized Training · Decentralized Execution</text>
+
+    <rect x="980" y="82" width="305" height="60" rx="6" fill="var(--gray-fill)" stroke="var(--gray-stroke)" stroke-width="1" filter="url(#shadow-light)"/>
+    <text x="1132" y="100" text-anchor="middle" font-size="11" font-weight="700" fill="var(--gray-strong)">Training Platform</text>
+    <text x="1132" y="116" text-anchor="middle" font-size="9" fill="#6b7280">STAGE Simulator · Random obstacles</text>
+    <text x="1132" y="132" text-anchor="middle" font-size="9" fill="#6b7280">Ubuntu 20.04 · 32GB · RTX 3090 · ~24h</text>
+
+    <!-- ============================================================ -->
+    <!-- ROW 2, COL 1: DECISION LAYER (x: 20-510, y: 235-655) -->
+    <!-- ============================================================ -->
+
+    <!-- 1. Nominal Formation Configuration -->
+    <rect x="42" y="278" width="220" height="68" rx="8" fill="var(--amber-fill)" stroke="var(--amber-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="152" y="300" text-anchor="middle" font-size="11" font-weight="700" fill="var(--amber-strong)">① Nominal Formation Config</text>
+    <text x="152" y="316" text-anchor="middle" font-size="9" fill="#92400e">x = [x₁ᵀ, ..., x_Nᵀ]ᵀ ∈ ℝ^(dN)</text>
+    <text x="152" y="330" text-anchor="middle" font-size="9" fill="#b45309">d=2 · Leaders x_l · Followers x_f</text>
+    <text x="152" y="342" text-anchor="middle" font-size="8.5" fill="#b45309">Defines desired formation shape</text>
+
+    <!-- Arrow down -->
+    <line x1="152" y1="346" x2="152" y2="366" stroke="var(--amber-stroke)" stroke-width="2" marker-end="url(#arrow-amber)"/>
+
+    <!-- 2. Affine Transformation Engine -->
+    <rect x="42" y="370" width="448" height="118" rx="8" fill="#fff7ed" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="42" y="370" width="448" height="26" rx="8" fill="#f59e0b"/>
+    <rect x="42" y="388" width="448" height="8" fill="#f59e0b"/>
+    <text x="266" y="388" text-anchor="middle" font-size="12" font-weight="700" fill="white">② Affine Transformation Engine</text>
+
+    <text x="58" y="414" font-size="9.5" font-weight="600" fill="#b45309">Time-Varying Target Formation (Eq.5):</text>
+    <text x="78" y="432" font-size="11" font-weight="600" fill="#92400e" font-family="monospace">x'(t) = (A(t) ⊗ I_d) · x + [1_N ⊗ I_d] · b(t)</text>
+
+    <text x="58" y="452" font-size="9" fill="#92400e">A(t) ∈ ℝ^(d×d): rotation · scaling · shear  |  b(t) ∈ ℝ^d: translation vector</text>
+
+    <text x="58" y="472" font-size="9" fill="#92400e">Transformations: Rotation (θ) · Scaling (s_x, s_y) · Shear (h_x, h_y) · Translation (t_x, t_y)</text>
+    <text x="58" y="484" font-size="9" fill="#b45309">Goal: formation can flexibly rotate, scale, shear, and translate to adapt to environment</text>
+
+    <!-- Arrow down -->
+    <line x1="266" y1="488" x2="266" y2="508" stroke="var(--amber-stroke)" stroke-width="2" marker-end="url(#arrow-amber)"/>
+
+    <!-- 3. Stress Matrix + Leader-Follower -->
+    <rect x="42" y="512" width="448" height="130" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="266" y="536" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">③ Leader-Follower via Stress Matrix Ω</text>
+    <line x1="58" y1="546" x2="474" y2="546" stroke="#fde68a" stroke-width="0.5"/>
+
+    <!-- Stress matrix definition -->
+    <rect x="58" y="556" width="188" height="52" rx="4" fill="white" stroke="#fcd34d" stroke-width="0.8"/>
+    <text x="152" y="574" text-anchor="middle" font-size="9.5" font-weight="600" fill="#92400e">Stress Matrix (Eq.4, Eq.7):</text>
+    <text x="152" y="592" text-anchor="middle" font-size="9" fill="#92400e" font-family="monospace">Ω = [Ω_ll  Ω_lf]</text>
+    <text x="152" y="604" text-anchor="middle" font-size="9" fill="#92400e" font-family="monospace">    [Ω_fl  Ω_ff]</text>
+
+    <text x="255" y="585" text-anchor="middle" font-size="13" fill="#f59e0b">⇒</text>
+
+    <!-- Followers target formula -->
+    <rect x="278" y="556" width="196" height="52" rx="4" fill="white" stroke="#fcd34d" stroke-width="0.8"/>
+    <text x="376" y="572" text-anchor="middle" font-size="9.5" font-weight="600" fill="#92400e">Followers' Target (Eq.8):</text>
+    <text x="376" y="590" text-anchor="middle" font-size="9.5" fill="#b45309" font-family="monospace">p_f*(t) = −Ω_ff⁻¹ · Ω_fl · p_l(t)</text>
+    <text x="376" y="604" text-anchor="middle" font-size="8.5" fill="#b45309">Uniquely determined by leaders' positions</text>
+
+    <!-- Key insight -->
+    <rect x="58" y="616" width="416" height="20" rx="4" fill="#fef3c7" stroke="#fbbf24" stroke-width="0.8"/>
+    <text x="266" y="631" text-anchor="middle" font-size="9.5" fill="#92400e">Key: 1-to-1 correspondence between leaders' positions and (A,b) — distributed computation</text>
+
+    <!-- Output: Target positions per UAV -->
+    <rect x="158" y="648" width="220" height="22" rx="4" fill="#f59e0b" stroke="#d97706" stroke-width="1"/>
+    <text x="268" y="664" text-anchor="middle" font-size="10" font-weight="600" fill="white">Output: Time-varying target p_i*(t) per UAV</text>
+
+    <!-- Arrow: Decision Layer → Execution Layer (target positions) -->
+    <path d="M 490 648 L 520 648" stroke="var(--amber-stroke)" stroke-width="2.5" fill="none" marker-end="url(#arrow-amber)"/>
+    <text x="505" y="638" text-anchor="middle" font-size="7.5" fill="#b45309">p_i*(t)</text>
+
+    <!-- ============================================================ -->
+    <!-- ROW 2, COL 2: EXECUTION LAYER (x: 530-980, y: 235-655) -->
+    <!-- ============================================================ -->
+
+    <!-- Observation Space -->
+    <rect x="550" y="278" width="410" height="98" rx="8" fill="var(--purple-fill)" stroke="var(--purple-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="755" y="300" text-anchor="middle" font-size="12" font-weight="700" fill="var(--purple-strong)">Observation Space o_i (per UAV_i)</text>
+    <line x1="566" y1="310" x2="944" y2="310" stroke="#c4b5fd" stroke-width="0.5"/>
+
+    <rect x="566" y="318" width="186" height="24" rx="4" fill="white" stroke="#a78bfa" stroke-width="0.8"/>
+    <text x="659" y="334" text-anchor="middle" font-size="9.5" fill="#6d28d9">🛰 LiDAR: 270° FOV × 3 scan layers</text>
+
+    <rect x="760" y="318" width="186" height="24" rx="4" fill="white" stroke="#a78bfa" stroke-width="0.8"/>
+    <text x="853" y="334" text-anchor="middle" font-size="9.5" fill="#6d28d9">🚀 Current velocity: [v_i, ω_i]</text>
+
+    <rect x="566" y="348" width="380" height="22" rx="4" fill="#fef3c7" stroke="#fbbf24" stroke-width="0.8"/>
+    <text x="756" y="364" text-anchor="middle" font-size="9.5" font-weight="600" fill="#92400e">🎯 Relative Target Position: Δp_i = p_i*(t) − p_i(t)  ← from Decision Layer</text>
+
+    <!-- Arrow: Obs → Network -->
+    <line x1="755" y1="376" x2="755" y2="396" stroke="var(--purple-stroke)" stroke-width="2" marker-end="url(#arrow-purple)"/>
+
+    <!-- Policy Network -->
+    <rect x="550" y="400" width="410" height="185" rx="8" fill="var(--blue-fill)" stroke="var(--blue-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="755" y="424" text-anchor="middle" font-size="12" font-weight="700" fill="var(--blue-strong)">Policy Network π_θ — 4 Hidden Layers (Fig.6)</text>
+    <line x1="566" y1="434" x2="944" y2="434" stroke="#bfdbfe" stroke-width="0.5"/>
+
+    <!-- CNN Branch -->
+    <text x="576" y="452" font-size="9.5" font-weight="600" fill="#1d4ed8">CNN Branch (LiDAR feature extraction):</text>
+
+    <rect x="576" y="460" width="115" height="22" rx="3" fill="white" stroke="#93c5fd" stroke-width="0.8"/>
+    <text x="633" y="476" text-anchor="middle" font-size="9" fill="#1d4ed8">Conv1D(32, k=5, s=2)</text>
+
+    <text x="697" y="476" font-size="11" fill="#3b82f6">→</text>
+
+    <rect x="708" y="460" width="115" height="22" rx="3" fill="white" stroke="#93c5fd" stroke-width="0.8"/>
+    <text x="765" y="476" text-anchor="middle" font-size="9" fill="#1d4ed8">Conv1D(32, k=3, s=1)</text>
+
+    <text x="829" y="476" font-size="11" fill="#3b82f6">→</text>
+
+    <rect x="840" y="460" width="104" height="22" rx="3" fill="white" stroke="#93c5fd" stroke-width="0.8"/>
+    <text x="892" y="476" text-anchor="middle" font-size="9" fill="#1d4ed8">Conv1D(32, k=3, s=1)</text>
+
+    <text x="576" y="494" font-size="8.5" fill="#6b7fa8">Each Conv1D followed by ReLU nonlinear activation</text>
+
+    <!-- Concatenation -->
+    <line x1="566" y1="502" x2="944" y2="502" stroke="#bfdbfe" stroke-width="0.3"/>
+
+    <rect x="576" y="508" width="368" height="22" rx="4" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.8"/>
+    <text x="760" y="524" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1d4ed8">Concat(LiDAR_features, v_i, ω_i, Δp_i) → FC(128) + ReLU</text>
+
+    <!-- Actor / Critic heads -->
+    <line x1="566" y1="538" x2="944" y2="538" stroke="#bfdbfe" stroke-width="0.3"/>
+
+    <rect x="576" y="546" width="172" height="24" rx="4" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.8"/>
+    <text x="662" y="564" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1d4ed8">Actor: Gaussian(μ_v,σ_v, μ_ω,σ_ω)</text>
+
+    <rect x="760" y="546" width="172" height="24" rx="4" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.8"/>
+    <text x="846" y="564" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1d4ed8">Critic: Value Function V(o_i)</text>
+
+    <!-- Stochastic policy -->
+    <text x="755" y="580" text-anchor="middle" font-size="9" fill="#1d4ed8">a_i ~ π_θ(·|o_i)  — stochastic Gaussian policy (Eq.9)</text>
+
+    <!-- Arrow: Network → Action -->
+    <line x1="755" y1="585" x2="755" y2="608" stroke="var(--rose-stroke)" stroke-width="2" marker-end="url(#arrow-rose)"/>
+
+    <!-- Action Space -->
+    <rect x="550" y="612" width="410" height="30" rx="6" fill="var(--rose-fill)" stroke="var(--rose-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="755" y="632" text-anchor="middle" font-size="11" font-weight="700" fill="var(--rose-strong)">Action Space: a_i = [v_cmd, ω_cmd]ᵀ  ·  v ∈ [0, v_max]  ·  ω ∈ [-ω_max, ω_max]  (Eq.1–2)</text>
+
+    <!-- Arrow: Action → UAV Model (right) -->
+    <path d="M 960 627 L 990 627" stroke="var(--rose-stroke)" stroke-width="2.5" fill="none" marker-end="url(#arrow-rose)"/>
+    <text x="975" y="618" text-anchor="middle" font-size="8" fill="#e11d48">v,ω</text>
+
+    <!-- ============================================================ -->
+    <!-- ROW 2, COL 3: UAV MODEL + REWARD + SIM (x: 1000-1300) -->
+    <!-- ============================================================ -->
+
+    <!-- UAV Kinematic Model -->
+    <rect x="1016" y="278" width="268" height="95" rx="8" fill="var(--green-fill)" stroke="var(--green-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="1150" y="300" text-anchor="middle" font-size="11" font-weight="700" fill="var(--green-strong)">UAV Kinematic Model (Unicycle)</text>
+    <line x1="1032" y1="310" x2="1268" y2="310" stroke="#a7f3d0" stroke-width="0.5"/>
+
+    <text x="1032" y="328" font-size="9.5" fill="#047857">State: p_i = [x_i, y_i]ᵀ, heading ψ_i</text>
+    <text x="1032" y="344" font-size="9.5" fill="#047857">Control: v (linear velocity), ω (angular vel)</text>
+
+    <rect x="1032" y="352" width="236" height="16" rx="3" fill="#d1fae5" stroke="#6ee7b7" stroke-width="0.6"/>
+    <text x="1150" y="364" text-anchor="middle" font-size="8.5" fill="#047857">ẋ=v·cos ψ,  ẏ=v·sin ψ,  ψ̇=ω  (Eq.1)</text>
+
+    <!-- LiDAR Perception -->
+    <rect x="1016" y="384" width="268" height="52" rx="8" fill="var(--purple-fill)" stroke="var(--purple-stroke)" stroke-width="1" filter="url(#shadow-light)"/>
+    <text x="1150" y="404" text-anchor="middle" font-size="10" font-weight="700" fill="var(--purple-strong)">Airborne LiDAR Perception</text>
+    <text x="1150" y="420" text-anchor="middle" font-size="9" fill="#6d28d9">270° FOV · 3 scan layers · Real-time obstacle detection</text>
+    <text x="1150" y="432" text-anchor="middle" font-size="8.5" fill="#7c5ce7">Detects: static obstacles · dynamic obstacles · other UAVs</text>
+
+    <!-- Reward Design -->
+    <rect x="1016" y="448" width="268" height="140" rx="8" fill="var(--yellow-fill)" stroke="var(--yellow-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="1150" y="470" text-anchor="middle" font-size="11" font-weight="700" fill="var(--yellow-strong)">Reward Design (r = Σ r_k)</text>
+    <line x1="1032" y1="480" x2="1268" y2="480" stroke="#fef08a" stroke-width="0.5"/>
+
+    <rect x="1032" y="488" width="236" height="20" rx="3" fill="white" stroke="#fde68a" stroke-width="0.6"/>
+    <text x="1150" y="503" text-anchor="middle" font-size="8.5" fill="#854d0e">r_target: +r_arrive or process reward (Δdist) (Eq.17)</text>
+
+    <rect x="1032" y="512" width="236" height="20" rx="3" fill="white" stroke="#fde68a" stroke-width="0.6"/>
+    <text x="1150" y="527" text-anchor="middle" font-size="8.5" fill="#854d0e">r_collision: penalty if ‖p_i−p_j‖ &lt; r_safe (Eq.18)</text>
+
+    <rect x="1032" y="536" width="236" height="20" rx="3" fill="white" stroke="#fde68a" stroke-width="0.6"/>
+    <text x="1150" y="551" text-anchor="middle" font-size="8.5" fill="#854d0e">r_smooth1: −λ_ω·|ω_i| if |ω_i|>0.7 (Eq.19)</text>
+
+    <rect x="1032" y="560" width="236" height="20" rx="3" fill="white" stroke="#fde68a" stroke-width="0.6"/>
+    <text x="1150" y="575" text-anchor="middle" font-size="8.5" fill="#854d0e">r_smooth2: heading penalty / distance weight (Eq.20)</text>
+
+    <!-- STAGE Simulator -->
+    <rect x="1016" y="598" width="268" height="44" rx="6" fill="var(--gray-fill)" stroke="var(--gray-stroke)" stroke-width="1" filter="url(#shadow-light)"/>
+    <text x="1150" y="616" text-anchor="middle" font-size="10" font-weight="700" fill="var(--gray-strong)">STAGE Simulator Environment</text>
+    <text x="1150" y="632" text-anchor="middle" font-size="9" fill="#6b7280">Random obstacles (gray cylinders) · Random start/target positions</text>
+
+    <!-- State feedback loop (UAV → Observation) -->
+    <path d="M 1016 327 L 970 327" stroke="var(--purple-stroke)" stroke-width="1.5" fill="none" marker-end="url(#arrow-purple)" stroke-dasharray="6,3"/>
+    <text x="993" y="320" text-anchor="middle" font-size="7.5" fill="#8b5cf6">state</text>
+
+    <!-- Reward feedback to PPO -->
+    <path d="M 1016 518 L 34 518 L 34 138 L 44 138" stroke="#eab308" stroke-width="1.5" fill="none" marker-end="url(#arrow-amber)" stroke-dasharray="6,3"/>
+    <text x="525" y="530" text-anchor="middle" font-size="9" fill="#b45309">reward + done → PPO update (per-UAV)</text>
+
+    <!-- ============================================================ -->
+    <!-- ROW 3: EVALUATION & INFERENCE (y: 675-860) -->
+    <!-- ============================================================ -->
+
+    <!-- Evaluation Metrics -->
+    <rect x="42" y="718" width="440" height="72" rx="8" fill="var(--cyan-fill)" stroke="var(--cyan-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="262" y="742" text-anchor="middle" font-size="12" font-weight="700" fill="var(--cyan-strong)">5 Evaluation Metrics</text>
+    <line x1="58" y1="752" x2="466" y2="752" stroke="#99f6e4" stroke-width="0.5"/>
+
+    <text x="62" y="770" font-size="9.5" fill="#0f766e">① Formation Position Error  ·  ② Formation Similarity Error</text>
+    <text x="62" y="784" font-size="9.5" fill="#0f766e">③ Motion Smoothness (Avg Jerk m/s³)  ·  ④ Flight Time (s)  ·  ⑤ Collisions (#)</text>
+
+    <!-- Comparison Methods -->
+    <rect x="42" y="800" width="440" height="48" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="262" y="820" text-anchor="middle" font-size="10" font-weight="700" fill="#475569">Compared Methods</text>
+    <text x="262" y="838" text-anchor="middle" font-size="9.5" fill="#64748b">A-F (Affine Formation [14]) · L-b (Learning-based [22]) · ORCA-varying · ORCA-Fixed [23]</text>
+
+    <!-- Test Scenes -->
+    <rect x="502" y="718" width="370" height="130" rx="8" fill="var(--teal-fill)" stroke="var(--teal-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="687" y="742" text-anchor="middle" font-size="12" font-weight="700" fill="var(--teal-strong)">3 Test Scenes (Fig.9)</text>
+    <line x1="518" y1="752" x2="856" y2="752" stroke="#bbf7d0" stroke-width="0.5"/>
+
+    <rect x="518" y="762" width="106" height="28" rx="4" fill="white" stroke="#86efac" stroke-width="0.8"/>
+    <text x="571" y="774" text-anchor="middle" font-size="9" font-weight="600" fill="#166534">Static Obstacles</text>
+    <text x="571" y="786" text-anchor="middle" font-size="8" fill="#166534">Narrow passages</text>
+
+    <rect x="634" y="762" width="106" height="28" rx="4" fill="white" stroke="#86efac" stroke-width="0.8"/>
+    <text x="687" y="774" text-anchor="middle" font-size="9" font-weight="600" fill="#166534">Dynamic Obstacles</text>
+    <text x="687" y="786" text-anchor="middle" font-size="8" fill="#166534">Moving UAVs</text>
+
+    <rect x="750" y="762" width="106" height="28" rx="4" fill="white" stroke="#86efac" stroke-width="0.8"/>
+    <text x="803" y="774" text-anchor="middle" font-size="9" font-weight="600" fill="#166534">Complex Scene</text>
+    <text x="803" y="786" text-anchor="middle" font-size="8" fill="#166534">Static + Dynamic</text>
+
+    <text x="687" y="820" text-anchor="middle" font-size="9.5" fill="#166534">50 experiments per scene · mean ± std reported</text>
+    <text x="687" y="838" text-anchor="middle" font-size="9" fill="#166534">Formation sizes: 4 to 10 UAVs scalability tested</text>
+
+    <!-- Inference Pipeline -->
+    <rect x="892" y="718" width="392" height="130" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" filter="url(#shadow-light)"/>
+    <text x="1088" y="742" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">Inference / Deployment Pipeline</text>
+    <line x1="908" y1="752" x2="1268" y2="752" stroke="#e2e8f0" stroke-width="0.5"/>
+
+    <rect x="908" y="762" width="176" height="32" rx="4" fill="white" stroke="#94a3b8" stroke-width="0.8"/>
+    <text x="996" y="776" text-anchor="middle" font-size="9" font-weight="600" fill="#334155">Formation Configuration</text>
+    <text x="996" y="790" text-anchor="middle" font-size="8" fill="#64748b">Set nominal shape + stress matrix</text>
+
+    <rect x="1096" y="762" width="172" height="32" rx="4" fill="white" stroke="#94a3b8" stroke-width="0.8"/>
+    <text x="1182" y="776" text-anchor="middle" font-size="9" font-weight="600" fill="#334155">Policy Inference</text>
+    <text x="1182" y="790" text-anchor="middle" font-size="8" fill="#64748b">π_θ(o_i) → a_i, deterministic=True</text>
+
+    <rect x="908" y="802" width="360" height="20" rx="3" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="0.5"/>
+    <text x="1088" y="816" text-anchor="middle" font-size="9" fill="#475569">For each timestep: LiDAR → _get_obs() → model.predict() → _do_action(v,ω) → step kinematics</text>
+
+    <text x="1088" y="842" text-anchor="middle" font-size="9" fill="#64748b">Record: trajectory, flight time, formation error, collisions, jerk</text>
+
+    <!-- ============================================================ -->
+    <!-- BOTTOM: CLOSED-LOOP DATA FLOW SUMMARY -->
+    <!-- ============================================================ -->
+
+    <rect x="20" y="878" width="1280" height="28" rx="5" fill="#1e293b"/>
+    <text x="660" y="896" text-anchor="middle" font-size="10" font-weight="600" fill="#e2e8f0">
+      Closed-Loop Data Flow: STAGE State → Decision Layer (affine → p_i*(t)) → Execution Layer (o_i → π_θ → a_i=[v,ω]) → UAV Kinematics → LiDAR → next State | Control freq: step-by-step (Eq.14–15)
+    </text>
+
+    <!-- Contribution callout -->
+    <rect x="20" y="918" width="1280" height="24" rx="4" fill="#eef2ff" stroke="#818cf8" stroke-width="0.8"/>
+    <text x="660" y="935" text-anchor="middle" font-size="10" fill="#4338ca">
+      Core Innovation: Model-Data Hybrid Framework — Affine transformations ensure structural integrity (model-based) + DRL enables safe flexible navigation (data-driven) · End-to-end velocity control · Treats neighbors as dynamic obstacles
+    </text>
+
+  </svg>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="background:#e8f0fe;border-color:#3b82f6"></span> PPO / Policy Network</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#e6f7ee;border-color:#10b981"></span> UAV Model / Kinematics</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#fef7ed;border-color:#f59e0b"></span> Decision Layer (Affine Trans.)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#f0ebfd;border-color:#8b5cf6"></span> Observation / Perception</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#ffeaf0;border-color:#f43f5e"></span> Action Space</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#eef2ff;border-color:#6366f1"></span> Curriculum Learning</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#fefce8;border-color:#eab308"></span> Reward Design</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#e6faf8;border-color:#14b8a6"></span> Evaluation Metrics</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#f0fdf4;border-color:#22c55e"></span> Test Scenes</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#f3f4f6;border-color:#9ca3af"></span> STAGE Simulator</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>多无人机编队控制 学习笔记 — DRL × 仿射变换 × 编队飞行</title>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe; --blue-stroke: #3b82f6; --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee; --green-stroke: #10b981; --green-strong: #047857;
+    --amber-fill: #fef7ed; --amber-stroke: #f59e0b; --amber-strong: #b45309;
+    --purple-fill: #f0ebfd; --purple-stroke: #8b5cf6; --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0; --rose-stroke: #f43f5e; --rose-strong: #be123c;
+    --gray-fill: #f3f4f6; --gray-stroke: #9ca3af; --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8; --cyan-stroke: #14b8a6; --cyan-strong: #0f766e;
+    --indigo-fill: #eef2ff; --indigo-stroke: #6366f1; --indigo-strong: #4338ca;
+    --yellow-fill: #fefce8; --yellow-stroke: #eab308; --yellow-strong: #a16207;
+    --teal-fill: #f0fdf4; --teal-stroke: #22c55e; --teal-strong: #166534;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height: 1.7;
+  }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12.5px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 12px; border-radius: 5px;
+    transition: all .15s;
+  }
+  nav a:hover { background: var(--amber-fill); color: var(--amber-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 12px; font-size: 14px; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.2px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--border); margin-bottom: 22px;
+  }
+  h3 { font-size: 15.5px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+
+  p { font-size: 14px; color: #334155; margin-bottom: 10px; }
+  ul, ol { margin: 6px 0 14px 20px; font-size: 14px; color: #334155; }
+  li { margin-bottom: 4px; }
+
+  code {
+    background: #f1f5f9; color: #1e293b; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 5px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1e293b; color: #e2e8f0; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12px; line-height: 1.55; padding: 16px 20px; border-radius: 8px;
+    overflow-x: auto; margin: 10px 0 16px;
+  }
+  pre .kw { color: #93c5fd; }
+  pre .fn { color: #c4b5fd; }
+  pre .cm { color: #64748b; }
+  pre .nm { color: #fde68a; }
+  pre .st { color: #86efac; }
+  pre .op { color: #fca5a5; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 14px 0; font-size: 13.5px;
+  }
+  .callout.info  { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip   { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn  { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger{ background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea  { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+
+  .tricks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; margin: 16px 0; }
+  .trick-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 20px;
+    background: #fafbfc; transition: box-shadow .15s;
+  }
+  .trick-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .trick-num {
+    display: inline-block; width: 26px; height: 26px; line-height: 26px;
+    text-align: center; border-radius: 50%; font-size: 12px; font-weight: 700;
+    margin-right: 8px;
+  }
+  .trick-card h4 { display: inline; font-size: 14px; }
+  .trick-card p, .trick-card li { font-size: 13px; color: #475569; }
+
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0; }
+  .cmp-col {
+    flex: 1; min-width: 240px; border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; background: #fafbfc;
+  }
+  .cmp-col h4 { margin-top: 0; }
+
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 4px; margin-right: 4px;
+  }
+  .tag-blue { background:#dbeafe; color:#1d4ed8; }
+  .tag-green { background:#d1fae5; color:#047857; }
+  .tag-amber { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red { background:#ffe4e6; color:#be123c; }
+
+  .svg-wrap { overflow-x: auto; margin: 8px -8px; }
+  .svg-wrap svg { min-width: 1100px; width: 100%; height: auto; }
+
+  blockquote {
+    border-left: 3px solid #cbd5e1; padding: 8px 16px; margin: 10px 0;
+    color: #64748b; font-style: italic; font-size: 13.5px;
+  }
+
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-num { color: #94a3b8; font-size: 12px; float: right; }
+  .formula-block .eq-main { font-size: 15px; color: #1e293b; letter-spacing: 0.3px; margin: 8px 0; }
+  .formula-block .eq-note { font-size: 12.5px; color: #64748b; margin-top: 6px; }
+  .symbol-table { margin: 10px 0; }
+  .symbol-table td:first-child {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 14px; font-weight: 600; color: #1d4ed8; white-space: nowrap; padding-right: 14px;
+  }
+  .symbol-table td:nth-child(2) { font-size: 13px; }
+
+  .fig-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 22px; margin: 16px 0;
+  }
+  .fig-box .fig-title { font-weight: 700; font-size: 14px; color: #1e293b; margin-bottom: 10px; }
+  .fig-box .fig-desc { font-size: 13px; color: #475569; }
+  .fig-box .fig-ascii {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 11px; line-height: 1.4; color: #334155;
+    background: #f1f5f9; padding: 14px; border-radius: 6px; margin: 10px 0;
+    white-space: pre; overflow-x: auto;
+  }
+
+  .phase-steps { counter-reset: phase; }
+  .phase-step {
+    counter-increment: phase; border-left: 3px solid #f59e0b;
+    padding: 10px 16px; margin: 10px 0; background: #f8fafc;
+    border-radius: 0 8px 8px 0;
+  }
+  .phase-step::before {
+    content: "Phase " counter(phase); font-weight: 700; font-size: 11px;
+    color: #f59e0b; display: block; margin-bottom: 2px;
+  }
+  .phase-step p { margin: 2px 0; font-size: 13px; }
+
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav>
+  <span class="brand">🚁 多无人机编队控制 学习笔记</span>
+  <a href="#arch">系统架构</a>
+  <a href="#layers">两层框架</a>
+  <a href="#paper">论文精读</a>
+  <a href="#formulas">算法公式</a>
+  <a href="#dataflow">数据流</a>
+  <a href="#training">RL训练</a>
+  <a href="#figures">图表解读</a>
+  <a href="#tricks">科研 Tricks</a>
+  <a href="#philosophy">设计哲学</a>
+  <a href="#roadmap">学习路线</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section>
+  <h1>🚁 多无人机灵活编队控制 学习笔记</h1>
+  <p style="font-size:15px;color:#64748b;margin-bottom:0;">
+    <strong>基于深度强化学习与仿射变换的多无人机编队控制</strong><br>
+    论文: <em>Flexible multi-UAV formation control via integrating deep reinforcement learning and affine transformations</em><br>
+    期刊: Aerospace Science and Technology (2025) · 作者: Yunhao Liu, Zhihong Liu 等 (国防科技大学)
+  </p>
+  <div style="margin-top:14px;">
+    <span class="tag tag-amber">仿射变换</span>
+    <span class="tag tag-blue">DRL · PPO</span>
+    <span class="tag tag-green">多无人机编队</span>
+    <span class="tag tag-purple">模型-数据混合驱动</span>
+    <span class="tag tag-red">端到端速度控制</span>
+    <span class="tag tag-amber">Leader-Follower</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 1. ARCHITECTURE ═══════════════ -->
+<section id="arch">
+  <h2>1. 系统架构全景图</h2>
+  <p>训练时的完整闭环：<strong>STAGE 状态 → LiDAR观测 → 决策层(仿射变换 → p_i*(t)) → 执行层(π_θ → [v,ω]) → 独轮车动力学 → 新状态</strong></p>
+
+  <div class="svg-wrap">
+    <svg viewBox="0 0 1320 1020" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="a-blue" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#3b82f6"/></marker>
+        <marker id="a-green" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/></marker>
+        <marker id="a-amber" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#f59e0b"/></marker>
+        <marker id="a-purple" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#8b5cf6"/></marker>
+        <marker id="a-rose" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#f43f5e"/></marker>
+        <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity=".08"/></filter>
+      </defs>
+
+      <!-- Sections -->
+      <rect x="20" y="20" width="1280" height="195" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="36" y="46" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">TRAINING ORCHESTRATION — Two-Stage Curriculum Learning + PPO + Multi-UAV</text>
+
+      <rect x="20" y="235" width="490" height="420" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="36" y="261" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">DECISION LAYER — Model-Based (Affine Transformations)</text>
+
+      <rect x="530" y="235" width="450" height="420" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="546" y="261" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">EXECUTION LAYER — Data-Driven (DRL per UAV)</text>
+
+      <rect x="1000" y="235" width="300" height="420" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="1016" y="261" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">UAV MODEL · REWARD</text>
+
+      <rect x="20" y="675" width="1280" height="185" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="36" y="701" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">EVALUATION &amp; CLOSED-LOOP</text>
+
+      <!-- PPO -->
+      <rect x="44" y="60" width="195" height="78" rx="8" fill="#e8f0fe" stroke="#3b82f6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="141" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#1d4ed8">PPO Algorithm</text>
+      <text x="141" y="104" text-anchor="middle" font-size="10" fill="#5b6e8c">Proximal Policy Optimization</text>
+      <text x="141" y="120" text-anchor="middle" font-size="9" fill="#7b8da6">γ=0.99 · λ=0.95 · K_epoch=20</text>
+      <text x="141" y="134" text-anchor="middle" font-size="9" fill="#7b8da6">lr=5e-5(S1)/2e-5(S2)</text>
+
+      <!-- Curriculum Learning -->
+      <rect x="260" y="52" width="230" height="48" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="375" y="72" text-anchor="middle" font-size="11" font-weight="700" fill="#4338ca">Two-Stage Curriculum Learning</text>
+      <text x="375" y="90" text-anchor="middle" font-size="9" fill="#6366f1">Stage 1: Obstacle-free → Stage 2: Complex</text>
+
+      <rect x="260" y="108" width="108" height="30" rx="4" fill="white" stroke="#a5b4fc" stroke-width="1"/>
+      <text x="314" y="122" text-anchor="middle" font-size="9" font-weight="600" fill="#4338ca">Stage 1 (70k iter)</text>
+      <text x="314" y="134" text-anchor="middle" font-size="8" fill="#6366f1">Nav+inter-UAV avoid</text>
+      <text x="376" y="126" text-anchor="middle" font-size="13" fill="#6366f1">→</text>
+      <rect x="390" y="108" width="108" height="30" rx="4" fill="white" stroke="#a5b4fc" stroke-width="1"/>
+      <text x="444" y="122" text-anchor="middle" font-size="9" font-weight="600" fill="#4338ca">Stage 2 (converge)</text>
+      <text x="444" y="134" text-anchor="middle" font-size="8" fill="#6366f1">Complex obstacles</text>
+
+      <line x1="260" y1="76" x2="239" y2="76" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a-amber)"/>
+
+      <!-- PPO → envs -->
+      <line x1="141" y1="138" x2="141" y2="172" stroke="#3b82f6" stroke-width="1.5"/>
+      <line x1="141" y1="172" x2="516" y2="172" stroke="#3b82f6" stroke-width="2" marker-end="url(#a-blue)"/>
+      <text x="328" y="166" text-anchor="middle" font-size="9" fill="#3b82f6">distribute policy θ → each UAV</text>
+
+      <!-- N UAV envs -->
+      <rect x="524" y="56" width="440" height="86" rx="8" fill="#e6f7ee" stroke="#10b981" stroke-width="1.5" filter="url(#sh)"/>
+      <rect x="538" y="70" width="60" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/><text x="568" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">UAV ₁</text>
+      <rect x="604" y="70" width="60" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/><text x="634" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">UAV ₂</text>
+      <rect x="670" y="70" width="60" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/><text x="700" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">UAV ₃</text>
+      <text x="753" y="87" text-anchor="middle" font-size="12" fill="#047857">···</text>
+      <rect x="538" y="104" width="60" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/><text x="568" y="121" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">UAV N</text>
+      <text x="744" y="156" text-anchor="middle" font-size="9.5" fill="#047857">Each UAV: independent π_θ · neighbors = dynamic obstacles</text>
+
+      <!-- Experience return -->
+      <path d="M 744 142 L 744 202 L 141 202 L 141 138" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#a-green)"/>
+      <text x="442" y="216" text-anchor="middle" font-size="9" fill="#10b981">collect {o_i, a_i, r_i, o_i'} for all UAVs → GAE → PPO update</text>
+
+      <!-- CTDE + Sim -->
+      <rect x="980" y="52" width="305" height="22" rx="4" fill="#e8f0fe" stroke="#93c5fd" stroke-width="1"/>
+      <text x="1132" y="68" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">CTDE: Centralized Training · Decentralized Execution</text>
+      <rect x="980" y="82" width="305" height="60" rx="6" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1" filter="url(#sh)"/>
+      <text x="1132" y="100" text-anchor="middle" font-size="11" font-weight="700" fill="#4b5563">Training Platform</text>
+      <text x="1132" y="116" text-anchor="middle" font-size="9" fill="#6b7280">STAGE Simulator · Random obstacles</text>
+      <text x="1132" y="132" text-anchor="middle" font-size="9" fill="#6b7280">Ubuntu 20.04 · 32GB · RTX 3090 · ~24h</text>
+
+      <!-- Decision Layer Components -->
+      <!-- Nominal Formation -->
+      <rect x="42" y="278" width="220" height="68" rx="8" fill="#fef7ed" stroke="#f59e0b" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="152" y="300" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">① Nominal Formation Config</text>
+      <text x="152" y="316" text-anchor="middle" font-size="9" fill="#92400e">x = [x₁ᵀ, ..., x_Nᵀ]ᵀ ∈ ℝ^(dN)</text>
+      <text x="152" y="330" text-anchor="middle" font-size="9" fill="#b45309">d=2 · Leaders x_l · Followers x_f</text>
+      <text x="152" y="342" text-anchor="middle" font-size="8.5" fill="#b45309">Defines desired formation shape</text>
+
+      <line x1="152" y1="346" x2="152" y2="366" stroke="#f59e0b" stroke-width="2" marker-end="url(#a-amber)"/>
+
+      <!-- Affine Transformation -->
+      <rect x="42" y="370" width="448" height="118" rx="8" fill="#fff7ed" stroke="#f59e0b" stroke-width="1.5" filter="url(#sh)"/>
+      <rect x="42" y="370" width="448" height="26" rx="8" fill="#f59e0b"/>
+      <rect x="42" y="388" width="448" height="8" fill="#f59e0b"/>
+      <text x="266" y="388" text-anchor="middle" font-size="12" font-weight="700" fill="white">② Affine Transformation Engine</text>
+      <text x="58" y="414" font-size="9.5" font-weight="600" fill="#b45309">Time-Varying Target Formation (Eq.5):</text>
+      <text x="78" y="432" font-size="11" font-weight="600" fill="#92400e" font-family="monospace">x'(t) = (A(t) ⊗ I_d) · x + [1_N ⊗ I_d] · b(t)</text>
+      <text x="58" y="452" font-size="9" fill="#92400e">A(t) ∈ ℝ^(d×d): rotation · scaling · shear  |  b(t) ∈ ℝ^d: translation</text>
+      <text x="58" y="472" font-size="9" fill="#92400e">Transformations: Rotation (θ) · Scaling (s_x, s_y) · Shear (h_x, h_y) · Translation (t_x, t_y)</text>
+      <text x="58" y="484" font-size="9" fill="#b45309">Goal: formation can flexibly rotate, scale, shear, and translate to adapt to environment</text>
+
+      <line x1="266" y1="488" x2="266" y2="508" stroke="#f59e0b" stroke-width="2" marker-end="url(#a-amber)"/>
+
+      <!-- Stress Matrix + Leader-Follower -->
+      <rect x="42" y="512" width="448" height="130" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="266" y="536" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">③ Leader-Follower via Stress Matrix Ω</text>
+      <line x1="58" y1="546" x2="474" y2="546" stroke="#fde68a" stroke-width="0.5"/>
+
+      <rect x="58" y="556" width="188" height="52" rx="4" fill="white" stroke="#fcd34d" stroke-width="0.8"/>
+      <text x="152" y="574" text-anchor="middle" font-size="9.5" font-weight="600" fill="#92400e">Stress Matrix (Eq.4, Eq.7):</text>
+      <text x="152" y="592" text-anchor="middle" font-size="9" fill="#92400e" font-family="monospace">Ω = [Ω_ll  Ω_lf]</text>
+      <text x="152" y="604" text-anchor="middle" font-size="9" fill="#92400e" font-family="monospace">    [Ω_fl  Ω_ff]</text>
+
+      <text x="255" y="585" text-anchor="middle" font-size="13" fill="#f59e0b">⇒</text>
+
+      <rect x="278" y="556" width="196" height="52" rx="4" fill="white" stroke="#fcd34d" stroke-width="0.8"/>
+      <text x="376" y="572" text-anchor="middle" font-size="9.5" font-weight="600" fill="#92400e">Followers' Target (Eq.8):</text>
+      <text x="376" y="590" text-anchor="middle" font-size="9.5" fill="#b45309" font-family="monospace">p_f*(t) = −Ω_ff⁻¹ · Ω_fl · p_l(t)</text>
+      <text x="376" y="604" text-anchor="middle" font-size="8.5" fill="#b45309">Uniquely determined by leaders</text>
+
+      <rect x="58" y="616" width="416" height="20" rx="4" fill="#fef3c7" stroke="#fbbf24" stroke-width="0.8"/>
+      <text x="266" y="631" text-anchor="middle" font-size="9.5" fill="#92400e">Key: 1-to-1 correspondence between leaders' positions and (A,b) — distributed computation</text>
+
+      <rect x="158" y="648" width="220" height="22" rx="4" fill="#f59e0b" stroke="#d97706" stroke-width="1"/>
+      <text x="268" y="664" text-anchor="middle" font-size="10" font-weight="600" fill="white">Output: Time-varying target p_i*(t) per UAV</text>
+
+      <!-- Arrow: Decision → Execution -->
+      <path d="M 490 648 L 520 648" stroke="#f59e0b" stroke-width="2.5" fill="none" marker-end="url(#a-amber)"/>
+      <text x="505" y="638" text-anchor="middle" font-size="7.5" fill="#b45309">p_i*(t)</text>
+
+      <!-- Execution Layer -->
+      <!-- Observation -->
+      <rect x="550" y="278" width="410" height="98" rx="8" fill="#f0ebfd" stroke="#8b5cf6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="755" y="300" text-anchor="middle" font-size="12" font-weight="700" fill="#6d28d9">Observation Space o_i (per UAV_i)</text>
+      <line x1="566" y1="310" x2="944" y2="310" stroke="#c4b5fd" stroke-width="0.5"/>
+      <rect x="566" y="318" width="186" height="24" rx="4" fill="white" stroke="#a78bfa" stroke-width="0.8"/>
+      <text x="659" y="334" text-anchor="middle" font-size="9.5" fill="#6d28d9">🛰 LiDAR: 270° FOV × 3 scans</text>
+      <rect x="760" y="318" width="186" height="24" rx="4" fill="white" stroke="#a78bfa" stroke-width="0.8"/>
+      <text x="853" y="334" text-anchor="middle" font-size="9.5" fill="#6d28d9">🚀 Current velocity: [v_i, ω_i]</text>
+      <rect x="566" y="348" width="380" height="22" rx="4" fill="#fef3c7" stroke="#fbbf24" stroke-width="0.8"/>
+      <text x="756" y="364" text-anchor="middle" font-size="9.5" font-weight="600" fill="#92400e">🎯 Relative Target: Δp_i = p_i*(t) − p_i(t)  ← from Decision Layer</text>
+
+      <line x1="755" y1="376" x2="755" y2="396" stroke="#8b5cf6" stroke-width="2" marker-end="url(#a-purple)"/>
+
+      <!-- Policy Network -->
+      <rect x="550" y="400" width="410" height="185" rx="8" fill="#e8f0fe" stroke="#3b82f6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="755" y="424" text-anchor="middle" font-size="12" font-weight="700" fill="#1d4ed8">Policy Network π_θ — 4 Hidden Layers (Fig.6)</text>
+      <line x1="566" y1="434" x2="944" y2="434" stroke="#bfdbfe" stroke-width="0.5"/>
+      <text x="576" y="452" font-size="9.5" font-weight="600" fill="#1d4ed8">CNN Branch (LiDAR):</text>
+      <rect x="576" y="460" width="115" height="22" rx="3" fill="white" stroke="#93c5fd" stroke-width="0.8"/><text x="633" y="476" text-anchor="middle" font-size="9" fill="#1d4ed8">Conv1D(32,k=5,s=2)</text>
+      <text x="697" y="476" font-size="11" fill="#3b82f6">→</text>
+      <rect x="708" y="460" width="115" height="22" rx="3" fill="white" stroke="#93c5fd" stroke-width="0.8"/><text x="765" y="476" text-anchor="middle" font-size="9" fill="#1d4ed8">Conv1D(32,k=3,s=1)</text>
+      <text x="829" y="476" font-size="11" fill="#3b82f6">→</text>
+      <rect x="840" y="460" width="104" height="22" rx="3" fill="white" stroke="#93c5fd" stroke-width="0.8"/><text x="892" y="476" text-anchor="middle" font-size="9" fill="#1d4ed8">Conv1D(32,k=3,s=1)</text>
+      <text x="576" y="494" font-size="8.5" fill="#6b7fa8">Each Conv1D followed by ReLU activation</text>
+      <line x1="566" y1="502" x2="944" y2="502" stroke="#bfdbfe" stroke-width="0.3"/>
+      <rect x="576" y="508" width="368" height="22" rx="4" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.8"/>
+      <text x="760" y="524" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1d4ed8">Concat(LiDAR_features, v_i, ω_i, Δp_i) → FC(128) + ReLU</text>
+      <line x1="566" y1="538" x2="944" y2="538" stroke="#bfdbfe" stroke-width="0.3"/>
+      <rect x="576" y="546" width="172" height="24" rx="4" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.8"/>
+      <text x="662" y="564" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1d4ed8">Actor: Gaussian(μ_v,σ_v, μ_ω,σ_ω)</text>
+      <rect x="760" y="546" width="172" height="24" rx="4" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.8"/>
+      <text x="846" y="564" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1d4ed8">Critic: Value Function V(o_i)</text>
+      <text x="755" y="580" text-anchor="middle" font-size="9" fill="#1d4ed8">a_i ~ π_θ(·|o_i)  — stochastic Gaussian policy (Eq.9)</text>
+
+      <line x1="755" y1="585" x2="755" y2="608" stroke="#f43f5e" stroke-width="2" marker-end="url(#a-rose)"/>
+
+      <!-- Action -->
+      <rect x="550" y="612" width="410" height="30" rx="6" fill="#ffeaf0" stroke="#f43f5e" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="755" y="632" text-anchor="middle" font-size="11" font-weight="700" fill="#be123c">Action: a_i = [v_cmd, ω_cmd]ᵀ  ·  v ∈ [0, v_max]  ·  ω ∈ [-ω_max, ω_max]  (Eq.1–2)</text>
+
+      <path d="M 960 627 L 990 627" stroke="#f43f5e" stroke-width="2.5" fill="none" marker-end="url(#a-rose)"/>
+      <text x="975" y="618" text-anchor="middle" font-size="8" fill="#e11d48">v,ω</text>
+
+      <!-- UAV Model + Reward -->
+      <rect x="1016" y="278" width="268" height="95" rx="8" fill="#e6f7ee" stroke="#10b981" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="1150" y="300" text-anchor="middle" font-size="11" font-weight="700" fill="#047857">UAV Kinematic Model (Unicycle)</text>
+      <line x1="1032" y1="310" x2="1268" y2="310" stroke="#a7f3d0" stroke-width="0.5"/>
+      <text x="1032" y="328" font-size="9.5" fill="#047857">State: p_i = [x_i, y_i]ᵀ, heading ψ_i</text>
+      <text x="1032" y="344" font-size="9.5" fill="#047857">Control: v (linear), ω (angular)</text>
+      <rect x="1032" y="352" width="236" height="16" rx="3" fill="#d1fae5" stroke="#6ee7b7" stroke-width="0.6"/>
+      <text x="1150" y="364" text-anchor="middle" font-size="8.5" fill="#047857">ẋ=v·cos ψ,  ẏ=v·sin ψ,  ψ̇=ω  (Eq.1)</text>
+
+      <rect x="1016" y="384" width="268" height="52" rx="8" fill="#f0ebfd" stroke="#8b5cf6" stroke-width="1" filter="url(#sh)"/>
+      <text x="1150" y="404" text-anchor="middle" font-size="10" font-weight="700" fill="#6d28d9">Airborne LiDAR Perception</text>
+      <text x="1150" y="420" text-anchor="middle" font-size="9" fill="#6d28d9">270° FOV · 3 scan layers · Real-time detection</text>
+      <text x="1150" y="432" text-anchor="middle" font-size="8.5" fill="#7c5ce7">Detects: static · dynamic obstacles · other UAVs</text>
+
+      <rect x="1016" y="448" width="268" height="140" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="1150" y="470" text-anchor="middle" font-size="11" font-weight="700" fill="#a16207">Reward Design (r = Σ r_k)</text>
+      <line x1="1032" y1="480" x2="1268" y2="480" stroke="#fef08a" stroke-width="0.5"/>
+      <rect x="1032" y="488" width="236" height="18" rx="3" fill="white" stroke="#fde68a" stroke-width="0.6"/>
+      <text x="1150" y="502" text-anchor="middle" font-size="8" fill="#854d0e">r_target: +r_arrive or process reward (Eq.17)</text>
+      <rect x="1032" y="510" width="236" height="18" rx="3" fill="white" stroke="#fde68a" stroke-width="0.6"/>
+      <text x="1150" y="524" text-anchor="middle" font-size="8" fill="#854d0e">r_collision: penalty if ‖p_i−p_j‖ &lt; r_safe (Eq.18)</text>
+      <rect x="1032" y="532" width="236" height="18" rx="3" fill="white" stroke="#fde68a" stroke-width="0.6"/>
+      <text x="1150" y="546" text-anchor="middle" font-size="8" fill="#854d0e">r_smooth1: −λ_ω·|ω_i| if |ω_i|>0.7 (Eq.19)</text>
+      <rect x="1032" y="554" width="236" height="18" rx="3" fill="white" stroke="#fde68a" stroke-width="0.6"/>
+      <text x="1150" y="568" text-anchor="middle" font-size="8" fill="#854d0e">r_smooth2: heading penalty / distance (Eq.20)</text>
+
+      <rect x="1016" y="598" width="268" height="44" rx="6" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1" filter="url(#sh)"/>
+      <text x="1150" y="616" text-anchor="middle" font-size="10" font-weight="700" fill="#4b5563">STAGE Simulator</text>
+      <text x="1150" y="632" text-anchor="middle" font-size="9" fill="#6b7280">Random obstacles · Random start/target · 2D</text>
+
+      <!-- State feedback -->
+      <path d="M 1016 327 L 970 327" stroke="#8b5cf6" stroke-width="1.5" fill="none" marker-end="url(#a-purple)" stroke-dasharray="6,3"/>
+      <text x="993" y="320" text-anchor="middle" font-size="7.5" fill="#8b5cf6">state</text>
+
+      <!-- Reward → PPO -->
+      <path d="M 1016 518 L 34 518 L 34 138 L 44 138" stroke="#eab308" stroke-width="1.5" fill="none" marker-end="url(#a-amber)" stroke-dasharray="6,3"/>
+      <text x="525" y="530" text-anchor="middle" font-size="9" fill="#b45309">reward + done → PPO update</text>
+
+      <!-- Evaluation -->
+      <rect x="42" y="718" width="440" height="72" rx="8" fill="#e6faf8" stroke="#14b8a6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="262" y="742" text-anchor="middle" font-size="12" font-weight="700" fill="#0f766e">5 Evaluation Metrics</text>
+      <line x1="58" y1="752" x2="466" y2="752" stroke="#99f6e4" stroke-width="0.5"/>
+      <text x="62" y="770" font-size="9.5" fill="#0f766e">① Formation Position Error  ·  ② Formation Similarity Error</text>
+      <text x="62" y="784" font-size="9.5" fill="#0f766e">③ Motion Smoothness (Avg Jerk)  ·  ④ Flight Time  ·  ⑤ Collisions</text>
+
+      <rect x="42" y="800" width="440" height="48" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+      <text x="262" y="820" text-anchor="middle" font-size="10" font-weight="700" fill="#475569">Compared Methods</text>
+      <text x="262" y="838" text-anchor="middle" font-size="9.5" fill="#64748b">A-F (Affine Formation [14]) · L-b (Learning-based [22]) · ORCA-varying · ORCA-Fixed [23]</text>
+
+      <rect x="502" y="718" width="370" height="130" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="687" y="742" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">3 Test Scenes (Fig.9)</text>
+      <line x1="518" y1="752" x2="856" y2="752" stroke="#bbf7d0" stroke-width="0.5"/>
+      <rect x="518" y="762" width="106" height="28" rx="4" fill="white" stroke="#86efac" stroke-width="0.8"/><text x="571" y="774" text-anchor="middle" font-size="9" font-weight="600" fill="#166534">Static Obstacles</text><text x="571" y="786" text-anchor="middle" font-size="8" fill="#166534">Narrow passages</text>
+      <rect x="634" y="762" width="106" height="28" rx="4" fill="white" stroke="#86efac" stroke-width="0.8"/><text x="687" y="774" text-anchor="middle" font-size="9" font-weight="600" fill="#166534">Dynamic Obstacles</text><text x="687" y="786" text-anchor="middle" font-size="8" fill="#166534">Moving UAVs</text>
+      <rect x="750" y="762" width="106" height="28" rx="4" fill="white" stroke="#86efac" stroke-width="0.8"/><text x="803" y="774" text-anchor="middle" font-size="9" font-weight="600" fill="#166534">Complex Scene</text><text x="803" y="786" text-anchor="middle" font-size="8" fill="#166534">Static + Dynamic</text>
+      <text x="687" y="820" text-anchor="middle" font-size="9.5" fill="#166534">50 experiments per scene · mean ± std</text>
+      <text x="687" y="838" text-anchor="middle" font-size="9" fill="#166534">Formation sizes: 4 to 10 UAVs scalability tested</text>
+
+      <rect x="892" y="718" width="392" height="130" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" filter="url(#sh)"/>
+      <text x="1088" y="742" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">Inference / Deployment</text>
+      <line x1="908" y1="752" x2="1268" y2="752" stroke="#e2e8f0" stroke-width="0.5"/>
+      <rect x="908" y="762" width="176" height="32" rx="4" fill="white" stroke="#94a3b8" stroke-width="0.8"/>
+      <text x="996" y="776" text-anchor="middle" font-size="9" font-weight="600" fill="#334155">Formation Configuration</text>
+      <text x="996" y="790" text-anchor="middle" font-size="8" fill="#64748b">Set nominal shape + stress matrix</text>
+      <rect x="1096" y="762" width="172" height="32" rx="4" fill="white" stroke="#94a3b8" stroke-width="0.8"/>
+      <text x="1182" y="776" text-anchor="middle" font-size="9" font-weight="600" fill="#334155">Policy Inference</text>
+      <text x="1182" y="790" text-anchor="middle" font-size="8" fill="#64748b">π_θ(o_i) → a_i, deterministic=True</text>
+      <rect x="908" y="802" width="360" height="18" rx="3" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="0.5"/>
+      <text x="1088" y="816" text-anchor="middle" font-size="9" fill="#475569">Per step: LiDAR → _get_obs() → model.predict() → _do_action(v,ω) → kinematics</text>
+      <text x="1088" y="840" text-anchor="middle" font-size="9" fill="#64748b">Record: trajectory, flight time, formation error, collisions, jerk</text>
+
+      <!-- Bottom bars -->
+      <rect x="20" y="878" width="1280" height="28" rx="5" fill="#1e293b"/>
+      <text x="660" y="896" text-anchor="middle" font-size="10" font-weight="600" fill="#e2e8f0">
+        Closed-Loop: STAGE State → Decision Layer (affine → p_i*(t)) → Execution Layer (o_i → π_θ → a_i=[v,ω]) → UAV Kinematics → LiDAR → next State
+      </text>
+
+      <rect x="20" y="918" width="1280" height="24" rx="4" fill="#eef2ff" stroke="#818cf8" stroke-width="0.8"/>
+      <text x="660" y="935" text-anchor="middle" font-size="10" fill="#4338ca">
+        Core Innovation: Model-Data Hybrid Framework — Affine transformations ensure structural integrity + DRL enables safe flexible navigation · End-to-end velocity control · Treats neighbors as dynamic obstacles
+      </text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. TWO-LAYER FRAMEWORK ═══════════════ -->
+<section id="layers">
+  <h2>2. 两层控制框架 —— 模型-数据混合驱动的核心设计</h2>
+
+  <div class="callout idea">
+    <div class="callout-title">💡 核心设计智慧：将编队问题拆解为"结构保持"和"安全导航"两个子问题</div>
+    论文将编队约束提炼为两个基本原则：<strong>编队构型的灵活保持</strong> + <strong>安全导航</strong>。然后分别用模型驱动（仿射变换）和数据驱动（DRL）的方法来解决——这就是"混合驱动"的精髓。
+  </div>
+
+  <table>
+    <tr><th>层级</th><th>方法</th><th>核心机制</th><th>解决问题</th><th>特点</th></tr>
+    <tr>
+      <td><strong>决策层<br>(Decision Layer)</strong></td>
+      <td><span class="tag tag-amber">模型驱动</span></td>
+      <td>仿射变换 + 应力矩阵<br>Leader-Follower 架构</td>
+      <td>编队结构完整性<br>灵活构型变换</td>
+      <td>无需训练 · 数学模型保证 · 分布式计算</td>
+    </tr>
+    <tr>
+      <td><strong>执行层<br>(Execution Layer)</strong></td>
+      <td><span class="tag tag-blue">数据驱动</span></td>
+      <td>DRL (PPO) · CNN+FC 网络<br>端到端速度控制</td>
+      <td>安全导航 · 避障<br>目标追踪</td>
+      <td>需训练~24h · 处理未知/动态障碍 · 实时响应</td>
+    </tr>
+  </table>
+
+  <h3>决策层 — 仿射变换如何保证编队结构？</h3>
+  <p>仿射变换的核心能力：<strong>旋转、缩放、剪切、平移</strong>——正好对应编队在复杂环境中需要的四种调整方式：</p>
+  <ul>
+    <li><strong>旋转</strong>：编队整体转向以对准狭窄通道方向</li>
+    <li><strong>缩放</strong>：缩小编队间距以通过狭窄通道，通过后恢复</li>
+    <li><strong>剪切</strong>：适应不规则障碍物形状</li>
+    <li><strong>平移</strong>：整体偏移避开障碍物区域</li>
+  </ul>
+  <p>关键数学保证：<strong>仿射变换保持共线性</strong>——如果三个 UAV 在标称构型中排成一条直线，在任何仿射变换下它们仍然共线。这就是"结构完整性"的数学基础。</p>
+
+  <h3>执行层 — DRL 为什么放在执行层？</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>如果 DRL 放在决策层？</h4>
+      <p>DRL 直接输出编队参数（A, b），然后每个 UAV 用传统控制器追踪目标位置。</p>
+      <p><strong>问题</strong>：DRL 需要处理全局信息（所有 UAV 状态 + 所有障碍物），状态空间巨大，且对未知动态障碍物泛化差。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>论文的做法：DRL 在执行层 ✅</h4>
+      <p>决策层用数学模型保证编队结构 → 只需输出目标位置。执行层每个 UAV 的 DRL 只需：追踪目标 + 避障。</p>
+      <p><strong>优势</strong>：每个 UAV 只关注局部信息（LiDAR + 自身状态 + 相对目标），维度低、泛化好、分布式执行。</p>
+    </div>
+  </div>
+
+  <h3>对比 OpenFlight 的两层/三级设计</h3>
+  <table>
+    <tr><th>维度</th><th>OpenFlight (单机)</th><th>本文 (多机编队)</th></tr>
+    <tr><td>控制层级</td><td>V1/V2/V3 三级（速度→姿态→舵面）</td><td>决策层 + 执行层 两层</td></tr>
+    <tr><td>分层逻辑</td><td>从抽象到具体（控制粒度递进）</td><td>从全局到局部（编队结构 → 个体安全）</td></tr>
+    <tr><td>DRL 位置</td><td>可替换所有层级（V2 直接控制舵面）</td><td>仅执行层（决策层用数学模型）</td></tr>
+    <tr><td>模型驱动部分</td><td>PID 自动驾驶仪（V1/V3）</td><td>仿射变换 + 应力矩阵（决策层）</td></tr>
+    <tr><td>数据驱动部分</td><td>PPO 策略网络（所有层级）</td><td>PPO 策略网络（仅执行层）</td></tr>
+    <tr><td>核心创新</td><td>RL 首次直接控制固定翼舵面</td><td>混合驱动框架实现灵活编队避障</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 3. PAPER DEEP DIVE ═══════════════ -->
+<section id="paper">
+  <h2>3. 论文精读</h2>
+
+  <h3>3.1 核心贡献</h3>
+  <ol>
+    <li><strong>模型-数据混合驱动框架</strong>：首次将仿射变换（模型驱动）与 DRL（数据驱动）系统性地结合用于多 UAV 编队控制</li>
+    <li><strong>两层解耦架构</strong>：决策层保证编队结构完整性，执行层处理安全导航——各司其职、优势互补</li>
+    <li><strong>端到端速度控制</strong>：DRL 直接输出速度指令 [v, ω]，无需中间 PID 层级</li>
+    <li><strong>将相邻 UAV 视为动态障碍物</strong>：训练时只设静态障碍物，相邻 UAV 自然充当动态障碍物——巧妙的训练策略</li>
+    <li><strong>两阶段课程学习</strong>：先在无障碍环境学基本导航，再在复杂障碍环境学避障——大幅加速收敛</li>
+  </ol>
+
+  <h3>3.2 UAV 运动学模型</h3>
+  <p>本文使用<strong>独轮车模型 (Unicycle Model)</strong>，相比 OpenFlight 的 6-DOF 模型简化很多：</p>
+  <div class="formula-block">
+    <div class="eq-num">Eq.(1)</div>
+    <div class="eq-main">ẋ = v · cos ψ, &nbsp; ẏ = v · sin ψ, &nbsp; ψ̇ = ω</div>
+    <div class="eq-main">0 ≤ v ≤ v_max, &nbsp; |ω| ≤ ω_max &nbsp; (Eq.2)</div>
+    <div class="eq-note">这是本文和 OpenFlight 的重要区别：本文关注的是编队层面的协调控制，使用了简化运动学；OpenFlight 关注单机极限机动，使用了高保真 6-DOF</div>
+  </div>
+
+  <h3>3.3 感知模型</h3>
+  <p>每个 UAV 配备 <strong>270° FOV 机载 LiDAR</strong>，3 层扫描线，用于实时检测周围障碍物（静态 + 动态）和其他 UAV。这是 DRL 策略的主要输入来源。</p>
+
+  <h3>3.4 实验结果（核心表格 Table 2）</h3>
+  <table>
+    <tr><th>场景</th><th>方法</th><th>位置误差 (m)</th><th>相似性误差</th><th>Avg Jerk</th><th>飞行时间 (s)</th><th>碰撞</th></tr>
+    <tr style="background:#ecfdf5;">
+      <td rowspan="5"><strong>Static</strong></td>
+      <td>A-F [14]</td><td>0.078</td><td>0.00034</td><td>50.61</td><td>12.20</td><td>❌ 50/50</td>
+    </tr>
+    <tr><td>L-b [22]</td><td>2.970</td><td>0.047</td><td>6.374</td><td>97.47</td><td>✅ 0/50</td></tr>
+    <tr><td>ORCA-varying</td><td>2.906</td><td>0.070</td><td>10.95</td><td>97.38</td><td>✅ 0/50</td></tr>
+    <tr><td>ORCA-Fixed</td><td>3.635</td><td>0.081</td><td>14.91</td><td>89.69</td><td>✅ 0/50</td></tr>
+    <tr style="background:#fef3c7;"><td><strong>Ours</strong></td><td><strong>2.747</strong></td><td><strong>0.039</strong></td><td><strong>6.219</strong></td><td><strong>89.01</strong></td><td>✅ 0/50</td></tr>
+    <tr style="background:#f0fdf4;">
+      <td rowspan="4"><strong>Dynamic</strong></td>
+      <td>L-b</td><td>0.838</td><td>0.018</td><td>7.684</td><td>33.00</td><td>✅ 0/50</td>
+    </tr>
+    <tr><td>ORCA-varying</td><td>1.308</td><td>0.033</td><td>13.99</td><td>101.89</td><td>✅ 0/50</td></tr>
+    <tr><td>ORCA-Fixed</td><td>3.295</td><td>0.244</td><td>12.00</td><td>36.09</td><td>✅ 0/50</td></tr>
+    <tr style="background:#fef3c7;"><td><strong>Ours</strong></td><td>0.997</td><td><strong>0.015</strong></td><td><strong>6.500</strong></td><td><strong>29.36</strong></td><td>✅ 0/50</td></tr>
+    <tr style="background:#fef2f2;">
+      <td rowspan="3"><strong>Complex</strong></td>
+      <td>L-b</td><td>2.682</td><td>0.078</td><td>6.759</td><td>80.90</td><td>✅ 0/50</td>
+    </tr>
+    <tr><td>ORCA-varying</td><td>3.693</td><td>0.089</td><td>8.389</td><td>110.67</td><td>✅ 0/50</td></tr>
+    <tr style="background:#fef3c7;"><td><strong>Ours</strong></td><td><strong>2.544</strong></td><td><strong>0.075</strong></td><td><strong>6.402</strong></td><td><strong>76.54</strong></td><td>✅ 0/50</td></tr>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">🏆 关键发现</div>
+    <strong>A-F 方法编队精度最高但全部碰撞</strong>——它只关注编队保持，完全不具备避障能力。<br>
+    <strong>本文方法在所有场景中综合最优</strong>：飞行时间最短、运动最平滑（Jerk 最小）、编队误差有竞争力。<br>
+    <strong>L-b 在动态场景中位置误差更好</strong>（0.838 vs 0.997），但编队相似性误差更差——因为 L-b 强制严格的相对位置约束，牺牲了编队灵活性。
+  </div>
+</section>
+
+<!-- ═══════════════ 4. ALGORITHM FORMULAS ═══════════════ -->
+<section id="formulas">
+  <h2>4. 算法公式全解 —— 从 POMDP 到仿射变换到 PPO</h2>
+  <p>论文的数学体系分为<strong>四个层次</strong>：问题建模（POMDP）→ 决策层（仿射变换+应力矩阵）→ 执行层（DRL）→ 训练优化（PPO）。</p>
+
+  <h3>4.1 POMDP 形式化</h3>
+  <div class="formula-block">
+    <div class="eq-main">POMDP = ⟨ S, A, T, R, Ω, O, γ ⟩</div>
+    <div class="eq-note">每个 UAV 面临的是一个<strong>部分可观测</strong>的序列决策问题——只能通过 LiDAR 感知局部环境</div>
+  </div>
+  <table>
+    <tr><th>符号</th><th>含义</th><th>本文中的具体对应</th></tr>
+    <tr><td><strong>S</strong></td><td>真实状态</td><td>所有 UAV 位置 + 障碍物位置 + 目标编队构型</td></tr>
+    <tr><td><strong>A</strong></td><td>动作空间</td><td>2 维连续 [v, ω]，v∈[0,v_max], ω∈[-ω_max,ω_max]</td></tr>
+    <tr><td><strong>T</strong></td><td>状态转移</td><td>独轮车运动学 Eq.(14-15)</td></tr>
+    <tr><td><strong>R</strong></td><td>奖励函数</td><td>r = r_target + r_collision + r_smooth1 + r_smooth2</td></tr>
+    <tr><td><strong>Ω</strong></td><td>观测空间</td><td>LiDAR 扫描 (270°×3) + 速度 + 相对目标位置</td></tr>
+    <tr><td><strong>O</strong></td><td>观测函数</td><td>LiDAR 感知 + 状态读取（不完全观测——看不到全局）</td></tr>
+  </table>
+
+  <h3>4.2 决策层公式 —— 仿射变换与应力矩阵</h3>
+
+  <h4>Eq.(3): 应力矩阵基本关系</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(3)</span>
+    <div class="eq-main">(Ω ⊗ I_d) · x = 0</div>
+    <div class="eq-note">应力矩阵 Ω 定义了编队成员之间的"平衡关系"——这是编队构型的数学约束</div>
+  </div>
+
+  <h4>Eq.(4): 应力矩阵定义</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(4)</span>
+    <div class="eq-main">[Ω]_{ij} = ω_{ij} (if i≠j and (i,j)∈E), &nbsp; 0 (if i≠j and (i,j)∉E), &nbsp; −Σ ω_{ik} (if i=j)</div>
+    <div class="eq-note">ω_{ij} > 0 = 吸引力, ω_{ij} < 0 = 排斥力, ω_{ij} = 0 = 无直接关系</div>
+  </div>
+
+  <h4>Eq.(5): 时变目标编队（核心公式）</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(5)</span>
+    <div class="eq-main">x'(t) = (A(t) ⊗ I_d) · x + [1_N ⊗ I_d] · b(t)</div>
+    <table class="symbol-table">
+      <tr><td>A(t) ∈ ℝ^(d×d)</td><td>仿射变换矩阵：编码旋转、缩放、剪切</td></tr>
+      <tr><td>b(t) ∈ ℝ^d</td><td>平移向量</td></tr>
+      <tr><td>x ∈ ℝ^(dN)</td><td>标称编队构型（预设形状）</td></tr>
+      <tr><td>x'(t)</td><td>当前时刻的目标编队位置（所有 UAV）</td></tr>
+      <tr><td>⊗</td><td>Kronecker 积——将 d×d 变换广播到每个 UAV</td></tr>
+    </table>
+  </div>
+
+  <h4>Eq.(6-7): Leader-Follower 应力矩阵分块</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(6-7)</span>
+    <div class="eq-main">Ω · x = 0 ⇒ Ω_l·x_l + Ω_f·x_f = 0</div>
+    <div class="eq-main">Ω = [Ω_{ll}  Ω_{lf};  Ω_{fl}  Ω_{ff}]</div>
+    <div class="eq-note">前 n_l 行为 leader 约束，后 n_f 行为 follower 约束</div>
+  </div>
+
+  <h4>Eq.(8): 跟随者目标位置计算公式（最实用的公式）</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(8)</span>
+    <div class="eq-main">p_f*(t) = −Ω_{ff}⁻¹ · Ω_{fl} · p_l(t)</div>
+    <div class="eq-note">只要知道 leaders 的位置和应力矩阵，每个 follower 就能<strong>独立计算</strong>自己的目标位置——无需中心节点！这是分布式实现的关键。</div>
+  </div>
+
+  <h3>4.3 执行层公式 —— DRL 策略优化</h3>
+
+  <h4>Eq.(9): 随机策略</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(9)</span>
+    <div class="eq-main">a_i ~ π_θ(·|o_i)</div>
+    <div class="eq-note">每个 UAV 的动作为从以 o_i 为条件的高斯分布中采样——训练时引入探索，测试时用确定性均值</div>
+  </div>
+
+  <h4>Eq.(10-15): 优化问题</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(10-15)</span>
+    <div class="eq-main">min E(T_i | π_θ)</div>
+    <div class="eq-main" style="margin-top:6px;">s.t. ‖p_i − p_j‖ ≥ r_safe &nbsp;（UAV 间避碰, Eq.11）</div>
+    <div class="eq-main">‖p_i − o_k‖ ≥ r_safe &nbsp;（障碍物避碰, Eq.12）</div>
+    <div class="eq-main">p_i* = 目标位置（满足编队约束, Eq.13）</div>
+    <div class="eq-main">p_i^{t+1} = p_i^t + Δt·v_i[cos ψ_i, sin ψ_i]ᵀ &nbsp;（运动学, Eq.14-15）</div>
+  </div>
+
+  <h3>4.4 奖励函数 —— Eq.(16-20)</h3>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(16)</span>
+    <div class="eq-main">r = r_target + r_collision + r_smooth1 + r_smooth2</div>
+  </div>
+
+  <table>
+    <tr><th>奖励项</th><th>公式</th><th>设计意图</th></tr>
+    <tr><td><strong>r_target</strong> (Eq.17)</td><td>到达目标: +r_arrive (15)<br>过程奖励: λ₁·(|Δp_{t-1}| − |Δp_t|)</td><td>鼓励 UAV 向目标点移动</td></tr>
+    <tr><td><strong>r_collision</strong> (Eq.18)</td><td>碰撞: −15<br>无碰撞: 0</td><td>硬惩罚——碰撞 = 任务失败</td></tr>
+    <tr><td><strong>r_smooth1</strong> (Eq.19)</td><td>−λ₂·|ω_i| if |ω_i| > 0.7<br>0 otherwise</td><td>抑制过大角速度，防止 zigzag</td></tr>
+    <tr><td><strong>r_smooth2</strong> (Eq.20)</td><td>heading 偏差惩罚 / 距离权重</td><td>防止过度适应避障策略（避免 zigzag）</td></tr>
+  </table>
+
+  <div class="callout idea">
+    <div class="callout-title">奖励设计亮点：heading 惩罚 / 距离权重 (Eq.20)</div>
+    这是一个<strong>自适应惩罚</strong>——当 UAV 离目标远时，heading 偏差的惩罚较小（允许绕路避障）；当 UAV 接近目标时，惩罚增大（强制对准目标）。这种设计自然地在"避障灵活性"和"目标导向"之间取得了平衡。
+  </div>
+
+  <h3>4.5 PPO 训练算法</h3>
+  <p>论文使用 PPO（Proximal Policy Optimization），关键超参数见 Table 1：γ=0.99, λ=0.95, K_epoch=20, lr=5e-5(S1)/2e-5(S2), KL_target=15e-4。</p>
+  <p>特别的是使用了 <strong>自适应 KL 惩罚系数</strong>：如果 KL 散度太大就增大惩罚系数 β，太小就减小——这是 PPO 原始论文中 KL-penalty 变体的做法。</p>
+</section>
+
+<!-- ═══════════════ 5. DATA FLOW ═══════════════ -->
+<section id="dataflow">
+  <h2>5. 控制系统数据流全解</h2>
+
+  <h3>5.1 数据流全景：一步闭环</h3>
+  <div class="fig-box">
+    <div class="fig-ascii">
+STAGE Simulator (所有 UAV 状态 + 障碍物)
+│
+├─ 决策层 ──── 仿射变换 + 应力矩阵 ────┐
+│  Leaders: 跟随参考轨迹               │
+│  Followers: p_f*(t) = −Ω_ff⁻¹·Ω_fl·p_l(t) │
+│                                       │
+│  输出: p_i*(t) for each UAV           │
+│                                       │
+├─ 执行层 ──── 每个 UAV 独立执行 ──────┤
+│                                       │
+│  UAV_i 观测 o_i:                      │
+│  · LiDAR 扫描 (270° × 3层)            │
+│  · 当前速度 [v_i, ω_i]                │
+│  · 相对目标 Δp_i = p_i*(t) − p_i(t)  │
+│                                       │
+│  CNN 分支 (3层 Conv1D) ──→ LiDAR 特征 │
+│  拼接 [LiDAR特征, v_i, ω_i, Δp_i]     │
+│  FC(128)+ReLU                         │
+│  Actor: [μ_v,σ_v, μ_ω,σ_ω]           │
+│  Critic: V(o_i)                       │
+│                                       │
+│  采样 a_i = [v_cmd, ω_cmd]            │
+│                                       │
+├─ 运动学 ──── 独轮车模型 ────────────┤
+│  x_i' = x_i + Δt·v_cmd·cos(ψ_i)      │
+│  y_i' = y_i + Δt·v_cmd·sin(ψ_i)      │
+│  ψ_i' = ψ_i + Δt·ω_cmd               │
+│                                       │
+├─ 奖励计算 ───────────────────────────┤
+│  r = r_target + r_collision + r_smooth│
+│                                       │
+└─ PPO 更新 (每 N 步收集经验后)         │
+    GAE → L_CLIP → Adam 更新 θ          │
+    循环 ←──────────────────────────────┘</div>
+  </div>
+
+  <h3>5.2 关键维度速查表</h3>
+  <table>
+    <tr><th>阶段</th><th>变量</th><th>维度</th><th>范围</th></tr>
+    <tr><td>LiDAR 扫描</td><td>laser_scans</td><td>270° × 3 层</td><td>距离值</td></tr>
+    <tr><td>CNN 特征</td><td>LiDAR_features</td><td>32 维 (展平后)</td><td>ReLU 后 ≥0</td></tr>
+    <tr><td>观测 o_i</td><td>obs</td><td>LiDAR特征 + 2 + 2 维</td><td>混合</td></tr>
+    <tr><td>动作 a_i</td><td>[v_cmd, ω_cmd]</td><td>2 维</td><td>[0,v_max], [-ω_max,ω_max]</td></tr>
+    <tr><td>目标位置</td><td>p_i*(t)</td><td>2 维 (x,y)</td><td>R²</td></tr>
+    <tr><td>编队构型</td><td>x</td><td>2N 维</td><td>R^(2N)</td></tr>
+    <tr><td>应力矩阵</td><td>Ω</td><td>N×N</td><td>R^(N×N)</td></tr>
+    <tr><td>仿射变换</td><td>(A, b)</td><td>2×2 + 2</td><td>R^(2×2) × R²</td></tr>
+    <tr><td>网络参数量</td><td>θ</td><td>~20K (估算)</td><td>float32</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 6. RL TRAINING DETAILS ═══════════════ -->
+<section id="training">
+  <h2>6. RL 训练详解</h2>
+
+  <h3>6.1 训练超参数（Table 1）</h3>
+  <table>
+    <tr><th>超参数</th><th>值</th><th>说明</th></tr>
+    <tr><td>γ (折扣因子)</td><td><strong>0.99</strong></td><td>99% 未来奖励计入当前决策</td></tr>
+    <tr><td>λ (GAE)</td><td><strong>0.95</strong></td><td>Bias-variance 平衡</td></tr>
+    <tr><td>T_horizon</td><td><strong>8000</strong></td><td>每次收集 8000 步经验才更新</td></tr>
+    <tr><td>K_epoch</td><td><strong>20</strong></td><td>同一批数据重复用 20 次</td></tr>
+    <tr><td>lr (学习率)</td><td><strong>5e-5 (S1) / 2e-5 (S2)</strong></td><td>两阶段递减——越到后面越精细</td></tr>
+    <tr><td>KL_target</td><td><strong>15e-4</strong></td><td>自适应 KL 的目标值</td></tr>
+    <tr><td>KL 惩罚系数 β</td><td><strong>自适应</strong></td><td>KL 太大 → β×2; KL 太小 → β÷2</td></tr>
+    <tr><td>ε (clip range)</td><td><strong>1.0</strong> (初始)</td><td>使用 KL-penalty，非 clip 变体</td></tr>
+    <tr><td>reward scale</td><td>r_arrive=15, r_collision=−15</td><td>到达和碰撞对称</td></tr>
+    <tr><td>safe radius</td><td>r_safe = 0.5m</td><td>碰撞判定距离</td></tr>
+  </table>
+
+  <div class="callout warn">
+    <div class="callout-title">注意：PPO 的两种变体</div>
+    OpenFlight 使用 PPO <strong>clip 变体</strong>（ε=0.2, 限制概率比），本文使用 PPO <strong>KL-penalty 变体</strong>（自适应 β, KL_target=1.5e-3）。两种变体都是 PPO 原论文提出的，但 clip 变体更常见（实现更简单）。本文使用 KL-penalty 可能与多智能体训练的不稳定性有关——自适应 KL 比固定 clip 更灵活。
+  </div>
+
+  <h3>6.2 两阶段课程学习</h3>
+  <div class="phase-steps">
+    <div class="phase-step"><p><strong>Stage 1: 无障碍环境训练 (~70k iter)</strong>：多个 UAV 在无障碍场景中学习基本导航能力 + UAV 间避碰。保存训练好的网络参数。</p></div>
+    <div class="phase-step"><p><strong>Stage 2: 复杂障碍环境训练</strong>：用 Stage 1 的参数初始化网络，在复杂障碍场景中继续训练。UAV 逐步学会在避障的同时保持编队。</p></div>
+  </div>
+  <div class="callout tip"><strong>为什么课程学习有效？</strong>直接从复杂场景开始训练，奖励信号稀疏且噪声大——策略在学会基本导航前就"迷失"了。Stage 1 提供了一个好的初始化，让 Stage 2 的探索更有效率。这与 OpenFlight 的"从 V1 开始验证框架"思路一致。</div>
+
+  <h3>6.3 训练环境设置</h3>
+  <ul>
+    <li><strong>模拟器</strong>：STAGE（常用的 2D 机器人模拟器）</li>
+    <li><strong>障碍物</strong>：随机生成的灰色圆柱体（静态），训练时 UAV 间互为动态障碍物</li>
+    <li><strong>每轮初始化</strong>：随机 UAV 起始位置 + 随机目标位置</li>
+    <li><strong>硬件</strong>：Ubuntu 20.04, 32GB RAM, GeForce RTX 3090</li>
+    <li><strong>训练时长</strong>：两阶段共约 24 小时</li>
+  </ul>
+
+  <h3>6.4 训练结果（Fig.8）</h3>
+  <p>Stage 1 的奖励在 ~70,000 迭代后稳定在 ~90——说明 UAV 学会了基本导航和 UAV 间避碰。Stage 2 开始时奖励明显高于 Stage 1 的起点（因为用了 Stage 1 的预训练参数），最终快速收敛到 ~115——说明 UAV 学会了在复杂障碍环境中的安全导航。</p>
+</section>
+
+<!-- ═══════════════ 7. FIGURE INTERPRETATION ═══════════════ -->
+<section id="figures">
+  <h2>7. 论文图表解读</h2>
+
+  <h3>Fig.3: 系统架构概览</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.3 — Overview of multi-UAVs flexible formation control</div>
+    <div class="fig-desc">
+      <p>最重要的架构图，展示了<strong>两层框架的完整数据流</strong>：</p>
+      <ul>
+        <li><strong>左侧（决策层）</strong>：标称编队 → 仿射变换 → 目标位置</li>
+        <li><strong>右侧（执行层）</strong>：LiDAR + 速度 + 相对目标 → CNN + FC 网络 → [v, ω] 速度指令</li>
+        <li><strong>核心信息</strong>：决策层的输出（目标位置）作为执行层的输入——两层解耦但协同</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Fig.5: 仿射变换示意</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.5 — Illustration of affine transformations (Zhao [14])</div>
+    <div class="fig-desc">
+      <p>展示了标称构型的六种变换：(a) 标称 (b) 旋转 (c) 缩放 (d-f) 剪切。这是理解"灵活编队"最直观的图——<strong>同一个标称形状可以通过仿射变换变成完全不同的空间构型</strong>，但数学上保持共线性和比例关系。</p>
+    </div>
+  </div>
+
+  <h3>Fig.6: 网络结构</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.6 — Network structure</div>
+    <div class="fig-desc">
+      <p><strong>关键设计</strong>：前 3 层专门处理 LiDAR 数据（CNN），然后与速度、目标位置拼接后经过 FC 层。</p>
+      <ul>
+        <li><strong>为什么 CNN 处理 LiDAR？</strong>LiDAR 是空间结构数据，CNN 能提取局部空间特征（如"左前方 45° 有一个障碍物"）</li>
+        <li><strong>为什么拼接后再 FC？</strong>将感知信息（LiDAR）与自身状态（速度、目标）融合做决策</li>
+      </ul>
+      <p>这比 OpenFlight 的纯 MLP 更复杂——因为需要处理高维 LiDAR 数据，而 OpenFlight 的观测已经是精心设计的 6D 低维特征。</p>
+    </div>
+  </div>
+
+  <h3>Fig.7: STAGE 训练环境</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.7 — Training environment in STAGE simulator</div>
+    <div class="fig-desc">
+      <p>多个 UAV（蓝色）在随机障碍物（灰色圆柱体）中训练。每个 UAV 有 270° LiDAR FOV。这是典型的 2D 多智能体训练场景。</p>
+    </div>
+  </div>
+
+  <h3>Fig.8: 两阶段训练曲线</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.8 — Average reward curve in two-stage training</div>
+    <div class="fig-desc">
+      <p>Stage 1 奖励稳定在 ~90（约 70k iter），Stage 2 从更高起点快速收敛到 ~115。</p>
+      <p><strong>读图要点</strong>：如果直接从复杂场景开始（无课程学习），平均奖励显著低于两阶段训练——这是课程学习有效性的直接证据。</p>
+    </div>
+  </div>
+
+  <h3>Fig.9: 三种测试场景</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.9 — Experimental validation scenes</div>
+    <div class="fig-desc">
+      <ul>
+        <li><strong>(a) 静态场景</strong>：已知棱柱障碍物 + 未知圆柱障碍物。编队需要通过狭窄通道</li>
+        <li><strong>(b) 动态场景</strong>：匀速直线运动的动态障碍物（橙色 UAV）</li>
+        <li><strong>(c) 复杂场景</strong>：静态 + 动态障碍物混合，编队需要通过狭窄通道同时躲避动态障碍</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Fig.10-12: 飞行轨迹对比</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.10-12 — Formation flight trajectories</div>
+    <div class="fig-desc">
+      <p>分别展示静态/动态/复杂场景中各方法的飞行轨迹。本文方法的轨迹明显更平滑、更直接（得益于 Jerk 惩罚和 heading 惩罚）。L-b 方法在避障时编队结构容易破坏——因为严格的相对位置约束与避障需求冲突。</p>
+    </div>
+  </div>
+
+  <h3>Fig.14-16: 可扩展性验证</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.14-16 — Scalability experiments (4~10 UAVs)</div>
+    <div class="fig-desc">
+      <p>验证了方法在 4 到 10 架 UAV 编队规模下的表现。这是重要的工程验证——证明方法不因编队规模增大而崩溃。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 8. RESEARCH TRICKS ═══════════════ -->
+<section id="tricks">
+  <h2>8. 科研 Tricks —— 哪些可以直接用到你的项目里</h2>
+
+  <div class="tricks-grid">
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#dbeafe;color:#1d4ed8">1</span>
+      <h4>混合驱动：模型 + 数据各司其职</h4>
+      <p><strong>核心思想</strong>：不要把全部问题交给 DRL。用数学模型处理<strong>有明确结构约束</strong>的子问题（编队形状保持），用 DRL 处理<strong>难以建模</strong>的子问题（避障、未知环境适应）。</p>
+      <p>模型驱动的部分让 DRL 的输入更干净（只需要追踪目标点），学习更高效。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#d1fae5;color:#047857">2</span>
+      <h4>将邻居视为动态障碍物 —— 巧妙的训练策略</h4>
+      <p>训练场景中<strong>只放静态障碍物</strong>，但其他 UAV 自然充当了动态障碍物。这避免了需要专门生成动态障碍物数据——UAV 间的相对运动自然提供了"动态"训练信号。</p>
+      <p>这招对多智能体 RL 训练特别实用：不需要专门设计动态障碍物行为模型。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#fef3c7;color:#92400e">3</span>
+      <h4>两阶段课程学习 —— 从简单到复杂</h4>
+      <pre><span class="cm"># Stage 1: 无障碍 —— 学会基本导航</span>
+train(nav + inter-UAV collision avoidance,
+      env=obstacle_free)
+
+<span class="cm"># Stage 2: 复杂障碍 —— 在好的基础上精进</span>
+train(complex obstacle avoidance,
+      env=obstacle_rich,
+      init_weights=stage1_checkpoint)</pre>
+      <p>比直接从复杂场景开始训练快得多、稳得多。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#ffe4e6;color:#be123c">4</span>
+      <h4>分布式计算的数学优雅性 (Eq.8)</h4>
+      <p><code>p_f*(t) = −Ω_ff⁻¹·Ω_fl·p_l(t)</code> —— 每个 follower 只需要知道 leaders 的位置和本地的应力矩阵块，就能<strong>独立计算</strong>自己的目标。不需要全局通信、不需要中心节点。</p>
+      <p>这是"分布式算法"的理想形态：数学保证的分布式可计算性。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#ede9fe;color:#6d28d9">5</span>
+      <h4>自适应 heading 惩罚 (Eq.20)</h4>
+      <p>heading 惩罚除以距离权重：离目标远 → 惩罚小（允许绕路）；离目标近 → 惩罚大（必须对准）。</p>
+      <p>这种<strong>状态依赖的自适应奖励</strong>比固定权重更灵活——RL 策略在远距离时更自由地探索避障路径，在近距离时更精确地对准目标。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#e6faf8;color:#0f766e">6</span>
+      <h4>PPO KL-penalty 变体 —— 多智能体训练的稳定性</h4>
+      <p>本文选择 PPO 的 KL-penalty 变体（而非更常见的 clip 变体）。自适应 KL 惩罚系数在多智能体场景中可能更稳定——当策略变化过大时自动加强约束。</p>
+      <p>选择算法变体要匹配任务特征：单智能体 → clip；多智能体 → KL-penalty 可能更好。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#fce7f3;color:#9d174d">7</span>
+      <h4>编队评价指标设计</h4>
+      <p>不只是"碰撞次数"——设计了<strong>编队位置误差 + 编队相似性误差</strong>两个核心指标，区分了"绝对位置精度"和"形状保持能力"。</p>
+      <p>对于编队控制论文，必须同时评估<strong>安全性</strong>（碰撞）、<strong>编队质量</strong>（误差）和<strong>运动质量</strong>（Jerk/时间）。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#f0fdf4;color:#166534">8</span>
+      <h4>对比方法的公平 setup</h4>
+      <p>每个对比方法都<strong>经过参数调优</strong>，确保在各自的实验场景中能实现无碰撞飞行。ORCA 方法还设置了 Fixed 和 Varying 两种目标模式。</p>
+      <p>做比较实验的铁律：<strong>让 baseline 也充分发挥</strong>，否则赢了也没有说服力。</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════ 9. DESIGN PHILOSOPHY ═══════════════ -->
+<section id="philosophy">
+  <h2>9. 设计哲学 —— "混合驱动" 的方法论</h2>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>❌ 常见误区</h4>
+      <ul>
+        <li>把所有问题都交给 DRL 端到端解决</li>
+        <li>认为"纯学习"比"模型+学习"更先进</li>
+        <li>忽略问题的结构特性</li>
+        <li>训练时不分阶段，直接从最难的场景开始</li>
+        <li>多智能体训练不考虑分布式约束</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>✅ 本文的做法</h4>
+      <ul>
+        <li><strong>数学模型处理结构约束</strong>（仿射变换 → 编队形状）</li>
+        <li><strong>DRL 处理难以建模的部分</strong>（避障、未知环境）</li>
+        <li><strong>两层解耦</strong>：决策层全局协调 + 执行层局部自主</li>
+        <li><strong>两阶段课程学习</strong>：简单 → 复杂</li>
+        <li><strong>分布式可计算</strong>：每个 follower 独立算目标</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout idea">
+    <div class="callout-title">🎯 本文的核心方法论</div>
+    <strong>不要试图用一个黑箱神经网络解决所有问题。</strong>先把问题拆解——哪些有明确的数学结构？哪些必须依靠数据驱动？<br>
+    模型驱动的部分让系统<strong>可解释、可保证</strong>；数据驱动的部分让系统<strong>自适应、灵活</strong>。两者结合才是工程上最优的方案。
+  </div>
+
+  <h3>对比 OpenFlight 的设计哲学</h3>
+  <table>
+    <tr><th>维度</th><th>OpenFlight</th><th>本文</th></tr>
+    <tr><td>核心哲学</td><td>"Less is more"<br>简单观测+简单网络+简单奖励</td><td>"Model-Data Hybrid"<br>数学模型+DRL 各司其职</td></tr>
+    <tr><td>网络复杂度</td><td>2层MLP (5000参数)</td><td>CNN+FC (更复杂，因LiDAR输入)</td></tr>
+    <tr><td>控制方式</td><td>端到端（V2直接输出舵面）</td><td>混合（决策层模型 + 执行层DRL）</td></tr>
+    <tr><td>适用场景</td><td>单机极限机动</td><td>多机编队协调</td></tr>
+    <tr><td>共同点</td><td colspan="2">PPO · 课程学习 · 密集奖励 · 硬约束用终止条件</td></tr>
+  </table>
+
+  <h3>作为多智能体 RL 新手的实操流程</h3>
+  <ol>
+    <li><strong>分析问题结构</strong>：哪些约束有数学模型？哪些需要学习？</li>
+    <li><strong>设计两层架构</strong>：决策层（全局协调）+ 执行层（局部自主）</li>
+    <li><strong>选数学模型</strong>：仿射变换、应力矩阵、一致性协议……选最适合的</li>
+    <li><strong>设计 DRL 部分</strong>：观测（传感器+模型输出）、动作、奖励</li>
+    <li><strong>两阶段训练</strong>：先简单场景学会基本功，再复杂场景精进</li>
+    <li><strong>多指标评估</strong>：安全（碰撞）+ 质量（误差）+ 效率（时间/Jerk）</li>
+    <li><strong>充分的 baseline 对比</strong>：纯模型、纯学习、混合——三种都要比</li>
+  </ol>
+</section>
+
+<!-- ═══════════════ 10. LEARNING ROADMAP ═══════════════ -->
+<section id="roadmap">
+  <h2>10. 学习路线 &amp; 改进方向</h2>
+
+  <h3>学习路线</h3>
+  <ol>
+    <li><strong>理解仿射变换</strong> → 搞懂 Eq.(5) 的数学含义：旋转、缩放、剪切、平移如何用矩阵表示</li>
+    <li><strong>理解应力矩阵</strong> → 搞懂 Eq.(3-4, 6-8)：为什么 follower 可以独立计算目标位置</li>
+    <li><strong>理解 DRL 执行层</strong> → CNN 处理 LiDAR + FC 融合状态 → PPO 训练（这是和 OpenFlight 最相似的部分）</li>
+    <li><strong>复现实验</strong> → 如果有开源代码，先跑通 Stage 1 的训练</li>
+    <li><strong>修改观测</strong> → 在观测中增删维度，观察对编队质量的影响</li>
+    <li><strong>扩展到新场景</strong> → 换一种编队形状、换一种障碍物分布</li>
+  </ol>
+
+  <h3>可改进方向</h3>
+  <table>
+    <tr><th>方向</th><th>难度</th><th>可能的改进点</th></tr>
+    <tr><td>运动学模型</td><td>⭐⭐</td><td>从独轮车升级到 6-DOF 固定翼模型（结合 OpenFlight 的 JSBSim）</td></tr>
+    <tr><td>3D 编队</td><td>⭐⭐</td><td>从 2D 扩展到 3D 空间编队（仿射变换矩阵从 2×2 扩展到 3×3）</td></tr>
+    <tr><td>网络结构</td><td>⭐⭐</td><td>引入 Attention 机制处理可变的 UAV 数量</td></tr>
+    <tr><td>训练策略</td><td>⭐⭐⭐</td><td>尝试 CTDE + 参数共享、MADDPG、QMIX 等多智能体 RL 算法</td></tr>
+    <tr><td>通信约束</td><td>⭐⭐⭐</td><td>加入通信延迟/丢包/带宽限制，验证分布式鲁棒性</td></tr>
+    <tr><td>动态拦截（你的课题）</td><td>⭐⭐⭐⭐</td><td>将静态目标 → 动态拦截点，单 UAV 追踪 → 多 UAV 协同围捕</td></tr>
+    <tr><td>实机部署</td><td>⭐⭐⭐⭐⭐</td><td>Sim-to-Real 迁移——LiDAR 噪声模型、通信延迟模拟、真机验证</td></tr>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">🔗 与 OpenFlight 的结合思路</div>
+    本文使用简化独轮车模型，OpenFlight 使用高保真 6-DOF 模型。一个自然的改进方向是：<strong>将本文的两层编队框架迁移到 OpenFlight 的 JSBSim 环境</strong>——决策层用仿射变换保证固定翼编队结构，执行层用 OpenFlight 的 PPO-ALC 直接控制舵面。这将是一个"高保真 + 混合驱动"的多固定翼编队控制系统。
+  </div>
+
+  <h3>前置知识清单</h3>
+  <table>
+    <tr><th>知识点</th><th>重要性</th><th>推荐资源</th></tr>
+    <tr><td>仿射变换（线性代数）</td><td>⭐⭐⭐⭐⭐</td><td>线性代数教材 · 矩阵乘法 · Kronecker 积</td></tr>
+    <tr><td>图论与应力矩阵</td><td>⭐⭐⭐⭐</td><td>Zhao [14] 原论文 · 图拉普拉斯矩阵</td></tr>
+    <tr><td>Leader-Follower 编队</td><td>⭐⭐⭐⭐</td><td>编队控制综述论文</td></tr>
+    <tr><td>PPO 算法</td><td>⭐⭐⭐⭐⭐</td><td>Schulman et al. (2017) · 本文 Algorithm 2</td></tr>
+    <tr><td>CNN 基础</td><td>⭐⭐⭐</td><td>1D 卷积 · 特征提取</td></tr>
+    <tr><td>多智能体 RL (MARL)</td><td>⭐⭐⭐</td><td>CTDE 范式 · 参数共享</td></tr>
+    <tr><td>独轮车运动学</td><td>⭐⭐</td><td>Eq.(1) 直接给出，无需额外学习</td></tr>
+  </table>
+</section>
+
+<footer>🚁 多无人机编队控制学习笔记 · 基于 Liu et al. (2025) Aerospace Science and Technology · NUDT 智能科学学院</footer>
+
+</div>
+</body>
+</html>

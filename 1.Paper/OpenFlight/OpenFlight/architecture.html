@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenFlight System Architecture</title>
+<style>
+  :root {
+    --bg: #f8f9fb;
+    --surface: #ffffff;
+    --border: #e2e5ea;
+    --text: #1a1d23;
+    --text-secondary: #5f6b7a;
+    --blue-fill: #e8f0fe;
+    --blue-stroke: #3b82f6;
+    --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;
+    --green-stroke: #10b981;
+    --green-strong: #047857;
+    --amber-fill: #fef7ed;
+    --amber-stroke: #f59e0b;
+    --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;
+    --purple-stroke: #8b5cf6;
+    --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;
+    --rose-stroke: #f43f5e;
+    --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;
+    --gray-stroke: #9ca3af;
+    --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;
+    --cyan-stroke: #14b8a6;
+    --cyan-strong: #0f766e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 24px;
+    color: var(--text);
+  }
+  .container {
+    max-width: 1400px;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 28px 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 6px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+  }
+  svg { display: block; width: 100%; height: auto; }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .legend-swatch {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>OpenFlight — System Architecture</h1>
+  <p class="subtitle">RL-based minimum-time flight control for fixed-wing UAVs · 6-DOF high-fidelity dynamics · Three control levels</p>
+
+  <svg viewBox="0 0 1320 1020" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Arrowheads -->
+      <marker id="arrow-blue" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#3b82f6"/>
+      </marker>
+      <marker id="arrow-green" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/>
+      </marker>
+      <marker id="arrow-amber" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#f59e0b"/>
+      </marker>
+      <marker id="arrow-purple" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#8b5cf6"/>
+      </marker>
+      <marker id="arrow-rose" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#f43f5e"/>
+      </marker>
+      <marker id="arrow-gray" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#9ca3af"/>
+      </marker>
+      <marker id="arrow-cyan" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+        <polygon points="0 0, 9 3.5, 0 7" fill="#14b8a6"/>
+      </marker>
+
+      <!-- Drop shadow -->
+      <filter id="shadow" x="-4%" y="-4%" width="108%" height="112%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.08"/>
+      </filter>
+      <filter id="shadow-light" x="-4%" y="-4%" width="108%" height="112%">
+        <feDropShadow dx="0" dy="1" stdDeviation="2" flood-opacity="0.05"/>
+      </filter>
+    </defs>
+
+    <!-- ============================================================ -->
+    <!-- SECTION LABELS (background) -->
+    <!-- ============================================================ -->
+
+    <!-- Training section bg -->
+    <rect x="20" y="20" width="582" height="230" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="36" y="46" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">TRAINING ORCHESTRATION</text>
+
+    <!-- Single Env section bg -->
+    <rect x="20" y="270" width="582" height="730" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="36" y="296" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">SINGLE ENVIRONMENT (×16 PARALLEL)</text>
+
+    <!-- Control levels section bg -->
+    <rect x="622" y="270" width="340" height="730" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="638" y="296" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">THREE CONTROL LEVELS</text>
+
+    <!-- Dynamics section bg -->
+    <rect x="982" y="270" width="318" height="500" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+    <text x="998" y="296" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">DYNAMICS &amp; RENDERING</text>
+
+    <!-- ============================================================ -->
+    <!-- TOP: TRAINING ORCHESTRATION -->
+    <!-- ============================================================ -->
+
+    <!-- PPO Algorithm -->
+    <rect x="48" y="64" width="180" height="72" rx="8" fill="var(--blue-fill)" stroke="var(--blue-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="138" y="90" text-anchor="middle" font-size="14" font-weight="700" fill="var(--blue-strong)">PPO Algorithm</text>
+    <text x="138" y="108" text-anchor="middle" font-size="11" fill="#5b6e8c">Proximal Policy Optimization</text>
+    <text x="138" y="124" text-anchor="middle" font-size="10" fill="#7b8da6">lr=2.5e-4 · batch=32 · γ=0.99</text>
+
+    <!-- Policy arrow: PPO → envs -->
+    <line x1="228" y1="90" x2="278" y2="90" stroke="var(--blue-stroke)" stroke-width="2" marker-end="url(#arrow-blue)"/>
+    <text x="253" y="82" text-anchor="middle" font-size="9" fill="#3b82f6">distribute</text>
+    <text x="253" y="108" text-anchor="middle" font-size="9" fill="#3b82f6">policy</text>
+
+    <!-- 16 envs box -->
+    <rect x="284" y="56" width="290" height="88" rx="8" fill="var(--green-fill)" stroke="var(--green-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+
+    <!-- 16 mini env boxes -->
+    <rect x="296" y="70" width="56" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/>
+    <text x="324" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">Env 1</text>
+    <rect x="358" y="70" width="56" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/>
+    <text x="386" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">Env 2</text>
+    <rect x="420" y="70" width="56" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/>
+    <text x="448" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">Env 3</text>
+    <text x="506" y="87" text-anchor="middle" font-size="12" fill="#047857">···</text>
+    <rect x="296" y="104" width="56" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/>
+    <text x="324" y="121" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">Env 16</text>
+
+    <text x="429" y="156" text-anchor="middle" font-size="11" fill="#047857">SubprocVecEnv · 16× JSBSim instances</text>
+
+    <!-- Experience return arrow -->
+    <line x1="429" y1="144" x2="429" y2="170" stroke="var(--green-stroke)" stroke-width="1.5"/>
+    <line x1="429" y1="170" x2="138" y2="170" stroke="var(--green-stroke)" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+    <line x1="138" y1="170" x2="138" y2="136" stroke="var(--green-stroke)" stroke-width="1.5"/>
+    <text x="283" y="182" text-anchor="middle" font-size="9" fill="#10b981">collect experiences (obs, action, reward, done) × 16</text>
+
+    <!-- Centralized Training / Decentralized Execution label -->
+    <rect x="170" y="194" width="240" height="22" rx="4" fill="#e8f0fe" stroke="#93c5fd" stroke-width="1"/>
+    <text x="290" y="209" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">CTDE: Centralized Training · Decentralized Execution</text>
+
+    <!-- ============================================================ -->
+    <!-- MIDDLE: CORE RL LOOP (per environment) -->
+    <!-- ============================================================ -->
+
+    <!-- Observation -->
+    <rect x="48" y="320" width="220" height="120" rx="8" fill="var(--purple-fill)" stroke="var(--purple-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="158" y="344" text-anchor="middle" font-size="13" font-weight="700" fill="var(--purple-strong)">Observation Space</text>
+    <line x1="68" y1="354" x2="248" y2="354" stroke="#c4b5fd" stroke-width="0.5"/>
+
+    <!-- Polar coord viz -->
+    <text x="78" y="372" font-size="10" font-weight="600" fill="#6d28d9">Polar Coordinate Representation:</text>
+    <text x="88" y="388" font-size="9.5" fill="#7c5ce7">Δψ = heading_error / 2π</text>
+    <text x="88" y="402" font-size="9.5" fill="#7c5ce7">d_h = tanh(horiz_dist × 0.01)</text>
+    <text x="88" y="416" font-size="9.5" fill="#7c5ce7">d_v = tanh(vert_dist × 0.02)</text>
+    <text x="88" y="430" font-size="9.5" fill="#7c5ce7">ω_z · v_body · v_NED</text>
+
+    <!-- V1: 6D / V2&V3: 11D -->
+    <rect x="68" y="440" width="58" height="16" rx="3" fill="#ede9fe" stroke="#a78bfa" stroke-width="0.8"/>
+    <text x="97" y="452" text-anchor="middle" font-size="8.5" font-weight="600" fill="#6d28d9">V1: 6D</text>
+    <rect x="132" y="440" width="76" height="16" rx="3" fill="#ede9fe" stroke="#a78bfa" stroke-width="0.8"/>
+    <text x="170" y="452" text-anchor="middle" font-size="8.5" font-weight="600" fill="#6d28d9">V2/V3: 11D</text>
+
+    <!-- Obs → Network arrow -->
+    <line x1="268" y1="380" x2="316" y2="380" stroke="var(--purple-stroke)" stroke-width="2" marker-end="url(#arrow-purple)"/>
+
+    <!-- Policy Network -->
+    <rect x="322" y="320" width="240" height="120" rx="8" fill="var(--blue-fill)" stroke="var(--blue-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="442" y="344" text-anchor="middle" font-size="13" font-weight="700" fill="var(--blue-strong)">Policy Network</text>
+    <text x="442" y="362" text-anchor="middle" font-size="10" fill="#5b6e8c">P2p3dNetwork (Feature Extractor)</text>
+    <line x1="342" y1="370" x2="542" y2="370" stroke="#bfdbfe" stroke-width="0.5"/>
+
+    <!-- Network internal -->
+    <rect x="362" y="380" width="44" height="18" rx="3" fill="white" stroke="#93c5fd" stroke-width="0.8"/>
+    <text x="384" y="393" text-anchor="middle" font-size="9" fill="#1d4ed8">Input</text>
+    <text x="417" y="393" font-size="12" fill="#3b82f6">→</text>
+    <rect x="430" y="380" width="100" height="18" rx="3" fill="white" stroke="#93c5fd" stroke-width="0.8"/>
+    <text x="480" y="393" text-anchor="middle" font-size="9" fill="#1d4ed8">Linear(64)+ReLU</text>
+    <text x="540" y="393" font-size="12" fill="#3b82f6">×2</text>
+
+    <!-- Actor / Critic heads -->
+    <rect x="362" y="406" width="78" height="18" rx="3" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.8"/>
+    <text x="401" y="419" text-anchor="middle" font-size="9" fill="#1d4ed8">Actor (μ, σ)</text>
+    <rect x="450" y="406" width="78" height="18" rx="3" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.8"/>
+    <text x="489" y="419" text-anchor="middle" font-size="9" fill="#1d4ed8">Critic (V)</text>
+
+    <!-- Network → Action arrow -->
+    <line x1="562" y1="380" x2="610" y2="380" stroke="var(--rose-stroke)" stroke-width="2" marker-end="url(#arrow-rose)"/>
+
+    <!-- Action Space -->
+    <rect x="48" y="468" width="514" height="52" rx="8" fill="var(--rose-fill)" stroke="var(--rose-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="60" y="490" font-size="13" font-weight="700" fill="var(--rose-strong)">Action Space (3D, a ∈ [-1, +1]³)</text>
+    <text x="60" y="508" font-size="10" fill="#e11d48">a[0] ← yaw / aileron / roll | a[1] ← airspeed / elevator / pitch | a[2] ← climb / throttle / airspeed</text>
+
+    <!-- ============================================================ -->
+    <!-- RIGHT: THREE CONTROL LEVELS -->
+    <!-- ============================================================ -->
+
+    <!-- V1: Velocity-Level -->
+    <rect x="642" y="320" width="300" height="172" rx="8" fill="var(--cyan-fill)" stroke="var(--cyan-stroke)" stroke-width="1.5" filter="url(#shadow-light)"/>
+    <rect x="642" y="320" width="300" height="28" rx="8" fill="#14b8a6"/>
+    <rect x="642" y="340" width="300" height="8" fill="#14b8a6"/>
+    <text x="792" y="339" text-anchor="middle" font-size="12" font-weight="700" fill="white">V1 · Velocity-Level Control (VLC)</text>
+
+    <text x="660" y="364" font-size="10" font-weight="600" fill="#0f766e">Denormalization (Eq.10):</text>
+    <text x="670" y="380" font-size="9.5" fill="#115e59">yaw_rate = action[0] × 0.5  (±0.5 rad/s)</text>
+    <text x="670" y="396" font-size="9.5" fill="#115e59">airspeed = 20 + action[1] × 6  (14~26 m/s)</text>
+    <text x="670" y="412" font-size="9.5" fill="#115e59">climb_rate = action[2] × 10  (±10 m/s)</text>
+
+    <line x1="660" y1="424" x2="924" y2="424" stroke="#99f6e4" stroke-width="0.5"/>
+
+    <!-- PID chain -->
+    <rect x="660" y="434" width="114" height="24" rx="4" fill="white" stroke="#5eead4" stroke-width="1"/>
+    <text x="717" y="451" text-anchor="middle" font-size="9.5" font-weight="600" fill="#0f766e">X8Autopilot (PID)</text>
+    <text x="786" y="451" font-size="12" fill="#14b8a6">→</text>
+    <rect x="798" y="434" width="130" height="24" rx="4" fill="white" stroke="#5eead4" stroke-width="1"/>
+    <text x="863" y="451" text-anchor="middle" font-size="9.5" fill="#0f766e">Aileron · Elevator · Throttle</text>
+
+    <!-- V2: Actuator-Level -->
+    <rect x="642" y="510" width="300" height="172" rx="8" fill="var(--amber-fill)" stroke="var(--amber-stroke)" stroke-width="1.5" filter="url(#shadow-light)"/>
+    <rect x="642" y="510" width="300" height="28" rx="8" fill="#f59e0b"/>
+    <rect x="642" y="530" width="300" height="8" fill="#f59e0b"/>
+    <text x="792" y="529" text-anchor="middle" font-size="12" font-weight="700" fill="white">V2 · Actuator-Level Control (ALC) ⭐ Core</text>
+
+    <text x="660" y="556" font-size="10" font-weight="600" fill="#b45309">Direct Control (no PID):</text>
+    <text x="670" y="574" font-size="9.5" fill="#92400e">aileron_cmd  = action[0]  (∈ [-1, +1])</text>
+    <text x="670" y="592" font-size="9.5" fill="#92400e">elevator_cmd = action[1]  (∈ [-1, +1])</text>
+    <text x="670" y="610" font-size="9.5" fill="#92400e">throttle_cmd = 0.5 + action[2]×0.5  (∈ [0, 1])</text>
+
+    <line x1="660" y1="624" x2="924" y2="624" stroke="#fde68a" stroke-width="0.5"/>
+
+    <rect x="660" y="636" width="260" height="36" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1" stroke-dasharray="4,2"/>
+    <text x="790" y="650" text-anchor="middle" font-size="9.5" fill="#b45309">⚠ No denormalization, no PID autopilot</text>
+    <text x="790" y="664" text-anchor="middle" font-size="9.5" fill="#b45309">RL directly learns surface deflections</text>
+
+    <!-- V3: Attitude-Level -->
+    <rect x="642" y="700" width="300" height="172" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5" filter="url(#shadow-light)"/>
+    <rect x="642" y="700" width="300" height="28" rx="8" fill="#22c55e"/>
+    <rect x="642" y="720" width="300" height="8" fill="#22c55e"/>
+    <text x="792" y="719" text-anchor="middle" font-size="12" font-weight="700" fill="white">V3 · Attitude-Level Control</text>
+
+    <text x="660" y="746" font-size="10" font-weight="600" fill="#166534">Attitude Commands → PID:</text>
+    <text x="670" y="764" font-size="9.5" fill="#14532d">roll_cmd  = action[0] × π  →  roll_hold()</text>
+    <text x="670" y="782" font-size="9.5" fill="#14532d">pitch_cmd = action[1] × π/2  →  pitch_hold()</text>
+    <text x="670" y="800" font-size="9.5" fill="#14532d">airspeed  →  airspeed_hold_w_throttle()</text>
+
+    <line x1="660" y1="814" x2="924" y2="814" stroke="#bbf7d0" stroke-width="0.5"/>
+
+    <rect x="660" y="824" width="260" height="38" rx="4" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+    <text x="790" y="840" text-anchor="middle" font-size="9.5" fill="#166534">Hybrid: RL outputs attitude targets</text>
+    <text x="790" y="855" text-anchor="middle" font-size="9.5" fill="#166534">PID handles inner-loop stabilization</text>
+
+    <!-- Comparison callout -->
+    <rect x="642" y="890" width="300" height="96" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="792" y="912" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">Key Distinction</text>
+    <line x1="662" y1="920" x2="922" y2="920" stroke="#e2e8f0" stroke-width="0.5"/>
+    <text x="662" y="938" font-size="9.5" fill="#475569">V1: RL → high-level velocity cmds → PID → surfaces</text>
+    <text x="662" y="954" font-size="9.5" fill="#475569">V2: RL → low-level surface cmds directly ⚡ fastest</text>
+    <text x="662" y="970" font-size="9.5" fill="#475569">V3: RL → mid-level attitude cmds → PID → surfaces</text>
+
+    <!-- ============================================================ -->
+    <!-- BOTTOM-LEFT: JSBSim Dynamics -->
+    <!-- ============================================================ -->
+
+    <!-- Arrow from Action to JSBSim -->
+    <path d="M 305 520 L 305 556 L 305 556" stroke="var(--amber-stroke)" stroke-width="2" fill="none"/>
+    <line x1="305" y1="520" x2="305" y2="600" stroke="var(--amber-stroke)" stroke-width="2" marker-end="url(#arrow-amber)"/>
+
+    <!-- JSBSim main -->
+    <rect x="1002" y="320" width="278" height="220" rx="8" fill="var(--green-fill)" stroke="var(--green-stroke)" stroke-width="1.5" filter="url(#shadow)"/>
+    <text x="1141" y="346" text-anchor="middle" font-size="14" font-weight="700" fill="var(--green-strong)">JSBSim FDM Engine</text>
+    <text x="1141" y="364" text-anchor="middle" font-size="10" fill="#047857">High-Fidelity 6-DOF Flight Dynamics</text>
+    <line x1="1022" y1="374" x2="1260" y2="374" stroke="#a7f3d0" stroke-width="0.5"/>
+
+    <!-- 6-DOF equations -->
+    <rect x="1022" y="382" width="240" height="44" rx="4" fill="white" stroke="#6ee7b7" stroke-width="0.8"/>
+    <text x="1142" y="398" text-anchor="middle" font-size="9.5" font-weight="600" fill="#047857">6-DOF Rigid Body Dynamics</text>
+    <text x="1142" y="414" text-anchor="middle" font-size="8.5" fill="#065f46">Translation: m(v̇ + ω×v) = F</text>
+    <text x="1142" y="424" text-anchor="middle" font-size="8.5" fill="#065f46">Rotation:  Iω̇ + ω×Iω = M</text>
+
+    <!-- Aerodynamics -->
+    <rect x="1022" y="434" width="116" height="40" rx="4" fill="white" stroke="#6ee7b7" stroke-width="0.8"/>
+    <text x="1080" y="450" text-anchor="middle" font-size="9.5" font-weight="600" fill="#047857">Aerodynamics</text>
+    <text x="1080" y="464" text-anchor="middle" font-size="8.5" fill="#065f46">Wind-tunnel data</text>
+    <text x="1080" y="474" text-anchor="middle" font-size="8.5" fill="#065f46">D, Y, L forces</text>
+
+    <rect x="1146" y="434" width="116" height="40" rx="4" fill="white" stroke="#6ee7b7" stroke-width="0.8"/>
+    <text x="1204" y="450" text-anchor="middle" font-size="9.5" font-weight="600" fill="#047857">Skywalker X8</text>
+    <text x="1204" y="464" text-anchor="middle" font-size="8.5" fill="#065f46">Cruise: 20 m/s</text>
+    <text x="1204" y="474" text-anchor="middle" font-size="8.5" fill="#065f46">8 kg · 2.1m span</text>
+
+    <!-- JSBSim Properties -->
+    <rect x="1022" y="482" width="240" height="26" rx="4" fill="#d1fae5" stroke="#6ee7b7" stroke-width="0.8"/>
+    <text x="1142" y="499" text-anchor="middle" font-size="9.5" fill="#047857">jsbsim_properties.py — 50+ aircraft properties</text>
+
+    <!-- State output label -->
+    <text x="1142" y="528" text-anchor="middle" font-size="9.5" fill="#047857">Returns: position, attitude, velocity, angular velocity</text>
+
+    <!-- JSBSim → Obs (feedback loop) -->
+    <path d="M 1002 430 L 60 430" stroke="var(--purple-stroke)" stroke-width="1.5" fill="none" marker-end="url(#arrow-purple)" stroke-dasharray="8,3"/>
+    <text x="460" y="422" text-anchor="middle" font-size="9" fill="#8b5cf6">next state → observation (closed loop, 30 Hz)</text>
+
+    <!-- ============================================================ -->
+    <!-- BOTTOM-RIGHT: Optional Rendering -->
+    <!-- ============================================================ -->
+
+    <!-- UE Rendering -->
+    <rect x="1002" y="556" width="278" height="100" rx="8" fill="var(--gray-fill)" stroke="var(--gray-stroke)" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#shadow-light)"/>
+    <text x="1141" y="580" text-anchor="middle" font-size="12" font-weight="700" fill="var(--gray-strong)">[Optional] Visualization Layer</text>
+    <line x1="1022" y1="592" x2="1260" y2="592" stroke="#d1d5db" stroke-width="0.5"/>
+
+    <rect x="1022" y="600" width="84" height="24" rx="4" fill="white" stroke="#d1d5db" stroke-width="0.8"/>
+    <text x="1064" y="617" text-anchor="middle" font-size="9.5" fill="#4b5563">Unreal Engine 4</text>
+
+    <rect x="1114" y="600" width="74" height="24" rx="4" fill="white" stroke="#d1d5db" stroke-width="0.8"/>
+    <text x="1151" y="617" text-anchor="middle" font-size="9.5" fill="#4b5563">AirSim 1.8.1</text>
+
+    <rect x="1196" y="600" width="66" height="24" rx="4" fill="white" stroke="#d1d5db" stroke-width="0.8"/>
+    <text x="1229" y="617" text-anchor="middle" font-size="9.5" fill="#4b5563">UE 5.2</text>
+
+    <text x="1141" y="648" text-anchor="middle" font-size="9.5" fill="#9ca3af">Only needed for real-time visualization</text>
+
+    <!-- ============================================================ -->
+    <!-- REWARD & TERMINATION -->
+    <!-- ============================================================ -->
+
+    <!-- Reward computation -->
+    <rect x="1002" y="672" width="278" height="100" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5" filter="url(#shadow-light)"/>
+    <text x="1141" y="696" text-anchor="middle" font-size="12" font-weight="700" fill="#a16207">Reward &amp; Termination</text>
+    <line x1="1022" y1="706" x2="1260" y2="706" stroke="#fef08a" stroke-width="0.5"/>
+
+    <text x="1032" y="724" font-size="9.5" font-weight="600" fill="#a16207">r = 0.25·Δd_h + 1.0·Δd_v + 20·Δψ</text>
+    <text x="1032" y="742" font-size="9.5" fill="#854d0e">Terminate: altitude∉[10,190] · |ω|&gt;10 · goal&lt;30m · t&gt;40s</text>
+    <text x="1032" y="760" font-size="9.5" fill="#854d0e">Goal: θ~U(1.41,1.73)  φ~U(-π,π)  d~U(450,550)</text>
+
+    <!-- Reward feedback to PPO -->
+    <path d="M 1002 722 L 600 722 L 600 126 L 228 126" stroke="#eab308" stroke-width="1.5" fill="none" marker-end="url(#arrow-amber)" stroke-dasharray="6,3"/>
+    <text x="680" y="734" text-anchor="middle" font-size="9" fill="#b45309">reward + done → PPO update</text>
+
+    <!-- ============================================================ -->
+    <!-- BOTTOM: TEST / INFERENCE PIPELINE -->
+    <!-- ============================================================ -->
+
+    <rect x="20" y="556" width="514" height="130" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" filter="url(#shadow-light)"/>
+    <text x="36" y="578" font-size="12" font-weight="700" fill="#475569">INFERENCE / TEST MODE</text>
+
+    <rect x="40" y="592" width="152" height="38" rx="4" fill="white" stroke="#94a3b8" stroke-width="0.8"/>
+    <text x="116" y="608" text-anchor="middle" font-size="9.5" font-weight="600" fill="#334155">Single Target Test</text>
+    <text x="116" y="622" text-anchor="middle" font-size="8.5" fill="#64748b">navp2p_v1_test.py</text>
+
+    <rect x="204" y="592" width="152" height="38" rx="4" fill="white" stroke="#94a3b8" stroke-width="0.8"/>
+    <text x="280" y="608" text-anchor="middle" font-size="9.5" font-weight="600" fill="#334155">Multi-Target Test</text>
+    <text x="280" y="622" text-anchor="middle" font-size="8.5" fill="#64748b">navp2p_v1_test_multi.py (64 pts)</text>
+
+    <rect x="368" y="592" width="152" height="38" rx="4" fill="white" stroke="#94a3b8" stroke-width="0.8"/>
+    <text x="444" y="608" text-anchor="middle" font-size="9.5" font-weight="600" fill="#334155">Flight Visualization</text>
+    <text x="444" y="622" text-anchor="middle" font-size="8.5" fill="#64748b">6-panel plot + CSV data</text>
+
+    <rect x="40" y="640" width="480" height="32" rx="4" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="0.5"/>
+    <text x="280" y="652" text-anchor="middle" font-size="9.5" fill="#475569">model.predict(obs, deterministic=True) → action → autopilot → JSBSim → record trajectory</text>
+    <text x="280" y="666" text-anchor="middle" font-size="9.5" fill="#64748b">Metrics: flight time, trajectory smoothness, control effort, success rate</text>
+
+    <!-- ============================================================ -->
+    <!-- FILE MAP -->
+    <!-- ============================================================ -->
+
+    <rect x="620" y="20" width="680" height="80" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+    <text x="640" y="42" font-size="11" font-weight="700" fill="#334155">Code Map</text>
+
+    <text x="640" y="60" font-size="9.5" fill="#475569"><tspan font-family="monospace" fill="#1d4ed8">airgym/envs/</tspan> Gym envs (3 control levels) <tspan font-family="monospace" fill="#1d4ed8">lib/jsbsimlib.py</tspan> JSBSim wrapper + X8Autopilot</text>
+    <text x="640" y="78" font-size="9.5" fill="#475569"><tspan font-family="monospace" fill="#1d4ed8">network/p2p3d_net.py</tspan> Feature extractor <tspan font-family="monospace" fill="#1d4ed8">navp2p_v*_train.py</tspan> Training scripts <tspan font-family="monospace" fill="#1d4ed8">navp2p_v*_test.py</tspan> Evaluation</text>
+    <text x="640" y="94" font-size="9.5" fill="#475569"><tspan font-family="monospace" fill="#1d4ed8">x8/x8.xml</tspan> Skywalker X8 aerodynamics <tspan font-family="monospace" fill="#1d4ed8">lib/jsbsim_properties.py</tspan> 50+ JSBSim property definitions</text>
+
+    <!-- ============================================================ -->
+    <!-- DATA FLOW SUMMARY ARROW AT BOTTOM -->
+    <!-- ============================================================ -->
+
+    <rect x="20" y="710" width="514" height="28" rx="5" fill="#1e293b"/>
+    <text x="277" y="729" text-anchor="middle" font-size="10.5" font-weight="600" fill="#e2e8f0">Closed-Loop: JSBSim State → _get_obs() → Policy → _do_action() → JSBSim.run_fdm() → 30 Hz</text>
+
+  </svg>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="background:#e8f0fe;border-color:#3b82f6"></span> PPO / Policy Network</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#e6f7ee;border-color:#10b981"></span> JSBSim / Dynamics</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#fef7ed;border-color:#f59e0b"></span> Actuator-Level (V2)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#f0ebfd;border-color:#8b5cf6"></span> Observation</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#ffeaf0;border-color:#f43f5e"></span> Action</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#e6faf8;border-color:#14b8a6"></span> Velocity-Level (V1)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#f0fdf4;border-color:#22c55e"></span> Attitude-Level (V3)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#f3f4f6;border-color:#9ca3af"></span> Optional (UE/AirSim)</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:#fefce8;border-color:#eab308"></span> Reward / Termination</div>
+  </div>
+</div>
+</body>
+</html>

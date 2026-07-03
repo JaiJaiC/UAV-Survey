@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UZH — Robotics and Perception Group — Research Dashboard</title>
+<style>
+  :root {
+    --accent: #c084fc;
+    --accent-light: #2d1530;
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-input: #252836;
+    --text: #e1e4ea;
+    --text-dim: #8b8fa3;
+    --border: #2a2d3a;
+    --tag-bg: #252836;
+    --success: #34d399;
+    --warn: #fbbf24;
+    --info: #60a5fa;
+    --radius: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, var(--bg-card), #1e2130);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header-inner { max-width: 1400px; margin: 0 auto; }
+  .header h1 { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+  .header .lab-name { font-size: 1rem; color: var(--text-dim); margin-top: 2px; }
+  .header-links { display:flex; gap: 16px; margin-top: 10px; flex-wrap:wrap; }
+  .header-links a {
+    color: var(--text-dim); text-decoration: none; font-size: 0.85rem;
+    padding: 4px 12px; border: 1px solid var(--border); border-radius: 20px;
+    transition: all 0.2s;
+  }
+  .header-links a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Layout ── */
+  .main { max-width: 1400px; margin: 0 auto; padding: 24px 32px; }
+
+  /* ── Stats bar ── */
+  .stats-bar { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+  .stat-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 20px; min-width: 120px;
+  }
+  .stat-card .num { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+  .stat-card .lbl { font-size: 0.8rem; color: var(--text-dim); }
+
+  /* ── Tabs ── */
+  .tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid var(--border); }
+  .tab {
+    padding: 10px 20px; cursor: pointer; border: none; background: none;
+    color: var(--text-dim); font-size: 0.9rem; font-weight: 500;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Panel ── */
+  .panel { display:none; }
+  .panel.active { display:block; }
+
+  /* ── Toolbar ── */
+  .toolbar { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+  .search-box {
+    flex:1; min-width:200px; padding: 10px 16px;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); font-size: 0.9rem;
+    outline: none; transition: border-color 0.2s;
+  }
+  .search-box:focus { border-color: var(--accent); }
+  select {
+    padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); font-size: 0.85rem;
+    cursor: pointer; outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+  .btn {
+    padding: 10px 18px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-input); color: var(--text); font-size: 0.85rem;
+    cursor: pointer; transition: all 0.2s; font-weight: 500;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn.danger { border-color: #f87171; color: #f87171; }
+  .btn.danger:hover { background: #f87171; color: #000; }
+
+  /* ── Paper list ── */
+  .paper-list { display:flex; flex-direction:column; gap:8px; }
+  .paper-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+    transition: all 0.2s; cursor: pointer;
+  }
+  .paper-card:hover { border-color: var(--accent); }
+  .paper-card .title {
+    font-weight: 600; font-size: 1rem; margin-bottom: 4px;
+    color: var(--text);
+  }
+  .paper-card .title a { color: inherit; text-decoration: none; }
+  .paper-card .title a:hover { color: var(--accent); }
+  .paper-card .meta { font-size: 0.85rem; color: var(--text-dim); }
+  .paper-card .bottom { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .tag {
+    display:inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: 0.75rem; background: var(--tag-bg); color: var(--text-dim);
+  }
+  .tag.status-toread { background: #1e3a5f; color: #60a5fa; }
+  .tag.status-reading { background: #3b2f0e; color: #fbbf24; }
+  .tag.status-read { background: #0f2e1d; color: #34d399; }
+  .tag.status-note { background: #2d1530; color: #c084fc; }
+
+  .paper-actions { margin-left:auto; display:flex; gap:8px; }
+  .paper-actions button {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-dim); padding: 4px 10px; cursor: pointer;
+    font-size: 0.78rem; transition: all 0.2s;
+  }
+  .paper-actions button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
+  .empty-state .icon { font-size:3rem; margin-bottom:12px; }
+
+  /* ── arXiv fetch panel ── */
+  .fetch-form { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .fetch-form .search-box { flex:2; }
+  .fetch-results { display:flex; flex-direction:column; gap:6px; max-height:500px; overflow-y:auto; }
+  .fetch-item {
+    display:flex; align-items:center; gap:12px; padding:10px 14px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .fetch-item .info { flex:1; min-width:0; }
+  .fetch-item .ftitle { font-size:0.9rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fetch-item .fauthors { font-size:0.78rem; color:var(--text-dim); }
+  .fetch-item .fyear { font-size:0.75rem; color:var(--accent); }
+
+  /* ── Add paper form ── */
+  .add-form {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+  }
+  .form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .form-row label { min-width:80px; font-size:0.85rem; color:var(--text-dim); padding-top:10px; }
+  .form-row input, .form-row textarea {
+    flex:1; padding: 10px 14px; background: var(--bg-input);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-size:0.9rem; outline:none; min-width:200px;
+  }
+  .form-row textarea { min-height:80px; resize:vertical; }
+  .form-row input:focus, .form-row textarea:focus { border-color: var(--accent); }
+
+  /* ── Detail modal ── */
+  .modal-overlay {
+    display:none; position:fixed; inset:0; background: rgba(0,0,0,0.7);
+    z-index:200; justify-content:center; align-items:center; padding:20px;
+  }
+  .modal-overlay.show { display:flex; }
+  .modal {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; max-width:700px; width:100%;
+    max-height:80vh; overflow-y:auto;
+  }
+  .modal h3 { font-size:1.2rem; margin-bottom:8px; }
+  .modal .close-btn {
+    float:right; background:none; border:none; color:var(--text-dim);
+    font-size:1.5rem; cursor:pointer; padding:0 8px;
+  }
+  .modal .close-btn:hover { color:var(--text); }
+  .modal .detail-section { margin-top:16px; }
+  .modal .detail-section h4 { font-size:0.85rem; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  .modal textarea { width:100%; min-height:120px; padding:12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:0.9rem; resize:vertical; margin-top:8px; }
+  .modal textarea:focus { border-color:var(--accent); outline:none; }
+
+  /* ── Export panel ── */
+  .export-options { display:flex; gap:12px; flex-wrap:wrap; }
+
+  /* ── Responsive ── */
+  @media (max-width:768px) {
+    .header, .main { padding:16px; }
+    .header h1 { font-size:1.3rem; }
+    .paper-actions { margin-left:0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1>UZH-RPG</h1>
+    <div class="lab-name">UZH — Robotics and Perception Group</div>
+    <div class="header-links">
+      <a href="https://rpg.ifi.uzh.ch/" target="_blank">🌐 Website</a>
+      <a href="https://github.com/uzh-rpg" target="_blank">📂 GitHub</a>
+      <a href="https://www.youtube.com/@RoboticsPerceptionGroup" target="_blank">▶️ YouTube</a>
+      <a href="https://rpg.ifi.uzh.ch/publications.html" target="_blank">📄 Publications</a>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-card"><div class="num" id="statTotal">0</div><div class="lbl">Total Papers</div></div>
+    <div class="stat-card"><div class="num" id="statUnread">0</div><div class="lbl">To Read</div></div>
+    <div class="stat-card"><div class="num" id="statRead">0</div><div class="lbl">Read</div></div>
+    <div class="stat-card"><div class="num" id="statNotes">0</div><div class="lbl">With Notes</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-panel="library">📚 Library</button>
+    <button class="tab" data-panel="fetch">🔍 Fetch arXiv</button>
+    <button class="tab" data-panel="add">➕ Add Paper</button>
+    <button class="tab" data-panel="export">📤 Export</button>
+  </div>
+
+  <!-- Library Panel -->
+  <div class="panel active" id="panel-library">
+    <div class="toolbar">
+      <input type="text" class="search-box" id="searchInput" placeholder="Search by title, author, keyword, notes...">
+      <select id="filterStatus">
+        <option value="all">All Status</option>
+        <option value="to-read">To Read</option>
+        <option value="reading">Reading</option>
+        <option value="read">Read</option>
+      </select>
+      <select id="filterTag">
+        <option value="all">All Tags</option>
+      </select>
+      <select id="sortBy">
+        <option value="added">Sort: Recently Added</option>
+        <option value="year">Sort: Year (newest)</option>
+        <option value="title">Sort: Title A-Z</option>
+      </select>
+    </div>
+    <div class="paper-list" id="paperList"></div>
+    <div class="empty-state" id="emptyState">
+      <div class="icon">📭</div>
+      <div>No papers yet. Fetch from arXiv or add manually!</div>
+    </div>
+  </div>
+
+  <!-- Fetch Panel -->
+  <div class="panel" id="panel-fetch">
+    <div class="toolbar">
+      <div class="fetch-form">
+        <input type="text" class="search-box" id="arxivQuery" placeholder="Search arXiv...">
+        <input type="number" id="arxivMax" value="20" min="1" max="50" style="width:80px; padding:10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:0.85rem;">
+        <button class="btn primary" onclick="fetchArxiv()">Search arXiv</button>
+      </div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <strong>Quick search:</strong>
+      <button class="btn" style="font-size:0.78rem;padding:6px 12px;" onclick="document.getElementById('arxivQuery').value='Scaramuzza event camera drone';fetchArxiv()">Scaramuzza event camera drone</button> | <button class="btn" style="font-size:0.78rem;padding:6px 12px;" onclick="document.getElementById('arxivQuery').value='agile drone flight deep learning';fetchArxiv()">agile drone flight deep learning</button> | <button class="btn" style="font-size:0.78rem;padding:6px 12px;" onclick="document.getElementById('arxivQuery').value='neuromorphic vision robotics';fetchArxiv()">neuromorphic vision robotics</button> | <button class="btn" style="font-size:0.78rem;padding:6px 12px;" onclick="document.getElementById('arxivQuery').value='UZH RPG visual odometry';fetchArxiv()">UZH RPG visual odometry</button>
+    </div>
+    <div class="fetch-results" id="fetchResults">
+      <div class="empty-state"><div class="icon">🔍</div><div>Enter a query to search arXiv</div></div>
+    </div>
+  </div>
+
+  <!-- Add Paper Panel -->
+  <div class="panel" id="panel-add">
+    <div class="add-form">
+      <div class="form-row">
+        <label>Title *</label>
+        <input type="text" id="addTitle" placeholder="Paper title">
+      </div>
+      <div class="form-row">
+        <label>Authors</label>
+        <input type="text" id="addAuthors" placeholder="Author names, comma separated">
+      </div>
+      <div class="form-row">
+        <label>Year</label>
+        <input type="text" id="addYear" placeholder="2026">
+      </div>
+      <div class="form-row">
+        <label>arXiv ID</label>
+        <input type="text" id="addArxivId" placeholder="e.g., 2401.12345">
+      </div>
+      <div class="form-row">
+        <label>URL</label>
+        <input type="text" id="addUrl" placeholder="https://arxiv.org/abs/...">
+      </div>
+      <div class="form-row">
+        <label>Tags</label>
+        <input type="text" id="addTags" placeholder="comma separated: planning, perception, RL">
+      </div>
+      <div class="form-row">
+        <label>Notes</label>
+        <textarea id="addNotes" placeholder="Your notes about this paper..."></textarea>
+      </div>
+      <button class="btn primary" onclick="addPaper()">Add to Library</button>
+    </div>
+  </div>
+
+  <!-- Export Panel -->
+  <div class="panel" id="panel-export">
+    <h3 style="margin-bottom:12px;">Export Library</h3>
+    <div class="export-options">
+      <button class="btn primary" onclick="exportJSON()">Export as JSON</button>
+      <button class="btn" onclick="exportCSV()">Export as CSV</button>
+      <button class="btn" onclick="exportBibTeX()">Export as BibTeX</button>
+    </div>
+    <div style="margin-top:16px;">
+      <h3 style="margin-bottom:12px;">Import</h3>
+      <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
+      <button class="btn" onclick="document.getElementById('importFile').click()">Import JSON File</button>
+      <button class="btn danger" onclick="clearLibrary()" style="margin-left:8px;">Clear All Papers</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+// ── Paper Store (localStorage) ──
+const STORE_KEY = 'uzh_rpg_papers';
+
+function getPapers() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch(e) { return []; }
+}
+
+function savePapers(papers) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(papers));
+}
+
+function generateId() {
+  return 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+}
+
+// ── Render ──
+function updateStats() {
+  const papers = getPapers();
+  document.getElementById('statTotal').textContent = papers.length;
+  document.getElementById('statUnread').textContent = papers.filter(p => p.status === 'to-read').length;
+  document.getElementById('statRead').textContent = papers.filter(p => p.status === 'read').length;
+  document.getElementById('statNotes').textContent = papers.filter(p => p.notes && p.notes.trim()).length;
+}
+
+function updateTagFilter() {
+  const papers = getPapers();
+  const tags = new Set();
+  papers.forEach(p => (p.tags || []).forEach(t => tags.add(t)));
+  const sel = document.getElementById('filterTag');
+  sel.innerHTML = '<option value="all">All Tags</option>';
+  [...tags].sort().forEach(t => {
+    sel.innerHTML += `<option value="${t}">${t}</option>`;
+  });
+}
+
+function renderLibrary() {
+  const papers = getPapers();
+  const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const statusFilter = document.getElementById('filterStatus')?.value || 'all';
+  const tagFilter = document.getElementById('filterTag')?.value || 'all';
+  const sortBy = document.getElementById('sortBy')?.value || 'added';
+
+  let filtered = papers.filter(p => {
+    if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+    if (tagFilter !== 'all' && !(p.tags || []).includes(tagFilter)) return false;
+    if (search) {
+      const haystack = [p.title, p.authors, p.notes, (p.tags||[]).join(' '), p.arxiv_id].join(' ').toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  if (sortBy === 'year') filtered.sort((a,b) => (b.year||0) - (a.year||0));
+  else if (sortBy === 'title') filtered.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+  else filtered.sort((a,b) => (b.added||0) - (a.added||0));
+
+  const container = document.getElementById('paperList');
+  const empty = document.getElementById('emptyState');
+
+  if (filtered.length === 0) {
+    container.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    container.innerHTML = filtered.map(p => {
+      const statusLabels = {'to-read':'To Read','reading':'Reading','read':'Read'};
+      const statusClass = 'status-' + (p.status || 'toread');
+      return `
+      <div class="paper-card" onclick="openDetail('${p.id}')">
+        <div class="title">
+          <a href="${p.url || '#'}" target="_blank" onclick="event.stopPropagation()">${escHtml(p.title)}</a>
+        </div>
+        <div class="meta">${escHtml(p.authors || 'Unknown')} — ${p.year || 'N/A'}</div>
+        <div class="bottom">
+          <span class="tag ${statusClass}">${statusLabels[p.status] || p.status || 'to-read'}</span>
+          ${(p.tags||[]).map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}
+          ${p.arxiv_id ? `<span class="tag" style="font-family:monospace;">arXiv:${escHtml(p.arxiv_id)}</span>` : ''}
+          <div class="paper-actions">
+            <button onclick="event.stopPropagation(); downloadPdf('${p.id}')" title="Download PDF">📥 PDF</button>
+            <button onclick="event.stopPropagation(); quickStatus('${p.id}','read')" title="Mark read">✅</button>
+            <button onclick="event.stopPropagation(); deletePaper('${p.id}')" title="Delete">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  updateStats();
+  updateTagFilter();
+}
+
+// ── Actions ──
+function addPaper() {
+  const title = document.getElementById('addTitle').value.trim();
+  if (!title) { alert('Title is required!'); return; }
+
+  const papers = getPapers();
+  papers.push({
+    id: generateId(),
+    title: title,
+    authors: document.getElementById('addAuthors').value.trim(),
+    year: document.getElementById('addYear').value.trim(),
+    arxiv_id: document.getElementById('addArxivId').value.trim(),
+    url: document.getElementById('addUrl').value.trim(),
+    tags: document.getElementById('addTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+    notes: document.getElementById('addNotes').value.trim(),
+    status: 'to-read',
+    added: Date.now()
+  });
+  savePapers(papers);
+  renderLibrary();
+  // Clear form
+  ['addTitle','addAuthors','addYear','addArxivId','addUrl','addTags','addNotes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  switchTab('library');
+}
+
+function quickStatus(id, status) {
+  const papers = getPapers();
+  const p = papers.find(p => p.id === id);
+  if (p) { p.status = status; savePapers(papers); renderLibrary(); }
+}
+
+function deletePaper(id) {
+  if (!confirm('Delete this paper?')) return;
+  let papers = getPapers();
+  papers = papers.filter(p => p.id !== id);
+  savePapers(papers);
+  renderLibrary();
+  closeModal();
+}
+
+function downloadPdf(id) {
+  const papers = getPapers();
+  const p = papers.find(p => p.id === id);
+  if (!p) return;
+  let url = '';
+  if (p.arxiv_id) url = `https://arxiv.org/pdf/${p.arxiv_id}.pdf`;
+  else if (p.url && p.url.includes('arxiv.org/abs/')) url = p.url.replace('/abs/','/pdf/') + '.pdf';
+  else if (p.url) url = p.url;
+  if (url) window.open(url, '_blank');
+  else alert('No PDF link available for this paper.');
+}
+
+// ── Detail Modal ──
+function openDetail(id) {
+  const papers = getPapers();
+  const p = papers.find(p => p.id === id);
+  if (!p) return;
+
+  const statusOptions = ['to-read','reading','read'].map(s =>
+    `<option value="${s}" ${p.status===s?'selected':''}>${s==='to-read'?'To Read':s==='reading'?'Reading':'Read'}</option>`
+  ).join('');
+
+  document.getElementById('modalContent').innerHTML = `
+    <button class="close-btn" onclick="closeModal()">×</button>
+    <h3>${escHtml(p.title)}</h3>
+    <div class="meta" style="margin-bottom:12px;">${escHtml(p.authors || 'Unknown authors')} — ${p.year || 'N/A'}</div>
+    ${p.url ? `<div><a href="${p.url}" target="_blank" style="color:var(--accent);">${p.url}</a></div>` : ''}
+    ${p.arxiv_id ? `<div style="margin-top:4px;">arXiv: <code>${p.arxiv_id}</code> | <a href="https://arxiv.org/pdf/${p.arxiv_id}.pdf" target="_blank" style="color:var(--accent);">Download PDF</a></div>` : ''}
+
+    <div class="detail-section">
+      <h4>Status</h4>
+      <select onchange="updateDetailField('${p.id}','status',this.value)" style="width:100%;">
+        ${statusOptions}
+      </select>
+    </div>
+    <div class="detail-section">
+      <h4>Tags</h4>
+      <input type="text" value="${(p.tags||[]).join(', ')}" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);"
+        onchange="updateDetailField('${p.id}','tags',this.value.split(',').map(s=>s.trim()).filter(Boolean))">
+    </div>
+    <div class="detail-section">
+      <h4>Notes</h4>
+      <textarea onchange="updateDetailField('${p.id}','notes',this.value)">${escHtml(p.notes || '')}</textarea>
+    </div>
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button class="btn primary" onclick="downloadPdf('${p.id}')">📥 Download PDF</button>
+      <button class="btn danger" onclick="deletePaper('${p.id}')">Delete</button>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+  renderLibrary();
+}
+
+function updateDetailField(id, field, value) {
+  const papers = getPapers();
+  const p = papers.find(p => p.id === id);
+  if (p) { p[field] = value; savePapers(papers); }
+}
+
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ── arXiv Fetch ──
+async function fetchArxiv() {
+  const query = document.getElementById('arxivQuery').value.trim();
+  if (!query) return;
+  const max = parseInt(document.getElementById('arxivMax').value) || 20;
+
+  document.getElementById('fetchResults').innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div>Searching arXiv...</div></div>';
+
+  try {
+    const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${max}&sortBy=submittedDate&sortOrder=descending`;
+    const resp = await fetch(url);
+    const text = await resp.text();
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, 'text/xml');
+    const entries = xml.querySelectorAll('entry');
+
+    if (entries.length === 0) {
+      document.getElementById('fetchResults').innerHTML = '<div class="empty-state"><div class="icon">📭</div><div>No results found.</div></div>';
+      return;
+    }
+
+    let html = '';
+    entries.forEach(entry => {
+      const title = entry.querySelector('title')?.textContent?.trim() || 'N/A';
+      const authors = [...entry.querySelectorAll('author name')].map(n => n.textContent.trim()).join(', ');
+      const published = entry.querySelector('published')?.textContent?.trim()?.slice(0,4) || '';
+      const id = entry.querySelector('id')?.textContent?.trim() || '';
+      const arxivId = id.split('/abs/').pop();
+      const summary = (entry.querySelector('summary')?.textContent?.trim() || '').slice(0, 200);
+
+      html += `
+      <div class="fetch-item">
+        <div class="info">
+          <div class="ftitle">${escHtml(title)}</div>
+          <div class="fauthors">${escHtml(authors)}</div>
+          <div style="font-size:0.75rem;color:var(--text-dim);margin-top:2px;">${escHtml(summary)}</div>
+        </div>
+        <div class="fyear">${published}</div>
+        <button class="btn primary" onclick='saveFromArxiv(${JSON.stringify({title,authors,year:published,arxiv_id:arxivId,url:"https://arxiv.org/abs/"+arxivId}).replace(/'/g,"&#39;")})'>➕ Save</button>
+      </div>`;
+    });
+
+    document.getElementById('fetchResults').innerHTML = html;
+  } catch(e) {
+    document.getElementById('fetchResults').innerHTML = `<div class="empty-state"><div class="icon">❌</div><div>Error: ${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function saveFromArxiv(data) {
+  const papers = getPapers();
+  // Check duplicate
+  if (papers.some(p => p.arxiv_id === data.arxiv_id)) {
+    alert('This paper is already in your library!');
+    return;
+  }
+  papers.push({
+    id: generateId(),
+    title: data.title,
+    authors: data.authors,
+    year: data.year,
+    arxiv_id: data.arxiv_id,
+    url: data.url,
+    tags: [],
+    notes: '',
+    status: 'to-read',
+    added: Date.now()
+  });
+  savePapers(papers);
+  renderLibrary();
+  alert('Paper added to library!');
+}
+
+// ── Export ──
+function exportJSON() {
+  const papers = getPapers();
+  const blob = new Blob([JSON.stringify(papers, null, 2)], {type:'application/json'});
+  downloadBlob(blob, 'UZH-RPG_papers.json');
+}
+
+function exportCSV() {
+  const papers = getPapers();
+  const header = 'id,title,authors,year,arxiv_id,url,tags,status,notes,added';
+  const rows = papers.map(p => [
+    p.id, csvEscape(p.title), csvEscape(p.authors), p.year||'', p.arxiv_id||'',
+    p.url||'', (p.tags||[]).join(';'), p.status||'to-read', csvEscape(p.notes||''), p.added||''
+  ].join(','));
+  const blob = new Blob([header + '\n' + rows.join('\n')], {type:'text/csv;charset=utf-8'});
+  downloadBlob(blob, 'UZH-RPG_papers.csv');
+}
+
+function exportBibTeX() {
+  const papers = getPapers();
+  const entries = papers.map(p => {
+    const key = (p.arxiv_id ? p.arxiv_id : (p.authors||'Unknown').split(',')[0].trim().split(' ').pop() + (p.year||'XXXX')).toLowerCase().replace(/[^a-z0-9]/g,'');
+    const authorBib = (p.authors||'Unknown').split(',').map(a => a.trim()).join(' and ');
+    return `@article{${key},\n  title = {${p.title}},\n  author = {${authorBib}},\n  year = {${p.year||'N/A'}},\n  archivePrefix = {arXiv},\n  eprint = {${p.arxiv_id||''}},\n  url = {${p.url||''}},\n}`;
+  });
+  const blob = new Blob([entries.join('\n\n')], {type:'text/plain;charset=utf-8'});
+  downloadBlob(blob, 'UZH-RPG_papers.bib');
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Not an array');
+      const papers = getPapers();
+      let added = 0;
+      data.forEach(item => {
+        if (item.title && !papers.some(p => p.id === item.id)) {
+          papers.push({...item, id: item.id || generateId(), added: item.added || Date.now()});
+          added++;
+        }
+      });
+      savePapers(papers);
+      renderLibrary();
+      alert(`Imported ${added} papers.`);
+    } catch(err) {
+      alert('Invalid JSON file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearLibrary() {
+  if (confirm('Delete ALL papers? This cannot be undone!')) {
+    localStorage.removeItem(STORE_KEY);
+    renderLibrary();
+  }
+}
+
+// ── Tabs ──
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const tab = document.querySelector(`[data-panel="${name}"]`);
+  if (tab) tab.classList.add('active');
+  const panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+  if (name === 'library') renderLibrary();
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => switchTab(tab.dataset.panel));
+});
+
+// ── Live search ──
+document.addEventListener('DOMContentLoaded', () => {
+  renderLibrary();
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.addEventListener('input', renderLibrary);
+  const filterStatus = document.getElementById('filterStatus');
+  if (filterStatus) filterStatus.addEventListener('change', renderLibrary);
+  const filterTag = document.getElementById('filterTag');
+  if (filterTag) filterTag.addEventListener('change', renderLibrary);
+  const sortBy = document.getElementById('sortBy');
+  if (sortBy) sortBy.addEventListener('change', renderLibrary);
+  // Enter key for search
+  document.getElementById('arxivQuery')?.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') fetchArxiv();
+  });
+});
+
+// ── Helpers ──
+function escHtml(s) {
+  if (!s) return '';
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function csvEscape(s) {
+  if (!s) return '';
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g,'""') + '"';
+  }
+  return s;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>

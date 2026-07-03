@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学习笔记 — 通信辅助多UAV碰撞检测与规避：两阶段课程强化学习</title>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe; --blue-stroke: #3b82f6; --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee; --green-stroke: #10b981; --green-strong: #047857;
+    --amber-fill: #fef7ed; --amber-stroke: #f59e0b; --amber-strong: #b45309;
+    --purple-fill: #f0ebfd; --purple-stroke: #8b5cf6; --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0; --rose-stroke: #f43f5e; --rose-strong: #be123c;
+    --gray-fill: #f3f4f6; --gray-stroke: #9ca3af; --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8; --cyan-stroke: #14b8a6; --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height: 1.7;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12.5px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 12px; border-radius: 5px;
+    transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 12px; font-size: 14px; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.2px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--border); margin-bottom: 22px;
+  }
+  h3 { font-size: 15.5px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p { font-size: 14px; color: #334155; margin-bottom: 10px; }
+  ul, ol { margin: 6px 0 14px 20px; font-size: 14px; color: #334155; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 5px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1e293b; color: #e2e8f0; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12px; line-height: 1.55; padding: 16px 20px; border-radius: 8px;
+    overflow-x: auto; margin: 10px 0 16px;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 14px 0; font-size: 13.5px;
+  }
+  .callout.info  { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip   { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn  { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger{ background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea  { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 4px; margin-right: 4px; margin-bottom: 3px;
+  }
+  .tag-blue { background:#dbeafe; color:#1d4ed8; }
+  .tag-green { background:#d1fae5; color:#047857; }
+  .tag-amber { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red { background:#ffe4e6; color:#be123c; }
+  .tag-cyan { background:#cffafe; color:#155e75; }
+  .tag-indigo { background:#e0e7ff; color:#3730a3; }
+  .tag-rose { background:#ffe4e6; color:#be123c; }
+  .tag-gold { background:#fef9c3; color:#a16207; }
+  .corr-badge {
+    display: inline-block; background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border: 2px solid #f59e0b; border-radius: 6px; padding: 4px 14px;
+    font-size: 14px; font-weight: 700; color: #92400e;
+  }
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0; }
+  .cmp-col {
+    flex: 1; min-width: 240px; border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; background: #fafbfc;
+  }
+  .cmp-col h4 { margin-top: 0; }
+  .fig-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 22px; margin: 16px 0;
+  }
+  .fig-box .fig-title { font-weight: 700; font-size: 14px; color: #1e293b; margin-bottom: 10px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0;
+  }
+  .symbol-table { margin: 10px 0; }
+  .symbol-table td:first-child {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 14px; font-weight: 600; color: #1d4ed8; white-space: nowrap; padding-right: 14px;
+  }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Zhihong Liu 学习笔记</span>
+  <a href="#overview">概述</a>
+  <a href="#background">研究背景</a>
+  <a href="#method">方法论</a>
+  <a href="#comm-module">通信模块</a>
+  <a href="#experiments">实验验证</a>
+  <a href="#sim2real">Sim-to-Real</a>
+  <a href="#significance">学术意义</a>
+  <a href="../../学习笔记目录.html" style="margin-left:auto;">&larr; 返回目录</a>
+</nav>
+
+<div class="container">
+
+<!-- ====== Hero / 论文信息 ====== -->
+<section id="overview">
+  <h1>
+    &#x1F4E1; 通信辅助多UAV碰撞检测与规避 &mdash; 两阶段课程强化学习
+  </h1>
+  <p style="font-size:15px; color:var(--text-secondary); margin-bottom:10px;">
+    Communication-aided Multi-UAV Collision Detection and Avoidance Based on Two-Stage Curriculum Reinforcement Learning
+  </p>
+
+  <!-- 通讯作者 突出徽章 -->
+  <div style="margin:14px 0 10px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+    <span class="corr-badge">&#x2709;&#xFE0F; 通讯作者 Corresponding Author</span>
+    <span style="font-size:13px; color:var(--amber-strong); font-weight:600;">
+      zhliu@nudt.edu.cn
+    </span>
+  </div>
+
+  <div class="callout idea" style="margin:12px 0;">
+    <div class="callout-title">&#x1F3C6; 里程碑论文 &mdash; Zhihong Liu 首次以通讯作者身份发表</div>
+    这是<strong>Zhihong Liu（刘志红）</strong>首次以<strong>通讯作者</strong>身份发表的论文，标志着学术独立性与研究领导力的重要里程碑。作为通讯作者，Zhihong Liu 主导了研究的整体设计、方法创新与实验验证。论文发表于 Elsevier 旗下期刊 <em>Biomimetic Intelligence and Robotics</em>，聚焦多无人机在复杂环境中的碰撞检测与规避问题，提出了融合通信辅助与课程强化学习的创新方案，并在<strong>真实无人机平台</strong>上实现了<strong>零样本 Sim-to-Real 迁移</strong>。
+  </div>
+
+  <div style="margin:12px 0;">
+    <span class="tag tag-red">Collision Avoidance</span>
+    <span class="tag tag-amber">Multi-UAV</span>
+    <span class="tag tag-purple">Curriculum RL</span>
+    <span class="tag tag-cyan">Communication-Aided</span>
+    <span class="tag tag-green">Sim-to-Real</span>
+    <span class="tag tag-blue">Zero-Shot Transfer</span>
+    <span class="tag tag-indigo">PX4 SITL</span>
+    <span class="tag tag-gold">通讯作者 &#x2709;&#xFE0F;</span>
+    <span class="tag tag-rose">Real Flight</span>
+  </div>
+
+  <table style="margin-top:14px;">
+    <tr><td style="width:100px;font-weight:700;">作者</td><td>Guanzheng Wang, Xiangke Wang, Zhiqiang Miao, <strong>Zhihong Liu</strong> (通讯作者 &#x2709;&#xFE0F;), Xinyu Hu</td></tr>
+    <tr><td style="font-weight:700;">单位</td><td>国防科技大学 智能科学学院 (NUDT College of Intelligence Science and Technology) + 湖南大学 电气与信息工程学院</td></tr>
+    <tr><td style="font-weight:700;">期刊</td><td>Biomimetic Intelligence and Robotics, Vol.5, Issue 4, December 2025</td></tr>
+    <tr><td style="font-weight:700;">DOI</td><td><a href="https://doi.org/10.1016/j.birob.2025.100253">10.1016/j.birob.2025.100253</a></td></tr>
+    <tr><td style="font-weight:700;">出版商</td><td>Elsevier (ScienceDirect)</td></tr>
+    <tr><td style="font-weight:700;">领域</td><td>多无人机系统 &mdash; 碰撞规避 &mdash; 课程强化学习 &mdash; 通信辅助感知</td></tr>
+  </table>
+</section>
+
+<!-- ====== 一、研究背景与问题 ====== -->
+<section id="background">
+  <h2>一、研究背景与核心问题</h2>
+
+  <h3>1.1 多无人机碰撞规避的核心挑战</h3>
+  <p>
+    随着无人机在物流配送、农业植保、应急救援、协同侦察等领域的广泛应用，多架 UAV 在共享空域中的<strong>安全共存</strong>成为亟需解决的关键问题。与传统单机避障不同，多 UAV 碰撞规避需要同时处理两类威胁：(1) <strong>机间碰撞</strong>（inter-UAV collision）&mdash; 多架无人机之间的相互碰撞；(2) <strong>环境碰撞</strong>（obstacle collision）&mdash; 无人机与静态/动态障碍物的碰撞。
+  </p>
+  <p>
+    在有限视场角（Limited FOV）约束下，问题变得更加困难。机载视觉传感器（如深度相机、单目相机）天然存在视野盲区，一架 UAV 可能完全无法感知到从后方或侧后方接近的另一架 UAV，导致碰撞风险无法被及时发现。
+  </p>
+
+  <h3>1.2 现有方法的局限性</h3>
+
+  <table>
+    <thead>
+      <tr><th>方法类别</th><th>代表算法</th><th>核心假设</th><th>主要局限</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>几何方法</strong></td>
+        <td>ORCA (Optimal Reciprocal Collision Avoidance), 人工势场法 (APF), 速度障碍法 (VO)</td>
+        <td>全部 UAV 的位置和速度信息完全已知</td>
+        <td>依赖完美状态信息；在复杂障碍物环境中性能急剧下降；难以处理 FOV 约束和感知盲区</td>
+      </tr>
+      <tr>
+        <td><strong>纯视觉方法</strong></td>
+        <td>基于深度图像的端到端 DRL，视觉 SLAM + 规划</td>
+        <td>所有潜在碰撞都能被机载视觉传感器捕获</td>
+        <td>FOV 限制导致感知盲区；视觉遮挡导致漏检；对光照和纹理敏感</td>
+      </tr>
+      <tr>
+        <td><strong>纯DRL方法</strong></td>
+        <td>MADDPG, MAPPO, 集中式 Critic 多智能体 RL</td>
+        <td>仿真环境足够丰富以覆盖所有场景</td>
+        <td>多智能体探索空间爆炸式增长；训练收敛困难；Sim-to-Real gap 显著</td>
+      </tr>
+      <tr>
+        <td><strong>通信辅助方法</strong></td>
+        <td><strong>本文提出的方案</strong></td>
+        <td>UAV 之间可交换状态信息</td>
+        <td>通信延迟和带宽受限（但本文通过高效的通信模块设计缓解）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <div class="callout-title">核心矛盾：感知局限 vs 安全需求</div>
+    在有限 FOV 约束下，<strong>纯视觉方法无法"看见"视野之外的 UAV</strong>，而<strong>几何方法又假设"全知全能"的完美状态信息</strong>。实际场景中，UAV 通常配备机间通信链路（如 WiFi、Zigbee、4G/5G），但现有方法很少<strong>系统性地将通信数据与感知数据融合</strong>用于碰撞规避决策。这构成了本文的核心研究动机。
+  </div>
+
+  <h3>1.3 本文的核心思路</h3>
+  <p>本文提出了一种<strong>通信辅助</strong>（Communication-Aided）的多 UAV 碰撞检测与规避框架，核心创新点包括：</p>
+  <ol>
+    <li><strong>感知 + 通信融合</strong>：将机载视觉感知数据与 UAV 间通信数据（位置、速度、意图）融合，突破单机 FOV 的物理限制，实现对"盲区"中潜在碰撞的检测。</li>
+    <li><strong>两阶段课程强化学习</strong>：设计课程式训练策略，阶段一在无障碍环境中训练基础的机间碰撞规避能力，阶段二在复杂障碍物环境中训练完整策略，有效解决多智能体 RL 的探索困难问题。</li>
+    <li><strong>PX4 SITL + 真实飞行验证</strong>：在 PX4 软件在环仿真（SITL）中训练，直接部署到真实无人机上，实现<strong>零样本 Sim-to-Real 迁移</strong>。</li>
+  </ol>
+</section>
+
+<!-- ====== 二、方法论深度解析 ====== -->
+<section id="method">
+  <h2>二、方法论：两阶段课程强化学习框架</h2>
+
+  <h3>2.1 总体架构</h3>
+  <p>
+    系统由三个核心模块组成：(1) <strong>感知模块</strong>（Perception Module）负责处理机载传感器数据并提取环境特征；(2) <strong>通信模块</strong>（Communication Module）负责接收邻近 UAV 的状态信息并融合到感知表征中；(3) <strong>策略网络</strong>（Policy Network）基于融合后的表征输出碰撞规避动作。整体采用集中式训练、分布式执行（CTDE）范式。
+  </p>
+
+  <div class="fig-box">
+    <div class="fig-title">图1: 系统总体架构 &mdash; 通信辅助多UAV碰撞检测与规避</div>
+    <pre style="background:#f0f4f8; color:#1e293b; font-size:11.5px; border:none;">
+    &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;
+    &#x2502;                        UAV i (本机)                                              &#x2502;
+    &#x2502;  &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;    &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;    &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;          &#x2502;
+    &#x2502;  &#x2502;  Onboard       &#x2502;    &#x2502; Communication  &#x2502;    &#x2502;    Policy     &#x2502;          &#x2502;
+    &#x2502;  &#x2502;  Perception   &#x2502;    &#x2502;    Module      &#x2502;    &#x2502;   Network    &#x2502;          &#x2502;
+    &#x2502;  &#x2502;  (Camera,     &#x2502;    &#x2502;  (Inter-UAV   &#x2502;    &#x2502;  (DRL-based  &#x2502;          &#x2502;
+    &#x2502;  &#x2502;   LiDAR)      &#x2502;    &#x2502;   state      &#x2502;    &#x2502;  collision   &#x2502;          &#x2502;
+    &#x2502;  &#x2502;              &#x2502;    &#x2502;   sharing)   &#x2502;    &#x2502;  avoidance)  &#x2502;          &#x2502;
+    &#x2502;  &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x252C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;    &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x252C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;    &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x252C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;          &#x2502;
+    &#x2502;       &#x2502;                  &#x2502;                  &#x2502;                    &#x2502;
+    &#x2502;       &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;                    &#x2502;
+    &#x2502;                          &#x2502;  Feature Fusion Layer                           &#x2502;
+    &#x2502;                          &#x2502;  (特征融合层：拼接感知特征 + 通信特征)            &#x2502;
+    &#x2502;                          &#x2502;                                               &#x2502;
+    &#x2502;                          &#x251C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;                    &#x2502;
+    &#x2502;                          &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;                                   &#x2502;
+    &#x2502;                          &#x2502;  PX4 Autopilot  &#x2502;                                   &#x2502;
+    &#x2502;                          &#x2502;  (底层飞控)    &#x2502;                                   &#x2502;
+    &#x2502;                          &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;                                   &#x2502;
+    &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;
+
+                              &#x2B06; &#x2B07;  Inter-UAV Communication Link
+                          (UAV i &#x27F6; UAV j: 位置、速度、航向角共享)
+
+    UAV i 从通信链路收到邻近 UAV j 的状态 s_j^comm = [p_j, v_j, &#x3C8;_j]
+    &#x2192; 与本地感知特征 o_i^vis 融合
+    &#x2192; 策略网络 &#x3C0;_&#x3B8;(a_i | o_i^vis, s_comm) 输出碰撞规避动作
+    &#x2192; 动作转换为期望位置/速度指令 &#x2192; PX4 飞控执行
+    </pre>
+  </div>
+
+  <h3>2.2 两阶段课程强化学习 (Two-Stage Curriculum RL)</h3>
+  <p>
+    多智能体强化学习（MARL）在复杂环境中的核心困难在于<strong>探索空间随智能体数量和障碍物数量呈指数增长</strong>。如果直接从零开始在完整场景中训练，策略可能永远无法遇到"有用"的训练样本，导致学习失败。本文提出的<strong>两阶段课程学习策略</strong>优雅地解决了这一问题：
+  </p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>Stage 1&#xFE0F;&#x20E3; 无障碍环境 &mdash; 基础碰撞规避</h4>
+      <p><strong>训练环境</strong>：空旷空域，无静态障碍物。</p>
+      <p><strong>训练目标</strong>：学习多 UAV 之间的相互碰撞规避（inter-UAV collision avoidance）。</p>
+      <p><strong>策略网络</strong>：仅训练<strong>部分策略网络</strong>（partial policy network），专注于利用通信信息和本机状态进行机间避碰。</p>
+      <p><strong>课程优势</strong>：任务维度低，智能体可以快速掌握"给对方让路"的基本行为模式。由于没有障碍物的干扰，碰撞规避的学习信号清晰且密集。</p>
+      <p><strong>输出</strong>：预训练的部分策略网络权重，将作为 Stage 2 的初始化。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>Stage 2&#xFE0F;&#x20E3; 复杂环境 &mdash; 完整碰撞规避</h4>
+      <p><strong>训练环境</strong>：包含密集静态/动态障碍物的杂乱空域。</p>
+      <p><strong>训练目标</strong>：同时处理机间碰撞和环境障碍物碰撞。</p>
+      <p><strong>策略网络</strong>：加载 Stage 1 预训练权重，训练<strong>完整策略网络</strong>（包括环境感知模块和通信融合模块的全部参数）。</p>
+      <p><strong>课程优势</strong>：智能体已经学会了机间避碰的基础行为，只需在已有能力上<strong>增量学习</strong>障碍物规避。这避免了"同时学习所有技能"导致的探索失败。</p>
+      <p><strong>输出</strong>：完整的碰撞规避策略，可同时处理机间 + 环境碰撞。</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">课程学习的本质：从简单到复杂的知识迁移</div>
+    两大阶段的设计本质上是<strong>先验知识注入</strong>的一种形式&mdash;&mdash;通过对训练任务的分解排序（curriculum），引导智能体先掌握基础技能，再在其上构建复杂技能。这比"从零开始端到端训练"更高效、更稳定，且最终学到的策略泛化能力更强。这种<strong>Curriculum RL</strong> 的思想在机器人控制、自动驾驶等领域正获得越来越多的关注。
+  </div>
+
+  <h3>2.3 策略网络输入输出设计</h3>
+
+  <table>
+    <thead>
+      <tr><th>组件</th><th>内容</th><th>维度/说明</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>本机状态</strong> <code>s_self</code></td><td>本机位置 p_i、速度 v_i、航向角 &#x3C8;_i、目标方向向量</td><td>连续值，归一化处理</td></tr>
+      <tr><td><strong>视觉感知</strong> <code>o_vis</code></td><td>机载深度相机/激光雷达的点云或深度图经过 CNN 编码后的特征向量</td><td>覆盖前方有限 FOV（如 90&deg;~120&deg;）</td></tr>
+      <tr><td><strong>通信信息</strong> <code>s_comm</code></td><td>邻近 UAV 的 [p_j, v_j, &#x3C8;_j]（通过机间通信链路获取）</td><td>每架邻近 UAV 提供 6~9 维状态向量</td></tr>
+      <tr><td><strong>融合特征</strong> <code>h_fused</code></td><td><code>Concat[CNN(o_vis), MLP(s_self), MLP(s_comm)]</code> &rarr; 全连接层融合</td><td>融合层将多源信息映射到统一表征空间</td></tr>
+      <tr><td><strong>动作输出</strong> <code>a_i</code></td><td>期望速度指令 <code>v_cmd = [v_x, v_y, v_z, &#x3C8;_cmd]</code> 或期望位置偏移</td><td>4 维连续动作空间（或 3 维，取决于飞行模式）</td></tr>
+    </tbody>
+  </table>
+
+  <div class="formula-block">
+    <p style="font-weight:700; margin-bottom:6px;">策略函数形式</p>
+    <p style="font-size:14px; text-align:center;">
+      <code>&#x3C0;<sub>&#x3B8;</sub>(a_i | o_i) = &#x3C0;<sub>&#x3B8;</sub>(a_i | Enc_vis(o_i<sup>vis</sup>), Enc_self(s_i<sup>self</sup>), Enc_comm(s_i<sup>comm</sup>))</code>
+    </p>
+    <p style="font-size:13px; color:var(--text-secondary); margin-top:6px;">
+      其中 <code>Enc_vis</code> 为 CNN 视觉编码器，<code>Enc_self</code> 为本机状态 MLP 编码器，<code>Enc_comm</code> 为通信信息 MLP 编码器。三者输出拼接后通过全连接融合层，最终由策略头（Actor head）输出动作分布的均值与方差。
+    </p>
+  </div>
+</section>
+
+<!-- ====== 三、通信模块设计 ====== -->
+<section id="comm-module">
+  <h2>三、通信模块设计详解</h2>
+
+  <h3>3.1 通信模块的核心作用</h3>
+  <p>
+    通信模块是本文方法区别于纯视觉方法和纯几何方法的关键。其核心作用是<strong>弥补 FOV 的限制</strong>&mdash;&mdash;当一架 UAV 处于另一架 UAV 的视觉盲区时（如正后方、侧后方），机间通信链路提供"看不见但可以通信"的感知补充，使策略网络能够对盲区中的潜在碰撞做出预判和规避。
+  </p>
+
+  <div class="fig-box">
+    <div class="fig-title">图2: 通信模块解决 FOV 盲区碰撞的示意</div>
+    <pre style="background:#f0f4f8; color:#1e293b; font-size:12px; border:none;">
+                         UAV-A FOV (~120&deg;)
+                       &#x2F;                      &#x5C;
+                      &#x2F;                        &#x5C;
+                     &#x2F;      UAV-A 前方           &#x5C;
+                    &#x2F;       (可见区域)            &#x5C;
+                   &#x2F;                                &#x5C;
+                  &#x2F;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500; UAV-A &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x5C;
+                  &#x5C;                                &#x2F;
+                   &#x5C;      盲区 (Blind Zone)       &#x2F;
+                    &#x5C;    UAV-B 在此处 &rarr;        &#x2F;
+                     &#x5C;   A 完全看不到 B !       &#x2F;
+                      &#x5C;                        &#x2F;
+                       &#x5C;                      &#x2F;
+                         &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;
+                         &#x2502;   UAV-B     &#x2502;
+                         &#x2502; (后方接近)  &#x2502;
+                         &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;
+
+              &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;
+              &#x2502;  &#x26A1; 通信链路激活：B &#x2192; A 发送 [p_B, v_B, &#x3C8;_B]                     &#x2502;
+              &#x2502;  &#x2192; A 的策略网络现在"知道"B 正在后方高速接近                    &#x2502;
+              &#x2502;  &#x2192; A 可以提前采取规避动作（如加速前飞或侧移让路）                &#x2502;
+              &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;
+    </pre>
+  </div>
+
+  <h3>3.2 通信信息的内容与编码</h3>
+  <p>每架 UAV 通过机间通信链路广播其基本状态信息，接收方对邻近 UAV 的状态进行编码和融合：</p>
+
+  <table>
+    <thead>
+      <tr><th>通信字段</th><th>符号</th><th>含义</th><th>编码方式</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>位置</td><td><code>p_j = [x_j, y_j, z_j]</code></td><td>邻近 UAV 在世界坐标系中的三维位置</td><td>转换为相对于本机的相对位置 <code>&#x394;p = p_j - p_i</code>，归一化</td></tr>
+      <tr><td>速度</td><td><code>v_j = [v_x, v_y, v_z]</code></td><td>邻近 UAV 的速度矢量</td><td>转换为相对速度 <code>&#x394;v = v_j - v_i</code></td></tr>
+      <tr><td>航向</td><td><code>&#x3C8;_j</code></td><td>邻近 UAV 的航向角</td><td>编码为 <code>[cos(&#x3C8;), sin(&#x3C8;)]</code> 以避免角度不连续</td></tr>
+      <tr><td>距离门控</td><td><code>d_ij</code></td><td>本机与邻近 UAV 的欧式距离</td><td>用于判断是否纳入融合（仅融合通信范围内的 UAV）</td></tr>
+    </tbody>
+  </table>
+
+  <div class="formula-block">
+    <p style="font-weight:700; margin-bottom:6px;">通信特征编码</p>
+    <p style="font-size:14px; text-align:center;">
+      <code>h_comm = MLP_comm( [&#x394;p_j, &#x394;v_j, cos(&#x3C8;_j), sin(&#x3C8;_j)]<sub>j &#x2208; N(i)</sub> )</code>
+    </p>
+    <p style="font-size:13px; color:var(--text-secondary); margin-top:6px;">
+      其中 <code>N(i)</code> 为 UAV i 通信范围内的邻近 UAV 集合。对于多架邻近 UAV，使用注意力机制（attention）或平均池化（mean pooling）聚合多个邻居的特征。
+    </p>
+  </div>
+
+  <h3>3.3 通信 vs 无通信的对比</h3>
+  <p>在 FOV 受限场景下，有无通信辅助对应答碰撞检测能力产生决定性影响：</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>&#x274C; 无通信辅助（纯视觉）</h4>
+      <ul>
+        <li>仅能看到前方 FOV 内的 UAV</li>
+        <li>后方/侧后方的 UAV 完全不可见</li>
+        <li>无法预测"被追上"的碰撞场景</li>
+        <li>需要复杂的轨迹预测来推断盲区风险</li>
+        <li>在交叉相遇（crossing encounter）场景中可能漏检</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>&#x2705; 有通信辅助（本文方法）</h4>
+      <ul>
+        <li>视觉（前方 FOV）+ 通信（全向感知）互补</li>
+        <li>后方和侧方的 UAV 通过通信被"虚拟看到"</li>
+        <li>可以提前计算 CPA (Closest Point of Approach)</li>
+        <li>策略网络显式接收邻近 UAV 的运动状态</li>
+        <li>在所有相遇几何（head-on, crossing, overtaking）中均有覆盖</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">通信带宽的实际考量</div>
+    本文的通信方案<strong>轻量级</strong>&mdash;&mdash;每架 UAV 仅广播 6~9 个浮点数（位置3+速度3+航向1），通信频率 10Hz 即可满足实时碰撞规避需求。这远低于视频流传输的带宽要求，适合现有的机间通信链路（WiFi、Zigbee、MAVLink 协议）。在实际部署中，MAVLink 协议的 <code>GLOBAL_POSITION_INT</code> 和 <code>ATTITUDE</code> 消息即可承载全部所需信息。
+  </div>
+</section>
+
+<!-- ====== 四、实验验证 ====== -->
+<section id="experiments">
+  <h2>四、实验验证：PX4 SITL + 真实飞行</h2>
+
+  <h3>4.1 实验平台与设置</h3>
+  <p>本文的实验验证令人印象深刻&mdash;&mdash;同时涵盖了<strong>PX4 软件在环仿真（SITL）</strong>和<strong>真实飞行实验</strong>，这在多 UAV 碰撞规避文献中属于高标准的验证方式：</p>
+
+  <table>
+    <thead>
+      <tr><th>实验配置</th><th>PX4 SITL 仿真</th><th>真实飞行实验</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>仿真/硬件平台</strong></td><td>PX4-Autopilot + Gazebo / jMAVSim, ROS + MAVROS 通信接口</td><td>Quadrotor UAV 平台（具体型号见论文），搭载 Pixhawk 飞控 + 机载计算机</td></tr>
+      <tr><td><strong>UAV 数量</strong></td><td>3~6 架</td><td>3 架</td></tr>
+      <tr><td><strong>传感器</strong></td><td>仿真深度相机（模拟 FOV 约束）</td><td>Intel RealSense D435i 深度相机</td></tr>
+      <tr><td><strong>通信</strong></td><td>ROS topic 模拟机间通信</td><td>WiFi MAVLink 机间通信</td></tr>
+      <tr><td><strong>训练环境</strong></td><td>仅 SITL 仿真中训练（无真实数据）</td><td>策略从 SITL 训练后直接部署（零样本迁移）</td></tr>
+      <tr><td><strong>障碍物</strong></td><td>圆柱体、墙体、随机障碍物群</td><td>实际障碍物（柱子、墙壁等）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.2 对比基线</h3>
+  <p>本文与多个强有力的基线方法进行了对比：</p>
+  <ul>
+    <li><strong>NH-ORCA</strong>：Non-Holonomic ORCA，目前最先进的几何碰撞规避方法之一，假设已知所有 UAV 的完整状态信息。</li>
+    <li><strong>DRL-based Baselines</strong>：包括不采用通信辅助的 DRL 方法、不采用课程学习的 DRL 方法，以及标准多智能体 RL 方法（如 MAPPO）。</li>
+    <li><strong>Ablation Variants</strong>：自身方法的消融变体&mdash;&mdash;去掉通信模块的变体、去掉课程学习的变体、去掉 Stage 1 预训练的变体。</li>
+  </ul>
+
+  <h3>4.3 关键实验结果</h3>
+
+  <table>
+    <thead>
+      <tr><th>方法</th><th>碰撞率 (Collision Rate)</th><th>任务成功率 (Success Rate)</th><th>平均飞行时间</th><th>轨迹平滑度</th><th>Sim-to-Real Gap</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>本文方法 (完整)</strong></td><td><strong>&#x2605; 最低</strong> (接近 0%)</td><td><strong>&#x2605; 最高</strong> (显著优于基线)</td><td>与基线相当</td><td>平滑</td><td>极小 (零样本迁移)</td></tr>
+      <tr><td>NH-ORCA</td><td>低 (在有完美信息的简单场景中)</td><td>中等 (复杂环境中下降明显)</td><td>最优</td><td>平滑</td><td>依赖准确状态估计</td></tr>
+      <tr><td>DRL (无通信)</td><td>偏高 (FOV 盲区导致漏检)</td><td>偏低</td><td>与本文相当</td><td>一般</td><td>中等</td></tr>
+      <tr><td>DRL (无课程学习)</td><td>中等偏高 (训练不充分)</td><td>偏低 (训练未收敛)</td><td>较长 (犹豫行为)</td><td>抖动</td><td>大</td></tr>
+      <tr><td>本文 (消融: 无通信)</td><td>升高</td><td>下降</td><td>与完整方法相当</td><td>一般</td><td>略增大</td></tr>
+      <tr><td>本文 (消融: 无课程)</td><td>升高</td><td>下降</td><td>较长</td><td>抖动</td><td>增大</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">关键发现：通信 + 课程 = 双赢</div>
+    实验结果表明：<strong>通信模块</strong>和<strong>课程学习</strong>是两个<strong>互补且均不可或缺</strong>的组件。去掉通信模块，盲区碰撞显著增加；去掉课程学习，策略无法有效收敛，整体性能大幅下降。两者协同工作，使得本文方法在碰撞率和成功率上均显著优于所有基线方法，包括信息条件更优的 NH-ORCA。
+  </div>
+
+  <h3>4.4 超越 NH-ORCA 的深层原因</h3>
+  <p>NH-ORCA 虽然在理论上可以保证无碰撞（在满足假设的条件下），但其性能高度依赖准确的全状态信息。在复杂障碍物环境中，NH-ORCA 的"完美信息假设"被打破：</p>
+  <ul>
+    <li>障碍物引起的速度场扭曲导致 ORCA 的可行速度空间计算不准确</li>
+    <li>Non-holonomic 约束（固定翼 UAV 的转弯半径限制）使得 ORCA 的线性速度假设不成立</li>
+    <li>DRL 方法通过数据驱动隐式地学习了这些非线性因素，而无需显式建模</li>
+  </ul>
+  <p>本文方法的优势在于<strong>不依赖完美信息</strong>&mdash;&mdash;通信模块提供的是"足够好"的近似信息，DRL 策略学会了在有噪声和不完整信息的条件下做出鲁棒决策。</p>
+</section>
+
+<!-- ====== 五、Zero-shot Sim-to-Real ====== -->
+<section id="sim2real">
+  <h2>五、零样本 Sim-to-Real 迁移分析</h2>
+
+  <h3>5.1 什么是 Zero-Shot Sim-to-Real Transfer</h3>
+  <p>
+    <strong>零样本 Sim-to-Real 迁移</strong>指的是：策略<strong>仅在仿真环境中训练</strong>，不经过任何真实世界数据的微调（fine-tuning）或领域自适应（domain adaptation），<strong>直接部署到真实无人机上</strong>执行任务。这是机器人学和无人机领域最具挑战性的能力之一，因为仿真与真实世界之间存在多种差异（Sim-to-Real Gap）。
+  </p>
+
+  <h3>5.2 Sim-to-Real Gap 的来源与本文化的缓解措施</h3>
+
+  <table>
+    <thead>
+      <tr><th>Gap 来源</th><th>表现</th><th>本文的缓解策略</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>物理动力学差异</strong></td><td>仿真的空气动力学模型不完美；真实 UAV 存在电机延迟、桨叶形变、电池电压下降等</td><td>使用 <strong>PX4 SITL</strong>（高保真飞控仿真）而非简化的质点模型；策略输出为速度指令（由 PX4 底层控制器处理），抽象层级较高</td></tr>
+      <tr><td><strong>传感器噪声</strong></td><td>真实相机的噪声、运动模糊、曝光变化</td><td>训练时注入<strong>域随机化</strong>（domain randomization）：对深度图像添加高斯噪声、随机 dropout 像素</td></tr>
+      <tr><td><strong>通信延迟与丢包</strong></td><td>真实 WiFi 链路存在延迟抖动和间歇性断连</td><td>训练时随机<strong>延迟通信消息</strong>并随机<strong>丢弃</strong>部分消息，使策略对通信不确定性鲁棒</td></tr>
+      <tr><td><strong>状态估计误差</strong></td><td>真实 GPS/IMU 的定位误差（~1-2m）</td><td>对输入状态注入高斯噪声，使得策略不依赖"精确到毫米"的位置信息</td></tr>
+      <tr><td><strong>视觉域差异</strong></td><td>仿真渲染 vs 真实场景的纹理、光照、对比度差异</td><td>使用深度图像（depth image）而非 RGB 图像作为视觉输入&mdash;&mdash;深度图像对纹理和光照不敏感</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout idea">
+    <div class="callout-title">零样本迁移成功的核心洞察</div>
+    本文的零样本迁移之所以成功，关键在于<strong>抽象层级的选择</strong>：(1) 使用<strong>深度图像</strong>而非 RGB（减少视觉域差异）；(2) 策略输出为<strong>高层速度指令</strong>而非底层电机 PWM（由 PX4 吸收动力学差异）；(3) 训练时大量使用<strong>域随机化</strong>（domain randomization）使得策略学会了"忽略"与任务无关的域特征。这三个设计选择的组合，本质上是在仿真和真实之间建立了一个<strong>足够宽的桥</strong>。
+  </div>
+
+  <h3>5.3 真实飞行实验的设计与结果</h3>
+  <p>真实飞行实验使用了 3 架 quadrotor UAV，在室内场景中设置了障碍物（柱子和墙壁），测试了以下场景：</p>
+  <ul>
+    <li><strong>迎面相遇 (Head-on encounter)</strong>：两架 UAV 沿同一航线相向飞行</li>
+    <li><strong>交叉相遇 (Crossing encounter)</strong>：两架 UAV 的航线在空间中交叉</li>
+    <li><strong>追越相遇 (Overtaking encounter)</strong>：一架 UAV 从后方追赶另一架（FOV 盲区场景）</li>
+    <li><strong>多机 + 障碍物混合场景</strong>：3 架 UAV 在密集障碍物中同时执行任务</li>
+  </ul>
+
+  <p>在所有测试场景中，从 SITL 零样本迁移的策略均成功完成了碰撞规避任务，<strong>无碰撞发生</strong>，且飞行轨迹平滑、无明显抖动或激进动作。追越相遇场景特别验证了通信模块的价值&mdash;&mdash;前方 UAV 通过通信感知到后方 UAV 的接近，主动侧移让路，而在纯视觉方法中这一场景几乎必然导致碰撞。</p>
+
+  <div class="fig-box">
+    <div class="fig-title">图3: Sim-to-Real 迁移的训练与部署流程</div>
+    <pre style="background:#f0f4f8; color:#1e293b; font-size:12px; border:none;">
+    &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;                            &#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;
+    &#x2502;  PX4 SITL 仿真环境        &#x2502;        &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x25B6;        &#x2502;  真实 Quadrotor UAV    &#x2502;
+    &#x2502;                           &#x2502;    Zero-Shot Transfer      &#x2502;                         &#x2502;
+    &#x2502;  &#x2022; Gazebo 物理引擎       &#x2502;                            &#x2502;  &#x2022; Pixhawk 飞控        &#x2502;
+    &#x2502;  &#x2022; PX4 飞控仿真          &#x2502;                            &#x2502;  &#x2022; RealSense D435i     &#x2502;
+    &#x2502;  &#x2022; 仿真深度相机           &#x2502;                            &#x2502;  &#x2022; WiFi MAVLink 通信   &#x2502;
+    &#x2502;  &#x2022; ROS + MAVROS 接口     &#x2502;                            &#x2502;  &#x2022; 机载计算机 (策略推理) &#x2502;
+    &#x2502;                           &#x2502;                            &#x2502;                         &#x2502;
+    &#x2502;  域随机化：               &#x2502;                            &#x2502;  &#x26A1; 策略从未见过      &#x2502;
+    &#x2502;  传感器噪声 + 通信延迟     &#x2502;                            &#x2502;     真实世界数据        &#x2502;
+    &#x2502;  + 状态噪声 + 障碍物随机   &#x2502;                            &#x2502;     &#x2192; 直接部署成功!    &#x2502;
+    &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;                            &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;
+    </pre>
+  </div>
+</section>
+
+<!-- ====== 六、学术意义与展望 ====== -->
+<section id="significance">
+  <h2>六、学术意义与未来展望</h2>
+
+  <h3>6.1 通讯作者里程碑：学术独立性的象征</h3>
+  <p>
+    在学术出版规范中，<strong>通讯作者 (Corresponding Author)</strong> 承担着研究设计、论文撰写、投稿沟通的总体责任，通常由研究团队的<strong>资深成员或项目负责人</strong>担任。Zhihong Liu 在此篇论文中首次以通讯作者身份出现（此前在 ACM Computing Surveys 综述中为第一作者，在 Aerospace Science and Technology 编队论文中为合作者），这标志着：
+  </p>
+  <ul>
+    <li><strong>学术独立性</strong>：Zhihong Liu 已经从"参与研究"过渡到"主导研究"&mdash;&mdash;通讯作者意味着他是该研究的总体设计和执行负责人。</li>
+    <li><strong>研究方向的确立</strong>：本文融合了 DRL、多 UAV 系统、通信感知三大技术方向，展示了 Zhihong Liu 在多 UAV 智能决策与控制领域建立了独立的研究体系。</li>
+    <li><strong>从综述到原创的跨越</strong>：ACM Computing Surveys 综述（论文 p16）虽然影响因子极高，但属于综述类文章；本文作为原创研究论文，证明了 Zhihong Liu 在方法创新和实验实施方面的完整能力。</li>
+    <li><strong>工程实践能力</strong>：PX4 SITL + 真实飞行实验的组合表明，Zhihong Liu 团队具备从仿真到真机的<strong>完整系统工程能力</strong>，这在 DRL 研究领域尤为珍贵。</li>
+  </ul>
+
+  <div class="callout idea">
+    <div class="callout-title">学术成长轨迹分析</div>
+    Zhihong Liu 的学术轨迹呈现出清晰的上升路径：<strong>综述一作 (ACM CSUR)</strong> &rarr; <strong>合作研究 (Aero Sci Tech)</strong> &rarr; <strong>通讯作者 (BIROB)</strong>。从"为领域知识做出贡献"到"参与创新研究"再到"独立主导研究"，每一步都体现了学术能力的成长与研究领导力的确立。BIROB 虽然是新刊，但本文扎实的 PX4 SITL + 真实飞行实验验证使其具有很高的工程参考价值。
+  </div>
+
+  <h3>6.2 方法论的学术贡献</h3>
+  <table>
+    <thead>
+      <tr><th>贡献维度</th><th>具体内容</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>问题定义</strong></td><td>首次在有限 FOV 约束下系统性地研究通信辅助多 UAV 碰撞规避问题，填补了纯视觉方法和纯几何方法之间的空白</td></tr>
+      <tr><td><strong>方法论创新</strong></td><td>两阶段课程强化学习为多智能体 RL 的探索困难问题提供了可复用的训练范式&mdash;&mdash;先学基础技能，再学复杂技能</td></tr>
+      <tr><td><strong>系统设计</strong></td><td>通信模块的轻量级设计（仅共享状态向量）在工程上可行，无需高带宽通信链路</td></tr>
+      <tr><td><strong>实验验证</strong></td><td>PX4 SITL + 真实飞行 + 零样本迁移，实验标准高于该领域大多数工作</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.3 通信辅助方法的普适意义</h3>
+  <p>本文的"通信辅助"思想不仅限于 UAV 碰撞规避，还可以泛化到更广泛的多机器人协作场景：</p>
+  <ul>
+    <li><strong>协同探索 (Cooperative Exploration)</strong>：机器人共享各自已探索的区域地图，避免重复探索</li>
+    <li><strong>协同感知 (Cooperative Perception)</strong>：多机器人从不同视角观测同一场景，通信融合实现"透视"遮挡物之后的目标</li>
+    <li><strong>编队控制 (Formation Control)</strong>：通信提供邻机的精确状态，辅助编队保持（与前一篇 p13 论文形成互补）</li>
+    <li><strong>人机协作 (Human-Robot Teaming)</strong>：机器人通过通信共享对环境中人类的意图预测</li>
+  </ul>
+
+  <h3>6.4 未来改进方向</h3>
+  <ul>
+    <li><strong>通信丢包与敌意干扰</strong>：当前方法假设通信链路可靠；未来需考虑间歇性断连和对抗性通信环境下的鲁棒性</li>
+    <li><strong>大规模集群 (Swarm)</strong>：本文验证了 3~6 架 UAV 的场景，扩展到数十架时通信拓扑管理和注意力机制的设计面临新挑战</li>
+    <li><strong>异构传感器融合</strong>：将通信信息与更多传感器（如毫米波雷达、事件相机）融合，进一步提升感知鲁棒性</li>
+    <li><strong>可解释性 (Explainability)</strong>：DRL 策略的"黑箱"特性在安全攸关的航空应用中是一大顾虑；引入注意力可视化或决策解释模块是重要方向</li>
+    <li><strong>5G/Beyond 5G 通信</strong>：利用 5G 网络的低延迟和高可靠性特性，实现更复杂的通信辅助协同决策（如协同轨迹重规划）</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="callout-title">DRL 在航空安全中的部署挑战</div>
+    尽管本文取得了令人印象深刻的实验结果，DRL 在真实航空环境中的部署仍面临<strong>安全性认证</strong>的挑战。航空领域对可证明安全（provable safety）有严格要求，而 DRL 策略缺乏形式化保证（formal guarantee）。一种折中方案是将 DRL 作为高层决策器（输出参考轨迹），由底层基于模型的控制器（如 MPC）执行并施加安全约束&mdash;&mdash;这种"Learning + Model-Based"的混合架构正在成为研究热点。
+  </div>
+
+  <h3>6.5 与前序论文的关系</h3>
+  <p>将本文置于 Zhihong Liu 已知论文谱系中分析：</p>
+  <table>
+    <thead>
+      <tr><th>论文</th><th>角色</th><th>核心主题</th><th>与本文的关系</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>p16: ACM CSUR 综述</strong></td><td>第一作者</td><td>DRL 训练加速（并行/分布式计算）</td><td>为本文的 DRL 训练效率提供了技术储备；课程学习也是加速训练的手段之一</td></tr>
+      <tr><td><strong>p13: Aero Sci Tech 编队</strong></td><td>合作者</td><td>DRL + 仿射变换多 UAV 编队控制</td><td>本文是编队控制的"互补面"&mdash;&mdash;编队关注"保持队形"，本文关注"避免碰撞"，两者结合可形成完整的多 UAV 协同飞行系统</td></tr>
+      <tr><td><strong>p23: BIROB 碰撞规避 (本文)</strong></td><td><strong>通讯作者 &#x2709;&#xFE0F;</strong></td><td>通信辅助 + 课程 RL 多 UAV 碰撞规避</td><td>首次通讯作者论文，标志着独立研究方向的确立</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</div>
+
+<footer>
+  <p>Zhihong Liu 论文学习笔记 &middot; Paper p23 &middot; Biomimetic Intelligence and Robotics, Vol.5(4), 2025</p>
+  <p>Zhihong Liu 为<strong>通讯作者 &#x2709;&#xFE0F;</strong> &mdash; 国防科技大学智能科学学院 &mdash; <strong>首次通讯作者论文，重要学术里程碑</strong></p>
+  <p style="margin-top:4px;"><a href="../../学习笔记目录.html" style="color:var(--blue-strong);">&larr; 返回学习笔记目录</a></p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenFlight 学习笔记 — RL × 固定翼无人机最短时间飞行控制</title>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe; --blue-stroke: #3b82f6; --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee; --green-stroke: #10b981; --green-strong: #047857;
+    --amber-fill: #fef7ed; --amber-stroke: #f59e0b; --amber-strong: #b45309;
+    --purple-fill: #f0ebfd; --purple-stroke: #8b5cf6; --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0; --rose-stroke: #f43f5e; --rose-strong: #be123c;
+    --gray-fill: #f3f4f6; --gray-stroke: #9ca3af; --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8; --cyan-stroke: #14b8a6; --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height: 1.7;
+  }
+
+  /* ── Navigation ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12.5px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 12px; border-radius: 5px;
+    transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 12px; font-size: 14px; }
+
+  /* ── Main ── */
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  /* ── Sections ── */
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.2px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--border); margin-bottom: 22px;
+  }
+  h3 { font-size: 15.5px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+
+  p { font-size: 14px; color: #334155; margin-bottom: 10px; }
+  ul, ol { margin: 6px 0 14px 20px; font-size: 14px; color: #334155; }
+  li { margin-bottom: 4px; }
+
+  /* ── Code ── */
+  code {
+    background: #f1f5f9; color: #1e293b; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 5px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1e293b; color: #e2e8f0; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12px; line-height: 1.55; padding: 16px 20px; border-radius: 8px;
+    overflow-x: auto; margin: 10px 0 16px;
+  }
+  pre .kw { color: #93c5fd; } /* keyword */
+  pre .fn { color: #c4b5fd; } /* function */
+  pre .cm { color: #64748b; } /* comment */
+  pre .nm { color: #fde68a; } /* number */
+  pre .st { color: #86efac; } /* string */
+  pre .op { color: #fca5a5; } /* operator */
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+
+  /* ── Callouts ── */
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 14px 0; font-size: 13.5px;
+  }
+  .callout.info  { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip   { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn  { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger{ background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea  { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+
+  /* ── Trick cards grid ── */
+  .tricks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; margin: 16px 0; }
+  .trick-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 20px;
+    background: #fafbfc; transition: box-shadow .15s;
+  }
+  .trick-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .trick-num {
+    display: inline-block; width: 26px; height: 26px; line-height: 26px;
+    text-align: center; border-radius: 50%; font-size: 12px; font-weight: 700;
+    margin-right: 8px;
+  }
+  .trick-card h4 { display: inline; font-size: 14px; }
+  .trick-card p, .trick-card li { font-size: 13px; color: #475569; }
+
+  /* ── Comparison row ── */
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0; }
+  .cmp-col {
+    flex: 1; min-width: 240px; border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; background: #fafbfc;
+  }
+  .cmp-col h4 { margin-top: 0; }
+
+  /* ── Tags ── */
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 4px; margin-right: 4px;
+  }
+  .tag-blue { background:#dbeafe; color:#1d4ed8; }
+  .tag-green { background:#d1fae5; color:#047857; }
+  .tag-amber { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red { background:#ffe4e6; color:#be123c; }
+
+  /* ── SVG responsive ── */
+  .svg-wrap { overflow-x: auto; margin: 8px -8px; }
+  .svg-wrap svg { min-width: 1100px; width: 100%; height: auto; }
+
+  /* ── Blockquote ── */
+  blockquote {
+    border-left: 3px solid #cbd5e1; padding: 8px 16px; margin: 10px 0;
+    color: #64748b; font-style: italic; font-size: 13.5px;
+  }
+
+  /* ── Math / Formula ── */
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-num { color: #94a3b8; font-size: 12px; float: right; }
+  .formula-block .eq-main { font-size: 15px; color: #1e293b; letter-spacing: 0.3px; margin: 8px 0; }
+  .formula-block .eq-note { font-size: 12.5px; color: #64748b; margin-top: 6px; }
+  .symbol-table { margin: 10px 0; }
+  .symbol-table td:first-child {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 14px; font-weight: 600; color: #1d4ed8; white-space: nowrap; padding-right: 14px;
+  }
+  .symbol-table td:nth-child(2) { font-size: 13px; }
+
+  /* ── Figure box ── */
+  .fig-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 22px; margin: 16px 0;
+  }
+  .fig-box .fig-title { font-weight: 700; font-size: 14px; color: #1e293b; margin-bottom: 10px; }
+  .fig-box .fig-desc { font-size: 13px; color: #475569; }
+  .fig-box .fig-ascii {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 11px; line-height: 1.4; color: #334155;
+    background: #f1f5f9; padding: 14px; border-radius: 6px; margin: 10px 0;
+    white-space: pre; overflow-x: auto;
+  }
+
+  /* ── Phase step ── */
+  .phase-steps { counter-reset: phase; }
+  .phase-step {
+    counter-increment: phase; border-left: 3px solid #3b82f6;
+    padding: 10px 16px; margin: 10px 0; background: #f8fafc;
+    border-radius: 0 8px 8px 0;
+  }
+  .phase-step::before {
+    content: "Phase " counter(phase); font-weight: 700; font-size: 11px;
+    color: #3b82f6; display: block; margin-bottom: 2px;
+  }
+  .phase-step p { margin: 2px 0; font-size: 13px; }
+
+  /* ── Footer ── */
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav>
+  <span class="brand">🛩️ OpenFlight 学习笔记</span>
+  <a href="#arch">系统架构</a>
+  <a href="#levels">三级控制</a>
+  <a href="#paper">论文精读</a>
+  <a href="#formulas">算法公式</a>
+  <a href="#dataflow">数据流</a>
+  <a href="#training">RL训练</a>
+  <a href="#figures">图表解读</a>
+  <a href="#tricks">科研 Tricks</a>
+  <a href="#philosophy">设计哲学</a>
+  <a href="#roadmap">学习路线</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section>
+  <h1>🛩️ OpenFlight 学习笔记</h1>
+  <p style="font-size:15px;color:#64748b;margin-bottom:0;">
+    <strong>基于强化学习的固定翼无人机最短时间飞行控制</strong><br>
+    论文: <em>Learning Minimum-Time Flight Control for Fixed-Wing UAVs in 3D Space with High-Fidelity 6-DOF Dynamics</em><br>
+    期刊: Journal of Automation and Intelligence (2025) · 作者: 王国政等 (国防科技大学) · 开源: <a href="https://github.com/running-mars/OpenFlight">github.com/running-mars/OpenFlight</a>
+  </p>
+  <div style="margin-top:14px;">
+    <span class="tag tag-blue">RL + 6-DOF</span>
+    <span class="tag tag-green">JSBSim</span>
+    <span class="tag tag-amber">PPO</span>
+    <span class="tag tag-purple">Stable-Baselines3</span>
+    <span class="tag tag-red">27.6% 时间缩短</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 1. ARCHITECTURE ═══════════════ -->
+<section id="arch">
+  <h2>1. 系统架构全景图</h2>
+  <p>训练时的完整数据闭环（30 Hz）：<strong>JSBSim 状态 → <code>_get_obs()</code> 极坐标观测 → 策略网络 (2×64 MLP) → 动作反归一化 → 控制层 (PID 或直接舵面) → <code>JSBSim.run_fdm()</code> → 新状态</strong></p>
+
+  <div class="svg-wrap">
+    <svg viewBox="0 0 1320 1020" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="a-blue" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#3b82f6"/></marker>
+        <marker id="a-green" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/></marker>
+        <marker id="a-amber" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#f59e0b"/></marker>
+        <marker id="a-purple" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#8b5cf6"/></marker>
+        <marker id="a-rose" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#f43f5e"/></marker>
+        <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity=".08"/></filter>
+      </defs>
+
+      <!-- Section backgrounds -->
+      <rect x="20" y="20" width="582" height="230" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="36" y="46" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">TRAINING ORCHESTRATION</text>
+
+      <rect x="20" y="270" width="582" height="730" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="36" y="296" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">SINGLE ENVIRONMENT (×16 PARALLEL)</text>
+
+      <rect x="622" y="270" width="340" height="730" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="638" y="296" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">THREE CONTROL LEVELS</text>
+
+      <rect x="982" y="270" width="318" height="500" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="998" y="296" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">DYNAMICS &amp; RENDERING</text>
+
+      <!-- PPO -->
+      <rect x="48" y="64" width="180" height="72" rx="8" fill="#e8f0fe" stroke="#3b82f6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="138" y="90" text-anchor="middle" font-size="14" font-weight="700" fill="#1d4ed8">PPO Algorithm</text>
+      <text x="138" y="108" text-anchor="middle" font-size="11" fill="#5b6e8c">Proximal Policy Optimization</text>
+      <text x="138" y="124" text-anchor="middle" font-size="10" fill="#7b8da6">lr=2.5e-4 · batch=32 · γ=0.99</text>
+
+      <line x1="228" y1="90" x2="278" y2="90" stroke="#3b82f6" stroke-width="2" marker-end="url(#a-blue)"/>
+      <text x="253" y="82" text-anchor="middle" font-size="9" fill="#3b82f6">distribute</text>
+      <text x="253" y="108" text-anchor="middle" font-size="9" fill="#3b82f6">policy</text>
+
+      <!-- 16 envs -->
+      <rect x="284" y="56" width="290" height="88" rx="8" fill="#e6f7ee" stroke="#10b981" stroke-width="1.5" filter="url(#sh)"/>
+      <rect x="296" y="70" width="56" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/><text x="324" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">Env 1</text>
+      <rect x="358" y="70" width="56" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/><text x="386" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">Env 2</text>
+      <rect x="420" y="70" width="56" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/><text x="448" y="87" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">Env 3</text>
+      <text x="506" y="87" text-anchor="middle" font-size="12" fill="#047857">···</text>
+      <rect x="296" y="104" width="56" height="26" rx="4" fill="white" stroke="#6ee7b7" stroke-width="1"/><text x="324" y="121" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">Env 16</text>
+      <text x="429" y="156" text-anchor="middle" font-size="11" fill="#047857">SubprocVecEnv · 16× JSBSim instances</text>
+
+      <!-- Experience return -->
+      <line x1="429" y1="144" x2="429" y2="170" stroke="#10b981" stroke-width="1.5"/>
+      <line x1="429" y1="170" x2="138" y2="170" stroke="#10b981" stroke-width="1.5" marker-end="url(#a-green)"/>
+      <line x1="138" y1="170" x2="138" y2="136" stroke="#10b981" stroke-width="1.5"/>
+      <text x="283" y="182" text-anchor="middle" font-size="9" fill="#10b981">collect experiences (obs, action, reward, done) × 16</text>
+
+      <rect x="170" y="194" width="240" height="22" rx="4" fill="#e8f0fe" stroke="#93c5fd" stroke-width="1"/>
+      <text x="290" y="209" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">CTDE: Centralized Training · Decentralized Execution</text>
+
+      <!-- Observation -->
+      <rect x="48" y="320" width="220" height="120" rx="8" fill="#f0ebfd" stroke="#8b5cf6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="158" y="344" text-anchor="middle" font-size="13" font-weight="700" fill="#6d28d9">Observation Space</text>
+      <line x1="68" y1="354" x2="248" y2="354" stroke="#c4b5fd" stroke-width="0.5"/>
+      <text x="78" y="372" font-size="10" font-weight="600" fill="#6d28d9">Polar Coordinate Representation:</text>
+      <text x="88" y="388" font-size="9.5" fill="#7c5ce7">Δψ = heading_error / 2π</text>
+      <text x="88" y="402" font-size="9.5" fill="#7c5ce7">d_h = tanh(horiz_dist × 0.01)</text>
+      <text x="88" y="416" font-size="9.5" fill="#7c5ce7">d_v = tanh(vert_dist × 0.02)</text>
+      <text x="88" y="430" font-size="9.5" fill="#7c5ce7">ω_z · v_body · v_NED</text>
+      <rect x="68" y="440" width="58" height="16" rx="3" fill="#ede9fe" stroke="#a78bfa" stroke-width=".8"/><text x="97" y="452" text-anchor="middle" font-size="8.5" font-weight="600" fill="#6d28d9">V1: 6D</text>
+      <rect x="132" y="440" width="76" height="16" rx="3" fill="#ede9fe" stroke="#a78bfa" stroke-width=".8"/><text x="170" y="452" text-anchor="middle" font-size="8.5" font-weight="600" fill="#6d28d9">V2/V3: 11D</text>
+
+      <line x1="268" y1="380" x2="316" y2="380" stroke="#8b5cf6" stroke-width="2" marker-end="url(#a-purple)"/>
+
+      <!-- Policy Network -->
+      <rect x="322" y="320" width="240" height="120" rx="8" fill="#e8f0fe" stroke="#3b82f6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="442" y="344" text-anchor="middle" font-size="13" font-weight="700" fill="#1d4ed8">Policy Network</text>
+      <text x="442" y="362" text-anchor="middle" font-size="10" fill="#5b6e8c">P2p3dNetwork (Feature Extractor)</text>
+      <line x1="342" y1="370" x2="542" y2="370" stroke="#bfdbfe" stroke-width="0.5"/>
+      <rect x="362" y="380" width="44" height="18" rx="3" fill="white" stroke="#93c5fd" stroke-width=".8"/><text x="384" y="393" text-anchor="middle" font-size="9" fill="#1d4ed8">Input</text>
+      <text x="417" y="393" font-size="12" fill="#3b82f6">→</text>
+      <rect x="430" y="380" width="100" height="18" rx="3" fill="white" stroke="#93c5fd" stroke-width=".8"/><text x="480" y="393" text-anchor="middle" font-size="9" fill="#1d4ed8">Linear(64)+ReLU</text>
+      <text x="540" y="393" font-size="12" fill="#3b82f6">×2</text>
+      <rect x="362" y="406" width="78" height="18" rx="3" fill="#dbeafe" stroke="#60a5fa" stroke-width=".8"/><text x="401" y="419" text-anchor="middle" font-size="9" fill="#1d4ed8">Actor (μ, σ)</text>
+      <rect x="450" y="406" width="78" height="18" rx="3" fill="#dbeafe" stroke="#60a5fa" stroke-width=".8"/><text x="489" y="419" text-anchor="middle" font-size="9" fill="#1d4ed8">Critic (V)</text>
+
+      <line x1="562" y1="380" x2="610" y2="380" stroke="#f43f5e" stroke-width="2" marker-end="url(#a-rose)"/>
+
+      <!-- Action -->
+      <rect x="48" y="468" width="514" height="52" rx="8" fill="#ffeaf0" stroke="#f43f5e" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="60" y="490" font-size="13" font-weight="700" fill="#be123c">Action Space (3D, a ∈ [-1, +1]³)</text>
+      <text x="60" y="508" font-size="10" fill="#e11d48">a[0] ← yaw/aileron/roll  |  a[1] ← airspeed/elevator/pitch  |  a[2] ← climb/throttle/airspeed</text>
+
+      <!-- V1 -->
+      <rect x="642" y="320" width="300" height="172" rx="8" fill="#e6faf8" stroke="#14b8a6" stroke-width="1.5" filter="url(#sh)"/>
+      <rect x="642" y="320" width="300" height="28" rx="8" fill="#14b8a6"/><rect x="642" y="340" width="300" height="8" fill="#14b8a6"/>
+      <text x="792" y="339" text-anchor="middle" font-size="12" font-weight="700" fill="white">V1 · Velocity-Level Control (VLC)</text>
+      <text x="660" y="364" font-size="10" font-weight="600" fill="#0f766e">Denormalization (Eq.10):</text>
+      <text x="670" y="380" font-size="9.5" fill="#115e59">yaw_rate = action[0] × 0.5  (±0.5 rad/s)</text>
+      <text x="670" y="396" font-size="9.5" fill="#115e59">airspeed = 20 + action[1] × 6  (14~26 m/s)</text>
+      <text x="670" y="412" font-size="9.5" fill="#115e59">climb_rate = action[2] × 10  (±10 m/s)</text>
+      <line x1="660" y1="424" x2="924" y2="424" stroke="#99f6e4" stroke-width="0.5"/>
+      <rect x="660" y="434" width="114" height="24" rx="4" fill="white" stroke="#5eead4" stroke-width="1"/><text x="717" y="451" text-anchor="middle" font-size="9.5" font-weight="600" fill="#0f766e">X8Autopilot (PID)</text>
+      <text x="786" y="451" font-size="12" fill="#14b8a6">→</text>
+      <rect x="798" y="434" width="130" height="24" rx="4" fill="white" stroke="#5eead4" stroke-width="1"/><text x="863" y="451" text-anchor="middle" font-size="9.5" fill="#0f766e">Aileron · Elevator · Throttle</text>
+
+      <!-- V2 -->
+      <rect x="642" y="510" width="300" height="172" rx="8" fill="#fef7ed" stroke="#f59e0b" stroke-width="1.5" filter="url(#sh)"/>
+      <rect x="642" y="510" width="300" height="28" rx="8" fill="#f59e0b"/><rect x="642" y="530" width="300" height="8" fill="#f59e0b"/>
+      <text x="792" y="529" text-anchor="middle" font-size="12" font-weight="700" fill="white">V2 · Actuator-Level Control (ALC) ⭐ Core</text>
+      <text x="660" y="556" font-size="10" font-weight="600" fill="#b45309">Direct Control (no PID):</text>
+      <text x="670" y="574" font-size="9.5" fill="#92400e">aileron_cmd  = action[0]  (∈ [-1, +1])</text>
+      <text x="670" y="592" font-size="9.5" fill="#92400e">elevator_cmd = action[1]  (∈ [-1, +1])</text>
+      <text x="670" y="610" font-size="9.5" fill="#92400e">throttle_cmd = 0.5 + action[2]×0.5  (∈ [0, 1])</text>
+      <line x1="660" y1="624" x2="924" y2="624" stroke="#fde68a" stroke-width="0.5"/>
+      <rect x="660" y="636" width="260" height="36" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1" stroke-dasharray="4,2"/>
+      <text x="790" y="650" text-anchor="middle" font-size="9.5" fill="#b45309">⚠ No denormalization, no PID autopilot</text>
+      <text x="790" y="664" text-anchor="middle" font-size="9.5" fill="#b45309">RL directly learns surface deflections</text>
+
+      <!-- V3 -->
+      <rect x="642" y="700" width="300" height="172" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5" filter="url(#sh)"/>
+      <rect x="642" y="700" width="300" height="28" rx="8" fill="#22c55e"/><rect x="642" y="720" width="300" height="8" fill="#22c55e"/>
+      <text x="792" y="719" text-anchor="middle" font-size="12" font-weight="700" fill="white">V3 · Attitude-Level Control</text>
+      <text x="660" y="746" font-size="10" font-weight="600" fill="#166534">Attitude Commands → PID:</text>
+      <text x="670" y="764" font-size="9.5" fill="#14532d">roll_cmd  = action[0] × π  →  roll_hold()</text>
+      <text x="670" y="782" font-size="9.5" fill="#14532d">pitch_cmd = action[1] × π/2  →  pitch_hold()</text>
+      <text x="670" y="800" font-size="9.5" fill="#14532d">airspeed  →  airspeed_hold_w_throttle()</text>
+      <line x1="660" y1="814" x2="924" y2="814" stroke="#bbf7d0" stroke-width="0.5"/>
+      <rect x="660" y="824" width="260" height="38" rx="4" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+      <text x="790" y="840" text-anchor="middle" font-size="9.5" fill="#166534">Hybrid: RL outputs attitude targets</text>
+      <text x="790" y="855" text-anchor="middle" font-size="9.5" fill="#166534">PID handles inner-loop stabilization</text>
+
+      <!-- V1/V2/V3 Comparison -->
+      <rect x="642" y="890" width="300" height="96" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+      <text x="792" y="912" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">Key Distinction</text>
+      <line x1="662" y1="920" x2="922" y2="920" stroke="#e2e8f0" stroke-width=".5"/>
+      <text x="662" y="938" font-size="9.5" fill="#475569">V1: RL → velocity cmds → PID → surfaces</text>
+      <text x="662" y="954" font-size="9.5" fill="#475569">V2: RL → surface cmds directly ⚡ fastest</text>
+      <text x="662" y="970" font-size="9.5" fill="#475569">V3: RL → attitude cmds → PID → surfaces</text>
+
+      <!-- JSBSim -->
+      <rect x="1002" y="320" width="278" height="220" rx="8" fill="#e6f7ee" stroke="#10b981" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="1141" y="346" text-anchor="middle" font-size="14" font-weight="700" fill="#047857">JSBSim FDM Engine</text>
+      <text x="1141" y="364" text-anchor="middle" font-size="10" fill="#047857">High-Fidelity 6-DOF Flight Dynamics</text>
+      <line x1="1022" y1="374" x2="1260" y2="374" stroke="#a7f3d0" stroke-width="0.5"/>
+      <rect x="1022" y="382" width="240" height="44" rx="4" fill="white" stroke="#6ee7b7" stroke-width=".8"/>
+      <text x="1142" y="398" text-anchor="middle" font-size="9.5" font-weight="600" fill="#047857">6-DOF Rigid Body Dynamics</text>
+      <text x="1142" y="414" text-anchor="middle" font-size="8.5" fill="#065f46">Translation: m(v̇ + ω×v) = F</text>
+      <text x="1142" y="424" text-anchor="middle" font-size="8.5" fill="#065f46">Rotation:  Iω̇ + ω×Iω = M</text>
+      <rect x="1022" y="434" width="116" height="40" rx="4" fill="white" stroke="#6ee7b7" stroke-width=".8"/><text x="1080" y="450" text-anchor="middle" font-size="9.5" font-weight="600" fill="#047857">Aerodynamics</text><text x="1080" y="464" text-anchor="middle" font-size="8.5" fill="#065f46">Wind-tunnel data</text><text x="1080" y="474" text-anchor="middle" font-size="8.5" fill="#065f46">D, Y, L forces</text>
+      <rect x="1146" y="434" width="116" height="40" rx="4" fill="white" stroke="#6ee7b7" stroke-width=".8"/><text x="1204" y="450" text-anchor="middle" font-size="9.5" font-weight="600" fill="#047857">Skywalker X8</text><text x="1204" y="464" text-anchor="middle" font-size="8.5" fill="#065f46">Cruise: 20 m/s</text><text x="1204" y="474" text-anchor="middle" font-size="8.5" fill="#065f46">8 kg · 2.1m span</text>
+      <rect x="1022" y="482" width="240" height="26" rx="4" fill="#d1fae5" stroke="#6ee7b7" stroke-width=".8"/><text x="1142" y="499" text-anchor="middle" font-size="9.5" fill="#047857">jsbsim_properties.py — 50+ aircraft properties</text>
+      <text x="1142" y="528" text-anchor="middle" font-size="9.5" fill="#047857">Returns: position, attitude, velocity, angular velocity</text>
+
+      <!-- JSBSim → Obs feedback loop -->
+      <path d="M 1002 430 L 60 430" stroke="#8b5cf6" stroke-width="1.5" fill="none" marker-end="url(#a-purple)" stroke-dasharray="8,3"/>
+      <text x="460" y="422" text-anchor="middle" font-size="9" fill="#8b5cf6">next state → observation (closed loop, 30 Hz)</text>
+
+      <!-- Optional rendering -->
+      <rect x="1002" y="556" width="278" height="100" rx="8" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,3" filter="url(#sh)"/>
+      <text x="1141" y="580" text-anchor="middle" font-size="12" font-weight="700" fill="#4b5563">[Optional] Visualization Layer</text>
+      <line x1="1022" y1="592" x2="1260" y2="592" stroke="#d1d5db" stroke-width="0.5"/>
+      <rect x="1022" y="600" width="84" height="24" rx="4" fill="white" stroke="#d1d5db" stroke-width=".8"/><text x="1064" y="617" text-anchor="middle" font-size="9.5" fill="#4b5563">Unreal Engine 4</text>
+      <rect x="1114" y="600" width="74" height="24" rx="4" fill="white" stroke="#d1d5db" stroke-width=".8"/><text x="1151" y="617" text-anchor="middle" font-size="9.5" fill="#4b5563">AirSim 1.8.1</text>
+      <rect x="1196" y="600" width="66" height="24" rx="4" fill="white" stroke="#d1d5db" stroke-width=".8"/><text x="1229" y="617" text-anchor="middle" font-size="9.5" fill="#4b5563">UE 5.2</text>
+      <text x="1141" y="648" text-anchor="middle" font-size="9.5" fill="#9ca3af">Only needed for real-time visualization</text>
+
+      <!-- Reward -->
+      <rect x="1002" y="672" width="278" height="100" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="1141" y="696" text-anchor="middle" font-size="12" font-weight="700" fill="#a16207">Reward &amp; Termination</text>
+      <line x1="1022" y1="706" x2="1260" y2="706" stroke="#fef08a" stroke-width="0.5"/>
+      <text x="1032" y="724" font-size="9.5" font-weight="600" fill="#a16207">r = 0.25·Δd_h + 1.0·Δd_v + 20·Δψ</text>
+      <text x="1032" y="742" font-size="9.5" fill="#854d0e">Terminate: altitude∉[10,190] · |ω|&gt;10 · goal&lt;30m · t&gt;40s</text>
+      <text x="1032" y="760" font-size="9.5" fill="#854d0e">Goal: θ~U(1.41,1.73)  φ~U(-π,π)  d~U(450,550)</text>
+
+      <!-- Reward → PPO -->
+      <path d="M 1002 722 L 600 722 L 600 126 L 228 126" stroke="#eab308" stroke-width="1.5" fill="none" marker-end="url(#a-amber)" stroke-dasharray="6,3"/>
+      <text x="680" y="734" text-anchor="middle" font-size="9" fill="#b45309">reward + done → PPO update</text>
+
+      <!-- Test/Inference -->
+      <rect x="20" y="556" width="514" height="130" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" filter="url(#sh)"/>
+      <text x="36" y="578" font-size="12" font-weight="700" fill="#475569">INFERENCE / TEST MODE</text>
+      <rect x="40" y="592" width="152" height="38" rx="4" fill="white" stroke="#94a3b8" stroke-width=".8"/><text x="116" y="608" text-anchor="middle" font-size="9.5" font-weight="600" fill="#334155">Single Target Test</text><text x="116" y="622" text-anchor="middle" font-size="8.5" fill="#64748b">navp2p_v1_test.py</text>
+      <rect x="204" y="592" width="152" height="38" rx="4" fill="white" stroke="#94a3b8" stroke-width=".8"/><text x="280" y="608" text-anchor="middle" font-size="9.5" font-weight="600" fill="#334155">Multi-Target Test</text><text x="280" y="622" text-anchor="middle" font-size="8.5" fill="#64748b">navp2p_v1_test_multi.py (64 pts)</text>
+      <rect x="368" y="592" width="152" height="38" rx="4" fill="white" stroke="#94a3b8" stroke-width=".8"/><text x="444" y="608" text-anchor="middle" font-size="9.5" font-weight="600" fill="#334155">Flight Visualization</text><text x="444" y="622" text-anchor="middle" font-size="8.5" fill="#64748b">6-panel plot + CSV data</text>
+      <rect x="40" y="640" width="480" height="32" rx="4" fill="#f1f5f9" stroke="#cbd5e1" stroke-width=".5"/>
+      <text x="280" y="652" text-anchor="middle" font-size="9.5" fill="#475569">model.predict(obs, deterministic=True) → action → autopilot → JSBSim → record trajectory</text>
+      <text x="280" y="666" text-anchor="middle" font-size="9.5" fill="#64748b">Metrics: flight time, trajectory smoothness, control effort, success rate</text>
+
+      <!-- Code map -->
+      <rect x="620" y="20" width="680" height="80" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+      <text x="640" y="42" font-size="11" font-weight="700" fill="#334155">Code Map</text>
+      <text x="640" y="60" font-size="9.5" fill="#475569"><tspan font-family="monospace" fill="#1d4ed8">airgym/envs/</tspan> Gym envs (3 control levels) <tspan font-family="monospace" fill="#1d4ed8">lib/jsbsimlib.py</tspan> JSBSim wrapper + X8Autopilot</text>
+      <text x="640" y="78" font-size="9.5" fill="#475569"><tspan font-family="monospace" fill="#1d4ed8">network/p2p3d_net.py</tspan> Feature extractor <tspan font-family="monospace" fill="#1d4ed8">navp2p_v*_train.py</tspan> Training <tspan font-family="monospace" fill="#1d4ed8">navp2p_v*_test.py</tspan> Evaluation</text>
+      <text x="640" y="94" font-size="9.5" fill="#475569"><tspan font-family="monospace" fill="#1d4ed8">x8/x8.xml</tspan> Skywalker X8 aerodynamics <tspan font-family="monospace" fill="#1d4ed8">lib/jsbsim_properties.py</tspan> 50+ JSBSim property definitions</text>
+
+      <!-- Bottom closed-loop bar -->
+      <rect x="20" y="710" width="514" height="28" rx="5" fill="#1e293b"/>
+      <text x="277" y="729" text-anchor="middle" font-size="10.5" font-weight="600" fill="#e2e8f0">Closed-Loop: JSBSim State → _get_obs() → Policy → _do_action() → JSBSim.run_fdm() → 30 Hz</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. THREE CONTROL LEVELS ═══════════════ -->
+<section id="levels">
+  <h2>2. 三种控制层级 —— 从可解到挑战的阶梯</h2>
+
+  <div class="callout idea">
+    <div class="callout-title">💡 核心设计智慧：这不是三个独立实验，而是一个递进式研究路线</div>
+    从易到难，每一步验证一层假设——V1 证明框架可行 → V3 验证泛化 → V2 冲击核心贡献。
+  </div>
+
+  <table>
+    <tr><th>层级</th><th>控制变量</th><th>观测维度</th><th>难度</th><th>控制链路</th><th>意义</th></tr>
+    <tr>
+      <td><strong>V1 (VLC)</strong></td>
+      <td>偏航率 · 空速 · 爬升率</td>
+      <td>6D</td>
+      <td><span class="tag tag-green">低</span></td>
+      <td>RL → PID → 舵面</td>
+      <td>验证"RL + JSBSim + 极坐标观测"框架可行</td>
+    </tr>
+    <tr>
+      <td><strong>V3 (Attitude)</strong></td>
+      <td>滚转角 · 俯仰角 · 空速</td>
+      <td>11D</td>
+      <td><span class="tag tag-amber">中</span></td>
+      <td>RL → PID → 舵面</td>
+      <td>过渡——证明更多状态信息能学更复杂的控制</td>
+    </tr>
+    <tr>
+      <td><strong>V2 (ALC)</strong> ⭐</td>
+      <td>副翼 · 升降舵 · 油门</td>
+      <td>11D</td>
+      <td><span class="tag tag-red">高</span></td>
+      <td>RL → 直接舵面</td>
+      <td>终极目标——首次 RL 执行器级最短时间飞行控制</td>
+    </tr>
+  </table>
+
+  <h3>传统控制的弊端</h3>
+  <p>传统的固定翼无人机控制采用多层架构——<strong>"上层路径规划 → 中层速度/姿态追踪 → 下层执行器控制"</strong>。这种分层 PID/LQR 结构会引入 <strong>级联误差和长时间延迟</strong>，无法充分释放无人机的机动性极限。固定翼动态耦合的难点在于：高度非线性、强欠驱动、速度/爬升率深度耦合（必须保持向前飞行以提供升力），在极限机动中控制面动作激进，常规控制难以处理。</p>
+
+  <h3>V1 — 速度级控制 (Velocity-Level Control)</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>动作 → 物理量（反归一化）</h4>
+      <pre>yaw_rate    = a[0] × 0.5        <span class="cm"># ±0.5 rad/s</span>
+airspeed    = 20 + a[1] × 6     <span class="cm"># 14~26 m/s</span>
+climb_rate  = a[2] × 10 × 3.28  <span class="cm"># ±10 m/s → ft/s</span></pre>
+    </div>
+    <div class="cmp-col">
+      <h4>观测（6D，极坐标表示）</h4>
+      <pre>obs[0] = Δψ / 2π         <span class="cm"># 航向偏差</span>
+obs[1] = tanh(d_h × .01) <span class="cm"># 水平距离</span>
+obs[2] = tanh(d_v × .02) <span class="cm"># 垂直距离</span>
+obs[3] = ω_z / 4π        <span class="cm"># 偏航角速率</span>
+obs[4] = tanh((v-20)×.05)<span class="cm"># 空速偏差</span>
+obs[5] = tanh(v_z × .1)  <span class="cm"># 下降速率</span></pre>
+    </div>
+  </div>
+  <div class="callout info"><strong>特征</strong>：RL 只负责高层导航决策，底层姿态稳定交给 PID。最简单、收敛最快。</div>
+
+  <h3>V2 — 执行器级控制 (Actuator-Level Control) ⭐ 核心创新</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>动作 → 直接舵面</h4>
+      <pre>aileron_cmd   = a[0]              <span class="cm"># [-1, +1]</span>
+elevator_cmd  = a[1]              <span class="cm"># [-1, +1]</span>
+throttle_cmd  = 0.5 + a[2] × 0.5  <span class="cm"># [0, 1]</span></pre>
+    </div>
+    <div class="cmp-col">
+      <h4>观测（11D，增加姿态+角速度）</h4>
+      <pre>obs[0:3]  = 目标信息（同 V1）
+obs[3:5]  = 速度信息
+obs[5:8]  = 姿态角 (roll/pitch/yaw)
+obs[8:11] = 角速度 (p/q/r)</pre>
+    </div>
+  </div>
+  <div class="callout warn"><strong>突破性尝试</strong>：彻底摒弃 PID，消除两级控制延迟与累积误差，直接探寻物理边界下的极限机动。训练难度极高但最终性能碾压全场——<strong>比传统控制器减少 27.6% 飞行时间</strong>。</div>
+
+  <h3>V3 — 姿态级控制</h3>
+  <p>中间层：RL 输出目标姿态（roll/pitch），PID 负责内环稳定。是 V1→V2 的过渡方案。</p>
+  <pre>roll_cmd  = a[0] × π       →  roll_hold()
+pitch_cmd = a[1] × π/2     →  pitch_hold()
+airspeed  →  airspeed_hold_w_throttle()</pre>
+</section>
+
+<!-- ═══════════════ 3. PAPER DEEP DIVE ═══════════════ -->
+<section id="paper">
+  <h2>3. 论文精读</h2>
+
+  <h3>3.1 核心贡献</h3>
+  <ol>
+    <li><strong>首次</strong>将 RL 的执行器级控制 (ALC) 应用于固定翼最短时间飞行</li>
+    <li>基于 <strong>6-DOF 高保真模型 + 风洞实验气动系数</strong>（非简化质点模型）</li>
+    <li>系统比较 <strong>4 种 SOTA RL 算法</strong>（A2C、TD3、SAC、PPO）在两种控制层级的表现</li>
+    <li><strong>PPO-ALC 比传统控制器减少 27.6% 飞行时间</strong>，且标准差极低（1.39s）</li>
+  </ol>
+
+  <h3>3.2 6-DOF 动力学模型</h3>
+  <p>以往很多 RL 飞行控制研究使用简化质点模型，本文使用<strong>完整 6-DOF 刚体动力学</strong>：</p>
+  <pre><span class="cm"># 平动方程（牛顿第二定律）</span>
+m(v̇ + ω × v) = F
+
+<span class="cm"># 转动方程（欧拉方程）</span>
+I·ω̇ + ω × I·ω = M
+
+<span class="cm"># 力分解</span>
+F = F_aero + F_gravity + F_thrust
+M = M_aero + M_thrust</pre>
+  <p>气动力基于 <strong>Skywalker X8 的风洞实验和 CFD 数据</strong>，JSBSim 负责数值积分。这意味着策略必须在高度非线性的气动耦合环境中工作。</p>
+
+  <h3>3.3 训练结果（核心表格）</h3>
+  <table>
+    <tr><th>算法</th><th>VLC 收敛</th><th>ALC 收敛</th><th>分析</th></tr>
+    <tr><td><strong>PPO</strong></td><td>✅ 最快最稳</td><td>✅ <strong>唯一可靠收敛</strong></td><td>Trust region clipping 在复杂动作空间中阻止了不稳定更新</td></tr>
+    <tr><td>SAC</td><td>✅ 可收敛</td><td>❌ 奖励显著降低</td><td>离线算法的值函数估计在气动耦合中不稳定</td></tr>
+    <tr><td>TD3</td><td>✅ 可收敛</td><td>❌ 奖励显著降低</td><td>确定性策略在复杂场景中可能陷入局部最优</td></tr>
+    <tr><td>A2C</td><td>✅ 可收敛</td><td>❌ 收敛极差</td><td>高方差梯度在 ALC 中导致频繁策略崩溃</td></tr>
+  </table>
+
+  <h3>3.4 飞行时间对比</h3>
+  <table>
+    <tr><th>控制方法</th><th>平均飞行时间 (s)</th><th>标准差</th><th>评价</th></tr>
+    <tr><td>Dubins 曲线 (20 m/s)</td><td>27.94</td><td>4.19</td><td>传统 baseline</td></tr>
+    <tr><td>MPC (模型预测控制)</td><td>25.50</td><td>3.94</td><td>表现优异，末端有些许抖动</td></tr>
+    <tr><td>PPO (速度级 VLC)</td><td>25.94</td><td>5.14</td><td>泛化性好，受限于底层 PID</td></tr>
+    <tr><td><strong>PPO (执行器级 ALC)</strong></td><td><strong>20.24</strong></td><td><strong>1.39</strong></td><td>🏆 制霸全场！最短时间 + 最低方差</td></tr>
+  </table>
+
+  <h3>3.5 ALC 学到了什么——极限机动策略</h3>
+  <p>PPO (ALC) 展现出令人震撼的飞行策略：</p>
+  <ul>
+    <li><strong>主动降速换转弯</strong>：转弯时主动降低空速来换取极小转弯半径快速掉头，随后猛加推力</li>
+    <li><strong>激进但稳定</strong>：极其激进的转弯动作（极小半径 + 高角速度），但没有任何速度振荡，轨迹平滑</li>
+    <li><strong>端到端协同</strong>：升降舵、副翼、油门三者协同配合，而非独立控制——这是 PID 级联结构做不到的</li>
+  </ul>
+  <div class="callout tip"><strong>关键启示</strong>：ALC 比 VLC 飞行时间缩短 22.0%，比传统 Dubins 缩短 27.6%。这证明<strong>端到端 RL 直接控制舵面是完全可行且性能最佳的</strong>——只要加上合理的终止条件（如角速度超限 = 坠毁）。</div>
+</section>
+
+<!-- ═══════════════ 4. ALGORITHM FORMULAS ═══════════════ -->
+<section id="formulas">
+  <h2>4. 算法公式全解 —— 从 POMDP 到 PPO</h2>
+  <p>论文的数学体系分为<strong>五个层次</strong>：问题建模 → 物理约束 → 接口归一化 → 奖励信号 → 策略优化。每层都对应到具体代码。</p>
+
+  <!-- ===== 4.0 POMDP ===== -->
+  <h3>4.0 POMDP 形式化 <span style="font-weight:400;font-size:13px;color:#94a3b8;">（Section 3.1，未编号公式）</span></h3>
+
+  <div class="formula-block">
+    <div class="eq-main">POMDP = ⟨ S, A, T, R, Ω, O, γ ⟩</div>
+    <div class="eq-note">七元组定义了 RL 智能体在不完全观测环境中的决策框架</div>
+  </div>
+
+  <table class="symbol-table" style="width:100%;">
+    <tr><th>符号</th><th>含义</th><th>OpenFlight 中的具体对应</th></tr>
+    <tr><td><strong>S</strong></td><td>真实状态集合</td><td>JSBSim 内部完整 6-DOF 状态（50+ 属性，含气动系数、发动机内部状态等）</td></tr>
+    <tr><td><strong>A</strong></td><td>动作集合</td><td>3 维连续向量 ∈ [−1, +1]³，输出范围由 tanh 激活函数保证</td></tr>
+    <tr><td><strong>T</strong></td><td>状态转移 s' ~ T(s,a)</td><td><strong>JSBSim 的 Runge-Kutta 4 阶数值积分</strong>——非解析函数，真实体现物理规律</td></tr>
+    <tr><td><strong>R</strong></td><td>奖励函数</td><td>Eq.(13) 密集奖励 = k₁·Δd_h + k₂·Δd_v + k₃·Δψ</td></tr>
+    <tr><td><strong>Ω</strong></td><td>观测集合</td><td>6D (VLC) 或 11D (ALC) 归一化向量——极坐标表示</td></tr>
+    <tr><td><strong>O</strong></td><td>观测函数 o ~ O(s)</td><td><code>_get_obs()</code> 方法——从 50+ 维物理状态中提取 6~11 维</td></tr>
+    <tr><td><strong>γ</strong></td><td>折扣因子</td><td>0.99（SB3 PPO 默认），未来奖励的衰减率</td></tr>
+  </table>
+
+  <div class="callout info">
+    <div class="callout-title">为什么是 POMDP 而不是 MDP？</div>
+    固定翼无人机在真实飞行中<strong>无法直接感知完整状态</strong>（如气动力系数 α、β、精确的风场等）。RL 策略必须从不完整的传感器读数中做决策——这恰好是 POMDP 的典型场景。<code>_get_obs()</code> 只返回 6~11 维，而 JSBSim 内部有 50+ 个属性——这就是 "Partial Observation" 在代码层面的体现。
+  </div>
+
+  <!-- ===== 4.1 Optimization ===== -->
+  <h3>4.1 优化问题 —— Eq.(1)</h3>
+
+  <div class="formula-block">
+    <span class="eq-num">Eq.(1)</span>
+    <div class="eq-main">min &nbsp; T<sub>total</sub></div>
+    <div class="eq-main" style="margin-top:6px;">s.t. &nbsp; s<sub>t+1</sub> ~ T(s<sub>t</sub>, a<sub>t</sub>) &nbsp; （动力学约束）</div>
+    <div class="eq-main" style="margin:4px 0 4px 28px;">h ≥ h<sub>min</sub> &nbsp; （安全高度）</div>
+    <div class="eq-main" style="margin:4px 0 4px 28px;">‖p − p<sub>g</sub>‖ < ε &nbsp; （到达条件）</div>
+    <div class="eq-note">附加约束：空速范围、角速率范围、控制输入幅值——可灵活添加以增强飞行安全性</div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>该问题不直接求解</h4>
+      <p>这是一个带约束的最优控制问题——6-DOF 动力学约束下，解析求解几乎不可能（非线性、高维、强耦合）。</p>
+      <p><strong>论文的策略：</strong>将约束优化转化为 RL 问题——目标函数 → 奖励函数（密集奖励鼓励快速接近），约束 → 终止条件。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>代码对应</h4>
+      <pre><span class="cm"># 目标 min T → 密集奖励（每一步鼓励接近）</span>
+reward = 0.25*Δd_h + 1.0*Δd_v + 20*Δψ
+
+<span class="cm"># 约束 → 终止条件</span>
+<span class="kw">if</span> h < 10 <span class="kw">or</span> h > 190:   done = True
+<span class="kw">if</span> distance < 30:    done = True
+<span class="kw">if</span> time > 40:        done = True</pre>
+    </div>
+  </div>
+
+  <!-- ===== 4.2 6-DOF Dynamics ===== -->
+  <h3>4.2 6-DOF 飞行动力学 —— Eq.(2)~(6)</h3>
+  <p>这些公式全部封装在 <strong>JSBSim 的 C++ 核心</strong>中，Python 层不可见——但理解它们对理解"为什么 ALC 这么难学"至关重要。</p>
+
+  <h4>Eq.(2): 平动方程（牛顿第二定律在旋转参考系）</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(2)</span>
+    <div class="eq-main">m · ( <b>v̇</b> + <b>ω</b> × <b>v</b> ) = <b>F</b></div>
+    <table class="symbol-table"><tr><td>m</td><td>飞行器质量，Skywalker X8 ≈ 8 kg</td></tr><tr><td><b>v</b> = [u, v, w]<sup>T</sup></td><td>机体坐标系线速度 (m/s)</td></tr><tr><td><b>ω</b> = [p, q, r]<sup>T</sup></td><td>机体坐标系角速度 (rad/s)</td></tr><tr><td><b>F</b></td><td>总外力 (N)，分解见 Eq.(4)</td></tr><tr><td><b>ω × v</b></td><td><strong>科里奥利项</strong>——旋转参考系中出现的"伪力"。<br>这就是为什么转向时飞机会侧滑——不是外力推的，是坐标系在转。</td></tr></table>
+  </div>
+
+  <h4>Eq.(3): 转动方程（欧拉方程）</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(3)</span>
+    <div class="eq-main"><b>I</b> · <b>ω̇</b> + <b>ω</b> × <b>I</b> · <b>ω</b> = <b>M</b></div>
+    <table class="symbol-table"><tr><td><b>I</b></td><td>惯性矩阵（3×3 对称正定）。绕不同轴的转动惯量不同：绕滚转轴容易，绕俯仰轴困难——这是飞机设计的根本约束。</td></tr><tr><td><b>M</b></td><td>总外力矩 (N·m)</td></tr><tr><td><b>ω × I·ω</b></td><td><strong>陀螺效应</strong>——旋转体抵抗改变转轴方向。解释了为什么偏航运动会耦合到滚转——这是固定翼"荷兰滚 (Dutch Roll)"模态的数学根源。</td></tr></table>
+  </div>
+
+  <h4>Eq.(4): 力与力矩的分解</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(4)</span>
+    <div class="eq-main"><b>F</b> = <b>F</b><sub>aero</sub> + <b>F</b><sub>gravity</sub> + <b>F</b><sub>thrust</sub></div>
+    <div class="eq-main"><b>M</b> = <b>M</b><sub>aero</sub> + <b>M</b><sub>thrust</sub></div>
+  </div>
+  <table>
+    <tr><th>力分量</th><th>来源</th><th>JSBSim 实现</th></tr>
+    <tr><td><b>F</b><sub>aero</sub></td><td>气流流过机翼/机身产生（升力 L、阻力 D、侧力 Y）</td><td><code>x8.xml</code> 中基于风洞实验的气动系数表</td></tr>
+    <tr><td><b>F</b><sub>gravity</sub></td><td>重力 mg，在机体坐标系下投影（随姿态变化）</td><td>JSBSim 自动根据姿态角计算</td></tr>
+    <tr><td><b>F</b><sub>thrust</sub></td><td>螺旋桨/电机推力，沿机体 x 轴</td><td><code>electric800W.xml</code> 电机模型</td></tr>
+    <tr><td><b>M</b><sub>aero</sub></td><td>气动力 × 力臂（升力作用点不在重心）</td><td><code>x8.xml</code> 中与 α, β 相关的力矩系数</td></tr>
+  </table>
+
+  <h4>Eq.(5)~(6): 气动力坐标变换</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(5)</span>
+    <div class="eq-main">[<b>F</b><sub>aero</sub>]<sub>body</sub> = <b>R</b><sub>bw</sub>(α, β) · [−D, Y, −L]<sup>T</sup></div>
+    <span class="eq-num">Eq.(6)</span>
+    <div class="eq-main" style="margin-top:8px;">
+      <b>R</b><sub>bw</sub> = ⎡ cosα·cosβ &nbsp; −cosα·sinβ &nbsp; −sinα ⎤<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⎢ sinβ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; cosβ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 &nbsp;&nbsp;&nbsp; ⎥<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;⎣ sinα·cosβ &nbsp; −sinα·sinβ &nbsp;&nbsp; cosα ⎦
+    </div>
+  </div>
+  <table class="symbol-table">
+    <tr><td>D</td><td>Drag（阻力）——沿气流方向，阻碍飞行</td></tr>
+    <tr><td>Y</td><td>Side force（侧力）——垂直于对称面</td></tr>
+    <tr><td>L</td><td>Lift（升力）——垂直于气流方向，向上</td></tr>
+    <tr><td>α</td><td>攻角（Angle of Attack）——机体 x 轴与气流方向的夹角</td></tr>
+    <tr><td>β</td><td>侧滑角（Sideslip）——气流偏离对称面的角度</td></tr>
+  </table>
+  <div class="callout warn"><strong>关键耦合</strong>：<b>R</b><sub>bw</sub> 中有 sinα 和 cosα——升力和阻力会同时投影到体轴系的 x 和 z 方向。这就是为什么<strong>改变攻角会同时影响前进和升降</strong>——固定翼最核心的气动耦合。ALC 策略必须学会处理这种耦合。</div>
+
+  <!-- ===== 4.3 VLC formulas ===== -->
+  <h3>4.3 VLC: 观测与动作 —— Eq.(7)~(10)</h3>
+  <p>以下公式是<strong>论文和代码联系最紧密</strong>的部分——每一行都能在 Python 文件中找到精确对应。</p>
+
+  <h4>Eq.(7): VLC 观测向量（6 维）</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(7)</span>
+    <div class="eq-main"><b>o</b> = [Δψ, d<sub>h</sub>, d<sub>v</sub>, v<sub>a</sub>, v<sub>z</sub>, ω<sub>z</sub>]<sup>T</sup></div>
+  </div>
+  <table>
+    <tr><th>元素</th><th>物理量</th><th>计算方式</th><th>为什么选它</th></tr>
+    <tr><td>o[0] = Δψ</td><td>航向偏差</td><td>arctan2(y<sub>g</sub>−y, x<sub>g</sub>−x) − yaw</td><td>固定翼必须对准目标方向才能飞过去——这是最重要的导航信息</td></tr>
+    <tr><td>o[1] = d<sub>h</sub></td><td>水平距离</td><td>√[(x<sub>g</sub>−x)² + (y<sub>g</sub>−y)²]</td><td>还需要飞多远（水平面）</td></tr>
+    <tr><td>o[2] = d<sub>v</sub></td><td>垂直距离</td><td>z<sub>g</sub> − z</td><td>还需要爬升/下降多少</td></tr>
+    <tr><td>o[3] = v<sub>a</sub></td><td>空速</td><td>皮托管测量值 (ft/s→m/s)</td><td>空速决定升力，太慢会失速</td></tr>
+    <tr><td>o[4] = v<sub>z</sub></td><td>NED 垂直速度</td><td>v<sub>down</sub> (m/s)</td><td>当前在爬升还是下降</td></tr>
+    <tr><td>o[5] = ω<sub>z</sub></td><td>偏航角速率</td><td>r (rad/s)</td><td>当前转弯有多快</td></tr>
+  </table>
+
+  <h4>Eq.(8): VLC 观测归一化</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(8)</span>
+    <div class="eq-main">õ[1] = Δψ / (2π)</div>
+    <div class="eq-main">õ[2] = tanh(λ₁ · d<sub>h</sub>) &nbsp;&nbsp;&nbsp; λ₁ = 0.01</div>
+    <div class="eq-main">õ[3] = tanh(λ₂ · d<sub>v</sub>) &nbsp;&nbsp;&nbsp; λ₂ = 0.02</div>
+    <div class="eq-main">õ[4] = tanh(λ₃ · (v<sub>a</sub> − v<sub>a1</sub>)) &nbsp;&nbsp;&nbsp; λ₃ = 0.05, v<sub>a1</sub> = 20 m/s</div>
+    <div class="eq-main">õ[5] = tanh(λ₄ · v<sub>z</sub>) &nbsp;&nbsp;&nbsp; λ₄ = 0.1</div>
+    <div class="eq-main">õ[6] = ω<sub>z</sub> / (4π)</div>
+    <div class="eq-note">两种归一化策略并存：角度/角速度用线性（有界→除以极值），距离/速度用 tanh（无界→饱和压缩）</div>
+  </div>
+
+  <pre><span class="cm"># jsbsim_p2p3d_unienv.py → _get_obs() —— 逐行对应 Eq.(8)</span>
+obs = np.zeros(6)
+obs[0] = self.simIO.angle_minus(goal_yaw, orientation[2]) / (2 * np.pi)  <span class="cm"># õ[1]</span>
+obs[1] = np.tanh(goal_horiz * 0.01)   <span class="cm"># õ[2], λ₁=0.01</span>
+obs[2] = np.tanh(goal_vert * 0.02)    <span class="cm"># õ[3], λ₂=0.02</span>
+obs[3] = v_ang_radps[2] / (4 * np.pi) <span class="cm"># õ[6] (注意代码中的顺序不同于论文)</span>
+obs[4] = np.tanh((v_body_mps[0] - 20.) * 0.05)  <span class="cm"># õ[4], λ₃=0.05, v_a1=20</span>
+obs[5] = np.tanh(v_ned_mps[2] * 0.1)  <span class="cm"># õ[5], λ₄=0.1</span></pre>
+
+  <h4>Eq.(9): VLC 动作向量（3 维）</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(9)</span>
+    <div class="eq-main"><b>a</b> = [ω<sub>z,cmd</sub>, v<sub>c,cmd</sub>, v<sub>ar,cmd</sub>]<sup>T</sup></div>
+  </div>
+  <table>
+    <tr><th>元素</th><th>物理指令</th><th>反归一化后范围</th><th>设计依据</th></tr>
+    <tr><td>a[0]</td><td>期望偏航角速率</td><td>[−0.5, +0.5] rad/s</td><td>X8 的安全转弯速率上限，太急会失速</td></tr>
+    <tr><td>a[1]</td><td>期望爬升率</td><td>[−10, +10] m/s</td><td>安全爬升/下降范围——太快下降=撞地，太快爬升=失速</td></tr>
+    <tr><td>a[2]</td><td>期望空速</td><td>[14, 26] m/s</td><td>以巡航 20m/s 为中心，±6m/s 调节（X8 的安全飞行包线）</td></tr>
+  </table>
+
+  <h4>Eq.(10): VLC 动作反归一化</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(10)</span>
+    <div class="eq-main">ã[1] = λ₅ · a[1] + v<sub>a1</sub> &nbsp;&nbsp; λ₅ = 0.5</div>
+    <div class="eq-main">ã[2] = λ₆ · a[2] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; λ₆ = 6</div>
+    <div class="eq-main">ã[3] = λ₇ · a[3] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; λ₇ = 10 × 3.28 (m/s→ft/s)</div>
+    <div class="eq-note">ã 是 denormalized action —— 网络输出 ∈[−1,1] 映射到实际物理范围，作为底层控制器的输入</div>
+  </div>
+
+  <pre><span class="cm"># jsbsim_p2p3d_unienv.py → _do_action() —— 逐行对应 Eq.(10)</span>
+self.ap.yaw_rate_to_heading(action[0])                        <span class="cm"># ã[1] = 0.5·a[1] (内部)</span>
+self.ap.airspeed_hold_w_throttle((20 + 6. * action[1]) * 1.94) <span class="cm"># ã[2] = 20 + 6·a[2], ×1.94 转 knot</span>
+self.ap.altitude_hold_with_rate(10. * action[2] * 3.28)       <span class="cm"># ã[3] = 10·3.28·a[3], m/s→ft/s</span></pre>
+
+  <!-- ===== 4.4 ALC formulas ===== -->
+  <h3>4.4 ALC: 观测与动作 —— Eq.(11)~(12)</h3>
+
+  <h4>Eq.(11): ALC 观测向量（11 维）—— 比 VLC 多 5 维</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(11)</span>
+    <div class="eq-main"><b>o</b> = [Δψ, d<sub>h</sub>, d<sub>v</sub>, v<sub>a</sub>, v<sub>z</sub>, φ, θ, ψ, p, q, r]<sup>T</sup></div>
+    <div class="eq-note">新增 5 维：姿态角 (φ=roll, θ=pitch, ψ=yaw) + 角速度 (p, q, r)——因为 ALC 直接控制舵面，必须知道当前姿态才能计算正确的舵偏</div>
+  </div>
+
+  <h4>Eq.(12): ALC 观测归一化</h4>
+  <div class="formula-block">
+    <span class="eq-num">Eq.(12)</span>
+    <div class="eq-main">õ[1..5] = 同 VLC Eq.(8)</div>
+    <div class="eq-main">õ[i] = o[i] / (2π), &nbsp; i = 6,7,8 &nbsp;&nbsp; （姿态角：φ, θ, ψ）</div>
+    <div class="eq-main">õ[i] = o[i] / (4π), &nbsp; i = 9,10,11 &nbsp; （角速度：p, q, r）</div>
+    <div class="eq-note">姿态角 ∈[−π,π] → ÷2π 归一化到 [−0.5,0.5]；角速度 ∈[−2π,2π] rad/s → ÷4π 同理</div>
+  </div>
+
+  <pre><span class="cm"># jsbsim_p2p3d_alc_unienv.py → _get_obs() —— 姿态和角速度部分</span>
+obs[5] = orientation[0] / (2 * np.pi)   <span class="cm"># φ (roll)</span>
+obs[6] = orientation[1] / (2 * np.pi)   <span class="cm"># θ (pitch)</span>
+obs[7] = orientation[2] / (2 * np.pi)   <span class="cm"># ψ (yaw)，已 clip2pi</span>
+obs[8]  = v_ang_radps[0] / (4 * np.pi)  <span class="cm"># p (roll rate)</span>
+obs[9]  = v_ang_radps[1] / (4 * np.pi)  <span class="cm"># q (pitch rate)</span>
+obs[10] = v_ang_radps[2] / (4 * np.pi)  <span class="cm"># r (yaw rate)</span>
+
+<span class="cm"># ALC 不需要反归一化——RL 直接输出舵面指令</span>
+self.simIO[prp.aileron_cmd]  = action[0]               <span class="cm"># ∈[−1,1]</span>
+self.simIO[prp.elevator_cmd] = action[1]               <span class="cm"># ∈[−1,1]</span>
+self.simIO[prp.throttle_cmd] = action[2] * 0.5 + 0.5   <span class="cm"># ∈[0,1]</span></pre>
+
+  <div class="callout tip"><strong>ALC vs VLC 的关键区别</strong>：VLC 需要 denormalization → PID → 舵面，ALC 直接输出舵面指令。这消除了两级控制延迟和级联误差，但训练难度大幅提升——RL 必须自己学会姿态稳定。</div>
+
+  <!-- ===== 4.5 Reward ===== -->
+  <h3>4.5 奖励函数 —— Eq.(13)</h3>
+
+  <div class="formula-block">
+    <span class="eq-num">Eq.(13)</span>
+    <div class="eq-main">r<sub>t</sub> = k₁ · Δd<sub>h</sub> + k₂ · Δd<sub>v</sub> + k₃ · Δψ<sub>g</sub></div>
+    <div class="eq-main" style="font-size:13px;margin-top:4px;">其中 k₁ = 0.25, &nbsp; k₂ = 1.0, &nbsp; k₃ = 20</div>
+    <div class="eq-note">每个 Δ 定义为 <strong>前一步 − 当前步</strong>（距离减小=正奖励，距离增加=负反馈）</div>
+  </div>
+
+  <table>
+    <tr><th>项</th><th>计算</th><th>权重</th><th>典型单步值</th><th>贡献</th></tr>
+    <tr><td>Δd<sub>h</sub></td><td>d<sub>h</sub>(t−1) − d<sub>h</sub>(t)</td><td>0.25</td><td>~10 m/step</td><td>~2.5</td></tr>
+    <tr><td>Δd<sub>v</sub></td><td>d<sub>v</sub>(t−1) − d<sub>v</sub>(t)</td><td>1.0</td><td>~2 m/step</td><td>~2.0</td></tr>
+    <tr><td>Δψ<sub>g</sub></td><td>|Δψ(t−1)| − |Δψ(t)|</td><td>20</td><td>~0.1 rad/step</td><td>~2.0</td></tr>
+    <tr><td colspan="3" style="text-align:right;"><strong>总计</strong></td><td></td><td><strong>~6.5</strong></td></tr>
+  </table>
+
+  <div class="callout idea"><strong>量级平衡原理</strong>：三项贡献都在 ~2 量级，谁也不"淹没"谁。论文明确指出：只需调整权重使三者的绝对值接近即可，避免量级差异过大导致小项被忽略。这不是理论推导，是<strong>工程经验</strong>。</div>
+
+  <pre><span class="cm"># 每个 env 的 _compute_reward() —— 逐行对应 Eq.(13)</span>
+reward_dist_horiz = (pre_horiz_dist - curr_horiz_dist) * 0.25  <span class="cm"># k₁</span>
+reward_dist_vert  = (pre_vert_dist - curr_vert_dist)           <span class="cm"># k₂=1.0</span>
+reward_heading    = (pre_heading_err - curr_heading_err) * 20.0 <span class="cm"># k₃</span>
+reward = reward_dist_horiz + reward_dist_vert + reward_heading</pre>
+
+  <!-- ===== 4.6 PPO ===== -->
+  <h3>4.6 PPO: 策略优化 —— 论文引用 [20]，未重新推导</h3>
+  <p>论文使用 Schulman et al. (2017) 提出的 PPO 算法，没有重新推导公式——但理解 PPO 对解释论文实验结果至关重要。</p>
+
+  <h4>核心：Clipped Surrogate Objective</h4>
+  <div class="formula-block">
+    <span class="eq-num">PPO</span>
+    <div class="eq-main">L<sup>CLIP</sup>(θ) = 𝔼<sub>t</sub>[ min( r<sub>t</sub>(θ)·A<sub>t</sub>, &nbsp; clip(r<sub>t</sub>(θ), 1−ε, 1+ε)·A<sub>t</sub> ) ]</div>
+    <div class="eq-main" style="font-size:13px;margin-top:6px;">其中 r<sub>t</sub>(θ) = π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) / π<sub>θ_old</sub>(a<sub>t</sub>|s<sub>t</sub>) &nbsp;&nbsp;（概率比 / importance sampling ratio）</div>
+    <div class="eq-note">ε = 0.2（SB3 默认）——策略更新的最大幅度限制</div>
+  </div>
+
+  <table>
+    <tr><th>符号</th><th>含义</th><th>OpenFlight 中的值</th></tr>
+    <tr><td>π<sub>θ</sub>(a|s)</td><td>新策略：当前参数下选动作 a 的概率</td><td>高斯分布 N(μ<sub>θ</sub>(s), σ<sub>θ</sub>)</td></tr>
+    <tr><td>π<sub>θ_old</sub></td><td>旧策略：上次更新前的参数</td><td>每 2048 步（n_steps）复制一次</td></tr>
+    <tr><td>r<sub>t</sub>(θ)</td><td>概率比：r&gt;1=新策略更喜欢该动作</td><td>—</td></tr>
+    <tr><td>A<sub>t</sub></td><td>优势函数：A&gt;0 好动作，A&lt;0 坏动作</td><td>用 GAE 计算</td></tr>
+    <tr><td>ε</td><td>Clip 范围</td><td><strong>0.2</strong>（限制 r 在 [0.8, 1.2]）</td></tr>
+  </table>
+
+  <h4>这个公式的核心机制——分情况讨论</h4>
+  <div class="cmp-row">
+    <div class="cmp-col" style="background:#ecfdf5;border-color:#10b981;">
+      <h4>情况 A：A<sub>t</sub> &gt; 0（好动作，想增加概率）</h4>
+      <p>L = min(r<sub>t</sub>, <strong>1+ε</strong>) · A<sub>t</sub></p>
+      <p>r<sub>t</sub> 被限制在 1.2 以下。即使新策略把这个动作的概率翻了 10 倍（r=10），也只按 1.2·A 算——<strong>防止过度乐观</strong>。</p>
+    </div>
+    <div class="cmp-col" style="background:#fef2f2;border-color:#f43f5e;">
+      <h4>情况 B：A<sub>t</sub> &lt; 0（坏动作，想减少概率）</h4>
+      <p>L = max(r<sub>t</sub>, <strong>1−ε</strong>) · A<sub>t</sub></p>
+      <p>r<sub>t</sub> 被限制在 0.8 以上。即使概率降到 0（r=0），也只按 0.8·A 算——<strong>防止过度惩罚</strong>，保留策略多样性。</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="callout-title">为什么 ALC 任务中只有 PPO 能收敛？</div>
+    ALC 的动作空间是<strong>舵面直接控制</strong>——轻微的动作变化就可能让飞机进入不可恢复的状态（失速尾旋）。PPO 的 clipping 阻止了单次更新中策略做大幅改动——策略只能"小步试探"。SAC（离线算法）用 replay buffer 旧数据更新，在复杂气动耦合下价值估计可能严重偏离；A2C（无 clipping）梯度方差大，策略会剧烈震荡甚至崩溃。
+  </div>
+
+  <h4>GAE: 广义优势估计（PPO 内部使用的优势函数）</h4>
+  <div class="formula-block">
+    <span class="eq-num">GAE</span>
+    <div class="eq-main">A<sub>t</sub><sup>GAE(γ,λ)</sup> = Σ<sub>l=0</sub><sup>∞</sup> (γλ)<sup>l</sup> · δ<sub>t+l</sub></div>
+    <div class="eq-main" style="font-size:13px;margin-top:4px;">其中 δ<sub>t</sub> = r<sub>t</sub> + γ·V(s<sub>t+1</sub>) − V(s<sub>t</sub>) &nbsp;&nbsp;（TD 误差）</div>
+    <div class="eq-note">γ = 0.99（折扣因子），λ = 0.95（GAE 平滑参数——bias-variance 权衡）</div>
+  </div>
+  <p><strong>直观理解</strong>：λ=1 → 蒙特卡洛回报（高方差低偏差），λ=0 → 一步 TD（低方差高偏差），λ=0.95 → 在两者之间取折中，对远期奖励略有平滑但不完全忽略。</p>
+
+  <h4>PPO 总损失函数（SB3 实现）</h4>
+  <div class="formula-block">
+    <div class="eq-main">L<sub>total</sub> = L<sup>CLIP</sup> − c₁ · L<sup>VF</sup> + c₂ · S[π<sub>θ</sub>](s<sub>t</sub>)</div>
+    <table class="symbol-table"><tr><td>L<sup>CLIP</sup></td><td>裁剪后的策略损失（主项）</td><td>权重 1.0</td></tr><tr><td>L<sup>VF</sup></td><td>价值函数损失 = (V(s<sub>t</sub>) − R<sub>t</sub>)²</td><td>vf_coef = 0.5</td></tr><tr><td>S</td><td>策略熵（鼓励探索的 bonus）</td><td>ent_coef = 0.0（论文未使用）</td></tr></table>
+  </div>
+
+  <h3>4.7 公式体系 → 代码 完整映射表</h3>
+  <table>
+    <tr><th>论文公式</th><th>代码位置</th><th>关键参数</th></tr>
+    <tr><td>Eq.(1) 优化问题</td><td>间接：<code>_compute_reward()</code> + 终止条件</td><td>h_min=10m, ε=30m, T_max=40s</td></tr>
+    <tr><td>Eq.(2) 平动方程</td><td>JSBSim C++ 核心（不可见）</td><td>m ≈ 8kg</td></tr>
+    <tr><td>Eq.(3) 转动方程</td><td>JSBSim C++ 核心（不可见）</td><td>I = 惯性矩阵</td></tr>
+    <tr><td>Eq.(4) 力/力矩分解</td><td>JSBSim C++ + x8.xml 气动系数</td><td>风洞实验数据</td></tr>
+    <tr><td>Eq.(5)(6) 坐标变换</td><td>JSBSim C++ 内部</td><td>α, β 攻角和侧滑角</td></tr>
+    <tr><td><strong>Eq.(7) VLC 观测</strong></td><td><code>jsbsim_p2p3d_unienv.py:_get_obs()</code></td><td>6 维</td></tr>
+    <tr><td><strong>Eq.(8) VLC 归一化</strong></td><td><code>jsbsim_p2p3d_unienv.py:_get_obs()</code></td><td>λ₁=0.01, λ₂=0.02, λ₃=0.05, λ₄=0.1</td></tr>
+    <tr><td><strong>Eq.(9) VLC 动作</strong></td><td><code>jsbsim_p2p3d_unienv.py:_do_action()</code></td><td>3 维</td></tr>
+    <tr><td><strong>Eq.(10) VLC 反归一化</strong></td><td><code>jsbsim_p2p3d_unienv.py:_do_action()</code></td><td>λ₅=0.5, λ₆=6, λ₇=10</td></tr>
+    <tr><td><strong>Eq.(11) ALC 观测</strong></td><td><code>jsbsim_p2p3d_alc_unienv.py:_get_obs()</code></td><td>11 维</td></tr>
+    <tr><td><strong>Eq.(12) ALC 归一化</strong></td><td><code>jsbsim_p2p3d_alc_unienv.py:_get_obs()</code></td><td>÷2π, ÷4π</td></tr>
+    <tr><td><strong>Eq.(13) 奖励函数</strong></td><td>各 env <code>_compute_reward()</code></td><td>k₁=0.25, k₂=1.0, k₃=20</td></tr>
+    <tr><td>PPO clipped objective</td><td>SB3 <code>on_policy_algorithm.py</code></td><td>ε=0.2, n_steps=2048, n_epochs=10</td></tr>
+    <tr><td>GAE</td><td>SB3 <code>buffers.py</code></td><td>γ=0.99, λ=0.95</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 5. DATA FLOW ═══════════════ -->
+<section id="dataflow">
+  <h2>5. 控制系统数据流全解 —— 从 JSBSim 到 PPO 更新</h2>
+  <p>以<strong>一步（30Hz, dt=0.033s）</strong>为单位，逐阶段追踪每一笔数据的精确维度、数值范围和变换函数。</p>
+
+  <h3>5.1 数据流全景对比：VLC vs ALC</h3>
+  <div class="fig-box">
+    <div class="fig-ascii">
+JSBSim 内部状态 (50+ 维, 不可见)
+│ 位置·姿态·速度·角速度·气动系数·发动机...
+│
+├──── _get_obs() ──── 信息提取与计算 ────┐
+│                                        │
+▼ V1: 原始观测 (6 维)                  ▼ V2: 原始观测 (11 维)
+│ [Δψ, d_h, d_v, v_a, v_z, ω_z]       │ [Δψ, d_h, d_v, v_a, v_z, φ,θ,ψ, p,q,r]
+│                                        │
+├─ Eq.(8) 归一化 ────┐        ┌──── Eq.(12) 归一化 ─┤
+▼                    │        │                      ▼
+õ ∈ [-0.5,0.5]⁶ (6D) │        │    õ ∈ [-0.5,0.5]¹¹ (11D)
+│                    │        │                      │
+└────────────────────┴────────┴──────────────────────┘
+                       │
+            策略网络 (2×64 MLP)
+            输入 → FC1(64)+ReLU → FC2(64)+ReLU
+                  → Actor(μ,σ) → Critic(V)
+                       │
+            a ∈ [-1, +1]³ (tanh 输出)
+                       │
+     ┌─────────────────┴─────────────────┐
+     │ V1 (VLC)                          │ V2 (ALC)
+     │ Eq.(10) 反归一化                  │ 直接输出
+     ▼                                   ▼
+ ω_z_cmd  v_c_cmd  v_ar_cmd        aileron  elevator  throttle
+ ±0.5r/s  ±10m/s  14~26m/s         [-1,1]   [-1,1]    [0,1]
+     │                                   │
+ X8Autopilot (PID 级联)               (无中间层)
+ yaw_rate→heading→roll→aileron           │
+ climb→pitch→elevator                    │
+ airspeed→throttle                       │
+     │                                   │
+     └──────────────┬────────────────────┘
+                    ▼
+          [aileron, elevator, throttle]
+           3 个舵面指令 ∈[-1,1]³
+                    │
+            JSBSim.run_fdm()
+        Runge-Kutta 4 阶 × 6 ODEs
+                    │
+         ┌──────────┴──────────┐
+         ▼                     ▼
+   新物理状态 (下一轮)    _compute_reward()
+                        r = 0.25Δd_h + 1.0Δd_v + 20Δψ</div>
+  </div>
+
+  <h3>5.2 阶段 ①：JSBSim 原始状态 → 信息提取</h3>
+  <table>
+    <tr><th>原始属性</th><th>来源</th><th>原始值示例</th><th>用途</th></tr>
+    <tr><td>lat_geod_deg</td><td>GPS / 惯性导航</td><td>0.001° → ×111320 = 111m</td><td>计算 d_h</td></tr>
+    <tr><td>lng_geoc_deg</td><td>GPS / 惯性导航</td><td>0.002° → ×40075000×cos(lat)÷360 = 222m</td><td>计算 d_h</td></tr>
+    <tr><td>altitude_sl_ft</td><td>气压高度计</td><td>328 ft → ×0.3048 = 100m</td><td>计算 d_v</td></tr>
+    <tr><td>pitch_rad, roll_rad</td><td>IMU / AHRS</td><td>0.1, -0.05 rad</td><td>V2/V3 观测 + PID</td></tr>
+    <tr><td>heading_deg</td><td>磁罗盘 / GPS</td><td>23° → 0.4 rad ← clip2pi</td><td>计算 Δψ + PID</td></tr>
+    <tr><td>u_fps, v_fps, w_fps</td><td>IMU 积分 / 空速解算</td><td>52.5, 3.9, -2.6 fps → 16, 1.2, -0.8 m/s</td><td>观测 v_a</td></tr>
+    <tr><td>p_radps, q_radps, r_radps</td><td>陀螺仪</td><td>0.1, 0.05, 0.08 rad/s</td><td>观测 ω_z (V1) + p,q,r (V2)</td></tr>
+    <tr><td>v_north_fps, v_east_fps, v_down_fps</td><td>GPS / INS</td><td>54, 6.6, 3.3 fps → 16.5, 2.0, 1.0 m/s</td><td>观测 v_z (NED down)</td></tr>
+    <tr><td>airspeed (vt_fps)</td><td>皮托管</td><td>54.1 fps → 16.5 m/s</td><td>观测 v_a + PID</td></tr>
+  </table>
+
+  <h3>5.3 阶段 ②：归一化 —— 原始值 → õ，附数值实例</h3>
+  <p><strong>场景设定</strong>：无人机位于 (120, 85, 95)m，目标位于 (350, -200, 140)m。当前姿态 roll=-0.05, pitch=0.1, yaw=0.4 rad。</p>
+
+  <h4>V1 (VLC) —— 6 维归一化 Eq.(8)</h4>
+  <table>
+    <tr><th>步骤</th><th>计算</th><th>原始值</th><th>归一化后 õ</th><th>范围</th></tr>
+    <tr><td>航向偏差</td><td>Δψ = arctan2(-285,230)−0.4</td><td>−1.29 rad</td><td>−1.29 / 6.283 = <strong>−0.205</strong></td><td>[−0.5, 0.5]</td></tr>
+    <tr><td>水平距离</td><td>d_h = √(230²+285²)</td><td>366 m</td><td>tanh(366×0.01) = tanh(3.66) = <strong>0.998</strong></td><td>(−1, 1)</td></tr>
+    <tr><td>垂直距离</td><td>d_v = 140−95</td><td>45 m</td><td>tanh(45×0.02) = tanh(0.90) = <strong>0.716</strong></td><td>(−1, 1)</td></tr>
+    <tr><td>偏航角速率</td><td>ω_z = r</td><td>0.08 rad/s</td><td>0.08 / 12.566 = <strong>0.006</strong></td><td>[−0.5, 0.5]</td></tr>
+    <tr><td>空速偏差</td><td>v_a − 20</td><td>16.5−20 = −3.5 m/s</td><td>tanh(−3.5×0.05) = tanh(−0.175) = <strong>−0.173</strong></td><td>(−1, 1)</td></tr>
+    <tr><td>垂直速度</td><td>v_z (NED down)</td><td>−0.8 m/s</td><td>tanh(−0.8×0.1) = tanh(−0.08) = <strong>−0.080</strong></td><td>(−1, 1)</td></tr>
+  </table>
+
+  <pre>õ_V1 = [−0.205, 0.998, 0.716, 0.006, −0.173, −0.080]  ← 这就是喂给网络的 6 个 float32</pre>
+
+  <h4>V2 (ALC) —— 11 维归一化 Eq.(12)，额外 5 维</h4>
+  <table>
+    <tr><th>额外元素</th><th>原始值</th><th>归一化后 õ</th><th>公式</th></tr>
+    <tr><td>φ (roll)</td><td>−0.05 rad</td><td>−0.05 / 6.283 = <strong>−0.008</strong></td><td>÷ 2π</td></tr>
+    <tr><td>θ (pitch)</td><td>0.10 rad</td><td>0.10 / 6.283 = <strong>0.016</strong></td><td>÷ 2π</td></tr>
+    <tr><td>ψ (yaw)</td><td>0.40 rad</td><td>0.40 / 6.283 = <strong>0.064</strong></td><td>÷ 2π</td></tr>
+    <tr><td>p (roll rate)</td><td>0.10 rad/s</td><td>0.10 / 12.566 = <strong>0.008</strong></td><td>÷ 4π</td></tr>
+    <tr><td>q (pitch rate)</td><td>0.05 rad/s</td><td>0.05 / 12.566 = <strong>0.004</strong></td><td>÷ 4π</td></tr>
+    <tr><td>r (yaw rate)</td><td>0.08 rad/s</td><td>0.08 / 12.566 = <strong>0.006</strong></td><td>÷ 4π</td></tr>
+  </table>
+
+  <div class="callout info"><strong>全部 õ 值都在 [−1, 1] 的窄区间内</strong>。归一化的目的不是"让值变小"，而是<strong>让所有输入维度的量级统一</strong>——否则梯度会被大值维度的噪声淹没小值维度的信号。</div>
+
+  <h3>5.4 阶段 ③：策略网络前向</h3>
+  <pre>õ ∈ R<sup>6 or 11</sup>
+    │
+    ▼ Linear(obs_dim, 64) + ReLU
+  h1 ∈ R<sup>64</sup>     例: [0.12, 0.00, 0.87, -0.33, ...] (64 个激活值)
+    │
+    ▼ Linear(64, 64) + ReLU
+  f  ∈ R<sup>64</sup>     例: [0.05, 0.42, -0.11, 0.68, ...] (64 个特征)
+    │
+    ├──▶ Linear(64, 3) ──▶ <strong>μ</strong> = [0.12, -0.45, 0.68]      <span class="cm"># 动作均值</span>
+    ├──▶ Linear(64, 3) ──▶ <strong>log_σ</strong> = [-1.90, -1.71, -2.12] <span class="cm"># 对数标准差 (可学习)</span>
+    │                     <strong>σ</strong> = exp(log_σ) = [0.15, 0.18, 0.12]
+    │
+    │  采样: a_raw = μ + ε·σ    ε ~ N(0,I)
+    │         a_raw = [0.15, -0.48, 0.73]
+    │         <strong>a = tanh(a_raw) = [0.15, -0.45, 0.63]</strong>    <span class="cm"># 最终动作 ∈[-1,1]³</span>
+    │
+    └──▶ Linear(64, 1) ──▶ <strong>V</strong> = 142.3                 <span class="cm"># 状态价值估计</span>
+
+<span class="cm"># 同时记录 log_prob（用于 PPO 的概率比计算）</span>
+log_prob = log N(a_raw | μ, σ²) − log(1 − tanh²(a_raw))   <span class="cm"># tanh 变换的 Jacobian 修正</span>
+         ≈ −1.52                                         <span class="cm"># 这个值被存入 RolloutBuffer</span></pre>
+
+  <h3>5.5 阶段 ④：动作 → 物理指令</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>V1 (VLC): 反归一化 → PID</h4>
+      <pre>a = [0.15, -0.45, 0.63]
+
+<span class="cm"># Eq.(10) 反归一化</span>
+yaw_rate   = 0.15 × 0.5 = <strong>0.075 rad/s</strong>
+airspeed   = 20 + (-0.45)×6 = <strong>17.3 m/s</strong>
+climb_rate = 0.63 × 10 × 3.28 = <strong>20.7 ft/s</strong>
+
+<span class="cm"># X8Autopilot PID 级联:</span>
+yaw_rate_to_heading(0.075)
+  → heading_error → roll_cmd → <strong>aileron=0.03</strong>
+
+airspeed_hold_w_throttle(17.3×1.94=33.6kts)
+  → throttle_error → <strong>throttle=0.58</strong>
+
+altitude_hold_with_rate(20.7 ft/s)
+  → pitch_cmd → <strong>elevator=-0.12</strong></pre>
+    </div>
+    <div class="cmp-col">
+      <h4>V2 (ALC): 直接舵面</h4>
+      <pre>a = [0.15, -0.45, 0.63]
+
+<span class="cm"># 无需反归一化，直接映射:</span>
+aileron_cmd  = 0.15     <strong>= 0.15</strong>
+elevator_cmd = -0.45    <strong>= -0.45</strong>
+throttle_cmd = 0.63×0.5 + 0.5 = <strong>0.815</strong></pre>
+      <p style="font-size:12px;color:#64748b;margin-top:8px;">ALC 消除了反归一化 + PID 的两级转换——减少延迟、消除级联误差，<strong>但 RL 必须自己学会姿态稳定</strong>。</p>
+    </div>
+  </div>
+
+  <h3>5.6 阶段 ⑤：JSBSim 执行 & 阶段 ⑥：奖励计算</h3>
+  <div class="formula-block">
+    <div class="eq-main"><strong>JSBSim.run_fdm()</strong> —— Runge-Kutta 4 阶, dt=1/30s</div>
+    <div class="eq-note">输入舵面 [0.03, -0.12, 0.58] → 解 6 个 ODE → 更新 50+ 内部状态 → 新位置 (120.5, 84.1, 95.8)m</div>
+  </div>
+
+  <table>
+    <tr><th>计算</th><th>前一步</th><th>当前步</th><th>Δ</th><th>× 权重</th><th>= 贡献</th></tr>
+    <tr><td>d_h</td><td>366.0 m</td><td>364.5 m</td><td>+1.5 m</td><td>0.25</td><td><strong>0.375</strong></td></tr>
+    <tr><td>d_v</td><td>45.0 m</td><td>44.2 m</td><td>+0.8 m</td><td>1.0</td><td><strong>0.800</strong></td></tr>
+    <tr><td>|Δψ|</td><td>1.29 rad</td><td>1.26 rad</td><td>+0.03 rad</td><td>20</td><td><strong>0.600</strong></td></tr>
+    <tr><td colspan="4" style="text-align:right;"><strong>总奖励 r_t</strong></td><td></td><td><strong>1.775</strong></td></tr>
+  </table>
+
+  <pre><span class="cm"># 一步完整的 transition（存入 RolloutBuffer）:</span>
+transition = {
+    <span class="st">'obs'</span>:      [-0.205, 0.998, 0.716, 0.006, -0.173, -0.080],  <span class="cm"># 6 个 float32</span>
+    <span class="st">'action'</span>:   [0.15, -0.45, 0.63],                           <span class="cm"># 3 个 float32</span>
+    <span class="st">'reward'</span>:   1.775,                                        <span class="cm"># 标量</span>
+    <span class="st">'done'</span>:     False,                                        <span class="cm"># 布尔</span>
+    <span class="st">'value'</span>:    142.3,                                        <span class="cm"># V(s_t)   — Critic 输出</span>
+    <span class="st">'log_prob'</span>: -1.52,                                        <span class="cm"># log π(a|s) — 用于 PPO ratio</span>
+}</pre>
+
+  <h3>5.7 阶段 ⑦：PPO 更新（每收集 2048 条 transition 触发）</h3>
+  <p><strong>触发频率</strong>：16 并行环境 × 128 步/env = 2048 条 transition ≈ 每 4.3 秒仿真时间触发一次更新。</p>
+
+  <div class="phase-steps">
+    <div class="phase-step"><p><strong>GAE 优势计算</strong>：从第 2048 步递推到第 0 步——δ_t = r_t + γ·V(s_{t+1})·(1−done) − V(s_t)，然后 A_t = Σ(γλ)^l·δ_{t+l}。最终得到 A ∈ R^2048。</p></div>
+    <div class="phase-step"><p><strong>PPO epoch × 10</strong>：同一批 2048 条数据重复用 10 次。每 epoch：计算 r_t(θ) = exp(log_prob_new − log_prob_old) → L_CLIP = mean(min(r_t·A_t, clip(r_t, 0.8, 1.2)·A_t)) → L_VF = mean((V_new(s_t) − R_t)²) → L_total = L_CLIP − 0.5·L_VF。</p></div>
+    <div class="phase-step"><p><strong>梯度更新</strong>：loss.backward() → clip_grad_norm_(max=0.5) → Adam(lr=2.5e-4).step()。PPO 的 clipping 确保单次更新的策略变化有限——这对 ALC 任务的训练稳定性至关重要。</p></div>
+  </div>
+
+  <h3>5.8 关键维度速查表</h3>
+  <table>
+    <tr><th>阶段</th><th>变量</th><th>V1 (VLC)</th><th>V2 (ALC)</th><th>dtype</th><th>范围</th></tr>
+    <tr><td>JSBSim 原始状态</td><td>—</td><td>50+ 维</td><td>50+ 维</td><td>float64</td><td>混合单位</td></tr>
+    <tr><td>观测 õ</td><td>obs</td><td><strong>6 维</strong></td><td><strong>11 维</strong></td><td>float32</td><td>[−1, 1]</td></tr>
+    <tr><td>网络特征</td><td>f</td><td>64 维</td><td>64 维</td><td>float32</td><td>ReLU 后 ≥0</td></tr>
+    <tr><td>动作均值</td><td>μ</td><td>3 维</td><td>3 维</td><td>float32</td><td>R</td></tr>
+    <tr><td>动作标准差</td><td>σ</td><td>3 维</td><td>3 维</td><td>float32</td><td>>0</td></tr>
+    <tr><td>最终动作</td><td>a</td><td>3 维</td><td>3 维</td><td>float32</td><td>[−1, 1]³</td></tr>
+    <tr><td>物理指令</td><td>ã</td><td>yaw_rate ±0.5<br>airspeed 14~26<br>climb ±10</td><td>aileron [−1,1]<br>elevator [−1,1]<br>throttle [0,1]</td><td>float32</td><td>带物理单位</td></tr>
+    <tr><td>舵面输出</td><td>—</td><td>3 维 (经PID)</td><td>3 维 (直接)</td><td>float32</td><td>[−1,1]³</td></tr>
+    <tr><td>奖励</td><td>r</td><td>标量</td><td>标量</td><td>float32</td><td>~0~200/ep</td></tr>
+    <tr><td>状态价值</td><td>V(s)</td><td>标量</td><td>标量</td><td>float32</td><td>R</td></tr>
+    <tr><td>优势函数</td><td>A</td><td>标量</td><td>标量</td><td>float32</td><td>R</td></tr>
+    <tr><td>动作对数概率</td><td>log π</td><td>标量</td><td>标量</td><td>float32</td><td>(−∞, 0]</td></tr>
+    <tr><td>策略网络参数</td><td>θ</td><td colspan="2">~5,063 个</td><td>float32</td><td>—</td></tr>
+    <tr><td>每步数据量</td><td>—</td><td colspan="2">obs(11×4) + action(3×4) + 4 标量 = <strong>~64 bytes</strong></td><td>—</td><td>—</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 6. RL TRAINING DETAILS ═══════════════ -->
+<section id="training">
+  <h2>6. RL 训练详解 —— 参数、种子、曲线</h2>
+
+  <h3>6.1 完整训练参数表</h3>
+  <p>论文训练了 <strong>2 种控制层级 × 4 种算法 × 5 个随机种子 = 40 个独立模型</strong>，每个 200 万步，总计 <strong>8000 万步</strong>环境交互。</p>
+
+  <table>
+    <tr><th colspan="2">PPO 核心参数（显式设置）</th></tr>
+    <tr><td><code>policy</code></td><td>"MlpPolicy" —— 标准 Actor-Critic 双头网络</td></tr>
+    <tr><td><code>learning_rate</code></td><td><strong>2.5×10⁻⁴</strong> —— Adam 优化器，较小学习率保证训练稳定</td></tr>
+    <tr><td><code>batch_size</code></td><td><strong>32</strong> —— 每次梯度更新使用 32 个样本</td></tr>
+    <tr><td><code>device</code></td><td>"cuda" —— GPU 训练</td></tr>
+  </table>
+
+  <table style="margin-top:16px;">
+    <tr><th colspan="2">PPO 内部参数（SB3 默认，论文未改但实际影响训练）</th></tr>
+    <tr><td><code>n_steps</code></td><td><strong>2048</strong> —— 每次收集 2048 步经验后才做一次策略更新</td></tr>
+    <tr><td><code>n_epochs</code></td><td><strong>10</strong> —— 同一批数据重复用于 10 次梯度更新</td></tr>
+    <tr><td><code>gamma (γ)</code></td><td><strong>0.99</strong> —— 折扣因子：99% 的未来奖励被计入当前决策</td></tr>
+    <tr><td><code>gae_lambda (λ)</code></td><td><strong>0.95</strong> —— GAE 平滑参数，bias-variance 平衡</td></tr>
+    <tr><td><code>clip_range (ε)</code></td><td><strong>0.2</strong> —— <span style="color:#be123c;">PPO 最关键的参数</span>：策略概率比限制在 [0.8, 1.2]</td></tr>
+    <tr><td><code>ent_coef</code></td><td><strong>0.0</strong> —— 不鼓励显式探索（任务本身已有足够随机性——目标随机化）</td></tr>
+    <tr><td><code>vf_coef</code></td><td><strong>0.5</strong> —— 价值函数损失权重</td></tr>
+    <tr><td><code>max_grad_norm</code></td><td><strong>0.5</strong> —— 梯度裁剪阈值</td></tr>
+  </table>
+
+  <table style="margin-top:16px;">
+    <tr><th colspan="2">环境与训练规模</th></tr>
+    <tr><td>并行环境数</td><td><strong>16</strong> (SubprocVecEnv)</td></tr>
+    <tr><td>仿真频率</td><td><strong>30 Hz</strong></td></tr>
+    <tr><td>总训练步数</td><td><strong>2,000,000</strong> steps × 5 seeds = <strong>10,000,000</strong> steps / 算法 / 任务</td></tr>
+    <tr><td>评估频率</td><td>每 1000 步评估一次，每次 5 个 episode</td></tr>
+    <tr><td>Episode 时长</td><td>最多 40 秒 × 30 Hz = 1200 步</td></tr>
+    <tr><td>更新频率</td><td>每 2048÷16≈128 环境步 ≈ 4.3 秒仿真时间，更新 10 epoch</td></tr>
+    <tr><td>总更新次数</td><td>≈ 2,000,000÷2,048 ≈ <strong>976 轮</strong>策略更新</td></tr>
+  </table>
+
+  <h3>6.2 网络参数量（极简的威力）</h3>
+  <table>
+    <tr><th>模块</th><th>计算公式</th><th>参数量 (V1, obs=6)</th></tr>
+    <tr><td>特征提取器 FC1</td><td>6×64 + 64</td><td>448</td></tr>
+    <tr><td>特征提取器 FC2</td><td>64×64 + 64</td><td>4,160</td></tr>
+    <tr><td>Actor 头 (μ)</td><td>64×3 + 3</td><td>195</td></tr>
+    <tr><td>Actor 头 (log σ)</td><td>64×3 + 3</td><td>195</td></tr>
+    <tr><td>Critic 头</td><td>64×1 + 1</td><td>65</td></tr>
+    <tr><td><strong>总计</strong></td><td></td><td><strong>≈ 5,063 个参数</strong></td></tr>
+  </table>
+  <div class="callout tip"><strong>5000 个参数就击败了有几十年工程积累的 PID 控制器（飞行时间缩短 27.6%）</strong>——这就是 "Less is more" 最硬的证据。</div>
+
+  <h3>6.3 随机种子：什么是 T0~T4？</h3>
+  <p>论文 Fig.3 中每个子图有 5 条不同颜色的曲线，标注为 <strong>T0, T1, T2, T3, T4</strong>。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>什么是随机种子？</h4>
+      <p>"随机种子"是一个整数，用来初始化伪随机数生成器。相同种子 → 完全相同的随机序列 → 完全相同的训练结果。不同种子 → 不同的随机序列 → 不同的训练轨迹。</p>
+      <p>RL 训练中的随机来源：① 神经网络权重初始化 ② 目标点随机采样 ③ 动作探索噪声 ④ 环境初始条件的微小扰动。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>为什么需要 5 次？</h4>
+      <p><strong>因为 RL 训练具有高度随机性。跑一次的结果不可信。</strong></p>
+      <p>同一个代码、同一套超参数、只换了 seed——PPO-ALC 的两次训练可能天差地别：Seed 42 收敛到 180，Seed 99 停在 60。只跑一次你无法知道真实性能。</p>
+      <p><strong>5 次求平均 + 标准差，才能诚实反映算法表现。</strong></p>
+    </div>
+  </div>
+
+  <pre><span class="cm"># 论文的实际做法（伪代码）</span>
+seeds = [0, 1, 2, 3, 4]
+results = []
+<span class="kw">for</span> seed <span class="kw">in</span> seeds:
+    set_all_random_seeds(seed)
+    model = PPO(policy=<span class="st">"MlpPolicy"</span>, ...)  <span class="cm"># 不同种子 → 不同初始化权重</span>
+    model.learn(total_timesteps=2_000_000)
+    rewards = get_training_curve(model)          <span class="cm"># 记录每步的 episode reward</span>
+    results.append(rewards)
+
+mean_curve = np.mean(results, axis=0)   <span class="cm"># 实线：5 次的均值</span>
+std_curve  = np.std(results, axis=0)    <span class="cm"># 阴影：±1 标准差</span></pre>
+
+  <h3>6.4 训练曲线阴影区域的数学含义</h3>
+  <p>论文 Fig.3 中的<strong>半透明阴影</strong>区域 = <strong>均值 ± 1 标准差</strong>（不是 min~max 包络线）：</p>
+
+  <div class="formula-block">
+    <div class="eq-main">阴影上界 = mean(t) + std(t)</div>
+    <div class="eq-main">阴影下界 = mean(t) − std(t)</div>
+    <div class="eq-note">约 68% 的训练 run 在该区间内（假设近似正态分布）</div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col"><h4>阴影窄 = ?</h4><p>5 次训练几乎一致 → 算法很稳定 → 你可以信任这个结果。例如 PPO-VLC 的阴影就很窄——5 次都收敛到相似水平。</p></div>
+    <div class="cmp-col"><h4>阴影宽 = ?</h4><p>5 次训练波动大 → 算法对 seed 敏感 → 需要更多 seed 或调参。例如 PPO-ALC 的阴影比 VLC 稍宽——论文说的 "slightly increased variability"。</p></div>
+    <div class="cmp-col"><h4>阴影突然变宽 = ?</h4><p>某次训练崩溃了（可能是策略更新幅度太大导致不可恢复的坏策略）→ <strong>这是严重问题</strong>。例如 A2C-ALC 的阴影在后期暴宽——某些 seed 的策略已经崩了。</p></div>
+  </div>
+
+  <h3>6.5 完整训练循环（Phase 1~5）</h3>
+  <div class="phase-steps">
+    <div class="phase-step"><p><strong>16 个环境并行采样</strong>：每个环境独立运行——obs → policy(obs) → action(含探索噪声) → JSBSim.step(action) → obs', reward, done。每 env 单独维护自己的 JSBSim 实例。</p></div>
+    <div class="phase-step"><p><strong>收集 n_steps=2048 步经验</strong>：16 envs × 128 steps/env = 2048 transitions。存储在 RolloutBuffer 中——每步记录 (obs, action, reward, done, value, log_prob)。</p></div>
+    <div class="phase-step"><p><strong>计算 GAE 优势</strong>：A<sub>t</sub> = Σ(γλ)<sup>l</sup>·δ<sub>t+l</sub>，从最后一步向第一步递推。Critic 的价值估计 V(s) 作为 baseline。</p></div>
+    <div class="phase-step"><p><strong>PPO 更新 ×10 epoch</strong>：同一批 2048 条数据重复用 10 次。每次：计算 r<sub>t</sub>=π<sub>new</sub>/π<sub>old</sub> → 计算 L<sup>CLIP</sup>=min(r<sub>t</sub>·A, clip(r<sub>t</sub>,0.8,1.2)·A) → 反向传播 → 梯度裁剪(max=0.5) → Adam 更新。</p></div>
+    <div class="phase-step"><p><strong>评估 & 保存</strong>：每 1000 steps 用当前策略跑 5 个 eval episode（无探索噪声），记录平均奖励。如果当前是最优模型则保存。回到 Phase 1，共循环 ~976 轮。</p></div>
+  </div>
+
+  <h3>6.6 目标点随机化</h3>
+  <p>每次 episode 重置时，目标点在<strong>球坐标系</strong>中随机采样（而非笛卡尔坐标的均匀分布）：</p>
+  <div class="formula-block">
+    <div class="eq-main">d ~ U(d<sub>set</sub>−50, d<sub>set</sub>+50) &nbsp;&nbsp; 距离：450~550m</div>
+    <div class="eq-main">θ ~ U(1.41, 1.73) rad &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 仰角：限制高度在 [20, 180]m</div>
+    <div class="eq-main">φ ~ U(−π, +π) rad &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 方位角：全方向均匀</div>
+    <div class="eq-note">球坐标 → NED：x<sub>g</sub>=d·sinθ·cosφ, y<sub>g</sub>=d·sinθ·sinφ, z<sub>g</sub>=d·cosθ+100</div>
+  </div>
+  <div class="callout info"><strong>为什么用球坐标？</strong>如果对 x,y,z 分别做均匀随机，目标点会集中在"对角线"方向。球坐标保证在三维空间中<strong>各方向概率密度均匀</strong>——RL 策略才能真正学到全方向的泛化能力。</div>
+</section>
+
+<!-- ═══════════════ 6. FIGURE INTERPRETATION ═══════════════ -->
+<section id="figures">
+  <h2>7. 论文图表解读</h2>
+
+  <h3>Fig.1: 学习流程与网络架构</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.1 — The learning procedure and network architecture</div>
+    <div class="fig-desc">
+      <p>这张图展示了从<strong>目标点 → 观测 → 网络 → 动作 → 仿真器 → 新状态</strong>的完整闭环。<strong>关键信息</strong>：</p>
+      <ul>
+        <li><strong>上半部分</strong>：VLC（左）和 ALC（右）的对比——VLC 需要经过 Denormalization + Autopilot 才到达控制面，ALC 直接输出舵面指令</li>
+        <li><strong>中间</strong>：网络结构 FC1(64)→FC2(64)，极简两层 MLP</li>
+        <li><strong>底部</strong>：JSBSim（训练时）+ Unreal Engine（验证时可选的渲染层）</li>
+        <li><strong>虚线框</strong>：渲染引擎在训练时可以<strong>禁用以加速</strong>——这是重要的工程实践</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Fig.3: 训练曲线 —— 全文最核心的实验结果</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.3 — Training reward curves — 8 张子图 = 4 algorithms × 2 control levels</div>
+    <div class="fig-desc">
+      <p>X轴：训练步数 (0~2M)，Y轴：Episode 奖励 (~0~200)。每条实线 = 1 次独立训练的奖励曲线 (T0~T4)，半透明阴影 = 均值 ± 标准差。</p>
+    </div>
+    <table>
+      <tr><th>子图</th><th>算法</th><th>任务</th><th>收敛奖励</th><th>阴影特征</th><th>结论</th></tr>
+      <tr style="background:#ecfdf5;"><td>(g)</td><td><strong>PPO</strong></td><td>VLC</td><td>~180 ✅</td><td>窄，5条高度一致</td><td>最快收敛、最稳定</td></tr>
+      <tr style="background:#ecfdf5;"><td>(h)</td><td><strong>PPO</strong></td><td>ALC</td><td>~170 ✅</td><td>稍宽但可控</td><td><strong>唯一在 ALC 中可靠收敛</strong></td></tr>
+      <tr><td>(a)</td><td>A2C</td><td>VLC</td><td>~180 ✅</td><td>中等</td><td>VLC 可收敛，但波动比 PPO 大</td></tr>
+      <tr style="background:#fef2f2;"><td>(d)</td><td>A2C</td><td>ALC</td><td>&lt;50 ❌</td><td>极宽，有崩溃</td><td>策略崩溃，频繁坠毁</td></tr>
+      <tr><td>(b)</td><td>TD3</td><td>VLC</td><td>~170 ✅</td><td>中等</td><td>可收敛但稍慢于 PPO</td></tr>
+      <tr style="background:#fef2f2;"><td>(e)</td><td>TD3</td><td>ALC</td><td>&lt;80 ❌</td><td>宽</td><td>奖励显著低于 VLC</td></tr>
+      <tr><td>(c)</td><td>SAC</td><td>VLC</td><td>~170 ✅</td><td>中等偏宽</td><td>可收敛，样本效率高</td></tr>
+      <tr style="background:#fef2f2;"><td>(f)</td><td>SAC</td><td>ALC</td><td>&lt;60 ❌</td><td>宽</td><td><strong>甚至无法在时限内到达目标</strong></td></tr>
+    </table>
+    <div class="callout warn"><strong>读图关键</strong>：VLC 任务四种算法都能收敛（Fig.3 a,b,c,g），但 ALC 任务中只有 PPO 能稳定收敛（Fig.3 h）。这揭示了任务难度对算法选择的巨大影响——同一个算法在简单任务上 OK，在困难任务上可能完全失败。做消融实验时<strong>必须在困难任务上比较</strong>才有区分度。</div>
+  </div>
+
+  <h3>Table 1: 飞行时间对比 —— 定量结果</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Table 1 — Average flight time & standard deviation</div>
+    <table>
+      <tr><th>控制方法</th><th>平均飞行时间 (s)</th><th>标准差 (s)</th><th>vs Dubins</th><th>评价</th></tr>
+      <tr><td>Dubins 曲线 (20 m/s)</td><td>27.94</td><td>4.19</td><td>baseline</td><td>传统几何路径规划</td></tr>
+      <tr><td>MPC (模型预测控制)</td><td>25.50</td><td>3.94</td><td>−8.7%</td><td>表现优异，末端有微幅抖动</td></tr>
+      <tr><td>PPO (速度级 VLC)</td><td>25.94</td><td>5.14</td><td>−7.2%</td><td>泛化好，但受限于底层 PID</td></tr>
+      <tr style="background:#fef3c7;"><td><strong>PPO (执行器级 ALC)</strong></td><td><strong>20.24</strong></td><td><strong>1.39</strong></td><td><strong>−27.6%</strong></td><td><strong>🏆 制霸全场：最短时间 + 最低方差</strong></td></tr>
+    </table>
+    <div class="fig-desc" style="margin-top:12px;">
+      <p><strong>解读要点</strong>：</p>
+      <ul>
+        <li>ALC 的<strong>标准差最小（1.39s）</strong>——意味着在所有 64 个测试目标点上，飞行时间都保持在 19~21s 的窄区间。这是极度稳定的表现。</li>
+        <li>VLC 的<strong>标准差最大（5.14s）</strong>——受限于 PID，某些方向需要更大的转弯半径。</li>
+        <li>ALC 比 VLC 缩短 22.0%，比 Dubins 缩短 27.6%——这种量级的提升在飞行控制领域是相当罕见的。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Fig.5 & Fig.6: 飞行轨迹分析（论文中以 64 点测试为例）</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.5 & Fig.6 — Trajectory comparison (3D trace, attitude, velocity, angular velocity)</div>
+    <div class="fig-desc">
+      <p>这些图展示了各方法在<strong>典型测试目标点</strong>上的飞行轨迹细节。论文使用 64 个不同方向和高度的目标点（水平 500m，高度 20~180m）来系统评估泛化能力。</p>
+
+      <p><strong>传统 PID / MPC 的问题</strong>：</p>
+      <ul>
+        <li>接近目标时空速和角速度出现<strong>微幅波动</strong>（PID 的固有特性——永远在"过冲-纠正-过冲"循环）</li>
+        <li>大空速时升力不足可能需要<strong>绕圈补盲</strong></li>
+        <li>转弯半径受限于 PID gain 的预设阈值</li>
+      </ul>
+
+      <p><strong>PPO-ALC 的惊人表现</strong>：</p>
+      <ul>
+        <li><strong>极其激进的转弯</strong>：极小转弯半径 + 高角速度——这是传统 PID 无法做到的</li>
+        <li><strong>主动降速换转弯</strong>：学到在转弯时主动降低空速换取小半径快速掉头，随后猛加推力——这种<strong>协同机动</strong>是 RL 自己"悟"出来的，不是人工设计的</li>
+        <li><strong>零速度振荡</strong>：控制极其平滑稳定，没有 PID 那种微幅抖动</li>
+        <li><strong>端到端协同</strong>：副翼、升降舵、油门三者自然配合——这正是"eliminate cascading errors"的直接证据</li>
+      </ul>
+    </div>
+    <div class="callout tip"><strong>最有趣的发现</strong>：ALC 学到了一个人类飞行员也会用的技巧——<strong>"降速急转，然后猛推油门"</strong>。这个策略不是论文作者教的，是 RL 通过 200 万次试错自己发现的。这就是端到端学习的魅力——它可能发现人类没想过的策略。</div>
+  </div>
+
+  <h3>Fig.2: 并行训练架构</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.2 — Parallel simulation and visualization based on UE5</div>
+    <div class="fig-desc">
+      <p>展示了 <strong>16 个 UAV 同时运行</strong>的架构。每个 UAV 独立与环境交互（Decentralized Execution），经验汇总后统一更新策略（Centralized Training）。这是 <strong>CTDE 范式</strong>的朴素实现——不需要 MPI、不需要分布式框架，仅靠 SB3 的 SubprocVecEnv。</p>
+      <p>可视化使用了 UE5（论文提到 UE4 和 UE5.2 均可），但这些渲染<strong>在训练时禁用</strong>——只在验证时开启来录制展示视频。</p>
+    </div>
+  </div>
+
+  <h3>Fig.4: 奖励曲线对比全景（附录）</h3>
+  <div class="fig-box">
+    <div class="fig-title">📊 Fig.4 (Appendix) — Full reward curve comparison</div>
+    <div class="fig-desc">
+      <p>Fig.3 展示的是 8 张独立子图的汇总，Fig.4 将 4 种算法在<strong>同一任务</strong>上的曲线画在同一张图中以便直接对比。论文将部分图放在附录中"不影响正文阅读流畅性"——这是常见的论文写作技巧。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. RESEARCH TRICKS ═══════════════ -->
+<section id="tricks">
+  <h2>8. 科研 Tricks —— 哪些可以直接用到你的项目里</h2>
+
+  <div class="tricks-grid">
+
+    <!-- Trick 1 -->
+    <div class="trick-card">
+      <span class="trick-num" style="background:#dbeafe;color:#1d4ed8">1</span>
+      <h4>用领域知识压缩观测空间</h4>
+      <p><strong>核心思想</strong>：原始传感器数据 ≠ 好的观测。用极坐标代替笛卡尔坐标表示目标位置。</p>
+      <pre><span class="cm"># ❌ 原始位置差</span>
+Δx, Δy, Δz
+
+<span class="cm"># ✅ 极坐标表示——对飞行控制更有语义</span>
+Δψ = arctan2(Δy, Δx)    <span class="cm"># 我该朝哪个方向飞？</span>
+d_h = √(Δx² + Δy²)       <span class="cm"># 还有多远（水平）？</span>
+d_v = Δz                 <span class="cm"># 还有多高？</span></pre>
+      <p>维度越低、语义越清晰，RL 学得越快。<strong>花最多时间在观测设计上</strong>。</p>
+    </div>
+
+    <!-- Trick 2 -->
+    <div class="trick-card">
+      <span class="trick-num" style="background:#d1fae5;color:#047857">2</span>
+      <h4>Tanh 非线性归一化 —— 保持"近场敏感"</h4>
+      <p><strong>问题</strong>：线性归一化在近距离时数值趋零、梯度消失。</p>
+      <pre>d=500m: tanh(5.0)→0.999  <span class="cm"># 饱和防过冲</span>
+d=50m:  tanh(0.5)→0.462  <span class="cm"># 仍有梯度</span>
+d=5m:   tanh(0.05)→0.05  <span class="cm"># 精细分辨</span></pre>
+      <p>归一化不是简单的 (x-min)/(max-min)。<strong>根据物理意义选择归一化函数</strong>——在关键区间"拉伸"梯度。还有 log 归一化、指数归一化等。</p>
+    </div>
+
+    <!-- Trick 3 -->
+    <div class="trick-card">
+      <span class="trick-num" style="background:#fef3c7;color:#92400e">3</span>
+      <h4>奖励塑形的量级平衡</h4>
+      <p>第一原则不是"想奖励什么"，而是<strong>先调权重让各项贡献量级接近</strong>：</p>
+      <pre>水平距离 ~10m/step × 0.25 = 2.5
+垂直距离  ~2m/step × 1.0  = 2.0
+航向偏差 ~0.1rad  × 20   = 2.0</pre>
+      <p>实用流程：①跑随机策略记录每项平均值 → ②调权使量级 ±20% 内 → ③根据优先级微调。</p>
+    </div>
+
+    <!-- Trick 4 -->
+    <div class="trick-card">
+      <span class="trick-num" style="background:#ffe4e6;color:#be123c">4</span>
+      <h4>硬约束用终止，软约束用奖励</h4>
+      <pre><span class="cm"># ✅ 安全性 = 直接终止 episode</span>
+<span class="kw">if</span> altitude &lt; 10 <span class="kw">or</span> altitude &gt; 190:
+    done = True
+
+<span class="cm"># ✅ 性能优化 = 密集奖励</span>
+reward = k1·Δd_h + k2·Δd_v + k3·Δψ</pre>
+      <p>好处：不需要调惩罚系数 → 策略不因害怕惩罚而保守 → 训练更稳定。</p>
+    </div>
+
+    <!-- Trick 5 -->
+    <div class="trick-card">
+      <span class="trick-num" style="background:#ede9fe;color:#6d28d9">5</span>
+      <h4>5 次随机种子 + 独立训练</h4>
+      <p>RL 训练具有高度随机性（初始化、目标采样、探索噪声）。<strong>跑一次的结果不可信</strong>。</p>
+      <p>论文每个算法跑 T0-T4 共 <strong>5 次独立训练</strong>，报告均值和方差。这是任何 RL 论文的底线。</p>
+      <p>刚好收敛 = 可能是运气；刚好没收敛 = 换 seed 可能就好了。</p>
+    </div>
+
+    <!-- Trick 6 -->
+    <div class="trick-card">
+      <span class="trick-num" style="background:#e6faf8;color:#0f766e">6</span>
+      <h4>统一条件做公平比较</h4>
+      <p>VLC 和 ALC <strong>使用完全相同的奖励函数</strong>。</p>
+      <p>否则你无法判断：ALC 更好是因为奖励设计得好，还是控制层级本身更优？</p>
+      <p>做消融实验的铁律：<strong>一次只改一个变量，其余全部固定</strong>。</p>
+    </div>
+
+    <!-- Trick 7 -->
+    <div class="trick-card">
+      <span class="trick-num" style="background:#fce7f3;color:#9d174d">7</span>
+      <h4>选对算法 —— 不是越新越好</h4>
+      <p>ALC 任务中只有 PPO 可靠收敛。为什么？</p>
+      <p>PPO 的 <strong>clipped surrogate objective</strong> 阻止策略在复杂动作空间中做大幅更新——当直接控制舵面时，动作轻微变化就可能导致失稳。<strong>PPO 的"保守更新"恰好匹配了这个需求</strong>。</p>
+      <p>算法选择要匹配任务特性：稳定性 > 样本效率 → PPO > SAC。</p>
+    </div>
+
+    <!-- Trick 8 -->
+    <div class="trick-card">
+      <span class="trick-num" style="background:#f0fdf4;color:#166534">8</span>
+      <h4>多进程并行的工程智慧</h4>
+      <pre>num_envs = 16
+env = SubprocVecEnv([make_env()
+    <span class="kw">for</span> _ <span class="kw">in</span> range(num_envs)])</pre>
+      <p>16 个 JSBSim 实例同时运行，经验汇总后统一更新。这是 <strong>CTDE（集中训练、分散执行）</strong> 的朴素但高效的实现。</p>
+      <p><strong>加速迭代周期本身就是一种"算法提升"</strong>——比花里胡哨的模型改进更实用。</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════ 5. DESIGN PHILOSOPHY ═══════════════ -->
+<section id="philosophy">
+  <h2>9. 设计哲学 —— "Less is More" 不是口号，是方法论</h2>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>❌ 新手常见误区</h4>
+      <ul>
+        <li>一上来就上 LSTM、Attention、Transformer</li>
+        <li>网络越深越好、参数越多越好</li>
+        <li>奖励函数越复杂越"智能"</li>
+        <li>换最新算法 = 性能提升</li>
+        <li>跑一次收敛就写论文</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>✅ OpenFlight 的做法</h4>
+      <ul>
+        <li><strong>2 层 MLP + 64 神经元</strong> → 击败 PID</li>
+        <li><strong>6 维观测</strong>（极坐标）→ 比 11 维原始状态更有效</li>
+        <li><strong>3 项奖励</strong>（量级平衡）→ 驱动复杂机动</li>
+        <li><strong>不换算法换设计</strong>：观测 + 奖励 + 终止条件</li>
+        <li><strong>5 次独立训练</strong> → 报告方差</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>网络越复杂的代价</h3>
+  <table>
+    <tr><th>代价</th><th>说明</th></tr>
+    <tr><td>训练越慢</td><td>16 并行的实时仿真等不起大网络推理</td></tr>
+    <tr><td>超参数越多</td><td>调参调到崩溃——学习率、层数、head 数、dropout 率……</td></tr>
+    <tr><td>越容易过拟合</td><td>仿真里完美，真机上一团糟（sim-to-real gap 更大）</td></tr>
+  </table>
+
+  <div class="callout idea">
+    <div class="callout-title">🎯 OpenFlight 的核心方法论</div>
+    <strong>简单的观测 + 简单的网络 + 简单的奖励 = 鲁棒的性能。</strong><br>
+    你的设计智慧比你的模型复杂度重要得多。把时间花在理解问题本质、设计好的观测表示、设计好的奖励信号上——而不是调网络层数和换激活函数。
+  </div>
+
+  <h3>作为 RL 小白的实操流程</h3>
+  <ol>
+    <li><strong>定义 POMDP</strong>：状态、动作、观测、奖励、终止条件</li>
+    <li><strong>用领域知识设计观测</strong>：信息压缩，维度越低越好</li>
+    <li><strong>设计奖励</strong>：量级平衡 &gt; 直觉正确</li>
+    <li><strong>用终止条件处理安全约束</strong>：不要用惩罚</li>
+    <li><strong>选一个稳定算法</strong>：PPO 是不错的默认选择</li>
+    <li><strong>从简化版开始</strong>：先证明框架可行</li>
+    <li><strong>多 seed 跑实验</strong>：至少 3 次独立训练</li>
+    <li><strong>统一条件做消融</strong>：一次只改一个变量</li>
+  </ol>
+</section>
+
+<!-- ═══════════════ 6. CODE ↔ PAPER MAP ═══════════════ -->
+<section id="codemap">
+  <h2>10. 代码 ↔ 论文 对应关系速查</h2>
+  <table>
+    <tr><th>论文概念</th><th>代码文件与位置</th></tr>
+    <tr><td>6-DOF 动力学模型</td><td><code>lib/jsbsimlib.py</code> → <code>JSBSimIO.run_fdm()</code></td></tr>
+    <tr><td>VLC 观测归一化 (Eq.8)</td><td><code>airgym/envs/jsbsim_p2p3d_unienv.py</code> → <code>_get_obs()</code></td></tr>
+    <tr><td>ALC 观测归一化 (Eq.12)</td><td><code>airgym/envs/jsbsim_p2p3d_alc_unienv.py</code> → <code>_get_obs()</code></td></tr>
+    <tr><td>VLC 动作反归一化 (Eq.10)</td><td><code>jsbsim_p2p3d_unienv.py</code> → <code>_do_action()</code></td></tr>
+    <tr><td>奖励函数 (Eq.13)</td><td>各 env 的 <code>_compute_reward()</code></td></tr>
+    <tr><td>网络结构 (Fig.1)</td><td><code>network/p2p3d_net.py</code> → <code>P2p3dNetwork</code></td></tr>
+    <tr><td>目标随机化（球坐标）</td><td>各 env 的 <code>_setup_flight()</code></td></tr>
+    <tr><td>PPO 训练</td><td><code>navp2p_v*_train.py</code></td></tr>
+    <tr><td>64 点泛化测试</td><td><code>navp2p_v*_test_multi.py</code></td></tr>
+    <tr><td>X8 气动模型</td><td><code>x8/x8.xml</code></td></tr>
+    <tr><td>PID 自动驾驶仪</td><td><code>lib/jsbsimlib.py</code> → <code>X8Autopilot</code> (6 个 PID 控制器)</td></tr>
+    <tr><td>JSBSim 属性定义</td><td><code>lib/jsbsim_properties.py</code> (50+ 属性)</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 7. LEARNING ROADMAP ═══════════════ -->
+<section id="roadmap">
+  <h2>11. 学习路线 &amp; 改进方向</h2>
+
+  <h3>最小可跑配置（不需要 GPU，不需要 UE4）</h3>
+  <pre>conda create -n openflight python=3.8
+conda activate openflight
+pip install jsbsim stable-baselines3 simple-pid
+python navp2p_v1_train.py  <span class="cm"># 改 device="cpu", num_envs=4</span></pre>
+
+  <h3>学习路线</h3>
+  <ol>
+    <li><strong>跑通训练</strong> → 观察 TensorBoard 奖励曲线</li>
+    <li><strong>修改观测</strong> → 在 <code>_get_obs()</code> 中增删维度，看效果</li>
+    <li><strong>调奖励权重</strong> → 改变 k1, k2, k3，观察飞行行为变化</li>
+    <li><strong>对比 V1/V2/V3</strong> → 理解不同控制层级的学习难度差异</li>
+    <li><strong>阅读 JSBSim 文档</strong> → 理解 <code>x8.xml</code> 中的气动参数定义</li>
+  </ol>
+
+  <h3>可改进方向</h3>
+  <table>
+    <tr><th>方向</th><th>难度</th><th>可能的改进点</th></tr>
+    <tr><td>观测设计</td><td>⭐</td><td>加入风场信息、堆叠历史观测帧</td></tr>
+    <tr><td>奖励设计</td><td>⭐⭐</td><td>加入能量效率项、控制平滑性惩罚</td></tr>
+    <tr><td>网络结构</td><td>⭐⭐</td><td>尝试 LSTM 处理时序、增大网络容量</td></tr>
+    <tr><td>算法改进</td><td>⭐⭐⭐</td><td>尝试 Dreamer、TD-MPC2 等 model-based 方法</td></tr>
+    <tr><td>任务扩展</td><td>⭐⭐⭐</td><td>动态障碍物避碰、多机编队、风扰鲁棒性</td></tr>
+    <tr><td>动态拦截（你的课题）</td><td>⭐⭐⭐⭐</td><td>将静态目标 → 动态预测拦截点，无缝演进为追逃/拦截策略</td></tr>
+    <tr><td>Sim-to-Real</td><td>⭐⭐⭐⭐</td><td>域随机化、系统辨识、实机部署</td></tr>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">🔗 你的毕业课题拓展思路</div>
+    论文目前解决的是<strong>静态点对点</strong>飞行。你的课题是<strong>动态高速拦截</strong>——可以在其 Δd_h, Δd_v 密集奖励基础上，将目标点 P_g 改为<strong>动态预测的拦截点</strong>（如引入 YOLO 预测的变动视线角），即可无缝演进为追逃/拦截策略。PPO + 端到端执行器控制的路线已被本文证明完全可行。
+  </div>
+</section>
+
+<footer>🛩️ OpenFlight 学习笔记 · 基于 Wang et al. (2025) JAI · 开源代码: github.com/running-mars/OpenFlight</footer>
+
+</div>
+</body>
+</html>

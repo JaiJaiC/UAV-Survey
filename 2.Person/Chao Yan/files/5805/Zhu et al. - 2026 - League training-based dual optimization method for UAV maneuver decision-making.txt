@@ -1,0 +1,1089 @@
+IEEE TRANSACTIONS ON EMERGING TOPICS IN COMPUTATIONAL INTELLIGENCE 1
+League Training-Based Dual Optimization Method
+for UA V Maneuver Decision-Making
+Haojie Zhu ,M o uC h e n , Fellow, IEEE ,C h a oY a n , Zengliang Han , and Tongle Zhou
+Abstract —Currently, most existing learning-based autonomous
+maneuver decision-making methods for Uncrewed Aerial Vehicles
+(UA Vs) focus on network weights optimization, overlooking the
+critical role of network architecture optimization in enhancingdecision-making performance. To address this issue, we proposea dual optimization method that improves autonomous maneuverdecision-making for high-performance UA Vs through concurrentlylearning network weights and architecture. Speciﬁcally, we utilizethe recurrent Soft Actor-Critic (SAC) algorithm and DifferentiableArchitecture Search (DARTS) to optimize the weights and discoverthe optimal architecture of decision-making policy, respectively.Furthermore, we designed a league training mechanism that re-gards the policies with the discovered architecture as league playersto further optimize their weights. The maneuver performance ofleague players is evaluated to facilitate the architecture searchefﬁciency. Lastly, we validate the stability and generalization ofthe proposed method through a series of simulations. The resultsdemonstrate that our method exhibits superior maneuver decision-making capabilities, outperforming existing algorithms in terms ofwin rates.
+Index Terms —Maneuver decision-making, differentiable arch-
+itecture search, soft actor-critic, league training, uncrewed aerialvehicles.
+I. I NTRODUCTION
+WITH the development of high-performance Uncrewed
+Aerial Vehicles (UA Vs), their cost-effectiveness and
+safety features present signiﬁcant promise [1]. The substitution
+of UA Vs for crewed aircraft offers the potential to not only lowerpilot training expenses but also reduce operational costs asso-
+ciated with ﬂight missions. Presently, the majority of employed
+UA Vs are predominantly controlled remotely. Carrying out ﬂight
+missions involves a sequential process for UA Vs, which includes
+collecting environmental data, making maneuver decisions, andcontrolling actuators. This process demands intricate computa-
+tions and strategy formulation, hindering their ability to make
+timely decisions in real-ﬂight scenarios [2]. Moreover, due to
+the constraints imposed by human-derived aviation experiences
+with crewed aircraft, autonomously generated strategies fail
+Received 2 November 2025; revised 24 February 2026; accepted 12 April
+2026. This work was supported by the National Natural Science Foundation ofChina under Grant 62533012, Grant 62403240, and Grant U23B2036. (Corre-
+sponding author: Mou Chen.)
+The authors are with the College of Automation Engineering, Nanjing
+University of Aeronautics and Astronautics, Nanjing 211106, China(e-mail: ddx440@nuaa.edu.cn; chenmou@nuaa.edu.cn; yanchao@
+nuaa.edu.cn; hanzengliang@nuaa.edu.cn; zhoutongle@nuaa.edu.cn).
+Recommended for acceptance by Y . Hou.Digital Object Identiﬁer 10.1109/TETCI.2026.3699776to fully exploit the comprehensive situational awareness and
+high overload maneuvering capabilities inherent in UA Vs. Thus,
+the key to expanding UA V applications rests on developing
+maneuver decision-making strategies that are more attuned toUA V capabilities [3].
+Currently, substantial research is focused on addressing UA V
+decision-making strategies, primarily categorized into three av-enues: i) approaches grounded in game theory, ii) methodologies
+rooted in optimization theory, and iii) techniques based on deep
+learning [4]. The ﬁrst approaches predominantly tackle decision-
+making predicaments within dynamic games using game the-
+ory [5]. These methods view UA Vs and targets as rational
+decision-makers, striving to attain optimal maneuvers by observ-ing and predicting target maneuvers. However, when confronted
+with intricate real-ﬂight scenarios, deriving an analytical Nash
+equilibrium solution proves challenging. The optimization the-
+ory approaches involve formulating and solving multi-objective
+optimization problems, employing dynamic programming, evo-lutionary algorithms, and other techniques to derive numerical
+solutions for optimal strategy [6]. Owing to the complexity of
+the state space in real-ﬂight environments, the computationalefﬁciency of these approaches often falls short of meeting real-
+time requirements. The deep learning-based methods utilize the
+powerful ﬁtting capabilities of neural networks to ascertain theoptimal mapping relationship between states and actions [7].B y
+directly using pilot demonstration data for behavioral cloning,
+interpretable and rapidly converging decision networks can beattained [8]. Nevertheless, constrained by human expertise, these
+approaches may not yield superior policies [9].
+The rise of UA Vs, capable of outperforming crewed aircraft,
+has led to an increased adoption of Reinforcement Learning
+(RL) methods for maneuver decision-making strategies un-
+constrained by human experiences [10]. Leveraging Convo-
+lutional Neural Networks (CNNs) and Recurrent Neural Net-
+works (RNNs), RL-based approaches are extensively applied inend-to-end decision-making processes, particularly in ﬁelds of
+autonomous driving and robotics [11],[12],[13]. These model-
+free algorithms exhibit proﬁciency in handling the intricatesituational awareness requirements of real-ﬂight scenarios [14],
+[15],[16],[17]. By employing self-play adversarial RL within
+simulated environments, agents use continuous trial and error toeventually reach and even surpass human pilot expertise [18],
+[19]. However, the complexity of high-performance UA V mod-
+els often hinders manually designed network architectures fromachieving optimal strategic outcomes [20]. This limitation stems
+from the fact that the optimal policy for high-dimensional,
+2471-285X © 2026 IEEE. All rights reserved, including rights for text and data mining, and training of artiﬁcial intelligence and similar technologi es.
+Personal use is permitted, but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index. html for more information.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+2 IEEE TRANSACTIONS ON EMERGING TOPICS IN COMPUTATIONAL INTELLIGENCE
+non-linear, and long-horizon UA V combat is unlikely to be
+captured by human intuition. This gap between the task’s com-
+plexity and the representational capacity of manually designednetworks constitutes a fundamental architecture design bottle-
+neck.
+The introduction of Neural Architecture Search (NAS) aims
+to tackle the challenge of network architecture design [21].
+NAS constructs the search space by deﬁning a set of optional
+operations in advance and then employs a speciﬁc controller toobtain candidate architectures. By evaluating the performance
+of architectures searched through the controller, NAS obtains
+feedback information to facilitate architecture search, ultimatelyoutputting the optimal network architecture [22]. Based on
+different encoding methods and search strategies, NAS can be
+categorized into three primary types: i) NAS with RL [23], ii)
+Evolutionary NAS (ENAS) [24],[25],[26],[27],[28],[29], and
+iii) NAS with gradient-based methods [30],[31],[32].N A S
+with RL methods encode architectures as strings, using theevaluated performance of decoded architectures from strings
+as RL rewards for architecture optimization. ENAS encodes
+architectures as individuals in a population, utilizing evolu-
+tionary algorithms to optimize architectures through operations
+such as selection, crossover, and mutation among populationindividuals [24]. Differentiable Architecture Search (DARTS)
+represents a typical gradient-based NAS approach, establishing
+a continuous encoding space and employing gradient descent toexplore architectures, thereby enhancing search efﬁciency [33],
+[34]. While these methods can unveil optimal architectures, they
+also result in inefﬁcient performance due to not fully utilizingthe candidate architectures generated during the search process.
+In light of this, we propose a league training-based dual
+optimization method that leverages the candidate architecturesproduced by NAS as league players [35]. To address the strate-
+gic cycling problem, our league training mechanism explicitly
+models the population dynamics. By preserving a diverse pool ofhistorical policies and architectures, the league forces the agent
+to optimize against a distribution of strategies rather than a single
+trajectory, thereby approximating a robust Nash Equilibrium.
+In competitive multi-agent environments, self-play algo-
+rithms often suffer from strategic cycling due to the non-transitive nature of game dynamics (analogous to Rock-Paper-
+Scissors). A policy π
+Amay learn to defeat πB, which in turn
+defeatsπC,b u tπAfalls prey to πC, preventing convergence to
+a global optimum [36],[37]. Unlike conventional NAS meth-
+ods that discard underperforming architectures prematurely, our
+league-based approach maintains a diverse pool of candidatearchitectures throughout the search process. This is particularly
+crucial for UA V maneuver decision-making, where architectures
+with slow initial convergence may possess superior long-termpotential due to their ability to capture complex temporal depen-
+dencies. The league mechanism preserves these ‘late-bloomer’
+architectures by assigning them appropriate opponents based onElo ratings.
+To the best of our knowledge, this is the ﬁrst DARTS-based
+league training approach to solve the maneuver decision-making
+problem for UA Vs. The main contributions of this paper can be
+reﬁned as follows:rA UA V ﬂight mission execution and threat evasion model
+based on the Soft Actor-Critic (SAC) algorithm with an
+RNN architecture is developed, and the correspondingreward function is established.
+rA weights and architecture dual optimization method forautonomous UA V maneuver decision-making is proposedby combining DARTS with the SAC algorithm.
+rA league training mechanism is designed to facilitate theweights optimization and architectures search, enhancingthe stability and generalization of the maneuver decision-
+making policy.
+The structure of this paper is outlined as follows. Section II
+presents the problem formulation. Section IIIpresents a dual op-
+timization method that combines weights optimization based on
+SAC algorithm and architecture optimization based on DARTSthrough league training. Section IVdetails the experimental
+setup and results. Finally, Section Vsummarizes the work of
+this paper and discusses the future challenges.
+II. P
+ROBLEM FORMULATION
+The primary objective in adversarial UA V ﬂight missions is
+to achieve a dominant position through maneuvers, as described
+in Fig. 1, thereby enabling the UA V to defeat the opponent
+and evade threats at minimal cost. Given the prevalence of
+beyond-visual-range engagements due to missile advancements,
+traditional dogﬁght scenarios are less relevant for UA V ﬂightmissions. Therefore, the maneuver objective is to secure an
+advantageous position and achieve target locking.
+The decision-making process for UA V maneuvers is formu-
+lated as a Markov Decision Process (MDP). A 6-degree-of-
+freedom end-to-end model for UA V dynamics is used, which
+can be described as follows [3]:
+⎧
+⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎨
+⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎪⎩˙x
+r=urcosθrcosψr+vr(sinφrsinθrcosψr
+−cosφrsinψr)
++wr(sinφrsinψr+c o sφrsinθrcosψr)
+˙yr=urcosθrsinψr+vr(sinφrsinθrsinψr
++c o sφrsinψr)
++wr(−sinφrcosψr+c o sφrsinθrsinψr)
+˙zr=ursinθr−vrsinφrcosθr−wrcosφrcosθr
+˙Vr=(ur˙ur+vr˙vr+wr˙wr)/Vr
+˙αr=(ur˙wr−wr˙ur)/(u2
+r+w2
+r)
+˙βr=(˙vrVr−vr˙Vr)/(V2
+rcosβr)
+˙φr=pr+(rrcosφr+qrsinφr)t a nθr
+˙θr=qrcosφr−rrsinφr
+˙ψr=(rrcosφr+qrsinφr)/cosθr
+˙pr=Iz¯L
+IxIz−I2xz+IxzN
+IxIz−I2xz+Ixz(Ix−Iy+Iz)
+IxIz−I2xzprqr
++Iz(Iy−Iz)−I2
+xz
+IxIz−I2xzqrrr
+˙qr=1
+Iy/parenleftbig
+M+(Iz−Ix)prrr+Ixz/parenleftbig
+r2
+r−p2
+r/parenrightbig/parenrightbig
+˙rr=Ixz¯L
+IxIz−I2xz+IxN
+IxIz−I2xz+Ix(Ix−Iy)+I2
+xz
+IxIz−I2xzprqr
+−Ixz(Ix−Iy+Iz)
+IxIz−I2xzqrrr(1)
+wherexr,yr,zrrepresent the UA V’s position, vr=[ur,vr,wr]
+denotes the UA V velocity vector with magnitude Vr;θr,ψr,φr
+correspond to the pitch, yaw, and roll angles of the UA V; αr,βrThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+ZHU et al.: LEAGUE TRAINING-BASED DUAL OPTIMIZATION METHOD FOR UA V MANEUVER DECISION-MAKING 3
+Fig. 1. Schematic diagram of the ﬂight mission environment between UA V
+and target.
+indicate the angle of attack and the sideslip angle; pr,qr,rrrep-
+resent the pitch rate, roll rate, and yaw rate along the body axes;
+Ix,Iz,Ixzrefer to the roll moment of inertia, the pitch moment
+of inertia, and the product moment of inertia respectively; M
+is the pitching moment, ¯Lis the rolling moment, and Nis the
+yawing moment.
+The action space is deﬁned as A(s)={a(s)}, where
+a=(upitch,uroll,uyaw,uthrust) (2)
+Here,upitch,uroll,uyaw∈[−1,1]represent the control level map-
+ping from minimum to maximum of elevator, aileron and rudder
+deﬂection, facilitating subsequent action outputs from the neural
+network. The default UA V thrust is set to full since it’s rarely
+reduced in ﬂight missions. uthrust∈[−1,1]indicates the post-
+combustion switch, where uthrust>0signiﬁes activation.
+To simulate real-world information acquisition, the environ-
+ment state space is deﬁned as S={(sr,sb)}, where
+sr=(xr,yr,zr,θr,ψr,φr,vr,ar,nr,lr,br,ˆxb,ˆyb,ˆzb)(3)
+sb=(xb,yb,zb,θb,ψb,φb,vb,ab,nb,lb,bb,ˆxr,ˆyr,ˆzr)(4)
+Here,sris the available states for UA V maneuver decision-
+making, including the UA V position (xr,yr,zr), attitude
+(θr,ψr,φr), velocity vector vr, acceleration vector ar, missile
+information (missile count nr, lock status lrand be locked status
+br), and noisy observed target position (ˆxb,ˆyb,ˆzb).sbrepresents
+the environment states utilized for simulating the opponent’s
+decision-making, with its components deﬁned analogously to
+those insrbut from the opponent’s perspective.
+The state update depends on both the UA V’s action and its
+opponent’s action, as illustrated by the transfer equation
+st+1=fenv(st,at(sr),ot(sb)) (5)
+whereatdenotes the UA V’s maneuver based on its available
+information sr,otrepresents the opponent’s action determined
+bysb,st=(sr,t,sb,t)denotes the joint environment state at timestept, andfenvencapsulates the UA V state updates as achieved
+through Eq. 1, along with updates to the relevant environment.
+III. D UAL OPTIMIZATION METHOD FOR UAV M ANEUVER
+DECISION -MAKING
+This section outlines the framework of dual optimization for
+UA V maneuver decision-making, as shown in Fig. 2. The core
+idea is to combine parameters optimization and architecture
+search through a league training mechanism. The parameters
+optimization process involves the interaction of players withdifferent performances obtained from architecture search, while
+the architecture optimization utilizes the results of player in-
+teractions as gradient feedback. These two aspects mutuallyenhance each other to achieve dual optimization objectives.
+Speciﬁcally, we describe the UA V maneuver decision-making
+model and its parameters optimization through the SAC algo-rithm (see Section III-A ). Subsequently, the DARTS algorithm
+is employed in network architecture search (see Section III-B ).
+Following this, we introduce a mechanism of league trainingto integrate the two aforementioned optimization methods, ul-
+timately presenting the complete dual optimization method for
+UA V maneuver decision-making (see Section III-C ).
+A. UAV Maneuver Decision-Making Via SAC Algorithm
+Initially, we construct the reward function required for RL
+training. To address the issue of sparse rewards, we propose apseudo-reward mechanism for providing denser learning signals
+during early-stage training. Additionally, we utilize a decay
+coefﬁcient to prevent the policy from overly relying on humanexpertise. Subsequently, an overview of the SAC algorithm is
+presented, along with details on gradient computation and the
+implementation process.
+1) Reward Function: In RL, the design of the reward func-
+tion dictates the direction of policy updates. Combining theaforementioned description of the decision objective, the ﬁnal
+reward function is provided: a reward of R
+Final>0is assigned
+for successfully launching a missile that attacks the target orevading missile attacks, and a reward of −R
+Final for being
+attacked. The following formula represents this:
+rFinal=/braceleftbigg
+RFinal, ifdUAV<d Op
+−RFinal,otherwise(6)
+whereRFinal>0deﬁnes the magnitude of the terminal reward,
+anddUAV,dOp∈[0,1]represent the received attack damage of
+the UA V and its opponent.
+In scenarios characterized by sparse rewards, the integration
+of pseudo-rewards becomes essential for effectively guiding the
+policy during the initial training process. Drawing from pilot
+expertise, pseudo-rewards can be formulated as a weighted sumof multiple reward functions including:
+i) Antenna Train Angle (ATA) reward: This reward motivates
+the UA V to pursue the target.
+r
+ATA=/braceleftbigge−|aATA|,if|aATA|<A ata
+−|aATA|
+180◦,otherwise(7)This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+4 IEEE TRANSACTIONS ON EMERGING TOPICS IN COMPUTATIONAL INTELLIGENCE
+Fig. 2. Overview of the dual optimization framework.
+whereaATArepresents the angle between the UA V’s nose direc-
+tion and the target, as depicted in Fig. 1,Aata>0is a constant
+representing the maximum ATA of positive reward.
+ii) Distance reward: This reward encourages pursuit within
+a speciﬁc range by providing a positive reward correlated with
+distance. The reward decreases when the UA V gets too close,
+with a ﬁxed penalty for situations beyond a certain range.
+rDis=⎧
+⎨
+⎩0,d < A low
+exp (2(Alow−d)/Ahigh),Alow≤d≤Ahigh
+PDis, otherwise(8)
+wheredrepresents the Euclidean distance between the UA V and
+its target, Alow,Ahighdenote the lower and upper distance thresh-
+olds for obtaining positive rewards, and PDis<0represents the
+punishment for surpassing the upper limit of distance.
+iii) Velocity reward: This reward also encourages the UA V to
+approach the target.
+rVel=/braceleftbigg
+RVel,|av|<A vel
+−RVel,otherwise(9)
+whereavis the angle between the UA V velocity vector and the
+target velocity vector, Avelrepresents the range of the angle be-
+tween velocity vectors that receive position reward, and RVel>0
+represents the rewards or punishment value used for velocity.
+iv) Lock reward: This reward is designed to encourage the
+UA V to maintain a lock on the target and evade being locked bythe target.
+r
+Lock=⎧
+⎨
+⎩RLock, if the UA V is locking the target
+−RLock,if the UA V is being locked by the target
+0, otherwise
+(10)
+whereRLock>0represents the rewards or punishment value
+used for locking.
+During the early training phase, pseudo-rewards play a crucial
+role in guiding the policy to learn fundamental pursuit/evasionmaneuvers. However, to avoid over-reliance on human-designed
+signals, we apply an exponential decay coefﬁcient to graduallyreduce the weight of pseudo-rewards, eventually leaving r
+Final
+as the primary feedback for the agent. Consequently, the reward
+calculation for each episode can be formulated as
+rt(i,st,at)=rFinal+e(−αpseudoi)wr⎡
+⎢⎢⎣rATA
+rDis
+rVel
+rLock⎤
+⎥⎥⎦(11)
+wherert(i,st,at)represents the reward function in the i-th
+episode,αpseudo>0denotes the decay coefﬁcient of pseudo-
+rewards, which is chosen such that pseudo-rewards remain suf-ﬁciently inﬂuential during the early training stage to facilitate
+exploration under sparse terminal feedback, while their contri-
+bution gradually diminishes in the later stage so that the learnedpolicy is ultimately governed by the win/loss objective rather
+than human-designed heuristics, and w
+ris a non-negative matrix
+that represents the weights assigned to the pseudo-rewards,which can be set based on expert experience and training ex-
+perience.
+2) SAC Algorithm: The SAC algorithm is extensively uti-
+lized in RL for policy exploration within continuous action
+spaces [38]. Given its model-free and off-policy nature, SAC
+is well suited to end-to-end training of UA V maneuver decision-
+making policy. We ﬁrst introduce a framework for training
+a UA V maneuvering decision-making policy using the SACalgorithm.
+To enhance the stability and efﬁciency of the SAC algorithm,
+we integrate learnable temperature coefﬁcients and a dual-Qnetwork [40]. By leveraging the Bellman equation to convert
+values into state-action values, the components necessitating
+gradient updates include the policy network, two Q networks,and an automatic temperature coefﬁcient, as elaborated below.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+ZHU et al.: LEAGUE TRAINING-BASED DUAL OPTIMIZATION METHOD FOR UA V MANEUVER DECISION-MAKING 5
+The soft state value function is deﬁned as [40]
+Vπθ(st+1)=Eπθ[min (Q¯w1(st+1,at+1),Q¯w2(st+1,at+1))
+−αlogπθ(at+1|st+1)] (12)
+whereEπθrepresents the expectation under policy πθ,Q¯w1,Q¯w2
+are the target state-action value functions with parameters
+¯w1,¯w2,α≥0is a learnable temperature parameter, and πθis
+the current policy based on the parameter θ.
+Substituting (12) into the following soft Bellman residual
+JQ=E(st,at)∼D/bracketleftbigg1
+2(min (Qw1(st,at),Qw2(st,at))
+−(rt+γVπθ(st+1)))2/bracketrightbig
+(13)
+whereE(st,at)∼Ddenotes the expectation taken over states st
+and actions atsampled from the distribution D,Qw1,Qw2are
+the state-action value functions with parameters w1,w2, andγ∈
+[0,1]is the discount factor. The gradient of the dual-Q network
+can be calculated as follows:
+/triangleinvwiJQ(wi)i∈{1,2}=/triangleinvwiQwi·(Qwi(st,at)−rt
+−γmin(Q¯w1(st+1,at+1),Q¯w2(st+1,at+1))
++αlogπθ(at+1|st+1)) (14)
+The policy network πtis updated by minimizing the Kullback-
+Leibler divergence (KL-divergence) of the policy and maximiz-ing the state-action value [12]
+J
+π=Est∼D,at∼π[αlogπθ(at|st)−min
+i∈{1,2}(Qwi(st,at))]
+(15)
+whereEst∼D,at∼πrepresents the expectation taken over states
+stsampled from the distribution Dand actions atsampled from
+the policy π.
+The gradient can be approximated by
+/triangleinvθJπ(θ)=α/triangleinvθlogπθ(at|st)+(α/triangleinvatlogπθ(at|st)
+−/triangleinvatmin
+i∈{1,2}(Qwi(st,at)))/triangleinvθπθ(st)(16)
+The temperature parameter αis adjusted to maximize the
+entropy of each visited state. The objective function is
+Jα=Eat∼π[−αlogπ(at|st)−αH] (17)
+whereEat∼πdenotes the expectation taken over actions at
+sampled from the policy π,His the target entropy item, often
+empirically set to a negative value proportional to the number ofactions. Given the maximum episodes of simulations max
+episode
+and the maximum steps for a single episode max step, the imple-
+mentation of UA V maneuver decision-making policy via SACis summarized in Algorithm 1.
+3) SAC With Recurrent Neural Network: Utilizing historical
+information can enable UA Vs to predict target intentions and en-
+sure maneuver continuity, facilitating early targeting or evasion.
+To achieve this, we incorporate an RNN architecture into thepolicy network. The RL framework with an RNN architecture
+enables batch processing of sequences throughout the entire
+episode, as depicted in Fig. 3. Speciﬁcally, at the beginning
+of each episode, the hidden state hrequired by the RNN is
+Fig. 3. Schematic diagram of the RL with RNN architecture.
+Algorithm 1: UA V maneuver decision-making policy via
+SAC.
+Input:Qw1,Qw2,Q¯w1,Q¯w2,πθ,α,D,max episode,max step,τ
+Output: r∗,θ∗
+1: Initialize the RL networks Qw1,Qw2,πθ,α
+2: Initialize the target Q network by
+Q¯wi←Qwifori∈{1,2}
+3: Initialize the replay buffer by D←∅
+4:whilei<max episode do
+5: Generate the initial states st←s0
+6: whilet<max stepdo
+7: Sample the UA V maneuver action at←πθ(st)
+8: Update the environment states st+1by(5)
+9: Compute rt(i,st,at)by(11)
+10: Store the experience by D←D∪ (st,at,rt,st+1)
+11: end while
+12: Sample a batch from D
+13: Update the Q network by
+Qwi←Qwi−λQwi/triangleinvwiJQ(wi)fori∈{1,2}
+14: Update the policy by πθ←πθ−λπ/triangleinvθJπ(θ)
+15: Update the temperature by α←α−λα/triangleinvαJα
+16: Update the target Q network parameters by
+¯wi←τ¯wi+( 1−τ)wifori∈{1,2}
+17: end while
+18: Output the optimal policy weights θ∗
+randomly initialized and continuously propagated until the end
+of the episode. The replay buffer will store the entire episodeinstead of individual transitions. During the sampling phase,
+a batch will consist of multiple episodes rather than multiple
+transitions, and episodes of varying lengths will be padded tothe same length using masks. In the loss calculation process, the
+original loss will be replaced by the sum-averaged loss over the
+entire time dimension.
+B. Differentiable Architecture Search for Maneuver
+Decision-Making Network
+To discover the optimal RNN architecture that surpasses
+traditional RNN performance in decision-making networks, we
+utilize the DARTS method for architecture design. We ﬁrstexplain the search space and encoding method of the approach,This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+6 IEEE TRANSACTIONS ON EMERGING TOPICS IN COMPUTATIONAL INTELLIGENCE
+Fig. 4. Schematic diagram of the search space.
+followed by outlining the optimization objectives and gradient
+computations for DARTS.
+1) Search Space and Encoding: The policy network in RL
+is constructed using an RNN architecture, with the optimalRNN architecture designed by DARTS method [12]. Inspired by
+DARTS [30], we deﬁne a search space where the inputs consist
+of the environmental state s
+tand the RNN’s hidden state ht−1.
+The initial node X0is derived through linear addition and a tanh
+activation. Subsequently, X0traverses a directed acyclic graph
+comprising Nnodes denoted as Xiwithi∈{1,2,...,N}.
+For each intermediate node Xi, input nodes are selected from
+{Xj}wherej<i , and output nodes are chosen from {Xk}
+wherek>i . The operation between nodes, represented by Oi,j,
+includes tanh, ReLU, Sigmoid, identity, and a zero operation
+indicating no connection. The ﬁnal output is the average of all
+intermediate nodes, as illustrated in Fig. 4.
+The probability of selecting Oufor each operator Oi,jis
+determined by a weight parameter βu
+i,jas follows:
+p(Oi,j=Ou)=exp/parenleftbig
+βu
+i,j/parenrightbig
+/summationtext
+k∈Oexp/parenleftbig
+βk
+i,j/parenrightbig (18)
+whereOdenotes the number of available operations.
+Consequently, the RNN network architecture is encoded as a
+vector of continuous parameters β={βk
+i,j}i∈N,i<j,k ∈O. Further
+inputs pruning is carried out for each intermediate node Xi.
+The activation probabilities of operators for multiple inputs
+are compared, and only the input corresponding to the highest
+probability is retained.
+To better grasp the relationship between the deﬁned encoding
+and its corresponding architecture, an example is provided inFig. 5. The table illustrates the probabilities of optional opera-
+tions for each node pair, derived from (18). The graphs showcase
+the results of activating the operator with the highest probabilityand the subsequent pruned outcome.
+2) Optimization in Network Architecture: The primary ob-
+jective of architecture search is to determine β
+∗that maximizes
+the UA V maneuver generation performance, formulated as [30]
+β∗=m a x
+βν(θ∗(β),β) (19)
+Fig. 5. An example of the relationship between an encoding and the corre-
+sponding decoding RNN architecture.
+Algorithm 2: RNN architecture optimization via DARTS.
+Input:β
+Output:β∗,π∗
+θ
+1: Initialize the encoding vector β
+2: Decode βto build the policy network πθ
+3: Converge ←False
+4:while notConverge do
+5: Update the architecture: β←β−/triangleinvβν(θ,β)
+6: Update the policy parameter θusing Algorithm 1
+7: ifChange in βis below threshold then
+8: Converge ←True
+9: end if
+10: end while
+whereνrepresents a ranking value that assesses the network’s
+performance with the architecture encoded by β, details of which
+will be discussed in Section III-C . The weights θ∗are optimized
+using Algorithm 1. An approximate gradient algorithm that
+signiﬁcantly reduces the computational complexity is deﬁned
+as[12]
+/triangleinvβν(θ∗(β),β)≈/triangleinvβν(θ−λπ/triangleinvθJπ(θ),β) (20)
+Algorithm 2outlines the optimization procedure of DARTS.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+ZHU et al.: LEAGUE TRAINING-BASED DUAL OPTIMIZATION METHOD FOR UA V MANEUVER DECISION-MAKING 7
+C. Dual Optimization With League Training Mechanism
+The optimization efﬁciency in UA V maneuver decision-
+making, despite the advancements of DARTS, still faces chal-
+lenges. This chapter introduces a novel league training mecha-
+nism designed for the adversarial nature inherent in UA V ma-neuver decision-making. This mechanism improves the utility
+of candidate architectures obtained through DARTS search. The
+dual optimization approach for maneuver decision-making isreﬁned to boost search efﬁciency within this context.
+1) League Ranking List: To establish clarity, we deﬁne each
+maneuver decision-making policy as player π
+iby their network
+architecture βiand network weights θi(βi). A League Ranking
+List (LRL) comprising Mplayers with varying performance is
+deﬁned as
+T={(πi,νi)}i∈{1,2,...,M} (21)
+whereνi=ν(θi(βi),βi)as in (19).
+To assess each player’s maneuver decision-making perfor-
+mance, pairwise confrontations are conducted and evaluated
+using the Elo score [39]. The Elo score νifor player πiand
+νjfor player πjare updated as follows:
+νnew
+i=νold
+i+K(fr(i,j)−fp(i,j))
+νnew
+j=νold
+j+K(fr(j,i)−fp(j,i)) (22)
+where
+fp(i,j)=1//parenleftBig
+1+1 0(νold
+j−νold
+i)/A Elo/parenrightBig
+fp(j,i)=1//parenleftBig
+1+1 0(νold
+i−νold
+j)/A Elo/parenrightBig
+(23)
+whereKis the coefﬁcient representing the evaluation speed,
+fr(i,j)denotes the outcome from the viewpoint of πi:t h e
+victory is represented by 1, the loss is represented by 0, and
+conversely, fr(j,i)=1−fr(i,j).fp(i,j)is the predicted win
+rate based on the Elo scores νiandνj, whileAElorepresents the
+base Elo score.
+Players matching with league players who have signiﬁcantly
+different performances (those who are likely to be defeated or
+have no chance of winning) do not contribute to performanceevaluation. Therefore, a probability matching mechanism for
+candidate player π
+cwith its Elo score νcis constructed as
+follows [35]:
+pmatch(c,i)=(1−fp(c,i))Amatch
+/summationtextM
+j=1(1−fp(c,j))Amatch(24)
+wherepmatch(c,i)denotes the probability of candidate player πc
+selecting player πifrom the league Tas an opponent, Amatch>0
+represents the matching weight coefﬁcient, fp(c,i)can be cal-
+culated by (23). This method ensures stable evaluations, with the
+highest-ranked player demonstrating optimal maneuver genera-
+tive capabilities, thereby avoiding policy loops. The update rulesare detailed in Algorithm 3.
+In the dual optimization framework of network architecture
+and parameters, the abilities of all players are continuouslyevolving, making it challenging to maintain stability acrossAlgorithm 3: League Player Elo Score Update.
+Input:πc,T
+Output:νc,T
+1: Initialize νc←AElo
+2: Converge ←False
+3:while notConverge do
+4: Select πi∈T by probability pmatch(i)in(24)
+5: Calculate fp(i,c),fp(c,i)by(23)
+6: Record the result of πivsπc
+7: Update νc,νiby(22)
+8: Update the LRL T
+9: ifChange in νcis below threshold then
+10: Converge ←True
+11: end if
+12: end while
+13: Output Tandνc
+the LRL. Thus, we introduce a rule-based maneuver decision-
+making policy πruleas baseline. This policy relies on expert rules
+to select the optimal action by comparing the expected rewardsof all actions in Basic Fighter Maneuvers (BFM) [41].
+2) Dual Optimization Mechanism: Utilizing the league train-
+ing mechanism proposed earlier, the ﬁnal dual optimizationframework is illustrated in Fig. 2. Firstly, the rule-based ma-
+neuver decision-making policy π
+rulewill serve as the baseline in
+the league T, with its Elo score set to a ﬁxed value AElo.T h e
+architecture search space decodes a candidate player πcbased
+on the current parameter βc, inheriting the parameters θcfrom
+the search space.
+To accelerate the learning efﬁciency, a random player is
+selected from the league Tas the imitation target. Pre-training
+for imitation learning is conducted on θc, with the loss com-
+puted using KL divergence. This process allows for the parallel
+computation of numerous candidate players to establish theirfundamental maneuver decision-making performance.
+After the pre-training, the Elo score ν
+cwill be evaluated
+using Algorithm 3. In this process, Algorithm 1is used to
+optimize both the parameters θcand parameters of the selected
+league player θi. The Elo score νcserves as feedback for archi-
+tectural evaluation, and the architecture βcis optimized using
+Algorithm 2.
+Finally, the candidate player πcis selected to join the league
+Tor be discarded based on its Elo score νc. As the dual
+optimization progresses, at regular intervals, all players within
+the league are paired for matches, and their replay buffers are
+employed for weights updates. Given the maximum iterations of
+weights optimization max weights , the entire algorithmic process
+is illustrated in Algorithm 4.
+IV . S IMULATION AND RESULT ANALYSIS
+A. Experimental Setup
+1) Environment Setting: We utilize Harfang3D [42] as a
+visual environment dependency and design the UA V maneu-vering model based on its built-in TFX model. Each UA VThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+8 IEEE TRANSACTIONS ON EMERGING TOPICS IN COMPUTATIONAL INTELLIGENCE
+Algorithm 4: League training-based dual optimization
+method.
+Input:β,π rule,max episode,max weights
+Output:π∗
+θ
+1: Initialize T←∅
+2: Add the baseline by T← T∪ (πrule,AElo)
+3:fori=1toM−1do
+4: Randomly initialize β
+5: Randomly initialize player π(θ)byθ(β)
+6: Add the initial player by T← T∪ (πθ,AElo)
+7:end for
+8:fori=1tomax episode do
+9: Initialize βc←β
+10: Get candidate player πcbyθc(βc)
+11: forl=1tomax weights do
+12: Select πk∈T by probability pmatch(k)in(24)
+13: Optimize weights θc,θlby Algorithm 1
+14: Calculate νc,νkby Algorithm 3
+15: end for
+16: Optimize architecture βcby Algorithm 2
+17: Update β←βc
+18: Add the candidate player T← T∪ (πc,νc)
+19: Discard the worst player in T
+20: ifimodAupdate =0then
+21: forj=1toMdo
+22: Select πk∈T,j/negationslash=kby probability pmatch(k)
+23: Optimize weights θj,θkby Algorithm 1
+24: Calculate νj,νkby Algorithm 3
+25: end for
+26: end if
+27: end for
+28: Output the policy with the highest Elo score π∗
+θ
+is equipped with guided missiles. The system automatically
+assesses the radar lock conditions and initiates missile launch
+upon successful target acquisition over a speciﬁc duration. The
+duration is directly proportional to the distance. The engag-
+ing UA Vs are randomly initialized in a space of dimensions10000×10000×3000 (m), with a maximum of max
+stepsteps
+per episode. If one UA V is injured or drops below the altitude
+threshold, it is deemed to have lost, and the episode ends prema-turely. The environment and initial conditions are set as shown
+in Table I.
+2) Simulation Conﬁguration: We employ Intel 14900KF
+CPU and NVIDIA 4090 GPU for training. During the imitation
+learning process, we sample 4×10
+6state-action samples from
+the replay buffer of the player for imitation learning. Gradientsare calculated using KL loss, the learning rate is set to 1, gradient
+clipping is applied, and Adam is employed as the optimizer.
+Detailed hyperparameters for SAC and DARTS are detailed in
+Table II.
+B. Comparison Results
+1) Baselines: For the comparative experiments, we consider
+DDPG [43],T D 3 [44], and SAC [40] as the RL baselines,TABLE I
+SIMULATION SETUP AND PARAMETER SETTINGS
+TABLE II
+HYPERPARAMETERS FOR SAC AND DARTS
+along with LSTM [45] as the representative manually designed
+RNN architecture. Crucially, to ensure a fair comparison and
+isolate the contribution of the NAS-optimized architecture, weuniﬁed the training curriculum across all experiments. All base-
+line algorithms were trained using the identical league training
+mechanism as the proposed method. Speciﬁcally, each baseline
+agent maintained a league comprising the rule-based model π
+rule
+and its own historical policy checkpoints. This rigorous setup
+ensures that performance disparities are strictly attributable to
+the network architecture rather than the training mode. The
+baselines are categorized as follows:rStandard RL (DDPG, TD3, SAC): Policy networks con-
+structed with standard fully connected layers (MLP),
+trained from scratch within the league framework.rPre-trained RL (DDPG-pre, TD3-pre, SAC-pre): MLP-
+based policies initialized via imitation learning on the
+rule-based model’s experience pool before entering theleague training loop.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+ZHU et al.: LEAGUE TRAINING-BASED DUAL OPTIMIZATION METHOD FOR UA V MANEUVER DECISION-MAKING 9
+Fig. 6. The comparison results of the return in competing against the rule-
+based model.
+rRecurrent RL (DDPG-LSTM, TD3-LSTM, SAC-LSTM):
+Policy networks incorporating LSTM units to capture
+temporal dynamics. These represent the strongest manual
+architecture baselines trained under the same league con-
+ditions.
+2) Results of Match With Rule-Based Model: Fig. 6illus-
+trates the return of the proposed method and compared algo-
+rithms, encompassing the introduced pseudo-rewards. It can beseen that by introducing pseudo-rewards to complement sparse
+rewards, all algorithms exhibited the ability to learn and improve
+decision-making in maneuver execution. However, experimentalresults suggest that the SAC algorithm outperforms the DDPG
+and TD3 algorithms in terms of performance limits and stability.
+This robustness is essential for executing end-to-end maneuverexecutions, leading to the selection of SAC as the primary RL
+framework in this approach. In addition, the evaluation of return
+did not demonstrate the proposed method’s superiority over
+other algorithms. This disparity arises from the fact that the artiﬁ-
+cially deﬁned pseudo-rewards merely signify accurate maneuverguidance based on human expertise and do not directly correlate
+with correct maneuver execution. Consequently, the results of
+return cannot fully reﬂect the maneuvering performance of thecompared algorithms.
+To better assess the performance of maneuver decision-
+making, we calculate the success rates of each algorithm whencompeting against the rule-based model, as shown in Fig. 7.T h e
+ﬁgure reveals that our proposed method demonstrates a high
+initial win rate and can maintain a consistently high successrate within a relatively short training period. In the context of
+training with the rule-based model, starting RL from scratch de-
+mands substantial interaction experience to explore basic ﬂightcapabilities. Conversely, pre-trained policies exhibit successful
+maneuvers early on, despite experiencing signiﬁcant oscillations
+during convergence. This pre-training approach accelerates the
+search process signiﬁcantly compared to training from scratch,
+validating the effectiveness of imitation pre-training in our pro-posed framework.
+3) Results of Mutual Match: For a more intuitive compar-
+ison of the maneuvering performance differences among var-ious algorithms, we establish a small league comprising theFig. 7. The comparison results of the success rate in competing against the
+rule-based model.
+Fig. 8. The comparison results of the Elo score in mutual match ﬂight mission.
+aforementioned trained models. Evaluating their performance
+using the proposed Elo score, we observed variations for each
+algorithm as depicted in Fig. 8. The result highlights that the
+initial performance of the proposed method remains consistent
+with the stage of pitting against the rule-based model, indicating
+that this policy possesses good robustness and transferability.Notably, this policy demonstrates high stability in maneuvering
+when facing different opponents. After multiple iterations, the
+Elo score consistently maintains a high level, indicating that
+the architecture generated by the proposed method possesses a
+high-performance ceiling. The Elo scores associated with LSTMarchitectures suggest that, during the early stages of training,
+policies structured with LSTM require longer training periods
+and achieve higher ELO scores. As previously discussed, theintegration of RNNs allows players to extract more valuable
+decision-making insights from historical states, signiﬁcantly en-
+hancing the upper limit of maneuver decision-making. Policieswith LSTM architectures, after longer iterations, demonstrate
+enhanced maneuver generative capabilities.
+After conducting pairwise confrontations among the policies
+learned by the compared algorithms, the results win rates areThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+10 IEEE TRANSACTIONS ON EMERGING TOPICS IN COMPUTATIONAL INTELLIGENCE
+Fig. 9. The comparison results of the win rate in mutual match ﬂight mission.
+summarized in Fig. 9. Statistical results demonstrate that the ma-
+neuverability of the algorithms under comparison, as reﬂected by
+their win rate, aligns comparably with the performance indicated
+by the Elo scores in Fig. 8. This suggests that the evaluation
+mechanism employed can accurately and effectively evaluate
+the maneuvering performance of each policy.
+Overall, the proposed method maintains favorable win rates
+against most baselines. More importantly, Fig. 9explicitly re-
+veals a non-transitive policy-loop pattern among several recur-
+rent policies. For example, the proposed method achieves a win
+rate of 52.4% against SAC-LSTM, SAC-LSTM achieves a win
+rate of 51.3% against TD3-LSTM, while TD3-LSTM achieves awin rate of 52.8% against the proposed method. These pairwise
+results suggest a non-transitive policy-loop pattern, indicating
+that recurrent architectures may induce diverse tactical behaviorsrather than a strictly transitive performance ordering.
+C. Ablation Studies
+To systematically evaluate the contributions of key com-
+ponents in our framework, we conduct comprehensive ab-
+lation studies by sequentially deactivating four critical ele-
+ments: pseudo-rewards (w/o PR), RNN architecture (w/o RNN),
+DARTS module (w/o DARTS), and league training mechanism(w/o LT). This ablation framework is designed to address two
+fundamental questions: (1) What are the foundational compo-
+nents necessary for effective UA V maneuver decision-making?(2) How much performance improvement is contributed by our
+proposed innovations?
+The speciﬁc conﬁgurations are outlined as follows:
+rw/o PR: Complete model without pseudo-rewards, using
+only ﬁnal rewards.rw/o RNN: Adopts the mechanism of the proposed league
+training, where players are initialized in advance withFig. 10. Ablation study on the inﬂuence of the proposed mechanism in Elo
+score.
+networks of varying numbers of fully connected layers,
+retaining imitation learning.rw/o DARTS: Utilizes the league training, with players
+employing different quantities of LSTM architectures, re-
+taining imitation learning.rw/o LT: Employs self-play, utilizing DARTS for architec-
+ture search. Whenever a new architecture is generated,
+the information related to the policy under the previousarchitecture is discarded.
+Upon adopting the league training mechanism, we recorded
+the highest Elo score in the league at each iteration, while for
+algorithms without this mechanism, we noted the highest Elo
+score corresponding to the current policy. The Elo evaluationresults are depicted in Fig. 10.
+The ablation study on pseudo-rewards reveals its critical role
+in the learning dynamics. As shown in Fig. 10, the “w/o PR”
+curve exhibits a signiﬁcantly slower convergence rate compared
+to the full model. This demonstrates that pseudo-rewards are
+not merely an auxiliary component but serve as an essentialexploration catalyst during the initial and intermediate stages
+of training. Notably, the failure to converge in the “w/o PR”
+variant is primarily attributed to the extreme sparsity of theterminal win/loss signal in this task, which makes effective
+exploration prohibitively difﬁcult when learning from scratch.
+This observation suggests that pseudo-rewards are necessary toprovide intermediate guidance and enable stable learning, rather
+than merely encoding hand-crafted tactics. It becomes apparent
+that the deactivation of the RNN architecture greatly inﬂuences
+the performance of the policy, resulting in performance levels
+comparable only to those of the rule-based model. Moreover,disabling the league training mechanism markedly showcases
+instability during training, characterized by highly ﬂuctuating
+means and signiﬁcant process variances. This instability arisesfrom the lack of experience and performance comparisons from
+historical players with different architectures. On the one hand,
+the performance of a single rule-based model as a reference isinsufﬁcient to reﬂect the true performance of the current policy.
+On the other hand, considering the principles of stochastic
+gradient descent, while the gradient updates of the architecturetend towards better performance, ﬂuctuations occur during theThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+ZHU et al.: LEAGUE TRAINING-BASED DUAL OPTIMIZATION METHOD FOR UA V MANEUVER DECISION-MAKING 11
+Fig. 11. Ablation study on the inﬂuence of the win rate in mutual match ﬂight
+mission.
+process. Disabling the DARTS algorithm exhibits a stable curve,
+with its Elo score consistently slightly above the level of the
+rule-based model, showing no signiﬁcant increase with the
+number of iterations.
+Due to the adoption of LSTM, a manually designed archi-
+tecture, this algorithm maintains a decent performance. This
+result directly validates the existence of the architecture design
+bottleneck. The performance gap between the ’w/o DARTS’and proposed method demonstrates that the manually designed
+network, while functional, is fundamentally limited in its rep-
+resentational capacity for this task. Our NAS-driven approachsuccessfully overcomes this bottleneck by automatically discov-
+ering a superior, task-speciﬁc RNN cell structure.
+D. Result Visualization
+From Fig. 11, we compiled the matching results among the
+algorithms designed in this phase after completing training.The observation from Fig. 11reveals the proposed algorithm
+demonstrates higher decision-making performance stability and
+consistently high success rates when matching different oppo-nents. This indicates that the dual optimization method leverages
+the league training mechanism to effectively achieve the dual
+goals of parameter optimization and architecture optimization,ultimately attaining the optimal decision policy.
+1) Maneuver Decision-Making Visualization: To better an-
+alyze performance, the study investigates the action, attitude,
+and positional relationships of the UA V and its target during
+the ﬂight missions. The engagement examples between theproposed method and the other models are depicted in Fig. 12.
+In Fig. 12(a) , the rule-based blue UA V attempts to gain an
+energy advantage by ﬁrst accelerating over a long distance.However, the red side quickly seizes the advantage by activating
+post-combustion and climbing rapidly, successfully locking onto
+the target, launching a missile, and evading effectively.
+In Fig. 12(d) , despite the initial disadvantaged position of
+the blue side, attempts are made to evade the red side’s attacks
+through maneuvering. Nevertheless, the red side still manages tolaunch a missile upon approaching the target and swiftly evadesthe blue side’s attack range after attacking. From Fig. 12(e) ,i t
+is evident that the policy without the RNN architecture exhibits
+frequent ﬂuctuations, indicating the lack of continuity in actionoutcomes at each step, leading to signiﬁcant variations.
+In Fig. 12(g) , the blue side’s policies based on LSTM ar-
+chitectures already exhibit performance similar to the red side,with capabilities for missile locking and launches. Fig. 12(i)
+reveals that the red side is more inclined to perform high-angle
+roll maneuvers after attacking, leveraging the UA V’s extensivemaneuvering capabilities to swiftly disengage.
+In Fig. 12(j) , the absence of the league training mechanism re-
+sults in the blue side adopting a different maneuvering approachcompared to the former. From Fig. 12(k) , it can be observed
+that the presence of the LSTM architecture imparts a degree of
+continuity to the maneuver actions, thereby ensuring a certainlevel of maneuver stability.
+Overall, the UA V maneuver decision-making policy we ob-
+tained exhibited exceptional stability and efﬁciency in maneu-vering, fully utilizing its high maneuverability in both offensive
+and defensive operations.
+2) Robustness and Maneuverability Test: To evaluate the
+robustness and maneuverability of the proposed method, we
+conducted additional tests, with the opponent model using SAC-LSTM. In the robustness test, we introduced random noise
+and time delays into the target observation state to simulate
+real-world environmental uncertainties. The results are shownin Figs. 13(a-c) . Furthermore, we tested the maneuverability by
+actively disabling the UA V’s weapon launch system, with results
+depicted in Figs. 13(d-f) .
+In Figs. 13(a-c) , the introduction of observation noise and
+latency causes the control commands to exhibit more frequent
+micro-adjustments, in contrast to the abrupt transitions observed
+in Fig. 12. Nevertheless, the red side still successfully locks
+onto the target and launches a missile, demonstrating goodrobustness.
+In Figs. 13(d-f) , disabling the weapon system extends the
+engagement duration to the maximum iteration time. Figs. 13(d)
+and(f)respectively present the top and side views of the two
+UA Vs’ positional changes. Following initial approach, both
+agents achieve mutual target lock and subsequently enter atwo-circle ﬁght. The red side leverages its superior turn radius to
+establish an advantageous ﬁring position ahead of the blue side,
+reacquiring and maintaining target lock thereafter. These resultscollectively conﬁrm that the proposed policy not only exhibits
+strong robustness under realistic sensing imperfections but also
+demonstrates superior within-visual-range dogﬁght maneuver-ing capability.
+3) Network Architecture Search Visualization: The architec-
+ture corresponding to the player with the highest Elo score
+among the league players obtained through the dual optimizationmechanism is illustrated in Fig. 14. From this architecture, it can
+be observed that the characteristics resembling the memory gates
+in LSTM are exhibited by X
+1activated through Sigmoid, as well
+asX7activated through ReLU and tanh. The presence of X4
+andX5demonstrates a certain degree of forgetting capability,
+indicating the efﬁciency of this network architecture in handling
+time series data.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+12 IEEE TRANSACTIONS ON EMERGING TOPICS IN COMPUTATIONAL INTELLIGENCE
+Fig. 12. The position relationships, action commands, and attitude changes of UA Vs in some examples. (a)–(c) Proposed method versus the rule-based m odel:
+3-D position trajectories, action commands, and attitude changes. (d)–(f) Proposed method versus SAC: 3-D position trajectories, action commands , and attitude
+changes. (g)–(i) Proposed method versus SAC-LSTM with league training: 3-D position trajectories, action commands, and attitude changes. (j)–(l) Proposed
+method versus SAC-LSTM: 3-D position trajectories, action commands, and attitude changes.
+Fig. 13. Robustness and maneuverability tests. (a)–(c) Robustness test under observation noise and time delay: 3-D position trajectories, action c ommands, and
+attitude changes. (d)–(f) Maneuverability test with the weapon launch system disabled: top-view position trajectories, 3-D position trajectorie s, and target-lock
+status over time.
+E. Computational Efﬁciency and Real-Time Feasibility
+To systematically assess the practicality of the proposed
+method, we conducted a comprehensive analysis of both ofﬂine
+training costs and online inference latency. The comparisonbetween the proposed method, the naive NAS implementation
+(w/o LT), and the standard SAC-LSTM baseline is summarized
+in Table III.TABLE III
+COMPARISON OF TRAINING COST AND INFERENCE LATENCYThis article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+ZHU et al.: LEAGUE TRAINING-BASED DUAL OPTIMIZATION METHOD FOR UA V MANEUVER DECISION-MAKING 13
+Fig. 14. The Recurrent architecture learned by the proposed method for UA V
+maneuver decision-making.
+As shown in Table III, the proposed framework demonstrates
+signiﬁcantly improved training efﬁciency compared to the naive
+NAS implementation. Speciﬁcally, the ablation variant (w/o LT),which represents a naive combination of SAC and DARTS,
+requires roughly 11.72 days to converge. In contrast, our method
+reduces the ofﬂine training time by approximately 60% to 4.72days. While we acknowledge that this cost is higher than the
+ﬁxed-architecture SAC-LSTM baseline (0.12 days), this in-
+crease is an inherent trade-off in NAS-based approaches. More
+importantly, this one-time ofﬂine investment is fully justiﬁed
+from two critical perspectives:
+1) Sample Efﬁciency Via League Training: The substantial
+reduction in training time compared to the naive baseline high-
+lights the effectiveness of candidate players. Unlike the w/o LTvariant that trains each candidate architecture from scratch, the
+league training mechanism reuses historical policies as sparring
+partners. This effectively curtails wasted computation and ac-celerates convergence, proving that our approach successfully
+mitigates the computational intensity typically associated with
+NAS.
+2) Real-Time Operational Feasibility: The primary con-
+straint for UA V combat deployment is the online inference la-tency rather than the one-time ofﬂine training cost. We measured
+the inference latency on our test platform. The average decision
+time per step for our NAS-optimized architecture is 1.36±0.63
+ms. This is well below the typical 20 ms (50 Hz) control cy-
+cle requirement for UA V ﬂight control systems. Consequently,
+although the dual optimization involves higher upfront com-putational costs, it yields a high-performance policy that is
+computationally efﬁcient and suitable for real-time deployment.
+V. C
+ONCLUSION AND FUTURE WORK
+In this paper, we introduce a novel framework for UA V maneu-
+ver decision-making. Leveraging a developed league training
+mechanism, we combine SAC and DARTS to optimize both
+the weights and architecture of the network simultaneously,culminating in a UA V maneuver decision-making policy with a
+higher performance ceiling. Through comparative simulations,we validate the effectiveness of the learned UA V maneuver
+decision-making policy in ﬂight missions. By introducing a
+rule-based expert player as an opponent, we demonstrate thatthe proposed method yields a UA V maneuver decision-making
+policy with a higher win rate.
+For future work, we plan to explore lightweight or on-device
+neural architecture search strategies to address real-world de-
+ployment constraints, and investigate the integration of advanced
+modules such as graph neural networks or attention mechanismsto better capture complex interactions in multi-UA V collabora-
+tive scenarios.
+R
+EFERENCES
+[1] H. Duan, Y . Lei, J. Xia, Y . Xia, Y . Deng, and Y . Shi, “Autonomous
+maneuver decision for unmanned aerial vehicle via improved pigeon-inspired optimization,” IEEE Trans. Aerosp. Electron. Syst. , vol. 59, no. 3,
+pp. 3156–3170, Jun. 2023.
+[2] H. Shin, J. Lee, H. Kim, and D. H. Shim, “An autonomous aerial combat
+framework for two-on-two engagements based on basic ﬁghter maneu-vers,” Aerosp. Sci. Technol. , vol. 72, pp. 305–315, 2018.
+[3] W. Ruan, H. Duan, and Y . Deng, “Autonomous maneuver decisions via
+transfer learning pigeon-inspired optimization for UA Vs in dogﬁght en-gagements,” IEEE/CAA J. Automatica Sinica , vol. 9, no. 9, pp. 1639–1657,
+Sep. 2022.
+[4] Z. Sun, S. Yang, C. Bai, and J. Gen, “A survey of air combat artiﬁcial
+intelligence,” Acta Aeronautica et Astronautica Sinica , vol. 42, no. 8, 2021,
+Art. no. 525799.
+[5] J. B. Cruz et al., “Game-theoretic modeling and control of a mili-
+tary air operation,” IEEE Trans. Aerosp. Electron. Syst. , vol. 37, no. 4,
+pp. 1393–1405, Oct. 2001.
+[6] J. B. Crumpacker, M. J. Robbins, and P. R. Jenkins, “An approximate
+dynamic programming approach for solving an air combat maneuvering
+problem,” Expert Syst. Appl. , vol. 203, 2022, Art. no. 117448.
+[7] Y . LeCun, Y . Bengio, and G. Hinton, “Deep learning,” Nature , vol. 521,
+no. 7553, pp. 436–444, 2015.
+[8] P. Florence et al., “Implicit behavioral cloning,” in Proc. 5th Conf. Robot
+Learn. , 2022, pp. 158–168.
+[9] H. Piao et al., “Beyond-visual-range air combat tactics auto-generation
+by reinforcement learning,” in Proc. Int. Joint Conf. Neural Netw. , 2020,
+pp. 1–8.
+[10] Z. Sun et al., “Multi-agent hierarchical policy gradient for air combat
+tactics emergence via self-play,” Eng. Appl. Artif. Intell. , vol. 98, 2021,
+Art. no. 104112.
+[11] R. Chai, D. Liu, T. Liu, Y . Xia, and S. Chai, “Deep learning-based trajectory
+planning and control for autonomous ground vehicle parking maneuver,”IEEE Trans. Autom. Sci. Eng. , vol. 20, no. 3, pp. 1633–1647, Jul. 2023.
+[12] Z. Yang and H. Nguyen, “Recurrent off-policy baselines for memory-based
+continuous control,” in Proc. Deep RL Workshop NeurIPS , 2021.
+[13] D. Wu, X. Dong, J. Shen, and S. C. H. Hoi, “Reducing estimation bias via
+triplet-average deep deterministic policy gradient,” IEEE Trans. Neural
+Netw. Learn. Syst. , vol. 31, no. 11, pp. 4933–4945, Nov. 2020.
+[14] A. P. Pope et al., “Hierarchical reinforcement learning for air-to-air com-
+bat,” in Proc. Int. Conf. Unmanned Aircr. Syst. , 2021, pp. 275–284.
+[15] J. Chai, W. Chen, Z. Yao, and D. Zhao, “A hierarchical deep reinforcement
+learning framework for 6-DOF UCA V air-to-air combat,” IEEE Trans.
+Syst. Man Cybern.-Syst. , vol. 53, no. 9, pp. 5417–5429, Sep. 2023.
+[16] Y . Hou et al., “Cooperative multiagent learning and exploration with
+min-max intrinsic motivation,” IEEE Trans. Cybern. , vol. 55, no. 6,
+pp. 2852–2864, Jun. 2025.
+[17] S. Zhou et al., “Cooperative multi-agent advice exchange via topolog-
+ical graph learning,” IEEE Trans. Cogn. Develop. Syst. , vol. 18, no. 1,
+pp. 142–153, Feb. 2026.
+[18] C. Bai, P. Yan, H. Piao, W. Pan, and J. Guo, “Learning-based multi-UA V
+ﬂocking control with limited visual ﬁeld and instinctive repulsion,” IEEE
+Trans. Cybern. , vol. 54, no. 1, pp. 462–475, Jan. 2024.
+[19] D. Liu, Q. Zong, X. Zhang, R. Zhang, L. Dou, and B. Tian, “Game of
+drones: Intelligent online decision making of multi-UA V confrontation,”IEEE Trans. Emerg. Topics Comput. Intell. , vol. 8, no. 2, pp. 2086–2100,
+Feb. 2024.
+[20] F. AlMahamid and K. Grolinger, “Autonomous unmanned aerial vehicle
+navigation using reinforcement learning: A systematic review,” Eng. Appl.
+Artif. Intell. , vol. 115, 2022, Art. no. 105321.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 
+14 IEEE TRANSACTIONS ON EMERGING TOPICS IN COMPUTATIONAL INTELLIGENCE
+[21] P. Ren, Y . Xiao, X. Chang, P. Huang, Z. Li, and X. Wang, “A comprehensive
+survey of neural architecture search: Challenges and solutions,” ACM
+Comput. Surv. , vol. 54, no. 4, pp. 1–34, 2022.
+[22] H. Zhang, Y . Jin, and K. Hao, “Evolutionary search for complete neural
+network architectures with partial weight sharing,” IEEE Trans. Evol.
+Comput. , vol. 26, no. 5, pp. 1072–1086, Oct. 2022.
+[23] B. Zoph and Q. V . Le, “Neural architecture search with reinforcement
+learning,” in Proc. Int. Conf. Learn. Representations , 2017.
+[24] Y . Liu, Y . Sun, B. Xue, M. Zhang, G. G. Yen, and K. C. Tan, “A survey on
+evolutionary neural architecture search,” IEEE Trans. Neural Netw. Learn.
+Syst. , vol. 34, no. 2, pp. 550–570, Feb. 2023.
+[25] Y . Xue, X. Han, F. Neri, J. Qin, and D. Pelusi, “A gradient-guided
+evolutionary neural architecture search,” IEEE Trans. Neural Netw. Learn.
+Syst. , vol. 36, no. 3, pp. 4345–4357, Mar. 2025.
+[26] J. Dong, B. Hou, L. Feng, K. C. Tan, and Y . S. Ong, “A cell-based
+fast memetic algorithm for automated convolutional neural architec-ture design,” IEEE Trans. Neural Netw. Learn. Syst. , vol. 34, no. 11,
+pp. 9040–9053, Nov. 2023.
+[27] Y . Sun, B. Xue, M. Zhang, G. G. Yen, and J. Lv, “Automatically designing
+CNN architectures using the genetic algorithm for image classiﬁcation,”IEEE Trans. Cybern. , vol. 50, no. 9, pp. 3840–3854, Sep. 2020.
+[28] H. Pham, M. Y . Guan, B. Zoph, Q. V . Le, and J. Dean, “Efﬁcient neural
+architecture search via parameter sharing,” in Proc. 35th Int. Conf. Mach.
+Learn ., 2018, pp. 4095–4104.
+[29] Y . Xue et al., “Neural architecture search with progressive evaluation and
+sub-population preservation,” IEEE Trans. Evol. Comput. , vol. 29, no. 5,
+pp. 1678–1691, Oct. 2025, doi: 10.1109/TEVC.2024.3393304 .
+[30] H. Liu, K. Simonyan, and Y . Yang, “DARTS: Differentiable Architecture
+Search,” in Proc. Int. Conf. Learn. Representations , 2019, pp. 1–13.
+[31] Y . Xue, K. Chen, and F. Neri, “Differentiable architecture search with
+attention mechanisms for generative adversarial networks,” IEEE Trans.
+Emerg. Topics Comput. Intell. , vol. 8, no. 4, pp. 3141–3151, Apr. 2024.
+[32] Y . Xue, X. Han, and Z. Wang, “Self-adaptive weight based on dual-
+attention for differentiable neural architecture search,” IEEE Trans. Ind.
+Informat. , vol. 20, no. 4, pp. 6394–6403, Apr. 2024.
+[33] P. Ye, B. Li, Y . Li, T. Chen, J. Fan, and W. Ouyang, “ β-DARTS: Beta-decay
+regularization for differentiable architecture search,” in IEEE/CVF Conf.
+Comput. Vis. Pattern Recognit. , Jun. 2022, pp. 10864–10873.
+[34] Y . Xue, C. Lu, F. Neri, and J. Qin, “Improved differentiable architecture
+search with multi-stage progressive partial channel connections,” IEEE
+Trans. Emerg. Topics Comput. Intell. , vol. 8, no. 1, pp. 32–43, Jan. 2024.
+[35] O. Vinyals et al., “Grandmaster level in StarCraft II using multi-agent
+reinforcement learning,” Nature , vol. 575, no. 7782, pp. 350–354, 2019.
+[36] D. Wang, J. Liu, J. Lian, X. dong, and W. Wang, “Distributed Nash
+equilibrium seeking for multiple coalition games by coalition estimatestrategies,” IEEE Trans. Autom. Control , vol. 69, no. 9, pp. 6381–6388,
+Sep. 2024.
+[37] D. Wang, F. Wu, X. Xu, C. Wen, J. Lian, and J. Zhou, “Broadcast gossip
+algorithm for Nash equilibrium seeking of nonaggregative games,” IEEE
+Trans. Artif. Intell. , vol. 5, no. 5, pp. 2444–2452, May 2024.
+[38] J. Duan, Y . Guan, S. E. Li, Y . Ren, Q. Sun, and B. Cheng, “Distributional
+soft actor-critic: Off-policy reinforcement learning for addressing value
+estimation errors,” IEEE Trans. Neural Netw. Learn. Syst. , vol. 33, no. 11,
+pp. 6584–6598, Nov. 2022.
+[39] Q. Bertrand, W. M. Czarnecki, and G. Gidel, “On the limitations of the
+Elo, real-world games are transitive, not additive,” in Proc. 26th Int. Conf.
+Artif. Intell. Statist. , 2023, pp. 2905–2921.
+[40] T. Haarnoja et al., “Soft actor-critic algorithms and applications,”2018,
+arXiv:1812.05905 .
+[41] J. S. McGrew, J. P. How, B. Williams, and N. Roy, “Air-combat strategy
+using approximate dynamic programming,” J. Guidance, Control, Dyn.
+,
+vol. 33, no. 5, pp. 1641–1654, 2010.
+[42] M. M. Ozbek, S. Yildirim, M. Aksoy, E. Kernin, and E. Koyuncu, “Har-
+fang3D dog-ﬁght sandbox: A reinforcement learning research platform forthe customized control tasks of ﬁghter aircrafts,”2022, arXiv:2210.07282 .
+[43] T. P. Lillicrap et al., “Continuous control with deep reinforcement learn-
+ing,” in Proc. Int. Conf. Learn. Representations , 2016.
+[44] S. Fujimoto, H. Hoof, and D. Meger, “Addressing function approximation
+error in actor-critic methods,” in Proc. Int. Conf. Mach. Learn. , 2018,
+pp. 1587–1596.
+[45] F. Dang, H. Zhu, X. Ning, W. Fu, M. Gu, and Y . Niu, “An air combat
+UCA V autonomous maneuver decision method based on LSTM net-work and MCDTS,” in Proc. Int. Conf. Auton. Unmanned Syst. , 2022,
+pp. 857–866.
+Haojie Zhu received the M.S. degree in control sci-
+ence and engineering from the College of Automation
+Engineering, Nanjing University of Aeronautics and
+Astronautics, Nanjing, China, in 2023. He is currentlyworking toward the Ph.D. degree in control scienceand engineering with the College of Automation
+Engineering, Nanjing University of Aeronautics and
+Astronautics. His research interests include ﬁre andcommand control, data fusion, task allocation, and
+their applications in autonomous decision-making
+system.
+Mou Chen (Fellow, IEEE) received the B.S. degree
+in material science and engineering and the Ph.D.
+degree in control theory and control engineering from
+the Nanjing University of Aeronautics and Astro-nautics (NUAA), Nanjing, China, in 1998 and 2004,respectively. From 2007 to 2008, he was an Academic
+Visitor with the Department of Aeronautical and
+Automotive Engineering, Loughborough University,Loughborough, U.K. From 2008 to 2009, he was aResearch Fellow with the Department of Electrical
+and Computer Engineering, National University of
+Singapore, Singapore. He is currently a Full Professor with the College of Au-tomation Engineering, NUAA. His research interests include nonlinear systemcontrol, intelligent control, and ﬂight control.
+Chao Yan received the B.E. degree in electrical en-
+gineering and automation from the China Universityof Mining and Technology, Xuzhou, China, in 2017,and the M.S. and Ph.D. degrees in control science and
+engineering from the National University of Defense
+Technology, Changsha, China, in 2019, and 2023,respectively. He was a visiting Ph.D. student with the
+School of Mechanical and Aerospace Engineering,
+Nanyang Technological University, Singapore, from2021 to 2022. He is currently an Associate Professorwith the College of Automation Engineering, Nanjing
+University of Aeronautics and Astronautics, Nanjing, China. His research inter-
+ests include deep reinforcement learning, coordination control of UA V swarms.
+Zengliang Han received the M.S. degree in control
+engineering from the College of Automation En-
+gineering, Qingdao University, Qingdao, China, in
+2019, and the Ph.D. degree in control theory andcontrol engineering from the Nanjing University ofAeronautics and Astronautics (NUAA), in 2023. He
+is currently a Postdoctoral Fellow with the College
+of Automation Engineering, NUAA. His researchinterests include intelligent optimization algorithm,hybrid enhanced intelligence, intelligent ﬁre control
+decisions, and multi-agent path planning.
+Tongle Zhou received the B.S. degree in electrical
+engineering and automation and the Ph.D. degreein control theory and control engineering from the
+Nanjing University of Aeronautics and Astronautics
+(NUAA), in 2014 and 2021, respectively. He wasa Research Fellow with the College of Automation
+Engineering, NUAA. He is currently a Lecturer with
+the College of Automation Engineering, NUAA. Hisresearch interests include ﬁre and command control,data fusion, task allocation, and their applications in
+autonomous decision-making system.This article has been accepted for inclusion in a future issue of this journal. Content is final as presented, with the exception of pagination. 
+Authorized licensed use limited to: Universita degli Studi di Genova. Downloaded on July 03,2026 at 03:00:34 UTC from IEEE Xplore.  Restrictions apply. 

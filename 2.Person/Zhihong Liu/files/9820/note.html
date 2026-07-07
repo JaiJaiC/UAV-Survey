@@ -76,7 +76,7 @@ MathJax = {
 <body>
 
 <nav>
-  <a href="../../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
   <span class="brand">📄 Paper Notes</span>
   <a href="#info">Info</a>
   <a href="#insight">Insight</a>
@@ -141,28 +141,24 @@ MathJax = {
 
 <section id="architecture">
   <h2>3. System Architecture</h2>
-  <h3>3.1 System Frame — 分布式 DRL 训练架构分类</h3>
+  <h3>3.1 System Frame — 分布式 DRL 三种核心架构</h3>
   <div class="mermaid-box"><pre class="mermaid">
-flowchart TB
-    subgraph ACTOR["Actor-Learner 架构"]
-      direction LR
-      A1["Actor 1<br/>环境交互+数据生成"] --> LS["Learner<br/>GPU训练+参数更新"]
-      A2["Actor 2<br/>环境交互+数据生成"] --> LS
-      A3["Actor N<br/>环境交互+数据生成"] --> LS
+flowchart LR
+    subgraph ACTOR["Actor-Learner"]
+      A1["Actor 1"] --> LS["Learner(GPU)"]
+      A2["Actor 2"] --> LS
+      A3["Actor N"] --> LS
     end
-    subgraph PS["Parameter Server 架构"]
-      direction LR
-      W1["Worker 1<br/>本地训练"] --> PSERV["Parameter Server<br/>全局参数存储"]
-      W2["Worker 2<br/>本地训练"] --> PSERV
-      PSERV --> W1
-      PSERV --> W2
+    subgraph PS["Parameter Server"]
+      W1["Worker 1"] --> PSERV["Param Server"]
+      W2["Worker 2"] --> PSERV
+      PSERV -.-> W1
+      PSERV -.-> W2
     end
-    subgraph ALLREDUCE["All-Reduce 架构"]
-      direction LR
-      N1["Node 1<br/>本地梯度"] <-->|"All-Reduce<br/>梯度聚合"| N2["Node 2<br/>本地梯度"]
-      N2 <--> N3["Node N<br/>本地梯度"]
+    subgraph AR["All-Reduce"]
+      N1["Node 1"] <--> N2["Node 2"]
+      N2 <--> N3["Node N"]
     end
-    ACTOR --> PS --> ALLREDUCE
     classDef a fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
     classDef p fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
     classDef r fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
@@ -173,59 +169,34 @@ flowchart TB
 
   <h3>3.2 Dataflow — 分布式 DRL 训练数据流</h3>
   <div class="mermaid-box"><pre class="mermaid">
-flowchart TB
-    subgraph SIM["仿真并行化"]
-      direction LR
-      E1["环境实例 1"] --> B1["经验缓冲 1"]
-      E2["环境实例 2"] --> B2["经验缓冲 2"]
-      EN["环境实例 N"] --> BN["经验缓冲 N"]
-    end
-    subgraph COMP["计算并行化"]
-      direction LR
-      B1 --> T1["GPU 训练节点 1"]
-      B2 --> T2["GPU 训练节点 2"]
-      BN --> TN["GPU 训练节点 N"]
-    end
-    subgraph SYNC["同步机制"]
-      T1 -->|梯度| SYNC_M["同步/异步聚合"]
-      T2 -->|梯度| SYNC_M
-      TN -->|梯度| SYNC_M
-      SYNC_M -->|更新参数| T1
-      SYNC_M -->|更新参数| T2
-      SYNC_M -->|更新参数| TN
-    end
-    SIM --> COMP --> SYNC
-    classDef s fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef c fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef y fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    class E1,E2,EN,B1,B2,BN s
-    class T1,T2,TN c
-    class SYNC_M y
+flowchart LR
+    ENV["N个环境实例<br/>并行交互采样"] --> BUF["经验缓冲池<br/>分布式存储"]
+    BUF --> GPU["GPU训练节点<br/>采样mini-batch+梯度计算"]
+    GPU -->|梯度| SYNC["同步/异步聚合<br/>All-Reduce / PS"]
+    SYNC -->|"更新参数"| GPU
+    SYNC -->|"新策略"| ENV
+    classDef e fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef b fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef g fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    class ENV e
+    class BUF b
+    class GPU,SYNC g
 </pre></div>
 
   <h3>3.3 Workflow — 分布式 DRL 训练流水线</h3>
   <div class="mermaid-box"><pre class="mermaid">
-flowchart TD
-    subgraph P1["阶段1: 仿真交互"]
-      direction LR
-      S1["并行启动 N 个环境实例"] --> S2["各 Actor 独立采样<br/>(st,at,rt+1,st+1)"] --> S3["经验存入 Replay Buffer"]
-    end
-    subgraph P2["阶段2: 分布式训练"]
-      direction LR
-      T1["从 Buffer 采样 mini-batch"] --> T2["前向传播计算损失"] --> T3["反向传播计算梯度"] --> T4["梯度同步 (All-Reduce/PS)"]
-    end
-    subgraph P3["阶段3: 参数更新"]
-      direction LR
-      U1["聚合梯度"] --> U2["SGD/Adam 更新参数"] --> U3["新参数广播到所有 Worker"]
-    end
-    P1 --> P2 --> P3
-    P3 -.->|"循环迭代"| P1
-    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    class S1,S2,S3 p1
-    class T1,T2,T3,T4 p2
-    class U1,U2,U3 p3
+flowchart LR
+    S1["① 并行启动<br/>N个环境实例"] --> S2["② Actor采样<br/>(s,a,r,s')"]
+    S2 --> S3["③ 存入<br/>Replay Buffer"]
+    S3 --> S4["④ GPU采样<br/>mini-batch"]
+    S4 --> S5["⑤ 前向+反向<br/>计算梯度"]
+    S5 --> S6["⑥ 梯度同步<br/>All-Reduce/PS"]
+    S6 --> S7["⑦ SGD更新<br/>广播参数"]
+    S7 -.->|循环| S2
+    classDef s fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef t fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    class S1,S2,S3 s
+    class S4,S5,S6,S7 t
 </pre></div>
 </section>
 

@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — SPINE: Deploying Foundation Model-Enabled Robots in the Field (Ravichandran et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">HOME</a>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- 1. PAPER INFO -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Deploying Foundation Model-Enabled Air and Ground Robots in the Field: Challenges and Opportunities（在野外部署基础模型驱动的空地机器人：挑战与机遇）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Zachary Ravichandran</strong><sup>*</sup>、<strong>Fernando Cladera</strong><sup>*</sup>（共同一作），Jason Hughes，Varun Murali，M. Ani Hsieh，George J. Pappas，Camillo J. Taylor，<strong>Vijay Kumar</strong></td></tr>
+    <tr><td><strong>机构</strong></td><td><strong class="bold-affil">宾夕法尼亚大学 GRASP 实验室</strong>（GRASP Laboratory, University of Pennsylvania）</td></tr>
+    <tr><td><strong>会议/期刊</strong></td><td><strong class="bold-venue">IEEE ICRA Workshop on Field Robotics 2025</strong></td></tr>
+    <tr><td><strong>链接</strong></td><td><a href="https://arxiv.org/abs/2505.17490" target="_blank">arXiv:2505.17490</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>SPINE</strong>——一个LLM驱动的模块化自主框架，首次在非结构化野外环境中实现公里级规模的LLM机器人规划，并首次演示了在机载设备上运行蒸馏后轻量语言模型的UAV规划器。论文系统总结了在野外部署FM驱动机器人的经验教训和开放挑战。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Foundation Model</span>
+    <span class="tag tag-green">Field Robotics</span>
+    <span class="tag tag-amber">LLM Planning</span>
+    <span class="tag tag-purple">Model Distillation</span>
+    <span class="tag tag-red">Air-Ground Teaming</span>
+    <span class="tag tag-cyan">Onboard SLM</span>
+    <span class="tag tag-gray">Semantic Mapping</span>
+  </div>
+</section>
+
+<!-- 2. INSIGHT & NOVELTY -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>为什么现有FM驱动机器人无法在野外部署？</strong><br>
+    答：因为几乎所有FM驱动机器人规划器都假设环境是已知的、结构化的——它们需要一个完整的先验地图，或者只能在小范围室内环境中运行。但在野外场景中，环境是非结构化的、部分未知的、需要主动探索才能获取信息——现有规划器无法处理这种情况。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：将LLM规划器嵌入<strong>闭环系统</strong>中——LLM不仅生成计划，还实时接收环境反馈（语义地图更新），并根据反馈在线调整计划。关键是引入了一个<strong>计划验证模块</strong>（plan validator），对LLM生成的计划进行物理可行性检查，形成"规划-验证-反馈-重规划"的闭环。此外，通过模型蒸馏（distillation），可以将大LLM的能力压缩到可在机载设备运行的小语言模型（SLM），解决野外通信受限的问题。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>启发什么洞察</th><th>类型</th></tr>
+    <tr><td>LLM聊天机器人的工具使用/API调用范式（如 ChatGPT Plugins）</td><td>让LLM通过调用机器人API来控制物理机器人——将自然语言任务描述"编译"成机器人可执行的子任务序列</td><td>架构</td></tr>
+    <tr><td>传统自主系统中的规划-执行-监控闭环</td><td>FM规划器不能是一次性的——需要在执行过程中不断接收地图更新和验证反馈，形成闭环，才能适应未知环境</td><td>策略</td></tr>
+    <tr><td>知识蒸馏（Hinton et al. 2015）和LoRA微调技术</td><td>大LLM（如GPT-4o）可以作为"教师"，教会小语言模型（如Llama 3.2 3B）完成机器人规划——在仅5GB VRAM的Jetson Orin NX上运行</td><td>方法</td></tr>
+    <tr><td>空地协作机器人团队（air-ground teaming）的互补性</td><td>UAV提供宏观视野快速扫描大范围区域，UGV提供地面细节——通过共同的语义图（semantic graph）作为lingua franca实现协同规划</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1: 首次大规模LLM驱动机器人野外部署——公里级非结构化环境中的规划</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>现有FM驱动机器人规划器只能在已知/结构化环境中运行。本文首次在野外（城市办公园区、半城郊、乡村三种环境）实现LLM驱动机器人的公里级自主规划。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>SPINE框架实现了2~8步非平凡推理的任务规划，完成12/14次任务，跨越100m~1km距离。失败原因仅为通信中断和里程计漂移——而非规划本身。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2: 闭环验证架构——解决LLM"幻觉"在物理世界中的安全问题</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>LLM会生成不可行的计划（hallucinated function calls、不可到达的目标点等）。在野外机器人场景中，这种错误可能导致安全事故。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Plan Validator 对每个LLM生成的计划进行语法约束（syntax）、可达性约束（reachability）、可探索性约束（explorable）三重检查。验证失败时自动生成自然语言反馈供LLM修正。图5验证了其关键作用：当未知地图比例超过40%时，有验证的成功率远高于无验证。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3: 首次在UAV上运行蒸馏后的机载语言模型规划器</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>野外机器人经常处于网络受限环境，无法依赖云端LLM（如GPT-4o）。需要能在机载计算设备上运行的小模型。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>以GPT-4o为教师，使用LoRA微调Llama 3.2 3B（<5GB VRAM），在NVIDIA Jetson Orin NX上实现实时UAV规划。蒸馏后模型成功率72.7%（vs 基线9.2%），首次实现完全机载的语言驱动UAV规划。</div>
+  </div>
+</section>
+
+<!-- 3. SYSTEM ARCHITECTURE -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 系统框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph USER["用户交互层"]
+      MISSION["自然语言任务描述 · 不完整规格"]
+      STATUS["任务状态反馈 · 规格澄清"]
+    end
+
+    subgraph SPINE["SPINE LLM规划器"]
+      PLANGEN["计划生成模块 · GPT-4o/Llama 3.2"]
+      PLANVAL["计划验证模块 · 语法+可达性+可探索性检查"]
+      FEEDBACK["自然语言反馈 · 解释违规原因"]
+    end
+
+    subgraph AUTONOMY["自主执行层"]
+      SUBTASKS["子任务序列: goto · explore · map_region · inspect"]
+      NAVIGATION["点导航 · LiDAR里程计 · 轨迹规划"]
+      EXPLORATION["主动探索 · 边界检测 · 信息增益"]
+      GRAPH["语义图构建 · 开放词汇检测 · 图拓扑"]
+    end
+
+    subgraph PLATFORM["机器人平台"]
+      UGV["Clearpath Jackal UGV · 地面自主"]
+      UAV["Falcon 4 UAV · 空中自主 · Jetson Orin NX"]
+      SENSORS["ZED 2i · Ouster LiDAR · GPS · IMU"]
+    end
+
+    subgraph COMM["通信基础设施"]
+      MESH["Mesh网络 · Rajant Breadcrumb · Cardinal电台"]
+      INTERNET["5G蜂窝 · 卫星互联网上行"]
+    end
+
+    MISSION --> PLANGEN
+    PLANGEN -->|"任务序列"| PLANVAL
+    PLANVAL -->|"验证通过"| SUBTASKS
+    PLANVAL -->|"验证失败"| FEEDBACK
+    FEEDBACK --> PLANGEN
+    SUBTASKS --> NAVIGATION
+    SUBTASKS --> EXPLORATION
+    NAVIGATION --> GRAPH
+    EXPLORATION --> GRAPH
+    GRAPH -->|"地图更新"| PLANGEN
+    NAVIGATION --> PLATFORM
+    EXPLORATION --> PLATFORM
+    GRAPH -->|"语义图"| STATUS
+    STATUS --> MISSION
+
+    classDef user fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef spine fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef auto fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef plat fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef comm fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class MISSION,STATUS user
+    class PLANGEN,PLANVAL,FEEDBACK spine
+    class SUBTASKS,NAVIGATION,EXPLORATION,GRAPH auto
+    class UGV,UAV,SENSORS plat
+    class MESH,INTERNET comm
+    </pre>
+  </div>
+
+  <h3>3.2 数据流——语义图驱动的闭环规划</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["输入"]
+      direction LR
+      NL["自然语言任务 → '北部停车场有施工吗?'"]
+      PRIOR["先验语义图 · 卫星图像提取"]
+    end
+
+    subgraph REASONING["LLM推理层"]
+      direction LR
+      INFER["推断所需语义类别: construction_vehicle · pothole · safety_barrier"]
+      COT["Chain-of-Thought推理: 在哪找这些目标? 需要探索哪些区域?"]
+      PLAN["生成API任务序列: goto → map_region → inspect"]
+    end
+
+    subgraph VALIDATION["计划验证"]
+      direction LR
+      SYNTAX["语法检查: 函数名/参数正确?"]
+      REACH["可达性检查: 目标点在当前图中可达?"]
+      EXPLORE["可探索性检查: 探索区域无障碍物?"]
+    end
+
+    subgraph EXEC["执行与感知"]
+      direction LR
+      UGVEXEC["UGV执行: Faster-LIO里程计 · GroundGrid规划"]
+      UAVEXEC["UAV执行: 航点导航 · 开放词汇检测"]
+      GSAM["Grounded SAM2: 检测+定位语义目标"]
+    end
+
+    subgraph FEEDBACK_LOOP["反馈闭环"]
+      direction LR
+      MAPUPDATE["语义图更新: 新增节点+边+属性"]
+      STATUSFEED["任务状态反馈 → LLM重规划"]
+    end
+
+    INPUT --> REASONING
+    REASONING --> VALIDATION
+    VALIDATION -->|"通过"| EXEC
+    VALIDATION -->|"失败+自然语言解释"| REASONING
+    EXEC --> GSAM
+    GSAM --> MAPUPDATE
+    MAPUPDATE --> STATUSFEED
+    STATUSFEED --> REASONING
+
+    classDef in fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef reason fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef val fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef exec fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef fb fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class NL,PRIOR in
+    class INFER,COT,PLAN reason
+    class SYNTAX,REACH,EXPLORE val
+    class UGVEXEC,UAVEXEC,GSAM exec
+    class MAPUPDATE,STATUSFEED fb
+    </pre>
+  </div>
+
+  <h3>3.3 工作流——从部署到蒸馏的完整管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1: 服务端LLM野外部署 (UGV)"]
+      direction LR
+      D1["任务输入: 不完整自然语言规格"] --> D2["SPINE + GPT-4o: 推理子任务"] --> D3["计划验证: 三重约束检查"] --> D4["执行: Faster-LIO + GroundGrid"] --> D5["地图更新: 语义图反馈"] --> D6["12/14任务成功 · 最大1km · 2-8步推理"]
+    end
+
+    subgraph PHASE2["阶段2: 模型蒸馏 (数据准备)"]
+      direction LR
+      K1["专家规划器: GPT-4o + SPINE"] --> K2["数据收集器: 生成任务规格+语义图"] --> K3["数据集: (观察, 动作) 元组"] --> K4["LoRA微调: Llama 3.2 3B"]
+    end
+
+    subgraph PHASE3["阶段3: 机载UAV部署"]
+      direction LR
+      U1["蒸馏后Llama 3.2 3B → Jetson Orin NX"] --> U2["语义图输入: 停车位+公园节点"] --> U3["任务执行: 4个任务中完成3个"] --> U4["成功率: 72.7% vs 基线9.2%"]
+    end
+
+    subgraph PHASE4["阶段4: 空地协同"]
+      direction LR
+      A1["UAV: 高空快速扫描 → 构建语义图"] --> A2["语义图作为lingua franca共享"] --> A3["UGV: 接收图+任务规划+执行"]
+    end
+
+    PHASE1 -->|"经验 + 通信限制"| PHASE2
+    PHASE2 -->|"蒸馏后模型"| PHASE3
+    PHASE3 -->|"能力扩展"| PHASE4
+
+    D6 -.->|"反馈: 通信丢失·里程计漂移"| D1
+    U4 -.->|"反馈: 多轮规划困难"| K4
+    A3 -.->|"反馈: 检测模型分布偏移"| A1
+
+    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class D1,D2,D3,D4,D5,D6 p1
+    class K1,K2,K3,K4 p2
+    class U1,U2,U3,U4 p3
+    class A1,A2,A3 p4
+    </pre>
+  </div>
+</section>
+
+<!-- 4. TASK -->
+<section id="task">
+  <h2>4. 任务——解决什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \text{给定: 不完整的自然语言任务描述 } \mathcal{S}, \text{ 部分先验语义图 } \mathcal{G}_0 $$
+    $$ \text{生成: 可执行的任务序列 } \Pi = [\pi_1, \pi_2, \ldots, \pi_K] \text{，使得 } \Pi \text{ 满足任务 } \mathcal{S} $$
+    $$ \text{约束: 每个 } \pi_i \text{ 必须在物理世界中可达/可探索，且机器人可在线更新 } \mathcal{G}_t $$
+    <div class="eq-note">
+      <strong>$\mathcal{S}$</strong> = 用户以自然语言给出的不完整任务描述（如"检查南部停车场是否有施工"）&nbsp;|&nbsp;
+      <strong>$\mathcal{G}_0$</strong> = 初始部分语义地图（从卫星图像提取或之前任务积累）&nbsp;|&nbsp;
+      <strong>$\Pi$</strong> = LLM生成的API调用序列（goto、map_region、explore、inspect等）&nbsp;|&nbsp;
+      <strong>$\mathcal{G}_t$</strong> = 随时间在线更新的语义图&nbsp;|&nbsp;
+      <strong>核心挑战</strong>：任务规格不完整→机器人必须推断隐含的子任务；环境部分未知→需要主动探索获取信息；地图实时变化→需要闭环重规划。
+    </div>
+  </div>
+
+  <h3>4.2 输入/输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>不完整的自然语言任务描述 + 部分先验语义地图</td><td>任务描述：1~3句自然语言；语义图：包含区域节点、对象节点、可通行性边的层次图</td></tr>
+    <tr><td><strong>输出</strong></td><td>可执行的任务序列（API调用）+ 机器人物理行为</td><td>2~8步推理任务，跨度100m~1km，涵盖导航、探索、检查等行为</td></tr>
+    <tr><td><strong>目标</strong></td><td>在非结构化野外环境中，以高成功率完成LLM驱动的规划与执行</td><td>成功率：UGV 12/14（86%）；蒸馏模型：72.7%（从9.2%基线提升）</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>系统集成+野外部署验证</strong>类工作——核心贡献不在于提出全新算法，而在于：（1）首次将LLM驱动机器人规划从结构化室内环境扩展到非结构化野外环境（公里级），（2）系统性地识别和解决野外部署中的工程挑战（通信、验证、蒸馏），（3）为整个社区提供经验教训和开放挑战路线图。平台涵盖UGV（Clearpath Jackal）和UAV（Falcon 4），环境涵盖城市、半城郊、乡村三种类型。</p>
+</section>
+
+<!-- 5. CHALLENGE -->
+<section id="challenge">
+  <h2>5. 挑战——为什么困难？</h2>
+
+  <h3>5.1 本质（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：LLM的"世界知识"与野外物理现实之间的语义鸿沟。<br><br>
+    （1）<strong>LLM的封闭世界假设 vs 野外开放性</strong>：LLM在训练时见过无数文本，但它们对物理世界的理解是"扁平"的——知道"停车场"的概念，但不知道当前具体环境中停车场在哪、长什么样。当环境中存在LLM从未见过的新物体/场景时（分布偏移），LLM的推理能力会急剧退化。<br><br>
+    （2）<strong>LLM幻觉 vs 物理安全</strong>：LLM可能生成不可行的计划——引用了不存在的API函数、指定了不可达的导航目标、规划了穿过障碍物的路径。在没有反馈的情况下，成功率随未知地图比例增加而急剧下降（图5）——当未知比例超过40%，无验证的成功率接近0%。<br><br>
+    （3）<strong>云端LLM vs 通信受限</strong>：GPT-4o等强大模型需要稳定的互联网连接——但在野外（乡村、隧道、山区）通信基础设施往往不可用。Mesh网络+5G/卫星可以缓解，但增加了部署复杂度和成本。而将LLM直接部署在机器人上受到SWaP（尺寸、重量和功耗）的严格限制。<br><br>
+    （4）<strong>大模型的泛化 vs 蒸馏的能力损失</strong>：将GPT-4o的能力蒸馏到Llama 3.2 3B可以在机载运行，但会损失多轮推理能力和复杂语义关联能力——如何在保持能力的同时缩小模型尺寸？
+  </div>
+
+  <h3>5.2 前人方法的局限</h3>
+  <table>
+    <tr><th>前人方法</th><th>核心思路</th><th>为何失效</th></tr>
+    <tr>
+      <td>SayPlan / InnerMonologue / Code as Policies（FM驱动机器人室内规划）</td>
+      <td>LLM生成API调用或代码，在结构化室内环境中执行操作任务</td>
+      <td>假设环境完全已知或可完全感知——机器人有完整地图。在野外，环境是部分未知的、需要主动探索的，这些假设不成立。</td>
+    </tr>
+    <tr>
+      <td>LM-Nav / VLMaps（FM视觉导航）</td>
+      <td>使用预训练的视觉-语言模型进行语义导航，利用嵌入匹配目标</td>
+      <td>主要在2D表示上操作（目标检测），设计用于小范围室内环境。野外需要3D理解、大范围、非传统视角（如UAV从高空俯视）。</td>
+    </tr>
+    <tr>
+      <td>NEUSIS（神经符号框架，UAV）</td>
+      <td>将任务分解为物理感知子任务（检测+3D建图），与LLM通信规划</td>
+      <td>仍依赖与离板GPT-4o通信——野外通信条件不满足时无法工作。且只处理了感知-规划的接口，未涉及安全验证。</td>
+    </tr>
+    <tr>
+      <td>传统自主导航（非FM方法）</td>
+      <td>基于几何地图的航点导航+障碍物规避</td>
+      <td>无法理解语义——不能根据"检查施工区域"这样的自然语言推断需要寻找哪些视觉特征（施工车辆、路障等），也无法进行语义级推理。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 — 鲁棒通信</strong>：服务端LLM需要持续的网络连接。Mesh电台扩展范围有限，5G/卫星互联网在偏远地区不可靠。当机器人脱离通信范围后，无法提问、无法更新计划、失去FM的核心优势。</li>
+    <li><strong>挑战 2 — 模块化 vs 端到端的安全性权衡</strong>：端到端LLM规划直接映射感知到行动，透明度低、风险高。模块化方法（LLM + 传统自主）虽然更安全、可解释，但增加了系统集成复杂性和潜在的信息瓶颈。</li>
+    <li><strong>挑战 3 — 视觉基础模型的野外分布偏移</strong>：Grounded SAM2等检测模型在野外环境中将普通汽车误认为施工车辆、将建筑物误认为安全护栏——因为它们主要在室内/结构化数据上训练。UAV的高空俯视视角加剧了这种偏移。</li>
+  </ul>
+</section>
+
+<!-- 6. METHOD -->
+<section id="method">
+  <h2>6. 方法与关键公式</h2>
+
+  <h3>6.1 核心方法</h3>
+  <p>SPINE是一个<strong>模块化LLM驱动自主框架</strong>，核心是"规划-验证-反馈"闭环。它不是提出新数学算法，而是设计了一套工程架构来解决LLM在物理世界中的可靠性问题。</p>
+
+  <h3>6.2 关键公式与概念</h3>
+
+  <h4>Group A: 任务规划——从自然语言到API序列</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 任务规划形式化</span>
+    $$ \Pi = \text{LLM}\left(\mathcal{S}, \mathcal{G}_t, \mathcal{A}\right) = [\pi_1, \pi_2, \ldots, \pi_K], \quad \pi_i \in \mathcal{A} $$
+    <div class="eq-note">
+      <strong>$\Pi$</strong> = LLM生成的子任务序列 &nbsp;|&nbsp;
+      <strong>$\mathcal{S}$</strong> = 自然语言任务描述 &nbsp;|&nbsp;
+      <strong>$\mathcal{G}_t$</strong> = 时刻t的语义图（包含区域节点、对象节点、可通行性边）&nbsp;|&nbsp;
+      <strong>$\mathcal{A}$</strong> = 机器人API行为库 = {goto, map_region, explore, inspect, extend_map, breadcrumb, answer} &nbsp;|&nbsp;
+      <strong>Chain-of-Thought</strong>：LLM被要求先推理（解释为什么需要这些步骤），再输出API序列——这种两阶段设计显著提高了计划质量。
+    </div>
+  </div>
+
+  <h4>Group B: 计划验证——三重约束检查</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 计划验证条件</span>
+    $$ \text{valid}(\Pi) \iff \bigwedge_{\pi_i \in \Pi} \left( \text{syntax}(\pi_i) \land \text{reachable}(\pi_i, \mathcal{G}_t) \land \text{explorable}(\pi_i, \mathcal{G}_t) \right) $$
+    <div class="eq-note">
+      <strong>syntax($\pi_i$)</strong> = 语法验证：函数名是否存在于API中？参数类型和数量是否正确？ —— 解决LLM的hallucinated function calls问题 &nbsp;|&nbsp;
+      <strong>reachable($\pi_i, \mathcal{G}_t$)</strong> = 可达性验证：导航目标点在图$\mathcal{G}_t$中是否连通？ —— 确保机器人不会尝试去无法到达的位置 &nbsp;|&nbsp;
+      <strong>explorable($\pi_i, \mathcal{G}_t$)</strong> = 可探索性验证：探索目标是否在无障碍物的自由空间中？ —— 防止机器人尝试穿越墙壁/障碍物 &nbsp;|&nbsp;
+      <strong>关键设计</strong>：验证失败时，validator自动生成包含具体违规信息的自然语言反馈，供LLM在下一次迭代中修正。
+    </div>
+  </div>
+
+  <h4>Group C: 模型蒸馏——知识迁移</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — LoRA微调目标</span>
+    $$ \theta_{\text{SLM}}^* = \arg\min_{\Delta\theta} \mathbb{E}_{(x, y) \sim \mathcal{D}_{\text{expert}}} \left[ \mathcal{L}\left(f_{\theta_0 + \Delta\theta}(x), \; y\right) \right] $$
+    $$ \text{其中 } \mathcal{D}_{\text{expert}} = \{(\mathcal{S}_i, \mathcal{G}_i, \Pi_i)\}_{i=1}^{N} \text{ 由 GPT-4o 专家生成} $$
+    <div class="eq-note">
+      <strong>$\theta_{\text{SLM}}$</strong> = 蒸馏后小语言模型的参数（Llama 3.2 3B，约5GB VRAM）&nbsp;|&nbsp;
+      <strong>$\theta_0$</strong> = 预训练基座模型权重 &nbsp;|&nbsp;
+      <strong>$\Delta\theta$</strong> = LoRA低秩适配矩阵（参数量极小，仅训练这些参数）&nbsp;|&nbsp;
+      <strong>$\mathcal{D}_{\text{expert}}$</strong> = 由GPT-4o专家生成的规划数据集（N个任务规格-语义图-计划三元组）&nbsp;|&nbsp;
+      <strong>数据收集技巧</strong>：使用第二个GPT-4o实例自动生成多样化的任务规格，使用先前任务中的语义图——实现零人工标注的数据集构建。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>LLM（UGV部署）</td><td><strong>GPT-4o</strong></td><td>服务端大语言模型，负责计划生成</td><td>推理能力最强、上下文窗口大、能处理复杂的多步推理和语义关联——是目前野外部署的最优选择</td></tr>
+    <tr><td>SLM（UAV蒸馏）</td><td><strong>Llama 3.2 3B</strong></td><td>蒸馏目标小模型，在Jetson Orin NX上运行</td><td>3B参数是SWaP约束下的最佳平衡点——大于3B则VRAM不足（>5GB），小于3B则推理能力不足</td></tr>
+    <tr><td>LoRA rank</td><td><strong>标准配置（未明确值）</strong></td><td>低秩适配矩阵的秩</td><td>LoRA通过仅训练低秩矩阵大幅减少微调参数量，使在有限计算资源下蒸馏成为可能</td></tr>
+    <tr><td>验证约束类型</td><td><strong>3种（syntax + reachable + explorable）</strong></td><td>计划验证的三重物理约束</td><td>分别对应LLM的三个失败模式：幻觉（syntax）、不可达（reachable）、不可行（explorable）——是最小完备的验证集合</td></tr>
+    <tr><td>通信</td><td><strong>Mesh网络 + 5G/卫星上行</strong></td><td>确保机器人与服务端LLM的连接</td><td>Mesh节点可扩展操作范围，5G/卫星提供互联网上行——这种多层冗余设计是野外部署的关键</td></tr>
+    <tr><td>UGV传感器</td><td><strong>ZED 2i + Ouster OS1 LiDAR + GPS + IMU</strong></td><td>地面平台传感配置</td><td>深度相机用于语义感知，64线LiDAR用于精确里程计和障碍物检测，GPS+IMU用于全局定位</td></tr>
+  </table>
+
+  <h3>6.4 模块化 vs 端到端：SPINE的设计哲学</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>模块化（SPINE方式）</h4>
+      <ul>
+        <li>LLM只做高层规划——输出API序列</li>
+        <li>低层执行由传统自主算法完成（Faster-LIO、GroundGrid）</li>
+        <li>计划验证确保物理可行性</li>
+        <li>LLM、验证器、执行器之间通过明确定义的接口通信</li>
+        <li><strong>优势</strong>：可解释、可验证、安全、各模块可独立优化</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>端到端（如直接输出控制指令）</h4>
+      <ul>
+        <li>LLM直接生成底层控制指令或代码</li>
+        <li>无中间验证层——错误直接传递到物理世界</li>
+        <li>缺乏透明度——出了事故难以追溯原因</li>
+        <li>"直接映射"虽然优雅但风险极高</li>
+        <li><strong>风险</strong>：不透明、不安全、野外环境中的意外行为不可预测</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7. PRINCIPLES -->
+<section id="principles">
+  <h2>7. 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">SPINE 在野外部署中的可靠性来源于四个相互支撑的技术原理：闭环 LLM 规划（规划-验证-反馈）、知识蒸馏（从 GPT-4o 到机载 SLM）、层次语义建图（开放词汇检测 + 图构建）、以及空地协同的通信架构。这些原理不是孤立的——它们形成了从"云端大模型推理"到"机载小模型执行"的完整能力迁移链条。</p>
+
+  <h3>7.1 闭环 LLM 规划 — "规划-验证-反馈"的信息闭环</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 闭环规划的数学描述</span>
+    $$ \Pi_t = \text{LLM}(S, \mathcal{G}_t), \quad \text{valid}(\Pi_t) \iff \bigwedge_{\pi_i \in \Pi_t} C(\pi_i, \mathcal{G}_t) $$
+    $$ \text{若 } \neg\text{valid}(\Pi_t): \; f_t = \text{Feedback}(\Pi_t, \mathcal{G}_t), \quad \Pi_t' = \text{LLM}(S, \mathcal{G}_t, f_t) $$
+    $$ \mathcal{G}_{t+1} = \text{Mapper}(\text{Sensors}(\text{Robot.execute}(\pi_1))) $$
+    <div class="eq-note">
+      <strong>$\Pi_t$</strong> = 时刻 t LLM 生成的子任务序列 &nbsp;|&nbsp;
+      <strong>$\mathcal{G}_t$</strong> = 时刻 t 的语义拓扑图 &nbsp;|&nbsp;
+      <strong>$C(\pi_i, \mathcal{G}_t)$</strong> = 三重约束（语法+可达性+可探索性）&nbsp;|&nbsp;
+      <strong>$f_t$</strong> = 验证失败时生成的<strong>自然语言反馈</strong>（如"目标节点 X 在当前图中不可达，最近的可达节点是 Y"）&nbsp;|&nbsp;
+      <strong>关键</strong>：这不是简单的"验证→拒绝"——验证器<strong>主动提供修正建议</strong>，LLM 在下一次迭代中利用这些反馈改进计划。整个系统是"自我修正"的，而非"一次生成、要么成功要么失败"。
+    </div>
+  </div>
+
+  <p><strong>为什么在野外环境中反馈闭环不可替代？</strong>图 5 的关键发现：当环境中未知部分超过 20% 时，无验证的成功率急剧下降直至趋近于 0。因为 LLM 在不完全信息下频繁产生幻觉——假设节点间存在连接、假设探索目标可达等。验证器不仅阻止了这些错误，更重要的是通过<strong>具体的问题描述</strong>引导 LLM 找到正确的替代方案——这在未知环境中是不可或缺的。</p>
+
+  <h3>7.2 知识蒸馏 — 从 GPT-4o 到机载 SLM 的能力迁移</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — LoRA 低秩适配的数学本质</span>
+    $$ \theta_{\text{SLM}}^* = \arg\min_{\Delta\theta \in \mathbb{R}^{r \times d}} \mathbb{E}_{(x, y) \sim \mathcal{D}_{\text{GPT-4o}}} \left[ \mathcal{L}(f_{\theta_0 + \Delta\theta}(x), \; y) \right] $$
+    $$ \text{其中 } \mathcal{D}_{\text{GPT-4o}} = \{(\mathcal{S}_i, \mathcal{G}_i, \Pi_i^{\text{GPT-4o}})\}_{i=1}^{N} $$
+    <div class="eq-note">
+      <strong>$\theta_0$</strong> = 预训练的 Llama 3.2 3B 权重（冻结）&nbsp;|&nbsp;
+      <strong>$\Delta\theta$</strong> = LoRA 低秩适配矩阵 $B \cdot A$（$r \ll d$，仅训练极少参数）&nbsp;|&nbsp;
+      <strong>$\mathcal{D}_{\text{GPT-4o}}$</strong> = 由 GPT-4o 教师模型生成的规划数据集 &nbsp;|&nbsp;
+      <strong>$N$</strong> = 数据集规模（使用第二个 GPT-4o 实例自动生成多样化任务规格，<strong>实现零人工标注</strong>）&nbsp;|&nbsp;
+      <strong>结果</strong>：蒸馏后 SLM 在 Jetson Orin NX（&lt;5GB VRAM）上实现 72.7% 规划成功率，相比原始 SLM 的 9.2% 是 8 倍提升。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>蒸馏前 — 原始 Llama 3.2 3B</h4>
+      <p><strong>行为</strong>：对化学泄漏任务，生成完全无关的推理——"The user wants to find regions..."——并输出错误的动作 goto(parking_lot_2)。</p>
+      <p><strong>成功率</strong>：<strong>9.2%</strong></p>
+      <p><strong>问题</strong>：缺乏机器人规划的具体知识——不知道如何处理 API、如何推理语义图、如何从任务规格中提取隐含子任务。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>蒸馏后 — Distilled Llama 3.2 3B</h4>
+      <p><strong>行为</strong>：正确识别"从空中不可见的区域"（building_interior_1, tree_cover_1），生成接近正确的计划序列。</p>
+      <p><strong>成功率</strong>：<strong>72.7%</strong></p>
+      <p><strong>剩余差距</strong>：多轮迭代规划、复杂语义推理仍不如 GPT-4o——但这是"从不可用到可用"的质变。</p>
+    </div>
+  </div>
+
+  <h3>7.3 层次语义建图 — 跨平台共享的通用语言</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 跨平台语义图共享的架构</span>
+    $$ \mathcal{G}_{\text{shared}} = \mathcal{G}_{\text{UAV}}^{\text{macro}} \oplus \mathcal{G}_{\text{UGV}}^{\text{micro}} \quad \text{使用相同 JSON Schema} $$
+    $$ \mathcal{G}_{\text{UAV}} = \{V_R^{\text{traversable}}, V_O^{\text{mission-relevant}}\} \quad \mathcal{G}_{\text{UGV}} = \{V_R^{\text{detailed}}, V_O^{\text{enriched by VLM}}\} $$
+    <div class="eq-note">
+      <strong>UAV 构建宏观图</strong>：从高空使用 Grounded SAM2 检测任务相关语义（construction_vehicle, pothole, safety_barrier）+ 可通行区域（road），构建包含 GPS 坐标的层次拓扑图 &nbsp;|&nbsp;
+      <strong>UGV 细化和增强</strong>：接收 UAV 的宏观图作为先验→使用 VLM（LLaVA）对物体节点进行语义增强（如"this car appears damaged, with a flat tire"）→通过地面的高分辨率传感器补充细节 &nbsp;|&nbsp;
+      <strong>图即接口</strong>：UAV 和 UGV 不共享原始传感器数据（带宽太大），而共享<strong>相同的 JSON 图格式</strong>——图成为了空地协作的 lingua franca。这使得 LLM 可以<strong>无差别地</strong>规划跨越 UAV 和 UGV 的任务。
+    </div>
+  </div>
+
+  <p><strong>为什么选择图作为空地协作的接口？</strong>三个原因：（1）<strong>带宽效率</strong>——图是高度压缩的语义表示，适合 Mesh 网络通信；（2）<strong>LLM 兼容性</strong>——LLM 可以直接理解和操作 JSON 图，无需额外编码/解码；（3）<strong>增量友好</strong>——图的增量更新（new nodes, new edges）天然适合异步通信——UAV 发现新区域后发送 add_node，UGV 随时接收并整合。</p>
+
+  <h3>7.4 通信感知部署 — 从云端到边缘的能力分配</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 4 — 通信条件自适应的规划能力分配</span>
+    $$ \text{规划能力} = \begin{cases} \text{GPT-4o 全能力} & \text{网络可用（Mesh + 5G/卫星）} \\ \text{蒸馏 SLM 有限能力} & \text{网络不可用（机载 Jetson）} \\ \text{混合：云分解 + 边执行} & \text{部分通信可用} \end{cases} $$
+    <div class="eq-note">
+      <strong>模式 1 — 云端全能力</strong>：UGV 通过 Mesh 网络（Rajant Breadcrumb DX-2）+ 5G/卫星互联网访问 GPT-4o API→处理复杂、需要深层语义推理的任务（如"风暴后物流受影响了吗？"） &nbsp;|&nbsp;
+      <strong>模式 2 — 机载有限能力</strong>：UAV 使用蒸馏后的 Llama 3.2 3B 在 Jetson Orin NX 上运行→处理相对明确的检查任务（如"南部停车场有施工活动吗？"） &nbsp;|&nbsp;
+      <strong>模式 3 — 混合分配</strong>：GPT-4o 将复杂任务分解为简单子任务→子任务分配给运行蒸馏模型的机器人执行——<strong>"大模型做规划、小模型做执行"</strong>，兼顾能力与去中心化。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">四个原理的系统级协同 — 从云端推理到物理执行的完整链条</div>
+    <strong>闭环 LLM 规划</strong>（原理 1）确保 LLM 的推理能被安全验证和在线修正 → <strong>知识蒸馏</strong>（原理 2）使得大模型的能力可以压缩到可在机载设备运行的小模型上 → <strong>层次语义图</strong>（原理 3）为不同平台和不同规模的模型提供了统一的"世界理解"接口 → <strong>通信感知部署</strong>（原理 4）根据通信条件动态决定使用哪个规模的模型。<strong>这四个原理共同解决了"如何让 FM 从实验室的已知结构化环境走向真实的未知野外环境"这一根本问题</strong>——这不仅是技术堆叠，而是对"将 AI 嵌入物理世界"这一系统工程问题的系统性回答。
+  </div>
+</section>
+
+<!-- 8. FIGURES -->
+<section id="figures">
+  <h2>8. 论文图表解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图。请将截图保存至 <code>figures/</code> 子目录。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">示例任务——UGV在部分已知环境中执行语言指定任务 / UAV部署蒸馏后语言模型进行机载规划</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Example missions"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>上图</strong>：UGV收到一个语言指定的任务描述（"找到红色建筑附近的蓝色汽车"等），在当前部分已知的地图中执行多步推理——首先导航到可见区域，然后主动建图探索，最终定位目标。这展示了SPINE的核心能力：<strong>利用在线感知来弥补先验知识的不足</strong>。</p>
+      <p><strong>下图</strong>：UAV部署蒸馏后的轻量语言模型（Llama 3.2 3B运行在Jetson Orin NX上），完全机载进行规划——无需云端LLM。这标志着从"依赖云端的强大模型"到"机载运行的轻量模型"的关键一步。</p>
+      <ul>
+        <li><strong>UGV任务的隐含推理</strong>：用户没有指定要去哪个具体位置——机器人必须通过语义推理确定哪些区域可能包含目标物体</li>
+        <li><strong>机载蒸馏的意义</strong>：首次实现完全在UAV机载计算设备上运行的语言驱动规划器——这是未来FM驱动机器人在通信受限环境中自主运行的基础</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">UGV/UAV自主框架概览——SPINE的模块化架构</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Autonomy framework overview"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>SPINE的完整系统架构。用户提供自然语言任务规格→SPINE使用LLM生成任务序列→计划验证模块检查安全性和可行性→验证通过后任务发送给自主框架（点导航、探索、图构建、开放词汇检测器等原子行为）→语义建图器反馈地图更新→闭环回到LLM进行下一步规划。</p>
+      <ul>
+        <li><strong>三层架构</strong>：SPINE（语义规划层）→ Autonomy Framework（自主执行层）→ Platform Controller（平台控制层）——各层之间有明确的接口，每层独立可替换</li>
+        <li><strong>双层反馈</strong>：Map Updates（环境反馈）和 Plan Validation Feedback（安全反馈）两条反馈路径，确保LLM基于最新信息进行规划</li>
+        <li><strong>API抽象</strong>：机器人行为被抽象为一组高层API调用（goto、explore、inspect等），LLM不需要了解底层传感器和控制器细节</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 5 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 5</span>
+      <span class="fig-caption">验证的重要性——有/无验证的成功率随未知地图比例变化曲线</span>
+      <span class="fig-source">来源：论文 Fig. 5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig5.png" alt="Importance of validation"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig5.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>SPINE在有/无计划验证模块时的成功率对比。当环境完全已知（0%未知）时，两种模式成功率都较高。但当环境中未知部分超过20%时，无验证的成功率急剧下降——超过40%未知时接近0%。有验证模式的鲁棒性显著更强。</p>
+      <ul>
+        <li><strong>验证的关键价值</strong>：不是"锦上添花"而是"必需品"——在未知环境下，LLM频繁生成不可行的计划，没有验证的话系统几乎无法工作</li>
+        <li><strong>反馈的价值</strong>：即使是最简单的反馈（"目标点在图中断开"），也足以让LLM纠正大部分错误——体现了LLM的自我修正能力</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 7 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 7</span>
+      <span class="fig-caption">蒸馏前后模型规划能力对比——GPT-4o vs 蒸馏Llama 3.2 3B vs 原始Llama 3.2 3B</span>
+      <span class="fig-source">来源：论文 Fig. 7</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig7.png" alt="Planning capabilities across models"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig7.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>三个模型在同一规划任务上的表现对比。任务：对化学泄漏做出响应，找出从空中不可见的区域进行triage。</p>
+      <ul>
+        <li><strong>GPT-4o（左）</strong>：正确推理"building_interior_1和tree_cover_1从空中不可见"，生成两步计划goto + map_region——完美</li>
+        <li><strong>蒸馏Llama 3.2 3B（中）</strong>：接近正确——识别了不可见区域，但多包含了field_1（实际上可见），且计划顺序有误</li>
+        <li><strong>原始Llama 3.2 3B（右/中下）</strong>：完全无法生成合理计划——生成无关的推理（"The user wants to find regions..."）和错误的动作（goto parking_lot_2）</li>
+        <li><strong>92%→73%的提升</strong>：蒸馏将成功率从几乎无用的9.2%提升到有用的72.7%——虽然仍有差距，但证明了蒸馏的可行性</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9. POTENTIAL FLAW -->
+<section id="flaw">
+  <h2>9. 潜在缺陷与扩展方向</h2>
+
+  <h3>8.1 局限性</h3>
+  <ul>
+    <li><strong>任务复杂度有限</strong>：当前部署的任务最多8步推理，集中在导航、探索、检查等点目标类任务。更复杂的操作任务（如操纵物体、多机器人协调）尚未在野外验证。</li>
+    <li><strong>蒸馏的能力损失</strong>：蒸馏后模型（72.7%成功率）与GPT-4o（100%）仍有显著差距——尤其在多轮迭代规划和复杂语义推理方面。蒸馏方法目前无法处理长时域规划数据。</li>
+    <li><strong>视觉检测的分布偏移</strong>：Grounded SAM2在野外场景中频繁出现误检（将汽车误认为施工车辆、建筑误认为安全护栏）——这是模型在非自然图像分布上泛化能力不足的体现。</li>
+    <li><strong>通信依赖性</strong>：UGV部署仍依赖服务端LLM（GPT-4o）——通信中断直接导致任务失败。蒸馏方案虽解决了UAV的机载问题，但UGV场景对推理能力要求更高，蒸馏可能不足以应对。</li>
+    <li><strong>规模有限</strong>：虽然号称"公里级"，但任务距离在100m~1.2km之间，实验次数有限（14次任务）——统计显著性有限。</li>
+  </ul>
+
+  <h3>8.2 扩展方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从当前的点导航/探索任务扩展到更复杂的操作任务——如UGV不仅找到目标物体，还要操作它（抓取、运输等）。多机器人协调——多个UGV/UAV在共享语义图上协作完成复杂任务。</li>
+    <li><strong>条件放松</strong>：<strong>异构计算分配</strong>——大模型（如GPT-4o）负责复杂任务分解，分解后的小任务分配给运行蒸馏模型的机器人执行。这种"分解-分配"范式既能利用大模型的推理能力，又能减少对通信的依赖。</li>
+    <li><strong>约束加入</strong>：(1) 建立野外FM驱动机器人的标准化评估协议——包括任务复杂度、环境多样性、平台多样性的分级基准；(2) 针对UAV俯视视角微调视觉基础模型——减小分布偏移；(3) 开发针对物理环境的LLM安全过滤器——类似论文10017（ROBOPAIR）揭示的越狱风险，SPINE也需要防御恶意自然语言输入。</li>
+  </ul>
+
+  <h3>8.3 数据敏感性</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>通信中断</td><td>服务端LLM无法访问→规划停止→机器人"发呆"。Mesh网络需要预设中继节点，在动态变化的野外环境中可能失效</td><td>★★★★★</td></tr>
+    <tr><td>语义图质量问题</td><td>检测模型误检（将普通汽车标为施工车辆）会传播到LLM规划中→LLM基于错误信息做决策→任务失败或错误行为</td><td>★★★★</td></tr>
+    <tr><td>蒸馏数据分布偏差</td><td>蒸馏数据集来自特定环境中的任务——模型学到的是对特定环境类型的"死记硬背"而非泛化推理能力。新环境可能使蒸馏模型退化到接近原始SLM水平</td><td>★★★★</td></tr>
+    <tr><td>低层自主算法失效</td><td>里程计漂移、GPS信号丢失、LiDAR被遮挡→底层定位失败导致高层LLM计划无法执行。SPINE的验证层无法检测这些低层故障</td><td>★★★</td></tr>
+  </table>
+
+  <h3>8.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>野外FM驱动机器人的安全边界形式化验证</strong>——SPINE的plan validator使用规则检查（syntax/reachable/explorable），但这只是一个工程解决方案。更有价值的方向是：如何给出LLM规划器的<strong>安全形式化保障</strong>？例如，将LLM生成的计划转换为线性时序逻辑（LTL）公式，然后使用形式化验证工具证明系统不会违反安全属性。这项工作如果能结合LLM的灵活性和形式化方法的严格性，将是FM驱动机器人安全部署的重大突破。另一个方向：如何让蒸馏模型在新环境中进行<strong>在线持续学习</strong>——当机器人遇到蒸馏数据集中未见过的场景时，如何从GPT-4o（或其他强大LLM）获取"按需指导"来增量提升自身能力？
+  </div>
+</section>
+
+<!-- 10. MOTIVATION -->
+<section id="motivation">
+  <h2>10. 动机——第一性原理推导</h2>
+
+  <h3>9.1 想法推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>传统的机器人自主系统依赖预编程的行为树或状态机——机器人只能执行预先定义好的任务，无法应对用户以自然语言表达的"不完整"任务需求。LLM提供了灵活的自然语言理解和推理能力——但几乎所有的LLM驱动机器人工作都假设环境是结构化、已知的。野外机器人面临的是"未知+非结构化+长距离+通信受限"的复合挑战。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：（i）纯传统自主——几何地图+航点导航，鲁棒但不能处理语义级任务；（ii）LLM驱动但结构化环境（SayPlan、InnerMonologue等）——能处理语义但不能处理未知环境；（iii）LLM配合感知但依赖离板模型（NEUSIS等）——增加了感知但仍有通信瓶颈。没有工作同时解决"语义理解+未知环境+闭环规划+野外部署"四个需求。</li>
+    <li><strong>如果将LLM嵌入闭环系统呢？</strong><br>LLM不是一次性输出最终计划，而是在执行过程中不断接收环境反馈、更新地图、修正计划——就像一个"边走边想"的智能体。但LLM会犯错——所以需要验证层来过滤危险/不可行的输出。这就是SPINE的核心设计：规划-验证-反馈闭环。</li>
+    <li><strong>如果通信断了怎么办？</strong><br>将大模型的能力"压缩"到小模型——让它在机器人本地运行。LoRA微调提供了一种参数高效的蒸馏方法。虽然蒸馏后的能力有损失，但对于许多任务来说已经足够——而且可以继续改进。</li>
+    <li><strong>最简单的方案是什么？</strong><br>GPT-4o通过API接收自然语言任务+语义地图→输出API调用序列→验证器检查→机器人执行→语义图更新→反馈→重新规划。这就是SPINE。最简形式不需要蒸馏、不需要空地协同——但论文展示了这个框架向这些方向的扩展是自然且可行的。</li>
+  </ol>
+
+  <h3>9.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    LLM让机器人能理解自然语言——但现有LLM规划器假设环境已知，无法在野外工作——为什么不把LLM嵌入一个闭环系统中，让它能实时接收环境反馈并修正计划，同时通过模型蒸馏让它在没有网络时也能在机载设备上运行？
+  </div>
+
+  <h3>9.3 如何到达这个想法</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：FM驱动机器人在室内/结构化环境中表现惊艳（SayPlan、Code as Policies等），但无人尝试在野外部署。野外机器人仍依赖传统自主方法——无法处理语义级任务。这两个世界之间存在明显的"能力鸿沟"。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将野外FM驱动机器人部署分解为四个子问题——（1）未知环境下的语义推理（如何从不完整信息推断下一步？）；（2）LLM计划的安全性保证（如何防止幻觉导致物理危险？）；（3）通信受限时的后备方案（如何在没有云端LLM时工作？）；（4）多平台协同（如何让UAV和UGV用FM共享信息？）。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）GPT-4o → 语义推理引擎；（2）规则验证器 → 安全检查；（3）LoRA蒸馏 + Llama 3.2 3B → 机载推理；（4）层次语义图 → 空地共享的信息表征。</li>
+    <li><strong>Step 4 — 组装方案</strong>：将四个工具整合为SPINE框架→在三种野外环境中测试UGV（14次任务、12次成功）→蒸馏版本在UAV上测试（4次任务、3次成功）→总结教训并提出开放挑战。这篇文章的本质贡献是<strong>系统性地跨越"从demo到deployment"的鸿沟</strong>——而这正是目前FM驱动机器人领域最需要的工作。</li>
+  </ul>
+</section>
+
+<!-- 11. KEY TAKEAWAYS -->
+<section id="takeaway">
+  <h2>11. 关键收获</h2>
+
+  <h3>10.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这篇文章是"从论文到野外部署"的示范案例。大多数FM驱动机器人论文停留在仿真或结构化室内环境——而SPINE展示了将这些方法带到真实野外环境所需克服的工程挑战。核心启示：<strong>不要只关注AI能力本身，也要关注将AI嵌入物理世界所需的系统工程</strong>——通信、验证、容错、资源约束——这些"无聊"的工程问题往往是决定能否真正部署的关键。</li>
+    <li><strong>技术技巧层面</strong>：(1) <strong>模块化优于端到端</strong>——LLM做高层推理，传统算法做底层执行，验证层做安全检查——各司其职、可独立优化；(2) <strong>反馈闭环是LLM安全性的关键</strong>——即使最简单的反馈也能大幅提升成功率；(3) <strong>蒸馏让FM"上机"成为可能</strong>——虽然能力有损，但72.7%的成功率已经足够许多任务使用。</li>
+    <li><strong>实验/部署层面</strong>：野外实验需要大量的基础设施准备——Mesh网络部署和测试需要设置时间、放置中继节点、配置不同频段。Mobile Infrastructure on Demand等方案可能提供解决通信问题的替代路径。论文没有隐藏失败案例（2/14失败来自通信和里程计）——这种透明性值得学习。</li>
+  </ul>
+
+  <h3>10.2 对我的研究的直接启示</h3>
+  <ul>
+    <li><strong>对于UAV自主飞行方向</strong>：SPINE的蒸馏管道可以直接应用于UAV——将一个强大的服务端LLM（如GPT-4o）的规划能力蒸馏到小型机载模型（如Llama 3.2 3B），让UAV在没有通信的条件下用自然语言指令进行自主规划。这是将LLM能力带到SWaP约束平台上的关键技术路径。</li>
+    <li><strong>对于空地协同方向</strong>：层次语义图作为"lingua franca"的概念非常强大——UAV从高空构建宏观语义图，UGV在图上进行细节规划。这种"宏观-微观"的分工天然适合空地协同。如果在语义图中加入UAV飞行约束（如禁飞区、信号覆盖范围），就能实现真正的联合规划。</li>
+    <li><strong>对于越狱/安全方向</strong>：SPINE目前完全没有考虑LLM越狱攻击的防御（这正是论文10017 ROBOPAIR揭示的漏洞）。将ROBOPAIR中发现的攻击模式与SPINE的验证模块结合——在验证层增加安全意图检查——是一个自然且有价值的研究方向。</li>
+  </ul>
+
+  <h3>10.3 关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Ravichandran et al. (2025) — SPINE: Online Semantic Planning... ICRA 2025</td><td>SPINE的完整技术描述——包含plan generation和plan validation的详细设计。本文是在此基础上的野外部署扩展。</td></tr>
+    <tr><td>Liang et al. (2022) — Code as Policies: Language Model Programs for Embodied Control</td><td>开创了"LLM生成代码/API调用控制机器人"的范式——SPINE的API调用设计直接受此启发。</td></tr>
+    <tr><td>Shah et al. (2023) — LM-Nav: Robotic Navigation with Large Pre-trained Models</td><td>FM驱动机器人导航的代表性工作——但限于结构化环境和已有的导航图。SPINE通过加入主动探索和地图更新来解决其局限。</td></tr>
+    <tr><td>Hu et al. (2024) — Deploying and Evaluating LLMs to Program Service Mobile Robots</td><td>室内服务机器人的LLM部署——SPINE的野外部署可以视为其"野外版"。两者的经验教训互补。</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Ravichandran, Cladera et al. · ICRA Workshop on Field Robotics 2025 · SPINE — Deploying FM-Enabled Robots in the Field</footer>
+
+</div>
+</body>
+</html>

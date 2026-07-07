@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Force-Aware Grasping (Hoi, Wu et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">A Precise Real-Time Force-Aware Grasping System for Robust Aerial Manipulation（面向鲁棒空中操作的精确实时力感知抓取系统）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Kenghou Hoi</strong>、Yuze Wu、Annan Ding、Junjie Wang、Anke Zhao、Jialiang Hou、Chengqian Zhang、<strong>Fei Gao</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">浙江大学</strong>（Zhejiang University），湖州研究院</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">arXiv:2602.08599</strong>，<strong>2026年2月</strong></td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://arxiv.org/abs/2602.08599" target="_blank">arXiv:2602.08599</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出基于可变形四旋翼（556g手型飞行机器人）和6个磁性软触觉传感器（8g/个）的力感知抓取框架——通过<strong>参考霍尔传感器消除地磁干扰</strong>，结合<strong>导纳控制和实时力反馈</strong>实现易碎物体安全抓取和重量实时测量，全机载自主运行。单个传感器成本仅$10，力测量精度&lt;0.05N。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Aerial Manipulation</span>
+    <span class="tag tag-green">Tactile Sensing</span>
+    <span class="tag tag-amber">Force-Aware Grasping</span>
+    <span class="tag tag-purple">Magnetic Soft Sensor</span>
+    <span class="tag tag-red">Admittance Control</span>
+    <span class="tag tag-cyan">Deformable Quadrotor</span>
+    <span class="tag tag-gray">Onboard Autonomy</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么现有空中抓取系统难以处理易碎物体？</strong><br>
+    答：传统空中操作依赖机械结构（夹爪开合）或纯位置控制，缺乏精确的力反馈——要么抓不住，要么夹碎物体。商业力/扭矩传感器虽然精度高（&lt;0.01N），但重量达280g、成本$2000，对小型UAV来说负担过重。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>用磁性软触觉传感器阵列（$10/个、8g/个）替代昂贵的商业F/T传感器</strong>——通过磁场-力映射实现三维力测量。关键突破：（1）引入<strong>参考霍尔传感器</strong>消除地磁干扰，使传感器在飞行器任意姿态下都能准确测量接触力（无需依赖训练数据的闭式解耦算法）；（2）将触觉传感与导纳控制结合，使得抓取系统可以像人手一样感知接触力并自适应调节抓取力度。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>人手抓取物体的力调节机制——皮肤触觉反馈+肌肉导纳调节</td><td>→ 空中抓取不应只是位置控制（开/关），而应模仿人的抓取过程——持续感知接触力、自适应调节抓取力度。触觉传感器就是UAV的"皮肤"，导纳控制器就是"肌肉"</td><td>架构</td></tr>
+    <tr><td>霍尔效应——磁场随距离变化的物理规律</td><td>→ 将力转化为磁场变化，再通过霍尔传感器测量磁场来实现力感知。关键在于解耦：地磁场在所有传感器上产生一致的偏移量——用一颗参考霍尔传感器（远离磁铁/受力点）测量纯地磁分量，从各传感器的测量值中减掉</td><td>方法</td></tr>
+    <tr><td>导纳控制——位置/力混合控制框架</td><td>→ 导纳控制器将力偏差转化为位置修正：检测到过大夹持力→虚拟弹簧-阻尼模型产生反向位移→保护易碎物体。这是"力感知→自适应抓取"的桥梁</td><td>数学 / 控制</td></tr>
+    <tr><td>软体触觉传感（MIT ReSkin, 9DTact等）</td><td>→ 磁性软触觉传感方案轻量（8g vs 280g F/T传感器）且低成本（$10 vs $2000），但此前受限于地磁干扰（传感器随UAV姿态变化时，地磁分量变化掩盖真实力信号）。参考霍尔传感器的闭式解耦彻底解决了这一瓶颈</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 地磁解耦——参考霍尔传感器的闭式解耦算法</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>磁性触觉传感器利用磁铁位移→磁场变化来测量力，但UAV飞行中的姿态变化会导致地磁场在各传感器上的投影分量不断变化——如果不消除地磁干扰，力信号会淹没在地磁噪声中</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>阵列传感器的共模噪声消除原理——地磁场在空间上近似均匀，所有传感器经历相同的背景磁场</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在传感器阵列之外安装一颗额外的参考霍尔传感器（位置远离所有磁铁和受力点，仅感受环境磁场）。传感器i的实际力信号 = B_i_measured - B_ref。不需要任何标定数据或神经网络训练——纯物理模型。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 磁性软触觉传感器设计与低成本制造（$10/个）</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>商业F/T传感器（如ATI Nano17）精度虽高但重量280g、成本$2000，无法部署到小型UAV。现有软触觉传感器（ReSkin、9DTact）或受限于分辨率、或缺乏系统集成方案</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>磁铁-硅胶弹性体-霍尔传感器的三层结构——力压硅胶→磁铁位移→霍尔测磁场变化→推算力</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>三层结构（硅胶垫片+嵌入永磁体+底部霍尔传感器PCB），单传感器8g、$10。6个传感器阵列安装于变形四旋翼机身内壁。每个传感器对三个霍尔通道（Bx, By, Bz）采样，50Hz实时输出三维力向量</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 力感知自适应导纳控制框架</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统的空中抓取是"盲抓"——末端执行器按预定轨迹闭合，无法感知接触力，导致易碎物体要么夹不紧（滑落）要么夹碎（过力）</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>机械臂导纳控制——将末端执行器模拟为质量-弹簧-阻尼系统，外力驱动位移</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>导纳控制器接收6个触觉传感器的力反馈→计算总接触力→与期望力比较→力偏差通过虚拟弹簧-阻尼模型转化为位置修正→输出到末端执行器变形电机。实现了抓取力的闭环控制：抓得不够紧→自动收紧；抓得太紧→自动放松</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph HARDWARE["硬件平台层 (556g)"]
+      DRONE["可变形四旋翼 · 手型机身"]
+      ARM["5-DOF手指结构 · 腱驱动末端执行器"]
+      SENSORS["6个触觉传感器 · 8g/个 · 机身内壁阵列"]
+      REFSENSOR["参考霍尔传感器 · 地磁解耦"]
+      COMPUTE["机载计算单元 · 全自主"]
+    end
+
+    subgraph SENSING["力感知层 (50Hz)"]
+      HALL_RAW["霍尔原始信号 Bx, By, Bz · 含地磁干扰"]
+      DECOUPLE["参考传感器减法 · 闭式地磁解耦"]
+      FORCE3D["三维力向量 Fi = [Fx, Fy, Fz] · 每传感器"]
+      FORCE_TOTAL["合成总接触力 · 6传感器融合"]
+    end
+
+    subgraph CONTROL["导纳控制层"]
+      ADMITTANCE["导纳控制器 · 质量-弹簧-阻尼模型"]
+      FORCE_ERR["力偏差 ΔF = F_desired - F_measured"]
+      POS_CMD["位置修正量 Δx = ΔF / (ms² + bs + k)"]
+      MOTORS["末端执行器电机 · 变形控制"]
+    end
+
+    subgraph GRASP["抓取执行层"]
+      APPROACH["接近目标 · 飞行轨迹规划"]
+      CONTACT["建立接触 · 触觉传感器检测"]
+      ADAPT["力自适应 · 导纳调节抓力"]
+      LIFT["提升物体 · 实时重量测量"]
+    end
+
+    DRONE --> ARM --> SENSORS
+    SENSORS --> HALL_RAW
+    REFSENSOR --> DECOUPLE
+    HALL_RAW --> DECOUPLE --> FORCE3D --> FORCE_TOTAL
+    FORCE_TOTAL --> ADMITTANCE --> FORCE_ERR --> POS_CMD --> MOTORS
+    MOTORS --> ARM
+    APPROACH --> CONTACT --> ADAPT --> LIFT
+
+    FORCE_TOTAL -.->|"反馈: 抓力实时监测"| ADAPT
+    MOTORS -.->|"反馈: 变形状态更新"| FORCE3D
+
+    classDef hardware fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef sensing fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef control fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef grasp fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class DRONE,ARM,SENSORS,REFSENSOR,COMPUTE hardware
+    class HALL_RAW,DECOUPLE,FORCE3D,FORCE_TOTAL sensing
+    class ADMITTANCE,FORCE_ERR,POS_CMD,MOTORS control
+    class APPROACH,CONTACT,ADAPT,LIFT grasp
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 力感知→导纳控制→抓取执行</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph MAGNETIC["磁场测量 (50Hz)"]
+      direction LR
+      B_RAW["6传感器 × 3通道 · Bx,By,Bz原始值"] --> B_REF["参考传感器 · 纯地磁分量"]
+      B_RAW --> SUB["差值计算 B_signal = B_raw - B_ref"]
+    end
+
+    subgraph FORCE["力估计"]
+      direction LR
+      CALIB["离线标定矩阵 C · 磁-力映射"] --> B2F["F = C · B_signal · 三维力向量"]
+      FUSION["6传感器力向量融合 · 总接触力/力矩"]
+    end
+
+    subgraph ADMIT["导纳控制回路"]
+      direction LR
+      DESIRED["期望力 F_d 设定"] --> ERR["ΔF = F_d - F_measured"]
+      ERR --> MASS["虚拟质量-弹簧-阻尼 M,B,K"]
+      MASS --> DX["位置修正 Δx"]
+    end
+
+    subgraph DEFORM["变形执行"]
+      direction LR
+      MOTOR_CMD["电机位置指令"] --> FINGER["手指腱驱动变形"]
+      FINGER --> GRASP_FORCE["实际抓取力 · 作用于物体"]
+    end
+
+    subgraph MEASURE["重量测量"]
+      LIFT_OBJ["提升物体"] --> WEIGHT_F["通过触觉力向量计算物体重量"]
+    end
+
+    MAGNETIC --> FORCE --> ADMIT --> DEFORM
+    DEFORM --> MEASURE
+    GRASP_FORCE -.->|"触觉反馈闭环"| MAGNETIC
+    ERR -.->|"力偏差驱动"| MASS
+    WEIGHT_F -.->|"实时重量读数"| MEASURE
+
+    classDef mag fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef force fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef admit fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef deform fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef measure fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class B_RAW,B_REF,SUB mag
+    class CALIB,B2F,FUSION force
+    class DESIRED,ERR,MASS,DX admit
+    class MOTOR_CMD,FINGER,GRASP_FORCE deform
+    class LIFT_OBJ,WEIGHT_F measure
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 从感知到抓取的全流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph INIT["阶段1: 初始化和标定"]
+      direction LR
+      I1["硬件上电 · 传感器初始化"] --> I2["离线标定 · 每个传感器B-F映射矩阵"]
+      I2 --> I3["参考传感器校准 · 记录地磁基线"]
+    end
+
+    subgraph APPROACH["阶段2: 接近与接触"]
+      direction LR
+      A1["飞行器接近目标物体 · 位置控制"] --> A2["末端执行器张开·准备抓取"]
+      A2 --> A3["建立接触·触觉传感器检测到力响应"]
+    end
+
+    subgraph GRASP["阶段3: 力感知自适应抓取"]
+      direction LR
+      G1["接触建立 · 传感器开始输出力向量"] --> G2["导纳控制器激活 · 闭环力调节"]
+      G2 --> G3["自适应收紧 · 直到接触力达到期望值"]
+      G3 --> G4["抓取稳定 · 实时力监测 · 防滑/防碎"]
+    end
+
+    subgraph MANIP["阶段4: 操作与释放"]
+      direction LR
+      M1["提升物体 · 触觉力测量物体重量"] --> M2["空中运输 · 持续力监测"]
+      M2 --> M3["目标位置 · 释放物体"]
+      M3 --> M4["抓取完成 · 传感器归零"]
+    end
+
+    INIT -->|"标定完成"| APPROACH
+    APPROACH -->|"接触检测"| GRASP
+    GRASP -->|"稳定抓取"| MANIP
+
+    G4 -.->|"力偏差反馈"| G2
+    M4 -.->|"准备下一轮"| A1
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef app fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef grasp fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef manip fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class I1,I2,I3 init
+    class A1,A2,A3 app
+    class G1,G2,G3,G4 grasp
+    class M1,M2,M3,M4 manip
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \min_{\mathbf{u}} \| \mathbf{F}_{\text{contact}} - \mathbf{F}_{\text{desired}} \| \quad \text{s.t.} \quad \mathbf{F}_{\text{contact}} \le \mathbf{F}_{\text{break}},\quad \mathbf{F}_{\text{contact}} \ge \mathbf{F}_{\text{slip}} $$
+    <div class="eq-note">
+      <strong>$\mathbf{F}_{\text{contact}}$</strong> = 通过6个触觉传感器实时测量的总接触力向量 &nbsp;|&nbsp;
+      <strong>$\mathbf{F}_{\text{desired}}$</strong> = 期望抓取力（足够紧但不损坏物体）&nbsp;|&nbsp;
+      <strong>$\mathbf{F}_{\text{break}}$</strong> = 物体破碎力阈值（易碎品上限）&nbsp;|&nbsp;
+      <strong>$\mathbf{F}_{\text{slip}}$</strong> = 物体滑落力阈值（抓取下限）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：在飞行器自重仅556g、总有效载荷有限的条件下，通过轻量触觉传感（6×8g = 48g）实现精确力感知（&lt;0.05N精度），使得导纳控制器能将接触力维持在[F_slip, F_break]的安全窗口内。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>6个触觉传感器各3通道霍尔信号（Bx, By, Bz）+ 参考传感器3通道地磁信号</td><td>18 + 3 = 21维磁场数据 @ 50Hz</td></tr>
+    <tr><td><strong>输出</strong></td><td>末端执行器变形指令——自适应抓取力；物体重量估计——实时读数</td><td>手指电机位置指令；重量标量（通过提升阶段力向量均值估算）</td></tr>
+    <tr><td><strong>目标</strong></td><td>实现对易碎物体（如薯片、纸杯、草莓）的安全抓取、空中运输和精确释放——此前空中操作无法做到</td><td>力测量精度&lt;0.05N，抓取成功率显著优于无触觉方案</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>硬件-感知-控制全栈系统</strong>——从传感器硬件设计（磁性软触觉传感器、地磁解耦）、到实时力感知算法（50Hz闭环）、到导纳控制框架（力反馈自适应抓取），覆盖了空中操作的完整技术链条。平台：556g变形四旋翼（手型飞行机器人），场景：对易碎物体的安全空中抓取与操作，任务：证明"轻型触觉传感+导纳控制"可以让小型UAV像人手一样精细操作。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：空中操作的重量-精度-成本三元悖论。<br><br>
+    （1）<strong>重量约束 vs 感知精度</strong>：精确的力感知需要高精度传感器——商业F/T传感器精度&lt;0.01N但重达280g，对于自重仅556g的飞行器来说是50%的有效载荷。轻量触觉传感器（8g）又面临精度不足和噪声干扰的问题<br><br>
+    （2）<strong>地磁干扰——移动平台独特的感知挑战</strong>：磁性触觉传感器依赖磁场变化测量力，但飞行中的UAV姿态持续变化→地磁场在各传感器轴上的投影分量不断变化→如果不消除地磁干扰，真实力信号（mN级变化）会被地磁漂移（μT级变化，在多传感器间不统一）完全掩盖。这是地面机器人的磁性传感器不需要面对的问题。<br><br>
+    （3）<strong>抓取力的安全窗口极窄</strong>：对于易碎物体（如纸杯、薯片），F_slip和F_break之间的窗口可能只有0.1~0.3N——传感器精度（&lt;0.05N）、控制频率（50Hz）和机械响应速度必须同时满足要求，任何一个环节的延迟/误差都可能导致抓取失败。<br><br>
+    <strong>将这三点放在一起</strong>：你需要在一个总重556g的飞行器上，用总重48g、总成本$60的传感器阵列实现&lt;0.05N的力测量精度，在飞行姿态动态变化的条件下消除地磁干扰，然后用这些力信号在极窄的安全窗口内自适应调节抓取力度。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Commercial F/T Sensor（商业力/扭矩传感器，如ATI Nano17）</td>
+      <td>应变片式六维力/扭矩传感器，精度极高（&lt;0.01N）</td>
+      <td>重量280g、成本$2000——对小UAV（556g）太重太贵。而且通常安装在机械臂末端，不适用于变形机身一体化的抓取结构</td>
+    </tr>
+    <tr>
+      <td>9DTact（低成本磁触觉传感器）</td>
+      <td>磁铁-硅胶-霍尔三层结构，90Hz采样率，20g，$30</td>
+      <td>精度仅&lt;0.4N——不够用于易碎物体抓取（安全窗口通常&lt;0.3N）。且未解决UAV飞行中的地磁干扰问题</td>
+    </tr>
+    <tr>
+      <td>ReSkin（MIT磁性皮肤传感器）</td>
+      <td>柔性磁触觉皮肤，400Hz采样率，薄至2mm</td>
+      <td>精度&lt;0.3N，同样不足。且依赖复杂的外部位移测量标定和训练数据，难以在飞行状态变化的场景中鲁棒运行</td>
+    </tr>
+    <tr>
+      <td>纯视觉抓取（无触觉反馈）</td>
+      <td>用相机检测物体、规划抓取姿态，电机按预定轨迹闭合</td>
+      <td>完全缺乏力反馈——对于刚性物体尚可，但对易碎物体（需要精确力控制）完全无能为力。无法感知抓取是否成功、物体是否滑落、是否即将夹碎</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 轻量且精确的触觉感知（&lt;8g、&lt;$10、&lt;0.05N精度）</strong>：在8g的单传感器质量预算内实现0.05N精度——比9DTact高8倍、比ReSkin高6倍。这需要精心设计磁铁-硅胶的力学特性和霍尔传感器的布局</li>
+    <li><strong>挑战 2 — 飞行姿态变化下的地磁解耦</strong>：UAV飞行中的滚转/俯仰/偏航持续改变地磁在各传感器轴上的投影。用一颗额外的参考霍尔传感器+闭式减法消除地磁——简单但此前无人系统地实现和验证，因为大多数地面机器人不需要处理这个问题</li>
+    <li><strong>挑战 3 — 抓取力的闭环控制带宽</strong>：导纳控制需要在50Hz（传感器采样率）下完成力感知→力偏差→位置修正→电机驱动的完整闭环。任何延迟都会在F_slip和F_break之间的窄窗口内造成超调——特别是对刚性大的物体（力变化陡峭）</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心算法包括三个模块：（1）地磁解耦——利用参考传感器消除环境磁场干扰；（2）磁场-力映射——将霍尔传感器读数转化为三维力向量；（3）导纳控制——将力偏差转化为位置修正，实现自适应抓取。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: 地磁解耦 -->
+  <h4>Group A: 地磁解耦——参考传感器消除环境磁场干扰</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 地磁解耦</span>
+    $$ \mathbf{B}_{\text{contact}}^{(i)} = \mathbf{B}_{\text{measured}}^{(i)} - \mathbf{B}_{\text{ref}} \quad (i = 1,\dots,6) $$
+    <div class="eq-note">
+      <strong>$\mathbf{B}_{\text{measured}}^{(i)}$</strong> = 第i个触觉传感器的霍尔3通道原始读数（含地磁+磁铁信号）&nbsp;|&nbsp;
+      <strong>$\mathbf{B}_{\text{ref}}$</strong> = 参考霍尔传感器的3通道读数（仅地磁分量，因为该传感器远离所有磁铁和受力点）&nbsp;|&nbsp;
+      <strong>$\mathbf{B}_{\text{contact}}^{(i)}$</strong> = 解耦后的纯接触力相关磁场信号 &nbsp;|&nbsp;
+      <strong>关键假设</strong>：地磁场在空间上近似均匀（在UAV机身尺度上完全成立），因此所有传感器经历相同的地磁背景——做减法即可完美消除。
+    </div>
+  </div>
+
+  <!-- Formula Group B: 磁-力映射 -->
+  <h4>Group B: 磁场-力映射——从磁信号到三维力向量</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 线性磁-力映射</span>
+    $$ \mathbf{F}^{(i)} = \mathbf{C}^{(i)} \cdot \mathbf{B}_{\text{contact}}^{(i)} $$
+    <div class="eq-note">
+      <strong>$\mathbf{F}^{(i)}$</strong> = 第i个传感器的三维力向量 [Fx, Fy, Fz] &nbsp;|&nbsp;
+      <strong>$\mathbf{C}^{(i)}$</strong> = 第i个传感器的3×3标定矩阵（离线标定获得——用已知力施加到传感器，记录磁场响应，线性最小二乘拟合）&nbsp;|&nbsp;
+      <strong>总接触力</strong>：$\mathbf{F}_{\text{total}} = \sum_{i=1}^{6} \mathbf{F}^{(i)}$ &nbsp;|&nbsp;
+      <strong>线性假设</strong>：在硅胶弹性体的小变形范围内，磁铁位移∝力，霍尔输出电压∝位移——整个链条近似线性，因此用一个3×3矩阵即可描述磁-力映射关系。
+    </div>
+  </div>
+
+  <!-- Formula Group C: 导纳控制 -->
+  <h4>Group C: 导纳控制——力偏差→位置修正</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 导纳控制器</span>
+    $$ M \Delta\ddot{x} + B \Delta\dot{x} + K \Delta x = \mathbf{F}_{\text{desired}} - \mathbf{F}_{\text{contact}} $$
+    <div class="eq-note">
+      <strong>$M, B, K$</strong> = 虚拟质量、阻尼、刚度参数（设计者可调的导纳参数）&nbsp;|&nbsp;
+      <strong>$\mathbf{F}_{\text{desired}}$</strong> = 期望抓取力（由任务设定，对于易碎物体设较低值，对于重物体设较高值）&nbsp;|&nbsp;
+      <strong>$\mathbf{F}_{\text{contact}}$</strong> = 从6个传感器估计的总接触力 &nbsp;|&nbsp;
+      <strong>$\Delta x$</strong> = 末端执行器的位置修正量（输出到变形电机的位移指令）&nbsp;|&nbsp;
+      <strong>物理直觉</strong>：如果接触力小于期望力（抓得不够紧），右侧为正→驱动末端向夹紧方向移动；如果接触力过大（即将夹碎），右侧为负→驱动末端向松开方向移动。质量和阻尼项平滑过渡，避免振荡。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>传感器数量</td><td><strong>6个</strong></td><td>机身内壁均匀分布的触觉传感器阵列</td><td>变形四旋翼的C形抓取轮廓需要多个接触点——6个传感器覆盖主要接触区域，在精度和重量（6×8g=48g）之间平衡</td></tr>
+    <tr><td>传感器采样率</td><td><strong>50 Hz</strong></td><td>每个传感器3通道磁场的采样频率</td><td>抓取力的动态变化相对缓慢（人手抓取~10Hz带宽），50Hz足以捕捉接触力变化，同时留足计算资源给导纳控制器和飞行控制</td></tr>
+    <tr><td>力测量精度</td><td><strong>&lt;0.05 N</strong></td><td>经地磁解耦后的三维力测量误差</td><td>对于薯片/纸杯等易碎物体安全窗口约0.1~0.3N——0.05N精度保证至少有2~6个精度步长用于调节，足够完成安全抓取</td></tr>
+    <tr><td>传感器重量</td><td><strong>8 g/个</strong></td><td>单个触觉传感器（硅胶+磁铁+PCB+霍尔芯片）</td><td>$10/个的超低成本也意味着可量产。6个传感器仅占飞行器自重的8.6%——这是商业F/T传感器（280g/50%）完全无法比拟的</td></tr>
+    <tr><td>飞行器总重</td><td><strong>556 g</strong></td><td>变形四旋翼 + 传感器阵列 + 机载计算</td><td>手型飞行机器人——比传统带机械臂的空中操作平台轻一个数量级（通常2~5kg），但通过变形机身实现一体化抓取</td></tr>
+  </table>
+
+  <h3>6.4 传感器性能对比</h3>
+  <table>
+    <tr><th>传感器方案</th><th>精度</th><th>采样率</th><th>重量</th><th>成本</th><th>地磁解耦</th></tr>
+    <tr><td>ATI Nano17 (F/T Sensor)</td><td>&lt;0.01 N</td><td>1000 Hz</td><td>280 g</td><td>$2000</td><td>N/A (应变片)</td></tr>
+    <tr><td>9DTact</td><td>&lt;0.4 N</td><td>90 Hz</td><td>20 g</td><td>$30</td><td>无</td></tr>
+    <tr><td>ReSkin (MIT)</td><td>&lt;0.3 N</td><td>400 Hz</td><td>~5 g</td><td>~$20</td><td>无</td></tr>
+    <tr class="highlight"><td><strong>Ours (本文)</strong></td><td>&lt;0.05 N</td><td>50 Hz</td><td>8 g</td><td>$10</td><td>参考传感器闭式解耦</td></tr>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 本文方案的关键权衡</div>
+    在精度/成本/重量三维空间里，本文方案选择了"适中采样率（50Hz）+ 高精度（0.05N）+ 极低成本（$10/8g）+ 地磁解耦"。50Hz之所以够用，是因为抓取力的带宽远低于电机控制带宽——导纳控制主要工作在准静态力调节模式，不需要kHz级采样。
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本系统需要掌握三个关键技术原理：磁性软触觉传感（如何将力转化为可测量的磁信号）、地磁解耦（为什么需要参考传感器）、导纳控制（如何让机器人像人手一样自适应抓取）。</p>
+
+  <h3>7.1 磁性软触觉传感器——力→形变→磁场→电信号</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 磁性触觉传感器的工作链</span>
+    $$ F_{\text{contact}} \rightarrow \delta_{\text{silicone}} \rightarrow \Delta d_{\text{magnet}} \rightarrow \Delta \mathbf{B}_{\text{Hall}} \rightarrow V_{\text{out}} $$
+    <div class="eq-note">
+      <strong>$F_{\text{contact}}$</strong> = 作用于传感器表面的接触力 &nbsp;|&nbsp;
+      <strong>$\delta_{\text{silicone}}$</strong> = 硅胶弹性体的压缩形变量（小变形，线性区）&nbsp;|&nbsp;
+      <strong>$\Delta d_{\text{magnet}}$</strong> = 嵌入硅胶中的永磁体的位移量 &nbsp;|&nbsp;
+      <strong>$\Delta \mathbf{B}_{\text{Hall}}$</strong> = 霍尔传感器处的磁场变化（$\mathbf{B} \propto 1/d^3$，即磁场强度与距离的三次方成反比）&nbsp;|&nbsp;
+      <strong>$V_{\text{out}}$</strong> = 霍尔芯片输出电压（比例于磁场分量Bx, By, Bz）&nbsp;|&nbsp;
+      <strong>核心特征</strong>：在小变形范围内，$F \propto \delta \propto V_{\text{out}}$——整个链条近似线性，所以用一个3×3矩阵就能完成磁-力映射。
+    </div>
+  </div>
+
+  <p>磁性触觉传感的优势：（1）非接触式测量——磁铁不需要与霍尔芯片物理接触，无磨损；（2）三维感知——一个三轴霍尔芯片可同时感知Bx/By/Bz三个分量，提供完整的三维力信息；（3）制造简单——硅胶浇注+磁铁嵌入+PCB焊接，工艺成熟成本低。劣势：对磁场噪声敏感（地磁、电磁干扰），这正是本文用地磁解耦解决的核心问题。</p>
+
+  <h3>7.2 地磁解耦——为什么一颗额外的霍尔传感器就够了</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 地磁解耦的物理解释</span>
+    $$ \mathbf{B}_{\text{measured}}^{(i)}(t) = \mathbf{B}_{\text{magnet}}^{(i)}(F) + \mathbf{B}_{\text{geo}}(\theta(t), \phi(t), \psi(t)) + \mathbf{B}_{\text{motor}}(t) $$
+    <div class="eq-note">
+      <strong>$\mathbf{B}_{\text{magnet}}^{(i)}(F)$</strong> = 由接触力F引起的磁铁位移产生的磁场变化——这是<strong>我们需要的信号</strong> &nbsp;|&nbsp;
+      <strong>$\mathbf{B}_{\text{geo}}(\theta, \phi, \psi)$</strong> = 地磁场在传感器坐标系中的投影——随UAV姿态角变化，是<strong>干扰信号</strong> &nbsp;|&nbsp;
+      <strong>$\mathbf{B}_{\text{motor}}(t)$</strong> = 电机电磁干扰——高频分量 &nbsp;|&nbsp;
+      <strong>地磁场的空间均匀性假设</strong>：在UAV机身尺度（~30cm）内，地磁场的大小和方向基本不变。因此参考传感器的读数 $\mathbf{B}_{\text{ref}} \approx \mathbf{B}_{\text{geo}} + \mathbf{B}_{\text{motor}}$（远离磁铁和受力点，无$\mathbf{B}_{\text{magnet}}$成分）。做减法后 $\mathbf{B}_{\text{contact}}^{(i)} = \mathbf{B}_{\text{measured}}^{(i)} - \mathbf{B}_{\text{ref}} \approx \mathbf{B}_{\text{magnet}}^{(i)}(F)$——只剩下力相关的信号。
+    </div>
+  </div>
+
+  <p><strong>为什么是闭式解而不是训练数据？</strong>：因为地磁场-姿态的关系是纯几何的（3D旋转），理论上可以用解析式表达。但实际中需要精确知道UAV的实时姿态和当地地磁倾角——这些本身就是带噪声的估计值。参考传感器方案绕过了所有这些中间变量：直接在传感器层面做减法，不需要任何模型或训练——一个简单而优雅的工程解决方案。</p>
+
+  <h3>7.3 导纳控制——模拟人手抓取的虚拟弹簧-阻尼模型</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 导纳控制 vs 阻抗控制的区别</span>
+    $$ \text{阻抗控制：输入位移} \rightarrow \text{输出力} \quad F = K(x_d - x) + B(\dot{x}_d - \dot{x}) $$
+    $$ \text{导纳控制：输入力} \rightarrow \text{输出位移} \quad M\Delta\ddot{x} + B\Delta\dot{x} + K\Delta x = F_d - F_e $$
+    <div class="eq-note">
+      <strong>阻抗控制</strong> = 控制器测量位置偏差→输出力指令→发送给执行器。适合"你想让环境感受什么力"的场景（如打磨、装配）。前提是执行器本身能精确控制力输出。&nbsp;|&nbsp;
+      <strong>导纳控制</strong> = 控制器测量力偏差→输出位置指令→发送给执行器。适合"你想让末端表现出什么运动特性"的场景。更适合本文，因为：（1）变形电机天然接受位置指令（角度/位移）；（2）触觉传感器天然输出力信号——力输入→位置输出正好匹配传感器和执行器的物理接口。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🎯 导纳控制（本文采用）</h4>
+      <ul>
+        <li>外回路：力控制——<strong>力偏差 → 位置修正</strong></li>
+        <li>内回路：位置控制——电机位置伺服</li>
+        <li>传感器输出力 → 天然适合导纳架构</li>
+        <li>电机接受位置指令 → 天然适合导纳架构</li>
+        <li>物理直觉：像人手——先感受到力，再调节抓取力度</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🔧 阻抗控制（未采用）</h4>
+      <ul>
+        <li>外回路：位置控制——<strong>位置偏差 → 力指令</strong></li>
+        <li>内回路：力控制——执行器力伺服</li>
+        <li>传感器输出力 → 需要转化为位置偏差</li>
+        <li>电机接受位置指令 → 需要额外的力内环</li>
+        <li>物理直觉：像机器——先设定目标位置，再计算所需力</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    软触觉传感器将力转化为磁场变化（原理1）→ 参考传感器消除地磁干扰，提取纯净的力信号（原理2）→ 导纳控制器将力偏差转化为平滑的位置修正（原理3）→ 变形电机执行抓取力度调整。这三个原理形成了完整的"感知→决策→执行"闭环，使得556g的手型飞行机器人可以像人手一样精细地抓取易碎物体。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig4.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">力感知抓取系统概览——硬件平台与传感器设计</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="System overview and sensor design"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 556g手型飞行机器人的整体外观——C形抓取轮廓容纳被抓物体，6个触觉传感器（蓝色标注）安装在机身内壁的接触区域，参考传感器（红色标注）安装在远离受力点的位置。(b) 单个触觉传感器的三层结构爆炸图——顶层硅胶弹性体（接触面）、中层嵌入永磁体（力-位移转换）、底层PCB+三轴霍尔芯片（位移-电信号转换）。(c) 传感器在抓取中的受力示意图——物体被C形机身包裹，触觉传感器与物体表面接触，导纳控制器调节抓取力度。</p>
+      <ul>
+        <li><strong>C形抓取轮廓的仿生设计</strong>：灵感来源于人手抓握——手掌和手指形成环形包裹，接触点分布在多个位置。C形机身天然提供了多接触点几何，触觉传感器阵列恰好覆盖这些接触区域</li>
+        <li><strong>参考传感器的位置选择</strong>：远离所有磁铁（至少20mm）和受力变形区域，确保其读数仅为环境磁场。论文通过实验验证了该位置在不同飞行姿态下地磁读数的一致性</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">地磁解耦效果与力测量标定结果</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Geomagnetic decoupling and calibration"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：地磁解耦的定量效果和传感器标定精度。(a) 飞行器在多种姿态（水平、滚转30°、俯仰30°）下，未解耦的传感器读数——可见地磁分量引起的大幅漂移（可达数百μT）。(b) 解耦后的信号——地磁漂移被有效消除，仅剩力相关分量。(c) 6个传感器各自的力标定曲线——实际力（横轴）vs 估计力（纵轴），线性度R²>0.97，验证了线性磁-力映射模型的合理性。</p>
+      <ul>
+        <li><strong>地磁漂移的幅值</strong>：在30°姿态变化下，地磁分量在传感器轴上的投影可变化数百μT——而接触力（0~1N范围）引起的磁场变化仅约10~50μT。不解耦的话，力信号完全被地磁噪声淹没</li>
+        <li><strong>解耦后的残余误差</strong>：&lt;0.05N，主要来源于参考传感器和触觉传感器之间的微小地磁梯度（机身尺度的空间不均匀性）+ 电机高频电磁干扰</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">导纳控制抓取实验——易碎物体与重量测量</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Admittance control grasping experiments"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：导纳控制在真实抓取任务中的表现。(a) 易碎物体抓取实验——薯片袋、纸杯、草莓等物体，接触力时间曲线显示抓取力在0.2~0.5N的窄窗口内稳定维持。(b) 无触觉反馈vs有触觉反馈对比——无反馈方案频繁出现滑落（力过小）或夹碎（力过大），有反馈方案成功率显著更高。(c) 重量测量实验——飞行器抓取物体后悬停，通过触觉传感器测量物体重量（抓取前后的力向量变化），误差在±5g以内。</p>
+      <ul>
+        <li><strong>接触力稳定时间</strong>：从初始接触到力稳定约1~2秒，取决于导纳参数（M, B, K）的调谐。过大阻尼导致响应慢，过小阻尼引起振荡</li>
+        <li><strong>重量测量的物理原理</strong>：抓取后提升物体→触觉传感器受到的力 = 物体重力分量 + 原接触力。通过对比抓取前（仅有接触力）和抓取后提升（接触力+重力）的力向量差，提取物体重量</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">多种操作任务——抓取、传递、越障的触觉力曲线</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Multi-task manipulation experiments"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 物体传递实验——飞行器将物体从A点抓取并运输到B点释放，全程触觉力曲线无中断。(b) 越障抓取——飞行器穿越狭窄窗口后抓取目标物体，飞行机动期间的触觉力信号展示出姿态变化引起的短暂地磁干扰被有效抑制。(c) 人机交互实验——人手将物体递给飞行器，飞行器检测到接触力后自动激活导纳抓取——展示了触觉反馈在非结构化人机交互中的潜力。</p>
+      <ul>
+        <li><strong>飞行机动中的触觉稳定性</strong>：飞行器加速/减速时惯性力会耦合到触觉信号中——但通过高频惯性补偿（IMU测量加速度→计算惯性力→从总力中扣除），可以在飞行机动中维持可靠的力感知</li>
+        <li><strong>人机交互的安全性</strong>：导纳控制的柔性特性使得人手接触飞行器时不会受伤——力偏差→自动后退→避免碰撞。这是刚性位置控制无法实现的安全特性</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 地磁场在机身尺度上空间均匀——这在绝大多数户外/室内环境中成立，但电机强磁场（大电流时）可能破坏这一假设；(2) 硅胶弹性体工作在小变形线性区——大抓取力可能导致非线性效应，降低力测量精度；(3) 传感器与物体的接触状态是"点接触"——对于不规则形状物体，可能只有部分传感器接触。</li>
+    <li><strong>适用场景</strong>：目前主要针对<strong>轻量易碎物体</strong>（薯片、纸杯、水果、鸡蛋等），抓取力上限受限于传感器量程（~2N）。对于重物（如1kg以上），C形抓取轮廓的几何约束可能不足。同时依赖变形机身——不适用于传统刚性机身的四旋翼。</li>
+    <li><strong>可扩展性</strong>：传感器数量固定为6个——对于更大或更小的抓取场景，传感器分布和数量需要重新设计。标定过程为离线完成，如果硅胶老化或磁铁位移（长期使用），标定矩阵可能漂移。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：(1) 传感器阵列可扩展至手指内部——在每个手指的指节安装微型触觉传感器，实现更精细的多点力感知；(2) 触觉+视觉融合——将触觉力信号与视觉深度信息融合，使抓取规划同时考虑几何（视觉）和力学（触觉）约束</li>
+    <li><strong>条件放松</strong>：(1) 适应性标定——利用抓取过程中的力-位移数据在线更新标定矩阵，应对硅胶老化和温度变化；(2) 高磁场环境鲁棒性——增加铁磁屏蔽罩或使用更高动态范围的霍尔芯片，在电机大电流干扰下维持精度</li>
+    <li><strong>约束加入</strong>：(1) 多物体顺序抓取与放置——利用触觉确认每个物体的抓取/释放状态；(2) 动态抓取——在飞行中抓取移动物体，需要更高的控制带宽和预测性力估计；(3) 滑移检测——利用触觉信号的高频成分（接触力突变/振动）检测物体滑动，触发快速重新抓取</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>电机电磁干扰（PWM大电流尖峰）</td><td>电机PWM开关瞬间产生强磁场脉冲（远强于磁铁信号），可能饱和霍尔传感器或造成错误的力读数。目前的50Hz采样率可能混叠这些高频干扰</td><td>★★★★</td></tr>
+    <tr><td>温度漂移（硅胶热膨胀 + 霍尔灵敏度温漂）</td><td>硅胶弹性体在温度变化时膨胀/收缩→磁铁位移变化→力读数偏移。霍尔芯片的灵敏度也有温度系数（~0.1%/°C）。长时间飞行中电机发热可能引起数度的温度变化</td><td>★★★</td></tr>
+    <tr><td>硅胶老化与力学特性退化</td><td>反复压缩/释放循环（每次抓取一次）会导致硅胶的弹性模量变化（蠕变、应力松弛）——标定矩阵逐渐失效。尤其是在高频使用场景下</td><td>★★★</td></tr>
+    <tr><td>地磁梯度（非均匀磁场环境）</td><td>在铁磁结构附近（钢筋建筑、铁桥、船舶甲板），地磁场不再空间均匀——参考传感器和各触觉传感器经历不同的背景磁场，减法解耦失效</td><td>★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>触觉-视觉-惯导多模态融合的自主空中操作</strong>——将触觉力感知（接触信息）与视觉SLAM（环境几何）和IMU（本体运动）融合，实现完全自主的"搜索→接近→抓取→运输→放置"全流程。核心问题：(1) 视觉检测到目标后，如何利用触觉确认抓取成功（视觉可能被遮挡）？(2) 触觉力和视觉深度如何联合优化抓取姿态（力-几何共优化）？(3) 惯性力补偿如何与触觉力估计耦合以提高飞行机动中的力感知鲁棒性？(4) 如果这个方向成功，将首次实现小型UAV对任意未知物体的鲁棒自主抓取——结合SLAM导航和触觉操作，在仓库物流、灾难救援、太空碎片清除等场景有巨大应用潜力。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>空中操作的根本瓶颈不是"能不能飞过去"（飞行控制已经成熟），而是"抓不抓得住"和"会不会抓碎"。缺乏力感知的空中抓取就像一个人戴了三层厚手套去拿豆腐——要么滑掉要么捏碎。核心原因是重量约束使得传统精密力传感器无法上机。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：（i）用商业F/T传感器——精度高但太重太贵，只适合大型无人机（>5kg级别）；（ii）用轻量软触觉传感器（ReSkin、9DTact）——轻且便宜但精度不够（>0.3N），无法处理易碎物体；（iii）不用力反馈纯靠视觉——完全盲抓，对易碎物体成功率极低。</li>
+    <li><strong>如果让软触觉传感器变精确呢？</strong><br>软触觉传感器精度不足的主要原因是噪声——其中最大、最难处理的噪声源是地磁干扰（UAV姿态变化导致）。如果能在传感器层面消除地磁——一颗额外的霍尔传感器，纯粹的减法——精度瓶颈就解决了。不需要更贵的芯片、更复杂的算法。</li>
+    <li><strong>有了精确的力信号，然后呢？</strong><br>导纳控制——将力偏差转化为位置修正。这是力感知和抓取执行之间的"翻译器"。选导纳而非阻抗的原因是：（1）传感器天然输出力——导纳输入是力；（2）电机天然接受位置——导纳输出是位置。接口完美匹配。</li>
+    <li><strong>最简单的方案是什么？</strong><br>变形四旋翼 + 6个$10触觉传感器 + 1个参考传感器 + 导纳控制器。全机载，不需要外部设备。原理简单——地磁做减法、力做线性映射、抓取力做导纳调节——但每一步都必须精确，因为易碎物体的安全操作窗口极窄。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    现有小型无人机抓取就像"盲人戴厚手套抓豆腐"——要么抓不住要么抓碎，因为既没有精确的力感知又受限于重量预算。为什么不给飞行器装上一套<strong>轻量廉价的磁性软触觉皮肤</strong>（用参考传感器一劳永逸地消除地磁干扰），再配合<strong>导纳控制</strong>让人手般的自适应抓取成为可能？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：所有现有轻量空中抓取方案要么精度不够（软触觉传感器）、要么太重太贵（商业F/T传感器）、要么没有力反馈（纯视觉）。同时注意到人手在抓取易碎物体时，信息源不是"精确的重量读数"而是"皮肤的压力感"——触觉。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"力感知空中抓取"分解为三个子问题——（1）如何轻量且精确地测量接触力？（2）如何消除UAV特有的地磁干扰？（3）如何将力信号转化为自适应抓取动作？</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）磁性软触觉传感器——8g/$10/个，三维力感知，制造简单；（2）参考霍尔传感器+减法——利用地磁空间均匀性，无需训练数据的闭式解耦；（3）导纳控制——将力偏差（感觉）转化为位置修正（动作），天然匹配传感器和执行器的物理接口。</li>
+    <li><strong>Step 4 — 组装方案</strong>：将传感器阵列嵌入变形四旋翼的C形机身内壁→参考传感器安装在远离受力点的位置→6个传感器+参考传感器的信号流经地磁解耦和力映射后得到总接触力→导纳控制器根据力偏差输出位置修正到变形电机→实现闭环力感知自适应抓取。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个<strong>"简单优雅胜过复杂模型"</strong>的典范——地磁解耦用"多装一颗传感器然后做减法"解决了看似需要复杂建模（地磁模型+姿态估计+坐标变换）的问题。在UAV领域，很多时候最简单的物理方案比复杂的算法方案更鲁棒——因为物理不会出错，但模型会。</li>
+    <li><strong>技术技巧层面</strong>：(1) 参考传感器的位置选择——必须远离所有磁铁和受力点，否则它自己也会感应到力信号，减法反而引入误差；(2) 导纳参数调谐——M/B/K的选择决定了抓取的"手感"，M太大→反应迟钝，B太小→振荡，K太大→像弹簧一样过硬（夹碎风险）；(3) 电机电磁干扰的滤波——50Hz采样率本身就有抗混叠作用（相比400Hz的ReSkin），低频采样+高频噪声=自然低通滤波</li>
+    <li><strong>实验/写作层面</strong>：论文的传感器对比表（F/T Sensor vs 9DTact vs ReSkin vs Ours）简洁有力，一目了然地展示了本文方案在精度-成本-重量三维空间中的独特位置。写论文做对比时应该学习这种多维度表格呈现方式</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于UAV总体设计方向</strong>：本文展示了一种"将抓取结构嵌入机身"而非"外挂机械臂"的设计哲学——变形四旋翼的C形抓取轮廓使得抓取成为机身的原生功能，而不是附加任务。这种"功能一体化"设计思路对于任何受重量约束的UAV系统都有启发性</li>
+    <li><strong>对于触觉感知方向</strong>：参考传感器+减法的地磁解耦方案可以被任何使用磁性传感的飞行机器人直接采纳——不管是用磁触觉、磁编码器还是磁导航。只需一颗额外的霍尔芯片，不需要重新设计传感器、不需要训练数据、不需要精确的姿态估计</li>
+    <li><strong>对于控制方向</strong>：导纳控制在空中操作中的应用才刚刚开始。除了抓取力控制，导纳框架还可以扩展到：空中对接（两架UAV柔顺连接）、壁面接触操作（导纳调节接触力）、人机物理交互（安全的人-UAV接触）。核心思想相同——用力偏差驱动位置修正</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Hoi, Wu et al. (2024) — A Bioinspired Airborne Deformable Robot for Versatile Aerial Manipulation. <em>under review</em></td><td>变形四旋翼平台的前序工作——展示了C形抓取轮廓和5-DOF手指的设计细节，是理解本文硬件平台的关键前置知识</td></tr>
+    <tr><td>Wu et al. (2026) — Hand-like Autonomous Flying Robot for Airborne Grasping and Interaction. <em>Nature Communications</em></td><td>同组同期发表于Nature Communications的手型飞行机器人——本文（9974）是触觉传感在变形飞行器上的具体应用，二者互补</td></tr>
+    <tr><td>Yuan et al. (2017) — Gelsight: High-Resolution Robot Tactile Sensors for Estimating Geometry and Force. <em>Sensors</em> 17, 2762</td><td>GelSight视觉触觉传感器——精度极高达微米级但体积大、计算重。与本文磁性方案对比，展示了不同触觉技术的设计折中空间</td></tr>
+    <tr><td>Hogan (1985) — Impedance Control: An Approach to Manipulation. <em>ASME JDSMC</em> 107, 1–24</td><td>阻抗/导纳控制的开山之作——40年后仍然是机械臂力控的基础框架。理解本文导纳控制器需要追溯到这篇经典</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Hoi, Wu et al. · arXiv:2602.08599, 2026 · Force-Aware Grasping System for Robust Aerial Manipulation · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

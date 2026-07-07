@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — PathPainter (Wang et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="返回 UAV-Survey 主页">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">信息</a>
+  <a href="#insight">洞察与创新</a>
+  <a href="#architecture">架构</a>
+  <a href="#task">任务</a>
+  <a href="#challenge">挑战</a>
+  <a href="#method">方法</a>
+  <a href="#principles">原理</a>
+  <a href="#figures">图表</a>
+  <a href="#flaw">局限</a>
+  <a href="#motivation">动机</a>
+  <a href="#takeaway">要点</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">PathPainter: Transferring the Generalization Ability of Image Generation Models to Embodied Navigation（PathPainter：将图像生成模型的泛化能力迁移至具身导航）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Yijin Wang</strong>（王益进）、Yuru Tian（田雨儒）、Xijie Huang（黄希杰）、Weiqi Gai（盖玮琪）、Mo Zhu（朱墨）、Xin Zhou（周鑫）、Yuze Wu（吴宇泽）、<strong>Fei Gao</strong>（高飞，通讯作者）</td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">浙江大学</strong>（Zhejiang University），Differential Robotics，北京航空航天大学（北航）</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">arXiv:2605.07496</strong>，<strong>2026年</strong></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>将BEV导航重新定义为<strong>图像生成问题</strong>——利用图像生成基础模型（GPT/Gemini）从自然语言指令中推断目标区域并生成可通行性掩膜（traversability mask），结合<strong>A*搜索</strong>在掩膜上规划全局路径、<strong>BEV-Patch-PF跨视图定位</strong>将机器人里程计与BEV地图对齐以消除长期漂移，形成"高层路径生成（基础模型）+ 低层运动执行（局部规划器）"两级管线。在<strong>UAV和四足机器人</strong>平台验证，四足机器人完成<strong>285m户外长距离导航</strong>。在<strong>DeepGlobe、UAVid、VDD</strong>数据集上超越<strong>SAM 3.1、Text2Seg、RNGDet++、SAMRoad</strong>等专用分割和道路拓扑模型，<strong>Gemini在精度-召回平衡上最优</strong>。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">BEV导航</span>
+    <span class="tag tag-green">图像生成模型</span>
+    <span class="tag tag-amber">基础模型</span>
+    <span class="tag tag-purple">跨视图定位</span>
+    <span class="tag tag-red">可通行性掩膜</span>
+    <span class="tag tag-cyan">零样本泛化</span>
+    <span class="tag tag-gray">四足机器人</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. 洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么现有BEV导航方法缺乏泛化能力？</strong><br>
+    答：传统方法依赖大量标注数据训练BEV分割模型，只能在见过类似场景的区域内工作——一旦进入陌生环境，语义分割模型失效，导航系统崩溃。强化学习方法需要数百万步交互才能学会一个场景的导航策略，同样无法泛化。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>图像生成模型（GPT、Gemini）在训练过程中已经内化了丰富的世界知识</strong>——它们能理解"草地可以走"、"水面不能通过"、"建筑之间的路径"等常识性知识，而不需要任何RGB标注。如果将BEV导航重新表述为图像生成任务——给定位置和语言指令，生成一张俯视图可通行性掩膜——那么基础模型可以<strong>零样本</strong>完成这个任务，无需训练数据、无需环境先验。这不是让模型"学习导航"，而是利用它已有的世界知识来"画"出可通行的地图。
+  </div>
+
+  <h3>2.2 灵感来源映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>→ 产生了什么洞察</th><th>类型</th></tr>
+    <tr><td>图像生成模型（GPT-4o / Gemini）的视觉理解能力</td><td>→ 这些模型已经内化了丰富的世界常识（道路、草地、建筑的可通行性），将这些知识以"可通行性掩膜"的形式输出，可以绕过BEV分割模型的训练需求，实现零样本导航</td><td>架构</td></tr>
+    <tr><td>文本到图像生成中的布局控制技术（ControlNet、Cross-Attention）</td><td>→ 通过将BEV位置编码注入生成的中间层（cross-attention），可以精确控制图像生成模型关注特定空间区域——不是自由生成，而是"以位置为条件"的受控生成，使得模型输出与机器人当前位置强相关</td><td>方法</td></tr>
+    <tr><td>跨视图定位（Cross-View Localization）</td><td>→ BEV地图和地面视图之间存在几何对应关系。通过BEV-Patch-PF（BEV Patch Particle Filter）将地面特征（DINOv2）与BEV特征匹配，可以将有噪声的机器人里程计精确对齐到BEV地图坐标系——解决了"生成的地图如何用于定位"这个关键工程问题</td><td>策略</td></tr>
+    <tr><td>A*路径规划在语义可通行性掩膜上的扩展</td><td>→ 传统A*假设栅格二值（可通行/不可通行）。在图像生成模型输出的连续可通行性掩膜上，加入<strong>边界距离惩罚项</strong>使得路径倾向于远离障碍物边缘——将语义不确定性转化为安全裕度。这比直接对预训练模型做微调（计算成本高）更高效</td><td>数学</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：将BEV导航重新定义为图像生成问题</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统BEV导航依赖BEV语义分割模型，需要大量标注数据且无法泛化到新环境。强化学习需要海量交互，采样效率极低。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>GPT-4o和Gemini等图像生成模型在预训练中已经学习了世界常识——它们知道草地、路面、建筑屋顶长什么样，无需额外训练</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将机器人当前位置作为BEV中心，用自然语言指令（如"走向远处的红房子"）和语义地图提示作为条件，让图像生成模型直接生成一张俯视图可通行性掩膜。模型输出连续值（0~1），表示每个像素的可通行程度。这一范式<strong>完全消除了训练需求</strong>——基础模型的泛化能力就是PathPainter的泛化能力。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：位置条件注入——以BEV坐标为条件生成可通行性掩膜</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>图像生成模型通常自由生成图像，没有空间约束——如何让模型知道"应该关注机器人当前位置周围的地形"？简单的文本提示无法提供精确的空间参考。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>扩散模型中的交叉注意力机制——将坐标信息通过线性投影后注入UNet的交叉注意力层，替代传统的文本嵌入</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将BEV坐标网格（H×W×2）经过傅里叶特征编码后，线性投影为与扩散UNet交叉注意力维度匹配的嵌入向量。在每一层交叉注意力中，该嵌入作为查询（query）来引导生成。这使得模型"知道"每个像素的空间位置，从而在正确的位置生成正确的语义（草地、道路、建筑）。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：BEV-Patch-PF跨视图定位——将里程计与生成地图对齐</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>图像生成模型输出的是静态BEV地图，但机器人的里程计在长时间运行中存在累积漂移——如何将机器人定位到这个生成的地图上？没有先验地图，传统定位方法（如ICP、蒙特卡洛定位）不可用。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>粒子滤波（Particle Filter）+ DINOv2视觉特征匹配</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将BEV地图划分为patches，提取DINOv2特征；同时从地面视图（前视RGB相机）提取DINOv2特征。通过粒子滤波将地面视图特征与BEV patches特征进行匹配——每个粒子代表一个可能的机器人位姿，权重由特征相似度决定。重采样后得到最优位姿估计，用于校正里程计漂移。这是一个<strong>无需训练</strong>的跨视图定位方案。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 系统总览</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph 感知层["感知层：自然语言理解 + 视觉编码"]
+      指令["自然语言指令：走向远方的红房子"]
+      前视图["前视RGB图像：DINOv2特征提取"]
+      位置编码["BEV坐标网格：傅里叶特征编码"]
+    end
+
+    subgraph 生成层["生成层：图像生成基础模型"]
+      条件注入["交叉注意力注入：位置编码→生成条件"]
+      掩膜生成["GPT/Gemini图像生成：可通行性掩膜 0~1"]
+      目标推断["语言→目标区域推断：生成热力图覆盖目标位置"]
+    end
+
+    subgraph 规划层["规划层：避障路径搜索"]
+      代价图["可通行性掩膜→代价地图：1-掩膜值+边界距离惩罚"]
+      A星搜索["A*全局路径搜索：起点→目标最短安全路径"]
+      路径输出["输出：安全全局路径（远离障碍物边界）"]
+    end
+
+    subgraph 定位层["定位层：跨视图定位"]
+      粒子初始化["粒子初始化：里程计位姿→高斯散布"]
+      特征匹配["BEV-Patch-PF：地面DINOv2特征 ↔ BEV特征匹配"]
+      位姿校正["粒子重采样→最优位姿→校正里程计累积误差"]
+    end
+
+    subgraph 执行层["执行层：四足机器人控制"]
+      轨迹跟踪["MPC轨迹跟踪控制器"]
+      四足执行["四足机器人：285m室外长距离导航"]
+    end
+
+    指令 --> 条件注入
+    前视图 --> 特征匹配
+    位置编码 --> 条件注入
+    条件注入 --> 掩膜生成
+    掩膜生成 --> 目标推断
+    目标推断 --> 代价图
+    代价图 --> A星搜索 --> 路径输出
+    路径输出 --> 轨迹跟踪
+    特征匹配 --> 位姿校正
+    位姿校正 --> 粒子初始化
+    粒子初始化 -.->|"重采样反馈"| 特征匹配
+    轨迹跟踪 --> 四足执行
+
+    classDef 感知 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef 生成 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef 规划 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef 定位 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef 执行 fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class 指令,前视图,位置编码 感知
+    class 条件注入,掩膜生成,目标推断 生成
+    class 代价图,A星搜索,路径输出 规划
+    class 粒子初始化,特征匹配,位姿校正 定位
+    class 轨迹跟踪,四足执行 执行
+    </pre>
+  </div>
+
+  <h3>3.2 数据流——从指令到导航的完整信息流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph 输入["系统输入"]
+      direction TB
+      语言指令["自然语言指令"]
+      RGB图像["前视RGB图像 640x480"]
+      里程计数["机器人里程计 x,y,θ"]
+    end
+
+    subgraph 生成模块["地图生成模块"]
+      direction TB
+      编码坐标["BEV坐标编码 HxWx2→傅里叶特征"]
+      模型推理["GPT/Gemini图像生成推理"]
+      掩膜输出["可通行性掩膜 256x256 连续值"]
+      目标热力["目标区域热力图 256x256"]
+    end
+
+    subgraph 定位模块["跨视图定位模块"]
+      direction TB
+      BEV特征["BEV→Patches→DINOv2嵌入"]
+      地面特征["前视图→DINOv2嵌入"]
+      粒子匹配["粒子滤波匹配：特征余弦相似度"]
+      位姿估计["最优位姿 x̂,ŷ,θ̂ → 校正里程计"]
+    end
+
+    subgraph 规划模块["路径规划模块"]
+      direction TB
+      融合代价["融合代价图：1-掩膜 + λ·边界距离⁻¹"]
+      全局路径["A*搜索→全局路径点序列"]
+      局部跟踪["MPC局部轨迹跟踪"]
+    end
+
+    subgraph 输出["系统输出"]
+      direction TB
+      电机指令["四足机器人电机控制指令"]
+      执行状态["到达目标 / 路径阻塞 / 需要重规划"]
+    end
+
+    语言指令 --> 模型推理
+    RGB图像 --> 地面特征
+    里程计数 --> 粒子匹配
+    编码坐标 --> 模型推理
+    模型推理 --> 掩膜输出
+    模型推理 --> 目标热力
+    掩膜输出 --> 融合代价
+    目标热力 --> 融合代价
+    BEV特征 --> 粒子匹配
+    地面特征 --> 粒子匹配
+    粒子匹配 --> 位姿估计
+    位姿估计 -.->|"校正后位姿反馈"| 里程计数
+    融合代价 --> 全局路径 --> 局部跟踪
+    局部跟踪 --> 电机指令
+    电机指令 --> 执行状态
+    执行状态 -.->|"需要重规划"| 模型推理
+
+    classDef 输入框 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef 生成框 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef 定位框 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef 规划框 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef 输出框 fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class 语言指令,RGB图像,里程计数 输入框
+    class 编码坐标,模型推理,掩膜输出,目标热力 生成框
+    class BEV特征,地面特征,粒子匹配,位姿估计 定位框
+    class 融合代价,全局路径,局部跟踪 规划框
+    class 电机指令,执行状态 输出框
+    </pre>
+  </div>
+
+  <h3>3.3 工作流程——从启动到完成的完整导航管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph 阶段一["阶段一：初始化与场景理解"]
+      direction LR
+      启动作业["接收任务指令：前往XX位置"]
+      首次建图["首次生成：GPT/Gemini生成全局可通行性掩膜"]
+      初始定位["初始定位：手动给定/视觉地标确定起始位姿"]
+    end
+
+    subgraph 阶段二["阶段二：全局路径规划"]
+      direction LR
+      代价构建["构建代价图：掩膜+边界距离惩罚+目标偏置"]
+      全局规划["A*搜索全局最优路径"]
+      路径发布["发布全局路径点序列给MPC控制器"]
+    end
+
+    subgraph 阶段三["阶段三：执行与定位"]
+      direction LR
+      局部跟踪["MPC跟踪：沿全局路径前进"]
+      里程更新["里程计更新：IMU+关节编码器推算位姿"]
+      跨视图校正["BEV-Patch-PF校正：每隔N帧用视觉特征校正位姿"]
+    end
+
+    subgraph 阶段四["阶段四：动态重规划与完成"]
+      direction LR
+      偏差检测["检测偏差：位姿偏离路径>阈值？"]
+      触发重规划["触发重规划：重新生成局部可通行性掩膜"]
+      重规划路径["A*重搜索：更新路径"]
+      到达终点["确认到达：机器人位姿在目标区域内"]
+    end
+
+    启动作业 --> 首次建图
+    首次建图 --> 初始定位
+    初始定位 --> 代价构建
+    代价构建 --> 全局规划 --> 路径发布
+    路径发布 --> 局部跟踪
+    局部跟踪 --> 里程更新 --> 跨视图校正
+    跨视图校正 --> 偏差检测
+    偏差检测 -->|"偏离>阈值"| 触发重规划
+    偏差检测 -->|"正常"| 局部跟踪
+    触发重规划 --> 重规划路径 --> 局部跟踪
+    里程更新 --> 到达终点
+    跨视图校正 -.->|"校正位姿反馈"| 局部跟踪
+
+    classDef 阶段一填 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef 阶段二填 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef 阶段三填 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef 阶段四填 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    class 启动作业,首次建图,初始定位 阶段一填
+    class 代价构建,全局规划,路径发布 阶段二填
+    class 局部跟踪,里程更新,跨视图校正 阶段三填
+    class 偏差检测,触发重规划,重规划路径,到达终点 阶段四填
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. 任务——解决了什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \max_{\pi} \; \mathbb{E}\left[\text{到达目标} \mid \text{语言指令} \; \mathcal{L}, \; \text{无先验地图}\right] \quad \text{s.t.} \quad \text{零训练数据},\; \text{环境泛化} $$
+    <div class="eq-note">
+      <strong>目标</strong>：给定自然语言指令 $\mathcal{L}$（如"穿过草地走向远处的红色建筑"），在没有先验地图、没有训练数据的情况下，使四足机器人在未知室外环境中安全到达目标位置。&nbsp;|&nbsp;
+      <strong>关键约束</strong>：(1) 零训练数据——不能依赖任何特定环境的BEV标注；(2) 环境泛化——同一套系统必须能在不同环境中工作（校园、公园、街区等）；(3) 长距离——测试中完成了285米室外导航。
+    </div>
+  </div>
+
+  <h3>4.2 输入/输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>(1) 自然语言导航指令；(2) 前视RGB图像（640×480）；(3) 机器人里程计（x, y, θ）</td><td>文本 + 图像 + 位姿三元组</td></tr>
+    <tr><td><strong>输出</strong></td><td>(1) 全局可通行性掩膜（256×256连续值）；(2) 目标区域热力图；(3) 安全全局路径点序列</td><td>2D地图 + 路径</td></tr>
+    <tr><td><strong>目标</strong></td><td>四足机器人在无先验地图的室外环境中完成长距离自主导航（测试：285米）</td><td>成功率 + 安全性 + 路径长度</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>跨模态、零样本、具身导航任务</strong>——核心挑战不在控制，而在<strong>感知与理解</strong>：如何从像素和文字中理解场景的几何语义（哪里可以走、哪里是目标），然后将这种理解转化为可供路径规划器使用的结构化地图。任务的独特之处在于<strong>完全依赖基础模型的预训练知识</strong>，不引入任何针对特定环境的训练——这使得它天然具有泛化能力。平台：四足机器人，场景：室外长距离导航（校园道路、草地、建筑间），核心指标：成功到达目标且路径安全。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. 挑战——为什么困难？</h2>
+
+  <h3>5.1 本质（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：泛化能力与训练数据的不可兼得。<br><br>
+    （1）<strong>BEV语义分割的泛化瓶颈</strong>：传统BEV导航依赖语义分割模型将前视图映射到BEV空间。这些模型在训练集覆盖的场景中表现良好，但一旦遇到训练分布外的场景（不同城市、不同季节、不同光照），语义分割的精度急剧下降——模型认不出未见过的路面纹理和植被类型。根本问题：<strong>语义分割模型学的是"特定场景的视觉特征→语义标签"的映射，而非通用的世界知识</strong>。<br><br>
+    （2）<strong>可通行性不是简单的语义类别</strong>："草地"在公园里可以走，在沼泽里不能走；"水面"大多数时候不能走，但浅水可以涉过——可通行性依赖于上下文，而非固定语义标签。传统方法将每个像素分类为有限的语义类别（道路/草地/建筑/天空），然后硬编码每个类别的可通行性——这种方案无法捕捉上下文的细微差异。<br><br>
+    （3）<strong>里程计漂移的累积效应</strong>：长距离导航中里程计误差不断累积（四足机器人的步态打滑尤其严重）。在没有闭环检测、没有GPS、没有先验地图的条件下，如何仅凭单目视觉将机器人定位到生成的地图上？这是一个"鸡生蛋蛋生鸡"的问题：需要定位才能建图，需要地图才能定位。<br><br>
+    <strong>将三点放在一起</strong>：你需要一个系统——(a) 在未见过的环境中理解可通行性，(b) 处理上下文敏感的通行判断，(c) 在无先验地图条件下来校正长距离里程计漂移。PathPainter用三个创新点分别对应这三个挑战：(a) 图像生成模型的世界知识，(b) 连续可通行性掩膜而非离散语义标签，(c) BEV-Patch-PF跨视图定位。
+  </div>
+
+  <h3>5.2 先前方法及其局限性</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>BEV Semantic Segmentation（BEV语义分割导航，如SAM 3.1, Text2Seg）</td>
+      <td>训练BEV语义分割模型（如LSS、BEVFormer），将多视角RGB图像映射为BEV语义地图，再在语义地图上做路径规划。SAM 3.1通过大规模预训练实现通用分割，Text2Seg利用文本提示控制分割类别</td>
+      <td>需要<strong>大规模标注数据</strong>（每个场景需要标注BEV语义），且泛化能力差——模型在DeepGlobe、UAVid训练集外的场景（如VDD多样地形数据集）中性能骤降。可通行性被硬编码为语义类别→可通行性的映射（如"道路=可通行"），无法处理上下文敏感的通行判断。SAM 3.1虽支持零样本分割但缺乏可通行性推理能力——它将"河流"和"道路"都分割出来但不区分哪个可通行。</td>
+    </tr>
+    <tr>
+      <td>Road Topology Detection（道路拓扑检测，如RNGDet++, SAMRoad）</td>
+      <td>从卫星/BEV图像中检测道路网络拓扑（道路中心线+连接关系），构建道路图用于导航规划。RNGDet++通过图神经网络检测道路拓扑，SAMRoad基于SAM进行道路中心线提取</td>
+      <td>仅检测<strong>道路</strong>而忽略其他可通行区域（如草地、广场、土路小径）——在非结构化环境中（如穿过公园、走小路），道路拓扑模型认为"无路可走"，实际上完全可以通过草地穿越。且依赖卫星图的分辨率和时效性——窄于2m的小径在低分辨率卫星图中不可见。在DeepGlobe数据集（主要覆盖城市道路）上表现好，但在UAVid（含多种城市场景）和VDD（含乡村/沙漠）上覆盖不足。</td>
+    </tr>
+    <tr>
+      <td>Reinforcement Learning Navigation（强化学习导航）</td>
+      <td>在模拟器中训练端到端导航策略，输入RGB+里程计，输出电机控制指令。代表性工作包括PointNav、ObjectNav等</td>
+      <td>采样效率极低——需要<strong>数百万步交互</strong>才能学会一个场景的导航。Sim2Real迁移困难——模拟器中的视觉和物理与真实世界存在domain gap。最致命的是：训练好的策略<strong>仅适用于训练场景</strong>，换一个环境就需要重新训练。</td>
+    </tr>
+    <tr>
+      <td>Classical V-SLAM + Planning（经典视觉SLAM+路径规划）</td>
+      <td>用ORB-SLAM等方法实时构建稀疏特征地图，在占据栅格地图上做A*规划</td>
+      <td>稀疏特征地图缺乏<strong>语义理解</strong>——能定位但不知道哪里可以走。占据栅格地图基于深度/立体匹配，在远距离、无纹理区域（如大面积草地、天空）失效。无法利用语言指令推断目标位置。</td>
+    </tr>
+    <tr>
+      <td>Foundation Model + Navigation（基础模型直接输出动作）</td>
+      <td>用LLM/VLM直接输出导航决策（如"直走→左转→停止"），不做地图构建</td>
+      <td>缺乏<strong>空间推理和长期规划能力</strong>——LLM的"一步一决策"在长距离导航中容易陷入局部最优（如进入死胡同）。没有全局地图就无法进行全局路径优化，也无法检测路径是否闭环。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 — 零样本可通行性推断</strong>：在没有训练数据、没有先验地图的条件下，仅凭前视RGB和语言指令推断出周围环境的2D可通行性。这要求系统能理解"草地的纹理→可以走，但沼泽的纹理→不能走"这样的细粒度视觉常识——传统视觉模型做不到，但图像生成模型在预训练中已经学到了。</li>
+    <li><strong>挑战 2 — 空间条件生成的可控性</strong>：图像生成模型通常自由生成，如何让输出与特定空间位置精确对应？如果模型把"草地"画在了实际是建筑的位置，导航就会失败。需要设计有效的空间条件注入机制——PathPainter用傅里叶特征编码+交叉注意力来解决。</li>
+    <li><strong>挑战 3 — 无先验地图的跨视图定位</strong>：里程计在285米距离上的累积误差可能达数米甚至数十米。没有闭环检测、没有GPS、没有先验地图，唯一的约束是"地面视图特征应该与BEV地图的对应位置特征相似"。这在数学上是一个高维非凸优化问题——粒子滤波通过重要性采样提供了一种实用的近似方案。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. 方法与关键公式</h2>
+
+  <h3>6.1 核心算法</h3>
+  <p>PathPainter的核心算法可以分为三个模块：(1) 基于图像生成模型的可通行性掩膜生成（将语言+位置编码为图像生成的条件）；(2) 基于A*的边界感知路径规划（在连续可通行性掩膜上搜索安全路径）；(3) BEV-Patch-PF跨视图定位（粒子滤波匹配地面特征与BEV特征）。以下逐一拆解关键公式。</p>
+
+  <h3>6.2 关键公式</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: 可通行性掩膜生成 -->
+  <h4>Group A: 可通行性掩膜生成——以位置为条件的图像生成</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 条件扩散生成</span>
+    $$ M^* = \arg\min_{M} \;\mathbb{E}_{t,\epsilon}\left[ \|\epsilon - \epsilon_\theta(M_t, t, \mathbf{c}_{\text{pos}}, \mathbf{c}_{\text{lang}})\|^2 \right] $$
+    <div class="eq-note">
+      <strong>$M^*$</strong> = 最终输出的可通行性掩膜（256×256，连续值0~1）&nbsp;|&nbsp;
+      <strong>$\epsilon_\theta$</strong> = 扩散模型的噪声预测网络（GPT-4o / Gemini的图像生成模块）&nbsp;|&nbsp;
+      <strong>$M_t$</strong> = 扩散步骤t时的噪声掩膜&nbsp;|&nbsp;
+      <strong>$\mathbf{c}_{\text{pos}}$</strong> = BEV空间坐标的条件编码（傅里叶特征→线性投影→交叉注意力注入）&nbsp;|&nbsp;
+      <strong>$\mathbf{c}_{\text{lang}}$</strong> = 自然语言指令的文本嵌入&nbsp;|&nbsp;
+      <strong>核心特征</strong>：不是训练一个新模型，而是将预训练的图像生成模型的去噪过程<strong>条件化</strong>到特定的空间位置和语言指令上——利用模型已有的世界知识生成特定位置的可通行性。
+    </div>
+  </div>
+
+  <!-- Formula Group B: 位置编码 -->
+  <h4>Group B: 空间位置条件注入——傅里叶特征编码</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 傅里叶特征位置编码</span>
+    $$ \gamma(\mathbf{p}) = \left[\sin(2^0 \pi \mathbf{p}), \cos(2^0 \pi \mathbf{p}), \sin(2^1 \pi \mathbf{p}), \cos(2^1 \pi \mathbf{p}), \ldots, \sin(2^{L-1} \pi \mathbf{p}), \cos(2^{L-1} \pi \mathbf{p})\right] $$
+    $$ \mathbf{c}_{\text{pos}} = \text{LinearProj}(\gamma(\mathbf{p})), \quad \mathbf{p} \in \mathbb{R}^{H \times W \times 2} $$
+    <div class="eq-note">
+      <strong>$\mathbf{p}$</strong> = BEV网格上每个像素的2D坐标（以机器人为原点，[-R, R]范围归一化）&nbsp;|&nbsp;
+      <strong>$L$</strong> = 傅里叶特征的频带数量（本文设为L=10，共20维编码）&nbsp;|&nbsp;
+      <strong>$\gamma(\cdot)$</strong> = 傅里叶特征映射——将低维坐标映射到高维空间，使网络更容易学习高频空间变化&nbsp;|&nbsp;
+      <strong>核心思想</strong>：受NeRF启发，傅里叶特征使神经网络能更好地表示空间位置的高频细节——对于导航而言，这意味着模型能区分"距离障碍物0.5米"和"距离0.3米"的细微空间差异。
+    </div>
+  </div>
+
+  <!-- Formula Group C: 边界感知A*路径搜索 -->
+  <h4>Group C: 边界感知A*路径搜索——在连续可通行性掩膜上规划</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 边界距离惩罚代价函数</span>
+    $$ C(i,j) = \underbrace{(1 - M_{ij})}_{\text{可通行性代价}} + \lambda \cdot \underbrace{\frac{1}{d_{\text{boundary}}(i,j) + \epsilon}}_{\text{边界距离惩罚}} + \beta \cdot \underbrace{\|(i,j) - \mathbf{g}\|}_{\text{目标距离引导}} $$
+    <div class="eq-note">
+      <strong>$M_{ij}$</strong> = 像素(i,j)的可通行性掩膜值（越接近1越可通行，越接近0越不可通行）&nbsp;|&nbsp;
+      <strong>$d_{\text{boundary}}(i,j)$</strong> = 像素(i,j)到最近障碍物边界的欧氏距离&nbsp;|&nbsp;
+      <strong>$\lambda$</strong> = 边界距离惩罚权重（本文设为0.3~0.5）&nbsp;|&nbsp;
+      <strong>$\epsilon$</strong> = 防止除零的小常数&nbsp;|&nbsp;
+      <strong>$\beta$</strong> = 目标导向权重（较小，防止路径穿越危险区域去抄近路）&nbsp;|&nbsp;
+      <strong>$\mathbf{g}$</strong> = 目标区域中心BEV坐标&nbsp;|&nbsp;
+      <strong>关键设计</strong>：第二项 $1/d_{\text{boundary}}$ 确保路径<strong>远离障碍物边界</strong>——即使可通行性值相同，靠近边界的像素代价更高。这利用了图像生成模型输出的<strong>连续值特性</strong>——不确定性被转化为安全裕度。
+    </div>
+  </div>
+
+  <!-- Formula Group D: BEV-Patch-PF 定位 -->
+  <h4>Group D: BEV-Patch-PF——粒子滤波跨视图定位</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 粒子权重更新</span>
+    $$ w_t^{(k)} \propto w_{t-1}^{(k)} \cdot \exp\left( \text{sim}\left( \phi_{\text{DINO}}(\mathbf{I}_{\text{ground}}),\; \phi_{\text{DINO}}(\text{BEV\_Patch}(\mathbf{x}_t^{(k)})) \right) / \tau \right) $$
+    <div class="eq-note">
+      <strong>$w_t^{(k)}$</strong> = 第k个粒子在时刻t的权重&nbsp;|&nbsp;
+      <strong>$\mathbf{x}_t^{(k)}$</strong> = 第k个粒子的位姿假设（2D位置+偏航角）&nbsp;|&nbsp;
+      <strong>$\phi_{\text{DINO}}(\cdot)$</strong> = DINOv2预训练视觉编码器提取的特征向量&nbsp;|&nbsp;
+      <strong>$\mathbf{I}_{\text{ground}}$</strong> = 当前时刻的前视RGB图像&nbsp;|&nbsp;
+      <strong>$\text{BEV\_Patch}(\mathbf{x}_t^{(k)})$</strong> = 假设位姿下，BEV地图上对应视角的虚拟patch渲染&nbsp;|&nbsp;
+      <strong>$\text{sim}(\cdot,\cdot)$</strong> = 余弦相似度&nbsp;|&nbsp;
+      <strong>$\tau$</strong> = 温度参数（控制权重分布的尖锐程度）&nbsp;|&nbsp;
+      <strong>关键优势</strong>：DINOv2特征具有<strong>跨视图一致性</strong>——相同地面区域在BEV视图和前视图中提取的特征应该相似。这不需要任何跨视图的训练数据——完全依赖DINOv2的预训练表征能力。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>BEV掩膜分辨率</td><td><strong>256×256</strong></td><td>可通行性掩膜的空间分辨率</td><td>在计算开销和空间精度之间折中——256×256足以区分道路、草地、建筑等特征，同时保证图像生成模型的推理时间在可接受范围内（秒级）</td></tr>
+    <tr><td>BEV覆盖范围</td><td><strong>50m × 50m</strong></td><td>每张BEV掩膜覆盖的物理范围</td><td>50米足够覆盖大多数局部导航决策所需的前瞻距离，同时避免远距离区域（图像生成模型对远距离的预测不可靠）影响规划</td></tr>
+    <tr><td>傅里叶特征频带数</td><td><strong>L=10</strong></td><td>位置编码的频率数量</td><td>10个频带（共20维）在空间分辨率和计算开销之间取得平衡。频带太少→不能表示细粒度空间差异；频带太多→编码维度过高，影响交叉注意力效率</td></tr>
+    <tr><td>边界距离惩罚权重</td><td><strong>λ=0.3~0.5</strong></td><td>路径安全裕度的控制参数</td><td>λ太小→路径贴着障碍物走，危险；λ太大→路径远离所有物体（包括可通行的结构），绕远路。0.3~0.5在实践中平衡安全性与效率</td></tr>
+    <tr><td>粒子滤波器粒子数</td><td><strong>K=200</strong></td><td>BEV-Patch-PF的粒子数量</td><td>200个粒子在定位精度和计算开销之间取得平衡。更多粒子→更精确但计算更慢；更少粒子→可能模式坍缩，定位失败</td></tr>
+    <tr><td>重规划触发阈值</td><td><strong>偏离路径>2m</strong></td><td>触发重新生成可通行性掩膜的条件</td><td>2米的安全阈值——允许里程计的小幅度漂移不影响执行，但当漂移过大时及时触发重规划以避免机器人走入危险区域</td></tr>
+  </table>
+
+  <h3>6.4 PathPainter vs 专用模型对比：GPT-4o / Gemini vs SAM 3.1 / Text2Seg / RNGDet++ / SAMRoad</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🎨 GPT-4o 图像生成</h4>
+      <ul>
+        <li>道路分割精度较高</li>
+        <li>草地/植被识别能力强</li>
+        <li>对光照变化具有一定鲁棒性</li>
+        <li>生成速度较快（秒级）</li>
+        <li>可通行性掩膜质量稳定</li>
+        <li>倾向于保守判断（Precision > Recall）</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🧠 Gemini 图像生成</h4>
+      <ul>
+        <li><strong>精度-召回率最佳平衡</strong></li>
+        <li>对建筑边界判断更准确</li>
+        <li>阴影区域的误判率更低</li>
+        <li>零样本道路分割表现最优</li>
+        <li>在DeepGlobe/UAVid/VDD三数据集综合最优</li>
+        <li>推理延迟略高于GPT-4o</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>📐 专用分割模型（SAM 3.1 / Text2Seg）</h4>
+      <ul>
+        <li><strong>SAM 3.1</strong>：通用图像分割，零样本能力但<strong>缺乏可通行性推理</strong>——将所有语义区域分割但不判断可通行性</li>
+        <li><strong>Text2Seg</strong>：文本驱动的语义分割，Recall高但Precision低——易将无关区域误标为道路</li>
+        <li>在训练场景（DeepGlobe）中表现好，但在VDD等分布外场景中性能急剧下降</li>
+        <li>需要场景特定的prompt/微调才能迁移到新环境</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🛣️ 道路拓扑模型（RNGDet++ / SAMRoad）</h4>
+      <ul>
+        <li><strong>RNGDet++</strong>：图神经网络的卫星图道路拓扑检测，仅检测<strong>道路</strong>（忽略草地等可通行非道路区域）</li>
+        <li><strong>SAMRoad</strong>：基于SAM的道路中心线提取，依赖道路先验</li>
+        <li>在UAVid城市场景中——非道路可通行区域（如广场、人行道）被忽略，路径规划受限</li>
+        <li>在窄小径（<2m宽）和乡村土路场景中完全失效——这些不是传统"道路"</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. 基本原理——核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解PathPainter需要掌握三个关键基础原理：扩散模型的条件生成（为什么图像生成模型能输出可通行性掩膜）、傅里叶特征空间编码（为什么位置信息能被注入生成模型）、粒子滤波跨视图定位（为什么无训练就能做跨视图匹配）。</p>
+
+  <h3>7.1 扩散模型条件生成——为什么GPT/Gemini能画地图</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 扩散模型的去噪过程</span>
+    $$ p_\theta(M_{t-1} \mid M_t, \mathbf{c}) = \mathcal{N}\left(M_{t-1}; \frac{1}{\sqrt{\alpha_t}}\left(M_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\epsilon_\theta(M_t, t, \mathbf{c})\right), \sigma_t^2\mathbf{I}\right) $$
+    <div class="eq-note">
+      <strong>$M_t$</strong> = 扩散过程第t步的噪声掩膜（t越大越接近纯噪声）&nbsp;|&nbsp;
+      <strong>$\mathbf{c}$</strong> = 条件信号（位置编码+语言嵌入）&nbsp;|&nbsp;
+      <strong>$\epsilon_\theta$</strong> = UNet去噪网络&nbsp;|&nbsp;
+      <strong>$\alpha_t, \bar{\alpha}_t, \sigma_t$</strong> = 扩散过程的时间调度参数 &nbsp;|&nbsp;
+      <strong>核心思想</strong>：正向过程逐步加噪（M_0 → M_T），反向过程逐步去噪（M_T → M_0）。条件信号<strong>在每一步都引导</strong>去噪方向——这就是为什么同样的模型能生成不同位置的可通行性掩膜。
+    </div>
+  </div>
+
+  <p>传统扩散模型用于图像生成（"画一只猫"），PathPainter的洞察是：<strong>"画一张俯视图可通行性地图"与"画一张俯视图"在生成方式上完全相同</strong>——区别仅在于条件信号（位置编码 + 语言指令 vs 文本描述）。GPT-4o和Gemini在预训练中见过海量的俯视图/地图类图像，因此有能力理解"从这个角度看，草地应该在这里，道路应该在那边"——这些都是训练数据中内化的世界知识。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 为什么不需要训练就能泛化？</div>
+    传统方法的思维是：收集数据 → 训练模型 → 泛化。PathPainter的思维是：<strong>基础模型已经完成了"收集数据→训练模型"这两步</strong>（爬取了数十亿张图片），我们只需要在推理时给它正确的条件信号，它就能<strong>零样本泛化</strong>。这不是魔法——这是规模法则（scaling law）的直接后果。GPT-4o/Gemini的训练数据中包含了足够多的"俯视图"和"可通行性"相关的视觉概念，以至于它们学到的表征已经泛化到了几乎所有视觉场景。
+  </div>
+
+  <h3>7.2 傅里叶特征空间编码——为什么位置信息能注入生成模型</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 傅里叶特征的数学直觉</span>
+    $$ \text{MLP}(\gamma(\mathbf{p}_1))^\top \text{MLP}(\gamma(\mathbf{p}_2)) \approx \text{MLP}'(\|\mathbf{p}_1 - \mathbf{p}_2\|) $$
+    <div class="eq-note">
+      <strong>直觉</strong>：傅里叶特征编码后的两个坐标向量的内积，近似于只依赖于它们之间欧氏距离的一个函数。&nbsp;|&nbsp;
+      <strong>这意味着</strong>：扩散UNet在做交叉注意力时，相邻位置的编码会获得相似的注意力权重——自然地形成了<strong>空间局部性</strong>。&nbsp;|&nbsp;
+      <strong>工程价值</strong>：不需要显式地告诉模型"像素(100, 50)和像素(101, 50)是相邻的"——傅里叶特征通过函数近似自动实现了这种空间局部性归纳偏置。
+    </div>
+  </div>
+
+  <p>在PathPainter中，每个BEV像素的2D坐标经过傅里叶编码后，变成20维的特征向量，再通过线性投影映射到扩散UNet的交叉注意力维度。这种编码方式确保了：(1) 不同像素的位置编码是可区分的；(2) 相邻像素的编码是相似的（空间平滑性）；(3) 编码只依赖于相对位置；这些特性共同使得扩散模型能将正确的语义放在正确的位置。</p>
+
+  <table>
+    <tr><th>编码方式</th><th>空间分辨率</th><th>训练需求</th><th>适用场景</th></tr>
+    <tr><td>直接坐标（x,y）</td><td>低——网络难以学习坐标的高频函数</td><td>需要训练数据</td><td>简单几何任务</td></tr>
+    <tr><td>可学习嵌入（Learned Embedding）</td><td>中——固定分辨率</td><td>需要训练</td><td>固定空间范围的场景</td></tr>
+    <tr><td><strong>傅里叶特征（本文方案）</strong></td><td><strong>高——可表示任意频率的空间变化</strong></td><td><strong>无需训练（数学变换）</strong></td><td><strong>需要精确空间控制的生成</strong></td></tr>
+  </table>
+
+  <h3>7.3 BEV-Patch-PF——为什么无训练的跨视图匹配能工作</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — DINOv2的跨视图特征一致性</span>
+    $$ \|\phi_{\text{DINO}}(\text{BEV\_view}) - \phi_{\text{DINO}}(\text{ground\_view})\| \ll \|\phi_{\text{DINO}}(\text{BEV\_view}) - \phi_{\text{DINO}}(\text{unrelated\_view})\| $$
+    <div class="eq-note">
+      <strong>物理直觉</strong>：同一个物理位置（如"图书馆前的圆形花坛"），无论是从天空俯瞰（BEV）还是从地面平视（前视图），DINOv2提取的特征向量在余弦空间中都<strong>显著相似</strong>——因为它捕捉的是"圆形、绿色、周围是灰色路面"这样的<strong>语义结构</strong>，而非像素级纹理。&nbsp;|&nbsp;
+      <strong>训练来源</strong>：DINOv2在预训练中通过对比学习（student-teacher）学到了<strong>跨视图一致的表征</strong>——同一个物体从不同角度看，特征应该相似。这是自监督学习的副产品，不需要任何跨视图标注数据。
+    </div>
+  </div>
+
+  <p>粒子滤波器将这种特征相似度转化为定位的"似然"。每个粒子代表一个假设的机器人位姿，粒子的权重由该位姿下BEV patch与前视图的特征相似度决定。200个粒子通过重要性采样（重采样）不断收敛到真实位姿附近——<strong>整个过程不需要训练</strong>，只需要预训练的DINOv2和粒子滤波算法。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    图像生成模型提供世界知识 → 傅里叶编码注入空间条件 → 可通行性掩膜指导路径规划 → 路径驱动四足机器人行进 → DINOv2+粒子滤波将机器人定位回生成的地图 → <strong>闭环</strong>。五个环节以"零训练"的方式连接——每个环节都依赖预训练模型已有的能力，不需要任何环境特定的数据。这是PathPainter能够实现"285米室外导航不迷路"的根本原因。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. 论文图表——图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig4.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">PathPainter系统概览：从自然语言指令到可通行性掩膜再到路径规划的完整流程</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="PathPainter系统概览"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：PathPainter的完整管线——从用户发出自然语言指令（"穿过草地走到远处的红色建筑"）开始，经过图像生成模型（GPT/Gemini）生成可通行性掩膜，到A*路径搜索输出安全路径，最后四足机器人执行导航。图的左侧是系统输入（语言+前视RGB），中间是生成的可通行性掩膜和叠加的A*路径，右侧是机器人在真实室外环境中执行导航。</p>
+      <ul>
+        <li><strong>范式转换的关键可视化</strong>：传统BEV导航需要先"语义分割→BEV映射→路径规划"，PathPainter直接"语言+图像→可通行性掩膜→路径规划"——跳过了BEV映射这一步，用图像生成模型的世界知识替代了训练数据</li>
+        <li><strong>可通行性掩膜的颜色编码</strong>：深绿色=高度可通行（路面、草地），黄色=中等可通行（碎石路、泥土），红色=不可通行（建筑、水域、密集植被）——连续的颜色编码比离散的语义标签更有信息量</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">基准对比：PathPainter vs SAM 3.1 / Text2Seg / RNGDet++ / SAMRoad 在DeepGlobe（道路）、UAVid（城市场景）、VDD（多样地形）三个数据集上的可通行性分割性能</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="可通行性掩膜生成对比"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：PathPainter（使用GPT-4o和Gemini两种backend）与四种专用模型（SAM 3.1通用分割、Text2Seg文本驱动分割、RNGDet++道路拓扑检测、SAMRoad道路中心线提取）在三个数据集上的零样本可通行性分割性能对比——包括IoU、Precision、Recall指标和精度-召回曲线。</p>
+      <ul>
+        <li><strong>DeepGlobe数据集（道路分割）</strong>：PathPainter(Gemini)在Precision上大幅领先专用模型——Gemini对模糊边界（土路与耕地的过渡带）的保守判断避免了误标；Text2Seg在Recall上领先但误报率高——倾向于将"看起来像路"的区域全部标为道路</li>
+        <li><strong>UAVid数据集（城市场景可通行区域）</strong>：最具挑战性的数据集——需区分可通行（道路、人行道）与不可通行（建筑、水体、植被）。PathPainter(Gemini)同时取得最高Precision和Recall——展示了基础模型在复杂城市场景语义理解上的优势；SAMRoad和RNGDet++在此数据集上性能骤降——因为这些模型仅适用于城市道路拓扑，UAVid中的多样场景超出其训练分布</li>
+        <li><strong>VDD数据集（多样化场景——乡村、山区、沙漠）</strong>：对泛化能力的终极测试。专用模型的性能在此数据集上骤降（训练数据未覆盖这些场景），而PathPainter的性能下降幅度远小于专用模型——这正是零样本泛化的优势：基础模型在互联网上见过这些地形的卫星图</li>
+        <li><strong>Gemini的精度-召回最佳平衡</strong>：在所有三个数据集上，Gemini在Precision和Recall之间取得最佳平衡——既能识别出大部分可通行区域（高召回），又不将不可通行区域误标为可通行（高精度）。GPT-4o更保守（牺牲召回换取精度），SAM 3.1更激进（牺牲精度换取召回）</li>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">BEV-Patch-PF跨视图定位：粒子滤波收敛过程和定位误差随距离变化的曲线</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="BEV-Patch-PF跨视图定位"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：BEV-Patch-PF定位的过程和性能。(a) 粒子初始分布（高斯散布在里程计位姿周围）→ 经过几轮观测更新后 → 粒子收敛到真实位姿附近的过程可视化；(b) 定位误差随导航距离的变化曲线——对比纯里程计（无校正）、BEV-Patch-PF校正后的定位精度。</p>
+      <ul>
+        <li><strong>关键发现：定位误差不随距离发散</strong>：纯里程计的定位误差随距离线性增长（285m时累积误差>15m），而BEV-Patch-PF校正后将误差控制在<strong>2m以内</strong>——这意味着粒子滤波有效地利用视觉特征约束了里程计漂移</li>
+        <li><strong>收敛速度</strong>：通常在3~5次观测更新后，粒子云从初始的大范围高斯散布收敛到真实位姿周围的紧凑分布。收敛后的粒子标准差<0.5m——与LiDAR定位精度相当</li>
+        <li><strong>退化场景</strong>：在无纹理区域（如大面积均匀草地）中，DINOv2特征的区分度下降，粒子收敛变慢甚至发散——这是跨视图定位的最大弱点</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">285米室外长距离导航实验结果：完整路径轨迹、关键节点截图和成功率统计</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="285米室外长距离导航实验"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：PathPainter在浙江大学校园内的真实四足机器人导航实验结果。总路径长度285米，途经道路、草地、建筑间通道等多种地形。(a) 完整的BEV路径轨迹叠加在卫星图上；(b) 5个关键位置节点——显示每段路径对应的前视图和生成的可通行性掩膜；(c) 多场景成功率对比。</p>
+      <ul>
+        <li><strong>285米全程自主</strong>：四足机器人在没有人工干预的情况下完成了285米的室外导航——从教学楼出发，穿过中心草坪，绕过图书馆，到达运动场。全程需要约15分钟。这在零样本BEV导航中是一个里程碑式的距离</li>
+        <li><strong>地形多样性</strong>：路径经过了5种不同地形——硬化路面、碎石路、修剪草坪、自然草地、建筑间通道——这展示了图像生成模型在不同地形上的泛化能力</li>
+        <li><strong>失败案例</strong>：在浓密灌木丛区域，可通行性掩膜将灌木丛下方的阴影错误标注为"可通行"，导致路径规划穿越了无法通行的区域。这暴露了图像生成模型对复杂遮挡场景理解的局限性</li>
+        <li><strong>总结成功率</strong>：10次实验8次成功到达目标（80%成功率），失败2次均因"在光照剧烈变化区域（树影斑驳）可通行性判断失误"</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在缺陷与扩展方向</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 需要网络连接——图像生成模型通过API调用，离线环境无法使用；(2) 依赖图像生成基础模型的API稳定性——如果API更新改变了模型行为（如输出格式变化），PathPainter可能失效；(3) 假设环境中的地形在视觉上可区分——大面积均匀的无纹理区域（如水泥广场）会导致定位退化；(4) BEV与地面视图之间必须存在充分的视觉重叠——狭窄巷道（两侧建筑遮蔽天空）的跨视图特征匹配可能失败。</li>
+    <li><strong>适用场景</strong>：目前适用于<strong>室外结构化/半结构化环境</strong>——校园、公园、街道等有多种地形特征的场景。在完全非结构化环境（沙漠、雪原）或极端密集环境（室内走廊、地下隧道）中，图像生成模型的世界知识可能不适用——因为它训练数据中这类场景的俯视图较少。</li>
+    <li><strong>可扩展性</strong>：每生成一张可通行性掩膜需要调用一次API（秒级延迟）——对于需要高频实时地图更新的动态环境（如人群密集的广场），秒级的生成延迟可能不够。此外，API调用的成本随导航距离线性增长——285米可能需要数十次调用。</li>
+  </ul>
+
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从2D BEV → 3D可通行性——当前只生成2D俯视图，如果扩展为3D体素可通行性掩膜，可以处理多层结构（高架桥、坡道、台阶等垂直导航场景）。这需要将条件信号从2D坐标编码升级为3D坐标编码，并可能需要使用NeRF或3D Gaussian Splatting作为3D先验。</li>
+    <li><strong>条件放松</strong>：(1) 本地部署——将图像生成模型蒸馏为小型模型（如Stable Diffusion级别的轻量模型），部署到机器人端，实现完全离线运行；(2) 语言指令替换为其他模态——如手势、草图、参考图片等作为目标指定方式，进一步降低使用门槛。</li>
+    <li><strong>约束加入</strong>：(1) 动态障碍物——当前可通行性掩膜是静态的，加入实时LiDAR/深度传感器检测动态障碍物（行人、车辆），在A*代价图上叠加动态不可通行区域；(2) 多机器人协同建图——多个机器人各自生成可通行性掩膜，通过跨视图定位共享对齐，构建更大范围的全局地图。</li>
+  </ul>
+
+  <h3>9.3 数据敏感度</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>光照急剧变化（树影斑驳、进出阴影）</td><td>图像生成模型对均匀光照场景的预测更准确。剧烈光照变化会导致可通行性掩膜中出现"断裂"——同一片草地被阴影分割为可通行和不可通行两块。实验中的2次失败均与此相关</td><td>★★★★★</td></tr>
+    <tr><td>无纹理区域（大面积水泥广场、均质草地）</td><td>DINOv2特征在这些区域缺乏区分度——所有patch的特征向量几乎相同，粒子滤波无法分辨不同位置。这可能直接导致定位失败——机器人"迷失"在无纹理区域中</td><td>★★★★</td></tr>
+    <tr><td>图像生成模型的API不确定性</td><td>同一输入多次调用API可能产生略有不同的可通行性掩膜。这种随机性对路径规划的稳定性有潜在影响——如果两次生成的掩膜在关键区域（如窄桥）的判定不同，规划的路径可能剧烈变化</td><td>★★★</td></tr>
+    <tr><td>BEV-地面视图的视觉差异过大</td><td>俯瞰视角和地面视角在某些场景中差异极大——例如树冠从空中看是绿色圆形，从地面看是枝叶纹理。DINOv2的特征跨视图一致性在这些场景中会降低，导致粒子滤波权重分布平坦（无法收敛到真实位姿）</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>基础模型的持续环境适应</strong>——PathPainter的零样本能力来自基础模型的预训练知识，但这也意味着它<strong>无法从导航经验中学习</strong>。一个关键方向是：如何在保持泛化能力的同时，让系统在导航过程中<strong>在线适应</strong>当前环境？例如，当机器人在校园中导航时，它可能逐渐学到"这片修剪过的方形灌木丛是不可通行的"——但当切换到公园场景时，修剪过的方形灌木可能又是可通行的（如迷宫花园）。这种"适应但不遗忘"的持续学习机制，是连接零样本泛化和终身学习的桥梁。如果这个方向做成了，PathPainter就能从一个"一招鲜"的工具进化为"越用越好"的系统。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机——第一性原理推导</h2>
+
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>具身导航的核心瓶颈不是控制——是<strong>理解</strong>。机器人要导航到一个地方，最难的步骤是"理解当前环境"和"知道目标在哪里"。传统方法试图通过训练让机器人学会理解——但这与人类的学习方式不同。人类不需要在一个校园里训练数百小时才能导航——因为我们有<strong>世界常识</strong>：草地能走、水面不行、建筑之间有路、远处那个红色的是栋楼。机器人的问题在于缺乏这种常识。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：(i) BEV语义分割——训练模型认识道路、草地、建筑，但泛化能力弱；(ii) 强化学习——在模拟器中学习导航策略，但采样效率低、Sim2Real难；(iii) 直接用LLM/VLM做决策——缺乏空间推理和长期规划能力。三条路线共同的缺陷是：<strong>都在试图让机器人在特定环境中重新学习人类已经知道的知识</strong>。</li>
+    <li><strong>如果不让机器人从头学习，而是让它利用已有知识呢？</strong><br>GPT-4o和Gemini在预训练中已经"见过"世界——数十亿张图片包含了人类视角和俯视角下的各种场景。这些模型知道草地长什么样、道路是什么纹理、建筑从空中看是什么形状。关键问题是：<strong>如何将这些知识以结构化的形式提取出来</strong>，用于导航？答案：定义为图像生成任务——"给我当前位置周围50米的可通行性俯视图"。</li>
+    <li><strong>如果图像生成模型能画地图，还需要什么？</strong><br>(1) 需要将画的地图用于路径规划——在连续可通行性掩膜上做A*，加入边界距离惩罚使得路径安全；(2) 需要将机器人定位到画的地图上——跨视图定位（BEV-Patch-PF）；(3) 需要处理里程计漂移——粒子滤波重采样。这三个"工程缝合"是让生成的"画"变成可用的"地图"的关键。</li>
+    <li><strong>最简单的方案是什么？</strong><br>用户说一句话描述目标 → GPT/Gemini生成当前位置周围的可通行性掩膜和目标位置热力图 → A*搜索路径 → 四足机器人沿路径走，每N步用DINOv2特征校正位姿 → 到地方了停下来。整个过程<strong>不需要任何训练数据、不需要先验地图、不需要GPS</strong>——只需要一个能上网的机器人和一个能调API的程序。这之所以可行，是因为基础模型的泛化能力已经被"免费"利用了。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    传统BEV导航方法需要大量标注数据训练环境特定的语义分割模型，泛化能力极差——那为什么不直接用<strong>已经看过数十亿张图片、内化了丰富世界常识的图像生成基础模型（GPT/Gemini）</strong>来直接生成可通行性掩膜，然后在这个掩膜上规划路径？你不是在教机器人认路——你是在请一个"看过世界的画家"帮你画一张地图。
+  </div>
+
+  <h3>10.3 如何想到这个思路</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：当前BEV导航的瓶颈在于"理解环境"——语义分割模型泛化差，强化学习采样效率低。同时注意到GPT-4V/Gemini等模型展示了惊人的视觉理解和常识推理能力——它们能从一张照片中识别场景、描述物体关系、回答常识问题。关键发现：<strong>这些模型能"看懂"道路、草地、建筑</strong>——但它们的输出格式是文本或自然图像，不是结构化的导航地图。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"零样本导航"分解为三个子问题：(1) 如何从自然语言指令推断目标位置？(2) 如何判断当前位置周围的可通行性？(3) 如何在无先验地图的条件下进行定位？这三个子问题对应PathPainter的三个核心模块。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：(1) 目标推断 → 图像生成模型的语言理解+视觉生成能力——让模型在目标位置画一个高亮区域；(2) 可通行性推断 → 将"判断可通行性"转化为"生成可通行性掩膜"——俯视图生成是最自然的图像生成格式；(3) 定位 → 粒子滤波+DINOv2跨视图匹配——利用自监督预训练特征的跨视图一致性，无需训练。</li>
+    <li><strong>Step 4 — 组装方案</strong>：三个模块通过BEV坐标系连接——生成的掩膜定义了全局坐标框架，路径规划输出该框架中的路径点，定位模块将机器人位姿映射回该框架。整个方案的关键是<strong>所有模块都不需要训练</strong>——图像生成模型已经训练好了，DINOv2已经训练好了，A*是经典算法——PathPainter只是找到了正确的"粘合剂"将它们连接起来。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 关键要点</h2>
+
+  <h3>11.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个教科书级的<strong>"借力打力"</strong>案例——不是自己训练一个模型来理解可通行性，而是"借用"已经训练好的、看过数十亿张图片的基础模型的世界知识。核心转变：从"为特定任务训练特定模型"到"用通用基础模型为特定任务生成结构化输出"。对于UAV领域的启示：<strong>很多我们认为需要专门训练模型的感知任务（语义分割、深度估计、目标检测），可能都可以通过"重新表述为图像生成任务"来零样本解决</strong>——只要基础模型够强，你不需要训练，只需设计正确的条件信号和输出解析器。</li>
+    <li><strong>技术技巧层面</strong>：(1) 位置编码的艺术——简单的(x,y)坐标不够，傅里叶特征能让扩散网络"感受"到空间结构；(2) 边界距离惩罚——连续可通行性掩膜优于离散语义标签的关键在于它能表达"不确定性"，而将不确定性转化为安全裕度是巧妙的设计；(3) DINOv2用于跨视图匹配——自监督预训练特征具有天然的跨视图一致性，这是一个被低估的"免费午餐"；(4) 系统闭环——生成地图→规划路径→执行→定位回地图，每一步都反馈到上一步，不是开环系统。</li>
+    <li><strong>实验/写作层面</strong>：论文用285米真实四足机器人实验来证明可行性——这个数据本身就是一个强有力的声明。写论文时，一个"惊人的数字"（如"零训练+285米+80%成功率"）往往比复杂的消融实验更有说服力。此外，GPT-4o vs Gemini的精度-召回曲线对比展示了作者对两种基础模型的公正评估——不偏袒任何一个API，增加了论文的可信度。</li>
+  </ul>
+
+  <h3>11.2 对我的研究的直接启示</h3>
+  <ul>
+    <li><strong>对于UAV视觉导航方向</strong>：PathPainter的核心思路可以自然迁移到无人机场景——将"无人机从当前位置飞到目标"重新表述为"图像生成模型生成3D空间的可飞行性体素图"，然后在该体素地图上做3D路径规划。相比四足机器人，无人机需要处理三维空间（如飞越建筑、避开树木）、更高的运动速度和更严格的实时性要求——但基础框架可以直接复用。</li>
+    <li><strong>对于视觉伺服方向</strong>：PathPainter的跨视图定位（BEV-Patch-PF）为无人机视觉伺服提供了新的思路——当前视觉伺服依赖特征匹配或位姿估计，但DINOv2的跨视图特征一致性可能提供一种更鲁棒的视觉反馈信号。特别是对于IBVS（Image-Based Visual Servoing），DINOv2特征可能比传统的点特征/线特征更能适应视角变化和光照变化。</li>
+    <li><strong>对于基础模型在UAV中的应用</strong>：PathPainter证明了"零样本"不是幻想——在正确的任务表述和系统设计下，基础模型确实可以在完全不训练的情况下解决具身导航中的感知问题。对于UAV领域，这意味着很多以前"需要采集数据+标注+训练"的感知模块（地形分类、着陆点检测、空中目标识别），现在可能只需要设计合适的提示词+条件信号。</li>
+  </ul>
+
+  <h3>11.3 推荐跟进参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Brooks et al. (2024) — Video generation models as world simulators. <em>OpenAI Technical Report</em></td><td>Sora等视频生成模型将"世界模拟"与"图像生成"统一——这意味着未来的导航系统可能不需要显式生成BEV地图，而是直接生成未来帧的视觉预测。这是PathPainter泛化方向的自然延伸：从"生成地图"到"生成世界模型"。</td></tr>
+    <tr><td>Oquab et al. (2023) — DINOv2: Learning Robust Visual Features without Supervision. <em>arXiv:2304.07193</em></td><td>DINOv2是PathPainter跨视图定位的核心——理解它的训练机制（student-teacher蒸馏+对比学习）对于理解"为什么跨视图特征会相似"至关重要。这也是自监督学习在机器人领域最成功的应用之一。</td></tr>
+    <tr><td>Mildenhall et al. (2020) — NeRF: Representing Scenes as Neural Radiance Fields. <em>ECCV 2020</em></td><td>傅里叶特征位置编码的原始来源——PathPainter使用傅里叶编码将空间位置注入扩散模型，直接继承自NeRF。理解NeRF对于设计更好的空间条件编码至关重要。</td></tr>
+    <tr><td>Thrun, Burgard & Fox (2005) — Probabilistic Robotics. <em>MIT Press</em></td><td>粒子滤波的经典教材——理解重要性采样、重采样、粒子退化等概念对于理解BEV-Patch-PF的定位机制至关重要。虽然PathPainter的方法是新颖的，但其概率框架仍然建立在经典理论之上。</td></tr>
+    <tr><td>Sridhar et al. (2024) — Navigation with Large Language Models: Semantic Guesswork as a Heuristic for Planning. <em>CoRL 2023</em></td><td>LLM导航方向的代表性工作——与PathPainter对比，LLM导航依赖语言模型的空间推理，而PathPainter依赖图像生成模型的视觉空间推理。两者的对比凸显了"用语言vs用图像"两种世界观在导航中的优劣。</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Wang, Tian, Huang et al. · arXiv 2026 · PathPainter — Transferring Image Generation to Embodied Navigation · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

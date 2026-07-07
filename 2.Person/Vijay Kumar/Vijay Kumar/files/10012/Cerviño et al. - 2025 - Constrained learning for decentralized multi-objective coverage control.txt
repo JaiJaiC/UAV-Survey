@@ -1,0 +1,664 @@
+Constrained Learning for Decentralized Multi-Objective Coverage Control
+Juan Cervin˜o∗, Saurav Agarwal∗, Vijay Kumar, and Alejandro Ribeiro
+Abstract—The multi-objective coverage control problem re-
+quiresarobotswarmtocollaborativelyprovidesensorcoverage
+to multiple heterogeneous importance density fields (IDFs)
+simultaneously. We pose this as an optimization problem with
+constraints and study two different formulations: (1) Fair
+coverage, where we minimize the maximum coverage cost for
+any field, promoting equitable resource distribution among all
+fields; and (2) Constrained coverage, where each field must
+becoveredbelowacertaincostthreshold,ensuringthatcritical
+areasreceiveadequatecoverageaccordingtopredefinedimpor-
+tance levels. We study the decentralized setting where robots
+Fig. 1. Multi-objective coverage control on an environment with four
+have limited communication and local sensing capabilities,
+importance density fields (IDFs), shown in different colors. Robots make
+making the system more realistic, scalable, and robust. Given
+localized observations based on their limited sensing range (middle). The
+the complexity, we propose a novel decentralized constrained rightfigureshowsthecumulativeobservationsofallrobots,theirpositions,
+learningapproachthatcombinesprimal-dualoptimizationwith andthecommunicationgraph.Theproposedprimal-dualalgorithmperforms
+a Learnable Perception-Action-Communication (LPAC) neural dual updates, which are used to re-weight the IDFs, and the LPAC policy
+networkarchitecture.WeshowthattheLagrangianofthedual computesthevelocityactionsfortherobots.
+problem can be reformulated as a linear combination of the
+IDFs,enablingtheLPACpolicytoserveasaprimalsolver.We
+empirically demonstrate that the proposed method (i) signifi-
+is challenging. Instead, multiple importance fields—such as
+cantly outperforms state-of-the-art decentralized controllers by
+vegetation density, proximity to habitation, and historical
+30% on average in terms of coverage cost, (ii) transfers well to
+larger environments with more robots, and (iii) is scalable in data—provide a comprehensive environmental view. Setting
+the number of IDFs and robots in the swarm. a cost threshold for each field ensures minimum information
+acquisition for each aspect appropriately.
+I. INTRODUCTION
+To address these optimization problems, we develop a
+In a multi-objective coverage control problem, an envi-
+novel decentralized constrained learning approach that com-
+ronment is characterized by importance density fields (IDFs)
+bines primal-dual optimization with a learnable perception-
+representing the relative significance of different regions,
+action-communication (LPAC) loops [2]. Specifically, we
+each capturing a distinct environmental aspect from various
+employ a primal-dual algorithm utilizing the Lagrangian
+information sources. Depending on the requirements, one
+dual, which periodically updates the dual variables, and the
+mayuseafaircoveragestrategyforequitableresourcedistri-
+LPAC policy serves as the primal solver. The LPAC archi-
+bution across all fields or a constrained coverage strategy to
+tectureusesconvolutionalneuralnetworks(CNNs)toextract
+satisfy specific constraints associated with individual fields.
+features from the robots’ local perceptions, graph neural
+Fair coverage minimizes the maximum coverage cost for
+networks(GNNs)tomodelinter-robotcommunication,anda
+any field, promoting equal resource allocation. For instance,
+shallowmultilayerperceptron(MLP)tooutputrobotvelocity
+in a flooding scenario, a swarm of robots is deployed to
+actions. The GNN is the primary collaborative component in
+provide sensor coverage over a large urban area. While
+LPAC as it decides what information to communicate and
+the central city region is critical, the outskirts also need
+how to use received information with its own perception.
+monitoring. A single importance field might cause robots
+Thisdesignenablesrobotstomakeinformeddecisionsbased
+to cluster in the city, neglecting other areas. A fair cover-
+on local information and limited communication, ensuring
+age strategy ensures robots are distributed across the entire
+scalability and efficiency in decentralized settings.
+region, providing adequate coverage to all areas, which is
+The primary contributions of this paper are as follows:
+crucialinhumanitarianapplicationswhereresourcesmustbe
+(i) A novel approach that combines primal-dual optimiza-
+fairly allocated [1]. Figure 1 shows a fair coverage solution.
+tion with the LPAC architecture for decentralized fair and
+Constrained coverage requires each field to be covered
+constrained multi-objective coverage problems with limited
+belowacertaincostthreshold,ensuringcriticalareasreceive
+communication and sensing robot capabilities.
+coverage according to predefined levels. In wildfire mon-
+(ii) The Lagrangian of the dual problem is reformulated as
+itoring, defining a single field for all relevant information
+a linear combination of IDFs, allowing the multi-objective
+∗Equalcontributions.TheauthorsarewiththeUniversityofPennsylvania coverage control problem to be recast as a dynamically re-
+JuanCervin˜ohasmovedtotheMassachusettsInstituteofTechnology. weighted single-objective problem.
+E-mail:{jcervino,sauravag,kumar,aribeiro}@upenn.edu.
+(iii)Extensiveempiricalstudiesdemonstratetheeffectiveness
+Sourcecode:https://github.com/KumarRobotics/CoverageControl.
+SupportedbythegrantARLDCISTCRAW911NF-17-2-0181. of the proposed method compared to existing centroidal
+5202
+raM
+31
+]YS.ssee[
+2v11311.9042:viXra
+Voronoi tessellation methods. Our approach achieves an II. DECENTRALIZEDMULTI-OBJECTIVECOVERAGE
+average improvement of 30% in coverage cost, with peak
+The coverage problem is defined on a d-dimensional
+improvements of up to 100%. environment W ⊂ R2 with a homogeneous set of N
+(iv) We establish the scalability and transferability of the
+robots V = {1,...,N}. The position of the robot at time
+proposedmethodintermsof(a)thenumberofrobots,(b)the
+t is denoted by p (t) ∈ W. Robots take control actions
+i
+size of the environment, and (c) the number of IDFs. u (t) ∈ R2 to move in the environment and follow a single
+i
+An interesting feature of our approach is that the LPAC
+integrator dynamics every time step ∆t:
+policy is trained on instances of a single-objective coverage
+controlproblemandthenappliedtothemulti-objectiveprob- p i (t+∆t)=p i (t)+∆tu i (t). (1)
+lem without further training. Given the promising results for
+In a decentralized setting, each agent makes observations
+the coverage control problem, our approach can potentially
+of its local environment and communicates with nearby
+provide a robust framework applicable to other multi-robot
+robots to exchange information. We define a communication
+coordination tasks with constraints.
+graph graph G = (V,E), where V is the set of robots
+and E is the set of edges that represents a communication
+A. Related Work
+link between the robots. The communication link (i,j) ∈ E
+Coverage Control is widely studied in robotics with exists if the distance between the robots i and j is less
+applications in mobile networking [3], surveillance [4], and than the communication radius r , i.e. ∥p −p ∥ ≤ r . We
+c i j c
+target tracking [5]. The foundations of decentralized control assume the communication occurs both ways and, therefore,
+algorithms for robots with limited sensing and communica- the graph is undirected. A robot may communicate an ab-
+tion capabilities were given by Corte´s et al. [6]. The algo- stract representation of its state with its neighbors, and the
+rithmsiterativelyperform(i)acentroidalVoronoitessellation communication graph is used to determine the neighborhood
+(CVT) [7], [8] of the environment and assigns each robot to of each robot. Decentralized policies are executed by each
+their respective Voronoi cell, and (ii) computes the centroid robot independently, and do not require a centralized server
+of each cell and moves the robot towards it. The algorithms thus alleviating the communication and scalability issues.
+are also referred to as variants of the Lloyd’s algorithm [9] In coverage control, the objective is to provide sensor
+from quantization theory. However, there has been a limited coverage based on the relative importance of each point in
+study on coverage control with multiple IDFs. theenvironment.Wedefineanimportancedensityfield(IDF)
+Socially fair coverage control with multiple IDFs arising Φ:W →R+,whichrepresentstheimportanceofeachpoint
+frompopulationgroupswasstudiedbyMalenciaetal.[1].By in the environment. The cost function J is thus defined as:
+using LogSumExp approximation, a relaxation of the min- (cid:90)
+max problem was proposed, which led to a control law. J(X(t))= minf(∥p −q∥)Φ(q)d(q), (2)
+i
+Ourapproachtacklesmulti-objectivecoverageproblemsin q∈W i∈V
+a principled way through duality, recasting them as a single where f is a non-decreasing function, and a common choice
+objective coverage control and therefore allowing any cover- is f(x) = x2. The state of the system is given by X(t) =
+age control policy to generalize to the multi-objective case {p (t)} . Assuming that two robots cannot occupy the
+i i∈V
+without the need for retraining or redesigning controllers. samepoint,wecanassigneachrobotadistinctportionofthe
+Graph Neural Networksarecascadedarchitecturescom- environment to cover based on the Voronoi partitions [35],
+posed of layers of graph convolutions and pointwise non- and the cost function can be rewritten as:
+linearities [10]. GNNs have shown impressive results in
+N (cid:90)
+(cid:88)
+problems like weather prediction [11], recommendation sys- J (X(t))= f(∥p (t)−q∥)Φ(q)dq, (3)
+i
+tems [12], and physics [13]. Given their graph convolutional i=1 q∈Pi
+structure, GNNs have been used for decentralized problems
+where P is the Voronoi partition of robot i.
+i
+in various robotics applications such as multi-robot active
+information acquisition [14], coverage control [15], [2], and A. Multi-Objective Coverage
+path planning [16], [17], [18]. GNNs are well-suited for
+We formulate two multi-objective coverage problems with
+robotic applications due to their stability to perturbations M independent IDFs Φ :W →R+ for m=1,...,M:
+m
+on the graph [19], [20], transferability to larger-scale graphs
+(i) Fair coverage minimizes the maximum coverage cost
+[21], and generalization to unseen graphs [22].
+of any IDF. (ii) Constrained coverage minimizes the cost
+Constrainedlearningisamachinelearningtechniquethat
+function of one IDF while ensuring that the cost functions
+tackles problems in which more than one objective needs to
+of the other IDFs are below a certain threshold.
+be satisfied jointly [23], [24]. Notable applications include
+Fair Coverage:GivenateamofN robotsoperatinginan
+federated learning [25], passing through robustness [26]
+environment with M IDFs, the fair multi-objective coverage
+and smoothness [27], and active learning [28]. Constrained
+problem (FMCP) is defined as:
+learning has found applications in GNNs for improving their
+stability [29] and robustness [30]. In robotics, constrained P = min ρ (FMCP)
+f
+X(t),ρ
+learninghasbeenappliedtosafereinforcementlearning[31],
+subject to J (X(t))≤ρ ∀m=1,...,M
+[32], [33] and legged robot locomotion [34]. m
+IntheFMCP,allcoveragefunctionsneedtobebelowρ.This Proposition1impliesthatalinearcombinationofcoverage
+is typically called an epigraph problem [36]. controlproblemsisequivalenttoacoveragecontrolproblem
+Constrained Coverage: Given a team of N robots oper- on the linear combinations of IDFs.
+atinginanenvironmentwithM IDFs,theconstrainedmulti-
+Corollary 2. The dual function d (λ) (cf. (6)) associated
+robot coverage problem (CMCP) is defined as: ∗
+with the Lagrangians L (X(t),λ) of the fair coverage
+f
+P =min J (X(t)) (CMCP) problem P (FMCP) and L (X(t),λ) of the constrained
+c 0 f c
+X(t) coverage problem P (CMCP) are equivalent to a sin-
+c
+subject to J m (X(t))≤α m ∀m=1,...,M. gle objective unconstrained coverage control problem with
+ThereareM+1IDFsthatneedtobecovered.The0-thIDF ϕ λ (q)=
+(cid:80)M
+m=1 λ m ϕ m (q).
+needs to be minimized, while the other M of them need to Proof. WecanapplyProposition1totheLagrangiansL and
+f
+be covered up to their corresponding α
+m
+. Note that the 0-th
+L . By defining ϕ (q)=
+(cid:80)M
+λ ϕ (q), and noting that
+objective is not necessary, and the formulation can be used c λ m=1 m m
+this is a valid IDF given that λ≥0, we complete the proof.
+to obtain feasible solutions that satisfy the constraints.
+For the constrained Lagrangian L , the term
+(cid:80)M
+λ α
+c m=1 m m
+III. APPROACH:PRIMAL-DUALANDLPACLOOPS is a constant and does not take part in the minimization. ■
+To solve the multi-objective coverage control problem, we Corollary 2 is important because it allows us to simplify
+resort to the dual domain. Denote the dual variables by λ i ≥ the multi-objective coverage control problem by recasting it
+0,i∈{0,...,M},λ=[λ 1 ,...,λ M ], the state X(t) by X t , as a single objective, thus utilizing a policy π for a single
+and define the constrained L c and fair L f Lagrangians as: coverage control. The case with constraints L c is equivalent
+M M to the minimization problem. Under mild assumptions, and
+(cid:88) (cid:88)
+L (X ,λ):= λ J (X ), s.t. λ =1, (4) bothforconvexaswellasnon-convexlosses,itcanbeshown
+f t m m t i
+that the constrained optimization problem P , and the dual
+m=1 i=1 ∗
+(cid:88) M counterpart D ∗ are close [24], [23], [37].
+L (X ,λ):=J (X )+ λ (J (X )−α ). (5)
+c t 0 t m m t m
+A. Primal-Dual Algorithm For Multi-Objective Coverage
+m=1
+Note that the variable ρ disappears from the Lagrangian L , To obtain the optimal dual variables and solve the dual
+f
+as it is a property of the solution (see [27, Appendix A]). problem 6, we will resort to a primal-dual algorithm. There
+Denoting a general Lagrangian by L ,∗ ∈ {f,c}, the are two time frames, the primal and the dual time frame, the
+∗
+problem D and dual function d (·) are dualbeingslowerthantheprimal,i.e.,thevalueofλremains
+∗ ∗
+constant over a T period, upon which it is modified.
+(cid:0) (cid:1)
+D =max d (λ):=minL (X ,λ) . (6)
+∗ ∗ ∗ t In the primal update, at time step k, given dual variables
+λ Xt
+λ = [λ0,...,λM], the objective is to find the action such
+While the primal constrained optimization problems P k k k
+f
+thattheobjectiveJ (X(t))isminimized.AfterT steps,the
+(FMCP) and P
+c
+(CMCP) are computationally challenging, λk
+dual variables get updates according to the following rules:
+the dual counterparts D are linear combinations of convex
+∗
+optimizationproblemsthatcanbesolvedinpractice.Wenow λ˜ =[λi +ηsi(k)] (dual update), (7)
+k+1 k +
+show that the dual problem (6) is equivalent to a coverage
+λ =P(λ˜ ) (dual projection), (8)
+control problem on the linear combination of the IDFs. k+1 k+1
+where si represents the slackness (or constraint satisfaction)
+Proposition 1. Given a set of scalars λ ≥ 0,m =
+m
+of the i-th constraint, [·] =max(0,·) element-wise, and P
+1,...,M, the linear combination of coverage control prob- +
+lems
+(cid:80)M
+λ J (X(t)), is equivalent to a coverage
+is a projection.
+m=1 m ϕm For (CMCP), the slackness takes the form:
+control problem on the linear combinations of IDFs, i.e.,
+J ϕλ (X(t)), with ϕ λ (x)=
+(cid:80)M
+m=1 λ m ϕ m (x). 1 (k (cid:88) +1)T
+si(k)= (J (X(t))−α , (9)
+Proof. Let the distance function dist(q,t) be defined as: c T i i
+t=kT
+dist(q,t):=minf(∥p (t)−q∥).
+i∈V i and there is no projection, i.e. λ˜ =λ.
+By the definition of J in (2) and the linearity of integration: For (FMCP), the dual slackness and the projection are:
+(cid:88) M (cid:88) M (cid:90) 1 (k (cid:88) +1)T
+λ J (X(t))= λ dist(q,t)ϕ (q)dq si(k)= J (X(t)) (10)
+m m m m f T i
+m=1 m=1 t=kT
+q∈W
+M
+(cid:90) (cid:88) M λ=argmin||λ−λ˜|| s.t. (cid:88) λ =1. (11)
+= dist(q,t) λ ϕ (q)dq. 2 m
+m m λ
+m=1
+m=1
+q∈W
+This projection [38] is required to satisfy the constraint
+Note that
+(cid:80)M
+m=1 λ m ϕ m (x) is a valid IDF as λ ≥ 0. By added to the Lagrangian in (4). A succinct explanation of
+definingϕ (x)= (cid:80)M λ ϕ (x),weobtaintheresult. ■ the primal-dual steps can be found in Algorithm 1.
+λ m=1 m m
+Algorithm 1: Primal Dual Multi-Objective Coverage The communication module receives the feature vector
+Input: Policy π, initial dual variables λ, dual period T, dual from the perception module and propagates it through the
+step size η, total number of dual steps K communicationgraphusingaGraphNeuralNetwork(GNN).
+for k=1 to K do The GNN computes a message for each robot that needs
+for t¯=1 to T do
+to be communicated to other agents. Furthermore, the GNN
+t←(k−1)T +t¯
+aggregates the received messages and combines them with
+Compute action U(t)←π(X(t),ϕ )
+λ
+Perform control actions U(t) using policy π the local feature vector to generate the final output, which is
+end for passed to the action module.
+Update dual variables according to (7) Our GNN architecture is a composition of 5 graph convo-
+Project dual variables according to (8)
+lution filters [40] with ReLU as the pointwise nonlinearity.
+end for
+Each convolution is parameterized by k = 3 hops, and
+each layer has 512 hidden units. The shift operator S is the
+normalized adjacency matrix of the communication graph,
+B. Perception-Action-Communication Loops S = D−1/2AD−1/2, A is the adjacency matrix, and D is
+Intelligent collaborative and decentralized robotic systems the diagonal degree matrix. Each layer is given by:
+requireeachrobottoindependentlyperceivetheenvironment, K
+(cid:88)
+communicate information with nearby neighbors, and take Z = (S)kX H , X =σ(Z ). (12)
+l l−1 lk l l
+appropriate actions by using all the received and sensed in- k=0
+formation.ThisleadstoaPerception-Action-Communication
+Here, X is the output of the l-th layer, H is the weight
+l lk
+(PAC)loop.InaLearnablePAC(LPAC)architecture[2],we
+matrix of the k-th filter in the l-th layer, and σ is the ReLU
+haveaneuralnetworkforeachmodule:aConvolutionalNeu-
+activation function.
+ral Network (CNN) for perception, a Graph Neural Network
+The action module is the last link in the chain and is in
+(GNN) for communication, and a Multi-Layer Perceptron
+charge of generating the local velocity control action for the
+(MLP) for action. We train an LPAC policy using imitation
+robot. The MLP has two layers with 32 units each, and the
+learning, where we use a clairvoyant CVT-based controller
+final output of the MLP is processed by a linear layer to
+to generate target velocity actions for the robots.
+generate the x and y components of the velocity action.
+Environment setup: Robots are initialized uniformly at
+randominasquareenvironmentwithsidelength1024mand C. Imitation Learning
+a resolution of 1m per pixel. For each importance density WeuseimitationlearningtotraintheLPACarchitectureto
+field (IDF), we generate a fixed number of 2D Gaussian mimicthebehavioroftheclairvoyantalgorithm.Thetraining
+distributions, where the mean is uniformly sampled in the is performed using the Adam optimizer [41] in Python using
+environment, and the variance is sampled from [40,60] with PyTorch [42] and PyTorch Geometric [43]. We use a batch
+a limit of 3 standard deviations to avoid detection from afar. size of 100 and train the network for 100 epochs, with a
+Each such distribution is scaled by a random factor sampled learning rate of 10−4 and a weight decay of 10−3. We use
+from [0.05,1.00] to have a wide range of importance values. themeansquarederror(MSE)lossasthelossfunction,where
+As robots move, they maintain an importance map for the target is the output of the clairvoyant algorithm, and the
+each IDF to store observations and a boundary map to predictionistheoutputoftheLPACarchitecture.Themodel
+storeperceivedboundaries.Theobservationsarelimitedtoa with the lowest validation loss is selected as the final model.
+64×64windowaroundtherobot.Therobotsfollowasingle
+integrator dynamics with a maximum speed of 1m·s−1.
+6
+We now describe the three modules of the architecture.
+The perception module comprises a CNN that takes as
+input a four-channel image representing the IDF, the bound-
+ary, and the relative coordinates of nearby robots. A local 4 SFCC[1]
+region of 256×256 pixels is extracted from the importance CentralizedCVT
+maps and the boundary map, and they are scaled down to
+LPAC
+32×32 pixels; this forms the first two channels of the input.
+2
+Therelativecoordinatesofthenearbyrobotsarescaledbythe Clairvoyant
+communicationrangeandareaddedasthelasttwochannels.
+The CNN consists of three sequences, each comprising
+0 50 100 150 200 250
+a convolutional layer followed by batch normalization [39] Time[s]
+and a leaky ReLU activation function. Each convolutional
+layer uses a 3 × 3 kernel with a stride of one and zero
+padding, producing 32 output channels. The output of the
+final sequence is flattened and passed through a linear layer
+with a leaky ReLU activation to generate a 32-dimensional
+feature vector, which is sent to the communication module.
+tsoCegarevoCdezilamroN
+Fig. 2. Fair coverage control problem with 32 robots and 4 IDFs in a
+1024×1024 m2 environment. The coverage cost increase in comparison
+totheclairvoyantis81%,246%,250%,and258%forLPAC,Centralized,
+Decentralized,andSFCC[1]respectively.TheLPACpolicyoutperformsthe
+centralizedCVTandSFCCapproaches.
+IV. EXPERIMENTS 1
+This section provides an empirical study of the two
+problems fair coverage (FMCP) and constrained cover-
+age (CMCP) in the context of multi-objective coverage
+control. We show that the proposed primal-dual algorithm 0.8
+with LPAC policy is: (i) an efficient solver for the multi-
+objectivecoveragecontrolproblem,(ii)generalizestoawide
+range of robot parameters, and (iii) scales with number of
+robots, number of constraints, and environment size. 0.6
+We compare our method against four baseline controllers:
+socially-fair coverage control (SFCC) [1], decentralized and
+0 100 200 300 400 500
+centralizedcentroidalVoronoitessellation(CVT)algorithms,
+Time[s]
+and the clairvoyant CVT algorithm used for imitation learn-
+ing. SFCC [1] is a centralized gradient-based algorithm that
+operates on the LogSumExp of the IDFs. The decentralized
+and centralized CVT algorithms operate on the partial in-
+formation about the IDF gathered by the robots along their
+trajectories (see [2, Section V.A]).
+Note that in our proposed approach, the LPAC policy
+has the same limited information as the decentralized CVT
+algorithm: (i) robots have a limited sensing radius to gather
+information about the IDF, (ii) robots can communicate
+with each other within a limited radius, and (iii) robots
+compute actions independently based on the information
+gathered from the environment and the communication with
+nearby robots. In contrast, the centralized CVT algorithm
+has information about the positions of all robots and their
+observations of the IDF and can compute actions for all
+robots simultaneously. The clairvoyant algorithm has perfect
+knowledgeoftheIDFandthepositionsoftherobotsresulting
+in near-optimal actions.
+Webeginbyconsideringthefaircoveragecontrolproblem
+(FMCP). Figure 2 presents the maximum coverage cost
+across all IDFs averaged over 100 randomly generated envi-
+ronments using the LPAC, centralized CVT, and clairvoyant
+controllers. The LPAC outperforms both the decentralized
+and centralized CVT controller by 50%. Moreover, the
+standard deviation bands of the LPAC controller are lower
+than the mean of the centralized CVT controller, indicating
+that the LPAC controller consistently performs better across
+different environments. The result illustrates the benefits of
+usingGNNsformulti-objectivecoveragecontrol,evenwhen
+accessing partially decentralized information.
+Figure 3 shows the performance of the proposed LPAC
+approach with respect to the centralized CVT controller
+as the communication radius and the sensor size of the
+robots are varied. The centralized algorithm is agnostic to
+the communication radius, and its performance increases
+significantly with sensor size. While the LPAC approach is a
+littlesensitivetotheseparameters,itconsistentlyoutperforms
+the centralized CVT for all configurations.
+Figure 4 shows the correlation of the maximum coverage
+cost and the dual variables for the environment in Figure 1.
+The upper row shows how the performance across IDFs
+improves as time progresses. The clairvoyant and LPAC
+switch the largest dual variable from blue to red, at around
+180s, thereby lowering the coverage cost for both IDFs,
+)
+CAPL
+(oitartsocegarevoC
+TVCdezilartneC
+(192,64) (192,96) (192,128)
+(256,64) (256,96) (256,128)
+(320,64) (320,96) (320,128)
+Fig. 3. Generalization study for the fair coverage problem for varying
+communication radius (192, 256, 320) and sensor size (64, 96, 128),
+averaged over 100 environments. The LPAC consistently outperforms the
+centralizedCVTforallconfigurations.
+ClairvoyantCVT LPAC CentralizedCVT
+4
+3
+2
+1
+0.5
+0.4
+0.3
+0.2
+0.1
+0 200 400 0 200 400 0 200 400
+Time[s]
+Fig. 4. Case study: Correlation of maximum coverage cost (top row) and
+dualvariables(bottomrow)perIDFfortheenvironmentshowninFigure1.
+Each color represents a different IDF. The primal-dual algorithm performs
+dual updates such that the least covered IDF has more weight. The LPAC
+policydrivestherobotsefficientlytoreducethecoveragecost.
+makingthesolutionmoreequitable.However,thecentralized
+CVT struggles to lower the cost for the blue IDF. The
+dual value is proportional to the difficulty of satisfying the
+constraint, which translates into minimizing the cost of the
+corresponding IDF.
+Weperformscalabilitystudiesforthefaircoveragecontrol
+problemforvaryingnumbersofrobots,numberofIDFs,and
+environment size, as shown in Figure 5. The y-axis shows
+the ratio of the maximum coverage cost of LPAC to the
+centralized CVT controller averaged over 100 environments
+of size 1024 × 1024; the values are less than 1 as LPAC
+outperforms the centralized CVT controller. In Figure 5a,
+whiletheLPACdoesnotperformaswellwhenthenumberof
+robots n is scaled down from 32, the performance improves
+significantly as n scales up. Additionally, Table I shows that
+the LPAC outperforms the centralized CVT controller for
+more than 90% of the environments. Figure 5b and Table I
+show the stability of LPAC as the number of IDFs is scaled
+up. The LPAC outperforms centralized CVT by at least 35%
+in all cases.
+64 10 2048
+(128)
+1.00 1.00
+56 9 1.00 1916
+(112)
+48
+8 1774
+40 (96)
+0.80 0.80 7
+0.80 1620
+32 (80)
+6
+24
+1448
+16 5 (64)
+0.60 0.60
+0.60
+8 4 1254
+0 50 100 150 200 250 0 50 100 150 200 250 0 50 100 150 200 250 (48)
+Time[s] - Time[s] Time[s]
+(a)Varyingnumberofrobots (b)VaryingnumberofIDFs (c)Varyingenvironmentlengthandrobots
+Fig.5. ScalabilitystudyfortheFairCoverageproblem:TheplotsshowthecoveragecostratioofLPACtoCentralizedCVT(C-CVT)onthey-axis.The
+simulations are executed for 500 time steps of 0.5s each and dual updates every 25 steps. The same model is used for all experiments without further
+training.TheLPACconsistentlyoutperformsC-CVTacrossallexperiments.Whiletheperformancereduceswhenthenumberofrobotsnisscaleddown,
+theLPACperformssignificantlybetterasnscalesup.TheperformanceforvaryingnumbersofIDFsandenvironmentsizesremainsrelativelystable.
+TABLEI
+FAIRCOVERAGE:VARYINGNUMBEROFROBOTSANDIDFS
+#BestEnvironments AverageMaxObjective
+CentralizedCVT LPAC CentralizedCVT LPAC
+stoboR#
+8 32 68 2.839 2.763
+16 15 85 2.680 2.191
+24 4 96 2.559 1.687
+32 6 94 2.251 1.386
+40 2 98 2.167 1.191
+48 6 94 1.842 1.163
+56 3 97 1.744 0.981
+64 3 97 1.608 0.983
+sFDI#
+100
+80
+60
+40
+20
+0
+0.30 0.40 0.50 0.60 0.70 0.80 0.90
+ConstraintLevels(µ)
+4 6 94 2.251 1.386
+5 6 94 3.137 1.979
+6 5 95 4.144 2.486
+7 4 96 5.072 3.214
+8 4 96 6.144 3.792
+9 1 99 7.060 4.667
+10 0 100 8.104 5.037
+Figure 5c shows the stability in performance as the size
+of the environment and number of robots are jointly scaled
+up. Once again, LPAC outperforms the centralized CVT
+algorithm by at least 35%, thus showing that LPAC scales in
+the coverage control problem size.
+Constrained Coverage:Weconsidertheconstrainedcov-
+erage control problem (CMCP) and compare the centralized
+CVT against the proposed primal-dual algorithm with LPAC
+policy. To the best of our knowledge, there does not exist
+another algorithm to compare against for the constrained
+multi-objective coverage control problem. We considered
+the feasibility problem with M = 4 IDFs, i.e. ϕ = 0,
+0
+and sampled the constraint thresholds α from a normal
+m
+distribution α ∼N(µ,0.1), for µ∈{0.3,...,0.9}.
+m
+Figure6showsthepercentageofinfeasibleconstraints(or
+equivalently IDFs) and infeasible problems (at least one of
+thefourIDFsisinfeasible).Exceptforµ=0.3with45%,the
+percentage of infeasible constraints in the LPAC approach is
+always less than half that of the centralized CVT algorithm.
+)%(ytilibisaefnI
+CentralizedCVT(constraints)
+CentralizedCVT(problems)
+LPAC(constraints)
+LPAC(problems)
+Fig. 6. Constrained coverage control with varying constraint levels (µ):
+TheLPAC(solid)outperformsthecentralizedCVT(dashed)intermsofthe
+percentageofinfeasibleIDFs(circles)andproblems(squares).
+Furthermore, averaged across all µ, LPAC is infeasible for
+26% less problems.
+Theextensivesimulationresultsestablishthattheproposed
+primal-dual algorithm with LPAC policy performs signifi-
+cantly better baseline algorithms for both fair coverage and
+constrained coverage problems.
+V. CONCLUSIONS
+In this paper, we reformulate the multi-objective coverage
+control with constraints as a coverage control problem with
+a single objective. Our method relies on utilizing a dy-
+namically re-weighted combination of maps using a primal-
+dual algorithm. We showcased the benefits of our method
+by utilizing a decentralized learning technique based on
+Graph Neural Networks that abstracts the perceptions and
+learns the communications and actions to be taken by each
+robot based solely on local perception and communications.
+Empirically, we implemented a wide variety of experiments
+showcasing that our method is scalable—both in the number
+of importance fields, as well as in the number of robots in
+the swarm—and improves upon both centralized and decen-
+tralized CVT algorithms by an average of 30%. Future work
+involves real-world experiments in decentralized settings.
+REFERENCES [23] L. F. Chamon, S. Paternain, M. Calvo-Fullana, and A. Ribeiro,
+“Constrainedlearningwithnon-convexlosses,”IEEETransactionson
+[1] M.Malencia,G.Pappas,andV.Kumar,“Sociallyfaircoveragecon- InformationTheory,vol.69,no.3,pp.1739–1760,2022.
+trol,” in IEEE International Conference on Robotics and Automation [24] L. Chamon and A. Ribeiro, “Probably approximately correct con-
+(ICRA),2023,pp.7656–7662. strained learning,” Advances in Neural Information Processing Sys-
+[2] S.Agarwal,R.Muthukrishnan,W.Gosrich,A.Ribeiro,andV.Kumar, tems,vol.33,pp.16722–16735,2020.
+“LPAC:Learnableperception-action-communicationloopswithappli- [25] Z. Shen, J. Cervino, H. Hassani, and A. Ribeiro, “An agnostic
+cationstocoveragecontrol,”arXivpreprintarXiv:2401.04855,2024. approachtofederatedlearningwithclassimbalance,”inInternational
+[3] B. Hexsel, N. Chakraborty, and K. Sycara, “Coverage control for ConferenceonLearningRepresentations(ICLR),2021.
+mobileanisotropicsensornetworks,”inIEEEInternationalConference [26] A.Robey,L.Chamon,G.J.Pappas,H.Hassani,andA.Ribeiro,“Ad-
+onRoboticsandAutomation,2011,pp.2878–2885. versarialrobustnesswithsemi-infiniteconstrainedlearning,”Advances
+[4] L.Doitsidisetal.,“Optimalsurveillancecoverageforteamsofmicro in Neural Information Processing Systems, vol. 34, pp. 6198–6215,
+aerial vehicles in gps-denied environments using onboard vision,” 2021.
+AutonomousRobots,vol.33,pp.173–188,2012. [27] J. Cervino, L. F. Chamon, B. D. Haeffele, R. Vidal, and A. Ribeiro,
+[5] L. C. Pimenta et al., “Simultaneous coverage and tracking (scat) “Learning globally smooth functions on manifolds,” in International
+of moving targets with robot networks,” in Algorithmic Foundation ConferenceonMachineLearning. PMLR,2023,pp.3815–3854.
+of Robotics VIII: Selected Contributions of the Eight International [28] J. Elenter, N. NaderiAlizadeh, and A. Ribeiro, “A lagrangian duality
+Workshop on the Algorithmic Foundations of Robotics. Springer, approachtoactivelearning,”AdvancesinNeuralInformationProcess-
+2010,pp.85–99. ingSystems,vol.35,pp.37575–37589,2022.
+[6] Corte´s, Jorge, Mart´ınez, Sonia, and Bullo, Francesco, “Spatially- [29] J. Cervin˜o, L. Ruiz, and A. Ribeiro, “Training stable graph neural
+distributed coverage optimization and control with limited-range in- networks through constrained learning,” in ICASSP 2022-2022 IEEE
+teractions,”ESAIM:COCV,vol.11,no.4,pp.691–719,2005. InternationalConferenceonAcoustics,SpeechandSignalProcessing
+[7] Q. Du, V. Faber, and M. Gunzburger, “Centroidal Voronoi Tessella- (ICASSP). IEEE,2022,pp.4223–4227.
+tions:ApplicationsandAlgorithms,”SIAMReview,vol.41,no.4,pp. [30] R.Arghal,E.Lei,andS.S.Bidokhti,“Robustgraphneuralnetworks
+637–676,1999. viaprobabilisticlipschitzconstraints,”inLearningforDynamicsand
+[8] H.EdelsbrunnerandR.Seidel,“Voronoidiagramsandarrangements,” ControlConference. PMLR,2022,pp.1073–1085.
+in Proceedings of the First Annual Symposium on Computational [31] S.Paternain,M.Calvo-Fullana,L.F.Chamon,andA.Ribeiro,“Safe
+Geometry, ser. SCG ’85. New York, NY, USA: Association for policies for reinforcement learning via primal-dual methods,” IEEE
+ComputingMachinery,1985,p.251–262. Transactions on Automatic Control, vol. 68, no. 3, pp. 1321–1336,
+[9] S.Lloyd,“Leastsquaresquantizationinpcm,”IEEETransactionson 2022.
+InformationTheory,vol.28,no.2,pp.129–137,1982. [32] A.Castellano,H.Min,E.Mallada,andJ.A.Bazerque,“Reinforcement
+[10] F. Gama, A. G. Marques, G. Leus, and A. Ribeiro, “Convolutional learningwithalmostsureconstraints,”inLearningforDynamicsand
+neural network architectures for signals supported on graphs,” IEEE ControlConference. PMLR,2022,pp.559–570.
+Transactions on Signal Processing, vol. 67, no. 4, pp. 1034–1049, [33] S. Rozada, D. Ding, A. G. Marques, and A. Ribeiro, “Deterministic
+2019. policygradientprimal-dualmethodsforcontinuous-spaceconstrained
+[11] R. Lam et al., “Graphcast: Learning skillful medium-range global mdps,”arXivpreprintarXiv:2408.10015,2024.
+weatherforecasting,”arXivpreprintarXiv:2212.12794,2022. [34] Y.Kimetal.,“Notonlyrewardsbutalsoconstraints:Applicationson
+[12] X.He,K.Deng,X.Wang,Y.Li,Y.Zhang,andM.Wang,“Lightgcn: leggedrobotlocomotion,”IEEETransactionsonRobotics,2024.
+Simplifyingandpoweringgraphconvolutionnetworkforrecommenda- [35] M. De Berg, Computational geometry: algorithms and applications.
+tion,”inProceedingsofthe43rdInternationalACMSIGIRconference SpringerScience&BusinessMedia,2000.
+onresearchanddevelopmentinInformationRetrieval,2020,pp.639– [36] S. Boyd and L. Vandenberghe, Convex optimization. Cambridge
+648. universitypress,2004.
+[13] A. Sanchez-Gonzalez, J. Godwin, T. Pfaff, R. Ying, J. Leskovec, [37] J. Elenter, L. F. Chamon, and A. Ribeiro, “Near-optimal solutions
+and P. Battaglia, “Learning to simulate complex physics with graph of constrained learning problems,” in International Conference on
+networks,”inInternationalConferenceonMachineLearning. PMLR, LearningRepresentations(ICLR),2024.
+2020,pp.8459–8468. [38] J. Duchi, S. Shalev-Shwartz, Y. Singer, and T. Chandra, “Efficient
+[14] M. Tzes, N. Bousias, E. Chatzipantazis, and G. J. Pappas, “Graph projections onto the l1-ball for learning in high dimensions,” in Pro-
+neural networks for multi-robot active information acquisition,” in ceedings of the 25th International Conference on Machine Learning,
+IEEE International Conference on Robotics and Automation (ICRA), ser. ICML ’08. New York, NY, USA: Association for Computing
+2023,pp.3497–3503. Machinery,2008,pp.272–279.
+[15] W. Gosrich et al., “Coverage control in multi-robot systems via [39] S. Ioffe and C. Szegedy, “Batch normalization: Accelerating deep
+graphneuralnetworks,”inInternationalConferenceonRoboticsand networktrainingbyreducinginternalcovariateshift,”inProceedings
+Automation(ICRA),2022,pp.8787–8793. ofthe32ndInternationalConferenceonInternationalConferenceon
+[16] E.Tolstaya,F.Gama,J.Paulos,G.Pappas,V.Kumar,andA.Ribeiro, Machine Learning - Volume 37, ser. ICML’15. JMLR.org, 2015, p.
+“Learningdecentralizedcontrollersforrobotswarmswithgraphneural 448–456.
+networks,”inConferenceonrobotlearning. PMLR,2020,pp.671– [40] L.Ruiz,F.Gama,andA.Ribeiro,“Graphneuralnetworks:Architec-
+682. tures,stability,andtransferability,”ProceedingsoftheIEEE,vol.109,
+[17] Q.Li,F.Gama,A.Ribeiro,andA.Prorok,“Graphneuralnetworksfor no.5,pp.660–682,2021.
+decentralized multi-robot path planning,” in IEEE/RSJ International [41] D.KingmaandJ.Ba,“Adam:Amethodforstochasticoptimization,”
+Conference on Intelligent Robots and Systems (IROS), 2020, pp. inInternationalConferenceonLearningRepresentations(ICLR),San
+11785–11792. Diega,CA,USA,2015.
+[18] Q.Li,W.Lin,Z.Liu,andA.Prorok,“Message-awaregraphattention [42] A. Paszke et al., “PyTorch: An Imperative Style, High-Performance
+networks for large-scale multi-robot path planning,” IEEE Robotics DeepLearningLibrary,”inAdvancesinNeuralInformationProcessing
+andAutomationLetters,vol.6,no.3,pp.5533–5540,2021. Systems 32, H. Wallach, H. Larochelle, A. Beygelzimer, F. d’Alche´
+[19] Z. Wang, J. Cervino, and A. Ribeiro, “Generalization of graph Buc,E.Fox,andR.Garnett,Eds. CurranAssociates,Inc.,2019,pp.
+neural networks is robust to model mismatch,” arXiv preprint 8024–8035.
+arXiv:2408.13878,2024. [43] M. Fey and J. E. Lenssen. (2019, May) Fast Graph Representation
+[20] F.Gama,J.Bruna,andA.Ribeiro,“Stabilitypropertiesofgraphneural LearningwithPyTorchGeometric.
+networks,”IEEETransactionsonSignalProcessing,vol.68,pp.5680–
+5695,2020.
+[21] L. Ruiz, L. Chamon, and A. Ribeiro, “Graphon neural networks and
+the transferability of graph neural networks,” Advances in Neural
+InformationProcessingSystems,vol.33,pp.1702–1712,2020.
+[22] Z. Wang, J. Cervino, and A. Ribeiro, “A manifold perspective on
+thestatisticalgeneralizationofgraphneuralnetworks,”arXivpreprint
+arXiv:2406.05225,2024.

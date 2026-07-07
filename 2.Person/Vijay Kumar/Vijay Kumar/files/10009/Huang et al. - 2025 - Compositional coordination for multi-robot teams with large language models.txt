@@ -1,0 +1,615 @@
+Compositional Coordination for Multi-Robot Teams with Large
+Language Models
+Zhehui Huang1, Guangyao Shi1, Yuwei Wu2, Vijay Kumar2, Gaurav S. Sukhatme1
+Abstract—Multi-robot coordination has traditionally relied Mission Description Execution System
+onamission-specificandexpert-drivenpipeline,wherenatural Meta Behavior
+Library (Python) Robot Execution Code (Python) Mission
+l d a o n m gu ai a n ge ex m p i e s r s t io s n in d t e o scr m ip a t t i h o e n m s at a i r c e al m fo a r n m ua u l l l a y tio t n ra , ns a l l a g t o e r d ith b m y Expert G G o o a a l l G A e ll n o e c r a a t t i i o o n n 2) Code Glue Code Fi C n o is d h e C (P o y n t d h i o ti n o ) n
+Generation Goal Generation
+design,andexecutablecode.Thisconventionalprocessislabor- Motion Generation
+i i n n t m en i s s i s v io e, n i r n e a q c u c i e r s e s m ib e le nt t s o .H no e n re -e , x w p e er p t r s o , p a o n s d eL in A fl N ex 2 i C bl B e t ( o La c n h g a u n a g g e e s Expert Mis T s e i m on p S la t t r e u c (N tu L r ) ing Go G al l u A e ll C oc o a d t e ion Co C d T o e r n i ( g d P g i y t e t i r o h n on)
+toCollectiveBehavior),anovelframeworkthatleverageslarge Mission Description Glue Code
+language models (LLMs) to streamline and generalize the User (NL) Motion Generation F A in c i t s i h o n C N on o d d i e t ( io s) n
+multi-robotcoordinationpipeline.LAN2CBtransformsnatural 1) Mission Code (Python)
+Analysis
+language (NL) mission descriptions into executable Python
+Mission Representation
+code for multi-robot systems through two core modules:
+(1) Mission Analysis, which parses mission descriptions into Standardized Dependency
+behavior trees, and (2) Code Generation, which leverages Desc M ri i p s t s i i o o n n (NL) Description (NL)
+the behavior tree and a structured knowledge base to 3) Update
+Behavior Tree Ready-to-Run
+generate robot control code. We further introduce a dataset of Style Representation Action Node(s)
+(JSON) (JSON) Simulation Real-World
+natural language mission descriptions to support development
+and benchmarking. Experiments in both simulation and Fig.1. LAN2CBisanLLM-assistedmulti-robotframeworkthatconverts
+real-world environments demonstrate that LAN2CB enables mission descriptions into structured representations (e.g., behavior trees),
+robust and flexible multi-robot coordination from natural assigns roles and priorities to each robot, and automatically generates
+executable code to accomplish complex missions. A mission change does
+language, significantly reducing manual engineering effort and
+notrequirehumaninterventionsincenewcodeisgeneratedautomatically.
+supporting broad generalization across diverse mission types.
+NLmeansnaturallanguage. user-orexpert-providedcontent. LLM-
+Website: https://sites.google.com/view/lan-cb
+generatedmissionrepresentations. LLM-generatedcode.
+minorchangestotheproblemstatementornewrequirements
+I. INTRODUCTION
+emerge, as the entire pipeline must be manually redesigned.
+Problem: Multi-robot coordination for complex collective
+Claim: We posit that recent advances in large language
+behaviors, including coverage, formation, foraging, and ex-
+models(LLMs)canbeleveragedtoalleviatethesethreelim-
+ploration, has been extensively studied for decades [1]–[7].
+itations.Specifically,theuseofsuchmodelscansignificantly
+However, most prior coordination methods target a specific
+reduce human expert effort and enhance the flexibility of
+and narrowly defined coordination task. This highlights the
+multi-robot coordination systems [8]–[12].
+need for a general and unified framework that can address a
+Background: LLMs are trained on massive amounts of
+wide range of coordination problems in a systematic way.
+text data to understand and generate human-like language,
+The conventional multi-robot development pipeline starts
+allowingthemtointerpretnaturallanguageprompts,perform
+with a natural language (NL) problem description, enabling
+contextual reasoning, and produce coherent responses or
+both expert and non-expert users to specify objectives and
+actions in both visual and linguistic tasks [13]–[19]. In
+constraints.Anexperttranslatesthisdescriptionintoamath-
+robotics,LLMsareincreasinglybeingusedtoimprovehigh-
+ematical formulation, typically as an optimization problem,
+level decision-making, task planning, and human-robot in-
+which inevitably requires additional assumptions. Following
+teraction[20]–[28].Applicationsincludeinterpretingnatural
+this, a domain expert designs algorithms to solve the for-
+language instructions, generating structured plans, assisting
+mulated problem, which are subsequently implemented and
+in code generation for robot control, and enabling dialogue-
+validated on robotic hardware. However, this pipeline has
+based coordination among multi-robot systems. The key
+three limitations: It is labor-intensive, inaccessible to non-
+advantages of LLMs in robotics include their flexibility,
+experts, and inflexible. The first two limitations are apparent
+ability to adapt to new tasks without extensive retraining,
+duetothesignificantuseofskilledexperts,despitetherepet-
+and capacity to bridge the gap between human intent and
+itive nature of problem formulation, algorithm design, and
+machine execution, thereby significantly reducing the need
+codeimplementation.Thethirdbecomesapparentwheneven
+for manual programming and domain-specific engineering.
+Contributions: 1. We propose, implement, and thoroughly
+1 Zhehui Huang, Guangyao Shi, and Gaurav S. Sukhatme are with
+the Department of Computer Science, University of Southern Cali- evaluate an LLM-based framework, Language to Collective
+fornia, Los Angeles, CA 90089, USA. Email: {zhehuihu, shig, Behavior (LAN2CB), which addresses the limitations of
+gaurav}@usc.edu.2 YuweiWuandVijayKumararewiththeGRASP
+the traditional pipeline and turns natural language mission
+Lab, University of Pennsylvania, Philadelphia, PA 19104, USA. Email:
+{yuweiwu, kumar}@seas.upenn.edu. descriptionsintoexecutableplansandPythoncodeforrobot
+5202
+tcO
+22
+]OR.sc[
+3v86061.7052:viXra
+teams.LAN2CBconsistsoftwomainmodules(Fig.1).The 2) Team-Level Integration: Extending LLMs to multi-
+firstmoduleisMISSIONANALYSIS,whichtakesthemission robot systems introduces challenges in coordination, com-
+specifiedinnaturallanguageasinput,identifiesthenecessary munication, and scalability, with research still in the early
+taskstobecompleted,andanalyzesthedependencybetween stages exploring their use for flexible, robust multi-robot
+tasks. The output of the first module, all ready-to-run nodes coordination[39].SomeworksuseLLMstotranslatenatural
+from a behavior tree, is given to the second module CODE language into formal representations [40]–[43], but they are
+GENERATION, together with a pre-constructed knowledge limited to simple missions and cannot handle multi-robot
+base, to generate executable code for robots. 2. We design a teams or decomposable long-horizon tasks. Others propose
+dataset of natural language mission specifications for multi- prompt-based frameworks for multi-robot coordination us-
+robot coordination. 3. Our experiments, both in simulation ing LLMs [27, 28]. For instance, Zhao et al. introduced
+andhardware,demonstratethatLAN2CBproduceseffective RoCO [27], where robots coordinate via interactive dia-
+multi-robot coordination from natural language. They also logues.However,suchframeworksfacelimitationswithlarge
+showthatLAN2CBisflexibleandextendable,obviatingthe robot teams (e.g., ≥ 10) and complex language-based mis-
+need to design from scratch whenever the mission changes sions. Shyam et al. proposed SMART-LLM [28], an LLM-
+and providing a standard format to incorporate existing basedtaskplannerformulti-robotteamswithtaskdecompo-
+knowledge into its knowledge base. sition and allocation, but it lacks domain knowledge, limits
+generalization beyond in-context examples, and cannot han-
+II. RELATEDWORK
+dle motion-level language commands. Our work is closely
+A. Multi-Robot Coordination relatedtoGenSwarm[44],whichtranslatesnaturallanguage
+Multi-robot systems can solve large tasks efficiently task descriptions into executable Python code. While both
+through cooperation, coordination, or collaboration [29]. aim to enable language-driven multi-robot coordination, our
+Prior work has shown that these approaches enable robots frameworkdiffersintwokeyways.First,ourmodulardesign
+to contribute effectively to overall team performance, either supportsabroaderrangeofcoordinationproblems,including
+through global control strategies [30] or by relying on local multi-team tasks with interdependencies and trigger events,
+observations and decentralized decision-making [31, 32]. unlike GenSwarm’s focus on simple, single-team scenarios.
+As tasks become more complex, task-level coordination Second,weincorporateastructuredknowledgebasetoguide
+has received growing attention, where high-level goals are the LLM, enhancing extensibility, whereas GenSwarm relies
+decomposed into interdependent sub-tasks that are allocated solely on in-context learning, limiting generality.
+and executed collaboratively by the team [33]–[35]. For
+example,Messingetal.[36]introducedafour-layerstructure III. PROBLEMSTATEMENT
+covering task planning, allocation, scheduling, and motion
+Consider an environment with N robots. Given natural
+planning to simplify decision-making. More recent work
+language mission descriptions from users, our goal is to
+applied learning-based methods to multi-robot coordination
+develop a system that can automatically control robots to
+by leveraging neural architectures such as graph attention
+accomplish these missions without further human interven-
+networks for scheduling [37] and heterogeneous policy
+tion. We focus on two fundamental categories of missions:
+networks for communication and collaboration in diverse
+1) goal-approaching missions, such as geometric formation
+robotteams[38].However,mostexistingapproachesremain
+or region visitation, and 2) herding missions, where robots
+limitedtospecifictasksandlackthegeneralizationtohandle
+must guide dynamic objects into specific regions or achieve
+more dynamic objectives, understand natural language, or
+a specific coverage percentage of an area. Mission diversity
+perform higher-level reasoning abilities.
+is introduced by systematically varying key dimensions,
+B. Integrating LLMs in Robotics resulting in a broad spectrum of possible tasks:
+1) Single-Robot Integration: Recent work has explored 1) Coordination Strategies: Missions may require robots
+integratingLLMswithsinglerobotstoenablemoreintuitive to coordinate, form a range of geometric patterns (e.g.,
+human-robot interaction and high-level task planning. These lines, circles, characters), visit assigned regions, track
+approaches leverage the language understanding and reason- dynamic targets, or herd dynamic objects.
+ing capabilities of LLMs to interpret natural language com- 2) Motion Patterns: Robots may be required to execute
+mands and translate them into executable actions. Because various motion trajectories, such as moving in straight
+naturallanguageisinherentlytiedtocontextsandsemantics, lines, zigzagging, or spiral paths.
+LLMs are particularly effective in understanding tasks such 3) Constraints: Additional requirements can be imposed,
+asnavigation,exploration,andinstructionfollowing.Inthese such as entering a region from a specific direction or
+scenarios, LLMs can help robots ground language inputs adhering to prescribed durations for actions.
+into spatial or semantic representations that guide behavior 4) Trigger:Taskscanincludetriggerconditionsthatallow
+in complex, partially known environments [22]–[24]. In actions to be terminated or modified in response to
+addition,real-timeresilience[20]andanomalydetection[25] environmental events. For example, if a robot comes
+have been integrated into LLM-based robotic pipelines to withinaspecifieddistance(e.g.,1meter)ofaforbidden
+improve robustness in dynamic and unforeseen situations. region, it needs to switch to another task.
+Mission Description Mission Structuring Template Meta Behavior Library
+This mission consists of two robot groups working in parallel with a trigger mechanism. Please polish and structure the mission description using the following template:
+G G G r r r o o o u u u p p p 1 1 2 : r r [ o o '/ b b ro o o b t t s s o m m t_0 u u s s ', t t ' / v f r o o is r b i m t o t t a h _ 1 e c ', i f r ' o / c r l u o lo l b a w o r i t f n _ o g 2 r ' m p ], o a G i t n r io o ts n u : p [ a - r 1 2 o . : 0 u [ , ' n / 5 r d o .0 b r ] e o , g [ t i 1 _ o 3 .0 n ', , _ ' 1 5 /r . .0 o C b ] i , r o [ c 0 t l _ e .0 4 c ' , , e 6 '/ n . r 0 o t ] e b . r o : t lo _5 c ' a ]. ted at the * T * * * h M P is h i s m a s s i i e o s s n [ i p o D h n e a c s s c o e r _ n i n p s u i t s m i t o s b n o : e * f r * ] [ : n [ u P m ha b s e e r _ T o i f t _ le p ] h * a * ses] phases focused on [brief_phase_overview]. Gen G e o ra a t l ion v f h o i e s l r l i o d t_ w i p n _ o g t i a n r t g s ets
+center coordinates of region 1; Circle radius: (half the size of region_1) + 1.0. The three robots - **Task [task_number]:** [Task Title]
+should be evenly distributed around the circle perimeter (120 degrees apart). * task_description: [Detailed description of which specific robots perform what Goal default
+If any robot from Group 1 comes within 1.5 units of any forbidden region, Group 1 robots actions.] Allocation minimal_conflict
+immediately stop visiting positions and move to region 0. Group 2 continues their circle * finish_condition: [Clear criteria that indicate when this task is successfully
+f o o r r ig m in a a ti l o G n r o ta u s p k 1 n o p r o m in a t l v ly i . s A it f a t t e io r n G t r a o s u k p . 2 completes their circular formation, it takes over the c ... ompleted.] Ge M n o e t r i a o t n ion motion_generation
+Structure Mission
+Description
+Standardized Mission Description Behavior Tree Style Mission Representation
+**Mission Description:** { "type": "Parallel",
+This mission consists of 2 phases, executed in parallel initially, focused on point visitation and circle "key_action": "",
+formation with an intermediate trigger-based handoff mechanism. "task_name": "Group 1 visit points, Group 2 forms circle",
+**Phase 1: Parallel Group Tasks with Trigger Mechanism** "status": "Idle",
+- **Task 1: Target Point Visitation by Group 1** "finish_condition": "Finish if all children nodes are finished.",
+* task_description: Robots '/robot_0', '/robot_1', and '/robot_2' (Group 1) each visit their designated points: ...
+- '/robot_0' to [-1.0, 5.0] - '/robot_1' to [1.0, 5.0] - '/robot_2' to [0.0, 6.0]. "children": [ {"type": "Action",
+* trigger_condition: If any Group 1 robot approaches within 1.5 units of the edge of 'forbidden_0' region, Comprehensive "key_action": "visit_points",
+all Group 1 robots must immediately cease point visitation and relocate to the center of 'region_0', each Analysis "task_name": "Group 1 visit points",
+with a unique 0.5-unit offset from the center to avoid collisions. "status": "Idle",
+* finish_condition: Each robot is within 0.1 units of their assigned target point, unless preempted by the "robot_ids": ["/robot_0", "/robot_1", "/robot_2"],
+trigger condition. "points": [[-1.0, 5.0], [1.0, 5.0], [0.0, 6.0]],
+.... "region_ids": [],
+"trigger_condition": "Trigger if any robot comes within 1.5 units of the edge of any
+Dependency forbidden region, Once triggered, group 1 robots need to stop visiting points and move
+Analysis to region_0, and group 2 robots need to take over visiting points after form circle.",
+Dependency Description "finish_condition": "Finish if all robots visit their assigned points.",
+A T o c p t i o o l n o g N y o G d r e a s p : h [ [ 2 1 : ] ] [ G G 1] r r [ o o 2 u u ] p p 1 2 ( ( ' ' / / r r o o b b o o t t _ _ 0 3' ' , , ' ' / / r r o o b b o o t t _ _ 4 1' ' , , ' ' / / r r o o b b o o t t _ _ 2 5 ' ' ) ) f v o i r s m its s a a s c s i i r g c n le e d a r p o o u i n nt d s r ( e [- g 1 i . o 0 n , 5 1 . . 0], [1.0, 5.0], [0.0, 6.0]) . . " . . . h . ] i } } n , ts": "",
+Node
+Selection
+{ "type": "Action", Ready-to-Run Action Node(s)
+"key_action": "visit_points",
+"task_name": "Group 1 visit points",
+"status": "Idle",
+"robot_ids": ["/robot_0", "/robot_1", "/robot_2"], "points": [[-1.0, 5.0], [1.0, 5.0], [0.0, 6.0]], "region_ids": [],
+"trigger_condition": "Trigger if any robot comes within 1.5 units of the edge of any forbidden region, Once triggered, group 1 robots need to stop visiting points and move to region_0, and group 2 robots need to take
+over visiting points after form circle.",
+"finish_condition": "Finish if all robots visit their assigned points.", ... }, ...
+Information Update & Code
+Node Reselection Generation
+C G o e d ne e ration Mission Finish Condition Code Robot Execution Code
+def mission_finish_condition_generation( def all_robot_execution(robot_positions: Dict[str, List[float]], object_positions: Dict[str, List[float]],
+robot_positions: Dict[str, List[float]], object_positions: Dict[str, List[float]], forbidden_region_info: Dict[str, Dict[str, Any]], regular_region_info: Dict[str, Dict[str, Any]], room_range:
+forbidden_region_info: Dict[str, Dict[str, Any]], regular_region_info: Dict[str, Dict[str, Dict[str, float], robot_key_action_dict: Dict[str, str]) -> Dict[str, List[Dict[str, Any]]]:
+Any]], room_range: Dict[str, float], done_info_dict: Dict[str, Any] # Returns: Dict mapping robot IDs to their motion plans with waypoints and constraints
+) -> Tuple[bool, Dict[str, Any]]: # --- Step 0: Filter robots to only those in this node's group ---
+# Returns: Tuple containing: group_1_robot_ids = ['/robot_0', '/robot_1', '/robot_2'], group_2_robot_ids = ... ; group_1_robot_positions =
+# - bool: Mission has finished or not. True if finished, False if not finished. {rid: robot_positions[rid] for rid in group_1_robot_ids if rid in robot_positions}, group_2_robot_positions ...
+# - Dict[str, Any]: Updated done_info_dict with persistent state information. This # --- Step 1: Goal Generation ---
+is used to track the progress of the mission. ... visit_point_list = [[-1.0, 5.0], [1.0, 5.0], [0.0, 6.0]], group_1_goal_positions = visit_points_func(...
+# --- Step 2: Goal Allocation ---
+group_1_allocated_goal_positions = default_goal_allocation(group_1_robot_ids, group_1_goal_positions) ...
+Trigger Condition Code # --- Step 3: Generate robot goal condition ---
+def trigger_condition_generation( robot_positions: Dict[str, List[float]], # No constraints, just use the allocated goals as conditions with direct goal_positions.
+object_positions: Dict[str, List[float]], forbidden_region_info: Dict[str, Dict[str, group_1_robot_goal_condition = group_1_allocated_goal_positions
+Any]], regular_region_info: Dict[str, Dict[str, Any]], room_range: Dict[str, float], # --- Step 4: Group Robot Motion Generation ---
+action_node_list: List[Any], done_info_dict: Dict[str, Any]) -> Dict[int, bool]: motion_info_dict = motion_generation(group_1_robot_positions, group_1_robot_goal_condition,
+# Returns: Dictionary mapping each action node index to a boolean indicating object_positions, regular_region_info, forbidden_region_info, room_range, group_1_robot_goal_condition) ...
+whether the trigger condition is satisfied (True) or not (False).
+# Check the trigger condition of each action node Action Node(s) Finish Condition Code
+# If the trigger_condition is an empty string, return False. def finish_condition_generation(robot_positions: Dict[str, List[float]], object_positions: Dict[str,
+# If the trigger_condition is not an empty string, implement the logic. List[float]], forbidden_region_info: Dict[str, Dict[str, Any]], regular_region_info: Dict[str, Dict[str, Any]],
+trigger_map: Dict[int, bool] = {} room_range: Dict[str, float], action_node_list: List[Any], robot_details_dict: Dict[str, List[Dict[str, Any]]]) ->
+for action_node in action_node_list: Dict[str, bool]:
+trigger_condition = getattr(action_node, 'trigger_condition', '') ... # Returns: Dictionary mapping robot namespaces to completion status (True if finished). ...
+Fig.2. AcomprehensivedemonstrationofLAN2CB. human-providedcontent. LLM-generatedmissiondescriptions. LLM-generatedcode.
+5) Task Finish Condition:Each atomictask hasa clearly requirements.Tasksthatareimmediatelyexecutableare
+defined completion criterion, such as reaching a des- then identified and forwarded to the next stage.
+ignated position within a user-specified tolerance or 2) Code Generation: Based on the mission description,
+herdingobjectswithinagivenrangeofthetargetregion. the system first generates the mission finish condition,
+6) Mission Finish Condition: Mission completion is de- which is generated once for the entire mission cycle.
+fined more broadly, either by the successful completion For each selected task, considering its constraints, trig-
+of all constituent atomic tasks or by satisfying higher- ger conditions, finish conditions, and hints, the system
+level objectives (e.g., achieving at least 60% coverage separately generates code for: (a) robot execution, (b)
+of a specified region). trigger conditions, and (c) task finish conditions.
+3) Execution:Thegeneratedcodeisdeployedtotherobots
+for execution. During run-time, if any trigger condition
+IV. METHOD
+or task finish condition is met, the workflow transitions
+The LAN2CB workflow consists of the following stages, to stage 4. If the overall mission finish condition is
+illustrated in Fig. 1: satisfied, it proceeds directly to stage 5.
+4) Mission Progress Update: Upon receiving execution
+1) Mission Analysis: Given natural language mission
+results, the system uses the LLM to update the status
+descriptions from users, the LLM autonomously de-
+of each task, then returns to stage 1 for further analysis
+composes missions into atomic task specifications and
+and potential replanning if necessary.
+analyzeinter-taskdependencies.Foreachtask,theLLM
+5) MissionCompletion:Oncethemissionfinishcondition
+extractsrobotassignments,relevantconstraints,triggers,
+is met, the mission is formally marked as complete.
+finish conditions, contextual hints, and other contextual
+TABLEI nodes for which all preconditions are met. The ready-to-run
+FIELDDESCRIPTIONSFORBEHAVIORTREENODE. actionnodesarethenselectedandforwardedfordownstream
+Field(AllNodes) Description processing,codegeneration.Thisapproachensuresthatrobot
+idx Uniqueindexofthenode.
+nodetype Parallel|Sequence|Action. actions are initiated only when all prerequisite tasks and
+taskname Concisetaskdescriptionofthenode. constraints have been resolved, thereby supporting safe and
+status Idle|Running|Success|Failure.
+efficient mission execution. After selecting action nodes that
+Constraints such as max speed, time limit, re-
+constraints
+gionstoavoid,andetc. are ready-to-run, we instruct the LLM to update the status
+Condition(s) that trigger node termination and
+triggercondition of all nodes in the behavior tree, marking the selected nodes
+activatenewnodes.
+finishcondition Condition(s)fordeterminingtaskcompletion. and their parent nodes as Running.
+hints Hintsorsuggestions.
+children ListofchildBehaviorTreeNodeobjects(empty B. Code Generation
+forActionnodes).
+Field(ActionNodes) Description After mission analysis and the identification of ready-to-
+actiontype visitpoints|followtargets|herd.
+robotids ListofrobotIDsthisactionnodewillcontrol. run action nodes, we prompt the LLM to generate Python
+objectids ListofobjectIDsrelatedtotheactionnode. code to control all robots in the environment. The code
+regionids ListofregionIDsrelatedtotheactionnode.
+points Listofpointsrelatedtotheactionnode. generationprocessconsistsoffourkeycomponents,executed
+synchronously with the robots’ control loop (Fig. 1 and 2):
+A. Mission Analysis
+1) Robot execution code generation; 2) Trigger condition
+Mission analysis consists of two key phases: mission un- code generation; 3) Action node finish condition code gen-
+derstandingandready-to-runactionnodeselection.However, eration; 4) Mission finish condition code generation.
+user-provided natural language mission descriptions often Robot Execution Code Generation: Recent works have
+omit explicit definitions of atomic tasks and their execu- shownthatLLMscaneffectivelyassistcodegeneration[45]–
+tion dependencies. As a result, directly prompting LLMs [48]. However, to improve success rates and mitigate hallu-
+for general mission understanding can yield incomplete or cinations, it is more effective to provide core functions in
+ambiguous task specifications and may overlook critical advance and expose them as APIs, rather than asking the
+execution dependencies. To address these challenges, the LLM to generate all code from scratch [49]. To this end,
+mission understanding phase begins by standardizing the we construct a meta behavior library for robot execution. To
+mission description using an expert-provided template. We ensureflexibilityandthecapabilitytoprocessmultipleaction
+then perform dependency analysis to explicitly extract task nodes simultaneously, the meta-behavior library comprises
+relationships, which serve as the basis for a comprehensive three sub-libraries:
+mission analysis. Afterward, the LLM selects ready-to-run • Goal Generation: Provides primitives for three fun-
+action nodes based on the results of the dependency and damental behaviors: (a) visiting points, (b) following
+comprehensive mission analyses. targets, and (c) herding.
+Dependency Analysis: To initiate dependency analysis, • Goal Allocation: Offers two strategies for mapping
+weprompttheLLMtoextractallatomictasksfromthemis- generated goals to robots: (a) a default mapping that
+sion description, initially disregarding trigger conditions and assigns goal positions based on robot IDs, and (b) a
+any tasks that may be activated post-trigger. The LLM then minimalconflictstrategythatassignsgoalstominimize
+analyzes the dependency relationships among these atomic trajectory intersections, assuming straight-line move-
+tasks.Iftriggersareactivatedduringexecution,were-invoke ment from start to goal.
+the LLM to update the dependency analysis accordingly. • Motion Generation: Generates feasible paths from start
+ComprehensiveMissionAnalysis:Buildingontheresults togoal,consideringenvironmentalconstraints.Foreach
+of dependency analysis, we combine these atomic tasks and waypoint,thefunctionnotonlyoutputsthepositionbut
+theirdependencieswiththestandardizedmissiondescription also constraints such as maximum speed for approach.
+toprompttheLLMforcomprehensivemissionanalysis.The This modular design allows the LLM to compose robust
+mission is represented in a behavior tree structure, with the execution code for all selected action nodes, promoting
+overall mission as the root and atomic tasks as action nodes. reusability,flexibility,andscalabilityinmulti-robotsystems.
+Non-leaf nodes of type Parallel or Sequence capture Trigger Condition Code Generation: For each action
+task execution topologies according to dependencies. For node, LLMs are prompted to implement the corresponding
+each node, we instruct the LLM to generate a unique index, trigger condition. If no trigger is specified, the function
+identify the node type, task name, status, constraints, trigger always returns False. Otherwise, the LLM encodes the
+conditions, finish conditions, hints, and children. For action trigger logic using available environmental information, in-
+nodes, the LLM also specifies the action type as well as the cluding robot and object states and region properties.
+associatedrobots,objects,regions,andpoints.SeeTab.Ifor Action Node Finish Condition Code Generation: For
+detailed field descriptions of the BehaviorTreeNode. each selected action node, the LLM generates code to
+Ready-to-RunActionNode(s)Selection:Afterconstruct- evaluate whether the node’s specified finish condition has
+ing the complete behavior tree and integrating the depen- been met. For example, if the task is to visit three points,
+dency analysis results, we ask the LLM to identify action theactionnodeisconsideredcompletewhenallthreepoints
+nodesthatareimmediatelyexecutable.Specifically,theseare have been visited.
+Mission Finish Condition Code Generation: Mission TABLEII
+finish condition generation is similar in nature to composite QUANTITATIVERESULTS.
+t n a e s e k ds fi t n o is g h en c e o r n a d te iti t o h n e m ge is n s e i r o a n ti fi on n . ish Ho c w on e d v i e t r io , n th c e od L e L o M nce on fo ly r M Ca is te s g io o n ry Tem W p / late Su A c v c g e . ss Avg ( . 1 T 0 o 3 k ) ens Co A s v t g ( . $) A / v E g r . r To (1 k 0 e 3 n ) s
+Rate Input Output
+the entire mission. ✗ 0.87 48.70 12.33 0.20 92.48
+CategoryA
+✓ 1.00 52.83 14.53 0.22 -
+C. Execution ✗ 0.73 40.53 9.97 0.16 37.39
+CategoryB
+✓ 0.93 35.25 8.54 0.14 128.10
+Onceallcodescriptsaregenerated,thesysteminitiatesor ✗ 0.73 44.24 10.06 0.17 37.73
+CategoryC
+resumes execution. During execution, if a trigger condition ✓ 0.87 58.12 14.86 0.24 111.45
+✗ 0.78 44.49 10.79 0.18 55.87
+is satisfied, we prompt the LLM to update the dependency Overall ✓ 0.93 48.73 12.64 0.20 119.78
+analysis by removing the current task that caused the trigger *Avg.Tokens/Errorisbasedonoutputtokens.
+and adding any new tasks associated with the trigger. The missionsrequireadvancedcodegeneration.Certainbehav-
+updated dependency analysis, together with the mission iors are not directly supported by the behavior libraries,
+description, is then used to prompt the LLM to generate a necessitating that the LLM synthesizes additional logic
+newbehaviortree.TheLLMsubsequentlyselectsnewready- or routines. Example: Generating a spiral trajectory for
+to-runactionnodesandgeneratescodeforthem.Ifthefinish robots when only straight-line motion is natively sup-
+condition of any action node is satisfied, the LLM updates ported. (See Missions #4, #5, and #6 in Fig. 3.)
+the behavior tree. This may also include updating parent • Category C: Advanced Missions. These missions demand
+nodes if their completion depends solely on the completion advancedanalysisandcomplexcodegeneration.Theymay
+of their children. The LLM then selects new ready-to-run involve intricate dependencies, trigger conditions, or non-
+action nodes and generates the corresponding code. If the trivial mission finish conditions, such as region coverage
+finish condition of any composite node is satisfied, the LLM requirements, dynamic triggers, or adaptive behaviors.
+updates the behavior tree by marking all of its child nodes (See Missions #7, #8, and #9 in Fig. 3.)
+that have not started or are still running as Failure, and Evaluation Metrics: We quantitatively evaluate missions
+marking the composite node as Success. Execution pro- using the metrics: (1) Avg. Success Rate: The proportion of
+ceedsiterativelyuntilthemissionfinishconditionissatisfied. missionscompletedsuccessfullyasintended,withouthuman
+intervention. (2) Avg. Token Number and Cost: The total
+V. EXPERIMENTS
+number of LLM tokens used per mission and related cost.
+The experimental study is designed to rigorously evaluate (3) Avg. Tokens per Error: The average number of tokens
+LAN2CB under a variety of multi-step, long-horizon mis- consumed per error given the output tokens of the LLM.
+sions. We focus on three questions: 1) How effectively does Results:WeevaluateallmissionsusingGPT-4.1,conduct-
+LAN2CBperformacrossdiversemissions?2)Howdoesthe ing each mission five times. Detailed results are provided
+use of a standardized template for mission descriptions im- in Tab. II. By standardizing raw mission descriptions from
+pact the performance of LAN2CB compared to raw natural users with an expert-provided template, LAN2CB achieves
+language input? 3) Can LAN2CB be reliably deployed on a 100% success rate on Category A (basic missions), a 93%
+real-world robotic platforms? success rate on Category B (basic missions with advanced
+code generation) and 87% success rate on Category C
+A. Performance Across Diverse Missions
+(advanced missions). In addition, the system demonstrates
+Tothebestofourknowledge,nostandarddatasetexistsfor
+strong robustness, achieving ∼0.12 million tokens per error
+evaluating multi-step, long-horizon multi-robot mission ex-
+acrossallmissions.TheseresultsdemonstratethatLAN2CB
+ecution under natural language mission descriptions. There-
+reliably analyzes mission descriptions, including identifying
+fore, we curate a comprehensive mission suite comprising
+taskdependencies,extractingessentialinformation,selecting
+three groups (nine missions total), each designed to test the
+ready-to-runnodes,anddynamicallyupdatingbehaviortrees.
+distinct capabilities of our system.
+Notably, the high success rates in Category B and Category
+Mission Dataset: We organize the missions by the com-
+C highlight its ability to perform advanced code generation
+plexity of mission analysis and required code generation:
+tasks. These tasks include synthesizing robot trajectories
+• Category A: Basic Missions. These missions comprise not natively supported by the behavior library, generating
+multiple atomic tasks executed in a straightforward order, custom formations, creating complex execution conditions
+with no trigger conditions. Mission analysis and code such as specifying approach directions or target-following
+generation are direct: all necessary information can be duration, and generating both triggers and mission finish
+extracted from the natural language descriptions, enabling conditions. Overall, our results indicate that LAN2CB is
+theLLM togenerateinputparameters forbehaviorlibrary both robust and adaptable for diverse multi-robot mission
+functions without additional reasoning. Examples: Assign- execution scenarios.
+ingrobotstovisitpredefinedpoints.(SeeMissions#1,#2,
+B. Impact of standardized template
+and #3 in Fig. 3.)
+• Category B: Basic Missions w/ Advanced Code Genera- To quantify the impact of using a template to standard-
+tion. While maintaining a simple overall structure, these ize the mission descriptions on LAN2CB, we ablated the
+Dependency Graph Start End
+#1
+Visit
+Points
+Enclose
+Visit Region
+Region
+#2
+Block Path 1
+Herd
+Objects
+Block Path 2
+Herd #3
+Objects Enclose
+Herd Region
+Objects
+#4
+Form ‘H’ Form ‘I’
+#5
+Visit Points (Zigzag)
+Visit Points (Spiral)
+Follow Enter Region #6
+Target 1 (10s) (Left Edge)
+Follow Enter Region
+Target 2 (10s) (Top Edge)
+Follow Enter Region
+Target 3 (10s) (Right Edge)
+#7
+Visit Points Visit
+Trigger if 1.5 Units Close to Trigger Region
+the Blue Region Enclose Visit
+Enclose Region Region Points
+#8
+Herd Objects
+Herd Objects
+Herd Objects Trigger
+Mission: Cover 60% of Region #9
+Herd Objects Herd Objects
+to Subregion 1 to Subregion 2
+Herd Objects Herd Objects
+to Subregion 4 to Subregion 3
+Fig.3. Quantitativeresultsforninemulti-robotmissions.Pleasecheckthewebsiteformoredetails.
+Start End Start End
+Inspect Depots Gather Inspect Depots Gather Inspect Depots Gather Inspect Depots Gather Move to the Target (Zigzag) Move to the Target (Zigzag) Move to the Target (Zigzag) Move to the Target (Zigzag)
+Mission #1: All robots collaboratibely inspect every depot. After that, they should gather around area 5.
+Mission #1: The robot moves to the target point in a zigzag pattern.
+Block Pershing Rd (L)Block Patton Rd (L) Block Pershing Rd (L)Block Patton Rd (L) Block Pershing Rd (L)Block Patton Rd (L) Block Pershing Rd (L)Block Patton Rd (L)
+Inspect PL2 Block Patton Rd (D) Inspect PL2 Block Patton Rd (D) Inspect PL2 Block Patton Rd (D) Inspect PL2 Block Patton Rd (D) R R o o b b o o t t 1 2 F o (2 ll 0 o s w ) s Ro R b e o gi t o 1 n E ( n R t ig e h rs t O Ed ra g n e g ) eR R o o b b o o t t 1 2 F o (2 ll 0 o s w ) s Ro R b e o gi t o 1 n E ( n R t ig e h rs t O Ed ra g n e g ) e R R o o b b o o t t 1 2 F o (2 ll 0 o s w ) s Ro R b e o gi t o 1 n E ( n R t ig e h rs t O Ed ra g n e g ) e R R o o b b o o t t 1 2 F o (2 ll 0 o s w ) s Ro R b e o gi t o 1 n E ( n R t ig e h rs t O Ed ra g n e g ) e
+Robot 2 Robot 1 Robot 2 Robot 1 Robot 1 Robot 2 Robot 1 Robot 2
+Mission #2: All robots must collaborate to block the left side of the Pershing Road, the left side of the Mission #2: Robot 1 follows Robot 2 for 20 seconds, and then enters the orange region via its right edge.
+Patton Road, and the downside side of the Patton Road (after inspecting Parking Lot 2).
+Herd Target Enclose Orange Herd Target Enclose Orange Herd Target Enclose Orange Herd Target Enclose Orange
+Group 1: Reach A2Group 2: Reach A2 Group 1: Gather A5Group 2: Reach A2 Group 1: Gather A5Group 2: Reach A2 Group 1: Gather A5Group 2: Reach A2 Robot Region Robot Region Robot Region Robot Region
+Target Robot Target Robot Target Robot Target Robot
+Mission #3: Group 1: [R1, R2, R3], Group 2: [R4, R5]. Two groups of robots compete to reach area 2. The first Mission #3: Three robots herd the target robot into the orange region. Once the target robot is inside, the
+group to have any of its robots arrive at area 2 is considered the winner and will gather around area 2, while three robots must enclose the orange region.
+Fig.4. the ot R her e g a ro l u i p s w ti il c l r - e s go e u t p t a i t n a g rea e 5. xperiments. idle, running, finished. V V i i s s i i t t Y P e u l r l p o l w e R R e e g g i i o o n n Sh F a o p r e m : ‘Ɔ’ V V i i s s i i t t Y P e u l r l p o l w e R R e e g g i i o o n n Sh F a o p r e m : ‘Ɔ’ V V i i s s i i t t Y P e u l r l p o l w e R R e e g g i i o o n n Sh F a o p r e m : ‘Ɔ’ V V i i s s i i t t Y P e u l r l p o l w e R R e e g g i i o o n n Sh F a o p r e m : ‘Ɔ’
+template-reformatting stage that aligns user-provided natural
+language mission descriptions to our predefined mission
+schema. As reported in Tab. II, this omission results in an Mission #4: All robots collaboratively visit the top-left and bottom-right corners of right two regions. Then, all
+robots form a reverse ‘C’ around the left region.
+average drop of ∼15% in success rates and causes the error Fig.5. Real-worldexperiments. idle, running, finished.
+rate to become 2.14× more frequent across all mission cat- VI. CONCLUSIONS
+egories. These results highlight the critical role of structured
+prompting in maintaining robust multi-robot performance. WepresentedanLLM-basedframework,LanguagetoCol-
+lectiveBehavior(LAN2CB),a pipelinethatconvertsnatural
+language into executable Python code for robot teams. Our
+C. Realistic Simulated Scenarios
+experiments suggest that LAN2CB enables effective multi-
+We validated our framework in three simulation scenarios robot coordination and remains flexible and extensible, even
+designed to approximate real-world conditions (see Fig. 4). for multi-step and long-horizon missions. Additionally, we
+designed a dataset of natural language mission descriptions
+for multi-robot coordination. For future work, we aim to
+D. Real World Demonstrations
+improve mission analysis through retrieval-augmented gen-
+We validated our framework through four real-world eration(RAG)[50],enablingLLMstoleveragepastmission
+demonstrations1 across two robot platforms (see Fig. 5). data more effectively. Furthermore, we plan to expand the
+meta-behavior library to support a broader and more diverse
+1WethankJiazhenLiuforassistancewiththephysicaldeployment. range of capabilities.
+REFERENCES autonomousaerialrobots,”in2024IEEE63rdConferenceonDecision
+andControl(CDC),2024,pp.1539–1546.
+[1] W.Burgard,M.Moors,D.Fox,R.Simmons,andS.Thrun,“Collabo- [21] K. Obata, T. Aoki, T. Horii, T. Taniguchi, and T. Nagai, “Lip-llm:
+rativemulti-robotexploration,”inProceedings2000ICRA.Millennium Integrating linear programming and dependency graph with large
+Conference.IEEEInternationalConferenceonRoboticsandAutoma- language models for multi-robot task planning,” IEEE Robotics and
+tion. Symposia Proceedings (Cat. No.00CH37065), vol. 1, 2000, pp. AutomationLetters,2024.
+476–481vol.1. [22] D. Shah, B. Osinski, B. Ichter, and S. Levine, “LM-nav: Robotic
+[2] M.Turpin,N.Michael,andV.Kumar,“Capt:Concurrentassignment navigation with large pre-trained models of language, vision, and
+andplanningoftrajectoriesformultiplerobots,”InternationalJournal action,”in6thAnnualConferenceonRobotLearning,2022.[Online].
+ofRoboticsResearch,vol.33,no.1,pp.98–112,January2014. Available:https://openreview.net/forum?id=UW5A3SweAH
+[3] L. E. Parker, D. Rus, and G. S. Sukhatme, Multiple Mobile Robot [23] R. Schumann, W. Zhu, W. Feng, T.-J. Fu, S. Riezler, and W. Y.
+Systems. Cham:SpringerInternationalPublishing,2016,pp.1335– Wang, “Velma: verbalization embodiment of llm agents for vision
+1384. and language navigation in street view,” in Proceedings of the
+[4] H.GarciadeMarina,M.Cao,andB.Jayawardhana,“Controllingrigid Thirty-Eighth AAAI Conference on Artificial Intelligence and Thirty-
+formationsofmobileagentsunderinconsistentmeasurements,”IEEE SixthConferenceonInnovativeApplicationsofArtificialIntelligence
+TransactionsonRobotics,vol.31,no.1,pp.31–39,2015. and Fourteenth Symposium on Educational Advances in Artificial
+[5] J. Alonso-Mora, S. Baker, and D. Rus, “Multi-robot navigation in Intelligence, ser. AAAI’24/IAAI’24/EAAI’24. AAAI Press, 2024.
+formation via sequential convex programming,” in 2015 IEEE/RSJ [Online].Available:https://doi.org/10.1609/aaai.v38i17.29858
+International Conference on Intelligent Robots and Systems (IROS), [24] Z. Ravichandran, V. Murali, M. Tzes, G. J. Pappas, and V. Kumar,
+2015,pp.4634–4641. “Spine:Onlinesemanticplanningformissionswithincompletenatural
+[6] F. Amigoni, J. Banfi, and N. Basilico, “Multirobot exploration of language specifications in unstructured environments,” International
+communication-restricted environments: A survey,” IEEE Intelligent Conference on Robotics and Automation (ICRA), 2025. [Online].
+Systems,vol.32,no.6,pp.48–57,2017. Available:https://arxiv.org/abs/2410.03035
+[7] M. Santos, Y. Diaz-Mercado, and M. Egerstedt, “Coverage control [25] R. Sinha, A. Elhafsi, C. Agia, M. Foutter, E. Schmerling, and
+for multirobot teams with heterogeneous sensing capabilities,” IEEE M.Pavone,“Real-timeanomalydetectionandreactiveplanningwith
+RoboticsandAutomationLetters,vol.3,no.2,pp.919–925,2018. largelanguagemodels,”inRobotics:ScienceandSystems(RSS),2024.
+[8] Z. Li, A. Mao, D. Stephens, P. Goel, E. Walpole, A. Dima, [26] A. A. Khan, M. Andrev, M. A. Murtaza, S. Aguilera, R. Zhang,
+J. Fung, and J. Boyd-Graber, “Improving the tenor of labeling: J. Ding, S. Hutchinson, and A. Anwar, “Safety aware task planning
+Re-evaluating topic models for content analysis,” 2024. [Online]. via large language models in robotics,” 2025. [Online]. Available:
+Available:https://arxiv.org/abs/2401.16348 https://arxiv.org/abs/2503.15707
+[9] Z. Li, L. Calvo-Bartolome´, A. Hoyle, P. Xu, A. Dima, J. F. Fung,
+[27] Z. Mandi, S. Jain, and S. Song, “Roco: Dialectic multi-robot col-
+andJ.Boyd-Graber,“Largelanguagemodelsstruggletodescribethe
+laboration with large language models,” in 2024 IEEE International
+haystackwithouthumanhelp:Human-in-the-loopevaluationoftopic
+Conference on Robotics and Automation (ICRA). IEEE, 2024, pp.
+models,”2025.[Online].Available:https://arxiv.org/abs/2502.14748
+286–299.
+[10] E. Kasneci, K. Seßler, S. Ku¨chemann, M. Bannert, D. Dementieva,
+[28] S. S. Kannan, V. L. Venkatesh, and B.-C. Min, “Smart-llm: Smart
+F.Fischer,U.Gasser,G.Groh,S.Gu¨nnemann,E.Hu¨llermeieretal.,
+multi-agentrobottaskplanningusinglargelanguagemodels,”in2024
+“Chatgptforgood?onopportunitiesandchallengesoflargelanguage
+IEEE/RSJInternationalConferenceonIntelligentRobotsandSystems
+modelsforeducation,”Learningandindividualdifferences,vol.103,
+(IROS). IEEE,2024,pp.12140–12147.
+p.102274,2023.
+[29] A.Prorok,M.Malencia,L.Carlone,G.S.Sukhatme,B.M.Sadler,and
+[11] Y. Wu, Y. Tao, P. Li, G. Shi, G. S. Sukhatmem, V. Kumar, and
+V. Kumar, “Beyond robustness: A taxonomy of approaches towards
+L. Zhou, “Hierarchical llms in-the-loop optimization for real-time
+resilientmulti-robotsystems,”arXivpreprintarXiv:2109.12343,2022.
+multi-robot target tracking under unknown hazards,” arXiv preprint
+[30] J. Desai, J. Ostrowski, and V. Kumar, “Controlling formations of
+arXiv:2409.12274,2024.
+multiple mobile robots,” in Proceedings. 1998 IEEE International
+[12] J.Jiang,F.Wang,J.Shen,S.Kim,andS.Kim,“Asurveyonlargelan-
+ConferenceonRoboticsandAutomation(Cat.No.98CH36146),vol.4,
+guagemodelsforcodegeneration,”arXivpreprintarXiv:2406.00515,
+1998,pp.2864–2869vol.4.
+2024.
+[31] L.Iocchi,D.Nardi,M.Piaggio,andA.Sgorbissa,“Distributedcoor-
+[13] F. Zeng, W. Gan, Y. Wang, N. Liu, and P. S. Yu, “Large language
+dination in heterogeneous multi-robot systems,” Autonomous robots,
+models for robotics: A survey,” arXiv preprint arXiv:2311.07226,
+vol.15,pp.155–168,2003.
+2023.
+[32] N.Michael,M.M.Zavlanos,V.Kumar,andG.J.Pappas,“Distributed
+[14] J. Wei, X. Wang, D. Schuurmans, M. Bosma, F. Xia, E. Chi, Q. V.
+Le, D. Zhou et al., “Chain-of-thought prompting elicits reasoning in multi-robot task assignment and formation control,” in 2008 IEEE
+large language models,” Advances in neural information processing
+InternationalConferenceonRoboticsandAutomation,2008,pp.128–
+systems,vol.35,pp.24824–24837,2022. 133.
+[15] J.Gao,B.Sarkar,F.Xia,T.Xiao,J.Wu,B.Ichter,A.Majumdar,and [33] Z. Chen, J. Alonso-Mora, X. Bai, D. D. Harabor, and P. J. Stuckey,
+D. Sadigh, “Physically grounded vision-language models for robotic “Integrated task assignment and path planning for capacitated multi-
+manipulation,” in 2024 IEEE International Conference on Robotics agent pickup and delivery,” IEEE Robotics and Automation Letters,
+andAutomation(ICRA). IEEE,2024,pp.12462–12469. vol.6,no.3,pp.5816–5823,2021.
+[16] Z. Li, X. Wu, H. Du, F. Liu, H. Nghiem, and G. Shi, “A survey of [34] K.Leahy,Z.Serlin,C.-I.Vasile,A.Schoer,A.M.Jones,R.Tron,and
+stateoftheartlargevisionlanguagemodels:Benchmarkevaluations C.Belta,“Scalableandrobustalgorithmsfortask-basedcoordination
+and challenges,” in Proceedings of the Computer Vision and Pattern from high-level specifications (scratches),” IEEE Transactions on
+Recognition Conference (CVPR) Workshops, June 2025, pp. 1587– Robotics,vol.38,no.4,pp.2516–2535,2022.
+1606. [35] J.Motes,R.Sandstro¨m,H.Lee,S.Thomas,andN.M.Amato,“Multi-
+[17] Z.Li,X.Wu,G.Shi,Y.Qin,H.Du,T.Zhou,D.Manocha,andJ.L. robot task and motion planning with subtask dependencies,” IEEE
+Boyd-Graber, “Videohallu: Evaluating and mitigating multi-modal RoboticsandAutomationLetters,vol.5,no.2,pp.3338–3345,2020.
+hallucinations on synthetic video understanding,” 2025. [Online]. [36] A. Messing, G. Neville, S. Chernova, S. Hutchinson, and
+Available:https://arxiv.org/abs/2505.01481 H. Ravichandar, “Grstaps: Graphically recursive simultaneous task
+[18] Z. Li, Y. Chang, Y. Zhou, X. Wu, Z. Liang, Y. Y. Sung, and allocation, planning, and scheduling,” The International Journal of
+J. L. Boyd-Graber, “Semantically-aware rewards for open-ended Robotics Research, vol. 41, no. 2, pp. 232–256, 2022. [Online].
+r1 training in free-form generation,” 2025. [Online]. Available: Available:https://doi.org/10.1177/02783649211052066
+https://arxiv.org/abs/2506.15068 [37] Z.WangandM.Gombolay,“Learningschedulingpoliciesformulti-
+[19] Z. Li, I. Mondal, Y. Liang, H. Nghiem, and J. L. Boyd-Graber, robotcoordinationwithgraphattentionnetworks,”IEEERoboticsand
+“Pedants: Cheap but effective and interpretable answer equivalence,” AutomationLetters,vol.5,no.3,pp.4509–4516,2020.
+2024.[Online].Available:https://arxiv.org/abs/2402.11161 [38] E. Seraj, R. Paleja, L. Pimentel, K. M. Lee, Z. Wang, D. Martin,
+[20] A.Tagliabue,K.Kondo,T.Zhao,M.Peterson,C.T.Tewari,andJ.P. M. Sklar, J. Zhang, Z. Kakish, and M. Gombolay, “Heterogeneous
+How,“Real:Resilienceandadaptationusinglargelanguagemodelson policy networks for composite robot team communication and coor-
+dination,” IEEE Transactions on Robotics, vol. 40, pp. 3833–3849,
+2024.
+[39] P.Li,Z.An,S.Abrar,andL.Zhou,“Largelanguagemodelsformulti-
+robotsystems:Asurvey,”arXivpreprintarXiv:2502.03814,2025.
+[40] Y. Chen, J. Arkin, C. Dawson, Y. Zhang, N. Roy, and C. Fan,
+“Autotamp: Autoregressive task and motion planning with llms as
+translators and checkers,” in 2024 IEEE International conference on
+roboticsandautomation(ICRA). IEEE,2024,pp.6695–6702.
+[41] Z. Wei, X. Luo, and C. Liu, “Hierarchical temporal logic task
+and motion planning for multi-robot systems,” arXiv preprint
+arXiv:2504.18899,2025.
+[42] X. Zhang, H. Qin, F. Wang, Y. Dong, and J. Li, “Lamma-
+p: Generalizable multi-agent long-horizon task allocation and
+planning with lm-driven pddl planner,” 2025. [Online]. Available:
+https://arxiv.org/abs/2409.20560
+[43] J. X. Liu, Z. Yang, I. Idrees, S. Liang, B. Schornstein, S. Tellex,
+and A. Shah, “Lang2ltl: Translating natural language commands to
+temporalrobottaskspecification,”inConferenceonRobbotLearning
+(CoRL),2023.[Online].Available:https://arxiv.org/abs/2302.11649
+[44] W. Ji, H. Chen, M. Chen, G. Zhu, L. Xu, R. Groß, R. Zhou,
+M. Cao, and S. Zhao, “Genswarm: Scalable multi-robot code-policy
+generation and deployment via language models,” arXiv preprint
+arXiv:2503.23875,2025.
+[45] I. Singh, V. Blukis, A. Mousavian, A. Goyal, D. Xu, J. Tremblay,
+D.Fox,J.Thomason,andA.Garg,“Progprompt:Generatingsituated
+robottaskplansusinglargelanguagemodels,”in2023IEEEInterna-
+tionalConferenceonRoboticsandAutomation(ICRA). IEEE,2023,
+pp.11523–11530.
+[46] M. Ahn, A. Brohan, N. Brown, Y. Chebotar, O. Cortes, B. David,
+C. Finn, C. Fu, K. Gopalakrishnan, K. Hausman et al., “Do as i
+can,notasisay:Groundinglanguageinroboticaffordances,”arXiv
+preprintarXiv:2204.01691,2022.
+[47] J.Liang,W.Huang,F.Xia,P.Xu,K.Hausman,B.Ichter,P.Florence,
+and A. Zeng, “Code as policies: Language model programs for em-
+bodiedcontrol,”in2023IEEEInternationalConferenceonRobotics
+andAutomation(ICRA). IEEE,2023,pp.9493–9500.
+[48] Y.Meng,F.Chen,Y.Chen,andC.Fan,“Audere:Automatedstrategy
+decisionandrealizationinrobotplanningandcontrolviallms,”arXiv
+preprintarXiv:2504.03015,2025.
+[49] Z.Huang,G.Shi,andG.S.Sukhatme,“Canlargelanguagemodels
+solve robot routing?” in International Symposium of Robotics Re-
+search,2024.
+[50] P. Lewis, E. Perez, A. Piktus, F. Petroni, V. Karpukhin, N. Goyal,
+H. Ku¨ttler, M. Lewis, W.-t. Yih, T. Rockta¨schel, S. Riedel, and
+D. Kiela, “Retrieval-augmented generation for knowledge-intensive
+nlp tasks,” in Proceedings of the 34th International Conference on
+Neural Information Processing Systems, ser. NIPS ’20. Red Hook,
+NY,USA:CurranAssociatesInc.,2020.

@@ -1,0 +1,623 @@
+PIP-LLM: Integrating PDDL-Integer Programming with LLMs for
+Coordinating Multi-Robot Teams Using Natural Language
+Guangyao Shi1†, Yuwei Wu2, Vijay Kumar2, Gaurav S. Sukhatme1
+Abstract—Enablingrobotteamstoexecutenaturallanguage where feasibility and optimality are equally critical. Con-
+commands requires translating high-level instructions into sequently, many recent works integrate LLMs with classi-
+feasible, efficient multi-robot plans. While Large Language
+cal planning [8], for example, by translating natural lan-
+Models (LLMs) combined with Planning Domain Description
+guage (NL) commands into Planning Domain Description
+Language (PDDL) offer promise for single-robot scenarios,
+existing approaches struggle with multi-robot coordination Language (PDDL) and leveraging existing solvers [9, 10].
+due to brittle task decomposition, poor scalability, and low Yet, most of these approaches remain limited to single-
+coordination efficiency. We introduce PIP-LLM, a language- robot domains, and extending them to multi-robot contexts
+based coordination framework that consists of PDDL-based
+introduces additional challenges. First, formulating multi-
+team-levelplanningandIntegerProgramming(IP)basedrobot-
+robot problems into a single structured representation is
+level planning. PIP-LLMs first decomposes the command by
+translatingthecommandintoateam-levelPDDLproblemand significantly more complex, and LLMs frequently produce
+solves it to obtain a team-level plan, abstracting away robot erroneous or incomplete encodings (“hallucinations” [11]–
+assignment. Each team-level action represents a subtask to be [15])whenhandlinglargeteamsandcomplextasks.Second,
+finishedbytheteam.Next,thisplanistranslatedintoadepen-
+even with correct formulations, standard solvers for PDDL
+dency graph representing the subtasks’ dependency structure.
+often fail to scale to the large state and action spaces of
+Such a dependency graph is then used to guide the robot-
+level planning, in which each subtask node will be formulated multi-robot planning. Third, numeric objectives and con-
+as an IP-based task allocation problem, explicitly optimizing straints (e.g., energy minimization or resource-constrained
+travel costs and workload while respecting robot capabilities task allocation) are difficult to specify in PDDL, and the
+and user-defined constraints. This separation of planning from
+corresponding solvers remain underdeveloped.
+assignment allows PIP-LLM to avoid the pitfalls of syntax-
+Several efforts have attempted to extend the LLM+classic
+based decomposition and scale to larger teams. Experiments
+acrossdiversetasksshowthatPIP-LLMimprovesplansuccess planning paradigm to multi-robot systems. Bai et al. [16]
+rate, reduces maximum and average travel costs, and achieves propose decomposing PDDL goals into robot-specific sub-
+better load balancing compared to state-of-the-art baselines. goals to decouple planning across robots. However, their
+method does not generalize well to teams with more than
+I. INTRODUCTION
+two robots or scenarios where decomposition is non-trivial.
+A long-standing goal in multi-robot research is to create
+Zhang et al. [17] introduce LaMMA-P, which extends the
+systemsthattakeconcisehumanlanguagecommandsandau-
+architecture proposed by Kannan et al. [6] by incorpo-
+tomatically generate executable coordination plans for robot
+rating PDDL planning for each robot. Both frameworks
+teams. Achieving this level of autonomy requires accurate
+rely heavily on pure syntactic segmentation and analysis of
+interpretation of human commands, decomposition of these
+natural language commands for task decomposition, which
+commands into executable subtasks, and effective allocation
+is inherently unreliable. For instance, suppose the command
+oftasksacrossrobots[1].Recentadvancesinlargelanguage is "put five apples in the fridge", the naive
+models(LLMs)offerapromisingpathtowardthisobjective.
+decomposition based on syntactic segmentation and anal-
+LLMs, trained on large-scale text corpora, exhibit ysis is to decompose the task into five subtasks, each of
+common-sense reasoning abilities and can process a wide which is to put an apple in the fridge. However, some
+range of tasks expressed in natural language. They have robots may be capable of moving two apples at a time,
+achieved notable success in domains such as robotic ma- and some robots move one. How to decompose the task
+nipulation [2, 3], navigation [4], and locomotion [5]. Some depends not only on textual information but also on the
+studies have directly employed LLMs as task planners, robots’ capabilities and their availability. Similarly, a com-
+showing moderate success in single-robot sequencing prob- mand such as "put all fruits and vegetables
+lems. However, in more complex scenarios, LLMs alone on the table into fridges 1 and 2" requires
+often produce suboptimal or infeasible solutions [6, 7], contextual reasoning about object quantities and container
+which is especially problematic in multi-robot coordination capacities, which cannot be captured by naive language
+segmentation. These limitations hinder their applicability to
+1Guangyao Shi and Gaurav S. Sukhatme are with with the Department
+large-scale, heterogeneous, or long-horizon tasks. Moreover,
+ofComputerScience,UniversityofSouthernCalifornia,LosAngeles,CA
+90089,USA.Email:{shig, gaurav}@usc.edu. their frameworks implicitly assume a special case of multi-
+2Yuwei Wu and Vijay Kumar are with the GRASP Lab, University robot task allocation (MRTA) [18] where the number of
+of Pennsylvania, Philadelphia, PA 19104, USA. Email: {yuweiwu,
+kumar}@seas.upenn.edu. subtasks is no greater than the number of robots and al-
+† Correspondingauthor. location is determined solely by skill requirements without
+5202
+tcO
+62
+]OR.sc[
+1v48722.0152:viXra
+0.0:OpenObject fridge1
+Verifier 1.0:OpenObject fridge2
+2.0:StoreObject apple table1 fridge1
+Y Y … 1 H o o) e. u ua r r e w ttaa a il s l s r e k b k e s dis o e p m ts r o o c e v rai i p i d n n t e a s io d l t yn r z u w ie c n it t h w i n o ha n fo et s u l t . lo hra w elr i l n at g hn eg in up f a o lag r n m e m a fo t a i r o k n ae : ss cseennese… o.r no5t)aandPDreDpLorptrsoubclehminffoilerm6a)tioan ptlaonP fDouDnLdp sroo bfalermgenerator. Teamplan 3 4 5 . . . 0 0 0 : : : S S C t t l o o o r r s e e e O O O b b b j j j e e e c c c t t t b l f e r a t id t n u g a c e n e 1 a ta ta b b le le 1 1 fr f i r d id g g e e 2 1
+Outputrequirements:… 6.0:CloseObject fridge2
+PDDLplan
+Task:
+p 1 u a t n a d ll f p ru u i t ts v e o g n e t t a a b b l l e es 1 in in to to f r f i r d id g g e e 2 . Solver:FastDownward,ENHSP,OPTIC,… Constructdependencygraphandtraverseitforcoordination
+1.0 4.0 6.0
+PDDLproblem
+Context:
+T ba h n is a s n c a e , n … e , in le c t l t u u d c e e s , : b a re p a p d le , , … Debugger root Robot-levelPlanning
+You will be provided with following information:
+R on el f a lo ti o o r n ; s a : p b p o le ok is is on on ta c b h le air 1 ; , B … oxis f 13 Yin )) oi s aa uh r td t a t e ha ss es kc k t rd a i i pe ss t s k i t oc o nr i c p a h tib e oo c nu k it n w t hn h ea e t t ru h er e laa r l t t ilo h an e ns g P ub D ae D gtwe L e f p oe r rn o a b o l b e sj m ceec n f t i se le .i n is 2t h s ) y ea n s t d a cee c s t n i c c er .i a p4 n t)i d o a n s P e a m bDoD a u n Lt t i td c ho e c m o o r ab r i e nje c cf t i tl s es u .in ch 5t h) th ea a sP t c i De f Dn w eL e p s r o o lv b e le i m t w f e ile can 0.0 2.0 3.0 5.0
+….
+…He.rearesomeinstructions.
+Domain: Outputrequirements:…
+( : ( p a r t e - d lo ic c a a t t e io s n ?object - object ?location - object) PDDLproblem Foreachtraversednodeingraph, solveIP-based
+(cleaned ?object - object) multi-robot taskallocationEq.4toEq.6
+(break ?object - object) PDDLProblemGenerator
+… You will be provided with following information:
+( ( ( ( o c s :a l u p o c p e s t p i n e o o n ? ? r x t x R i v - e - e o l o o ? b b c o j j a e e b t c c j e e t t ) O ) c t b - j e o c b t j e ; ; … c ; ; t i i ) s s - - c ) o ) lo p s e e n d 13 Y… H )) o e . aa u re r td a t a e a s r s s e kc k r s d i i o pe s m t si t oc o e nr , i p i f n a o t s ib r o t on r t u h u it e c n t t i g hn o i ea n v t e s rue . n rl aa ta lt il s oa k nn , sg g ub e ae n gt e we r e a foe te rn a a o bs P jce D ec D ntse L . i p n r 2 o th) b e l a e s m dce e f sn il c e er . .ip4t)io an PabDoDuLt tdhoem oabinje cfitles .in the scene Robot1: 0.0:OpenObjectfridge1 3.0 StoreObjectbananatable1fridge1
+( ( ( : : : a a a c c c t t t i i i o o o n n n S S O t w p o e i r t e c n h O O O b b n j j e e c c … t t … … ) ) ) t …O Wh u eh t p ceo u nn t yt r e e ox q ut u gd ir ee e ns m ec e rrai n pt t te s io : Pn … D.wDeL jpursotb nleemeds ,t ofi rcsot ndseidciedre t hwohsiceh o obbjejecctsts t haaret arerele rvealenvt afonrt tinh eo utar spkr obbalseemd foilne the task description and Robot2:3.0:StoreObjectbananatable1fridge1 5.0:CloseObjectfridge1
+…
+Team-levelPlanning
+Robot3:1.0:OpenObjectfridge2 4.0:StoreObjectlettucetable1fridge2 6.0:CloseObjectfridge2
+Fig.1. OverviewofPIP-LLM.Usersprovidethetask,context,andPDDLdomaindescriptioninnaturallanguage(orangebox).Then,LLMswillanalyze
+therelevantinformationtoconstructaPDDLprobleminstance(PDDLProblemGenerator).Next,theresultisfedtoaDebugger andaVerifier,which
+willcheckthesyntaxofPDDLproblemsandthecorrectnessofthesolutionandfeedtheinformationbacktotheproblemgenerationLLM.Thegeneration
+processmayberepeatedseveralrounds.Eachactionintheoutputplancorrespondstoasubtaskthattherobotsasateamcando.Then,PIP-LLMusesthis
+plantoconstructadependencygraphtoidentifythedependenciesbetweensubtasksandfacilitateparallelexecution,whichwillthenbeusedtoallocate
+andschedulerobotstofinishallsub-tasks(greenbox,robot-levelplanning).
+explicitly considering task costs (e.g., travel distance) and • We propose a novel multi-robot task planning frame-
+the transition costs between tasks. Generally, however, the work that integrates PDDL-based team-level planning
+number of subtasks may exceed the number of robots in with IP-based robot-level allocation, enabling flexible
+MRTA; tasks may vary in duration; and robots may need to and efficient coordination of robot teams using natural
+transitbetweenmultipletasks.Withoutexplicitlyconsidering language commands.
+task costs, solutions can be highly suboptimal; without • Weintroduceabenchmarkdatasetforevaluatingmulti-
+propercoordination,workloadimbalancesleadtolargetravel robot task planning in large-scale, long-horizon scenar-
+costs of a particular robot, i.e., some robots are busy all the ios involving many robots and objects.
+time while others keep idling. • We provide extensive simulation results and demon-
+To address these challenges, we propose a novel frame- strate real-world applications to validate the effective-
+work, PIP-LLM, for language-driven multi-robot coordi- ness and scalability of the proposed framework.
+nation (Fig. 1). The key idea is to form a hierarchical
+planning structure: using LLM+PDDL for team-level task
+II. RELATEDWORK
+understanding and then using Integer Programming (IP) for Recent advances have demonstrated the potential of inte-
+robot assignments. Specifically, given a natural language grating LLMs with individual robotic platforms to enable
+command,ourframeworkfirstformulatesateam-levelPDDL natural human–robot interaction and high-level task plan-
+problem that captures what the robot team as a whole must ning. By leveraging the strengths of LLMs in language
+accomplish, independent of specific robot assignments. The understandingandcontextualreasoning,thesesystemstrans-
+resulting plan is then represented as a dependency graph by late free-form instructions into executable action sequences.
+analyzing action dependencies, which will then be used to Because natural language is inherently contextual and se-
+schedule the robotic team. Unlike prior work that relies on mantic, LLMs are well-suited for navigation, exploration,
+syntactic segmentation, this approach provides semantically and instruction following; in such settings, they help ground
+groundedandformaltaskdecompositionbyformulatingand linguistic inputs into spatial and semantic representations
+solving PDDL problems. In the second stage, a skill-based that guide behavior in complex, partially observed environ-
+allocation framework using IP assigns tasks to robots based ments [19]–[21]. In addition, modules for real-time resi-
+on their capabilities and task costs, ensuring both feasibility dency [22] and anomaly detection [23] have been integrated
+and efficiency. This two-level design enables the framework into LLM-based robotic pipelines to improve robustness in
+to robustly handle complex commands, scale efficiently to dynamic and unforeseen conditions.
+large numbers of robots and objects, and achieve more Built on this, researchers are increasingly exploring how
+balancedandnear-optimalexecution.Furthermore,userpref- LLMs can facilitate coordination for multi-robot teams [6,
+erences can be seamlessly incorporated into task allocation; 7, 24]–[27]. Some pioneering works seek to design prompt
+for example, constraints expressed in natural language, such frameworkstosolvemulti-robotcoordinationproblemsusing
+as excluding a particular robot from certain tasks. mainly LLMs [6, 7]. Zhao et al. [7] proposed a dialogue-
+The main contributions of this paper are as follows: based framework to coordinate multiple robots. Such ap-
+proaches are not suitable to solve long-horizon and large- B. Problem Statement
+scale multi-robot problems because such problems will re-
+Givena high-levelnatural-language instructionI, ouraim
+quire robots to communicate many rounds with redundant
+is to parse the instruction, decompose it into the requisite
+(possibly misleading as the number of rounds increases)
+subtasks, and synthesize an executable plan. Subtasks are
+information. LLMs tend to get lost and hallucinate. Chen
+scheduled to maximize robot utilization, enabling parallel
+et al. [25] did an extensive evaluation of communication
+execution when precedence and resource constraints allow.
+frameworks (centralized, decentralized, or hybrid) to find
+Environment E contains multiple robots and objects, and I
+a scalable solution for multi-robot coordination. Another
+is assumed to be feasible within E.
+representative work along this direction is [6], in which the
+authors propose a framework for multi-robot task planning IV. PROPOSEDFRAMEWORK
+based on the canonical decomposition of multi-robot task
+A. Overview
+planning, i.e., task decomposition, coalition formation, and
+task allocation [1]. Such a framework does not use any The proposed framework is shown in Fig. 1, which hier-
+external tools and purely relies on LLMs’ reasoning ca- archically conducts task planning for multi-robot systems.
+pability to solve problems. However, it cannot be used to Team-Level Planning. Given a task description in natural
+coordinate large-scale robot teams, and it does not consider language, LLMs will first analyze the context information,
+the optimality aspects of the coordination. relevantpredicates,andgoalsthatneedtobeachieved.Based
+on this analysis, it will construct a PDDL problem instance.
+Another line of work uses LLMs to translate natural
+Then, the problem instance will be fed to a Debugger and
+languageintostructuredintermediaterepresentations[17,24,
+a Verifier, which will check the syntax of PDDL problems
+28, 29]. Xu et al. [24] use hierarchical temporal logic as an
+and the correctness of the solution and feed the information
+intermediate representation for temporally dependent multi-
+backtotheproblemgenerationLLM.Thegenerationprocess
+robot task planning. Zhang et al. [17] extend [6] by adding
+will be repeated until the set loop limit is reached. Each
+a PDDL representation for each robot’s individual planning.
+action in the output plan corresponds to a subtask that the
+Ourworkalignswiththisdirection.Theproposedframework
+robots as a team can do. Then, we will use this plan to
+adoptsahierarchicalstructurethatemploystwodistinctrep-
+construct a dependency graph, which helps us to identify
+resentationsatdifferentlevels:PDDLforteam-levelplanning
+the dependencies between subtasks and facilitate parallel
+and IP for robot-level planning. Our framework can cover
+execution. Details on how to construct such task trees will
+both the feasibility and optimality aspects of multi-robot
+be discussed in Sec. IV-B. The team-level planning part of
+coordination and is very suitable for long-horizon tasks that
+PIP-LLM is, in essence, doing task decomposition. But it is
+involve a large number of robots.
+fundamentally different from those in [6, 17] which rely on
+syntacticlanguagesegmentationtodecomposetasks.Instead,
+III. PROBLEMFORMULATION
+our framework uses LLMs to construct a formal high-level
+planandrepresenttasksasastructuredformat,adependency
+A. Preliminaries
+tree. It should be noted that our team-level PDDL planning
+PDDL: As a standard, declarative language for specifying problem is different from the robot-specific PDDL planning
+automated planning tasks [30, 31], it separates the domain, problem [16, 17] in the sense that the action is about the
+which specifies types, predicates, and parameterized actions teamasawholecanwithoutreferringtoanyspecificrobots.
+with preconditions and effects, from the problem, which Such an abstract reduces the information fed to LLMs and
+enumerates concrete objects, an initial state, and goals. allows them to do high-level reasoning more accurately.
+Beyond the basic STRIPS subset, PDDL supports richer
+constructssuchasconditionalandquantifiedeffects,numeric
+Algorithm 1: Dependency Graph Scheduling
+fluents, and durative actions.
+Input : A subtask dependency graph G =(V,E)
+Robot Model: We consider a set of N (possibly) heteroge-
+Output: Ordered robot actions
+neous robots, R = {R1,R2,...,RN}. Let ∆ denote the
+1 create empty stack H # stack for BFS frontier
+set of all skills or actions that a robot may be capable
+2 H.insert(root)
+of performing. We assume that skills in ∆ are either pre-
+3 while schedule is triggered and H is not empty do
+implemented in the system or accessible through available
+4 current subtasks ← H.next task()
+API calls. Each agent Rn possesses a subset of skills, Sn ⊆
+5 sol ← skill MRTA (current subtasks)
+∆,subjecttospecificconstraints.Forexample,therobotskill
+6 allocate subtasks to robots using sol
+PickUpObjectmaybelimitedbythemaximummassthat
+7 add child nodes of current subtasks in G to H
+the robot can lift.
+8 end
+Environment Model: We assume a static and deterministic
+environment. The state of the environment can be explicitly
+represented. The number of objects and robots is fixed, and Robot-Level Planning. The constructed dependency graph
+therobot’sactionwillhaveadeterministiceffectonthestate will then be used to allocate and schedule robots to finish
+of the environment. all sub-tasks. Specifically, we will traverse the task tree in
+a Breadth-First-Search (BFS) fashion. We maintain a BFS Algorithm 2: Dependency Graph Generation
+frontier in a stack. The task nodes in this frontier can be Input :
+executed in parallel. When we need to allocate robots for • A PDDL domain file, a problem file
+the task, we pop one node from the frontier and update • A plan file P as an ordered list
+the stack. More details are given in Algo. 1. Whenever we
+Output: A subtask dependency graph G
+traverse a node in the dependency graph, we will solve a
+1 G ← root node
+skill-basedMRTAproblemtoallocatethesubtasktospecific
+2 for action index, action in P do
+robots to finish. Details will be discussed in Sec. IV-C. # trace back to find a proper parent node
+Moreover,wemayincorporatehumanpreferenceconstraints 3 for i in range(action index-1, 1, −1) do
+into the MRTA formulation to accommodate humans’ extra 4 flag ← Check dependency(action, P[i])
+requirements of robots. 5 if flag and no parent node added then
+Combiningbothteam-levelplanningandrobot-levelplan- 6 add action as child node of P[i] in G
+ning, as we will show in the experiments, such a hierarchy 7 break
+planning structure in our framework can not only achieve a 8 end
+high success rate in fulfilling diverse tasks, but also improve 9 end
+theoverallcoordinationefficiencyofthemulti-robotsystems 10 if no parent node added then
+compared to baselines. 11 add action as child node of root of G
+B. From Team-Level Plan to Subtask Dependency Graph 12 end
+13 end
+The output from the PDDL planner is a sequence of team
+14 return G
+actions. If we execute the actions in order, we can finish
+the tasks. However, it is not necessary to strictly follow the
+orderbecausesomeactionsintheplanmaybeparallelizable.
+An example is shown in Fig. 1. Given the domain, we can skills are Y = (cid:2) y 1 , y 2 , ..., y U (cid:3)T ∈ R ≥ U 0 , with y u = 0 if
+get a team plan as shown at the upper right of Fig. 1. skill u is unnecessary and y u >0 otherwise.
+It should be noted that for the first action (OpenObject Assigning robot i to a task incurs a cost c i ∈ R ≥0 ; in
+fridge1) in the plan, its effect will not affect any pre- this work, we take c i to be the total travel distance of robot
+conditions in the next action (OpenObject fridge2). i. Given the task skill requirement, robot skill matrix, and
+Similarly, there is no conflict in preconditions and effects the cost, we will solve the following lexicographic multi-
+betweenStoreObject apple table1 fridge1and objective IP problem to decide robot task allocation,
+StoreObject lettuce table1 fridge2.Insucha (cid:88)
+min {maxc x , c x } (2a)
+case, we can actually execute these two actions in parallel. i i i i i
+i
+Inspired by this, we propose a simple action parallelization
+s.t. Qx≥Y, x ∈{0,1}, (2b)
+algorithm as shown in Algo. 2 to parallelize the team i
+actionsobtainedfromourteam-levelplanning.Theresulting customized constraints, (2c)
+dependency graph of the plan is also in the robot-level
+where x is a binary variable: x = 1 if robot i is assigned
+i i
+planning block of Fig. 1. to the task, otherwise 0; x = [x ,x ,...,x ]T. The first
+1 2 N
+C. Skill-based Multi-Robot Task Allocation objective max i c i x i denotes the maximum cost of the team,
+(cid:80)
+and the second objective c x denotes the sum of the
+We consider a team of N (potentially heterogeneous) i i i
+teamcost.Eq.(2c)denotesotherdomain-specificconstraints
+robots, where each robot is characterized by a vector of
+or preference constraints specified by users (an example is
+continuous capability skills [32]. The skills of robot i are
+given in Tab. III, ID=5). Such problems can be solved using
+q(i) = (cid:2) q(i), q(i), ..., q(i)(cid:3) ∈RU , (1) existing solvers like Gurobi.
+1 2 U ≥0
+whereq(i) ∈R denotestheleveloftheu-thskill.Ifrobot V. EXPERIMENTS
+u ≥0
+ilacksskillu(e.g.,acar-likerobotcannotopenarefrigerator We conducted two types of simulation experiments to
+door), then q(i) = 0; otherwise q(i) > 0 quantifies its evaluate the performance of the proposed PIP-LLM frame-
+u u
+capacity. For example, if a robot can pick up 2 units of work. In the first type of experiment, we use the AI2THOR
+objects,itspickupskillis2.0.Stackingtherobotskillvectors simulator [33] as [6, 17], which is designed for domestic
+gives the team skill matrix Q=[q(1)T,...,q(N)T]∈RU×N tasks. The goal of this type of experiment is to evaluate
++
+whose i-th column and u-th row corresponds to robot i and whether the proposed framework can improve the team
+skill u, respectively. coordination efficiency in terms of travel costs while not
+Each task is specified by the skill requirements needed compromising the success rate. In the second type of ex-
+to complete it. For example, the task put a lunch box periment, we used a customized warehouse environment
+in the fridge may require the skills open door: 1.0, in Gazebo, which involved coordinating many robots to
+close door: 1.0, pick up: 1.2, and drop: 1.2, where rearrange many objects. The goal of the second type of
+1.2 encodes a weight affordance. Formally, the desired task experiment is to show the scalability and flexibility of the
+proposedframeworkincoordinatingalargenumberofrobots • RU measures the planning efficiency of the action
+withconciselanguagecommands.Moreover,wevalidateour sequencebycomparingthetotaltransitionsfromallsuc-
+results with a hardware demonstration. cessful executions to the overall corresponding ground
+truth count.
+A. AI2THOR Benchmark Dataset • GCR is computed using the set difference between
+ground truth goal conditions and final conditions
+To evaluate the performance of PIP-LLM and facilitate
+achieved, divided by the total number of ground truth
+comparisonswithbaselinemethods,wecreatedabenchmark
+goal conditions.
+dataset by inheriting and modifying those from [6, 17].
+• SR is calculated as the ratio of successful executions to
+Specifically, the dataset consists of three categories of tasks
+the total number of tasks.
+tobetterevaluatetheperformanceoftheproposedframework
+• TC-avg is the average travel cost for robots to finish all
+with an increasing level of complexity.
+the tasks. It is a metric for the coordination efficiency
+• Compound Tasks involve multiple objects and can of the team.
+be decomposed into sequential or parallel subtasks. • TC-max is the maximum total travel cost for robots to
+The robot team is homogeneous, and each robot has finish all the tasks. It is a metric for the team’s load-
+the necessary skills to finish all tasks. We need to balancing efficiency.
+properly allocate and schedule tasks among robots.
+We use SMART-LLM [6], LaMMA-P [17], and a basic
+For example, Slice the lettuce, trash the
+Chain of Thought (CoT) as our baselines using GPT-4o. We
+mug and switch off the light.
+evaluate our framework PIP-LLM using both GPT-4o and
+• Complex Tasks are intended for heterogeneous robot Qwen-32B.
+teams. It resembles Compound Tasks in their charac-
+teristics, like task decomposition, multi-robot engage-
+C. Results for AI2-THOR Environment
+ment, and the presence of multiple objects. However,
+unlike Compound Tasks, where individual robots can 1) Qualitativeresults: Anillustrativeexampleisshownin
+perform subtasks independently, robots may need to Fig. 2. The task description is given in the caption. The first
+perform a subtask cooperatively due to limitations in row presents screenshots of ours during the task execution,
+their skills, e.g., a robot does not have the skill to open andthesecondrowcorrespondstobaselines.Thetravelcost
+the fridge/microwave; a robot can only afford one unit of each robot is shown in Fig. 2d and 2h, respectively. As
+of weight and cannot move an object of two units of we can see from the figures, our approach, by using object
+weight1. We create a set of such tasks by either setting information and robot cost to optimize the task allocation
+the robots’ corresponding skill to zero or increasing andscheduling,resultsinasmallertravelcost(shorterpaths
+the weight of objects. Such tasks require strategic team for each robot), i.e., better coordination efficiency.
+coordination for effective task completion. 2) Quantitative results: The main statistical results are
+• Vague Tasks These tasks present additional chal- shown in Tab. I. Overall, in all GPT-4o-based frameworks,
+lenges with ambiguous natural language instruc- ourframeworkshowssignificantimprovementintravelcost-
+tions, which require the robots to infer miss- relatedmetrics(TC-sumandTC-max)comparedtothestate-
+ing details. For example, gather up 3 school of-the-art baselines and shows a substantial increase in the
+supplies on the bed; It is very bright successrate,especiallyinthevaguetasksgroup.Suchresults
+and we do not need light. suggest that our framework can not only improve the team
+coordination efficiency but also augment LLMs’ capability
+Our dataset includes 41 compound tasks, 23 complex tasks,
+to understand and analyze the tasks. We attribute such
+and25vaguecommandtaskstoevaluatetaskdecomposition,
+improvementstothefollowingreasons.First,ourframework
+allocation, and execution efficiency.
+introduces a hierarchical structure: team first, then robots.
+On the team level, LLMs will be guided by the PDDL
+B. Evaluation Baselines and Metrics
+domainanddonotneedtogointodetailsofeachrobot,thus
+We use the following evaluation metrics: Success Rate beinglesslikelytobedistractedbyredundantinformationto
+(SR),RobotUtilization(RU),GoalConditionRecall(GCR), hallucinate. Besides, we introduce the debugger and checker
+Executability (Exe), Sum of Travel Cost (TC-sum), Max of structure to allow the LLMs to correct themselves if the
+TravelCost(TC-max),following[6,17,34].Ourevaluations first round of generation is not right. Second, on the robot
+arebasedonthedataset’sfinalgroundtruthdemonstratedby level, we incorporate an explicit cost-aware task allocation
+humans. and scheduling structure, which will inherently improve
+the coordination efficiency. Tab. I also shows the result of
+• Exeisthefractionofactionsinthetaskplanthatcanbe
+using Qwen-32B for our framework. In such a case, the
+executed,regardlessoftheirimpactontaskcompletion.
+performanceofourframework,intermsofbothsuccessrate
+and travel cost, remains significantly better than the naive
+1AI2THOR does not support cooperative manipulation. When dealing
+CoT framework with GPT-4o. These results demonstrate the
+with such tasks, we manually inspect the plan and cost output from
+frameworks,butdonotvisualizeplansinthesimulator. effectiveness of the proposed framework.
+TABLEI
+EVALUATIONOFPIP-LLMANDBASELINESINTHEAI2-THORSIMULATOR.
+Compound Complex Vague
+Methods
+SR↑ TCmax/avg↓ GCR↑ RU↑ Exe↑ SR↑ TCmax/avg↓ GCR↑ RU↑ Exe↑ SR↑ TCmax/avg↓ GCR↑ RU↑ Exe↑
+CoT(GPT-4o) 0.37 6.5/5.8 0.42 0.72 0.67 0.00 –/– 0.16 0.00 0.45 0.00 –/– 0.00 0.00 0.00
+SMART-LLM(GPT-4o) 0.71 6.3/5.3 0.82 0.78 0.93 0.26 7.3/6.0 0.39 0.63 0.75 0.00 –/– 0.12 0.00 0.67
+LaMMA-P(GPT-4o) 0.93 6.3/5.0 0.94 0.91 0.92 0.78 7.0/5.8 0.88 0.87 1.00 0.52 7.0/5.5 0.56 0.71 0.91
+PIP-LLM(ours,GPT-4o) 0.93 5.3/4.3 0.95 1.00 1.00 0.87 5.8/4.5 0.92 0.90 1.00 0.68 6.0/4.8 0.77 0.82 0.91
+PIP-LLM(ours,Qwen-32B) 0.63 5.8/4.8 0.72 1.00 0.93 0.48 6.5/5.5 0.45 0.81 0.64 0.40 0.14/0.14 0.35 0.77 0.54
+(a)ours:PIP-LLM (b) (c) (d)
+(e)SMART-LLM&LaMMA-P (f) (g) (h)
+Fig. 2. An illustrative example to show the differences between our framework, PIP-LLM, and baselines (SMART-LLM and LaMMA-P). The task is
+put potato and knife in sinkbasin and trash the bottle and cup. (a)-(d) show the execution of results from PIP-LLM. (e)-(h)
+show the execution of baselines. The top left of (a) and (e) shows the allocated tasks of all robots. The top of (d) and (h) shows the cost of all robots.
+Oursachievesmuchsmallermaximum/averagecost.Red,blue,andgreencolorscorrespondtorobots1,2,and3,respectively.
+Methods Compound Complex Vague ing planning without generating explicit PDDL problems.
+SR TCmax/avg SR TCmax/avg SR TCmax/avg As shown in the table, the success rate drops substantially
+PIP-LLMw/oD 0.49 5.8/5.0 0.35 5.8/4.8 0.16 6.8/5.3
+acrossallthreetaskcategories,underscoringthecriticalrole
+PIP-LLMw/oB&V 0.68 5.5/4.3 0.43 6.5/5.0 0.32 6.3/4.8
+PIP-LLMw/N=1 0.85 5.5/4.8 0.74 5.3/4.5 0.44 6.0/4.8 of the PDDL domain in guiding task understanding and
+PIP-LLMw/N=3 0.90 5.8/4.8 0.83 6.0/4.8 0.60 6.0/4.5
+PIP-LLMw/N=4 0.93 5.3/4.3 0.87 5.8/4.5 0.68 6.0/4.8 decomposition. In the second row, we remove the solution
+PIP-LLMw/oAS 0.93 6.5/5.3 0.87 7.0/5.8 0.68 7.3/6.5
+refinement loop, i.e., the debugger and verifier components
+TABLEII (B and V). This results in a pronounced decline in success
+ABLATIONSACROSSTHREECATEGORIES.WECONSIDERTHE rate, particularly for the complex and vague task groups,
+FOLLOWINGKEYCOMPONENTSINFIG.1:TEAM-LEVELPLANNING highlightingtheeffectivenessofBandV.Tofurtherexamine
+PDDLDOMAIN(D),DEBUGGER(B),VERIFIER(V),THENUMBEROF their impact, we vary the number of refinement loops (N)
+ALLOWEDREFININGLOOPS(N),ANDTHETASKALLOCATIONAND from the third to the fifth rows. The results clearly indicate
+SCHEDULINGCOMPONENT(AS).EVALUATIONISBASEDONGPT-4O. that increasing N consistently improves performance. We
+adopt N = 4 for the results reported in Tab. I. Finally, in
+the last row, we replace our task allocation and scheduling
+D. Ablation Study for AI2-THOR Environment module with a purely LLM-based approach. This modifi-
+cation led to a substantial increase in travel-related costs,
+We conducted an ablation study to assess the contribution demonstratingtheefficiencyoftheproposedAS component
+of individual components to the performance of PIP-LLMs in optimizing resource utilization.
+in Tab. II. The following key components were considered:
+E. Results for Gazebo Warehouse Environment
+the team-level planning PDDL domain (D), the debugger
+(B),theverifier(V),thenumberofallowedrefinementloops Since AI2THOR is designed for a small-scale household
+(N),andthetaskallocationandschedulingmodule(AS).In setup, we cannot use it to test scalable multi-robot coordi-
+the first row, we exclude the PDDL domain D and allow the nation. To this end, we create a customized warehouse envi-
+LLMs to design team-level actions autonomously, perform- ronment in Gazebo for the second part of our experiments,
+(a) (b)
+(a) (b)
+box2
+box2
+box1
+(c) (d)
+(c) (d)
+Fig. 5. Snapshots of hardware experiments. The task is Push boxes
+to their corresponding goals.Theplannedpathsforrobotsare
+marked as blue, green, and red dots, respectively, in (a). Three robots are
+available for the task. The transparent robots and boxes along the paths
+denotetheirfuturelocations.
+Fig. 3. A team of 12 robots conducting tasks in the warehouse. Tab. III shows ten representative tasks for the warehouse
+Products 1, 2, 3, and 4 are in red, blue, green, and magenta, respectively. environment. A task is considered finished successfully if
+The task command is There should be full of product 1
+the product distribution on the shelves is the same as the
+in shelf 1; full of product 2 in shelf 2; full of
+product 3 in shelf 3; and shelf 4 should be empty. ground truth annotated by a human. To estimate the success
+The team-level action plan is 0.0: (move-product shelf2 rate, we execute each task ten times from varied initial
+shelf3 product3 magnitude6) 1.0: (move-product
+robotlocations,explicitlyaccountingforGPT-4o’sstochastic
+shelf3 shelf2 product2 magnitude6), ..., 8.0:
+(move-product shelf4 shelf2 product2 magnitude4) output.AsshowninTab.III,ourframeworkisabletoachieve
+(a)-(d)showthechangesinproductlocationsovertime. a significantly higher success rate meanwhile inducing a
+much lower travel cost. Baselines include CoT, SMART-
+LLM, and LaMMA-P. We observe that these baselines
+succeed only in the first task. This is because in task 1,
+the initial product distribution is very close to the desired
+distribution: we just need to move two products 1 from
+shelf 1 to shelf 3. The baseline frameworks can manage
+such “one-step” simple planning. For other tasks, they all
+involve moving products back and forth between shelves,
+which causes all baselines to fail. These results indicate
+that our framework can effectively understand high-level
+instructions to coordinate a large number of robots with a
+high coordination efficiency. Moreover, in tasks 6 and 7,
+we introduce noise to the language commands by using
+misspellings. We observe that such small noise can still lead
+the framework to fail occasionally. For example, in task 6,
+product 3 is written as prodcut3 on purpose and LLMs may
+generate a PDDL problem by claiming prodcut3 as a new
+product instead of product 3. Similarly, LLMs may claim
+shelve4 as a new shelf in the generated PDDL file.
+Fig.4. PDDLdomainusedfortheGazebowarehouseenvironment.
+Hardware Demonstration. We employ multiple mobile
+asshowninFig.3,inwhichateamofrobotsneedstomove ground robots to perform object transfer operations, where
+many objects between different shelves based on the input each robot is tasked with pushing boxes to designated
+oflanguageinstructions.Weuseblocksofdifferentcolorsto goal locations. Snapshots of a representative experiment at
+representdifferentobjectsthatneedtobemoved.Weassume different time frames are shown in Fig. 5.
+that the states of robots and objects are known. The team- Limitations.Theproposedframeworkreliesonapre-defined
+level planning PDDL domain file is shown in Fig. 4, which team-levelPDDLplanningdomain.Suchadomainencapsu-
+focuses on only moving products from one shelf to another lates all possible transitions in the environment and can ef-
+shelf without referring to any specific robots. An illustrative fectivelyguideLLMstofindteam-levelsolutions.Currently,
+task example is given in the caption of Fig. 3. The PDDL it is still very challenging for LLMs to automatically design
+plan, i.e., a sequence of team actions, will be generated and such a domain given a general problem context description.
+fedtothetaskallocationandschedulingparttodecidewhich Anotherlimitationisthatweassumetheworldisclosedand
+robots should be used to accomplish the team action. The static,asintheclassicAIplanning.Ifthereexistsuncertainty
+team can efficiently rearrange a large number of objects. in the environment (e.g., the number and type of objects
+TABLEIII
+[3] Y.J.Ma,W.Liang,G.Wang,D.-A.Huang,O.Bastani,D.Jayaraman,
+STATISTICALRESULTSFROMTABLETOPEXPERIMENTS.
+Y. Zhu, L. Fan, and A. Anandkumar, “Eureka: Human-level reward
+designviacodinglargelanguagemodels,”inTheTwelfthInternational
+Task Successrate(%) Travelcost(m) ConferenceonLearningRepresentations,2024.
+[4] B. Yu, H. Kasaei, and M. Cao, “L3mvn: Leveraging large language
+ID ours baselines ours(max/avg) baselines modelsforvisualtargetnavigation,”in2023IEEE/RSJInternational
+ConferenceonIntelligentRobotsandSystems(IROS). IEEE,2023,
+1 100 100 28.5/33.0 34.1/40.3 pp.3554–3560.
+2 100 0 164.7/141.1 — [5] Y.Tang,W.Yu,J.Tan,H.Zen,A.Faust,andT.Harada,“Saytap:Lan-
+3 100 0 151.2/111.6 — guagetoquadrupedallocomotion,”inConferenceonRobotLearning.
+4 100 0 321.3/267.1 — PMLR,2023,pp.3556–3570.
+[6] S. S. Kannan, V. L. Venkatesh, and B.-C. Min, “Smart-llm: Smart
+5 90 0 194.3/167.1 —
+multi-agentrobottaskplanningusinglargelanguagemodels,”in2024
+6 80 0 201.4/157.4 —
+IEEE/RSJInternationalConferenceonIntelligentRobotsandSystems
+7 70 0 304.2/271.4 — (IROS). IEEE,2024,pp.12140–12147.
+8 100 0 111.6/97.4 — [7] Z. Mandi, S. Jain, and S. Song, “Roco: Dialectic multi-robot col-
+9 100 0 221.2/177.4 — laboration with large language models,” in 2024 IEEE International
+Conference on Robotics and Automation (ICRA). IEEE, 2024, pp.
+10 100 0 288.3/248.3 —
+286–299.
+[8] M.Ghallab,D.Nau,andP.Traverso,AutomatedPlanning:theoryand
+ID Taskdescription practice. Elsevier,2004.
+[9] Y. Liu, L. Palmieri, S. Koch, I. Georgievski, and M. Aiello, “Delta:
+1 Thereshouldbe7product1inshelf3. Decomposed efficient long-term robot task planning using large lan-
+2 Thereshouldbe3product2inshelf4,5product2inshelf2. guage models,” in 2025 IEEE International Conference on Robotics
+3 There should be 10 product1 in shelf3, 9 product1 in shelf2. We andAutomation(ICRA). IEEE,2025,pp.10995–11001.
+canonlyuserobot1tomoveproductto[location]oftheshelf1 [10] B.Liu,Y.Jiang,X.Zhang,Q.Liu,S.Zhang,J.Biswas,andP.Stone,
+4 There should be 2 product2, 7 product3, 8 product1 in shelf3, 3 “Llm+ p: Empowering large language models with optimal planning
+product2,5product3,12product1inshelf2. proficiency,”arXivpreprintarXiv:2304.11477,2023.
+[11] Z. Li, X. Wu, H. Du, F. Liu, H. Nghiem, and G. Shi, “A survey of
+5 There should be 20 product1 in shelf2, 16 product1 in shelf4,
+stateoftheartlargevisionlanguagemodels:Benchmarkevaluations
+2 product1 in shelf3. But robot 0 should not be used to move
+and challenges,” in Proceedings of the Computer Vision and Pattern
+product1fromoneshelftoanother.
+Recognition Conference (CVPR) Workshops, June 2025, pp. 1587–
+6. Onshelf4,thereoughtabe14prodcut3,2prodcut1,and1prduct2.
+1606.
+(includemisspellingsbydesign)
+[12] Z.Ji,Y.Tiezheng,Y.Xu,N.Lee,E.Ishii,andP.Fung,“Towardsmit-
+7. Theyresupposedtobe17prodct1onshelve4,Ithink. igatingllmhallucinationviaselfreflection,”inThe2023Conference
+8. shelf4hastenplussevenproduct1 onEmpiricalMethodsinNaturalLanguageProcessing,2023.
+9. shelf2stocksaquartetofproduct2andatrioofproduct3 [13] Z. Li, X. Wu, G. Shi, Y. Qin, H. Du, T. Zhou, D. Manocha, and
+J. L. Boyd-Graber, “Videohallu: Evaluating and mitigating multi-
+10. shelf4storesadozenproduct3andaquintetofproduct1.
+modalhallucinationsonsyntheticvideounderstanding,”arXivpreprint
+arXiv:2505.01481,2025.
+[14] Z. Li, W. Yu, C. Huang, R. Liu, Z. Liang, F. Liu, J. Che, D. Yu,
+are changing or the execution of actions succeeds with a J.Boyd-Graber,H.Mietal.,“Self-rewardingvision-languagemodel
+probability),somereplanningmechanismshouldbeincluded viareasoningdecomposition,”arXivpreprintarXiv:2508.19652,2025.
+[15] T. Guan, F. Liu, X. Wu, R. Xian, Z. Li, X. Liu, X. Wang, L. Chen,
+to close the loop for PIP-LLM.
+F.Huang,Y.Yacoobetal.,“Hallusionbench:anadvanceddiagnostic
+suiteforentangledlanguagehallucinationandvisualillusioninlarge
+VI. CONCLUSION vision-languagemodels,”inProceedingsoftheIEEE/CVFConference
+onComputerVisionandPatternRecognition,2024,pp.14375–14385.
+[16] D.Bai,I.Singh,D.Traum,andJ.Thomason,“Twostep:Multi-agent
+This work presents a hierarchical framework, PIP-LLM,
+task planning using classical planners and large language models,”
+that integrates LLMs with both PDDL and IP to support arXivpreprintarXiv:2403.17246,2024.
+scalable, long-horizon multi-robot task planning. By lever- [17] X. Zhang, H. Qin, F. Wang, Y. Dong, and J. Li, “Lamma-p: Gen-
+eralizablemulti-agentlong-horizontaskallocationandplanningwith
+aging the complementary strengths of PDDL and IP, and
+lm-drivenpddlplanner,”arXivpreprintarXiv:2409.20560,2024.
+using LLMs to bridge natural language inputs with formal [18] B.P.GerkeyandM.J.Mataric´,“Aformalanalysisandtaxonomyof
+representations, the framework lowers the barrier to entry task allocation in multi-robot systems,” The International journal of
+roboticsresearch,vol.23,no.9,pp.939–954,2004.
+for non-experts while maintaining the rigor needed for com-
+[19] R. Schumann, W. Zhu, W. Feng, T.-J. Fu, S. Riezler, and W. Y.
+plex problem-solving. Through comprehensive simulations
+Wang, “Velma: verbalization embodiment of llm agents for vision
+and hardware validation, we demonstrate the framework’s andlanguagenavigationinstreetview,”inProceedingsoftheThirty-
+effectiveness and potential in enabling intuitive deployment
+EighthAAAIConferenceonArtificialIntelligence,2024.
+[20] Z. Ravichandran, V. Murali, M. Tzes, G. J. Pappas, and V. Kumar,
+ofmulti-robotcoordinationsystemsacrossdiversescenarios.
+“Spine:Onlinesemanticplanningformissionswithincompletenatural
+The code and dataset will be released after acceptance. language specifications in unstructured environments,” International
+ConferenceonRoboticsandAutomation(ICRA),2025.
+[21] D. Shah, B. Osinski, B. Ichter, and S. Levine, “LM-nav: Robotic
+REFERENCES navigation with large pre-trained models of language, vision, and
+action,”in6thAnnualConferenceonRobotLearning,2022.
+[1] Y. Rizk, M. Awad, and E. W. Tunstel, “Cooperative heterogeneous [22] A.Tagliabue,K.Kondo,T.Zhao,M.Peterson,C.T.Tewari,andJ.P.
+multi-robot systems: A survey,” ACM Computing Surveys (CSUR), How,“Real:Resilienceandadaptationusinglargelanguagemodelson
+vol.52,no.2,pp.1–31,2019. autonomousaerialrobots,”in2024IEEE63rdConferenceonDecision
+[2] H. Liu, Y. Zhu, K. Kato, A. Tsukahara, I. Kondo, T. Aoyama, and andControl(CDC),2024,pp.1539–1546.
+Y. Hasegawa, “Enhancing the llm-based robot manipulation through [23] R. Sinha, A. Elhafsi, C. Agia, M. Foutter, E. Schmerling, and
+human-robot collaboration,” IEEE Robotics and Automation Letters, M.Pavone,“Real-timeanomalydetectionandreactiveplanningwith
+vol.9,no.8,pp.6904–6911,2024. largelanguagemodels,”inRobotics:ScienceandSystems(RSS),2024.
+[24] S.Xu,X.Luo,Y.Huang,L.Leng,R.Liu,andC.Liu,“Nl2hltl2plan:
+Scaling up natural language understanding for multi-robots through
+hierarchical temporal logic task specifications,” IEEE Robotics and
+AutomationLetters,2025.
+[25] Y.Chen,J.Arkin,Y.Zhang,N.Roy,andC.Fan,“Scalablemulti-robot
+collaborationwithlargelanguagemodels:Centralizedordecentralized
+systems?” in 2024 IEEE International Conference on Robotics and
+Automation(ICRA). IEEE,2024,pp.4311–4317.
+[26] J.Wang,G.He,andY.Kantaros,“Probabilisticallycorrectlanguage-
+based multi-robot planning using conformal prediction,” IEEE
+RoboticsandAutomationLetters,2024.
+[27] B.Yu,H.Kasaei,andM.Cao,“Co-navgpt:Multi-robotcooperativevi-
+sualsemanticnavigationusinglargelanguagemodels,”arXivpreprint
+arXiv:2310.07937,2023.
+[28] K. Obata, T. Aoki, T. Horii, T. Taniguchi, and T. Nagai, “Lip-llm:
+Integrating linear programming and dependency graph with large
+language models for multi-robot task planning,” IEEE Robotics and
+AutomationLetters,2024.
+[29] A. Lykov, M. Dronova, N. Naglov, M. Litvinov, S. Satsevich,
+A. Bazhenov, V. Berman, A. Shcherbak, and D. Tsetserukou, “Llm-
+mars: Large language model for behavior tree generation and nlp-
+enhanced dialogue in multi-agent robot systems,” arXiv preprint
+arXiv:2312.09348,2023.
+[30] P. Haslum, N. Lipovetzky, D. Magazzeni, C. Muise, R. Brachman,
+F. Rossi, and P. Stone, An introduction to the planning domain
+definitionlanguage. Springer,2019,vol.13.
+[31] M.FoxandD.Long,“Pddl2.1:Anextensiontopddlforexpressing
+temporalplanningdomains,”Journalofartificialintelligenceresearch,
+vol.20,pp.61–124,2003.
+[32] H. Ravichandar, K. Shaw, and S. Chernova, “Strata: unified frame-
+work for task assignments in large teams of heterogeneous agents,”
+Autonomous Agents and Multi-Agent Systems, vol. 34, no. 2, p. 38,
+2020.
+[33] E.Kolve,R.Mottaghi,W.Han,E.VanderBilt,L.Weihs,A.Herrasti,
+D. Gordon, Y. Zhu, A. Gupta, and A. Farhadi, “AI2-THOR: An
+Interactive3DEnvironmentforVisualAI,”arXiv,2017.
+[34] I. Singh, V. Blukis, A. Mousavian, A. Goyal, D. Xu, J. Tremblay,
+D.Fox,J.Thomason,andA.Garg,“Progprompt:Generatingsituated
+robottaskplansusinglargelanguagemodels,”in2023IEEEInterna-
+tionalConferenceonRoboticsandAutomation(ICRA). IEEE,2023,
+pp.11523–11530.

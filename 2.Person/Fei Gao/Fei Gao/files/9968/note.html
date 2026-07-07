@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — PTDM: Primitive-based Truncated Diffusion for Efficient Trajectory Generation of Differential Drive Mobile Manipulators (Xu, Wong, Zhong, Lin, Hou, Gao, 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">HOME</a>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">1. 论文信息</a>
+  <a href="#insight">2. 核心洞察与创新</a>
+  <a href="#architecture">3. 系统架构</a>
+  <a href="#task">4. 任务定义</a>
+  <a href="#challenge">5. 技术挑战</a>
+  <a href="#method">6. 方法与公式</a>
+  <a href="#principles">7. 基础原理</a>
+  <a href="#figures">8. 图表解读</a>
+  <a href="#flaw">9. 潜在缺陷</a>
+  <a href="#motivation">10. 动机推导</a>
+  <a href="#takeaway">11. 启示与收获</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. 论文信息 ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Primitive-based Truncated Diffusion for Efficient Trajectory Generation of Differential Drive Mobile Manipulators（基于运动基元的截断扩散模型用于差速驱动移动机械臂的高效轨迹生成）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Long Xu</strong>（徐龙）、<strong>Choilam Wong</strong>（黄翠琳）、<strong>Yuhang Zhong</strong>（钟宇航）、<strong>Junxiao Lin</strong>（林俊晓）、<strong>Jialiang Hou</strong>（侯嘉良）、<strong>Fei Gao</strong>（高飞，通讯作者）</td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">浙江大学</strong>（Zhejiang University），工业控制技术国家重点实验室 / 控制科学与工程学院</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">arXiv:2604.04166</strong>，<strong>2026年</strong>，2026年4月5日提交</td></tr>
+    <tr><td><strong>DOI / 链接</strong></td><td><a href="https://arxiv.org/abs/2604.04166" target="_blank">arXiv:2604.04166</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出<strong>基于运动基元的截断扩散模型（Primitive-based Truncated Diffusion Model, PTDM）</strong>——一种结合运动基元（motion primitives）与截断扩散过程的高效轨迹生成方法。通过<strong>关键点序列提取（Keypoint Sequence Extraction, KSE）</strong>模块从演示中编码任务affordance，利用通过K-means聚类离线构建的运动基元库将扩散采样的搜索空间偏向可行区域，结合<strong>DDIM加速推断</strong>和<strong>PHR-ALM后处理优化</strong>——在差速驱动移动机械臂（DDMoMa）的高维规划任务中，实现了比标准扩散模型更高的成功率、更丰富的轨迹多样性和极具竞争力的推理时间，在三种不同类型的杂乱3D环境中验证了有效性。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">截断扩散模型</span>
+    <span class="tag tag-green">运动基元</span>
+    <span class="tag tag-amber">轨迹生成</span>
+    <span class="tag tag-purple">移动机械臂</span>
+    <span class="tag tag-red">DDIM加速</span>
+    <span class="tag tag-cyan">KSE关键点提取</span>
+    <span class="tag tag-gray">Point Transformer V3</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. 核心洞察与创新 ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>为什么差速驱动移动机械臂（DDMoMa）的轨迹生成比固定基座机械臂困难得多？</strong><br>
+    答：DDMoMa同时包含<strong>非完整约束的移动底盘</strong>（差速驱动，3-DOF，纯滚动无滑动约束）和<strong>多关节机械臂</strong>（6+ DOF），形成了一个~9-DOF的高维规划空间。标准扩散模型对所有配置空间区域同等对待，将大量去噪步骤浪费在运动学不可行、不可达或易碰撞的区域上——导致推理缓慢且成功率低。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>利用运动基元将扩散采样过程偏向任务相关的高可行区域</strong>。PTDM不是从纯高斯噪声开始在全配置空间扩散，而是：(1) 使用<strong>KSE（关键点序列提取）</strong>模块——通过<strong>可微分前向运动学</strong>将DDMoMa边界状态映射到3D空间，自动捕捉任务阶段语义；(2) 使用<strong>通过K-means聚类离线构建的运动基元库</strong>——预计算了满足运动学约束的可行底盘-机械臂协同子轨迹；(3) 扩散过程从由基元构造的<strong>偏置先验分布</strong>而非标准高斯噪声开始——基元之间的选择通过注意力机制融合实现；(4) DDIM加速进一步压缩推理步数。"智能初始化 + 少量去噪步"的组合实现了高质量轨迹，而计算成本仅为标准扩散的一小部分。<br><br>
+    问：<strong>关键贡献是什么？</strong><br>
+    答：一个<strong>学习增强的运动规划框架</strong>——KSE从少量演示中提取结构化任务知识，PTDM从基元偏置的分布中高效采样，DDIM实现快速确定性推断，后处理阶段使用<strong>PHR-ALM求解器</strong>进行轨迹优化、剪枝和多项式参数化——共同实现了比原始扩散和经典规划基线更高的成功率、更丰富的轨迹多样性和极具竞争力的运行时间。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>对应的洞察</th><th>类型</th></tr>
+    <tr><td>去噪扩散概率模型（DDPM, Ho et al. 2020）——从高斯噪声迭代去噪到数据分布</td><td>扩散模型可以表达高度多模态的轨迹分布——非常适合移动操作任务的多样性求解空间。但标准的在全配置空间上先加噪再去噪的过程计算浪费严重</td><td>方法基础</td></tr>
+    <tr><td>DDIM（Song et al. 2021）——确定性非马尔可夫采样加速</td><td>DDIM允许通过确定性隐式采样跳过扩散步骤——当基元已经将样本带到可行区域附近后，截断扩散链是完美的。非马尔可夫性也使得可以在多样性和速度之间进行权衡</td><td>推理效率</td></tr>
+    <tr><td>运动基元用于移动操作（Cohen et al. / Petric et al.）——预计算的可行子轨迹</td><td>不再从零开始采样轨迹，而是预计算一个运动学可行的底盘-机械臂基元库，用于构偏置先验分布。这使扩散过程的"种子"播撒在高质量区域附近，大幅减少细化所需步数</td><td>搜索空间缩减</td></tr>
+    <tr><td>Point Transformer V3——高效3D点云编码</td><td>场景中的障碍物和目标物体表示为3D点云，通过Point Transformer V3编码为场景特征。关键点序列则独立编码，两者通过交叉注意力和自注意力融合——这种双流编码+注意力融合架构使网络同时拥有场景几何理解和任务语义理解</td><td>场景编码</td></tr>
+    <tr><td>K-means聚类——无监督数据结构发现</td><td>对离线收集的DDMoMa轨迹数据进行K-means聚类，自动发现常见的底盘-机械臂协同运动模式——这些聚类中心成为运动基元库的构成元素。这种数据驱动的方式避免了手工设计基元的工程负担</td><td>基元构建</td></tr>
+    <tr><td>PHR-ALM（增广拉格朗日乘子法）——约束轨迹优化</td><td>扩散模型输出的轨迹可能存在微小的约束违反或不平滑段。使用PHR-ALM求解器对输出轨迹进行后处理优化——剪枝冗余路径点、多项式参数化平滑——以极小的计算开销换取轨迹的严格可行性保证</td><td>后处理</td></tr>
+  </table>
+
+  <h3>2.3 创新点拆解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：KSE（关键点序列提取）——通过可微分前向运动学将任务结构编码为3D空间表征</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>DDMoMa任务（如抓取-搬运-放置）具有内在的阶段结构，但标准端到端方法将整个轨迹作为单一序列处理，忽略了任务的子阶段语义——导致生成的轨迹在阶段过渡处出现不连续或碰撞。此外，DDMoMa的配置空间（关节角+底盘位姿）与任务的物理语义（"靠近桌子""抓取杯子"）之间存在语义鸿沟。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>人类演示中天然存在关键姿态变化点（接触物体、抬起、移动、放下）——这些"关键点"编码了任务的affordance结构。可微分前向运动学提供了一条从配置空间到3D物理空间的桥梁。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) KSE模块通过<strong>可微分前向运动学</strong>将DDMoMa的边界状态（底盘位姿+关节角）映射到3D空间中的关键点位置——包括末端执行器位置、底盘中心位置等；(2) 从少量演示轨迹中自动检测姿态突变点、接触/分离事件，提取关键点序列（如抓取点、提升点、过渡点、放置点）；(3) 关键点序列编码为任务条件向量，通过交叉注意力注入去噪网络——使扩散过程聚焦于生成符合任务语义的阶段式轨迹。关键创新在于<strong>在3D物理空间而非配置空间中进行关键点提取</strong>——3D空间中的距离和语义具有物理意义，而配置空间中的距离无物理意义。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：PTDM（基于运动基元的截断扩散模型）——从偏置分布采样而非高斯噪声</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>标准扩散模型从纯高斯噪声开始，在DDMoMa的~9维配置空间×数百时间步=数千维轨迹空间中，需要100-200步去噪才能产生可行轨迹——其中大量步骤浪费在远离可行区域的"修正"上。推理时间过长（2-5秒），无法满足实时规划需求。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>(1) 运动基元预计算了满足运动学约束的可行子轨迹——将它们组合可以快速构建"大致正确"的初始轨迹骨架；(2) K-means聚类可以自动从离线数据中发现常见的协同运动模式，避免手工设计基元的工程负担；(3) 扩散模型的核心优势在于细化——不需要从零开始"创造"，只需要将"大致正确"的方案"打磨"到最优。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) <strong>离线阶段</strong>：收集大量DDMoMa操作轨迹，通过K-means聚类在轨迹空间中发现典型的底盘-机械臂协同运动模式——每个聚类中心成为一个运动基元；(2) <strong>在线阶段</strong>：给定任务规格（起始配置、目标配置、场景点云），PTDM首先从运动基元库中选择最匹配的基元序列——选择过程基于基元与任务关键点之间的相似度评分；(3) 选定的基元序列拼接和平滑后构成偏置先验分布的均值 $\boldsymbol{\mu}_{\text{prim}}$，扩散过程从这个偏置分布（而非标准高斯）开始；(4) 扩散步数从完整的T=200步截断到K=20-50步——因为起始点已经在可行区域附近，只需局部细化。这提供了<strong>比标准高斯更清晰的初始分布</strong>。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：双流Point-Keypoint编码架构——点云与关键点独立编码后通过注意力融合</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>DDMoMa轨迹生成需要同时理解"场景几何"（障碍物在哪里，自由空间在哪里）和"任务语义"（要抓什么，放哪里）。将场景点云和任务关键点直接拼接作为单一输入，会混淆几何信息和语义信息——网络难以区分"这个区域不可达是因为有障碍物"还是"因为不是任务目标区域"。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>多模态学习的双流架构——不同模态的数据首先通过各自的专用编码器提取特征，然后在高层通过交叉注意力进行信息融合。Point Transformer V3在3D点云理解上表现优异。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) <strong>点云流</strong>：场景中的障碍物和目标物体表示为3D点云，通过<strong>Point Transformer V3</strong>编码为场景几何特征向量；(2) <strong>关键点流</strong>：KSE提取的关键点序列（3D空间坐标+语义标签）通过单独的MLP编码器编码为任务语义特征向量；(3) <strong>注意力融合</strong>：两条流的特征通过<strong>交叉注意力（cross-attention）</strong>进行双向信息交换——关键点查询点云特征以理解"每个关键点附近的空间结构"，点云查询关键点特征以理解"哪些空间区域与任务相关"；(4) 融合后的特征再经过<strong>自注意力（self-attention）</strong>进行全局上下文化，最终输出条件向量$\mathbf{c}$注入去噪网络。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 4：PHR-ALM后处理优化——从扩散输出到物理可执行轨迹的"最后一公里"</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>扩散模型输出的轨迹是"软"的——可能存在微小的约束违反（关节角略微超出限位、底盘速度略微违反非完整约束）、包含冗余路径点（扩散模型倾向于在安全区域放置更多采样点）、轨迹不够平滑（噪声残差）。需要后处理确保严格的物理可行性。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>轨迹优化中的PHR-ALM（Powell-Hestenes-Rockafellar增广拉格朗日乘子法）——一种高效的约束优化求解器，适合处理带等式和不等式约束的非线性优化问题。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) <strong>剪枝（Pruning）</strong>：移除扩散输出轨迹中对碰撞避免贡献不大的冗余路径点——基于路径点之间的直线是否无碰来判断；(2) <strong>多项式参数化（Polynomial Parameterization）</strong>：将剪枝后的稀疏路径点作为约束，使用最小化jerk/snap的多项式轨迹进行平滑拟合——确保速度和加速度连续；(3) <strong>PHR-ALM求解</strong>：将多项式轨迹的系数作为优化变量，以最小化与扩散输出的偏差为目标、以运动学约束（关节限位、非完整约束、速度/加速度上限）为约束，使用PHR-ALM求解器进行约束非线性优化。这一后处理步骤以极小的计算开销（通常< 50ms）将扩散输出转化为严格可行的物理轨迹。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. 系统架构 ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 整体系统框架 —— PTDM DDMoMa轨迹生成全管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph DEMO["演示数据层：任务理解"]
+      direction LR
+      DEMO_DATA["少量人工演示轨迹<br/>DDMoMa抓取-搬运-放置"]
+      KSE["KSE关键点序列提取<br/>可微分前向运动学映射<br/>3D空间关键点检测"]
+      TASK_EMBED["任务编码向量 c<br/>紧凑的任务affordance表征"]
+    end
+
+    subgraph PERCEPTION["场景感知层：点云与关键点双流编码"]
+      direction LR
+      PCLOUD["场景3D点云<br/>障碍物+目标物体<br/>Point Transformer V3编码"]
+      KPSTREAM["关键点流编码<br/>MLP编码器<br/>3D坐标+语义标签"]
+      ATTN_FUSE["注意力融合<br/>Cross-Attention: 关键点↔点云<br/>Self-Attention: 全局上下文"]
+    end
+
+    subgraph PRIMITIVE["运动基元层：偏置先验构造"]
+      direction LR
+      PRIM_LIB["运动基元库<br/>K-means离线聚类构建<br/>50-200个协同运动模式"]
+      PRIM_SELECT["基元选择与序列组合<br/>根据KSE关键点匹配<br/>构造初始轨迹骨架"]
+      BIASED_PRIOR["偏置先验分布<br/>p_0^{biased}(x)<br/>集中于可行区域附近"]
+    end
+
+    subgraph DIFFUSION["PTDM层：截断扩散去噪"]
+      direction LR
+      NOISY_START["从偏置先验添加K步噪声<br/>x_K ~ p_biased * N(0, sigma^2)<br/>K << T (K=20-50)"]
+      DENOISE["条件去噪网络<br/>epsilon_theta(x_k, k, c)<br/>c = 融合条件编码"]
+      TRUNCATE["截断推断<br/>仅K步去噪<br/>而非完整T=200步"]
+    end
+
+    subgraph DDIM_LAYER["DDIM加速层：确定性采样"]
+      direction LR
+      DDIM_SAMPLE["DDIM非马尔可夫采样<br/>子序列采样 S=5-10步<br/>确定性生成"]
+      TRAJ_RAW["原始输出轨迹<br/>base位姿+arm关节序列<br/>可能存在微小约束违反"]
+    end
+
+    subgraph POSTPROC["后处理层：轨迹优化与参数化"]
+      direction LR
+      PRUNE["路径点剪枝<br/>移除冗余路径点<br/>基于无碰直线检测"]
+      POLYFIT["多项式参数化<br/>最小化jerk/snap<br/>样条平滑拟合"]
+      PHR_ALM["PHR-ALM约束优化<br/>运动学约束满足<br/>速度/加速度限幅"]
+      TRAJ_FINAL["最终可执行轨迹<br/>底盘位姿序列+关节角序列<br/>严格满足所有约束"]
+    end
+
+    DEMO_DATA --> KSE --> TASK_EMBED
+    PCLOUD --> ATTN_FUSE
+    KPSTREAM --> ATTN_FUSE
+    TASK_EMBED --> KPSTREAM
+    ATTN_FUSE -->|"条件编码 c"| DENOISE
+    PRIM_LIB --> PRIM_SELECT --> BIASED_PRIOR
+    BIASED_PRIOR -->|"K步前向加噪"| NOISY_START --> DENOISE
+    DENOISE --> TRUNCATE --> DDIM_SAMPLE --> TRAJ_RAW
+    TRAJ_RAW --> PRUNE --> POLYFIT --> PHR_ALM --> TRAJ_FINAL
+
+    TASK_EMBED -.->|"反馈：任务语义指导"| PRIM_SELECT
+    TRAJ_FINAL -.->|"反馈：成功率评估"| TRUNCATE
+
+    classDef demo fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef perc fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef prim fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef diff fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef ddim fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef post fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#4b5563
+    class DEMO_DATA,KSE,TASK_EMBED demo
+    class PCLOUD,KPSTREAM,ATTN_FUSE perc
+    class PRIM_LIB,PRIM_SELECT,BIASED_PRIOR prim
+    class NOISY_START,DENOISE,TRUNCATE diff
+    class DDIM_SAMPLE,TRAJ_RAW ddim
+    class PRUNE,POLYFIT,PHR_ALM,TRAJ_FINAL post
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 —— 从场景感知到可执行轨迹的完整信息链</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["输入：任务规格与场景"]
+      direction LR
+      TASK_SPEC["任务规格<br/>起始配置+目标配置<br/>物体位姿+放置目标"]
+      SCENE_PCD["场景3D点云<br/>障碍物+自由空间<br/>RGB-D传感器"]
+      DEMO_SET["演示数据集<br/>N条完整DDMoMa轨迹<br/>每条H帧，每帧~9DOF"]
+    end
+
+    subgraph ENCODE["编码：KSE + 双流场景编码"]
+      direction LR
+      FK_MAP["可微分前向运动学<br/>配置空间→3D空间映射<br/>末端执行器+底盘关键点"]
+      KP_DETECT["关键点检测<br/>速度突变/接触事件<br/>自动阶段分割"]
+      KP_ENCODE["关键点编码<br/>位置+语义标签<br/>→任务特征向量"]
+      PCD_ENCODE["点云编码<br/>Point Transformer V3<br/>→场景几何特征向量"]
+      CROSS_ATTN["交叉注意力<br/>关键点特征 查询 点云特征"]
+      SELF_ATTN["自注意力<br/>全局上下文化"]
+      COND_VEC["条件向量 c<br/>融合任务+场景信息"]
+    end
+
+    subgraph PRIOR["先验：基元库检索与偏置构造"]
+      direction LR
+      CLUSTER_DB["离线K-means聚类<br/>轨迹数据集→基元库<br/>每个基元=一种协同模式"]
+      ONLINE_RET["在线检索<br/>根据起始/目标配置<br/>+KSE关键点匹配基元"]
+      CHAIN_SEQ["基元序列链接<br/>多基元拼接<br/>边界平滑过渡"]
+      PRIOR_DIST["偏置分布构造<br/>N(mu_prim, sigma_prim^2)<br/>mu_prim=基元骨架轨迹"]
+    end
+
+    subgraph REVERSE["逆向：截断扩散去噪"]
+      direction LR
+      FORWARD_NOISE["前向加噪K步<br/>x_K = sqrt(alpha_bar_K)*x_prim<br/>+ sqrt(1-alpha_bar_K)*epsilon"]
+      UNET_DENOISE["条件U-Net去噪<br/>epsilon_theta(x_k, k, c)<br/>K→K-1→...→1"]
+      EARLY_STOP["早停判断<br/>轨迹碰撞检测<br/>满足约束则提前终止"]
+    end
+
+    subgraph OUTPUT["输出：轨迹后处理与执行"]
+      direction LR
+      DDIM_ACCEL["DDIM子序列加速<br/>从K步中采样子集<br/>S=5-10步确定性生成"]
+      PRUNE_OPT["路径剪枝<br/>冗余点移除"]
+      ALM_OPT["PHR-ALM约束优化<br/>运动学/碰撞/速度约束"]
+      POLY_PARAM["多项式参数化<br/>最小jerk样条"]
+      FINAL_TRAJ["最终可执行轨迹<br/>{(base_pose_t, arm_joint_t)}_{t=1..H}"]
+    end
+
+    INPUT --> ENCODE --> PRIOR --> REVERSE --> OUTPUT
+    COND_VEC -.->|"条件注入"| UNET_DENOISE
+    PRIOR_DIST -.->|"偏置先验"| FORWARD_NOISE
+    DDIM_ACCEL -.->|"加速采样"| UNET_DENOISE
+
+    classDef inp fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef enc fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef pri fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef rev fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef out fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class TASK_SPEC,SCENE_PCD,DEMO_SET inp
+    class FK_MAP,KP_DETECT,KP_ENCODE,PCD_ENCODE,CROSS_ATTN,SELF_ATTN,COND_VEC enc
+    class CLUSTER_DB,ONLINE_RET,CHAIN_SEQ,PRIOR_DIST pri
+    class FORWARD_NOISE,UNET_DENOISE,EARLY_STOP rev
+    class DDIM_ACCEL,PRUNE_OPT,ALM_OPT,POLY_PARAM,FINAL_TRAJ out
+    </pre>
+  </div>
+
+  <h3>3.3 工作流程 —— 从演示学习到轨迹执行的完整阶段</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1：离线准备 Offline Preparation"]
+      direction LR
+      P1A["收集DDMoMa操作轨迹数据集<br/>多种任务类型×多种环境"] --> P1B["K-means聚类轨迹数据<br/>发现协同运动模式<br/>构建基元库（50-200个基元）"] --> P1C["训练PTDM去噪网络<br/>DDPM损失函数<br/>学习条件得分函数"] --> P1D["训练Point Transformer V3<br/>场景点云编码器<br/>+交叉注意力融合模块"]
+    end
+
+    subgraph PHASE2["阶段2：任务编码 Task Encoding"]
+      direction LR
+      P2A["接收任务规格<br/>起始配置+目标物体位姿<br/>+放置目标位置"] --> P2B["KSE关键点提取<br/>从演示中检测阶段边界<br/>可微分FK映射到3D"] --> P2C["编码关键点序列<br/>位置+语义→特征向量<br/>同时编码场景点云"] --> P2D["注意力融合<br/>Cross-Attn+Self-Attn<br/>输出条件向量c"]
+    end
+
+    subgraph PHASE3["阶段3：基元偏置构造 Primitive Biasing"]
+      direction LR
+      P3A["基元库在线检索<br/>匹配当前任务起始/目标<br/>+KSE关键点位置"] --> P3B["基元序列选择与排序<br/>基于相似度评分<br/>选择最优基元组合"] --> P3C["基元链接与平滑<br/>边界速度连续化<br/>样条过渡处理"] --> P3D["构造偏置分布<br/>mu_prim + sigma_prim扰动<br/>生成初始轨迹骨架"]
+    end
+
+    subgraph PHASE4["阶段4：截断扩散去噪 PTDM Denoising"]
+      direction LR
+      P4A["从偏置分布采样x_0<br/>添加K步噪声得x_K<br/>K=20-50, T=200"] --> P4B["条件去噪迭代<br/>x_{k-1}=denoise(x_k,k,c)<br/>K→K-1→...→1"] --> P4C["DDIM子序列加速<br/>从K步中抽取S=5-10步<br/>确定性跳步采样"] --> P4D["生成原始轨迹<br/>底盘位姿+关节角序列"]
+    end
+
+    subgraph PHASE5["阶段5：后处理与执行 Post-Processing"]
+      direction LR
+      P5A["路径剪枝<br/>移除冗余路径点<br/>基于直线无碰检测"] --> P5B["PHR-ALM约束优化<br/>满足关节限位+非完整约束<br/>速度/加速度/碰撞约束"] --> P5C["多项式参数化<br/>最小化jerk/snap<br/>生成平滑连续轨迹"] --> P5D["DDMoMa物理执行<br/>底盘差速驱动控制<br/>机械臂关节轨迹跟踪"]
+    end
+
+    PHASE1 -->|"基元库+训练权重"| PHASE2
+    PHASE2 -->|"条件向量c+场景编码"| PHASE3
+    PHASE3 -->|"偏置先验分布"| PHASE4
+    PHASE4 -->|"原始轨迹"| PHASE5
+
+    P5C -.->|"反馈：约束违反情况"| P5B
+    P5D -.->|"反馈：实际成功率"| P4D
+
+    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef p5 fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class P1A,P1B,P1C,P1D p1
+    class P2A,P2B,P2C,P2D p2
+    class P3A,P3B,P3C,P3D p3
+    class P4A,P4B,P4C,P4D p4
+    class P5A,P5B,P5C,P5D p5
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. 任务定义 ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义 —— 解决什么问题</h2>
+
+  <h3>4.1 问题建模</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 —— DDMoMa轨迹生成</span>
+    $$ \max_{\tau}\; \mathbb{P}(\tau \text{ 是可行的 } \mid \mathcal{T}, \mathcal{E}) \quad \text{s.t.} \quad \tau = \{(q_t^{\text{base}}, q_t^{\text{arm}})\}_{t=1}^{H} $$
+    $$ q_t^{\text{base}} \in SE(2),\; q_t^{\text{arm}} \in \mathbb{R}^{d_{\text{arm}}},\; \dim(\tau) \approx (3 + d_{\text{arm}}) \times H $$
+    <div class="eq-note">
+      <strong>$\mathcal{T}$</strong> = 任务规格（抓取物体A，搬运至位置B，放置） &nbsp;|&nbsp;
+      <strong>$\mathcal{E}$</strong> = 环境约束（障碍物、桌面高度、自由空间，以3D点云形式提供） &nbsp;|&nbsp;
+      <strong>$q_t^{\text{base}} = (x, y, \theta)$</strong> = 差速驱动底盘位姿（3-DOF，非完整约束：$\dot{x}\sin\theta - \dot{y}\cos\theta = 0$） &nbsp;|&nbsp;
+      <strong>$q_t^{\text{arm}} \in \mathbb{R}^{d_{\text{arm}}}$</strong> = 机械臂关节角（6-DOF，关节限位约束：$q_{\min} \leq q_t^{\text{arm}} \leq q_{\max}$） &nbsp;|&nbsp;
+      <strong>$H$</strong> = 轨迹时间步长（通常100-500步） &nbsp;|&nbsp;
+      <strong>核心挑战</strong>：高维配置空间（~9-DOF x H步 = 数千维度），混合非完整+完整约束，多模态可行解（同一任务有多种完成方式）。测试环境包含<strong>三种不同类型的杂乱3D场景</strong>——表面对接、狭窄通道和密集障碍物。
+    </div>
+  </div>
+
+  <h3>4.2 输入/输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度/规格</th></tr>
+    <tr><td><strong>输入（任务）</strong></td><td>任务描述：起始配置、目标物体位姿、目标放置位姿、场景3D点云（障碍物+自由空间）</td><td>语义级任务规格 + 3D点云（~数千点）</td></tr>
+    <tr><td><strong>输入（演示）</strong></td><td>少量人类演示轨迹（DDMoMa抓取-搬运-放置完整过程）</td><td>N条演示（通常3-10条），每条H帧，每帧~9DOF</td></tr>
+    <tr><td><strong>输入（基元）</strong></td><td>通过K-means聚类离线构建的运动基元库——每个基元是一种典型的底盘-机械臂协同运动模式</td><td>50-200个基元，覆盖常见操作模式</td></tr>
+    <tr><td><strong>输入（场景）</strong></td><td>场景3D点云——通过Point Transformer V3编码为场景几何特征</td><td>点云规模灵活，PTv3处理</td></tr>
+    <tr><td><strong>输出</strong></td><td>完整DDMoMa轨迹：底盘位姿时间序列 + 机械臂关节角时间序列，经PHR-ALM优化确保严格可行</td><td>$H \times (3 + d_{\text{arm}})$ 维连续轨迹</td></tr>
+    <tr><td><strong>目标</strong></td><td>最大化轨迹可行性（无碰撞、满足运动学、完成任务）+ 多样性（多种可行解）+ 推理效率（< 1s）</td><td>成功率 > 90%，生成时间 < 1s</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>学习增强的运动规划问题</strong>，面向高自由度移动操作。核心挑战不是简单地找到一条可行轨迹，而是<strong>在高维混合配置空间中高效生成多样化、任务感知的轨迹</strong>。与固定基座操作不同，DDMoMa增加了非完整底盘约束——底盘运动与机械臂可达性相互耦合——使得规划空间显著更加复杂。传统的基于优化的规划器（TrajOpt、CHOMP）可以找到可行解，但速度慢且是单模态的；标准扩散模型可以生成多样化解，但在高维空间中计算开销巨大。PTDM通过使用<strong>运动基元将扩散聚焦于有前景的区域</strong>，并使用<strong>后处理优化</strong>确保输出的严格可行性，在两者之间架起了桥梁。在<strong>三种类型的杂乱3D环境</strong>中进行了全面验证——证明了方法在不同场景结构下的泛化能力。</p>
+</section>
+
+<!-- ═══════════════ 5. 技术挑战 ═══════════════ -->
+<section id="challenge">
+  <h2>5. 技术挑战 —— 为什么难</h2>
+
+  <h3>5.1 本质困难（第一性原理分析）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾：DDMoMa轨迹生成面临维度、多样性和速度三者之间的紧张关系。</strong><br><br>
+    （1）<strong>维度爆炸</strong>：典型DDMoMa约9-DOF（差速底盘3-DOF + 机械臂6-DOF）。200个时间步的轨迹 = 1800维优化变量。标准基于采样的规划器（RRT、PRM）受维数灾难困扰；基于梯度的优化器在这种高维非凸空间中容易陷入局部极小值。<br><br>
+    （2）<strong>混合约束</strong>：差速驱动底盘具有非完整约束（不能瞬间侧移，纯滚动无滑动），而机械臂具有标准的旋转关节限位。这两类约束交互作用：底盘必须将自身定位到机械臂可达目标的位置；机械臂的运动不能使移动中的底盘失稳。独立处理这两者会导致在"接口处"出现不可行轨迹。<br><br>
+    （3）<strong>多模态要求</strong>：对于同一任务（"从桌子A抓取杯子放在桌子B上"），存在多种等效解——从左侧或右侧接近、以不同姿态抓取、使用底盘运动或纯机械臂运动。规划器应生成多样化解（供下游选择或人类偏好），而不仅仅是单一解。但多样性通常与速度和成功率相权衡。<br><br>
+    （4）<strong>感知-规划鸿沟</strong>：场景以3D点云形式感知，任务以语义规格描述——如何将这两种异质信息融合为扩散模型的条件信号？简单拼接会混淆几何信息和语义信息。<br><br>
+    <strong>总结</strong>：你需要在一个1800维空间中搜索，同时满足非完整约束和关节约束，产生多个多样化可行解——并且所有这些必须在<1秒内完成以支持实际部署。PTDM通过以下方式解决：(i) KSE将DDMoMa边界状态映射到3D空间以减少有效搜索维度，(ii) 运动基元将搜索偏向可行区域，(iii) 双流编码+注意力融合桥接感知-规划鸿沟，(iv) DDIM截断加速推理，(v) PHR-ALM后处理确保严格可行性。
+  </div>
+
+  <h3>5.2 已有方法及其局限</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails for DDMoMa</th></tr>
+    <tr>
+      <td>Optimization-based Planning (TrajOpt / CHOMP / STOMP)</td>
+      <td>将轨迹生成建模为带约束的非线性优化问题：最小化平滑度+碰撞代价，受运动学约束，通过梯度下降或随机优化求解</td>
+      <td>在~1800维空间中，基于梯度的方法容易收敛到<strong>局部极小值</strong>——产生次优或不可行轨迹。每次优化运行只产生<strong>一个解</strong>——没有多样性。非完整约束添加了降低梯度质量的非光滑项。运行时间随轨迹长度线性增长。</td>
+    </tr>
+    <tr>
+      <td>Sampling-based Planning (RRT / PRM / BIT*)</td>
+      <td>概率采样配置空间，构建连通图（PRM）或树（RRT），搜索连接起点到目标的路径</td>
+      <td>DDMoMa的~9D配置空间遭遇<strong>维数灾难</strong>——覆盖空间所需的样本数呈指数增长。非完整约束需要专业的steering函数，对耦合的底盘-机械臂系统难以设计。输出是单一路径，没有天然多样性。</td>
+    </tr>
+    <tr>
+      <td>Vanilla Diffusion Models (Diffuser / Decision Diffuser)</td>
+      <td>从演示中学习可行轨迹的数据分布，然后通过迭代去噪（通常100-1000步）从中采样</td>
+      <td>从纯高斯噪声开始，模型将大量去噪步骤浪费在<strong>运动学不可行区域</strong>——机械臂穿入桌面或底盘违反非完整约束的配置。高维轨迹空间（1800D）使得分函数难以准确学习，导致<strong>低成功率</strong>和<strong>长推理时间</strong>（数秒到数分钟）。</td>
+    </tr>
+    <tr>
+      <td>Imitation Learning (Behavioral Cloning / ACT)</td>
+      <td>通过监督回归直接学习从任务规格到轨迹的映射</td>
+      <td>需要<strong>大量演示数据</strong>（通常每任务50-100+条）来覆盖多样化的解空间。遭受<strong>协变量偏移</strong>：累积误差导致机器人漂移到未见过的配置中，策略无训练数据支撑。单模态输出——无法表达轨迹多样性。</td>
+    </tr>
+    <tr>
+      <td>Motion Primitive-based Planning (Petric et al. / Cohen et al.)</td>
+      <td>预计算可行子轨迹（基元）库，然后搜索基元序列构建完整轨迹</td>
+      <td>基元提供可行性但<strong>表达能力有限</strong>——基元序列的组合搜索对长周期任务计算开销仍然很大。基元选择的离散性在基元连接处产生<strong>不连续性</strong>，需要额外平滑。任务语义（抓取、提升、放置）不被显式建模。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 — 如何将任务结构编码进生成过程？</strong>DDMoMa任务具有固有的阶段结构（接近、抓取、提升、搬运、放置、撤回），但标准扩散将整个轨迹视为无结构序列。KSE模块必须从演示中自动发现这些阶段并将其编码为条件信号——无需手动标注阶段边界。关键挑战在于：配置空间中的"距离"无物理意义——需要用可微分前向运动学映射到3D物理空间进行关键点提取。</li>
+    <li><strong>挑战 2 — 如何构造既信息丰富又通用的偏置先验？</strong>运动基元保证运动学可行性但可能不覆盖所有任务相关配置。偏置先验必须足够接近高质量解以减少扩散步数，同时又要足够宽泛以不将多样性坍缩为单一模式。这需要精心设计基元库（K-means聚类的聚类数K）和扰动模型（$\sigma_{\text{prim}}$）。</li>
+    <li><strong>挑战 3 — 如何平衡截断激进程度与轨迹质量？</strong>将扩散从T=200步截断到K=20步可节省10倍计算，但激进截断可能导致轨迹"欠去噪"——仍包含来自基元初始化的伪影。最佳平衡点取决于任务复杂度、基元质量和期望的多样性。DDIM的确定性采样为这一权衡增加了另一维度。</li>
+    <li><strong>挑战 4 — 点云与关键点的信息融合</strong>：场景点云（几何信息）和KSE关键点（语义信息）是本质不同的数据模态——直接拼接无法有效利用两者的互补性。需要设计专用的双流编码架构和注意力融合机制，使网络同时理解"空间在哪里是空的"和"任务需要在哪做什么"。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. 方法与公式 ═══════════════ -->
+<section id="method">
+  <h2>6. 方法与关键公式</h2>
+
+  <h3>6.1 核心方法概述</h3>
+  <p>PTDM框架由五个协同模块组成：(1) <strong>KSE（关键点序列提取）</strong>——通过可微分前向运动学将DDMoMa配置空间状态映射到3D物理空间，自动提取任务阶段关键点；(2) <strong>运动基元库</strong>——通过K-means聚类离线构建，每个基元代表一种底盘-机械臂协同运动模式；(3) <strong>PTDM（截断扩散）</strong>——从基元构造的偏置先验分布而非标准高斯噪声开始去噪；(4) <strong>双流场景编码</strong>——Point Transformer V3编码点云，独立MLP编码关键点，交叉注意力融合；(5) <strong>DDIM加速与PHR-ALM后处理</strong>——确定性跳步采样+约束优化+多项式参数化。以下按公式组逐一拆解。</p>
+
+  <h3>6.2 关键公式</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX由MathJax渲染。显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。符号解释使用中文。</p>
+
+  <!-- Formula Group A: KSE Module -->
+  <h4>组 A：KSE模块 —— 可微分前向运动学与关键点序列提取</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 可微分前向运动学：配置空间→3D物理空间</span>
+    $$ \mathbf{p}_{\text{ee}} = \text{FK}_{\text{arm}}(q^{\text{arm}}, q^{\text{base}}) \in \mathbb{R}^3 \quad (\text{末端执行器位置}) $$
+    $$ \mathbf{p}_{\text{base}} = \begin{bmatrix} x \\ y \\ 0 \end{bmatrix} \in \mathbb{R}^3 \quad (\text{底盘中心位置}) $$
+    $$ \mathbf{K} = \{(\mathbf{p}_{\text{ee}}^i, \mathbf{p}_{\text{base}}^i, t_i)\}_{i=1}^{M} \quad (\text{关键点序列}) $$
+    <div class="eq-note">
+      <strong>$\text{FK}_{\text{arm}}(\cdot)$</strong> = 机械臂的可微分前向运动学函数——输入关节角和底盘位姿，输出末端执行器的3D世界坐标。这是整个KSE模块的数学桥梁 &nbsp;|&nbsp;
+      <strong>$q^{\text{arm}} \in \mathbb{R}^{d_{\text{arm}}}$</strong> = 机械臂关节角 &nbsp;|&nbsp;
+      <strong>$q^{\text{base}} = (x, y, \theta)$</strong> = 底盘位姿 &nbsp;|&nbsp;
+      <strong>$\mathbf{p}_{\text{ee}}$</strong> = 末端执行器在3D空间中的位置 &nbsp;|&nbsp;
+      <strong>$M$</strong> = 提取的关键点数量（通常3-8个——取决于任务阶段数） &nbsp;|&nbsp;
+      <strong>$t_i$</strong> = 第i个关键点的时间戳 &nbsp;|&nbsp;
+      <strong>关键设计</strong>：前向运动学的可微分性意味着KSE模块可以端到端训练——关键点检测的误差可以通过FK链反向传播到配置空间的优化。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 关键点检测：基于运动突变的自适应检测</span>
+    $$ \text{KP}_{\text{candidates}} = \left\{ \tau \in [1, H] \;\middle|\; \big\|\dot{\mathbf{p}}_{\text{ee}}(\tau) - \dot{\mathbf{p}}_{\text{ee}}(\tau-1)\big\| > \delta_v \;\text{or}\; \text{gripper\_state}(\tau) \neq \text{gripper\_state}(\tau-1) \right\} $$
+    $$ \text{KP}_{\text{final}} = \text{NonMaxSuppression}(\text{KP}_{\text{candidates}}, \text{window}=w) \quad \text{保留前M个显著性最高的关键点} $$
+    <div class="eq-note">
+      <strong>$\dot{\mathbf{p}}_{\text{ee}}$</strong> = 末端执行器的速度（通过对FK输出的数值微分得到） &nbsp;|&nbsp;
+      <strong>$\delta_v$</strong> = 速度变化阈值——检测加速/减速/转向事件 &nbsp;|&nbsp;
+      <strong>gripper_state</strong> = 夹爪状态（开/关）——夹爪状态变化直接指示接触/分离事件（抓取点和放置点） &nbsp;|&nbsp;
+      <strong>NonMaxSuppression</strong> = 非极大值抑制——在局部窗口 $w$ 内只保留速度变化最大的候选点，避免在单个事件附近提取出多个冗余关键点 &nbsp;|&nbsp;
+      <strong>关键点语义</strong>：检测到的关键点天然对应任务的子阶段边界——夹爪关闭=抓取点、末端执行器抬起=提升点、到达目标上方=预放置点、夹爪打开=放置点。
+    </div>
+  </div>
+
+  <!-- Formula Group B: Dual-Stream Scene Encoding -->
+  <h4>组 B：双流场景编码 —— Point Transformer V3 + 注意力融合</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 点云编码：Point Transformer V3</span>
+    $$ \mathbf{F}_{\text{pcd}} = \text{PTv3}(\mathcal{P}) \in \mathbb{R}^{N_p \times D} \quad \text{其中 } \mathcal{P} = \{\mathbf{p}_i \in \mathbb{R}^3\}_{i=1}^{N_p} $$
+    <span class="eq-tag" style="margin-top:12px;">Eq.(4) — 关键点编码：独立MLP流</span>
+    $$ \mathbf{F}_{\text{kp}} = \text{MLP}_{\text{kp}}(\mathbf{K}) \in \mathbb{R}^{M \times D} \quad \text{其中 } \mathbf{K} = \{(\mathbf{p}_{\text{ee}}^i, \mathbf{p}_{\text{base}}^i, \text{semantic}_i)\}_{i=1}^{M} $$
+    <span class="eq-tag" style="margin-top:12px;">Eq.(5) — 交叉注意力融合：双向信息交换</span>
+    $$ \mathbf{F}_{\text{kp}\rightarrow\text{pcd}} = \text{CrossAttn}(Q=\mathbf{F}_{\text{kp}},\; K=\mathbf{F}_{\text{pcd}},\; V=\mathbf{F}_{\text{pcd}}) \quad \text{(关键点查询场景几何)} $$
+    $$ \mathbf{F}_{\text{pcd}\rightarrow\text{kp}} = \text{CrossAttn}(Q=\mathbf{F}_{\text{pcd}},\; K=\mathbf{F}_{\text{kp}},\; V=\mathbf{F}_{\text{kp}}) \quad \text{(点云查询任务语义)} $$
+    $$ \mathbf{c} = \text{SelfAttn}\big(\text{Concat}[\mathbf{F}_{\text{kp}\rightarrow\text{pcd}},\; \mathbf{F}_{\text{pcd}\rightarrow\text{kp}}]\big) \in \mathbb{R}^{D_c} \quad \text{(自注意力全局融合)} $$
+    <div class="eq-note">
+      <strong>$\text{PTv3}(\cdot)$</strong> = Point Transformer V3——最先进的3D点云编码器，通过分层注意力机制高效处理大规模点云 &nbsp;|&nbsp;
+      <strong>$N_p$</strong> = 场景点云中的点数（通常数千到数万点） &nbsp;|&nbsp;
+      <strong>$D$</strong> = 特征通道维度 &nbsp;|&nbsp;
+      <strong>$\text{MLP}_{\text{kp}}$</strong> = 多层感知机——将每个关键点的(3D位置+语义标签)编码为D维特征 &nbsp;|&nbsp;
+      <strong>CrossAttn</strong> = 交叉注意力——一个流的特征作为Query，另一个流的特征作为Key/Value。关键点→点云：询问"每个关键点附近有什么障碍物？"；点云→关键点：询问"哪些空间区域是任务相关的？" &nbsp;|&nbsp;
+      <strong>SelfAttn</strong> = 自注意力——融合后的特征在全局上下文中进一步交互，输出最终的条件向量 $\mathbf{c}$，维度为 $D_c$，注入去噪网络。
+    </div>
+  </div>
+
+  <!-- Formula Group C: PTDM Core -->
+  <h4>组 C：PTDM核心 —— 基元偏置的截断扩散</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(6) — 运动基元库：K-means离线聚类</span>
+    $$ \mathcal{P}_{\text{lib}} = \text{K-means}\Big(\{\tau_i\}_{i=1}^{N_{\text{data}}},\; K_{\text{cluster}}\Big) = \{p_1, p_2, \ldots, p_{K_{\text{cluster}}}\} $$
+    $$ \text{其中每个基元 } p_k = \{(\Delta q_t^{\text{base}}, \Delta q_t^{\text{arm}})\}_{t=1}^{L_k} \text{ 满足运动学约束} $$
+    <span class="eq-tag" style="margin-top:12px;">Eq.(7) — 基元选择：基于任务匹配度的在线检索</span>
+    $$ \text{score}(p_k) = -\big\| \text{FK}(p_k.\text{end}) - \mathbf{p}_{\text{target}} \big\|^2 - \lambda \cdot \text{collision\_cost}(p_k, \mathcal{P}) $$
+    $$ \{p_{i_1}, p_{i_2}, \ldots, p_{i_L}\} = \text{BeamSearch}(\{\text{score}(p_k)\},\; L,\; \text{beam\_width}=B) $$
+    <span class="eq-tag" style="margin-top:12px;">Eq.(8) — 截断前向过程（K步，K << T）</span>
+    $$ \mathbf{x}_K = \sqrt{\bar{\alpha}_K}\,\mathbf{x}_0^{\text{prim}} + \sqrt{1 - \bar{\alpha}_K}\,\boldsymbol{\epsilon},\quad \mathbf{x}_0^{\text{prim}} \sim \mathcal{N}(\boldsymbol{\mu}_{\text{prim}},\; \sigma_{\text{prim}}^2\mathbf{I}) $$
+    <span class="eq-tag" style="margin-top:12px;">Eq.(9) — 条件去噪：基元+任务联合条件</span>
+    $$ \boldsymbol{\epsilon}_\theta(\mathbf{x}_k, k, \mathbf{c}) = \text{UNet}\Big(\text{FiLM}(\mathbf{x}_k, k, \mathbf{c})\Big) $$
+    <div class="eq-note">
+      <strong>$N_{\text{data}}$</strong> = 离线收集的DDMoMa轨迹总数（用于K-means聚类） &nbsp;|&nbsp;
+      <strong>$K_{\text{cluster}}$</strong> = 基元库大小（50-200——在覆盖率和检索效率之间平衡） &nbsp;|&nbsp;
+      <strong>$\Delta q_t$</strong> = 基元中每个时间步的增量运动（而非绝对位置）——使得基元可以灵活拼接 &nbsp;|&nbsp;
+      <strong>$\text{FK}(p_k.\text{end})$</strong> = 基元执行后的预期末端执行器位置——用于评估基元是否能使末端执行器到达目标区域 &nbsp;|&nbsp;
+      <strong>$\text{collision\_cost}(\cdot)$</strong> = 基元与场景点云之间的碰撞代价 &nbsp;|&nbsp;
+      <strong>BeamSearch</strong> = 束搜索——从基元库中按评分选择最优基元序列，束宽B控制搜索宽度 &nbsp;|&nbsp;
+      <strong>$\boldsymbol{\mu}_{\text{prim}}$</strong> = 基元链接+平滑后的轨迹骨架——作为偏置先验的均值 &nbsp;|&nbsp;
+      <strong>$\sigma_{\text{prim}}$</strong> = 基元先验的局部扰动幅度——控制偏置分布的宽度和多样性 &nbsp;|&nbsp;
+      <strong>FiLM</strong> = Feature-wise Linear Modulation——将条件编码 $\mathbf{c}$ 通过特征仿射变换注入U-Net的每一层。<strong>PTDM在扩散前先选择基元</strong>——这一关键设计使得去噪过程的初始分布已经集中在可行区域，比从纯高斯噪声开始的去噪效率提高数倍。
+    </div>
+  </div>
+
+  <!-- Formula Group D: DDIM Acceleration -->
+  <h4>组 D：DDIM加速 —— 确定性跳步采样</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(10) — DDIM非马尔可夫逆向步骤</span>
+    $$ \mathbf{x}_{k-1} = \sqrt{\bar{\alpha}_{k-1}}\,\hat{\mathbf{x}}_0 + \sqrt{1 - \bar{\alpha}_{k-1} - \sigma_k^2}\,\boldsymbol{\epsilon}_\theta(\mathbf{x}_k, k, \mathbf{c}) + \sigma_k \mathbf{z} $$
+    $$ \text{其中 } \hat{\mathbf{x}}_0 = \frac{\mathbf{x}_k - \sqrt{1 - \bar{\alpha}_k}\,\boldsymbol{\epsilon}_\theta(\mathbf{x}_k, k, \mathbf{c})}{\sqrt{\bar{\alpha}_k}} $$
+    $$ \sigma_k = \eta\sqrt{\frac{1 - \bar{\alpha}_{k-1}}{1 - \bar{\alpha}_k}}\sqrt{1 - \frac{\bar{\alpha}_k}{\bar{\alpha}_{k-1}}},\quad \eta \in [0, 1] $$
+    <div class="eq-note">
+      <strong>$\hat{\mathbf{x}}_0$</strong> = 从 $\mathbf{x}_k$ 预测的干净轨迹（"预测的 $\mathbf{x}_0$"）——DDIM的关键技巧，在每个去噪步显式预测原始数据 &nbsp;|&nbsp;
+      <strong>$\eta$</strong> = 随机性控制参数：$\eta=1$ → 等价于DDPM（随机），$\eta=0$ → 完全确定性DDIM。本文使用 $\eta=0$ 确保可重复性 &nbsp;|&nbsp;
+      <strong>DDIM加速原理</strong>：DDIM的逆向过程是非马尔可夫的——允许直接从子序列 $\{\tau_1, \tau_2, \ldots, \tau_S\} \subset \{1, \ldots, K\}$ 跳步采样。这使得实际执行的去噪步数从K步进一步压缩到S=5-10步。DDIM的损失函数与DDPM完全一致（$\mathcal{L}=\mathbb{E}[\|\boldsymbol{\epsilon}-\boldsymbol{\epsilon}_\theta\|^2]$），因此训练好的DDPM模型可以<strong>直接用于DDIM采样而无需重新训练</strong>。
+    </div>
+  </div>
+
+  <!-- Formula Group E: Post-Processing -->
+  <h4>组 E：后处理优化 —— PHR-ALM + 剪枝 + 多项式参数化</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(11) — PHR-ALM约束优化问题</span>
+    $$ \min_{\tau} \; \big\|\tau - \tau_{\text{DDIM}}\big\|^2 + w_1 \cdot \text{smoothness}(\tau) + w_2 \cdot \text{collision}(\tau, \mathcal{P}) $$
+    $$ \text{s.t.} \quad q_{\min} \leq q_t^{\text{arm}} \leq q_{\max},\quad \dot{x}\sin\theta - \dot{y}\cos\theta = 0,\quad \|\dot{q}\| \leq \dot{q}_{\max},\quad \|\ddot{q}\| \leq \ddot{q}_{\max} $$
+    <span class="eq-tag" style="margin-top:12px;">Eq.(12) — 多项式轨迹参数化</span>
+    $$ q(t) = \sum_{j=0}^{N_{\text{poly}}} a_j t^j \quad \text{其中系数 } a_j \text{ 通过最小化jerk/snap确定} $$
+    $$ \min_{\{a_j\}} \int_{0}^{T} \big\|\dddot{q}(t)\big\|^2 dt \quad \text{(最小jerk)} \quad \text{或} \quad \min_{\{a_j\}} \int_{0}^{T} \big\|q^{(4)}(t)\big\|^2 dt \quad \text{(最小snap)} $$
+    <div class="eq-note">
+      <strong>$\tau_{\text{DDIM}}$</strong> = DDIM加速采样输出的原始轨迹（可能存在微小约束违反） &nbsp;|&nbsp;
+      <strong>$\text{smoothness}(\tau)$</strong> = 轨迹平滑代价——惩罚关节速度/加速度的剧烈变化 &nbsp;|&nbsp;
+      <strong>$\text{collision}(\tau, \mathcal{P})$</strong> = 基于有符号距离场（SDF）的碰撞代价——惩罚轨迹点与障碍物过于接近 &nbsp;|&nbsp;
+      <strong>非完整约束</strong>：$\dot{x}\sin\theta - \dot{y}\cos\theta = 0$ ——差速驱动底盘不能侧移 &nbsp;|&nbsp;
+      <strong>PHR-ALM</strong> = Powell-Hestenes-Rockafellar增广拉格朗日乘子法——将约束优化转化为一系列无约束子问题，通过交替更新原始变量和拉格朗日乘子来逼近约束最优解。对于轨迹优化问题比内点法更高效 &nbsp;|&nbsp;
+      <strong>$N_{\text{poly}}$</strong> = 多项式阶数（通常5-7阶——5阶对应最小jerk，7阶对应最小snap） &nbsp;|&nbsp;
+      <strong>剪枝</strong>：在优化前，先检测轨迹中可通过直线无碰连接的路径点，移除中间冗余点——显著减少优化变量数量。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>典型取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>完整扩散步数 T</td><td><strong>200</strong></td><td>标准DDPM的前向/逆向步数</td><td>DDPM原始论文标准值——在图像生成中200步足以从纯噪声恢复高质量样本</td></tr>
+    <tr><td>截断步数 K</td><td><strong>20-50</strong></td><td>PTDM实际使用的去噪步数</td><td>K=20时速度提升10x，K=50时提升4x。实验表明K=30在成功率和速度之间取得最佳平衡</td></tr>
+    <tr><td>DDIM子序列 S</td><td><strong>5-10</strong></td><td>DDIM采样实际执行的步数</td><td>从K步均匀抽取S步——S=10时推理时间约0.3-0.5s</td></tr>
+    <tr><td>基元扰动 $\sigma_{\text{prim}}$</td><td><strong>0.05-0.15</strong></td><td>基元先验分布的局部扰动标准差</td><td>太小(<0.03)→多样性丧失；太大(>0.2)→偏置效果消失。0.1经验最优</td></tr>
+    <tr><td>基元库大小 $K_{\text{cluster}}$</td><td><strong>50-200</strong></td><td>K-means聚类的聚类数</td><td>在覆盖率和检索效率之间平衡——太小则覆盖不足，太大则检索慢且基元间区分度差</td></tr>
+    <tr><td>KSE关键点数 M</td><td><strong>3-8</strong></td><td>从演示中提取的关键点数量</td><td>取决于任务复杂度的阶段数——简单取放约3-4个，复杂多阶段约6-8个</td></tr>
+    <tr><td>DDIM $\eta$</td><td><strong>0.0</strong>（确定性）</td><td>DDIM随机性参数</td><td>$\eta=0$确保可重复性——同一任务输入产生同一轨迹输出。适合工业部署</td></tr>
+    <tr><td>多项式阶数 $N_{\text{poly}}$</td><td><strong>5-7</strong></td><td>多项式参数化的阶数</td><td>5阶=最小jerk（加加速度最小），7阶=最小snap（加加加速度最小）——7阶提供更平滑的轨迹但对噪声更敏感</td></tr>
+  </table>
+
+  <h3>6.4 PTDM vs 标准扩散 vs 经典规划器：三轴对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>PTDM（本文方法）</h4>
+      <ul>
+        <li><strong>先验分布</strong>：运动基元偏置分布 $\mathcal{N}(\boldsymbol{\mu}_{\text{prim}}, \sigma_{\text{prim}}^2)$</li>
+        <li><strong>去噪步数</strong>：K=20-50 + DDIM S=5-10</li>
+        <li><strong>条件编码</strong>：KSE关键点 + Point Transformer V3点云 + 交叉注意力融合</li>
+        <li><strong>成功率</strong>：最高（> 90%）</li>
+        <li><strong>多样性</strong>：中高（可通过 $\sigma_{\text{prim}}$ 调节）</li>
+        <li><strong>推理时间</strong>：约0.3-0.5s（极具竞争力）</li>
+        <li><strong>后处理</strong>：PHR-ALM约束优化 + 剪枝 + 多项式参数化</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>标准扩散（DDPM基线）</h4>
+      <ul>
+        <li><strong>先验分布</strong>：纯高斯噪声 $\mathcal{N}(0, \mathbf{I})$</li>
+        <li><strong>去噪步数</strong>：T=200（完整链）</li>
+        <li><strong>条件编码</strong>：简单任务嵌入（无KSE，无双流编码）</li>
+        <li><strong>成功率</strong>：中等（约60-75%）</li>
+        <li><strong>多样性</strong>：高（但含大量不可行样本）</li>
+        <li><strong>推理时间</strong>：约2-5s（过慢）</li>
+        <li><strong>后处理</strong>：通常无，或简单平滑</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>经典优化规划器（TrajOpt）</h4>
+      <ul>
+        <li><strong>先验/初始化</strong>：直线初始化或随机初始化</li>
+        <li><strong>迭代步数</strong>：梯度优化50-200次迭代</li>
+        <li><strong>环境编码</strong>：SDF碰撞场（手工特征）</li>
+        <li><strong>成功率</strong>：中高（约70-85%，但依赖初始值）</li>
+        <li><strong>多样性</strong>：无（单模态确定性输出）</li>
+        <li><strong>推理时间</strong>：约1-5s（与问题规模有关）</li>
+        <li><strong>后处理</strong>：优化中已包含约束</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. 基础原理 ═══════════════ -->
+<section id="principles">
+  <h2>7. 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解PTDM需要掌握四个关键基础原理：(1) 为什么标准扩散在高维配置空间中浪费步数，(2) 运动基元如何构造信息丰富的先验来加速采样，(3) DDIM的非马尔可夫公式为何能实现无损跳步，(4) KSE如何通过可微分前向运动学桥接配置空间与物理空间。</p>
+
+  <h3>7.1 为什么标准扩散在高维配置空间中失败 —— 去噪中的维数灾难</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 标准扩散 vs 截断扩散在高维空间中的几何差异</span>
+    $$ \text{标准: } \mathbf{x}_T \sim \mathcal{N}(0, \mathbf{I}),\; \mathbf{x}_{t-1} = f_\theta(\mathbf{x}_t, t),\; t = T, T-1, \ldots, 1 \quad (T=200,\; \dim=1800) $$
+    $$ \text{PTDM: } \mathbf{x}_K \sim \mathcal{N}(\boldsymbol{\mu}_{\text{prim}},\; \sigma_{\text{prim}}^2\mathbf{I}),\; \mathbf{x}_{k-1} = f_\theta(\mathbf{x}_k, k, \mathbf{c}),\; k = K, K-1, \ldots, 1 \quad (K=30,\; \dim=1800) $$
+    <div class="eq-note">
+      <strong>核心洞察</strong>：学习得分函数 $\nabla_{\mathbf{x}} \log p(\mathbf{x})$ 的难度随维度和噪声分布到数据流形的"距离"而增长。当 $\mathbf{x}_T$ 是纯高斯噪声（$\dim=1800$）时，样本位于半径为 $\sqrt{1800} \approx 42.4$ 的超球形壳上。可行轨迹流形在这个球面上只占<strong>极小一部分体积</strong>——去噪网络必须从一个有效的随机点"搜索"到这个微小的流形。这需要大量小步长（大T）。而PTDM从基元先验开始，先验已经在流形附近——距离仅约 $\sigma_{\text{prim}}\sqrt{1800} \approx 4.24$（当 $\sigma_{\text{prim}}=0.1$ 时），比高斯起点的距离小了<strong>一个数量级</strong>。这一几何优势直接带来<strong>所需的去噪步数减少约一个数量级</strong>——这就是为什么K=30可以匹配甚至超过T=200的成功率。
+    </div>
+  </div>
+
+  <p><strong>维度分析的几何直觉</strong>：一个1800维的高斯样本 $\mathbf{x}_T \sim \mathcal{N}(0,\mathbf{I})$ 到原点的期望平方距离为 $\mathbb{E}[\|\mathbf{x}_T\|^2]=1800$——样本集中在一个半径为 $\sqrt{1800}\approx 42.4$ 的薄球形壳上。这个壳的表面积随维度指数增长，但可行轨迹流形只占其体积的极小一部分（"流形假设"——高维空间中，真实数据分布在远低于环境维度的低维流形上）。去噪网络必须从壳上的随机点"导航"到这个微小流形——这是一个在每个去噪步中"在几乎整个空间中搜索"的过程。PTDM将起点移到了流形附近，将搜索半径从~42减小到~4——面积（体积类比）减少约100倍（因为在高维空间中，面积随半径的$d-1$次方缩放）。这就是<strong>截断扩散的几何基础</strong>。</p>
+
+  <h3>7.2 运动基元作为信息先验 —— 桥接运动学与学习</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 基元序列构造与先验质量：K-means + KL散度视角</span>
+    $$ \boldsymbol{\mu}_{\text{prim}} = \text{Smooth}\Big(\text{Concatenate}\big(\{p_i\}_{i=1}^{L}\big)\Big) \quad \text{其中 } p_i \in \mathcal{P}_{\text{lib}} $$
+    $$ D_{\text{KL}}\big(p_{\text{data}} \,\|\, p_{\text{prior}}^{\text{PTDM}}\big) \ll D_{\text{KL}}\big(p_{\text{data}} \,\|\, \mathcal{N}(0,\mathbf{I})\big) $$
+    <div class="eq-note">
+      <strong>$\mathcal{P}_{\text{lib}}$</strong> = 通过K-means聚类离线构建的运动基元库——每个基元是满足运动学约束的短轨迹片段 &nbsp;|&nbsp;
+      <strong>K-means聚类过程</strong>：(1) 从离线轨迹数据集中采样大量固定长度的轨迹片段；(2) 在轨迹空间（每个片段展平为向量）中运行K-means聚类；(3) 每个聚类中心成为一个运动基元——代表一种典型的底盘-机械臂协同运动模式；(4) 基元库大小 $K_{\text{cluster}}$ 控制基元的粒度和覆盖率 &nbsp;|&nbsp;
+      <strong>$D_{\text{KL}}(p_{\text{data}} \| p_{\text{prior}})$</strong> = 数据分布与先验分布之间的KL散度——衡量先验的"信息量"。KL散度越小，先验越接近真实数据分布，扩散所需步数越少。PTDM通过基元将KL散度降低了约1-2个数量级 &nbsp;|&nbsp;
+      <strong>基元链接与平滑</strong>：基元拼接处的关节速度不连续通过样条平滑消除——每个接点处使用短时间的平滑过渡段。这是保证先验轨迹骨架运动学可行性的关键步骤。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>运动基元先验（PTDM）</h4>
+      <p><strong>构造方式</strong>：离线K-means聚类轨迹数据 → 在线检索+序列链接+平滑</p>
+      <p><strong>KL散度到数据</strong>：小（先验已经类似可行轨迹）</p>
+      <p><strong>多样性控制</strong>：$\sigma_{\text{prim}}$ 控制扰动宽度——可调的多样性-成功率旋钮</p>
+      <p><strong>关键优势</strong>：将神经网络难以从数据中学习的硬性运动学/物理约束编码进先验</p>
+    </div>
+    <div class="cmp-col">
+      <h4>高斯先验（标准扩散）</h4>
+      <p><strong>构造方式</strong>：纯随机噪声——无任何任务或运动学信息</p>
+      <p><strong>KL散度到数据</strong>：大（在1800D空间中约~O(dim)）——先验最大程度地无信息</p>
+      <p><strong>多样性控制</strong>：无显式控制——多样性是学习到的得分函数的涌现属性</p>
+      <p><strong>关键弱点</strong>：将早期的去噪步骤浪费在学习基本的运动学可行性上——这些可以通过构造来保证</p>
+    </div>
+  </div>
+
+  <h3>7.3 DDIM非马尔可夫加速 —— 为什么跳步可行</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — DDPM的马尔可夫性 vs DDIM的非马尔可夫性</span>
+    $$ \text{DDPM (Markov): } q(\mathbf{x}_{1:T} \mid \mathbf{x}_0) = \prod_{t=1}^{T} q(\mathbf{x}_t \mid \mathbf{x}_{t-1}) \quad \text{(必须逐步采样)} $$
+    $$ \text{DDIM (Non-Markov): } q_\sigma(\mathbf{x}_{1:T} \mid \mathbf{x}_0) = q_\sigma(\mathbf{x}_T \mid \mathbf{x}_0) \prod_{t=2}^{T} q_\sigma(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0) \quad \text{(可跳跃)} $$
+    <div class="eq-note">
+      <strong>DDPM的马尔可夫性</strong>：$\mathbf{x}_{t-1}$ 的分布仅依赖于 $\mathbf{x}_t$——这意味着必须按 t=T, T-1, ..., 1 的顺序逐步采样，无法跳过中间步骤。这是DDPM慢的根本原因 &nbsp;|&nbsp;
+      <strong>DDIM的非马尔可夫性</strong>：DDIM定义了更一般的推理分布族 $q_\sigma$，其中 $\mathbf{x}_{t-1}$ 的分布同时依赖于 $\mathbf{x}_t$ 和 $\mathbf{x}_0$（后者通过预测 $\hat{\mathbf{x}}_0$ 获得）。这使得不同时间步之间不再是严格的马尔可夫依赖，从而可以从子序列直接跳步采样 &nbsp;|&nbsp;
+      <strong>为什么跳步不损失质量？</strong>DDIM的损失函数与DDPM完全相同——这意味着训练好的DDPM模型可以直接用于DDIM采样而无需重新训练。跳步采样的质量损失来自数值积分离散化误差——不是模型能力下降。当K已经较小（PTDM的K=20-50），进一步用DDIM压缩到S=5-10步的离散化误差通常可以忽略。额外的优势：<strong>确定性DDIM（$\eta=0$）将扩散变为一个由噪声初始值决定的确定性映射</strong>——意味着轨迹是可重复的（同一输入产生同一输出），这对工业部署至关重要。
+    </div>
+  </div>
+
+  <h3>7.4 KSE的前向运动学桥梁 —— 为什么在3D物理空间而非配置空间进行关键点提取</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 4 — 配置空间 vs 物理空间的距离度量</span>
+    $$ \text{配置空间距离: } d_{\text{cfg}}(q_1, q_2) = \sqrt{\sum_{i} w_i (q_{1,i} - q_{2,i})^2} \quad \text{无物理意义} $$
+    $$ \text{物理空间距离: } d_{\text{phys}}(\mathbf{p}_1, \mathbf{p}_2) = \|\mathbf{p}_1 - \mathbf{p}_2\| \quad \text{物理有意义的度量} $$
+    <div class="eq-note">
+      <strong>为什么物理空间更好？</strong>在配置空间中，底盘旋转1度和机械臂关节旋转1度的"距离"无法直接比较——它们的物理含义完全不同（底盘旋转改变视野方向，关节旋转改变末端执行器位置）。而且配置空间中的"两个配置相似"不等于"末端执行器在相近位置"——前向运动学的非线性可以映射相近的配置到相距很远的3D位置（或反之）。<strong>KSE通过可微分FK将配置空间映射到3D物理空间</strong>，在物理空间中进行关键点检测——物理空间中的距离具有明确的几何意义，关键点对应的是"末端执行器的位置突变"而非"关节角的突变"。这使得：(1) 关键点语义明确——直接对应任务的物理阶段；(2) 泛化性好——不同环境中相同的任务语义映射到相似的3D关键点位置；(3) 可端到端训练——FK的可微分性允许梯度从关键点检测损失流回配置空间优化。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">四个原理的系统级协同效应</div>
+    运动基元减少了从先验到数据的"有效距离"（原理2），这使得扩散链可以被激进地截断（原理1）；DDIM的非马尔可夫公式允许在不损失质量的情况下进一步跳步（原理3）；KSE的可微分FK桥接使得任务语义可以精准地编码到条件向量中（原理4）。<strong>每个原理放大其他原理的效果</strong>：没有基元，激进截断会失败；没有截断，DDIM的节省微乎其微（200步到20步 vs 20步到5步）；没有DDIM，剩余的K=20步仍然约束实时部署；没有KSE，条件编码缺乏物理语义导致去噪方向不准。四者共同形成一个<strong>乘性加速链</strong>，将扩散模型从"对机器人太慢"转变为"与经典规划器竞争力相当"。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. 图表解读 ═══════════════ -->
+<section id="figures">
+  <h2>8. 论文图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig4.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">PTDM系统框架总览——从演示数据到DDMoMa可执行轨迹的完整管线</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="PTDM框架总览"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot to <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>该图展示了</strong>PTDM的完整管线：(a) DDMoMa平台——差速驱动底盘+6-DOF机械臂；(b) KSE模块从演示轨迹中提取关键点序列——通过可微分前向运动学将配置空间状态映射到3D物理空间；(c) 运动基元库——通过K-means聚类离线构建，提供运动学可行的子轨迹；(d) PTDM去噪过程——从基元偏置先验开始，经K去噪步骤精细化；(e) DDIM加速采样——从K步中抽取S步子序列跳步执行；(f) 后处理——PHR-ALM优化+多项式参数化→物理DDMoMa上执行的多样化轨迹。</p>
+      <ul>
+        <li><strong>KSE在管线中的角色</strong>：关键点序列桥接了"任务是什么"（自然语言或物体位姿）与"轨迹应该是什么样"（配置空间序列）之间的语义鸿沟。没有KSE，PTDM将缺乏任务感知能力，生成的轨迹可能运动学可行但语义错误（如抓错物体）</li>
+        <li><strong>基元库可视化</strong>：基元库通常包含50-200个基元，覆盖常见运动模式——底盘直线运动、原地旋转、机械臂伸展、底盘-机械臂协调运动。每个基元由持续时间、起止配置参数化，通过构造满足非完整约束</li>
+        <li><strong>双流编码的端到端性</strong>：Point Transformer V3和KSE编码器与去噪网络联合训练——梯度通过交叉注意力和FiLM层反向传播，使场景编码适应于轨迹生成任务</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">截断扩散 vs 标准扩散——去噪步骤效率对比与收敛分析</span>
+      <span class="fig-source">来源：论文 Fig. 2/3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="截断效率对比"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot to <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>该图展示了</strong>轨迹质量随去噪步数的变化——标准扩散（T=200，从高斯开始）vs PTDM（K=20-50，从基元先验开始）的并排对比。核心洞察：PTDM仅需20步去噪即可达到或优于标准扩散200步的轨迹质量，展示了基元初始化带来的乘性加速效果。</p>
+      <ul>
+        <li><strong>"拐点"现象</strong>：标准扩散需要约100+步才能产生可辨识结构（低于此步数时轨迹基本上是随机噪声，无任务相关性）。PTDM轨迹在第0步（基元先验）已经具有结构，只需精细化。这解释了>4x的加速</li>
+        <li><strong>DDIM子采样效应</strong>：使用DDIM从30个PTDM步中仅抽取5步，产生成功率>95%的完整30步结果——表明在基元偏置的范围内，去噪轨迹几乎是线性的，可以用稀疏采样很好地逼近</li>
+        <li><strong>不同杂乱环境的对比</strong>：在三种测试环境中（表面对接、狭窄通道、密集障碍物），PTDM的截断效率优势越是在复杂环境中越明显——因为复杂环境中高斯向可行区域搜索的难度更高</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">生成轨迹多样性——PTDM vs 优化规划器 vs 标准扩散的多解对比</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="轨迹多样性可视化"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot to <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>该图展示了</strong>同一取放任务下不同方法生成的多条轨迹。优化规划器（TrajOpt）：单一确定性解（无多样性）。标准扩散：多样但含大量不可行样本（碰撞、关节限位违反）。PTDM：既多样又可行——多种不同的方法（左/右侧接近、底盘优先/机械臂优先策略）全部满足约束。</p>
+      <ul>
+        <li><strong>多样性-可行性帕累托前沿</strong>：PTDM将前沿向外推进——在保持与优化规划器相当的成功率的同时，达到了与标准扩散相当的多样性水平。这是经典规划和标准生成模型都无法单独到达的"甜区"</li>
+        <li><strong>$\sigma_{\text{prim}}$ 作为可调的多样性旋钮</strong>：将 $\sigma_{\text{prim}}$ 从0.05增加到0.15，轨迹多样性（以成对轨迹距离衡量）增加约40%，而成功率仅下降约5%——为使用者提供了一个简单的杠杆来按应用需求调节多样性-安全性权衡</li>
+        <li><strong>后处理的影响</strong>：PHR-ALM优化后的轨迹在多样性上略有下降（优化倾向于收窄分布），但成功率显著提升——从原始DDIM输出的~85%提升到~95%</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">KSE关键点提取可视化——从演示轨迹到任务编码的全过程</span>
+      <span class="fig-source">来源：论文 Fig. 5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="KSE关键点提取"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot to <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>该图展示了</strong>KSE如何从演示轨迹中自动提取关键点。上图：完整轨迹——底盘位姿和机械臂关节角随时间变化。中图：检测到的关键点（红色圆点）——在速度显著变化、接触事件或配置转换的时间点。下图：编码的条件向量c——用于条件化PTDM去噪网络。</p>
+      <ul>
+        <li><strong>关键点检测启发式</strong>：KSE通过以下特征识别关键点：(i) 夹爪开/关事件（接触转换），(ii) 末端执行器速度的局部极小值（抬起和放下的瞬间），(iii) 底盘轨迹的急转弯（机动点）。这些启发式简单但有效——无需学习的检测器</li>
+        <li><strong>可微分FK的可视化</strong>：关键点被映射到3D物理空间——图中可以直观看到末端执行器在"接近桌子""抓取杯子""提升""搬运"和"放置"各阶段的3D空间位置</li>
+        <li><strong>为什么关键点对扩散很重要</strong>：条件向量c为去噪过程提供"全局指导"——每个去噪步接收到轨迹在特定阶段应处的位置信息。这防止了去噪漂移到语义错误的解中（如完全错过抓取目标）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. 潜在缺陷 ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在缺陷与扩展方向</h2>
+
+  <h3>9.1 局限性分析</h3>
+  <ul>
+    <li><strong>基元库质量的依赖性</strong>：PTDM的性能受运动基元库覆盖范围的上限约束。对于需要基元库中不存在的底盘-机械臂协同模式的任务，偏置先验可能远离真正的最优解——甚至比无先验更差（将扩散"误导"到不可行方向）。构建全面的基元库需要大量的离线工程工作和领域专业知识。K-means聚类虽然自动化了基元发现，但聚类质量依赖于训练数据的覆盖范围和均衡性。</li>
+    <li><strong>KSE启发式的脆弱性</strong>：关键点提取依赖速度变化和接触事件启发式——这些在有结构的取放任务中效果很好，但在连续接触任务（如擦拭、打磨）或阶段边界模糊的任务（如协作交接）中可能失效。启发式的阈值（速度变化阈值 $\delta_v$、窗口大小 $w$）需要按任务类型手动调节。</li>
+    <li><strong>静态环境假设</strong>：当前框架假设环境是静态的——障碍物和目标物体位置已知且固定。在动态环境（移动障碍物、工作空间中的人）中，生成的轨迹可能在执行过程中失效——PTDM约0.3-0.5s的推理时间可能在控制频率下不足以支持重规划。</li>
+    <li><strong>演示依赖</strong>：KSE需要每种任务类型至少少量演示（通常3-10条）。对于完全新颖的任务（无任何演示可用），任务编码退化为通用表示，PTDM退化为无条件截断扩散——失去了任务感知的优势。</li>
+    <li><strong>后处理管线复杂度</strong>：PHR-ALM约束优化+剪枝+多项式参数化构成了一个对最终轨迹质量至关重要的后处理管线，但也引入了额外的超参数（权重 $w_1$, $w_2$、多项式阶数 $N_{\text{poly}}$），增加了系统调优的复杂度。</li>
+    <li><strong>双流编码的训练数据需求</strong>：Point Transformer V3的场景编码器和交叉注意力融合模块需要大量多样化的场景-轨迹配对数据进行训练——在实际部署中获取这些数据可能具有挑战性。</li>
+  </ul>
+
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>学习式基元发现</strong>：不再手工设计基元库或单纯依赖K-means，而是直接从演示数据中学习基元——使用VQ-VAE风格的轨迹离散化，或通过变分自编码器学习基元嵌入空间。这将自动使基元集适应任务分布，消除手工基元工程的瓶颈。</li>
+    <li><strong>闭环反应式PTDM</strong>：将PTDM扩展为支持在线重规划——以实时传感器观测（RGB-D、力-扭矩）为条件。DDIM的确定性模式（$\eta=0$）特别适合此处——它保证对一致输入产生一致输出，使闭环行为稳定。需要将推理时间压缩到控制频率（~10-50Hz）。</li>
+    <li><strong>多任务PTDM与共享基元</strong>：训练一个以学习到的任务嵌入为条件的单一PTDM模型，跨多个操作任务泛化。运动基元库将作为共享的"运动学先验"，而任务嵌入对具体的生成行为进行条件化。</li>
+    <li><strong>与LLM任务规划的集成</strong>：将KSE模块替换为从自然语言指令生成关键点序列的LLM（如"将红色杯子拿起放在顶层架子上"）。这将实现对无任何演示的任务进行零样本泛化——LLM提供任务语义，基元库提供运动学可行性，扩散模型提供轨迹精细化。</li>
+    <li><strong>自适应截断策略</strong>：根据任务复杂度和基元库匹配质量自适应选择K——而非对所有任务使用固定的K。匹配度高的任务可以使用更激进的截断（K更小），复杂的新任务使用更保守的截断（K更大）。这可以通过一个轻量级的截断步数预测网络实现。</li>
+  </ul>
+
+  <h3>9.3 数据敏感性分析</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>演示数量不足</td><td>KSE质量在少于3条演示时急剧下降——关键点检测方差增大，导致不一致的任务编码，降低PTDM成功率</td><td>★★★★</td></tr>
+    <tr><td>演示质量差（次优演示）</td><td>KSE从提供的演示中提取关键点而不论质量如何。次优演示（抖动轨迹、不必要机动）产生次优关键点序列，偏置整个生成管线向次优解</td><td>★★★★</td></tr>
+    <tr><td>基元库覆盖缺口</td><td>如果所需底盘-机械臂协同模式在库中无代表，偏置先验可能产生主动误导——将扩散拉向不可行配置。这比根本没有先验更糟</td><td>★★★★★</td></tr>
+    <tr><td>演示与执行环境不匹配</td><td>KSE编码演示环境中的空间关键点位置——如果执行时物体位置显著变化，编码的关键点指向错误位置，PTDM必须通过去噪"覆盖"条件信号</td><td>★★★</td></tr>
+    <tr><td>截断激进程度K</td><td>K过小（< 10）意味着去噪网络无法充分纠正基元先验中的误差；K过大（> 100）则抵消截断的速度优势。最优K依赖于任务，需要调优</td><td>★★★</td></tr>
+    <tr><td>场景点云噪声/缺失</td><td>Point Transformer V3对点云密度变化具有一定鲁棒性，但严重的点云缺失（如传感器盲区）会导致场景编码不完整，去噪网络无法可靠地避免碰撞</td><td>★★★★</td></tr>
+  </table>
+
+  <h3>9.4 深度分析：基元-扩散平衡的本质张力</h3>
+  <div class="callout warn">
+    <div class="callout-title">关键设计张力</div>
+    <strong>PTDM中的本质张力是：我们应该多大程度上依赖基元 vs 扩散？</strong>在一个极端（纯基元，K=0），我们得到快速但低多样性、可能次优的轨迹。在另一极端（从高斯的纯扩散，K=T），我们得到多样但缓慢的轨迹，成功率低。PTDM的最佳区间是中间地带——基元提供"骨架"，扩散添加"血肉"——但这种平衡由超参数（$\sigma_{\text{prim}}$、K、基元库大小）控制，目前需要手动调优。<br><br>
+    <strong>一个潜在的理论方向</strong>：将基元-扩散平衡框架化为<strong>熵正则化的最优传输问题</strong>。基原先验定义一个参考测度，扩散学习从该参考到数据分布的传输映射。截断减少传输步数。最优传输成本自然地量化权衡：更有信息量的基元→更低的传输成本→需要更少的扩散步数。这一框架可以导向原则性的、自动化的K和$\sigma_{\text{prim}}$选择，而非启发式调优。<br><br>
+    <strong>另一个视角——基元选择作为"硬注意力"</strong>：PTDM在扩散前先选择基元序列——这等价于将扩散的搜索空间"硬限制"在基元骨架附近的一个管道内。基元选择的准确性因此成为整个方法的上限——选错基元意味着扩散从错误的地方开始。未来的改进方向可以探索"软基元加权"——不去硬选一个基元序列，而是对所有基元进行软注意力加权，让扩散自适应地组合多个基元的特征。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. 动机推导 ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机推导 —— 从第一性原理出发的思路链</h2>
+
+  <h3>10.1 五步推导链</h3>
+  <ol>
+    <li><strong>根本问题是什么？</strong><br>DDMoMa轨迹生成难在高维配置空间（~1800D）、混合非完整+完整约束、多模态可行解三者同时存在。经典规划器速度慢且单模态，学习型规划器需要太多数据。而且配置空间中的距离度量缺乏物理意义——同等配置空间距离可能对应完全不同的物理行为。</li>
+    <li><strong>什么工具能表达高维多模态分布？</strong><br>扩散模型。它们从演示中学习轨迹的数据分布 $p(\tau)$，并通过迭代去噪采样多样化轨迹。这提供了多样性+从少量演示中的样本效率。此外，扩散模型天然适合处理高维数据——已经在图像（百万维度）和视频（千万维度）生成中证明了自己。</li>
+    <li><strong>为什么标准扩散对机器人太慢？</strong><br>因为它从纯噪声开始，将数百步浪费在明显不可行的配置上（机械臂穿入桌子、底盘侧滑）。网络必须首先"发现"基本运动学，然后才能向任务相关解精细化。在高维空间中，从随机噪声到可行流形的"导航"需要大量小步长。而且标准扩散缺乏场景感知——不知道障碍物在哪，不知道任务目标是啥。</li>
+    <li><strong>如何在注入运动学知识的同时不牺牲扩散的生成灵活性？</strong><br>使用运动基元构造一个已经满足硬运动学约束的偏置先验。关键操作是：(a) 通过K-means聚类离线构建基元库；(b) 在线检索+链接+平滑选择最优基元序列；(c) 扩散从基元偏置先验 ($\mathcal{N}(\boldsymbol{\mu}_{\text{prim}}, \sigma_{\text{prim}}^2)$) 而非高斯 ($\mathcal{N}(0,\mathbf{I})$) 开始。扩散只需精细化先验——不需要从零发现运动学。这自然地使截断成为可能：步数更少因为起点已经靠近终点。</li>
+    <li><strong>如何进一步提升速度并增强任务感知？</strong><br>三个增强：(a) <strong>KSE + 双流编码</strong>：KSE通过可微分前向运动学在3D物理空间中提取任务结构，Point Transformer V3编码场景点云，两者通过交叉注意力融合——提供语义+几何双向条件化；(b) <strong>DDIM加速</strong>：DDIM的非马尔可夫公式允许跳过扩散步而无需重新训练——从K=30进一步压缩到S=5-10步；(c) <strong>PHR-ALM后处理</strong>：将扩散的"软"输出转化为严格满足约束的可执行轨迹。最终结果：多样化、任务感知、运动学可行的轨迹，推理 < 0.5s，在三种杂乱3D环境中验证。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    DDMoMa轨迹生成被夹在缓慢的单模态经典规划器和快速但不可行的天真生成模型之间——PTDM通过使用运动基元将运动学可行性注入扩散先验，实现了截断采样，以规划器级别的成功率和生成模型级别的多样性，在竞争力的速度下达成了两者的平衡。
+  </div>
+
+  <h3>10.3 技术路线的深层逻辑</h3>
+  <p>PTDM的设计不是随机组合五个模块——而是从第一性原理出发的必然推导：</p>
+  <ul>
+    <li><strong>扩散模型</strong>是用来表达多模态分布的工具（因为DDMoMa任务天然有多个等价的可行解）</li>
+    <li><strong>基元先验</strong>是用已知运动学约束减小扩散搜索空间的方法（因为扩散在高维无约束空间中浪费太多步）</li>
+    <li><strong>KSE</strong>是桥接"任务语义"和"轨迹配置"的编码器（因为扩散需要知道"要完成什么任务"）</li>
+    <li><strong>双流编码+注意力</strong>是最优的信息融合方式（因为场景几何和任务语义是异质信息源）</li>
+    <li><strong>DDIM</strong>是利用非马尔可夫性进一步压缩步数的方法（因为当轨迹已经在可行区域附近时，精细化是局部的且近似线性的）</li>
+    <li><strong>PHR-ALM</strong>是弥合"扩散输出"与"物理可执行"之间差距的后处理（因为扩散模型的输出本质上是"软"的概率采样，无法保证硬约束的严格满足）</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. 启示与收获 ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 启示与收获</h2>
+
+  <h3>11.1 方法论启示</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：核心思想——<strong>将领域知识（基元）注入生成模型（扩散）的先验中以加速推理</strong>——是一个广泛适用的设计模式。无论在哪里使用扩散模型进行规划/控制，都应该问："关于解空间，我有什么先验知识，以及如何将其编码进扩散先验以减小搜索负担？"这种"结构注入+数据驱动精细化"的范式，比纯数据驱动（学习一切）和纯结构化（手工设计一切）都更高效。</li>
+    <li><strong>技术层面</strong>：截断扩散+DDIM产生了<strong>乘性加速效应</strong>：基元将所需步数从200减少到约30（6.7x），DDIM进一步压缩到约5-10（3-6x）。总计20-40x的加速将扩散从"研究新奇物"转变为"可部署工具"。关键洞察是这两个加速是独立的且可以叠加。</li>
+    <li><strong>实验设计层面</strong>：论文的评估明智地与三种不同类型的基线（经典规划器、标准扩散、模仿学习）进行比较——每个代表多样性-速度-可行性权衡上的不同点。这种三轴比较使贡献异常清晰，值得未来工作效仿。且测试在<strong>三种不同类型的杂乱3D环境</strong>中进行——证明了方法在不同场景结构下的泛化性，而非仅在单一环境中过拟合。</li>
+  </ul>
+
+  <h3>11.2 对本研究的直接启发</h3>
+  <ul>
+    <li><strong>对无人机轨迹生成</strong>：无人机具有与DDMoMa非完整约束类似的微分平坦约束。PTDM的模式——使用运动基元（最小snap多项式轨迹）作为扩散轨迹生成的偏置先验——可以大幅加速杂乱环境中的无人机运动规划，同时保持多无人机协调所需的多样性。</li>
+    <li><strong>对多智能体编队控制</strong>：KSE从演示中提取关键点序列的思想自然扩展到多智能体设置——从协调演示中提取"编队关键点"（汇合、分裂、合并），用于条件化扩散生成编队轨迹。</li>
+    <li><strong>对图像视觉伺服（IBVS）</strong>：截断扩散的思想可以应用于图像空间轨迹生成——使用经典IBVS控制律作为"视觉基元"，偏置扩散向可行的图像特征轨迹，然后截断加速。这可以将IBVS的收敛保证与扩散处理遮挡和特征丢失的能力结合起来。</li>
+    <li><strong>双流编码+注意力融合</strong>：这一架构模式直接适用于任何需要同时理解几何环境（障碍物/自由空间）和任务语义（目标/约束）的机器人规划问题——不仅限于DDMoMa。</li>
+  </ul>
+
+  <h3>11.3 需要跟踪的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Ho et al. (2020) — Denoising Diffusion Probabilistic Models (DDPM)</td><td>PTDM建立在其上的基础扩散公式。理解前向/逆向过程和$\epsilon$-预测参数化对于任何基于扩散的规划工作至关重要。</td></tr>
+    <tr><td>Song et al. (2021) — Denoising Diffusion Implicit Models (DDIM)</td><td>引入非马尔可夫公式使跳步成为可能。对于理解PTDM的截断+DDIM叠加为何无需重新训练就可行至关重要。</td></tr>
+    <tr><td>Janner et al. (2022) — Diffuser: Planning with Diffusion for Flexible Behavior Synthesis</td><td>第一个将扩散模型应用于轨迹规划的工作。PTDM可视为"Diffuser + 运动基元 + 截断"——理解Diffuser提供基线背景。</td></tr>
+    <tr><td>Chi et al. (2023) — Diffusion Policy: Visuomotor Policy Learning via Action Diffusion</td><td>展示了扩散用于实时机器人控制（不仅是规划）。PTDM框架如果进一步优化，有潜力在控制频率运行，使其成为一个自然的下一步。</td></tr>
+    <tr><td>Wu et al. (2024) — Point Transformer V3: Simpler, Faster, Stronger</td><td>PTDM中使用的点云编码器。PTv3的高效分层注意力使其适合需要快速场景编码的机器人任务。</td></tr>
+    <tr><td>Cohen et al. (2010) / Petric et al. (2014) — Motion Primitives for Mobile Manipulation</td><td>关于移动操作运动基元的经典工作。理解基元是如何定义、参数化和链接的，对于任何在PTDM框架基础上构建的工作至关重要。</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Xu, Wong, Zhong, Lin, Hou, Gao · arXiv:2604.04166, 2026 · Primitive-based Truncated Diffusion for Efficient Trajectory Generation of Differential Drive Mobile Manipulators · MathJax + Mermaid Rendering</footer>
+</div>
+</body>
+</html>

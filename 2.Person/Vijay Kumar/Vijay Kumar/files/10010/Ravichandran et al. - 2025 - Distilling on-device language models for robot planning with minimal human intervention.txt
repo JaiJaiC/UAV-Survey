@@ -1,0 +1,1308 @@
+Distilling On-device Language Models for Robot
+Planning with Minimal Human Intervention
+ZacharyRavichandran,IgnacioHounie,FernandoCladera,
+AlejandroRibeiro,GeorgeJ.Pappas,VijayKumar
+UniversityofPennsylvania
+Abstract: Largelanguagemodels(LLMs)providerobotswithpowerfulcontex-
+tualreasoningabilitiesandanaturalhumaninterface. Yet,currentLLM-enabled
+robots typically depend on cloud-hosted models, limiting their usability in envi-
+ronmentswithunreliablecommunicationinfrastructure,suchasoutdoororindus-
+trialsettings. WepresentPRISM,aframeworkfordistillingsmalllanguagemodel
+(SLM)-enabled robot planners that run on-device with minimal human supervi-
+sion. StartingfromanexistingLLM-enabledplanner, PRISM automaticallysyn-
+thesizesdiversetasksandenvironments,elicitsplansfromtheLLM,andusesthis
+syntheticdatasettodistillacompactSLMasadrop-inreplacementofthesource
+model. Weapply PRISM tothreeLLM-enabledplannersformappingandexplo-
+ration, manipulation, and household assistance, and we demonstrate that PRISM
+improves the performance of Llama-3.2-3B from 10-20% of GPT-4o’s perfor-
+mancetoover93%—usingonlysyntheticdata. Wefurtherdemonstratethatthe
+distilledplannersgeneralizeacrossheterogeneousroboticplatforms(groundand
+aerial) and diverse environments (indoor and outdoor). We release all software,
+trainedmodels,anddatasetsathttps://zacravichandran.github.io/PRISM.
+Keywords: LLM-enabledrobots,LLMDistillation
+1 Introduction
+Large language Models (LLMs) have emerged as powerful tools for robot planning by providing
+contextual reasoning and a natural human interface. LLM-enabled robots have been successfully
+deployed for mobile manipulation [1, 2, 3], autonomous driving [4, 5], service robots [6], naviga-
+tion[7,8],andinspection[9,10]. Beingtrainedoninternet-scaledata,LLMscontainrichsemantic
+knowledgeandarehighlyadaptable. Withonlyafewin-contextexamples,theycanattunetotask-
+relevantinformationandgeneralizetonovelroboticscenarios.
+However, the scale of LLMs brings significant computational demands. Current frontier mod-
+els contain hundreds of billions of parameters and require significant cloud computing infras-
+tructure [11, 12]. Although small language models (SLMs) can run on-device, their relatively
+poor performance in robot planning domains has precluded widespread adoption by the com-
+munity [13]. Consequently, nearly all LLM-enabled robots rely on models such as GPT or
+PALM [14, 1, 3, 9, 4, 15, 16, 6], which tethers them to external compute. While this dependence
+maybefeasibleinstructuredenvironmentssuchashomesoroffices,itseverelylimitsdeployment
+in large-scale, unstructured settings — domains critical for environmental monitoring, industrial
+inspection,disasterresponse,andahostofsimilarproblems.
+Toaddresstheselimitations,weintroduce PRISM (PlanningwithRoboticdIstilledSmalllanguage
+Models), a framework for distilling SLMs that run on-device with minimal human intervention.
+Starting from an existing LLM-enabled planner (termed “source”), PRISM generates diverse tasks
+and textual environment representations — such as scene graphs or object sets — and uses these
+generations to elicit plans from the source LLM. This interaction produces high-quality planning
+demonstrations without manual annotations, simulators, or dataset curation. The user simply pro-
+9thConferenceonRobotLearning(CoRL2025),Seoul,Korea.
+5202
+tcO
+6
+]OR.sc[
+2v68471.6052:viXra
+Synthesize environments Elicit expert Distill SLM with
+and tasks planner examples observation-action
+rollouts
+Scenario observation
+Scenario
+E
+T
+n
+aE
+v
+sn
+i
+kv
+S r
+si
+c o
+:r
+n e
+o
+m
+[
+n
+n
+e
+Cm
+a n
+ae
+r t
+nn
+i :
+t
+o
+I:
+c o
+gc
+a
+eo
+s
+ta
+t
+s
+a
+tt
+l
+oa l
+s
+m
+c
+ys
+e
+c
+n
+be
+e
+on aet , …] Scenario
+πLLM πSLM
+TasEknsv:i r[oCnamne nIt :g ecto atsot amly sbcoeante, …]
+Tasks: [Can I get to my boat, …] action
+Deploy zero-shot across platforms and environments
+I got reports that the bridge is blocked Is there activity in the southern and
+northern parking lots?
+I will investigate
+I will look
+Reasoning:
+I need to find a Reasoning:
+path to the bridge I’ll first map the
+Plan: southern lot
+explore_to(bridge) Plan:
+map(lot_1)
+P R l N t m e a o h a a n w e p s : ( o I b b n r r i n i i n e d d g e g g : d e e ) t o map P R l I n m e a ’ o a a n l r p s : l t ( o h l n n e o i o r t n w n _ g 2 : m l ) a o p t the
+Generate synthesized Elicit LLM-generated Distill SLM with
+scenarios (Sec. 3.1) plans (Sec. 3.2) observation-action
+rollouts (Sec. 3.3)
+observation
+Scenario
+Scenario
+Envi S r c on e m n e a n r t i : o c oastal scene πLLM πSLM
+TaEsnkvsi:r o[nCmaenn tI: gceota sttoa lm ys cbeonaet , …] Scenario
+TasEknsv:i r[oCnamne nIt :g ecto atsot amly sbcoeante, …]
+Tasks: [Can I get to my boat, …] action
+Deploy distilled SLM zero-shot across platforms and environments
+Is there activity in the southern and
+Is the path to the exit clear?
+northern parking lots?
+I’ll search to the door I will look
+Reasoning: Reasoning:
+I need to find a I’ll first map the
+path to the door southern lot
+Plan: Plan:
+explore_to(door) map(lot_1)
+Reasoning: Reasoning:
+Now I’ll map the I’ll now map the
+area northern lot
+Plan: Plan:
+map(door) map(lot_2)
+UGV indoors and outdoors UAV outdoors
+Figure 1: PRISM distills on-device language models for robot planning with minimal human in-
+tervention. Given an existing LLM-enabled planner, PRISM synthesizes diverse task and textual
+environments,elicitsplansfromtheLLM,thenusestheresultingdatasettofine-tuneanSLMthat
+rivalstheperformanceoftheoriginalplanner,whilebeingextremelycomputeefficient. Wedemon-
+stratePRISM-distilledmodelsacrossplatformsandenvironments.
+videstheLLM-enabledplanneralongwithitsactionandobservationspaces. PRISM thenusesthe
+generateddatasettofine-tuneanSLMthatsharestheoriginalplanner’sinterface,enablingittodi-
+rectlyreplacethesourceLLM.WeoutlinePRISMinFig.1,wesummarizePRISM’scontributions:
+• Effectiveness. PRISMdistillsSLMsthatrivaltheplanningperformanceofasourceLLM-enabled
+planner,suchasGPT-4o,asmeasuredbyplanningsuccessrate.
+• On-devicemodels. PRISM effectivelydistillslanguagemodelsthataresmallenoughtorunon-
+boardrobotcompute. Inthiswork,weconsidermodelswithamemoryfootprintofunder5GB.
+• Minimal human interaction. PRISM requires a high-level configuration comprising the source
+planner’sobservationspace,actionspace,etc.,butitdoesnotrequiremanualdatasetconstruction,
+simulators,detailsaboutthedeploymentenvironment,orotherlaborintensiveinformation.
+We evaluate PRISM across three LLM-enabled planners — SPINE on real-world air and ground
+robots[9], LLM-PlannerintheALFREDsimulator[16,17], andSayCaninamanipulationsimu-
+lator [18]. While undistilled SLMs achieve only 10-20% of GPT-4o’s success rate, PRISM boosts
+performancetoover93%acrossallthreesettings. Moreover,thedistilledSLMscomputeefficiency
+enablesthemtoplanonboardarobotinclosed-loopcontrolsettings. Wealsoreleasedatasets,mod-
+els, and code in order to promote reproducibility. The rest of the paper is structured as follows.
+Weoverviewrelatedworkin§2,describeourframeworkin§3,presentexperimentalresultsin§4,
+provideconcludingremarksin§5,anddiscusslimitationsin§6.
+2 Relatedwork
+LLM-EnabledRobots.LLMshaveemergedasapowerfulenablerofcontextually-awarerobots,as
+evidencedbytheirdeploymentinmobilemanipulation[1,3,2,18,19],servicerobots[6],taskand
+motionplanning[20],autonomousdriving[21,4],anomalydetection[22,23],navigation[14,8,7,
+24],explorationandmapping[9,10],andmulti-robotteaming[25]. Theseworksforegoanymodel
+training;instead,theyconfigureapre-trainedLLMviain-contextexamples. Whileconvenientand
+effective, this approach requires the use of extremely large models (over 100B parameters) — all
+theaboveworksuseGPT-4[11],PALM[26],orsimilar—whicharefartoolargetorunonboarda
+robotandthereforetetherstherobottohigh-qualitynetworkinfrastructure.
+2
+DistillingLLMs. LLMdistillationaimstoretainthecontextualreasoningabilitiesofLLMswhile
+overcomingtheircomputelimitations. ThesemethodstrainanSLMtoemulatethegenerationsof
+a source LLM via supervised fine tuning (SFT) [27, 28, 29], reinforcement learning [30, 31], and
+rankingoptimization[32,33],amongothermethods.ByfinetuningatargetSLMratherthantraining
+from scratch, these methods enjoy significant compute and data efficiency [34]. While traditional
+distillationmethodscurateadatasetofquerieswithwhichtoelicitLLMgenerations,anemerging
+line of self-distillation research uses an LLM to generate both queries and responses [35, 36, 37],
+therebyreducingtheneedfordatasetcuration. Incontrasttopriorself-distillationmethodswhich
+operateinthevirtualdomain, methodsforrobotplanningmustbegrounded inthephysicalworld
+byrespectingrobotaffordances,respondingtosensoryinput,andoperatinginclosed-loopsettings.
+Whileourmethodologydrawsfromgeneraldistillationtechniques,itskeynoveltyliesinaddressing
+theuniquechallengesofrobotplanning,whichpriordistillationworkhasnotconsidered.
+DistillingRobotPlanners.Distillationhasbeenappliedtovirtualplanningdomains,includingweb
+searchorvideogames[38,39,40,41,42].Thesemethodstypicallyusehigh-qualityqueries—such
+asadatasetofinstructions—toelicitplanningexamplesfromanLLM,whicharethenusedtotrain
+asmallermodel.Qiaoetal.[43]applyself-distillationprinciplestothisrealmbybootstrappingdata
+withgenerationsfromanLLM.Recently,roboticisthaveapplieddistillationtechniquestoproblems
+including multi-robot control [44] and manipulation [45]. Of particular note is the work by Ha
+etal.[13],whouseanLLMtogenerateexpertplanswhichareusedtodistillavisuomotorpolicy.
+WhilethesemethodssuccessfullyleveragethecontextualknowledgeofanLLMtotraindownstream
+planners, theystillrequireexternalknowledge—suchasasimulatororcurateddata—andthese
+worksdistillauxiliaryplannersthatcannotreplacethesourceLLM.Incontrast,PRISMsynthesizes
+alltrainingdatadirectlyfromasourceLLM-enabledplanner. TheresultingdistilledSLMisnotan
+auxiliarycomponentbutacompactplannerdesignedtodirectlyreplacethesourceLLM,makingit
+deployableonboardrobotswithoutnetworkreliance.
+3 DistillingOn-deviceLMsforRobotPlanning
+PRISM distillsanSLMthatmimicstheperformanceofanLLM-enabledplannerwithminimalhu-
+man intervention — i.e., without reliance on datasets or simulators. Our key observation is that
+becausetheactionandobservationspacesofanLLM-enabledplanneraretextual,theycanbesyn-
+thesizedandusedtoelicitplansfromtheLLM,andtheresultingdatacanbeusedtotrainanSLM.
+Concretely, PRISM takes as input a source LLM-enabled planner, πLLM(a i |o i ,s), which is condi-
+tionedonataskt,takesanobservationo ,andproducesanactiona ,atplanningiterationi. These
+i i
+input-outputsetsmustbetextuallyrepresented,butweplacenofurtherrestrictionsontheirformat.
+PRISM’sobjectiveistotrainatargetSLM—e.g.,Llama-3.2-3Borsimilar—toproduceaplanner,
+πSLM(a |o ,t)thatmimicsthesourceLLMwhilebeingsignificantlymoreefficient.
+i i
+PRISM comprises three modules — scenario generation, plan elicitation, and planner distillation.
+Thescenariogenerationmodulesynthesizesadiversesetoftasksandenvironments(termed“sce-
+narios,” §3.1). These scenarios are used by the elicitation module to extract plans from the LLM-
+enabled planner, and this process yields a dataset of task-observation-action sequences (§3.2). Fi-
+nally, the planner distillation module uses this synthesized dataset to train a target SLM via SFT
+(§3.3). Wediscusseachmoduleindetailbelow.
+3.1 ScenarioGeneration
+The scenario generation module takes as input the LLM-enabled planner’s action and observation
+spaces and produces scenarios comprising environments — which produce observations for the
+planner — and semantically coherent tasks. We instantiate this module with an LLM (GPT-4o),
+given their generative abilities. This scenario generation LLM is prompted with the observation
+formatalongwiththedesiredenvironmentsizeandnumberoftasks,whicharehyperparametersof
+thismodule.Thisgenerationprocedure,combinedwithahightemperature(1inourwork),promotes
+datadiversity. Weprovidethehigh-levelformat;pleaseseetheappendixforthefullprompt:
+3
+LLM Scenario generator Data sample
+Description: Costal scene Task: Can I cross the river?
+Environment: {objects: boat, dock
+regions: road, river Observation: {dock, road}
+…}
+Tasks: [Can I cross the river? …]
+Masked Environment Action: map(dock)
+{objects: boat, dock
+regions: road, river} Observation: add(boat)
+action observation Action: answer(yes, I found a boat)
+πLLM
+Description: Costal scene
+Environment: {objects: boat, dock
+regions: road, river
+…}
+Tasks: [Can I cross the river? …]
+Scenario Data Sample
+Description: Masked Environment Task: Can I cross the river?
+coastal scene {objects: boat, dock
+regions: road, river} Observation: {dock, road}
+Scenario Environment: Action: map(dock)
+generation LLM {objects: boat, dock observation action
+regions: road, river} Observation: add(boat)
+Task:
+πLLM Action: answ
+b
+e
+o
+r
+a
+(
+t
+y
+)
+es, I found a
+Can I cross the river?
+Collect rollout
+Synthesized data Response from LLM-enabled planner
+Figure 2: Synthesizing a data sample: The scenario generator synthesizes an environment and se-
+manticallycoherenttask. Theenvironmentismasked,yieldinganinitialpartialobservationforthe
+LLM-enabledplanner. Giventhistaskandpartialobservation,theLLM-enabledplanneriteratively
+providesactionsandreceivesnewobservationsuntilthetaskiscomplete. Thisrolloutiscollected
+asadatasampleandaddedtothesynthesizeddataset.
+You are generating data for training an llm-enabled planner.
+The planner takes observations in the following format: <OBSERVATION>.
+Generate an environment of size <SIZE> with <N_TASKS> corresponding tasks
+and a description of the scenario.
+Alongwithenvironmentsandtasks,thegeneratorprovidesadescriptiontoenforcesemantic
+coherence. Allgenerationsareverifiedtoensureenvironmentsadheretotherepresentationrequired
+bythesourceplanner;thegeneratorisre-promptedifitprovidesanerroneousenvironment.
+In our instantiation of PRISM, we consider two observation representations. First, we consider a
+scenegraphwithnodesoftyperegionorobject;objectnodesrepresentsemanticentities,while
+regionnodesaretraversablepointsinthescene. Edgesinthegrapharedefinedbetweentwore-
+gions(“regionnodes”)oranobjectandaregion(“objectnodes”). Regionedgesindicatetraversable
+paths,whileobjectedgesindicatevisibilityfromaparticularlocation. Nodescanalsobeenriched
+withsemanticdescriptionsderivedfromavision-languagemodelorsimilarperceptionsystem. We
+next consider object sets — a popular representation for manipulation and instruction-following
+tasks—whichdefineallobjectsaccessiblebytheplanner. Ifusingthescenegraphrepresentation,
+anoutputfromthescenariogenerationLLMwouldlooklikethefollowing:
+Scenariogenerationformat Graphicalenvironmentrepresentation
+{"description": "scene description", {"regions": ["..."],
+"environment": "environment", "objects": ["..."],
+"task": ["task_1", "task_2", "..."]} "edges": ["..."]}
+3.2 PlanElicitation
+Given the generated scenarios, the plan elicitation module extracts plans from the source LLM-
+enabledplannerviathreesteps—environmentmasking,closed-loopplanningemulation,andplan
+validation. Environment masking produces a partial observation, o1, for the planner by hiding a
+randomizedportionoftheenvironment—i.e.,removingnodesandedgesfromagraph,removing
+objects from a set, etc.. The plan elicitation module then emulates closed-loop planning by using
+theprovidedactionspace. Eachactiondefinessomeoperationontheenvironment—forexample,
+a map action may reveal previously unobserved objects, a goto action would change the robots
+location,etc. Theplanelicitationmoduleusesthisaction-observationrelationshiptosimulatewhat
+the planner would have seen had it taken a certain action in a synthesized environment — i.e.,
+observation oi+1 given action ai and the synthesized environment. In our instantiation of PRISM,
+we consider actions for mapping, navigation, and object interaction, though more actions may be
+consideredifneeded.Giventhisabilitytoemulateclosed-loopplanning,themoduleseedstheLLM-
+4
+enabledplannerwiththeinitialobservationanditeratesuntiltermination. Terminationoccurswhen
+the planner signals task completion (e.g., via a done action) or a reaches a pre-defined maximum
+number of planning iterations. Should the planner timeout, we consider the sample invalid. This
+simplevalidationprocedurehassignificanteffectsondistilledSLMperformance(see§4.4),andthis
+processyieldsarolloutofobservation-pairsthatiscollectedintodataset:
+D ={s ,(o1,a1,...,oT,aT)}N (1)
+i i i i i i=1
+where N is the number of scenarios, and T is the plan trajectory length (which may differ across
+scenarios). WeprovideanexampleofplanelicitationprocedureinFig.2.
+3.3 PlannerDistillation
+Given the dataset D, the planner distillation module trains the target SLM-enabled planner πSLM
+usingsupervisedfine-tuning(SFT),minimizingthecrossentropyovereveryactiona1...aT:
+i i
+N T
+min 1 (cid:88)(cid:88) CE (cid:0) πSLM(cid:0) at|s ,o1,a1,...ot−1.at−1(cid:1) , at(cid:1) (2)
+πSLM N i i i i i i i
+i=1 t=1
+Eachactionpredictionutilizesthecumulativecontextofallprecedingobservation-actionpairs. We
+trainonallactionsjointly,whichhasshownimprovedefficiencywithoutperformancedegradation
+compared to more elaborate training schemes in multi-turn SFT of LMs [46]. Since the objective
+in Eq. 2 only involves actions from the LLM planner, it can be evaluated in a single forward-pass
+without the overhead of autoregressive sampling of SLM actions. To reduce GPU memory foot-
+printduringfinetuning,weleverageLoRA[34],apopularparameterefficientfinetuningtechnique.
+LoRAaddsalowranktrainableupdatetopre-trainedmodelweights, therebyshrinkingoptimizer
+states. Fora3billionparameterLlama,LoRAwithrank8requiresonly6milliontrainableparam-
+eters. Since updates can be merged with the weights, it incurs no additional inference cost. And
+whilePRISM’sprimaryobjectiveistoproduceasmalllanguagemodelforrobotplanning,employ-
+ingefficientoptimizationtechniquesisafurtheradvantageofourmethod.
+4 ExperimentalResults
+We evaluate PRISM in order to assess how well it fulfills the contributions outlined in §1. By de-
+sign, PRISM requires minimal human intervention, and we empirically evaluate the second two
+contributions. First,weevaluateeffectiveness:doesPRISMdistillSLM-enabledplannerswithcom-
+parable performance to the source LLM-enabled planner? We then evaluate efficiency: do the
+producedmodelsrunon-deviceinreal-time? Wealsomeasuretheimpactoftwokeycomponents
+of our data synthesis pipeline — environment masking and plan validation. We evaluate PRISM
+overthreeLLM-enabledplanners[9,18,16]indistinctenvironmentsandtaskswiththefollowing
+methodology. We first evaluate the planner using an LLM, as it was original designed. We then
+replacetheplanner’sLLMwithanSLM,andwemeasureperformance. Finally,weapplyPRISMto
+theplanner,andwemeasuretheperformanceoftheplannerwhileusingthePRISM-distilledSLM.
+4.1 Experimentalsetup
+WeconsiderthefollowingthreeLLM-enabledplanners. Foreachplanner,wedescribetheevalua-
+tiontasksandexperimentalenvironments,asoutlinedinFig.3.
+SPINE[9]isdesignedforlanguage-drivennavigation,mappingandexplorationinpartially-known
+andunstructuredenvironments. Theplanneroperatesinaclosed-loopmanner: activelymappingits
+sceneandupdatingitsplanbasedonitsfindings.
+• Tasks. Weconsidertwolevelsofdifficulty. First, weevaluateagainstfully-specified tasksthat
+directlyreferenceactionsandsemanticsinthescene(i.e.,“inspectthedesk”). Next,weevaluate
+againstunder-specifiedtasksthatrequiretheplannertoinferrelevantactionsandsemantics(i.e.,
+“findmeaplacetowork”). Weconsider20indoorUGVtasks,15outdoorUGVtasks,and10
+UAVtasks,splitevenlybetweenfully-andunder-specifiedvariants.
+5
+Mapping and exploration Home assistance Manipulation
+Environments Platforms Environments Environments
+Outdoor UAV Living room Manipulation
+Kitchens
+Indoor
+UGV
+Bedrooms
+Figure3: WeevaluatePRISMonthreedistinctLLM-enabledplanningdomains: mappingandex-
+ploration,homeassistance,andmanipulation. Left: SPINE[9]inbothindoorandoutdoorenviron-
+mentsonbotUAVsandUGVs. Middle: LLM-Planner[16]tohouseholdtasksintheALFRED[17]
+simulator. Right: SayCan[18]tomanipulationtasks.
+• Environments. WeevaluateSPINEinbothindoorandoutdoorenvironmentswiththefollowing
+levelsofdifficulty: mappingtasksrequiretherobottocollectsemanticinformation,andexplo-
+rationtasksrequiretherobottocollectbothmetricandsemanticinformation—i.e,explorefree
+space. Weconsider15explorationtasksand30mappingtasks.
+SayCan [1] is a hierarchical language-guided planner that combines an LLM’s task-level reason-
+ing with lower-level affordance estimates. Instead of token-wise probabilities used in the original
+setting,weprompttheLLMtogeneratecandidateactionsconsistentwithourframework’stextual
+input–outputplannerabstraction.
+• Tasks.Arobotarmistaskedwithrearrangingcoloredbowlsandboxesonatable.Intheabsence
+ofanopen-sourcebenchmark,wedesigntwentytasks,eachrenderedinmultiplescenevariants.
+Following [47], we introduce Attribute ambiguity — replacing canonical terms with synonyms
+— and Numeric ambiguity — swapping exact counts for vague phrases such as a “some.” We
+also include more challenging variants with arithmetic constraints, color–based negation, and
+loadbalancing,forcingtheplannertoreasonoverthesespecifications. SeeAppendixfordetails.
+• Environments. WeusethePyBullet[48]simulator. Foreachtask,wecreatemultipleenviron-
+mentswithdifferentconfigurationsofcoloredblocksandbowls,andrandomizedplacings.
+LLM-Planner [16] casts language-driven household manipulation tasks as few-shot text-to-plan
+generation. TheplannerqueriesanLLM(GPT4)withthetaskspecification,anobject-setdescrip-
+tionoftheobservedenvironment,and9in-contextexamples;thesein-contextexamplesarechosen
+bymatchingLLMembeddingsbetweentheinputtaskandapre-definedsetof100expertdemonstra-
+tions.TheLLMreturnsasequenceofsemanticsub-goals(e.g.,Navigation fridge,OpenObject
+fridge)which,iffeasible,arerealizedbyalower-levelcontroller
+• Tasks. We consider tasks from Action Learning From Realistic Environments and Directives
+(ALFRED)[17]. WeevaluateonthesevenALFREDtemplates: Pick&Place, Stack&Place,
+Pick-Two & Place, Clean & Place, Heat & Place, Cool & Place, and Examine-in-Light, and
+we report results in the Validation split. Directives provide only a single goal sentence, so the
+plannermustinferallconcreteactions.
+• Environments. ExperimentsarerunintheunseensplitofALFRED–i.e.,environmentsdiffer
+from the in-context examples from the training set – comprising eight AI2-THOR [49] homes
+with kitchens, bedrooms, bathrooms, and living rooms. The agent must explore cluttered, par-
+tiallyobservableroomscontainingupto115objecttypes.
+Baselinesandtraining:WecomparePRISMagainsttheaboveplannersequippedwiththefollowing
+language models: GPT-4o (LLM) and Llama-3.2-3B (SLM), which we choose because of their
+6
+Has rain damaged the roof? UAV mapping and exploration Place the green and red blocks on top Manipulation
+of their matching bows
+PRISM PRISM
+Reason: The user is likely robot.pick_and_place(green block, green bowl)
+UAV observation referring to the roof of robot.pick_and_place(red block, red bowl)
+the building done()
+Plan: map(building)
+SLM
+SLM pick red block, pick green block
+Reason: I will explore connections place red block on top of red bowl
+to look for a roof place green block on top of green bowl
+done()
+Find my silver car UGV mapping and exploration Put a heated apple next to the lettuce Household assistance
+on the middle shelf in the refrigerator.
+PRISM PRISM
+Reason: I will inspect the car to PickupObject apple, PutObject apple microwave
+find out . OpenObject microwave, Navigation fridge,
+Plan: inspect(car) PutObject apple fridge
+UGV observation
+SLM SLM
+Reason: I will assume the car is PickupObject Apple,
+not damaged. PutObject Apple in Microwave
+Plan: answer(no) [FAILED]
+Figure4: Inthefollowingexamples, PRISM completesthetask,andwehighlightfailuremodesof
+the SLM. Top right: SLM does not identify semantic targets. Top left: SLM incorrectly invokes
+plannerAPIandmistakeslogicalordering;twoblockscannotbesimultaneouslyhelpbytherobot.
+Bottom right: SLM makes unwarrented assumptions about the environment. Bottom left: SLM
+incorrectlyinvokesAPIandtheplanterminates.
+Put a heated apple next to the lettuce on the middle shelf in the refrigerator.
+widespreaduseandcompetitiveperformancewithintheirsizeclass; wedefercomparativestudies
+to future work. Moreover, the selected models have acceptable latency for the experimental setup
+mentionedabove. Together,thesebaselinesallowustomeasureboththecomparativeimprovement
+PRISM provides over a base SLM relative to a SoTA LLM. PRISM’s trains on 3,200 examples for
+SPINE,1,500examplesforSayCan,and1000examplesforLLM-Planner.
+HardwarePlatforms.WeevaluateSPINEontwo
+physical platforms. First, we consider a UGV —
+Successrate(%)
+a Clearpath Jackal — equipped with an Ouster Method SPINE[9] SayCan[1] LLM-Planner[16]
+OS1-64 LiDAR and ZED-2i for object detection SLM 13.54 10.0 1.76
+and obstacle avoidance, and compute comprising PRISM 92.00 50.0 15.54
+LLM 98.07 50.0 16.49
+a Ryzen 5 3600 CPU and an Nvidia RTX 4000
+SSF Ada GPU. Second, we consider the Falcon Table 1: Comparison of SLM, PRISM, and
+4 UAV, equipped with a downward-facing RGB GPT-4o in SPINE [50], SayCan [18], and
+cameraandanNvidiaJetsonOrinNXcomputer. LLM-Planner[16]
+4.2 ModelEffectiveness
+We report success across all three planners in
+Table1. GPT-4oachievesa98.07%,50%,and
+Fully-specified(%) Under-specified(%)
+16.49% success rate across SPINE, SayCan,
+LLM Ours SLM LLM Ours SLM
+and LLM-Planner respectively, which match
+Mapping 100 100 50 100 90 0
+trends from the original publications (SayCan
+Exploration 100 87.5 0 83.3 75 0
+isslightlylowerduetoourcustombenchmark).
+Without distillation, SLM achieves 13.54%, Table2:Planningsuccessrateinvaryinglevelsof
+10%, and 1.76% success. PRISM boosts this environmentandtaskdifficulty
+performanceto92%,50%,and15.54%,which
+amounts to at least a 93% increase across all three planners. Qualitatively, PRISM addresses two
+primaryfailuremodesoftheSLM.First,theSLMwillprovideafeasibleplan(i.e.,usingthecorrect
+syntax), but the plan will be semantically incorrect. In the second failure mode, the SLM fails to
+provideavalidplanaltogether. WehighlightcomparativeexamplesinFig.4.
+We then analyze performance over varying levels of task and environment difficulty in SPINE, as
+reportedinTab.2. Intheeasiestscenarios—fullyspecifiedmappingtasks—GPT-4oand PRISM
+both achieve 100% success rate, while SLM only achieves 50% success. We observe a modest
+(10%) performance decrease for PRISM in under-specified tasks. Exploration presents the most
+7
+difficultsettingforallmodels. PRISM’sperformancedropsto75%inunder-specifiedexploration,
+whileGPT-4oonlyachieved83.3%success. Notably, SLMperformancedropsto0%indifficulty
+settings beyond fully-specified mapping missions. These results suggest that spatial reasoning is
+stillcomparativelydifficultforLLM-enabledplanners,andPRISMinheritsthisweakness.
+4.3 Modelefficiency
+We next perform latency analysis between PRISM-
+distilled models and GPT-4o — our baseline LLM
+—usingSPINErunningontheUGV(see§4.1). We
+measure the latency of 60 PRISM queries, and we
+comparethisto60GPT-4oqueriesunderthefollow-
+ingnetworksimulations.Ethernet-Minimallatency
+corresponds to the best scenario for querying GPT-
+4o, where the robot is connected to the internet us-
+ing an ethernet connection. The round-trip time to
+openai.comis6.7ms,andweobtainameanquery
+time of 3.64 s, with a standard deviation of 2.25 s.
+Ethernet-200msadds100msoflatencytoeachre-
+ceivedandtransmittedpacketusingtheutilitytraffic Figure5:LatencycomparisonbetweenGPT-
+controller for Linux [51], which simulates the con- 4oandPRISM
+ditionsofarobotusingsatelliteinternetservicesand
+mesh networks. In this setting, we obtain a mean query time of 4.90 s, with a standard deviation
+of1.73s. Fig.5showsadensityestimateforthedifferentevaluatedmethods. Weobservethatthe
+latency of PRISM is within 200 ms of GPT-4o under ideal conditions. PRISM is more than 1 sec-
+ondfasterthanGPT-4ounderrealisticdeploymentconditions,whileexhibitinglessvariance. This
+highlightsamajoradvantageofPRISM: besidesbeingabletooperatewithoutanynetwork,itoffers
+moredeterministiclatencyasitdoesnotdependonuncertaintiesinthenetworkconditions.
+4.4 Importanceofenvironmentmaskingandplanvalidation
+Finally,wemeasuretheimportanceoftwokeycomponentsofour
+data synthesis framework — environment masking and plan vali-
+Method Success
+dation—byablatingthesecomponents. Weevaluateperformance
+Ours 90.9%
+acrosseleventasksandenvironmentssampledfromthelargercol- (-)environmentmasking 63.6%
+(-)validation 45.5%
+lection described in §4.1, and we report result in Tab. 2. Without
+environment masking, performance decrease by 27.3% to 63.6%. Table 3: Data synthesis abla-
+Havingnotbeentrainedwithinteractivedata, thethisvariantfails tion
+whensuccessrequiremanyplanningiterations. Withoutvalidation,
+performance drops by nearly half to 45.5%. The no-validation variant mimics failure modes from
+sourceLLMnotproperlyreactingtonewobservationsandrepeatedlycallingthesame,ineffective
+action;thesefailuremodesaretypicallyfilteredoutwithvalidation.
+5 Conclusion
+Wepresent PRISM, aframeworkfordistillingeffectiveSLM-enabledrobotplannerswithminimal
+human interaction. Given a source LLM-enabled planner, PRISM synthesizes tasks and environ-
+ments, elicits plans from the LLM-enabled planner in these synthesized environments, and then
+usestheresultingdatatotrainanSLM-enabledplannerthatservesasadrop-inreplacementforthe
+sourcemodel. Weevaluate PRISM’sabilitytodistillSLMsthatrivaltheperformanceofLLMson
+three distinct planning domains. We find that while an undistilled SLM (Llama-3.2-3B) achieves
+between10-20%performanceofGPT-4o,PRISMbooststhistoover93%usingonlysyntheticdata,
+and we successfullydeploy PRISM-distilled modelsfor planning on air andground robots. Future
+workmayinvestigatemethodsforsynthesizinghigherqualitydata—inparticular, datathatleads
+toimprovedspatialreasoningofthedistilledSLMs.
+8
+6 Limitations
+We identify two primary limitations to our work. Firstly, we consider LLM-enabled planners that
+operate over atomic action primitives, such as those for navigation, mapping, and manipulation.
+Whilesuchactionspacesencompassalargeportionoftheexistingliterature[3,9,10,18,52,2,8],
+aclassofLLM-enabledplannersuseformallanguages,code,orotheractionrepresentations[19,53,
+54]. Becausethelatteractionrepresentationsarestilltextual,PRISMislikelycomparablewiththese
+methods,thoughfutureworkshouldvalidatethishypothesis. Secondly,recentworkhasshownthat
+even frontier LLMs can produce harmful robotic actions [55]. We anticipate that PRISM inherits
+thesesafetyvulnerabilities,andweproposetwomitigationstrategies. Intheshortterm,ourworkis
+compatiblewithrecently-proposedsafeguardsforLLM-enabledrobots[50,56,57].Futureresearch
+couldalsodirectlyincorporatesafetyobjectivesintoPRISM’sdistillationprocess[30,58].
+Acknowledgments
+WegratefullyacknowledgesupportfromtheDistributedandCollaborativeIntelligentSystemsand
+Technology(DCIST),NSFGrantCCR-2112665,DARPASAFRONgrantHR0011-25-3-0135,and
+the NSF Graduate Research Fellowship. We thank Antonio Loquercio and Dinesh Jayaraman for
+theirsupportduringtheinceptionofthisworkinESE6800: RealWorldRobotLearning,andVarun
+MuraliandAnishBhattacharyafortheirhelpfulfeedbackonthemanuscript.
+References
+[1] B.Chen,F.Xia,B.Ichter,K.Rao,K.Gopalakrishnan,M.S.Ryoo,A.Stone,andD.Kappler.
+Open-vocabulary queryable scene representations for real world planning. In arXiv preprint
+arXiv:2209.09874,2022.
+[2] D.Honerkamp,M.Bu¨chner,F.Despinoy,T.Welschehold,andA.Valada.Language-grounded
+dynamicscenegraphsforinteractiveobjectsearchwithmobilemanipulation. arXivpreprint
+arXiv:2403.08605,2024.
+[3] K. Rana, J. Haviland, S. Garg, J. Abou-Chakra, I. Reid, and N. Suenderhauf. Sayplan:
+Grounding large language models using 3d scene graphs for scalable task planning. In 7th
+AnnualConferenceonRobotLearning,2023. URLhttps://openreview.net/forum?id=
+wMpOMO0Ss7a.
+[4] M. Omama, P. Inani, P. Paul, S. C. Yellapragada, K. M. Jatavallabhula, S. Chinchali, and
+M. Krishna. Alt-pilot: Autonomous navigation with language augmented topometric maps.
+arxiv:2310.02324,2023.
+[5] B.Li,Y.Wang,J.Mao,B.Ivanovic,S.Veer,K.Leung,andM.Pavone. Drivingeverywhere
+withlargelanguagemodelpolicyadaptation. CVPR,2024.
+[6] Z.Hu,F.Lucchetti,C.Schlesinger,Y.Saxena,A.Freeman,S.Modak,A.Guha,andJ.Biswas.
+Deploying and Evaluating LLMs to Program Service Mobile Robots. IEEE Robotics and
+AutomationLetters,2024. doi:10.1109/LRA.2024.3360020.
+[7] D. Shah, B. Osin´ski, b. ichter, and S. Levine. Lm-nav: Robotic navigation with large pre-
+trainedmodelsoflanguage,vision,andaction. InK.Liu,D.Kulic,andJ.Ichnowski,editors,
+ProceedingsofThe6thConferenceonRobotLearning,volume205ofProceedingsofMachine
+LearningResearch,pages492–504.PMLR,14–18Dec2023. URLhttps://proceedings.
+mlr.press/v205/shah23b.html.
+[8] D. Shah, M. R. Equi, B. Osin´ski, F. Xia, B. Ichter, and S. Levine. Navigation with Large
+LanguageModels: SemanticGuessworkasaHeuristicforPlanning. InJ.Tan,M.Toussaint,
+and K. Darvish, editors, ProceedingsofThe7thConferenceonRobotLearning, volume 229
+ofProceedingsofMachineLearningResearch,pages2683–2699.PMLR,06–09Nov2023.
+9
+[9] Z. Ravichandran, V. Murali, M. Tzes, G. J. Pappas, and V. Kumar. SPINE: Online Seman-
+tic Planning for Missions with Incomplete Natural Language Specifications in Unstructured
+Environments. InternationalConferenceonRoboticsandAutomation(ICRA),2025.
+[10] M.FadhilGinting,D.-K.Kim,S.-K.Kim,B.J.Krishna,M.J.Kochenderfer,S.Omidshafiei,
+and A.-a. Agha-mohammadi. SayComply: Grounding Field Robotic Tasks in Operational
+Compliance through Retrieval-Based Language Models. arXiv e-prints, pages arXiv–2411,
+2024.
+[11] OpenAI. Gpt-4 technical report. Technical report, OpenAI, 2023. URL https://cdn.
+openai.com/papers/gpt-4.pdf.
+[12] A.Grattafiori,A.Dubey,A.Jauhri,A.Pandey,A.Kadian,A.Al-Dahle,A.Letman,A.Mathur,
+A.Schelten,A.Vaughan,etal. Thellama3herdofmodels. arXivpreprintarXiv:2407.21783,
+2024.
+[13] H. Ha, P. Florence, and S. Song. Scaling up and distilling down: Language-guided robot
+skill acquisition. In J. Tan, M. Toussaint, and K. Darvish, editors, Proceedings of The 7th
+Conference on Robot Learning, volume 229 of Proceedings of Machine Learning Research,
+pages 3766–3777. PMLR, 06–09 Nov 2023. URL https://proceedings.mlr.press/
+v229/ha23a.html.
+[14] Z. Dai, A. Asgharivaskasi, T. Duong, S. Lin, M.-E. Tzes, G. Pappas, and N. Atanasov. Op-
+timalscenegraphplanningwithlargelanguagemodelguidance. In2024IEEEInternational
+ConferenceonRoboticsandAutomation(ICRA),pages14062–14069.IEEE,2024.
+[15] B.Liu,Y.Jiang,X.Zhang,Q.Liu,S.Zhang,J.Biswas,andP.Stone. LLM+P:Empowering
+LargeLanguageModelswithOptimalPlanningProficiency.arXivpreprintarXiv:2304.11477,
+2023.
+[16] C.H.Song,J.Wu,C.Washington,B.M.Sadler,W.-L.Chao,andY.Su. Llm-planner: Few-
+shot grounded planning for embodied agents with large language models. In Proceedings of
+theIEEE/CVFInternationalConferenceonComputerVision(ICCV),October2023.
+[17] M. Shridhar, J. Thomason, D. Gordon, Y. Bisk, W. Han, R. Mottaghi, L. Zettlemoyer, and
+D.Fox. ALFRED:ABenchmarkforInterpretingGroundedInstructionsforEverydayTasks.
+In The IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 2020. URL
+https://arxiv.org/abs/1912.01734.
+[18] M.Ahn,A.Brohan,N.Brown,Y.Chebotar,O.Cortes,B.David,C.Finn,C.Fu,K.Gopalakr-
+ishnan, K. Hausman, A. Herzog, D. Ho, J. Hsu, J. Ibarz, B. Ichter, A. Irpan, E. Jang, R. J.
+Ruano, K. Jeffrey, S. Jesmonth, N. Joshi, R. Julian, D. Kalashnikov, Y. Kuang, K.-H. Lee,
+S.Levine,Y.Lu,L.Luu,C.Parada,P.Pastor,J.Quiambao,K.Rao,J.Rettinghouse,D.Reyes,
+P. Sermanet, N. Sievers, C. Tan, A. Toshev, V. Vanhoucke, F. Xia, T. Xiao, P. Xu, S. Xu,
+M.Yan,andA.Zeng. Doasicanandnotasisay:Groundinglanguageinroboticaffordances.
+InarXivpreprintarXiv:2204.01691,2022.
+[19] J. Liang, W. Huang, F. Xia, P. Xu, K. Hausman, B. Ichter, P. Florence, and A. Zeng.
+Code as policies: Language model programs for embodied control. In arXiv preprint
+arXiv:2209.07753,2022.
+[20] Y.Chen,J.Arkin,Y.Zhang,N.Roy,andC.Fan. Autotamp: Autoregressivetaskandmotion
+planningwithllmsastranslatorsandcheckers. arXivpreprintarXiv:2306.06531,2023.
+[21] S.Sharan,F.Pittaluga,V.KumarBG,andM.Chandraker. LLM-Assist: EnhancingClosed-
+LoopPlanningwithLanguage-BasedReasoning. arXivpreprintarXiv:2401.00125,2023.
+10
+[22] A.Tagliabue,K.Kondo,T.Zhao,M.Peterson,C.T.Tewari,andJ.P.How. Real: Resilience
+andadaptationusinglargelanguagemodelsonautonomousaerialrobots.ConferenceonRobot
+Learning(CoRL),2023.
+[23] R.Sinha,A.Elhafsi,C.Agia,M.Foutter,E.Schmerling,andM.Pavone. Real-TimeAnomaly
+Detection and Reactive Planning with Large Language Models. In Robotics: Science and
+Systems,2024.
+[24] Q.Xie,T.Zhang,K.Xu,M.Johnson-Roberson,andY.Bisk. Reasoningabouttheunseenfor
+efficientoutdoorobjectnavigation. arxiv:2309.10103,2023.
+[25] S. S. Kannan, V. L. N. Venkatesh, and B.-C. Min. SMART-LLM: Smart Multi-Agent Robot
+TaskPlanningusingLargeLanguageModels. In2024IEEE/RSJInternationalConferenceon
+IntelligentRobotsandSystems(IROS),pages12140–12147,2024. doi:10.1109/IROS58592.
+2024.10802322.
+[26] A. Chowdhery, S. Narang, J. Devlin, M. Bosma, G. Mishra, A. Roberts, P. Barham, H. W.
+Chung, L. Hou, B. Lester, et al. Palm: Scaling language modeling with pathways. arXiv
+preprintarXiv:2204.02311,2022.
+[27] R.Taori,I.Gulrajani,T.Zhang,Y.Dubois,X.Li,C.Guestrin,P.Liang,andT.B.Hashimoto.
+Stanfordalpaca:Aninstruction-followingllamamodel.https://github.com/tatsu-lab/
+stanford_alpaca,2023.
+[28] W.-L. Chiang, Z. Li, Z. Lin, Y. Sheng, Z. Wu, H. Zhang, L. Zheng, S. Zhuang, Y. Zhuang,
+J. E. Gonzalez, I. Stoica, and E. P. Xing. Vicuna: An open-source chatbot impress-
+ing gpt-4 with 90%* chatgpt quality, March 2023. URL https://lmsys.org/blog/
+2023-03-30-vicuna/.
+[29] M.Wu,A.Waheed,C.Zhang,M.Abdul-Mageed,andA.F.Aji. Lamini-lm: Adiverseherd
+ofdistilledmodelsfromlarge-scaleinstructions. CoRR,abs/2304.14402,2023. URLhttps:
+//arxiv.org/abs/2304.14402.
+[30] Y.Bai,S.Kadavath,S.Kundu,A.Askell,J.Kernion,A.Jones,A.Chen,A.Goldie,A.Mirho-
+seini, C.McKinnon, etal. Constitutionalai: Harmlessnessfromaifeedback. arXivpreprint
+arXiv:2212.08073,2022.
+[31] G.Cui,L.Yuan,N.Ding,G.Yao,B.He,W.Zhu,Y.Ni,G.Xie,R.Xie,Y.Lin,etal.Ultrafeed-
+back: Boosting language models with scaled ai feedback. arXiv preprint arXiv:2310.01377,
+2023.
+[32] R. Rafailov, A. Sharma, E. Mitchell, C. D. Manning, S. Ermon, and C. Finn. Direct pref-
+erence optimization: Your language model is secretly a reward model. Advances in Neural
+InformationProcessingSystems,36:53728–53741,2023.
+[33] F. Song, B. Yu, M. Li, H. Yu, F. Huang, Y. Li, and H. Wang. Preference ranking optimiza-
+tionforhumanalignment. InProceedingsoftheAAAIConferenceonArtificialIntelligence,
+volume38,pages18990–18998,2024.
+[34] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen, et al. Lora:
+Low-rankadaptationoflargelanguagemodels. ICLR,2022.
+[35] C. Liu, Y. Kang, F. Zhao, K. Kuang, Z. Jiang, C. Sun, and F. Wu. Evolving knowledge dis-
+tillation with large language models and active learning. arXiv preprint arXiv:2403.06414,
+2024.
+[36] C.Baykal,K.Trinh,F.Iliopoulos,G.Menghani,andE.Vee. Robustactivedistillation. arXiv
+preprintarXiv:2210.01213,2022.
+11
+[37] Y. Wang, Y. Kordi, S. Mishra, A. Liu, N. A. Smith, D. Khashabi, and H. Hajishirzi.
+Self-instruct: Aligning language models with self-generated instructions. arXiv preprint
+arXiv:2212.10560,2022.
+[38] B.Chen,C.Shu,E.Shareghi,N.Collier,K.Narasimhan,andS.Yao.Fireact:Towardlanguage
+agentfine-tuning. arxiv:2310.05915,2023.
+[39] A. Zeng, M. Liu, R. Lu, B. Wang, X. Liu, Y. Dong, and J. Tang. Agenttuning: Enabling
+generalizedagentabilitiesforllms. arxiv:2310.12823,2023.
+[40] D.Yin,F.Brahman,A.Ravichander,K.Chandu,K.-W.Chang,Y.Choi,andB.Y.Lin.Lumos:
+LearningAgentswithUnifiedData,ModularDesign,andOpen-SourceLLMs. arXivpreprint
+arXiv:2311.05657,2023.
+[41] Y.Kong,J.Ruan,Y.Chen,B.Zhang,T.Bao,S.Shi,G.Du,X.Hu,H.Mao,Z.Li,X.Zeng,
+andR.Zhao. Tptu-v2: Boostingtaskplanningandtoolusageoflargelanguagemodel-based
+agentsinreal-worldsystems,2023. URLhttps://arxiv.org/abs/2311.11315.
+[42] W.Choi,W.K.Kim,M.Yoo,andH.Woo. Embodiedcotdistillationfromllmtooff-the-shelf
+agents. arXivpreprintarXiv:2412.11499,2024.
+[43] S.Qiao, N.Zhang, R.Fang, Y.Luo, W.Zhou, Y.E.Jiang, C.Lv, andH.Chen. AUTOACT:
+automatic agent learning from scratch via self-planning. CoRR, abs/2401.05268, 2024. doi:
+10.48550/ARXIV.2401.05268. URLhttps://doi.org/10.48550/arXiv.2401.05268.
+[44] J.Liu,C.Xu,P.Hang,J.Sun,M.Ding,W.Zhan,andM.Tomizuka. Language-drivenpolicy
+distillationforcooperativedrivinginmulti-agentreinforcementlearning,2024. URLhttps:
+//arxiv.org/abs/2410.24152.
+[45] L.Zha, Y.Cui, L.-H.Lin, M.Kwon, M.G.Arenas, A.Zeng, F.Xia, andD.Sadigh. Distill-
+ing and retrieving generalizable knowledge for robot manipulation via language corrections.
+In 2024 IEEE International Conference on Robotics and Automation (ICRA), pages 15172–
+15179,2024. doi:10.1109/ICRA57147.2024.10610455.
+[46] Z.Teng,Y.Song,X.Ye,andY.Ouyang.Fine-tuningllmsformulti-turndialogues:optimizing
+cross-entropylosswithkldivergenceforallroundsofresponses. InProceedingsofthe2024
+16thInternationalConferenceonMachineLearningandComputing,pages128–133,2024.
+[47] A. Z. Ren, A. Dixit, A. Bodrova, S. Singh, S. Tu, N. Brown, P. Xu, L. Takayama, F. Xia,
+J. Varley, et al. Robots that ask for help: Uncertainty alignment for large language model
+planners. arXivpreprintarXiv:2307.01928,2023.
+[48] E.CoumansandY.Bai. Pybullet,apythonmoduleforphysicssimulationforgames,robotics
+andmachinelearning,2016.
+[49] E. Kolve, R. Mottaghi, W. Han, E. VanderBilt, L. Weihs, A. Herrasti, M. Deitke, K. Ehsani,
+D.Gordon,Y.Zhu,etal. Ai2-thor: Aninteractive3denvironmentforvisualai. arXivpreprint
+arXiv:1712.05474,2017.
+[50] Z.Ravichandran,A.Robey,V.Kumar,G.J.Pappas,andH.Hassani. Safetyguardrailsforllm-
+enabled robots. arXiv preprint arXiv:2503.07885, 2025. URL https://arxiv.org/abs/
+2503.07885.
+[51] 2023. URLhttps://wiki.linuxfoundation.org/networking/iproute2.
+[52] C. Huang, O. Mees, A. Zeng, and W. Burgard. Visual language maps for robot navigation.
+In 2023 IEEE International Conference on Robotics and Automation (ICRA), pages 10608–
+10615,2023. doi:10.1109/ICRA48891.2023.10160969.
+12
+[53] J. X. Liu, Z. Yang, I. Idrees, S. Liang, B. Schornstein, S. Tellex, and A. Shah. Lang2ltl:
+Translatingnaturallanguagecommandstotemporalrobottaskspecification. InConferenceon
+RobbotLearning(CoRL),2023. URLhttps://arxiv.org/abs/2302.11649.
+[54] Y.Chen,R.Gandhi,Y.Zhang,andC.Fan. Nl2tl: Transformingnaturallanguagestotemporal
+logicsusinglargelanguagemodels. arXivpreprintarXiv:2305.07766,2023.
+[55] A. Robey, Z. Ravichandran, V. Kumar, H. Hassani, and G. J. Pappas. Jailbreaking llm-
+controlledrobots. arXivpreprintarXiv:2410.13691,2024.
+[56] B.Quartey,E.Rosen,S.Tellex,andG.Konidaris. Verifiablyfollowingcomplexrobotinstruc-
+tionswithfoundationmodels. arxiv:2402.11498,2024.
+[57] Z.Yang,S.S.Raman,A.Shah,andS.Tellex. Pluginthesafetychip: Enforcingconstraints
+forllm-drivenrobotagents. arxiv:2309.09919,2023.
+[58] L.Ouyang,J.Wu,X.Jiang,D.Almeida,C.L.Wainwright,P.Mishkin,C.Zhang,S.Agarwal,
+K.Slama,A.Ray,J.Schulman,J.Hilton,F.Kelton,L.Miller,M.Simens,A.Askell,P.Welin-
+der,P.Christiano,J.Leike,andR.Lowe. Traininglanguagemodelstofollowinstructionswith
+humanfeedback. NeuralInformationProcessingSystems,2022.
+[59] M.Shridhar,L.Manuelli,andD.Fox. Cliport: Whatandwherepathwaysforroboticmanipu-
+lation. InConferenceonrobotlearning,pages894–906.PMLR,2022.
+13
+A SummaryofAppendices
+We report the implementation details of our LLM distillation procedure in §B. We then provide
+further detail on the action primitives, output format, observation space, and evaluation tasks for
+thethreeplannersusedinourevaluation—SPINE(§C),SayCan(§D)andLLM-Planner(§E).We
+providethepromptsusedforthescenariogenerationLLMasappliedtoeachplanner(§F).Finally,
+weprovideexamplesofsynthesizedenvironmentsandelicitedplansforeachplanner(§G).
+B LLMDistillationImplementation
+We use the Unsloth1 Library, which is built on top of the Huggingface Transformers library and
+PyTorch. WereporthyperparametersusedfordistillingSLMsviasupervisedfinetuninginTab.4
+Parameter SPINE SayCan LLMPlanner
+learningrate 1e-4 1e-4 2e-4
+weightdecay 1e-3 1e-3 5e-2
+epochs 5 5 5
+warmupsteps 5 5 5
+lorarank 32 32 16
+loraalpha 16 16 16
+Table4: SLMhyperparameters
+C SPINE
+SPINE [9]: The SPINE planner is designed for language-driven mapping, navigation, and explo-
+ration in partially-known and unstructured environments. The planner operates in a closed-loop
+manner: activelymappingitssceneandupdatingitsplanbasedonitsfindings.
+C.1 Actionprimitives
+SPINEcomposesplanswiththefollowingactionprimitives.
+1. map region(region node): Gotoaregionandsearchorobjects.
+2. inspect(object node, query): Inspectanobjectforattributesdescribedinthequery.
+3. explore region(region node, exploration radius): Go to a region and explore
+withinagivenradius.
+4. goto(region node): gotoaregionnode.
+5. answer(message to user): Terminatetaskandprovideamessagetotheuser.
+C.2 Outputformat
+At each iteration, the LLM provides its primary goal (primary goal) — which is particularly
+relevantforunder-specifiedtasks—relevantportionsofthesemanticgraphforachievingthatgoal
+(relevant graph),itsreasoningforitsplan,andtheplan,allviaJSON
+{"primary_goal": "",
+"relevant_graph": "",
+"reasoning": "",
+"plan": ""}
+1https://unsloth.ai/
+14
+C.3 Observationspace
+The observation space is a semantic graph with nodes of type regions and objects and edges
+definedbetweenandobjectandregion(object edges)ortworegions(region edges).Theinitial
+observationisprovidedtotheLLMviatheJSONformatbelow.
+{"regions": "",
+"objects": "",
+"region_connections": "",
+"object_connections": ""}
+During an episode, the planner receives updated observations via the graph-
+manipulation API: add nodes, remove node, add connections, remove connections,
+update robot location,update node attributes.
+C.4 Tasks
+ExperimentaltasksfortheUAVandUGVarereportedinTab.5,Tab.6,andTab.7.
+Fully-specifiedIndoor Under-specifiedIndoor
+Gotothedesk Isthepathtotheexitclear?
+Gotothetable Findaplacetosit
+Inspectthechair Findaplacetowork
+Maptheareanearthedesk Iwanttowatchamovie. Help
+Gotothedoor Ineedtodosomeroboticsexperiments
+Gototheground 1 Gotothesouthernpartofthescene
+Inspectthetelevision Helpmefindmybackpack. Ilastsawitwhen
+Iwasworking.
+Goinspectthetablethenreturntowhereyou Ilostmylaptop. Help.
+started
+Inspecttheplantthenreturntowhereyou Whatisneartheperson?
+started
+Inspectthechairtheninspectthetable Iwillbegivingatourofthelabforkids. Is
+thereanythingdangerousaround?
+Table5: IndoorUGVtasks
+D SayCan
+SayCan[1]isahierarchicallanguage-guidedplannerthatcombinesanLLM’stask-levelreasoning
+withlower-levelaffordanceestimates. Wefollowthetabletoprearrangementenvironment. Lower
+levellanguageskillprimitivesareimplementedwithCLIPort[59].
+D.1 Actionprimitives
+Actionsarespecifiedasrobot.pick and place(object, place). Objectsandplacesmustbe
+listedintheobservation. Forexample,“robot.pick and place(red block, blue bowl)”.
+D.2 Outputformat
+Plans are sequences of actions that must end with the action “done()”. Unlike the original set-
+ting where the probability of the model is evaluated for each possible action given the observed
+15
+Fully-specifiedOutdoor Under-specifiedOutdoor
+Mapthepath WherecanIparkmycar?
+Gotothetrees Iwantashadyplacetoread
+Inspectthecar Arethechairsunderthetreesoccupied?
+Gotosidewalk2 Ismycardamaged?
+Gotoparkinglot1 Istheredebrisonthepath?
+Isconstructionblockingthesidewalk?
+Ilostmycar. Help.
+Whatisneartheperson?
+Isthepathclear?
+CanIgettotheparkinglot?
+Table6: OutdoorUGVtasks
+Fully-specified Under-specified
+Gotoparkinglot1 Istherespacetoparkmycar?
+Mapthebuilding Isconstructionblockingtheroad?
+Gotothecaninecenter Findmydog
+Gotothelandingstrip Hasraindamagedanyroofs?
+Mapthebikerack Istheplaygroundbuilt?
+Returntothelandingstrip Returntoland
+Table7: UAVtasks
+environment (i.e. pick and place actions for all combinations of objects) , we simply prompt the
+LLMtooutputthenextactiontoaccommodateourtextualinput-outputabstraction. Forexample:
+“robot.pick and place(red block, blue bowl)
+robot.pick and place(blue block, red bowl)
+done()”
+D.3 Observationspace
+Welistallobjectswithnon-zeroaffordancesasobservationinputs,e.g.“objects = [red block,
+blue bowl]”. Following[18]affordancesareimplementedwithaViLDobjectdetector[17].
+D.4 Tasks
+TheenvironmentisatabletopsettinginthePybulletsimulator[48]withaUR5robotandrandomly
+generatedplacingsofsetsofcoloredblocksandbowls. Wespecify10taskseachwithtwodifferent
+objectconfigurations,withvaryinglevelsofdifficultyandambiguity.
+E LLM-Planner
+LLM-Planner [16]: The planner queries an LLM with the task specification and an object set de-
+scription of the observed environment, and 9 in-context demonstrations. The demonstrations are
+selectedviaanearestneighborsearchusingBERTembeddingsfromasmallsetoftask-planexpert
+demonstrations(100samplesfromtrainingset). TheLLMreturnsasequenceofsemanticsub-goals
+(e.g., Navigation fridge, OpenObject fridge). Aseparatelow-levelcontrollerthengrounds
+eachsub-goaltoprimitiveactionsinthepartiallyobservedscene.
+16
+Task Objects
+Giveeverybowlanoddnumberofblocks—or red/green/blueblock,red/blue/greenbowls
+noneatall red/blueblock,red/blue/greenbowls
+Putpairsofsame-coloredblocksintobowls. red/red/blue/greenblock,red/blue/green
+Leavesingleblocks. bowls
+red/red/blue/yellow/yellowblock,red/blue
+bowls
+Moveonlythecolorsthatappearexactlyonce red/blue/yellowblock,yellowbowl
+intotheyellowbowl,
+sortallremainingblocksintobowlsthatmatch redblock/redblock/blueblock/blue
+theircolor. block/red/blue/green/yellowbowls
+Putthebluestufftogether blue/red/yellowblock,blue/red/yellowbowls
+blue/blue/red/greenblock,blue/red/green
+bowls
+Placeallblocksontopoftheirmatchingbowls red/blue/greenblock,red/blue/greenbowls
+red/red/blueblock,green
+block/red/blue/greenbowls
+Separatetheblocksbycolor,puttingeachcolor red/blue/green/greenblock,
+groupintoadifferentbowl. red/blue/green/yellowbowls
+red/blue/yellow/yellowblock,red/bluebowls
+Distributetheblocksasevenlyaspossible red/blue/yellow/redblock,red/bluebowls
+amongtheavailablebowls. red/blue/green/yellow/redblock,red/blue
+bowls
+red/blue/green/yellowblock,
+Stacktheblocksthataren’tred
+blue/green/yellowbowls
+red/red/greenblock,blue/greenbowls
+Putblocksinbowlswithnon-matchingcolors red/blue/green/blue/green/yellowbowls
+red/yellow/greenblock,blue/green/yellow
+bowls
+Placeeveryblockintoabowl,ensuringno red/blue/greenblock,red/blue/green/yellow
+blockisinabowlofitsowncolor. bowls
+red/blue/green/yellowblock,red/blue/green
+bowls
+Table8: Block–bowlmanipulationtasksusedfortheSayCanplanner. Bowlandblockpositionsare
+randomized.
+E.1 Actionprimitives
+We include seven object interaction actions and a navigation action, as described in [17, Sec. 3.1]
+andin[17,Sec.4.1],respectively.
+1. PickObject—pickup(grasp)thetargetobjectmoveitintotheagent’sinventory.
+2. PutObject—placetheheldobjectatthecurrentfocallocationorreceptacle(e.g., counter
+top,table).
+3. OpenObject—openanopenableobjectsuchasacabinet,drawer,microwave,ordoor.
+4. CloseObject—closeanobjectpreviouslyopenedbyOpenObject.
+5. ToggleOnObject — switch a toggleable object to its “on” state (e.g., faucet, microwave,
+stoveburner).
+17
+6. ToggleOffObject—switchatoggleableobjectfrom“on”backto“off”.
+7. SliceObject — use a knife currently held to slice a slice-able object (e.g., apple, bread,
+potato)thatisspecifiedbythemask.
+8. Navigation — discretised egocentric movement and viewpoint-control primitives:
+MoveAhead, RotateLeft/Right, LookUp/Down, which translate or rotate the agent with-
+outinteractingwithobjects.
+E.2 Observationspace
+Theplannerrecievesastringwithvisibleobjects,e.g.“Visible objects: fridge, cabinet,
+countertop”.
+E.3 Outputformat
+Comma-sepparatedstringofAction Objectpairs,e.g.: “Navigationmicrowave,OpenObjectmi-
+crowave,PutObjecteggmicrowave,CloseObjectmicrowave,ToggleObjectOnmicrowave”
+E.4 Tasks
+We consider tasks from Action Learning From Realistic Environments and Directives (AL-
+FRED)[17]. WeevaluateonthesevenALFREDtemplates:
+• Clean&Place(e.g.,“Washthemugandputitinthecabinet”)
+• Heat&Place(e.g.,“Heatthepotatoandputitonthecounter”)
+• Cool&Place(e.g.,“Coolthesodaandputitonthetable”)
+• Examine-in-Light(e.g.,“Findthekeycardandexamineitunderthelamp”).
+Environments Experiments are run in the unseen split of ALFRED — i.e., environments differ
+from the in-context examples from the training set — comprising eight AI2-THOR [49] homes
+withkitchens,bedrooms,bathrooms,andlivingrooms. Theagentmustexplorecluttered,partially
+observableroomscontainingupto115objecttypes.
+F ScenariogenerationLLM
+F.1 SPINEdatageneratorprompt
+You are generating data for training an llm-based planner,
+like the SPINE paper from ravichandran et al.
+Generate a scene graph for training in the following format <OBSERVATION_FORMAT>
+for example, <EXAMPLE_GRAPH>
+Make sure all nodes referenced in the conntections are listed in the objects and
+regions list. Provide your answer in the following JSON format:
+<OUTPUT_FORMAT>
+Add a "description" attribute to each node that provides information.
+These will be hidden from the robot
+Task generation instructions
+- DO NOT reference specific objects or nodes. Make the planner infer theese.
+- Tasks should request specific information, not general exploration.
+Make the planner map or inspect certain entities.
+For example, start tasks with phrases such as "what", "I heard",
+"find out", "map", "inspect", "Can I", "is there", and likewise
+ThevariableOBSERVATION FORMATtakestheform:
+18
+{"objects": [{"name": "object_1_name", "coords": ["west_east_coordinate",
+"south_north_coordinate"]}, "..."],
+"regions": [{"name": "region_1_name", "coords": ["west_east_coordinate",
+"south_north_coordinate"]}, "..."],
+"object_connections": [["object_name", "region_name"], "..."],
+"region_connections": [["some_region_name", "other_region_name"], "..."]
+"robot_location": "region_of_robot_location"}
+ThevariableEXAMPLE GRAPHtakestheform:
+{"objects": [
+{"name": "shed_1", "coords": [78, 9]},
+{"name": "gate_1", "coords": [52, -56]}],
+"regions": [
+{"name": "ground_1", "coords": [0, 0]},
+{"name": "road_1", "coords": [5.7, -8.3]},
+{"name": "road_2", "coords": [19.3, -6.5]},
+{"name": "road_3", "coords": [35.7, -12.1]},
+{"name": "road_4", "coords": [52.7, -20]},
+{"name": "road_5", "coords": [57.2, -31.6]},
+{"name": "bridge_1", "coords": [54.3, -46.7]},
+{"name": "road_6", "coords": [52.4, -56.5]},
+{"name": "driveway_1", "coords": [78.4, 9.1]}],
+"object_connections": [
+["shed_1", "driveway_1"],
+["gate_1", "road_6"]],
+"region_connections":[
+["ground_1", "road_1"],
+["road_1", "road_2"],
+["road_2", "road_3"],
+["road_3", "road_4"],
+["road_4", "road_5"],
+["road_5", "bridge_1"],
+["bridge_1", "road_6"],
+["road_6", "driveway_1"]],
+"robot_location": "ground_1"}
+WhileOUTPUT FORMATcomprisesagraph,tasklist,anddescription.
+F.2 LLM-Plannerdatageneratorprompt
+WeprovidethepromptfortheLLM-Plannerdatageneratorbelow.
+You are a data generator for synthesizing tasks for the ALFRED simulator.
+You should use objects from the following list: 'AlarmClock', 'Apple', 'ArmChair', 'BaseballBat',
+(cid:44)→ 'BasketBall', 'Bathtub', 'BathtubBasin', 'Bed', 'Blinds', 'Book', 'Boots', 'Bowl', 'Box', 'Bread',
+(cid:44)→ 'ButterKnife', 'Cabinet', 'Candle', 'Cart', 'CD', 'CellPhone', 'Chair', 'Cloth', 'CoffeeMachine',
+(cid:44)→ 'CounterTop', 'CreditCard', 'Cup', 'Curtains', 'Desk', 'DeskLamp', 'DishSponge', 'Drawer',
+(cid:44)→ 'Dresser', 'Egg', 'FloorLamp', 'Footstool', 'Fork', 'Fridge', 'GarbageCan', 'Glassbottle',
+(cid:44)→ 'HandTowel', 'HandTowelHolder', 'HousePlant', 'Kettle', 'KeyChain', 'Knife', 'Ladle', 'Laptop',
+(cid:44)→ 'LaundryHamper', 'LaundryHamperLid', 'Lettuce', 'LightSwitch', 'Microwave', 'Mirror', 'Mug',
+(cid:44)→ 'Newspaper', 'Ottoman', 'Painting', 'Pan', 'PaperTowel', 'PaperTowelRoll', 'Pen', 'Pencil',
+(cid:44)→ 'PepperShaker', 'Pillow', 'Plate', 'Plunger', 'Poster', 'Pot', 'Potato', 'RemoteControl', 'Safe',
+(cid:44)→ 'SaltShaker', 'ScrubBrush', 'Shelf', 'ShowerDoor', 'ShowerGlass', 'Sink', 'SinkBasin', 'SoapBar',
+(cid:44)→ 'SoapBottle', 'Sofa', 'Spatula', 'Spoon', 'SprayBottle', 'Statue', 'StoveBurner', 'StoveKnob',
+(cid:44)→ 'DiningTable', 'CoffeeTable', 'SideTable', 'TeddyBear', 'Television', 'TennisRacket', 'TissueBox',
+(cid:44)→ 'Toaster', 'Toilet', 'ToiletPaper', 'ToiletPaperHanger', 'ToiletPaperRoll', 'Tomato', 'Towel',
+(cid:44)→ 'TowelHolder', 'TVStand', 'Vase', 'Watch', 'WateringCan', 'Window', 'WineBottle'
+The agent has the following capabilities
+OpenObject
+CloseObject
+PickupObject
+PutObject
+ToggleObjectOn
+ToggleObjectOff
+SliceObject
+Navigation
+Your response should be json with the following keys
+{tasks: ["description of task 1", "description of task 2", ...],
+visible objects: [list of objects in the scene],
+reasoning: your reasoning}
+19
+F.3 SayCandatageneratorprompt
+WeprovidethepromptfortheLLM-Plannerdatageneratorbelow.
+You are a task generator for the SayCan pick-and-place environment.
+Each task should have a 'raw_input' field describing the goal and a 'config' field specifying 'pick'
+(cid:44)→ and 'place' lists. Output a JSON array of task objects.
+Examples:
+objects = [red block, yellow block, blue block, green bowl]
+# put the yellow one the green thing.
+robot.pick_and_place(yellow block, green bowl)
+done()
+objects = [yellow block, blue block, red block]
+# move the light colored block to the middle.
+robot.pick_and_place(yellow block, middle)
+done()
+objects = [blue block, green bowl, red block, yellow bowl, green block]
+# stack the blocks.
+robot.pick_and_place(green block, blue block)
+robot.pick_and_place(red block, green block)
+done()
+objects = [red block, blue block, green bowl, blue bowl, yellow block, green block]
+# group the blue objects together.
+robot.pick_and_place(blue block, blue bowl)
+done()
+objects = [green bowl, red block, green block, red bowl, yellow bowl, yellow block]
+# sort all the blocks into their matching color bowls.
+robot.pick_and_place(green block, green bowl)
+robot.pick_and_place(red block, red bowl)
+robot.pick_and_place(yellow block, yellow bowl)
+done()
+Generate 3 tasks using 4 blocks.
+20
+G Examplesynthesizedenvironments,tasks,andplans
+G.1 SPINEsynthesizeddata
+We provide an example synthesized graph and corresponding tasks below. Please note that the
+outputissplittoenablereadability.
+{ "graph": {
+"objects": [
+{"name": "bench_1", "coords": [5, 10],
+"description": "A wooden bench facing the ocean."},
+{"name": "bench_2", "coords": [15, 10],
+"description": "A wooden bench near a lamppost."},
+{"name": "lamppost_1", "coords": [10, 12],
+"description": "A tall lamppost providing light at night."},
+{"name": "food_stall_1", "coords": [20, 8],
+"description": "A stall selling ice cream and snacks."},
+{"name": "food_stall_2", "coords": [25, 8],
+"description": "A stall offering hot dogs and beverages."},
+{"name": "kite_1", "coords": [30, 5],
+"description": "A colorful kite flying high in the sky."},
+{"name": "bicycle_1", "coords": [35, 15],
+"description": "A parked bicycle near the storefronts."},
+{"name": "scooter_1", "coords": [40, 15],
+"description": "A parked electric scooter."},
+{"name": "street_performer_1", "coords": [45, 10],
+"description": "A musician playing guitar."}],
+"regions": [
+{"name": "boardwalk_1", "coords": [0, 10],
+"description": "The starting point of the boardwalk."},
+{"name": "boardwalk_2", "coords": [10, 10],
+"description": "A section of the boardwalk with benches."},
+{"name": "boardwalk_3", "coords": [20, 10],
+"description": "A section of the boardwalk with food stalls."},
+{"name": "boardwalk_4", "coords": [30, 10],
+"description": "A section of the boardwalk near kite flyers."},
+{"name": "boardwalk_5", "coords": [40, 10],
+"description": "A section of the boardwalk with street performers."},
+{"name": "beach_1", "coords": [0, 0],
+"description": "A sandy beach area with children playing."},
+{"name": "beach_2", "coords": [10, 0],
+"description": "A beach area with people sunbathing."},
+{"name": "beach_3", "coords": [20, 0],
+"description": "A beach area with kite flyers."},
+{"name": "beach_4", "coords": [30, 0],
+"description": "A beach area with volleyball nets."},
+{"name": "beach_5", "coords": [40, 0],
+"description": "A quieter section of the beach."},
+{"name": "storefront_1", "coords": [0, 20],
+"description": "A row of colorful storefronts."},
+{"name": "storefront_2", "coords": [10, 20],
+"description": "A section with souvenir shops."},
+{"name": "storefront_3", "coords": [20, 20],
+"description": "A section with cafes and restaurants."},
+{"name": "storefront_4", "coords": [30, 20],
+"description": "A section with clothing stores."},
+{"name": "storefront_5", "coords": [40, 20],
+"description": "A section with art galleries."},
+{"name": "parking_lot_1", "coords": [50, 15],
+"description": "A small parking lot for cars."},
+{"name": "palm_tree_1", "coords": [5, 15],
+"description": "A tall palm tree providing shade."},
+{"name": "palm_tree_2", "coords": [25, 15],
+"description": "A palm tree near the food stalls."},
+{"name": "palm_tree_3", "coords": [35, 15],
+"description": "A palm tree near the parked bicycles."},
+{"name": "ocean_1", "coords": [0, -5],
+"description": "The ocean with gentle waves."}],
+21
+"object_connections": [
+["bench_1", "boardwalk_2"],
+["bench_2", "boardwalk_2"],
+["lamppost_1", "boardwalk_2"],
+["food_stall_1", "boardwalk_3"],
+["food_stall_2", "boardwalk_3"],
+["kite_1", "beach_3"],
+["bicycle_1", "storefront_3"],
+["scooter_1", "storefront_3"],
+["street_performer_1", "boardwalk_5"]],
+"region_connections": [
+["boardwalk_1", "boardwalk_2"],
+["boardwalk_2", "boardwalk_3"],
+["boardwalk_3", "boardwalk_4"],
+["boardwalk_4", "boardwalk_5"],
+["beach_1", "beach_2"],
+["beach_2", "beach_3"],
+["beach_3", "beach_4"],
+["beach_4", "beach_5"],
+["storefront_1", "storefront_2"],
+["storefront_2", "storefront_3"],
+["storefront_3", "storefront_4"],
+["storefront_4", "storefront_5"],
+["boardwalk_2", "beach_2"],
+["boardwalk_3", "beach_3"],
+["boardwalk_4", "beach_4"],
+["storefront_3", "parking_lot_1"],
+["boardwalk_1", "storefront_1"],
+["boardwalk_5", "storefront_5"],
+["boardwalk_5", "ocean_1"],
+["beach_5", "ocean_1"]],
+"robot_location": "boardwalk_1"
+{"tasks": [
+"What is the closest food stall to the starting point of the boardwalk?",
+"I heard there is a musician playing nearby. Can you find out where?",
+"Map the locations of all benches along the boardwalk.",
+"Inspect the area where kites are flying.",
+"Can I find a place to park a bicycle near the storefronts?",
+"Is there a lamppost providing light near any benches?",
+"Find out which section of the beach has volleyball nets.",
+"Map the palm trees along the boardwalk.",
+"What is the closest section of the boardwalk to the ocean?",
+"Inspect the parking lot for available spaces.",
+"Is there a food stall offering beverages nearby?",
+"Find out where the kite flyers are located.",
+"Map the sections of the boardwalk with street performers.",
+"Is there a quieter section of the beach nearby?",
+"Inspect the area with souvenir shops.",
+"What is the closest palm tree to the food stalls?",
+"Find out where the parked scooters are located.",
+"Map the sections of the boardwalk with lampposts.",
+"Is there a section of the beach with children playing?",
+"Inspect the area with cafes and restaurants.",
+"What is the closest section of the boardwalk to the parking lot?",
+"Find out where the art galleries are located.",
+"Map the sections of the beach with sunbathers.",
+"Is there a section of the boardwalk with cyclists?",
+"Inspect the area with clothing stores."
+],
+"description": "A bustling coastal boardwalk scene flanked by a sandy
+beach on one side and a row of colorful storefronts on the other. The environment
+includes a wooden boardwalk populated with scattered benches, lampposts,
+and occasional food stalls selling snacks and beverages. Close to the boardwalk
+are cyclists and pedestrians enjoying their time, with children playing
+and flying kites on the beach. The ocean waves gently lap against the shore,
+with occasional sailboats in the distance. Behind the storefronts, an array
+of parked bicycles and scooters lines the street, while a small parking
+lot accommodates cars. Tall palm trees provide intermittent shade along
+the boardwalk, and street performers attract crowds. The scene is vibrant
+and dynamic, with seagulls flying above and people capturing the picturesque
+views on their cameras."
+}
+22
+G.2 SPINEelicitedplan
+Weprovidetheelicitedplanwiththeabovesemanticgraph(§G.1)forthetask“‘Istherealamppost
+providinglightnearanybenches?” isbelow. Weprefaceplanswith“//plan”andobservationswith
+“//observation”.
+// plan
+{'primary_goal': 'Determine if there is a lamppost
+providing light near any benches.',
+'relevant_graph': 'boardwalk_1, lamppost_1',
+'reasoning': 'I cannot reach lamppost_1 from my current location, boardwalk_1.
+I will map boardwalk_1 to try to find a connection.',
+'plan': '[map_region(boardwalk_1)]}
+// observation
+add_nodes({boardwalk_2: {coords: [10.0, 10.0], type: region, description:
+A section of the boardwalk with benches., name: boardwalk_2}},
+{storefront_1: {coords: [0.0, 20.0], type: region, description:
+A row of colorful storefronts., name: storefront_1}}),
+add_connections([boardwalk_1, boardwalk_2], [boardwalk_1, storefront_1]),
+update_node_attributes({name: boardwalk_1, description:
+The starting point of the boardwalk.})
+// plan
+{'primary_goal': 'Determine if there is a lamppost providing light
+near any benches.',
+'relevant_graph': 'boardwalk_2, lamppost_1, bench_2',
+'reasoning': 'I discovered a new region, boardwalk_2, which contains benches.
+I will navigate to boardwalk_2 and explore the region to
+see if there is a lamppost providing light near the benches.',
+'plan': '[goto(boardwalk_2), explore_region(boardwalk_2, 3)]'}
+// observation
+update_robot_location(boardwalk_2)
+// plan
+{'primary_goal': 'Determine if there is a lamppost providing light near any
+benches.',
+'relevant_graph': 'boardwalk_2, lamppost_1, bench_2',
+'reasoning': 'I have reached boardwalk_2, which contains benches.
+I will now explore the region to see
+if there is a lamppost providing light near the benches.',
+'plan': '[explore_region(boardwalk_2, 3)]'}
+// observation
+add_nodes({bench_1: {coords: [5.0, 10.0], type: object,
+description: A wooden bench facing the ocean., name: bench_1}},
+{boardwalk_3: {coords: [20.0, 10.0], type: region,
+description: A section of the boardwalk with food stalls., name: boardwalk_3}}),
+add_connections([bench_1, boardwalk_2], [bench_2, boardwalk_2],
+[boardwalk_2, lamppost_1], [boardwalk_2, boardwalk_3],
+[beach_2, boardwalk_2]),
+update_node_attributes({name: boardwalk_2,
+description: A section of the boardwalk with benches.})'
+// plan
+{'primary_goal': 'Determine if there is a lamppost
+providing light near any benches.',
+'relevant_graph': 'boardwalk_2, lamppost_1, bench_1, bench_2',
+'reasoning': 'I discovered that boardwalk_2 has connections to both
+bench_1 and bench_2, as well as lamppost_1. This indicates that lamppost_1
+is near the benches and likely provides light to them.',
+'plan': '[answer(Yes, there is a lamppost, lamppost_1,
+providing light near the benches, bench_1 and bench_2, on boardwalk_2.)]'}
+G.3 LLMPlannersynthesizeddata
+Weprovideanexamplesynthesizedobjectsetandcorrespondingtasksbelow.
+23
+{
+"Task description": "Navigate to the DiningTable and use the Knife to slice the bread. Then, place
+(cid:44)→ the sliced pieces onto a Plate.",
+"Completed plans": [],
+"Visible objects": [
+"DiningTable",
+"Bread",
+"Knife",
+"Plate",
+"AlarmClock",
+"Desk",
+"Bed",
+"Fridge",
+"Egg",
+"CounterTop",
+"CoffeeMachine"
+],
+"Next Plans": [
+"Navigation DiningTable",
+"PickupObject Knife",
+"SliceObject Bread",
+"PutObject Knife DiningTable",
+"PickupObject Bread",
+"Navigation Plate",
+"PutObject Bread Plate"
+]
+}
+G.4 LLMPlannerelicitedplan
+Weprovideanexampleelicitedplanbelow.
+{
+"trial": "trial_T20190908_145356_918528",
+"scene": "FloorPlan10",
+"type": "pick_heat_then_place_in_recep",
+"repeat_idx": 1,
+"goal_instr": "Put a heated apple in the trash can.",
+"initial_high_level_plans": [
+"Navigation apple",
+"PickupObject apple",
+"Navigation microwave",
+"OpenObject microwave",
+"PutObject apple microwave",
+"CloseObject microwave",
+"ToggleObjectOn microwave",
+"ToggleObjectOff microwave",
+"OpenObject microwave",
+"PickupObject apple",
+"CloseObject microwave",
+"Navigation garbagecan",
+"PutObject apple garbagecan"
+],
+"completed_plans": [
+"Navigation apple",
+"PickupObject apple",
+"Navigation microwave",
+"OpenObject microwave",
+"PutObject apple microwave",
+"CloseObject microwave",
+"ToggleObjectOn microwave",
+"ToggleObjectOff microwave",
+"OpenObject microwave",
+"PickupObject apple",
+"CloseObject microwave",
+"Navigation garbagecan",
+"PutObject apple garbagecan"
+],
+"failed_plans": [],
+"success": true
+}
+G.5 SayCansynthesizeddata
+Weprovideanexamplesynthesizedobjectsetbelow.
+24
+objects = [red block, green block, blue block, red bowl, green bowl, blue bowl]
+# Place all blocks on top of their matching bowls
+G.6 SayCanelicitedplan
+Weprovideanexampleelicitedplanbelow.
+objects = [red block, green block, blue block, red bowl, green bowl, blue bowl]
+# Place all blocks on top of their matching bowls
+robot.pick_and_place(red block, red bowl)
+robot.pick_and_place(blue block, blue bowl)
+robot.pick_and_place(green block, green bowl)
+done()
+25

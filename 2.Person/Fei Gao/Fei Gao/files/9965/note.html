@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Safety-Shielded RL for High-Speed Vision-Based Flight (Zhang et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">High-Speed Vision-Based Flight in Clutter with Safety-Shielded Reinforcement Learning（基于安全屏障强化学习的杂乱环境中高速视觉飞行）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Jiarui Zhang</strong>, Yu Hu, Yunlong Song, Weixuan Zhang, Yuang Zhang, Ruitian Pang, Siqi Shen, <strong>Fei Gao</strong>（corresponding）, Chao Xu, Yanjun Cao</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">浙江大学</strong>（Zhejiang University），FAST Lab / 控制科学与工程学院</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">arXiv preprint</strong>，<strong>2026年</strong>，arXiv:2602.08653</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://arxiv.org/abs/2602.08653" target="_blank">arXiv:2602.08653</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出了一种<strong>端到端强化学习框架与基于模型的安全机制深度整合</strong>的方案，实现四旋翼在密集杂乱环境中的高速视觉飞行（最高 7.5 m/s）。核心创新三合一：(1) <strong>非对称 Actor-Critic PPO</strong>——Actor 接收经过域随机化（丢包/噪声/延迟）的深度图和状态观测，Critic 访问真值状态提供准确价值估计，训练效率提升数倍；(2) <strong>物理启发的七项复合奖励结构</strong>——包含导航奖励、安全奖励、平滑性奖励、碰撞惩罚、成功奖励、速度奖励和高度奖励，引导策略从零逐步学会完整的高速飞行行为；(3) <strong>HOCBF 安全过滤器</strong>——部署阶段以 100Hz 实时求解二次规划（QP），将策略输出的归一化推力 + 姿态角指令投影到可证明安全的动作集合上，数学保证碰撞概率为零（前提：障碍物检测正确）。CNN 处理 100×60 深度图，GRU 融合时序上下文，输出由 PX4 控制器跟踪的姿态指令。在密集杂乱和森林环境中验证，性能超越传统规划器（A*/RRT*+ESDF）和可微分物理基线方法。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">强化学习 PPO</span>
+    <span class="tag tag-green">HOCBF 安全滤波</span>
+    <span class="tag tag-amber">高速视觉飞行</span>
+    <span class="tag tag-purple">非对称 Actor-Critic</span>
+    <span class="tag tag-red">Sim-to-Real 迁移</span>
+    <span class="tag tag-cyan">深度图感知</span>
+    <span class="tag tag-gray">域随机化</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么现有的高速视觉飞行方法在密集杂乱环境中难以同时保证速度和安全？</strong><br>
+    答：因为现有方法陷入了两个极端——纯学习型方法（端到端 RL）为了追求更高奖励而做出危险动作，在 OOD 场景下安全性完全无保证；纯规划型方法（A*/RRT* + 轨迹优化 + 控制器）每条管线的级联延迟累加（建图 → 规划 → 优化 → 跟踪），在 7.5 m/s 的高速下总延迟已经超过了可用的反应时间窗口。本文的核心洞察在于：<strong>RL 负责"敏捷性"——学会在杂乱环境中的高速飞行策略；HOCBF 负责"安全性"——作为最后一道形式化防线，将 RL 的每个输出实时投影到可证明安全的动作集上</strong>。这相当于给 RL 策略加了一个数学保证的"安全护栏"——策略可以在护栏内自由发挥性能，但永远不会跨越安全边界。<br><br>
+    问：<strong>本文的关键技术洞察是什么？</strong><br>
+    答：(1) <strong>非对称 Actor-Critic</strong> 是解决"贫乏观测下训练困难"的零代价方案——Critic 访问仿真真值状态获得准确价值估计，Actor 经域随机化训练学会从噪声/延迟/丢包的深度图中鲁棒推理。部署时仅需 Actor，Critic 不参与——训练时的信息不对称在部署时自动消解；(2) <strong>HOCBF 的安全投影本质上是求解一个 4 维单约束二次规划</strong>——在 RL 输出动作的"邻域"内寻找满足可证明安全约束的最近可行动作，计算开销微秒级，对实时性零影响；(3) <strong>七项奖励的精心逐项设计</strong>不是简单的线性加权——导航奖励使用指数衰减形式（鼓励快速接近目标），安全奖励使用二次形式（形成安全势场），平滑性奖励防止高频抖动——每项奖励的数学形式都对应一个具体的物理意图。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>控制屏障函数（CBF）在自动驾驶中的应用（Ames et al. 2017/2019）</td><td>→ CBF 通过定义"安全集合的前向不变性"提供形式化安全保证——本文将其扩展到高阶形式（HOCBF），处理四旋翼加速度级动力学下相对阶为 2 的困难。关键工程突破：从深度图通过有限差分法在线估计障碍物相对距离和相对速度，构造实时可用的 HOCBF 约束</td><td>数学/安全</td></tr>
+    <tr><td>非对称 Actor-Critic 在腿足机器人中的成功（Hwangbo et al. 2019）</td><td>→ Critic 访问全状态可以显著加速部分可观测环境中的训练——本文首次将此架构用于无人机高速视觉飞行：Critic 获取精确位姿/速度/障碍物真值，Actor 仅依赖噪声深度图 + 延迟状态 + 丢包。训练收敛步数减少约 60%</td><td>架构/方法</td></tr>
+    <tr><td>Loquercio et al. (2021) — Learning High-Speed Flight in the Wild (Science Robotics)</td><td>→ 端到端学习可以直接从深度图输出飞行动作，在真实森林中以 5 m/s 飞行——但缺乏安全保证。本文在此基础上实现三个关键升级：(1) 速度从 5 → 7.5 m/s；(2) 增加 HOCBF 可证明安全层；(3) 引入非对称 Actor-Critic + 系统化域随机化</td><td>策略/范式</td></tr>
+    <tr><td>PX4 自驾仪的低层姿态控制律</td><td>→ RL 策略不直接输出电机 PWM 指令（那会导致严重的 sim-to-real 执行器动力学 mismatch）——而是输出"归一化集体推力 + 期望姿态角（roll, pitch, yaw）"，由 PX4 成熟的内环控制律跟踪。这个"高层学习 + 低层经典控制"的层级架构是 sim-to-real 零样本迁移的关键工程决策</td><td>工程</td></tr>
+    <tr><td>域随机化在机器人操作中的大规模验证（OpenAI et al. 2019）</td><td>→ 在仿真中随机化所有可能的噪声维度（感知噪声 + 动力学参数 + 环境结构），迫使策略学会"在所有可能的世界中都能飞行"的最鲁棒策略——这是 sim-to-real 零样本迁移的统计学习理论基础</td><td>训练</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 非对称 PPO——噪声/延迟/丢包容忍的视觉飞行策略学习</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>真实无人机上的深度相机存在噪声、运动模糊、帧率不稳定（丢帧）、通信延迟等问题——如果在仿真中用"完美深度图"训练，迁移到真机时性能会雪崩式退化。另一方面，如果 Actor 和 Critic 都用噪声观测，价值估计的质量被感知噪声污染，训练收敛极慢甚至完全不收敛。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>域随机化 + 非对称 Actor-Critic 的组合——域随机化让 Actor 学会适应真实传感器的退化特性，非对称 Critic 让训练保持高效（价值估计不受噪声污染）。该模式在腿足机器人（ANYmal）中已被验证，但本文是首次将其适配至高速无人机视觉飞行场景。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Actor 观测（经过域随机化处理）：深度图 100×60（随机像素级 dropout 20%、高斯噪声 σ=0.05m、随机帧延迟 0-20ms）+ 线速度 + 旋转矩阵 3×3 + 上一帧动作（4 维）+ 目标相对位置（3 维）。每个分量有独立的随机化强度参数。Critic 观测（仅在训练时存在）：上述全部内容 + 真值位姿 + 真值速度 + 障碍物精确 3D 距离。这种设计让 Actor 学会了从严重退化的视觉输入中"推断"环境 3D 结构——类似于人类驾驶员在浓雾中依靠有限的视觉片段判断安全行车路线。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 物理启发的七项复合奖励——从零学会完整高速飞行行为的隐式课程</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>标准 RL 避障任务的奖励通常是稀疏的（"到达目标=+1，碰撞=-1"）——这种奖励信号几乎不可能训练出高速飞行策略（信用分配链过长，探索成本极高）。需要设计一个密集的、物理启发的奖励函数，逐步引导 RL 从零学会"快速、安全、平滑地穿越密集杂乱环境"。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>行为克隆中的"辅助损失"设计——在主要目标之外增加辅助目标（平滑性、能耗）来约束策略的行为空间，防止策略学到不可取的捷径行为。传统运动规划中全局引导 + 局部避障的分层思想。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>七项奖励，从高到低的优先级层次：(1) <strong>导航奖励</strong> $r_{\text{nav}}$：目标距离减少量的指数奖励 $\exp(-\beta \cdot \Delta d_t)$——引导策略向目标前进，且"快速靠近"比"缓慢靠近"获得几何级更高的奖励；(2) <strong>安全奖励</strong> $r_{\text{safe}}$：与最近障碍物距离的二次惩罚 $\min(0, d_{\text{obs}}-d_{\text{thresh}})^2$——距离越近惩罚越大，形成"安全势场"；(3) <strong>平滑性奖励</strong> $r_{\text{smooth}}$：连续动作变化量 $\|a_t - a_{t-1}\|^2$ 的 L2 惩罚——防止策略输出高频抖动的姿态指令，这在高速飞行中特别关键（抖动 → 振动 → 传感器噪声加剧 → 恶性循环）；(4) <strong>碰撞惩罚</strong> $r_{\text{col}}$：一旦碰撞终止并给予 -100 的大额惩罚；(5) <strong>成功奖励</strong> $r_{\text{succ}}$：到达目标区域时 +100 的大额奖励；(6) <strong>速度奖励</strong> $r_{\text{speed}}$：速度向量模长的线性奖励 $w_{\text{speed}} \cdot \|v_t\|$——鼓励高速飞行；(7) <strong>高度奖励</strong> $r_{\text{height}}$：偏离目标高度的二次惩罚 $-(z_t - z_{\text{target}})^2$——维持安全飞行高度。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: HOCBF 安全过滤器——策略输出的实时可证明安全投影</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>即使在仿真中训练得再好，RL 策略在真实环境中仍是一个黑箱——在 OOD 状态下（如比训练环境密集 3 倍的障碍物布局）可能输出致命动作。尤其在 7.5 m/s 的高速下，一个错误动作的后果在约 100ms 内就会发生——没有"尝试-纠正"的机会。传统解决方案要么在训练时加安全约束（如 constrained MDP）——但约束在训练分布外仍然空洞；要么在部署时靠人工干预——完全不可行。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>控制屏障函数（CBF）在自动驾驶中的成功应用——CBF 将"安全"定义为系统状态保持在一个前向不变的安全集合内，通过将控制输入限制在"安全许可集"中来提供可证明的安全保证。问题：标准 CBF 要求系统的相对阶为 1（即控制输入 $u$ 直接影响安全函数 $h(x)$ 的变化率），但四旋翼的加速度级动力学使得位置约束的相对阶为 2。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>HOCBF（High-Order CBF）通过逐级构造中间约束来处理相对阶 ≥ 2 的情况。(1) 定义安全函数 $h(x) = d_{\text{obs}}(x) - r_{\text{safe}}$（无人机到最近障碍物的距离减去安全半径 1.0m）；(2) 构造一阶扩展约束 $\psi_1 = \dot{h} + \alpha_1 h \geq 0$——限制 $h$ 向零靠近的速率；(3) 构造二阶约束 $\psi_2 = \ddot{h} + (\alpha_1+\alpha_2)\dot{h} + \alpha_1\alpha_2 h \geq 0$——这个约束是控制输入 $a$ 的线性函数，可作为 QP 约束；(4) 每个控制周期（100Hz）求解 QP：$\min_{a} \|a - a_{RL}\|_W^2$ s.t. $\psi_2(a) \geq 0$——找到离 RL 输出最近且满足形式化安全约束的动作。QP 仅需微秒级求解，对实时性零影响。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame —— CNN + GRU + 非对称 Actor-Critic + HOCBF 一体化架构</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SENSING["感知层（可部署传感器 + 域随机化注入）"]
+      direction LR
+      DEPTH["深度相机\n100×60 深度图像\n随机丢包/噪声/延迟"]
+      IMU["IMU + 里程计\n线速度 v + 旋转矩阵 R"]
+      GOAL["目标相对位置\nΔx, Δy, Δz"]
+    end
+
+    subgraph ENCODER["特征编码层"]
+      direction LR
+      CNN["CNN 编码器\n3×Conv(3×3, stride=2)\n通道数: 64→128→256\n输出 256-dim 空间特征"]
+      STATE_ENC["状态编码 MLP\n[v(3) + R(9) + goal(3)]\n→ 128-dim 运动特征"]
+      ACT_HIST["动作历史缓冲区\n5 步窗口: a_{t-5}...a_{t-1}\n4×5 = 20-dim"]
+    end
+
+    subgraph TEMPORAL["时序融合层"]
+      direction LR
+      CONCAT["特征拼接\nCNN(256) ⊕ 状态(128)\n⊕ 动作历史(20)"]
+      GRU["GRU 时序建模\n128-dim 隐状态\n捕捉障碍物运动趋势\n补偿深度图丢包"]
+    end
+
+    subgraph POLICY["策略网络（非对称 PPO）"]
+      direction LR
+      ACTOR["Actor 网络（可部署）\nMLP: 256→128→4\n输出: 归一化集体推力\n+ 期望 roll, pitch, yaw"]
+      CRITIC["Critic 网络（仅训练）\nMLP: 384→128→1\n输入: GRU隐状态 + 真值状态\n输出: 标量价值 V(s)"]
+    end
+
+    subgraph SAFETY["安全屏蔽层（仅部署时运行）"]
+      direction LR
+      HOCBF["HOCBF 安全过滤器\nQP: min‖a - a_RL‖²\ns.t. L²_f h + L_g L_f h·a ≥ ...\n100Hz 实时求解\n保证可证明安全"]
+      PX4["PX4 姿态控制器\n跟踪 roll/pitch/yaw + 推力\n内环: 角速率控制 400Hz\n外环: 姿态控制 100Hz"]
+    end
+
+    DEPTH --> CNN
+    IMU --> STATE_ENC
+    GOAL --> STATE_ENC
+    CNN --> CONCAT
+    STATE_ENC --> CONCAT
+    ACT_HIST --> CONCAT
+    CONCAT --> GRU
+    GRU --> ACTOR
+    GRU -.->|"仅训练时"| CRITIC
+    CRITIC -.->|"TD-error 梯度\n引导 Actor 学习"| ACTOR
+    ACTOR -->|"a_RL (推力+姿态角)"| HOCBF
+    HOCBF -->|"a_safe (安全动作)"| PX4
+
+    classDef sens fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef enc fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef temp fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef pol fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef safe fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class DEPTH,IMU,GOAL sens
+    class CNN,STATE_ENC,ACT_HIST enc
+    class CONCAT,GRU temp
+    class ACTOR,CRITIC pol
+    class HOCBF,PX4 safe
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow —— 训练流与部署流的分离设计（非对称架构的核心）</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph TRAIN["训练阶段（仿真 + 域随机化 + 非对称 Critic）"]
+      direction LR
+      SIM["高保真仿真器\n随机场景生成\nIsaac Gym / Flightmare"] --> PRIV["特权状态 s_t^priv\n真值位姿 + 真值速度\n+ 障碍物精确距离"]
+      SIM --> NOISY["带噪声观测 o_t^noisy\n深度图: 丢包 20%\n+ 噪声 σ=0.05m + 延迟 0-20ms\n状态: 高斯噪声"]
+      NOISY --> ENC_T["CNN + GRU 特征编码"]
+      ENC_T --> ACTOR_T["Actor（训练中）\n输出 a_RL:\n推力 + roll/pitch/yaw"]
+      PRIV --> ENC_T_PRIV["特权编码\nGRU 隐状态 + 真值拼接"]
+      ENC_T_PRIV --> CRITIC_T["Critic（训练中）\n输出 V(s_priv)"]
+      ACTOR_T --> SIM
+      CRITIC_T -.->|"TD-error\n→ 策略梯度方向"| ACTOR_T
+    end
+
+    subgraph DEPLOY["部署阶段（真实硬件 + HOCBF 安全投影）"]
+      direction LR
+      REAL_CAM["真实深度相机\n100×60 @ 30Hz"] --> REAL_ENC["CNN + GRU 编码\n机载 Jetson 推理 <5ms"]
+      REAL_IMU["真实 IMU + 里程计\n100Hz"] --> REAL_ENC
+      REAL_ENC --> ACTOR_D["Actor（冻结权重）\n输出 a_RL:\n推力 + roll/pitch/yaw"]
+      ACTOR_D --> QP["HOCBF QP 求解器\nmin ‖a - a_RL‖²\ns.t. CBF ≤ 0\n100Hz 实时求解 <2ms"]
+      QP -->|"a_safe"| PX4_D["PX4 姿态控制\n400Hz 电机 PWM"]
+      PX4_D --> DRONE["真实四旋翼\n最高 7.5 m/s"]
+      DRONE -.->|"传感器反馈"| REAL_CAM
+      DRONE -.->|"IMU/里程计反馈"| REAL_IMU
+    end
+
+    SIM -.->|"zero-shot transfer\n仅迁移 Actor 权重\nCritic 丢弃不部署"| ACTOR_D
+
+    classDef train fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef deploy fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class SIM,PRIV,NOISY,ENC_T,ACTOR_T,CRITIC_T,ENC_T_PRIV train
+    class REAL_CAM,REAL_IMU,REAL_ENC,ACTOR_D,QP,PX4_D,DRONE deploy
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow —— 从训练到部署的完整生命周期</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1: 仿真训练（~200M 环境步）"]
+      P1A["初始化: 随机场景生成\n障碍物密度/尺寸/位置随机\n起终点随机"] --> P1B["域随机化注入\n感知: 丢包20% + 噪声σ=0.05m + 延迟0-20ms\n动力学: 质量±15% + 惯量±20% + 推力系数±10%"]
+      P1B --> P1C["非对称 PPO 训练循环\nActor: 噪声观测 → 动作\nCritic: 真值状态 → 价值估计\nGAE 优势估计 + clip 策略更新"]
+      P1C --> P1D{"收敛检查\n成功率 > 90%\n平均速度 > 5 m/s"}
+      P1D -- "否 → 继续训练" --> P1C
+    end
+
+    subgraph PHASE2["阶段2: 策略导出与仿真闭环验证"]
+      P2A["冻结 Actor 权重\n导出 ONNX 格式"] --> P2B["仿真闭环测试\n注入 HOCBF 安全过滤器\n测试碰撞率 + HOCBF 触发率"]
+      P2B --> P2C{"HOCBF 触发频率 < 5%?\n仿真碰撞率 = 0%?"}
+      P2C -- "否 → 策略过于激进\n返回调优" --> P1C
+    end
+
+    subgraph PHASE3["阶段3: 真机阶梯部署"]
+      P3A["加载 Actor + HOCBF\n到机载 NVIDIA Jetson"] --> P3B["传感器标定\n深度相机外参 + IMU 对齐"]
+      P3B --> P3C["渐进式提速验证\n2 m/s → 5 m/s → 7.5 m/s\n每级 10 次飞行"]
+      P3C --> P3D{"全速度等级通过?\n成功率 > 85%"}
+      P3D -- "否 → 调整域随机化\n范围或强度" --> P1B
+    end
+
+    subgraph PHASE4["阶段4: 任务执行与迭代"]
+      P4A["接收飞行任务\n目标点序列"] --> P4B["100Hz 在线循环\nActor 推理 → HOCBF QP → PX4"]
+      P4B --> P4C["高速自主穿越\n密集杂乱 / 森林环境\n最高 7.5 m/s"]
+      P4C --> P4D["记录日志\n轨迹 / 速度曲线 / HOCBF 触发统计\n用于策略迭代改进"]
+    end
+
+    PHASE1 --> PHASE2 --> PHASE3 --> PHASE4
+
+    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class P1A,P1B,P1C,P1D p1
+    class P2A,P2B,P2C p2
+    class P3A,P3B,P3C,P3D p3
+    class P4A,P4B,P4C,P4D p4
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题（约束马尔可夫决策过程 CMDP）</span>
+    $$ \max_{\pi} \mathbb{E}_{\tau \sim \pi} \left[ \sum_{t=0}^{T} \gamma^t R(s_t, a_t) \right] \quad \text{s.t.} \quad \forall t: h(x_t) \geq 0 $$
+    $$ h(x) = d_{\text{obs}}(x) - r_{\text{safe}}, \quad a_t^{\text{exec}} = \text{HOCBF}\big( \pi(o_t^{\text{noisy}}) \big) $$
+    <div class="eq-note">
+      <strong>$\pi$</strong> = 视觉飞行策略（从噪声深度图 + 本体感知到姿态指令的端到端映射）&nbsp;|&nbsp;
+      <strong>$o_t^{\text{noisy}}$</strong> = 经域随机化处理的观测（丢包/噪声/延迟——模拟真实传感器退化）&nbsp;|&nbsp;
+      <strong>$h(x_t)$</strong> = 安全函数——四旋翼位置到最近障碍物距离减去安全半径 1.0m &nbsp;|&nbsp;
+      <strong>HOCBF</strong> = 高阶控制屏障函数——将 $\pi$ 的输出投影到满足 $h(x) \geq 0$ 的可证明安全动作集 &nbsp;|&nbsp;
+      <strong>$R$</strong> = 七项复合奖励：导航 + 安全 + 平滑 + 碰撞 + 成功 + 速度 + 高度。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度/频率</th></tr>
+    <tr><td><strong>输入 — 深度图像</strong></td><td>单通道前视深度图（经域随机化：丢包/噪声/延迟）</td><td>100×60×1 @ 30Hz</td></tr>
+    <tr><td><strong>输入 — 线速度</strong></td><td>世界坐标系下的三轴线速度（IMU + 里程计融合）</td><td>3 维 @ 100Hz</td></tr>
+    <tr><td><strong>输入 — 旋转矩阵</strong></td><td>机体坐标系到世界坐标系的 3×3 旋转矩阵（表示当前姿态）</td><td>9 维（展平）@ 100Hz</td></tr>
+    <tr><td><strong>输入 — 上一帧动作</strong></td><td>最近 5 帧的动作向量用作时序上下文</td><td>4×5 = 20 维</td></tr>
+    <tr><td><strong>输入 — 目标相对位置</strong></td><td>目标点在当前机体坐标系下的三维相对位置</td><td>3 维 @ 100Hz</td></tr>
+    <tr><td><strong>输出 — RL 原始动作</strong></td><td>质量归一化集体推力 + 期望姿态角（roll, pitch, yaw）</td><td>4 维 @ 100Hz</td></tr>
+    <tr><td><strong>输出 — HOCBF 安全动作</strong></td><td>QP 投影后的安全推力 + 姿态角指令</td><td>4 维 @ 100Hz</td></tr>
+    <tr><td><strong>最终执行</strong></td><td>PX4 将安全动作转化为 4 个电机的 PWM 转速指令</td><td>4 × PWM @ 400Hz</td></tr>
+    <tr><td><strong>任务目标</strong></td><td>从起点安全导航至目标点，仅依赖机载深度相机，最大速度 7.5 m/s</td><td>成功率 + 碰撞率 + 到达时间</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>安全关键的视觉高速自主导航</strong>任务——处于"感知-规划-控制"的交汇地带。核心特征：(1) <strong>感知层面</strong>——从 100×60 极低分辨率深度图中隐式理解 3D 空间结构，无需显式建图、SLAM 或占据栅格；(2) <strong>决策层面</strong>——在部分可观测 + 感知退化的条件下实时输出安全飞行动作（100Hz 闭环）；(3) <strong>安全层面</strong>——通过 HOCBF 提供可证明的数学安全保证（前提：障碍物检测正确）。任务的关键难点：100×60 = 6000 像素的深度图是极其有限的信息瓶颈，而 7.5 m/s 的高速意味着"看到障碍物 → 做出反应"的可用时间窗口约 500ms——策略必须在信息极度贫乏的条件下做出零容错的安全决策。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：高速视觉飞行中的"敏捷性-安全性-感知可靠性"不可能三角。<br><br>
+    （1）<strong>敏捷性 vs 安全性</strong>：速度越高，可用的安全反应时间越短（7.5 m/s 时，10m 外障碍物的反应窗口仅 1.3 秒，减去感知延迟约 50ms 和机动执行时间约 200ms，纯决策时间不足 1 秒）。RL 策略为了最大化速度奖励，天然倾向于选择紧贴障碍物的"擦边"路径——这在完美的仿真感知中可以成功，但在真实传感器噪声下极其危险。HOCBF 通过在每个控制周期强制执行形式化安全约束，从根本上解决了这个矛盾——RL 可以自由追求速度，但 HOCBF 在输出端将其"拉回"安全区域。<br><br>
+    （2）<strong>感知可靠性 vs 速度</strong>：高速飞行中深度相机面临三类退化：(a) 运动模糊——7.5 m/s 线速度 + 角速度导致的图像模糊使深度估计算法失效；(b) 帧率不稳定——30Hz 相机在高动态下可能出现帧丢失，导致 GRU 时序链断裂；(c) 固有噪声——消费级深度相机（如 RealSense D435i）在 5m 处的深度噪声约 σ=0.05m。100×60 的超低分辨率进一步压缩了可用信息——CNN 必须仅从 6000 个像素中推断完整的 3D 避障策略。域随机化（丢包 20% + 噪声 σ=0.05m + 延迟 0-20ms）迫使策略学会在"感知严重退化"的条件下仍做出安全决策。<br><br>
+    （3）<strong>Sim-to-Real 动力学 mismatch</strong>：仿真中的四旋翼动力学模型（推力响应曲线、气动阻尼系数、电池电压-推力映射、螺旋桨惯量效应）与真机存在系统性差异。RL 策略可能无意识地学会利用仿真的特定动力学特性（如"瞬间全推力加速"）——这在真机上由于电机电流限制和电池内阻而无法复现。解决策略：(a) 输出姿态角而非电机指令——将底层执行器动力学的 mismatch 委托给 PX4 成熟的级联控制律吸收；(b) 仿真中加入动力学域随机化（质量 ±15%、转动惯量 ±20%、推力系数 ±10%）——覆盖真机参数的制造公差范围。<br><br>
+    <strong>三者交织</strong>：这不是三个独立问题的简单叠加——它们相互放大。感知噪声导致 RL 策略误判障碍物位置 → HOCBF 基于错误输入触发不当安全干预 → 过度减速导致真机动力学进入高气动阻尼区域 → 策略的输出与实际执行偏差增大 → 进一步加剧感知-控制的 mismatch。打破这个恶性循环需要三层设计同时到位：非对称训练（解决感知噪声下的学习）、域随机化（解决分布漂移）、HOCBF（解决安全底线）。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits <span style="font-weight:400;font-size:13px;color:#64748b;">（前人方法及其局限 — 节标题英文，正文中文）</span></h3>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails at High Speed (&gt;5 m/s)</th></tr>
+    <tr>
+      <td>Traditional Planning Pipeline: VIO + ESDF + A*/RRT* + Trajectory Optimization + Controller</td>
+      <td>Sensing → Mapping → Planning → Control: visual-inertial odometry estimates state, Euclidean Signed Distance Field built incrementally from depth, global/local planner generates collision-free trajectory, low-level controller tracks it</td>
+      <td><strong>级联延迟在每一级累加</strong>——从"看到"障碍物到"做出反应"的总延迟可达 100-200ms（建图 30ms + 规划 50ms + 优化 30ms + 通信 10ms = 120ms），在 7.5 m/s 下等于飞行了 0.9 米后才开始反应。<strong>保守的 ESDF 膨胀半径</strong>（通常 ≥ 1.5m）直接舍弃了 RL 策略可以自然利用的狭窄空隙。<strong>规划和控制的分离</strong>无法利用四旋翼全耦合动力学的敏捷性——将速度上限锁死在约 3-4 m/s</td>
+    </tr>
+    <tr>
+      <td>Pure End-to-End RL (Standard PPO/SAC, No Safety Layer)</td>
+      <td>Train a single neural network mapping depth images directly to motor commands or velocity setpoints using PPO/SAC, deploy zero-shot from simulation to real hardware</td>
+      <td><strong>无安全性证明</strong>——RL 策略是随机黑箱，在 OOD 状态下（如比训练密度高 3 倍的障碍物布局）可产生灾难性动作，且无任何机制阻止。<strong>无特权 Critic 时</strong>，用噪声部分观测训练价值函数极不准确，训练收敛缓慢（>500M 步仍未收敛）。<strong>直接输出电机指令</strong>导致严重的 sim-to-real 执行器动力学 mismatch——仿真中学会的"瞬间全推力"在真机上无法复现</td>
+    </tr>
+    <tr>
+      <td>Differentiable-Physics Optimization (Song et al., 2021)</td>
+      <td>Backpropagate gradients through a differentiable simulator to directly optimize open-loop trajectories for vision-based flight tasks</td>
+      <td><strong>开环本质</strong>——输出是固定轨迹而非闭环反应策略，无法适应在线感知变化（如突然出现的障碍物或风扰动）。<strong>长时域梯度退化</strong>——超过 5 秒的轨迹优化中，碰撞约束的梯度在反向传播中衰减至几乎为零，无法有效优化。实验表明在密集杂乱和森林场景中经常卡在局部最优（绕大圈但不碰撞）</td>
+    </tr>
+    <tr>
+      <td>MPC with Learned Dynamics (Neural-MPC)</td>
+      <td>Learn a neural dynamics model of the quadrotor from data, then use it inside a nonlinear MPC loop for real-time trajectory replanning</td>
+      <td><strong>计算瓶颈</strong>——100Hz 的非线性 MPC 需要强大的机载 GPU，大幅增加重量和功耗。<strong>学习动力学误差在高速下复合放大</strong>——气动阻尼和旋翼间干扰等效应在 >5 m/s 时占主导，而学习到的模型通常在低速数据上训练。<strong>感知仍非端到端</strong>——需要显式状态估计和 ESDF 建图，继承所有 pipeline 延迟</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 部分可观测性下的高速信用分配</strong>：深度相机 100×60 分辨率 + 仅前视 FoV——策略需要在信息极度不完整的条件下，对 100Hz 频率的动作输出进行正确的信用分配。经典 RL 的信用分配问题（"1 秒前的某个动作导致了现在的碰撞吗？"）在部分可观测 + 高速的场景下被极度放大——因为观测噪声使因果关系更加模糊。非对称 Critic 通过访问真值状态来切断这种模糊性。</li>
+    <li><strong>挑战 2 — 安全性的可证明性与感知错误的张力</strong>：HOCBF 提供的形式化安全保证以"障碍物距离 $d_{\text{obs}}$ 已知且准确"为前提——但在真实深度相机中，细薄障碍物（电线、细树枝）、透明障碍物（玻璃）、黑色表面（吸收红外）均存在系统性漏检。一旦 $d_{\text{obs}}$ 被低估，HOCBF 的可证明安全性立即失效——而策略对此完全无感知。这个"感知错误 → 安全保证失效"的链式故障是本文方法最根本的脆弱性。</li>
+    <li><strong>挑战 3 — CBF 保守性 vs 通过性的最优权衡</strong>：HOCBF 的安全半径 $r_{\text{safe}}$ 是一个关键设计参数——太大（如 1.5m）会过度约束飞行空间，在狭窄通道中 QP 无可行解（策略被"锁死"）；太小（如 0.5m）则安全冗余不足。且最优值取决于当前飞行条件（速度、环境密度、传感器噪声水平）——目前是固定值，无法自适应调节。这个参数的标定是经验和理论之间的灰色地带。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>整体算法分为三个解耦的阶段：(1) <strong>训练阶段</strong>——在仿真中运行非对称 PPO，Actor 接收经过域随机化（丢包/噪声/延迟）的观测，Critic 接收真值状态，通过最大化七项复合奖励学习从 100×60 深度图到归一化推力 + 姿态角指令的端到端映射；(2) <strong>闭环验证阶段</strong>——将训练好的 Actor 与 HOCBF 结合，在仿真中验证碰撞率（必须为 0%）和 HOCBF 触发率（必须 < 5%）；(3) <strong>部署阶段</strong>——将 Actor 权重（仅 Actor，不含 Critic）零样本迁移到真机，每个控制周期（100Hz）运行：Actor 推理（< 5ms）→ HOCBF QP（< 2ms）→ PX4 姿态跟踪。</p>
+
+  <h3>6.2 Key Formulas</h3>
+
+  <h4>Group A: 非对称 PPO 目标函数</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 非对称 Actor-Critic PPO 损失函数</span>
+    $$ L_{\text{PPO}}(\theta) = \mathbb{E}_t \left[ \min\left( r_t(\theta) \hat{A}_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t \right) \right] - \beta \cdot \mathcal{H}(\pi_\theta) + \lambda \cdot L_{\text{value}}(\phi) $$
+    $$ r_t(\theta) = \frac{\pi_\theta(a_t | o_t^{\text{noisy}})}{\pi_{\theta_{\text{old}}}(a_t | o_t^{\text{noisy}})}, \quad \hat{A}_t = \sum_{k=0}^{\infty} (\gamma \lambda_{\text{GAE}})^k \delta_{t+k} $$
+    $$ \delta_t = r_t + \gamma V_\phi(s_t^{\text{priv}}) - V_\phi(s_{t+1}^{\text{priv}}), \quad \text{其中 } V_\phi \text{ 的输入为 Critic 可见的真值状态} $$
+    <div class="eq-note">
+      <strong>$o_t^{\text{noisy}}$</strong> = Actor 的噪声观测（深度图丢包 20% + 高斯噪声 σ=0.05m + 随机延迟 0-20ms）&nbsp;|&nbsp;
+      <strong>$s_t^{\text{priv}}$</strong> = Critic 的特权状态（真值位姿/速度/障碍物精确 3D 距离）&nbsp;|&nbsp;
+      <strong>$\lambda_{\text{GAE}}$</strong> = GAE trace-decay 参数 0.95——平衡优势估计的偏差和方差 &nbsp;|&nbsp;
+      <strong>$\beta \cdot \mathcal{H}$</strong> = 熵正则化——在高维动作空间中防止策略过早确定性坍缩到局部最优 &nbsp;|&nbsp;
+      <strong>$L_{\text{value}}$</strong> = 价值网络 MSE 损失——Critic 学习准确的价值估计以提供高质量策略梯度。
+    </div>
+  </div>
+
+  <h4>Group B: HOCBF 安全过滤器——QP 形式的实时可证明安全投影</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — HOCBF 安全投影 QP 及其约束构造</span>
+    $$ \min_{a \in \mathbb{R}^4} \|a - a_{RL}\|_W^2 \quad \text{s.t.} \quad L_f^2 h(x) + L_g L_f h(x) \cdot a + (\alpha_1 + \alpha_2) L_f h(x) + \alpha_1 \alpha_2 h(x) \geq 0 $$
+    $$ h(x) = d_{\text{obs}}(x) - r_{\text{safe}} = d_{\text{obs}}(x) - 1.0, \quad \dot{h} \text{ 由有限差分法从连续深度帧中在线估计} $$
+    <div class="eq-note">
+      <strong>$h(x)$</strong> = 安全函数——无人机位置到最近障碍物的距离减去安全半径 1.0m &nbsp;|&nbsp;
+      <strong>$L_f, L_g$</strong> = 四旋翼动力学函数 $f$（无控制项）和 $g$（控制系数矩阵）的 Lie 导数 &nbsp;|&nbsp;
+      <strong>$L_f^2 h(x)$</strong> = 安全函数的二阶 Lie 导数（由无控制动力学决定的固有加速度项）&nbsp;|&nbsp;
+      <strong>$L_g L_f h(x)$</strong> = 控制输入 $a$ 对安全的影响通道——这是 QP 约束中唯一与决策变量相关的项（线性）&nbsp;|&nbsp;
+      <strong>$\alpha_1, \alpha_2$</strong> = 安全衰减系数——控制向安全边界靠近的速率上限，值越大越保守（默认 3.0）&nbsp;|&nbsp;
+      <strong>$W$</strong> = 对角加权矩阵——$W_{ii}$ 大表示第 $i$ 维动作修改代价高（推力通常比姿态更不应被修改）。
+    </div>
+  </div>
+
+  <h4>Group C: 七项物理启发奖励函数</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 七项复合奖励函数的完整设计（优先级递减）</span>
+    $$ R_t = \underbrace{w_{\text{nav}} \cdot \exp(-\beta_{\text{nav}} \cdot \Delta d_t)}_{\text{① 导航奖励: 指数衰减}} + \underbrace{w_{\text{safe}} \cdot \min\big(0, d_{\text{obs}} - d_{\text{thresh}}\big)^2}_{\text{② 安全奖励: 二次势场}} + \underbrace{w_{\text{smooth}} \cdot \|a_t - a_{t-1}\|_2^2}_{\text{③ 平滑性奖励: L2惩罚}} $$
+    $$ + \underbrace{w_{\text{col}} \cdot \mathbf{1}_{\text{collision}}}_{\text{④ 碰撞惩罚: -100}} + \underbrace{w_{\text{succ}} \cdot \mathbf{1}_{\text{success}}}_{\text{⑤ 成功奖励: +100}} + \underbrace{w_{\text{speed}} \cdot \|v_t\|_2}_{\text{⑥ 速度奖励: 线性}} + \underbrace{w_{\text{height}} \cdot (z_t - z_{\text{target}})^2}_{\text{⑦ 高度奖励: 二次惩罚}} $$
+    <div class="eq-note">
+      <strong>$\Delta d_t = d_t - d_{t-1}$</strong> = 到目标距离的变化量——负值（靠近目标）获得正奖励，指数形式使"快速靠近"比"缓慢靠近"获得几何级更高的奖励 &nbsp;|&nbsp;
+      <strong>$d_{\text{obs}}$</strong> = 到最近障碍物距离，$d_{\text{thresh}}$ = 安全阈值——距离 < 阈值时二次惩罚，形成安全势场（越近惩罚梯度越大）&nbsp;|&nbsp;
+      <strong>权重层次（经验调参）</strong>：$w_{\text{nav}} \gg w_{\text{speed}} > w_{\text{safe}} > w_{\text{smooth}} > w_{\text{height}}$——导航（到达目标）是最高优先级，速度次之，其余为辅助约束。
+    </div>
+  </div>
+
+  <h4>Group D: CNN + GRU 特征提取——从 100×60 深度图到 128 维时空隐状态</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 视觉-时序特征提取完整流程</span>
+    $$ \mathbf{f}_{\text{depth}} = \text{CNN}(I_{\text{depth}}) \in \mathbb{R}^{256}, \quad I_{\text{depth}} \in \mathbb{R}^{100 \times 60 \times 1} $$
+    $$ \mathbf{f}_{\text{state}} = \text{MLP}\big([v_x, v_y, v_z,\; \text{flatten}(R_{3 \times 3}),\; \Delta x_g, \Delta y_g, \Delta z_g]\big) \in \mathbb{R}^{128} $$
+    $$ \mathbf{h}_t = \text{GRU}\big(\mathbf{h}_{t-1},\; [\mathbf{f}_{\text{depth}},\; \mathbf{f}_{\text{state}},\; \mathbf{a}_{t-1}]\big) \in \mathbb{R}^{128} $$
+    $$ a_t = \text{MLP}_{\text{actor}}(\mathbf{h}_t) \in \mathbb{R}^4, \quad V_t = \text{MLP}_{\text{critic}}([\mathbf{h}_t,\; s_t^{\text{priv}}]) \in \mathbb{R} $$
+    <div class="eq-note">
+      <strong>CNN 详细架构</strong>：3 层 Conv2d(3×3 kernel, stride=2, pad=1) + BatchNorm + ReLU，通道数 64 → 128 → 256 → AdaptiveAvgPool2d(1×1) → Flatten → Linear(256) &nbsp;|&nbsp;
+      <strong>GRU 隐状态 128 维</strong>——在时序记忆容量和推理延迟（< 5ms on Jetson）之间的工程折中 &nbsp;|&nbsp;
+      <strong>$\mathbf{a}_{t-1}$</strong> = 上一帧动作——为 GRU 提供"当前处于何种飞行模式"的上下文（加速/转向/悬停），类似于 Kalman Filter 的控制输入项 &nbsp;|&nbsp;
+      <strong>关键工程细节</strong>：GRU 的隐状态充当"短期视觉记忆"——当深度图因丢包（20% 概率）而缺失时，策略可基于 $\mathbf{h}_{t-1}$ 进行"预测性推断"，而非输出随机动作。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>深度图分辨率</td><td><strong>100×60</strong></td><td>CNN 输入的空间分辨率</td><td>极低分辨率是故意设计——(1) 降低 CNN 计算量（FLOPs），保证 100Hz 推理；(2) 迫使策略学习几何结构（空隙形状/宽度）而非纹理细节，天然提高泛化；(3) 低分辨率天然具有抗噪特性（噪声在池化中被平滑）</td></tr>
+    <tr><td>PPO clip 范围 $\epsilon$</td><td><strong>0.2</strong></td><td>策略更新信任区域裁剪参数</td><td>标准值——在高速飞行中，过大的更新步长可能导致策略突变（"突然决定急转"），在训练中引发大幅碰撞崩溃</td></tr>
+    <tr><td>域随机化 — 丢包率</td><td><strong>20%</strong></td><td>深度图帧被随机丢弃的概率</td><td>20% 模拟真实相机在高速运动 + USB 带宽不足时的帧丢失率。足够严重以训练出鲁棒性（80% 帧仍可用），但不会使训练完全退化</td></tr>
+    <tr><td>域随机化 — 深度噪声</td><td><strong>$\sigma$ = 0.05m</strong></td><td>每个有效像素上的零均值高斯噪声标准差</td><td>对应 Intel RealSense D435i 在 5m 处的典型深度均方根误差。过大的噪声（>0.1m）会使训练无法收敛</td></tr>
+    <tr><td>域随机化 — 观测延迟</td><td><strong>0-20ms 均匀分布</strong></td><td>模拟传感器→机载计算机→飞控的随机通信延迟</td><td>覆盖机载系统的典型延迟范围（串口 2-5ms + 计算排队 5-15ms）。均匀分布表示所有延迟值等可能出现——最坏情况下的鲁棒性</td></tr>
+    <tr><td>HOCBF 安全半径 $r_{\text{safe}}$</td><td><strong>1.0 m</strong></td><td>无人机机体到障碍物的最小允许距离</td><td>1.0m 综合考虑：(1) 感知误差 ~0.3m；(2) 控制延迟 0.05s × 7.5m/s = 0.375m；(3) 机动惯性余量 ~0.3m。总和约 1.0m——工程上的合理安全底线</td></tr>
+    <tr><td>HOCBF 衰减系数</td><td><strong>$\alpha_1 = \alpha_2 = 3.0$</strong></td><td>控制安全约束的"保守度"——越大越早触发干预</td><td>3.0 意味着系统从边界恢复到安全内部的时间常数约 1/3 秒——足够快以在碰撞前有效介入，但不至于快到引起轨迹抖动</td></tr>
+    <tr><td>GRU 隐状态维度</td><td><strong>128</strong></td><td>时序记忆的编码维度</td><td>128 维在 Jetson 上推理约 1ms——在"记忆容量"和"推理延迟"之间的 Pareto 最优点</td></tr>
+    <tr><td>动作历史窗口</td><td><strong>5 步（~50ms）</strong></td><td>输入网络的历史动作回溯长度</td><td>5 步足以区分"正在持续右转"（趋势）和"偶发的右转抖动"（噪声），帮助 GRU 稳定隐状态更新</td></tr>
+  </table>
+
+  <h3>6.4 有 HOCBF vs 无 HOCBF 的系统性能对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🛡️ 有 HOCBF 安全过滤器（本文完整方案）</h4>
+      <ul>
+        <li>每个动作都经过 100Hz QP 安全验证——可证明不碰撞（前提：障碍物检测正确）</li>
+        <li>QP 最小化动作修改量 $\|a - a_{RL}\|_W^2$——策略意图最大程度保留</li>
+        <li>仿真碰撞率：<strong>0%</strong>（HOCBF 数学保证）</li>
+        <li>真机碰撞率：<strong>~2%</strong>（仅由感知漏检导致——电线/细树枝未被深度相机检测到）</li>
+        <li>平均飞行速度：比无 HOCBF 低约 5%（正常飞行中 HOCBF 极少触发修改）</li>
+        <li>HOCBF 平均触发频率：<strong>3.7%</strong>（每 100 个控制周期约 4 次触发安全投影）</li>
+        <li>OOD 泛化（3 倍训练密度）：成功率 > <strong>90%</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>⚡ 无 HOCBF（纯 RL 端到端，无安全层）</h4>
+      <ul>
+        <li>RL 输出直接执行——无中间验证步骤，无安全保证</li>
+        <li>无修正机制——RL 的 OOD 错误输出直接作用于无人机</li>
+        <li>仿真碰撞率：<strong>~8%</strong>（RL 探索中自然发生的碰撞）</li>
+        <li>真机碰撞率：<strong>~15%</strong>（sim-to-real gap 放大 RL 的危险动作倾向）</li>
+        <li>平均飞行速度：理论更快（无 CBF 减速干预），但碰撞后速度为 0</li>
+        <li>无触发频率概念——唯一的反馈是一次碰撞后的任务终止</li>
+        <li>OOD 泛化（3 倍训练密度）：成功率仅 <strong>~61%</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+
+  <h3>7.1 非对称 Actor-Critic —— 用特权信息"教"策略在贫乏观测下做出最优决策</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 非对称训练的信息理论与梯度正确性</span>
+    $$ \text{信息不等式（Actor 能获取的信息始终少于 Critic）: } I(a_t; s_t^{\text{priv}} \mid o_t^{\text{noisy}}) < I(a_t; s_t^{\text{priv}} \mid s_t^{\text{priv}}) $$
+    $$ \text{但策略梯度无偏（因为 } o_t^{\text{noisy}} \text{ 是 } s_t^{\text{priv}} \text{ 的因果函数）: } \nabla_\theta J = \mathbb{E} \left[ \nabla_\theta \log \pi_\theta(a_t \mid o_t^{\text{noisy}}) \cdot Q^\pi(s_t^{\text{priv}}, a_t) \right] $$
+    <div class="eq-note">
+      <strong>关键洞察</strong>：虽然 Actor 无法访问特权状态（信息不等式约束了策略的最高可达性能——这是无法突破的上限），但 Critic 基于真值状态估计的 $Q^\pi$ 是<strong>正确的</strong>价值估计——因为 $o_t^{\text{noisy}}$ 在因果关系上是 $s_t^{\text{priv}}$ 的（噪声）函数。策略梯度定理保证了梯度方向的正确性——<strong>非对称 Critic 为 Actor 提供的梯度信号是无偏的</strong>。<br><br>
+      <strong>直觉类比</strong>：驾校教练（Critic）可以看到整个路况（特权状态——所有障碍物的精确位置和速度），随时告诉学员（Actor）："刚才那个转弯可以更快"或"刚才那个距离太近了下次注意"。学员自己只能看到前方有限的模糊视野（噪声深度图），但通过教练的持续反馈，学员学会了从有限视野中推断出完整的路况信息。这就是非对称训练的"知识传递"效应——Critic 的"上帝视角"通过策略梯度桥梁完整地传递给了只有"局部视角"的 Actor。
+    </div>
+  </div>
+
+  <p>在本文的具体场景中，Critic 访问的障碍物精确距离信息具有不可替代的作用——它让价值函数在"虽然 Actor 视野中看不到，但确实距离障碍物很近"的状态上赋予极低的价值（危险预警），即使该障碍物在当前深度图中因丢包或处于视野边缘而不可见。这种"隐藏危险的预先警告"通过优势函数 $\hat{A}_t$ 编码为梯度信号，引导 Actor 学会对视野边缘和丢包区域保持天然的谨慎。</p>
+
+  <h3>7.2 HOCBF —— 为什么高阶控制屏障函数对四旋翼飞行安全是必要的</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 相对阶的概念与 HOCBF 的构造逻辑</span>
+    $$ \text{四旋翼动力学（简化）: } \dot{x} = f(x) + g(x) u, \quad x = [\mathbf{p}, \dot{\mathbf{p}}, \mathbf{q}, \boldsymbol{\omega}]^T, \quad u = [f_{\text{thrust}}, \phi_{\text{des}}, \theta_{\text{des}}, \psi_{\text{des}}]^T $$
+    $$ h(x) = \|\mathbf{p} - \mathbf{p}_{\text{obs}}\| - r_{\text{safe}} \text{（位置函数）} \Rightarrow L_g h(x) = 0 \text{（} u \text{ 是加速度级，不直接影响位置）} $$
+    $$ L_g L_f h(x) \neq 0 \Rightarrow \text{相对阶 } = 2 \Rightarrow \text{需要 HOCBF 而非标准 CBF} $$
+    <div class="eq-note">
+      <strong>$L_g h(x) = 0$</strong> = 控制输入 $u$（推力 + 姿态角）不<strong>直接</strong>影响安全函数 $h$ 的变化率——因为 $u$ 直接影响的是加速度 $\ddot{\mathbf{p}}$，而 $h$ 是位置 $\mathbf{p}$ 的函数。必须经过两次时间积分（$\ddot{\mathbf{p}} \rightarrow \dot{\mathbf{p}} \rightarrow \mathbf{p}$）才能使 $u$ 的影响传播到 $h$。<br><br>
+      <strong>标准 CBF 的局限</strong>：标准 CBF 约束为 $\dot{h}(x) + \alpha h(x) \geq 0$——这要求 $u$ 能<strong>瞬间</strong>影响 $\dot{h}$（即 $L_g h(x) \neq 0$，相对阶 = 1）。这对四旋翼的碰撞避免约束不成立——推力不能瞬间改变位置（只能改变加速度），因此标准 CBF 在数学上不适用于该问题。<br><br>
+      <strong>HOCBF 的核心技巧</strong>：将原始的 1 个安全约束 $h(x) \geq 0$（相对阶 = 2）替换为 <strong>2 个级联的中间约束</strong>：$\psi_1 = \dot{h} + \alpha_1 h \geq 0$（相对阶 = 1）和 $\psi_2 = \dot{\psi}_1 + \alpha_2 \psi_1 \geq 0$（相对阶 = 0，即直接约束 $u$）。这个两级构造将高相对阶问题降阶为可直接求解的一阶问题。
+    </div>
+  </div>
+
+  <h3>7.3 域随机化 —— 从统计学习角度理解 sim-to-real 的泛化</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 域随机化的泛化误差界与"包裹策略"</span>
+    $$ \mathbb{E}_{\text{real}}[R(\pi)] \geq \mathbb{E}_{\text{sim}}^{\text{rand}}[R(\pi)] - D_{TV}(p_{\text{sim}}^{\text{rand}}, p_{\text{real}}) \cdot R_{\max} $$
+    $$ p_{\text{sim}}^{\text{rand}} = \text{Mixture}\big(p_{\text{sim}}(\theta_1), p_{\text{sim}}(\theta_2), ..., p_{\text{sim}}(\theta_K)\big) $$
+    $$ \text{目标: } p_{\text{sim}}^{\text{rand}} \supseteq p_{\text{real}} \text{（仿真分布"包裹"真实分布）} $$
+    <div class="eq-note">
+      <strong>$D_{TV}$</strong> = 仿真观测分布 $p_{\text{sim}}^{\text{rand}}$ 与真机观测分布 $p_{\text{real}}$ 之间的全变差距离（Total Variation distance）。距离越小，sim-to-real 的性能退化越少——域随机化的目标就是最小化这个距离。<br><br>
+      <strong>$p_{\text{sim}}^{\text{rand}}$</strong> = 经过域随机化后的仿真观测分布——是 $K$ 个不同仿真参数 $\theta_k$（对应不同的噪声水平、延迟、动力学参数）下观测分布的<strong>均匀混合</strong>。混合分布的支撑集远大于任何单个分布。<br><br>
+      <strong>"包裹"策略</strong>：如果 $p_{\text{sim}}^{\text{rand}}$ 的支撑集覆盖了 $p_{\text{real}}$ 的支撑集（即真实世界中可能出现的任何传感器/动力学状态都在仿真中出现过），则策略在真实世界中的性能退化在理论上受限于覆盖的"紧密程度"。域随机化的艺术在于选择正确的随机化维度和范围——太少则覆盖不足（gap 大），太多则训练过难（策略学不会）。
+    </div>
+  </div>
+
+  <p>本文的域随机化分为三组共 7 个维度：(a) <strong>感知随机化 3 项</strong>——深度图丢包（20%）、高斯噪声（σ=0.05m）、通信延迟（0-20ms uniform）；(b) <strong>动力学随机化 3 项</strong>——质量 ±15%、转动惯量 ±20%、推力系数 ±10%；(c) <strong>环境随机化 1 项</strong>——障碍物密度/尺寸/位置/光照条件随机。消融实验表明：全部保留时真机成功率为 93.8%，移除全部域随机化后真机成功率暴跌至 58.3%——降幅高达 35.5 个百分点，是所有消融项中影响最大的单一模块。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    <strong>非对称 Actor-Critic</strong> 提供训练效率（解决"贫乏观测下信用分配困难"——价值估计方差降低约 3 倍）→ <strong>域随机化</strong> 提供鲁棒性桥接（解决"仿真到真实的分布漂移"——真机成功率从 58% 提升至 93%）→ <strong>HOCBF</strong> 提供部署安全底线（解决"RL 黑盒在 OOD 状态下的不可信性"——OOD 密度 ×3 时成功率从 61% 提升至 90%）→ <strong>三者形成一个完整的"高效训练-鲁棒迁移-安全部署"闭环系统</strong>。缺少任何一环：无非对称训练 → 策略不够鲁棒（训练不收敛）；无域随机化 → 真机迁移失败（成功率 < 60%）；无 HOCBF → OOD 场景不安全（成功率 < 62%）。三个模块各自独立贡献，叠加后产生超线性的协同效果——这正是系统工程中"1+1+1 > 3"的典型案例。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">系统概览：端到端视觉飞行策略 + HOCBF 安全屏蔽的完整架构</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="System overview of Safety-Shielded RL for high-speed vision-based flight"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 左侧输入——100×60 深度图像（经域随机化：丢包 20% + 高斯噪声 σ=0.05m + 随机延迟 0-20ms）、IMU 线速度和旋转矩阵、目标相对位置、5 步动作历史。(b) 中间特征提取——CNN（3 层 3×3 卷积）将深度图编码为 256 维空间特征，与 128 维状态编码和 20 维动作历史拼接后送入 128 维 GRU 进行时序融合。(c) 右上策略网络——Actor MLP（256→128→4）输出归一化集体推力 + roll/pitch/yaw 期望姿态角；Critic MLP（仅在训练时存在）基于 GRU 隐状态 + 真值状态输出标量价值。(d) 右下安全层——HOCBF 安全过滤器求解 4 维 QP，将 Actor 输出投影到满足可证明安全约束的动作集上（灰色区域 = 不安全动作空间，箭头 = QP 投影方向）；安全动作传递给 PX4 姿态控制器（400Hz）。</p>
+      <ul>
+        <li><strong>GRU 的"记忆桥梁"关键作用</strong>：当深度图因 20% 丢包而缺失时，GRU 基于 $\mathbf{h}_{t-1}$ 和前几帧积累的几何信息进行"预测性推断"——输出不是随机的，而是基于历史上下文的最可能安全动作。这在森林高速飞行中特别关键（细树枝可能在任何一帧被漏检或丢包）</li>
+        <li><strong>HOCBF 的"最小干预"哲学</strong>：QP 目标函数为 $\min \|a - a_{RL}\|_W^2$——加权最小二乘，仅在 $a_{RL}$ 违反安全约束时施加修正，修正量由 $W$ 矩阵加权（推力维度通常权重更大——更不应被修改）。实测中只有 3.7% 的控制周期触发修正，其余 96.3% 的时间 $a^* = a_{RL}$（零干预）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">训练曲线与四组分层的消融实验：域随机化 + 非对称 Critic + HOCBF + 奖励逐项</span>
+      <span class="fig-source">来源：论文 Fig. 3-5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Training curves and layered ablation studies"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了四组关键消融结果</strong>：</p>
+      <p><strong>(a) 非对称 vs 对称 Critic：</strong>非对称 PPO 在约 200M 环境步收敛至成功率 > 90%、平均速度 > 6 m/s。对称 PPO（Actor 和 Critic 都用噪声观测）在 500M 步后成功率仍约 60%、平均速度约 4 m/s。非对称 Critic 提供的准确价值估计使策略梯度的信噪比提高约 3 倍——训练效率的差距随时间累积而非缩小（对称 Critic 可能永远不会收敛到同等水平）。</p>
+      <p><strong>(b) 域随机化逐项移除（真机测试）：</strong>从完整设置出发逐步移除各项随机化，每步的真机成功率变化："全部保留" → 93.8% → "−延迟" → 78%（−15.8%）→ "−噪声" → 65%（−13%）→ "−丢包" → 55%（−10%）→ "−动力学" → 40%（−15%）→ "全部移除" → 18%。</p>
+      <p><strong>(c) HOCBF 消融：</strong>真机 120 次飞行：HOCBF 开启 → 碰撞率 2%（仅 2 次，均为细树枝漏检）；HOCBF 关闭 → 碰撞率 15%（18 次）。HOCBF 以约 5% 的平均速度代价换取了约 87% 的碰撞率降低——这是"安全-性能"权衡的 Pareto 最优点。</p>
+      <p><strong>(d) 奖励函数七项逐项移除：</strong>(i) −导航 → 策略原地悬停（没有向目标移动的动力）；(ii) −安全 → 策略学会"碰运气"高速飞行——仿真成功率仍高（有随机种子重试）但真机碰撞率飙升；(iii) −平滑 → 动作高频振荡（50Hz+）导致真机机身剧烈抖动 → IMU 数据被污染 → 恶性循环；(iv) −速度 → 策略以最低安全速度飞行（~2 m/s），完全失去速度优势。</p>
+      <ul>
+        <li><strong>延迟随机化的意外高重要性</strong>：移除延迟随机化（保留噪声和丢包）时真机成功率下降最大（−15.8%）——说明深度图的<strong>时序一致性</strong>（帧之间的时间间隔必须被正确建模）是策略学会鲁棒飞行的重要因素。GRU 对输入序列的时间间隔高度敏感——仿真中的"帧间等间隔"假设在真实系统（非实时 OS）中不成立</li>
+        <li><strong>动力学随机化不可忽视</strong>：移除动力学随机化（保留全部感知随机化）导致成功率仅 40%——说明即使感知鲁棒，如果策略在仿真中学会了依赖特定的推力-加速度映射，真机的动力学差异仍会通过控制误差累积导致失败</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">真机实验：密集杂乱和森林环境中的高速飞行轨迹、速度曲线和 HOCBF 触发分布</span>
+      <span class="fig-source">来源：论文 Fig. 7-8</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Real-world flight trajectories in dense clutter and forest"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>(a) 密集杂乱场景（室内随机柱子和板材，间距约 1.5m）：</strong>RL+HOCBF 以平均 6.8 m/s 穿越——飞行轨迹自然弯曲，充分利用连续空间中的最大空隙。传统规划方法（VINS + ESDF + A* + B-spline）以平均 3.2 m/s 通过——ESDF 的保守膨胀半径将狭窄空隙标记为"不可通过"。可微分物理基线有几次完全卡住（梯度优化发散到局部最优——绕远路但不碰）。</p>
+      <p><strong>(b) 真实森林环境（天然树林，树干间距 1-3m）：</strong>RL 策略展现出"智能空隙选择"行为——轨迹平滑弯曲地穿过树干之间的最大间隔，类似于人类 FPV 飞手的路径选择策略。森林中的地面不平、树枝摇曳、斑驳光影等真实噪声均未导致策略失败——域随机化的价值在此得到最直接的体现。</p>
+      <p><strong>(c) 速度-时间曲线：</strong>加速阶段 0 → 7.5 m/s 仅需约 0.8 秒（推力→加速度→速度→位置的级联延迟）。森林巡航阶段平均速度 6.2 m/s，峰值 7.5 m/s。速度在遇到窄间隙时自动降低（RL 自发学会的安全减速行为——不需人工调参），通过后重新加速。</p>
+      <p><strong>(d) HOCBF 触发事件分布（120 次飞行统计）：</strong>平均 3.7% 触发率。触发分布：急转弯后（40%）——转弯中深度图有短暂盲区，策略输出偏激进而被 HOCBF 拉回；狭窄空隙通过时（35%）——安全函数 $h(x)$ 接近零边界时被 CBF 约束激活；强风扰动（15%）——环境力将无人机推向障碍物，HOCBF 通过修正推力补偿；传感器噪声尖峰（10%）。</p>
+      <ul>
+        <li><strong>森林环境的"自然课程"效应</strong>：森林中树木的分布有天然规律（树干 + 树冠空隙形成自然通道）——RL 策略（感谢 CNN 的空间理解能力）比基于网格的规划方法更擅长利用这种自然结构，因为 CNN 可以直接"看到"空隙的形状、宽度和深度，而非将其抽象为占据栅格的 0/1 二值</li>
+        <li><strong>速度自适应的行为涌现</strong>：策略在密集区域自动减速、在空旷区域自动加速——这种"速度自适应"行为并非人工编程的状态机逻辑，而是从七项奖励函数的隐式交互中<strong>自发涌现</strong>的——导航奖励推动了向目标的高速飞行，安全奖励在靠近障碍物时通过价值函数间接减速，两种力量的动态平衡产生了自然的速度调节</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>HOCBF 对完美障碍物检测的根本性依赖</strong>：HOCBF 提供的"可证明安全保证"以障碍物距离 $d_{\text{obs}}$ 准确为前提——这是一个很强的假设。在实际部署中，以下障碍物类别存在系统性的检测失败风险：(a) 细薄物体——电线、细树枝（直径 < 5mm）在 100×60 深度图中可能占据 0-1 个像素，被亚像素采样遗漏；(b) 透明/反射表面——玻璃幕墙、水面反射导致深度值为 0（空洞）或错误值；(c) 动态障碍物——行人、其他无人机、飘落树叶的相对速度使有限差分估计失效。一旦 $d_{\text{obs}}$ 被低估或未检测，HOCBF 的数学保证立即失效——而系统对此完全没有感知（没有不确定性估计或故障检测机制）。</li>
+    <li><strong>全局导航能力的缺失</strong>：策略的输入仅包含"目标相对位置"（局部导航信号），没有全局地图或高层语义规划能力。这意味着：(a) 如果目标点在大型障碍物（如建筑物）后方，策略无法自动规划绕行路径——可能陷入"直冲障碍物→HOCBF 减速→徘徊→再冲"的死循环；(b) 在 U 型或环形障碍物布局中，策略可能被"困住"——因为局部梯度永远指向目标方向（穿过障碍物），而绕行需要暂时的"远离目标"——这在纯局部奖励函数中是不可学习的。</li>
+    <li><strong>100×60 深度图的信息瓶颈</strong>：虽然低分辨率有助于计算效率和泛化，但在某些场景中 6000 个像素根本不足以区分安全空隙和危险空隙。例如两个相距 0.8m 的杆子和一个 1.2m 空隙——在 100×60 分辨率 + 10m 距离的投影下，这些可能仅相差 1-2 像素——CNN 需要从亚像素模式中推断可通过性，这在不完美的深度值下几乎是随机猜测。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>不确定感知的安全屏障（Probabilistic CBF）</strong>：将深度图的逐像素不确定性估计（如从深度相机的噪声模型中导出的方差图）纳入 HOCBF 约束——将确定性约束 $h(x) \geq 0$ 升级为概率约束 $\Pr[h(x) \geq 0] \geq 1-\delta$。当深度不确定性高时，CBF 自动变得更加保守——可从根本上解决"感知错误→安全保证失效"的链式故障。</li>
+    <li><strong>分层规划：拓扑地图 + RL 飞行</strong>：在 RL 策略之上增加一个轻量级拓扑规划器——高层负责"选择全局通行的子目标序列"（如基于可见性图的稀疏路径搜索，> 1Hz 更新），低层 RL 负责"在子目标之间以最高速度安全飞行"（100Hz 推理）。高层规划处理"绕行大型障碍物"的全局需求，低层 RL 保持端到端的敏捷性优势。</li>
+    <li><strong>多模态感知融合：深度 + 事件相机</strong>：事件相机（event camera）的高时间分辨率（微秒级）和低延迟是深度相机的理想补充——事件流可以捕获高速运动中的障碍物边缘信息（深度相机可能因运动模糊丢失），也可在强光/弱光下提供可靠的几何线索。将事件流作为一个额外通道馈入 CNN 或作为 GRU 的辅助输入，可大幅提升极端光照条件下的鲁棒性。</li>
+    <li><strong>在线自适应 CBF 参数</strong>：当前 HOCBF 的 $\alpha_1, \alpha_2$ 和 $r_{\text{safe}}$ 是手动标定的固定值——但在实际部署中，最优值依赖于飞行条件（速度、环境密度、电池电压、风速）。设计一个在线自适应机制——根据实时飞行状态动态调节 CBF 保守度：环境密度高 → 提高 $r_{\text{safe}}$ 和 $\alpha$ → 更安全（减速）；环境开阔 → 降低 $r_{\text{safe}}$ → 更敏捷（提速）。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据/环境问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>深度相机在强光/弱光下的退化</td><td>室外正午强阳光使红外结构光饱和 → 深度图大面积空洞（无效像素=0）。弱光下 ToF 传感器信噪比骤降 → 深度噪声从 σ=0.05m 飙升至 σ=0.2m+。策略从未在"大面积空洞深度图"上充分训练（域随机化仅覆盖 20% 丢包率，而非 50%+ 的空洞率）→ CNN 特征崩溃 → 输出准随机动作。HOCBF 在 $d_{\text{obs}}$ 大面积错误时安全保证失效</td><td>★★★★★</td></tr>
+    <tr><td>高速运动模糊 + 时序退化</td><td>7.5 m/s 线速度 + 大角速度转弯导致连续深度帧之间的像素位移达数十像素 → 深度图在连续帧间失去几何对应性 → GRU 的时序推理失效（输入序列"不连贯"）。极端情况下连续多帧均严重模糊 → 策略完全依赖"惯性导航"（历史动作 + 本体感知），失去视觉避障能力</td><td>★★★★</td></tr>
+    <tr><td>电池电压衰减（低电量状态）</td><td>锂电池 SOC < 20% 时电压从 4.2V 降至 3.5V → 最大推力下降约 30%（推力 ∝ 电压^2）→ 策略在训练时假设的"可达加速度包络"不再成立 → HOCBF 的动力学模型假设的最大减速度无法实现 → QP 约束可能无可行解（需要减速度大于物理极限）→ 安全保证失效</td><td>★★★★</td></tr>
+    <tr><td>机载 GPU 过热降频</td><td>Jetson Xavier/Orin 在持续 100% 负载下 > 5 分钟后触发 thermal throttling → CNN 推理时间从 ~5ms 飙升至 ~15-20ms → 控制频率从标称的 100Hz 降至 ~50Hz → 域随机化中的延迟阈值 (20ms) 被突破 → 策略在"超长延迟"的 OOD 状态下运行，性能未知</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>从"安全屏蔽"到"安全协同训练"——CBF-Guided Reinforcement Learning</strong>。当前架构中 HOCBF 和 RL 是单向关系：RL 输出 → HOCBF 修正。但如果将 HOCBF 的激活信号反馈到 RL 的训练损失函数中——例如，将"HOCBF 触发的频率"作为额外的正则化惩罚项加入 PPO 目标（惩罚那些频繁触发 CBF 的策略），RL 策略会<strong>主动学习</strong>"不需要 CBF 修正的内在安全行为"。HOCBF 的角色从"部署时的被动安全网"升级为"训练时的主动安全教师"——两者的关系从单向变为双向协同。预期效果：CBF 触发频率从 3.7% 降至 < 1%，飞行速度进一步提高（因为策略自身更安全，CBF 减少减速干预）。这代表了从"安全作为附加层"到"安全作为训练信号"的范式升级——将安全从系统外部的补丁变成系统内部的目标。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>无人机在杂乱环境中的飞行速度存在一个由系统架构决定的"天花板"——传统"感知→建图→规划→控制"的串行 pipeline 中，每一级的延迟都在累加：深度图获取 33ms + 建图 30ms + 规划 50ms + 优化 30ms + 通信 10ms = 总延迟约 150ms。在 7.5 m/s 下，这意味着从"看到"障碍物到"开始反应"，无人机已经飞了 1.1 米。这不是"算法不够优化"的问题——这是"架构性延迟"——只要 pipeline 是串行的，这个天花板就无法突破。</li>
+    <li><strong>前人如何处理？各自的根本局限是什么？</strong><br>(i) <strong>经典规划方法</strong>——被架构性延迟锁死在 3-4 m/s；(ii) <strong>端到端 RL</strong>——消除了 pipeline 延迟（"深度图→动作"一步到位），速度可达 5+ m/s，但缺乏安全保证——黑箱策略在 OOD 场景可能输出致命动作；(iii) <strong>可微分物理</strong>——离线优化、开环执行、不鲁棒。三者的共同问题：都在追求"一个系统同时解决性能和安全"，但这是两个正交的目标——最好由不同机制分别处理。</li>
+    <li><strong>为什么 RL + HOCBF 的混合架构是正确方向？</strong><br>因为性能和安全性对系统设计的要求是不同的——(a) 性能（速度、敏捷、平滑路径）需要<strong>数据驱动的灵活性和泛化</strong>——这是 RL 的强项；(b) 安全性（不碰撞）需要<strong>可证明的数学保证</strong>——这是 CBF 的强项。混合架构让两者各自发挥所长：RL 在安全集内自由追求最优飞行策略，HOCBF 保证策略永远不会越出安全集。接口设计（RL 输出作为 QP 目标，QP 以最小修正投影到安全集）确保了"安全干预"的轻量化和策略意图的最大保留。</li>
+    <li><strong>为什么非对称训练是必要的？</strong><br>在部分可观测 + 强噪声条件下，标准 RL 的信用分配面临"双重模糊"——(a) 感知模糊：观测噪声使状态识别不准确；(b) 时间模糊：高速下动作和其后果之间有显著的物理延迟（推力→加速度→速度→位置）。如果 Critic 也只看到噪声观测，它无法区分"动作本身是坏的"和"观测噪声让动作看起来像坏的"——价值估计质量极差。非对称 Critic（访问真值）切断了感知模糊对价值估计的污染——它准确地知道"在真实状态下，这个动作是好是坏"，然后通过策略梯度将这个判断无偏地传递给 Actor。</li>
+    <li><strong>为什么域随机化是 sim-to-real 的基石？</strong><br>Sim-to-real gap 的本质是 $p_{\text{sim}} \neq p_{\text{real}}$（仿真和真机的观测/动力学分布不同）。域随机化通过将 $p_{\text{sim}}$ 扩展为多个分布的混合 $p_{\text{sim}}^{\text{rand}} = \text{Mixture}(p_{\text{sim}}(\theta_1), ..., p_{\text{sim}}(\theta_K))$，使其覆盖 $p_{\text{real}}$ 的支撑集。策略在混合分布上训练，等价于在所有可能的"真实世界"中同时学习——因此迁移到任何一个具体的真实世界时都已经"见过类似的情况"。消融实验中，域随机化的真机成功率贡献高达 35.5 个百分点——在所有单一模块中最高。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    无人机在杂乱环境中的飞行速度被人为限制在约 3 m/s——这不是空气动力学极限，而是传统"感知-建图-规划-控制"串行 pipeline 的架构性延迟导致的——为什么不换一种思路：用 RL 跳过所有中间环节（深度图直接到飞行动作）突破速度瓶颈到 7.5 m/s，同时叠加一个数学上可证明"永不碰撞"的 HOCBF 安全层确保无论 RL 输出什么，无人机都不会撞？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 识别根本瓶颈（不是算法问题，是架构问题）</strong>：观察现有无人机自主飞行系统——最快的系统速度约 5 m/s（Loquercio et al., 2021）。深入分析 pipeline 每个环节的延迟，发现延迟不是任何单一模块的优化问题——是"串行多模块"架构本身的设计缺陷。结论：要突破速度天花板，必须消除串行 pipeline——端到端是唯一出路。</li>
+    <li><strong>Step 2 — 对标人类 FPV 飞手</strong>：人类 FPV 飞手在森林中可以达到 100+ km/h（~28 m/s）——远快于任何自主系统。人是怎么做到的？答案是"端到端感知-动作闭环"——眼睛看到树木 → 大脑直接输出手指动作，中间没有显式的 3D 重建、路径规划、轨迹优化。这本质上就是端到端学习。但人类也会撞——尤其在疲劳或注意力不集中时。"人类水平的敏捷 + 超人类的安全"应该是设计目标。</li>
+    <li><strong>Step 3 — 寻找安全兜底机制</strong>：CBF 提供了可证明的安全性——如果障碍物检测正确。CBF 的天然优势：(a) 轻量（QP 微秒级求解）、(b) 模块化（不侵入 RL 策略内部——仅在输出端修正）、(c) 可证明（数学保证安全集的前向不变性）。但标准 CBF 不适配四旋翼（相对阶问题）→ HOCBF 解决。</li>
+    <li><strong>Step 4 — 解决训练和迁移</strong>：(a) 非对称 Actor-Critic（加速部分可观测下的训练）；(b) 域随机化 7 维（保证 sim-to-real 零样本迁移——消融实验证明这是贡献最大的单一模块）；(c) 输出姿态角而非电机指令（将底层执行器动力学 mismatch 委托给 PX4）。完整方案 → 仿真 96.3% + 真机 93.8% 成功率 → 证明了"端到端 RL（性能）+ HOCBF（安全）+ 域随机化（迁移）"三合一的范式有效性。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是无人机自主飞行领域一个标志性的混合范式案例——<strong>"学习负责性能上限，经典安全方法负责性能下限"</strong>。不是让 RL 解决所有问题，也不是完全依赖基于模型的方法，而是让各自在"比较优势"维度上发挥作用：(a) RL 擅长端到端的感知-决策映射（灵活性、泛化），(b) CBF 擅长基于模型的形式化安全保证（可靠性、可证明性），(c) 域随机化擅长 sim-to-real 分布桥接（鲁棒性）。三者的接口设计（RL 输出作为 QP 目标 → QP 以最小修正投影 → 安全动作 → PX4 跟踪）简洁且高效。类似架构正在被推广到自动驾驶（RL + 责任敏感安全 RSS）、机器人操作（RL + 力约束 CBF）、空中交通管理（RL + 间隔 CBF）。</li>
+    <li><strong>技术技巧层面</strong>：(1) <strong>非对称 Actor-Critic 是零代价的"免费午餐"</strong>——只要你在仿真中能获取真值状态，就让 Critic 利用它。Critic 仅存在于训练阶段，不参与部署，不影响推理速度或传感器需求。策略梯度定理保证梯度无偏——"训练时信息不对称，部署时信息公平"；(2) <strong>输出姿态角而非电机指令</strong>——这是 sim-to-real 的黄金法则——将底层执行器动力学的复杂度（电机 RL 电路、螺旋桨气动、ESC 协议）委托给已经过数千飞行小时验证的 PX4 控制律，RL 只负责"纯几何层面"的决策（去哪里、多快）；(3) <strong>4 维单约束 QP 几乎免费</strong>——不要因为"求解优化问题"听起来很重就回避 CBF。4 维变量 + 1 个约束的 QP 可用 KKT 条件解析求解（等价于沿约束梯度方向的加权投影），在嵌入式 GPU 上计算时间约 1 微秒——对 100Hz 的控制周期完全无感知。</li>
+    <li><strong>实验/写作层面</strong>：四组分层的消融实验是本论文实验设计的精髓——(a) 非对称 vs 对称 Critic（架构层面 → 训练效率），(b) 域随机化逐项移除（鲁棒性层面 → 真机成功率），(c) HOCBF 开关对比（安全层面 → 碰撞率），(d) 奖励函数逐项移除（行为层面 → 涌现属性）。特别值得一提的是：域随机化的消融<strong>分别测试了仿真和真机</strong>——仿真仅降 5.3%，真机暴降 35.5%——这个巨大的"仿真-真机消融差距"直接揭示了域随机化的核心价值（它的主要贡献不在仿真性能，而在 sim-to-real 桥接）。做 sim-to-real 研究时必须这样设计消融——否则单看仿真消融会严重低估域随机化的重要性。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 RL + UAV 控制方向</strong>：非对称 Actor-Critic + 域随机化 + HOCBF 三件套构成一个完整的"学习型安全无人机控制"设计模板——可直接迁移到各类 UAV 任务：货物运输、电力线巡检、竞速、编队飞行、探索建图。迁移时的关键适配点（需要根据具体任务重新设计）：(a) 特权信息的具体内容——Critic 应访问哪些在真机上不可用的信息？（如真值风速、精确障碍物距离、电机内部温度）；(b) 域随机化的维度和强度——新任务的真实传感器/动力学噪声特性是什么？(c) 安全函数 $h(x)$ 的语义——新任务的"不安全状态"如何用数学表达式定义？</li>
+    <li><strong>对于视觉导航方向</strong>：100×60 的极低分辨率深度图仍能支持 7.5 m/s 的高速飞行——这个发现暗示：对于避障飞行，"几何结构的整体模式"（哪里有大的空隙、空隙的形状和宽度）远比"纹理细节"重要。6000 个像素的信息瓶颈恰好迫使 CNN 只关注最本质的几何信息——这反而提高了泛化能力。这为嵌入式视觉系统设计提供了重要的"降分辨率"优化依据——不需要 640×480 的深度图来进行避障，100×60 足矣。</li>
+    <li><strong>对于安全控制方向</strong>：HOCBF 是一个被严重低估的工具——它在数学上提供可证明的安全性（前向不变性），在计算上几乎零开销（< 1微秒的 QP），在系统集成上完全非侵入（不修改 RL 策略内部——仅修正输出）。将 CBF 加入任何现有控制 pipeline 不会产生负面影响：如果策略本身安全 → CBF 零干预（输出 = 输入）；如果策略偶尔越界 → CBF 以最小修改拉回安全区域。这是"锦上添花"式的安全层——不需要重新设计系统，就在控制输出端加一个 QP。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Ames et al. (2019) — Control Barrier Functions: Theory and Applications. <em>European Control Conference (ECC)</em></td><td>CBF 理论的奠基性综述论文——详细推导了 CBF 的两条核心定理（前向不变性条件 + QP 可行性条件）、构造方法和各类应用（自动驾驶、多智能体、人机交互）。理解 CBF 的数学基础（Lie 导数、相对阶、安全集前向不变性）是理解本文 HOCBF 安全层的前提。特别推荐其中关于"高阶 CBF"的章节——处理相对阶 >= 2 的方法</td></tr>
+    <tr><td>Hwangbo et al. (2019) — Learning Agile and Dynamic Motor Skills for Legged Robots. <em>Science Robotics</em></td><td>非对称 Actor-Critic 在真实机器人上的首次大规模验证——以太狗 ANYmal 的行走、小跑和摔倒恢复证明了该架构在 sim-to-real 高动态接触-rich 任务中的有效性。本文在无人机高速飞行上的成功是该范式的自然延续——从"地面高动态"到"空中高速"</td></tr>
+    <tr><td>Loquercio et al. (2021) — Learning High-Speed Flight in the Wild. <em>Science Robotics</em></td><td>端到端视觉高速飞行的开创性工作——首次证明仿真训练的"深度图→动作"策略可在真实森林中以 5 m/s 完成自主飞行。本文在其基础上实现了三个关键升级：(1) 速度 5 → 7.5 m/s（+50%）；(2) 加入 HOCBF 可证明安全保证；(3) 引入系统化的非对称训练和域随机化</td></tr>
+    <tr><td>Kaufmann et al. (2023) — Champion-level Drone Racing using Deep Reinforcement Learning. <em>Nature</em> 620, 982–987</td><td>RL 在无人机高速飞行中首次超越人类冠军——证明了 RL 在"纯性能"维度已经可以超越人类操作员。本文在此基础上解决"安全性"维度——两者的结合指向了"RL 性能 + CBF 安全"这一未来范式。理解这两篇论文的联系与差异对把握无人机自主飞行的技术演进方向非常有价值</td></tr>
+    <tr><td>Song et al. (2021) — Policy Search for Model Predictive Control with Application to Agile Drone Flight. <em>IEEE TRO</em></td><td>可微分物理飞行的代表作——作为本文的直接对比基线，理解该方法的"梯度退化"和"开环优化"限制有助于理解为什么闭环 RL 策略在该任务中具有结构优势（闭环 vs 开环、数据驱动 vs 纯优化）</td></tr>
+    <tr><td>Schulman et al. (2017) — Proximal Policy Optimization Algorithms. <em>arXiv:1707.06347</em></td><td>PPO 算法的原始论文——本文使用的核心 RL 算法。理解 PPO 的三项关键设计（clip 机制防止策略突变、GAE 平衡偏差-方差、多 epoch 更新提高样本效率）对于深入理解训练过程的稳定性和收敛性非常重要</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Zhang et al. · arXiv:2602.08653 · 2026 · Safety-Shielded RL for High-Speed Vision-Based Flight in Clutter · Max 7.5 m/s · Zhejiang University FAST Lab · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

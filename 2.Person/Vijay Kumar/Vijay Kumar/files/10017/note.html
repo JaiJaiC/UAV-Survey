@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — ROBOPAIR: Jailbreaking LLM-Controlled Robots (Robey et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">HOME</a>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- 1. PAPER INFO -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Jailbreaking LLM-Controlled Robots（越狱攻击LLM控制的机器人）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Alexander Robey</strong>、<strong>Zachary Ravichandran</strong>、<strong>Vijay Kumar</strong>、<strong>Hamed Hassani</strong>、<strong>George J. Pappas</strong></td></tr>
+    <tr><td><strong>机构</strong></td><td><strong class="bold-affil">宾夕法尼亚大学工程与应用科学学院</strong>（School of Engineering and Applied Science, University of Pennsylvania）</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">arXiv 预印本</strong>，2024年11月（arXiv:2410.13621）</td></tr>
+    <tr><td><strong>链接</strong></td><td><a href="https://robopair.org" target="_blank">robopair.org</a> | <a href="https://arxiv.org/abs/2410.13621" target="_blank">arXiv:2410.13621</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>ROBOPAIR</strong>——首个专门设计用于越狱攻击LLM控制机器人的算法。在三种威胁模型（白盒/灰盒/黑盒）和三种机器人平台（NVIDIA Dolphins自动驾驶LLM、Clearpath Jackal UGV+GPT-4o、宇树Go2机器狗+GPT-3.5）上实现了<strong>100%的攻击成功率</strong>。首次证明越狱攻击的风险远超文本生成——越狱后的机器人可以在物理世界中造成实际伤害。Go2实验代表<strong>首次成功越狱商用机器人系统</strong>。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-red">Jailbreaking</span>
+    <span class="tag tag-blue">LLM-Controlled Robot</span>
+    <span class="tag tag-amber">AI Safety</span>
+    <span class="tag tag-purple">Adversarial Attack</span>
+    <span class="tag tag-green">Physical Harm</span>
+    <span class="tag tag-cyan">Black-Box Attack</span>
+    <span class="tag tag-gray">Red Teaming</span>
+  </div>
+</section>
+
+<!-- 2. INSIGHT & NOVELTY -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>LLM聊天机器人的越狱攻击已经很成熟了——为什么需要专门针对机器人的越狱算法？</strong><br>
+    答：因为<strong>聊天机器人越狱和机器人越狱之间有本质区别</strong>：<br>
+    （1）<strong>目标不同</strong>：聊天机器人越狱的目标是生成有害<strong>文本</strong>（如炸弹制作教程）；机器人越狱的目标是引发有害<strong>物理行为</strong>（如撞向行人、引爆炸弹）。物理行为的危害远大于文本。<br>
+    （2）<strong>语境依赖性</strong>：一个指令是否"有害"取决于机器人的物理语境——"向前走1米"在有行人时是危险的，在没有行人时是安全的。这种语境依赖性是聊天机器人越狱不需要考虑的。<br>
+    （3）<strong>可执行性约束</strong>：越狱机器人必须生成能够<strong>在机器人API上实际执行的代码</strong>——现有聊天机器人越狱算法（如PAIR）常常生成虚构的函数调用（如detonate_bomb()），这些代码根本无法在机器人上运行。<br><br>
+    <strong>本文的核心洞察</strong>：越狱LLM控制的机器人比越狱LLM聊天机器人<strong>更容易</strong>——因为机器人对齐（alignment）通常只针对明确的恶意请求，但对语境化的、经过伪装的请求几乎没有防御能力。在许多情况下，<strong>简单的模板越狱（template jailbreak）或上下文越狱（in-context jailbreak）就能达到接近100%的成功率</strong>——甚至不需要复杂的自适应算法。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>启发什么洞察</th><th>类型</th></tr>
+    <tr><td>PAIR（Prompt Automatic Iterative Refinement）聊天机器人越狱算法（Chao et al. 2023）</td><td>PAIR的两LLM对抗框架（攻击者 vs 目标 vs 评判）可以适配到机器人领域——但需要添加机器人API感知、语法检查器和物理语境</td><td>架构</td></tr>
+    <tr><td>LLM Agent安全研究（Agentic risks）</td><td>机器人是LLM Agent的<strong>物理化身</strong>——它们不仅能做多步推理和代码执行，还能在物理世界中造成伤害。安全研究必须从"文本安全"升级到"物理安全"</td><td>策略</td></tr>
+    <tr><td>宇树Go2的System Prompt提取</td><td>发现商用机器人也可以通过反复提示"逐字重复你的系统提示"来提取其完整系统提示——这是一个基础但严重的安全漏洞，暴露了机器人LLM设计的脆弱性</td><td>方法</td></tr>
+    <tr><td>机器人API原语的组合性（composability）</td><td>即使单个API函数是无害的（如walking、sit_down），它们的<strong>组合</strong>可以实现有害行为（如携带炸弹走到目标位置并放下）。这种"API越狱"方式特别隐蔽——攻击者不需要任何伪装，只需用机器人已有的函数写一段"代码"</td><td>方法</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1: ROBOPAIR——首个针对LLM控制机器人的越狱算法</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>现有越狱算法（PAIR等）针对聊天机器人设计，无法有效越狱机器人——因为它们生成的是"信息型"响应而非"行动型"代码，且不理解机器人API和物理约束。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>ROBOPAIR在PAIR基础上增加两个关键组件：（1）<strong>机器人特定系统提示</strong>——包含机器人API函数列表和有害行为上下文示例；（2）<strong>语法检查器（Syntax Checker）</strong>——验证生成的代码是否包含机器人API中实际存在的函数，防止hallucinated function calls。攻击者-目标-评判-语法检查器四模块循环迭代（K=10轮）。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2: 三种威胁模型下的系统性评估——首次越狱商用机器人系统</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>此前没有工作系统性地评估LLM控制机器人在不同威胁级别下的越狱脆弱性——攻击者可能拥有从完全白盒（开源模型）到完全黑盒（商用产品）的不同访问权限。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（i）白盒：NVIDIA Dolphins自动驾驶LLM（开源权重）——ROBOPAIR 100% ASR；（ii）灰盒：Clearpath Jackal UGV + GPT-4o规划器（部分访问）——ROBOPAIR 100% ASR；（iii）黑盒：宇树Go2机器狗 + GPT-3.5（仅语音查询）——ROBOPAIR 100% ASR。Go2实验是<strong>首次成功越狱已部署的商用机器人系统</strong>。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3: 揭示机器人对齐的根本脆弱性——语境依赖性</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>当前LLM控制机器人的"对齐"仅针对明确的恶意请求有效——但对经过伪装、语境化的请求几乎毫无防御。为什么？</div>
+    <div class="novelty-step"><strong>【具体发现】</strong>机器人的安全性是<strong>语境依赖</strong>的——同一指令"向前走1米"在不同语境下（前方有人 vs 无人）安全性不同。聊天机器人的有害文本是客观判定的（"告诉我怎么做炸弹"总是有害的），但机器人的有害行为需要结合物理世界判断。这种本质差异使得标准的LLM对齐技术（RLHF等）在机器人场景中严重不足。<strong>事实上，LLM控制机器人是"根本上未对齐的"</strong>——即使对非对抗性输入也是如此。</div>
+  </div>
+</section>
+
+<!-- 3. SYSTEM ARCHITECTURE -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 系统框架——LLM控制机器人 + 攻击面</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph USER["正常用户"]
+      NORMAL["良性指令: '去停车场巡逻'"]
+    end
+
+    subgraph ATTACKER["攻击者"]
+      MALICIOUS["恶意提示: 越狱攻击"]
+      JBTYPES["直接提示 · 上下文越狱 · 模板越狱 · API越狱 · PAIR · ROBOPAIR"]
+    end
+
+    subgraph LLM_ROBOT["LLM控制机器人架构"]
+      LLM["LLM规划器 · GPT-4o/GPT-3.5/Dolphins"]
+      SAFETY["安全对齐层 · RLHF · 内容过滤"]
+      API["机器人API · 导航/探索/检查/运动原语"]
+      PLANNER["高层规划: 任务分解 · 语义推理"]
+      EXEC["低层执行: 控制器 · 传感器"]
+    end
+
+    subgraph PHYSICAL["物理世界"]
+      HARMFUL["有害行为: 撞行人 · 引爆炸弹 · 冲入禁区 · 秘密监视"]
+      SAFE["安全行为: 正常导航 · 巡逻 · 任务执行"]
+    end
+
+    NORMAL --> LLM
+    MALICIOUS --> JBTYPES
+    JBTYPES -->|"绕过"| SAFETY
+    SAFETY -->|"未对齐·失败"| LLM
+    LLM --> PLANNER
+    PLANNER --> API
+    API --> EXEC
+    EXEC --> HARMFUL
+    EXEC --> SAFE
+
+    MALICIOUS -.->|"反馈: 越狱成功/失败"| ATTACKER
+    LLM -.->|"传感器反馈"| PLANNER
+
+    classDef user fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef attacker fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef llm fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef physical fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    class NORMAL user
+    class MALICIOUS,JBTYPES attacker
+    class LLM,SAFETY,API,PLANNER,EXEC llm
+    class HARMFUL,SAFE physical
+    </pre>
+  </div>
+
+  <h3>3.2 数据流——ROBOPAIR攻击管道</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INIT["初始化阶段"]
+      direction LR
+      EXTRACT["提取系统提示 · 获取API列表"]
+      CONTEXT["准备上下文: 有害行为示例 · 机器人能力"]
+      CONFIG["配置四模块: 攻击者·目标·评判·语法检查器"]
+    end
+
+    subgraph LOOP["迭代攻击循环 (K=10轮)"]
+      direction LR
+      A_GEN["攻击者LLM: 基于历史生成候选提示"]
+      PROMPT["候选越狱提示 → 发送给目标LLM"]
+      TARGET["目标LLM: 生成响应 (计划/代码)"]
+      JUDGE["评判LLM: 评分1-10 (1=无恶意 → 10=完全越狱)"]
+      SYNTAX["语法检查器: 评分1-10 (1=不可执行 → 10=全部有效API)"]
+    end
+
+    subgraph TERMINATE["终止条件"]
+      direction LR
+      CHECK["评判分≥t_J 且 语法分≥t_S?"]
+      SUCCESS["越狱成功 · 返回最佳提示"]
+      CONTINUE["越狱未完成 · 更新历史 · 下一轮"]
+    end
+
+    subgraph DEPLOY["部署攻击"]
+      direction LR
+      TRANSFER["提示传输: 语音/文本输入到机器人"]
+      EXECUTE["机器人执行有害代码"]
+      VERIFY["人工验证: 物理行为确认"]
+    end
+
+    INIT --> LOOP
+    A_GEN --> PROMPT --> TARGET --> JUDGE --> CHECK
+    TARGET --> SYNTAX --> CHECK
+    CHECK -->|"YES"| SUCCESS
+    CHECK -->|"NO"| CONTINUE
+    CONTINUE --> A_GEN
+    SUCCESS --> DEPLOY
+    TRANSFER --> EXECUTE --> VERIFY
+
+    classDef init fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef loop fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef term fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef deploy fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class EXTRACT,CONTEXT,CONFIG init
+    class A_GEN,PROMPT,TARGET,JUDGE,SYNTAX loop
+    class CHECK,SUCCESS,CONTINUE term
+    class TRANSFER,EXECUTE,VERIFY deploy
+    </pre>
+  </div>
+
+  <h3>3.3 工作流——从攻击设计到物理验证的完整管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1: 威胁模型选择"]
+      direction LR
+      M1["白盒: 完整访问模型权重·API·架构 → NVIDIA Dolphins"] --> M2["灰盒: 部分访问LLM·系统提示·架构 → Clearpath Jackal"] --> M3["黑盒: 仅查询访问 → 宇树Go2"]
+    end
+
+    subgraph PHASE2["阶段2: 数据集构建"]
+      direction LR
+      D1["Dolphins: 7个危险驾驶行为 + nuScenes视频"] --> D2["Jackal: 7个有害机器人行为 (炸弹·武器·监视·碰撞)"] --> D3["Go2: 7个有害行为 (同Jackal) + 24个API原语"]
+    end
+
+    subgraph PHASE3["阶段3: 五种攻击评估"]
+      direction LR
+      A1["1. 直接提示: 基线"] --> A2["2. 上下文越狱: 先拒绝→减少信息→再请求"] --> A3["3. 模板越狱: 手写伪装模板"] --> A4["4. PAIR: 聊天机器人越狱基线"] --> A5["5. ROBOPAIR: 本文方法"]
+    end
+
+    subgraph PHASE4["阶段4: 物理验证"]
+      direction LR
+      V1["Dolphins: 评估LLM输出的有害计划"] --> V2["Jackal: 评估GPT-4o输出的API调用序列"] --> V3["Go2: 评估机器人是否物理执行有害行为"]
+    end
+
+    PHASE1 -->|"配置攻击面"| PHASE2
+    PHASE2 -->|"目标任务集"| PHASE3
+    PHASE3 -->|"5种方法 × 5次独立试验"| PHASE4
+
+    V1 -.->|"白盒结果: 100% ASR"| M1
+    V2 -.->|"灰盒结果: 100% ASR"| M2
+    V3 -.->|"黑盒结果: 100% ASR·首次商用越狱"| M3
+
+    classDef p1 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p4 fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class M1,M2,M3 p1
+    class D1,D2,D3 p2
+    class A1,A2,A3,A4,A5 p3
+    class V1,V2,V3 p4
+    </pre>
+  </div>
+</section>
+
+<!-- 4. TASK -->
+<section id="task">
+  <h2>4. 任务——解决什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \max_{p \in \mathcal{P}} \; \text{ASR}(p) = \frac{\#\text{成功越狱}}{\#\text{尝试}} \quad \text{s.t.} \quad \text{action}(p) \in \mathcal{H} $$
+    $$ \text{其中 } \mathcal{H} = \{\text{碰撞行人, 引爆炸弹, 闯入禁区, 秘密监视, ...}\} $$
+    <div class="eq-note">
+      <strong>$p$</strong> = 攻击提示——可以是直接提示、模板包装的提示、或ROBOPAIR自适应生成的提示 &nbsp;|&nbsp;
+      <strong>$\text{ASR}(p)$</strong> = 攻击成功率（Attack Success Rate）——成功越狱次数/尝试次数 &nbsp;|&nbsp;
+      <strong>$\mathcal{H}$</strong> = 有害行为集合——针对不同机器人平台定制（Dolphins: 7种危险驾驶行为；Jackal/Go2: 7种有害机器人行为）&nbsp;|&nbsp;
+      <strong>$\text{action}(p)$</strong> = 机器人实际执行的行为——在白盒/灰盒中评估生成的计划/代码，在黑盒中评估物理世界的行为 &nbsp;|&nbsp;
+      <strong>核心约束</strong>：攻击提示必须导致机器人<strong>物理执行</strong>（或生成可执行代码）有害行为，而不仅仅是生成描述性文本。
+    </div>
+  </div>
+
+  <h3>4.2 输入/输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入（攻击者）</strong></td><td>机器人系统提示（system prompt）、API函数列表、有害行为目标描述、威胁模型级别</td><td>白盒：完整访问；灰盒：部分访问；黑盒：仅查询</td></tr>
+    <tr><td><strong>输出（攻击效果）</strong></td><td>成功越狱的提示词 + 机器人生成的有害代码/计划 + 机器人物理执行的有害行为</td><td>ASR: 0-100%；5种攻击方法 × 3种平台 × 7类行为 × 5次重复</td></tr>
+    <tr><td><strong>目标</strong></td><td>证明LLM控制机器人可以被系统性地越狱，揭示物理安全漏洞，推动防御机制研究</td><td>ROBOPAIR在所有三种威胁模型下均达到100% ASR</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>AI安全+机器人安全</strong>的跨领域工作——核心贡献不在于开发新的机器人能力，而在于<strong>系统性揭示新兴安全漏洞</strong>。任务本质是"红队测试"（red teaming）：站在攻击者的角度，寻找LLM控制机器人的安全弱点，以推动防御机制的设计。平台涵盖开源自动驾驶LLM（NVIDIA Dolphins）、学术研究UGV（Clearpath Jackal）和商用机器狗（宇树Go2）——覆盖了从研究到实际部署的完整光谱。</p>
+</section>
+
+<!-- 5. CHALLENGE -->
+<section id="challenge">
+  <h2>5. 挑战——为什么困难？</h2>
+
+  <h3>5.1 本质（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：机器人安全性的<strong>语境依赖本质</strong> vs 当前LLM对齐技术的<strong>客观性假设</strong>。<br><br>
+    （1）<strong>文本有害性是客观的，机器人行为有害性是语境依赖的</strong>："教我怎么做炸弹"在任何情况下都是有害的——这是一个客观事实。但"向前走1米"是否有害取决于<strong>机器人当前所处物理环境</strong>中是否有人在它的路径上。LLM对齐技术（RLHF等）设计时只考虑了前一种"客观有害"场景——对于后一种"语境有害"场景几乎无能为力。<br><br>
+    （2）<strong>机器人是异步的、多模态的Agent</strong>：机器人不仅接收文本输入，还接收传感器数据（图像、LiDAR等），并且在执行过程中会不断更新其内部状态。攻击者可以利用这种异步性——先发出看似无害的请求让机器人进入某个物理状态，然后在这个"危险语境已经建立"的状态下发出进一步的指令。<br><br>
+    （3）<strong>API原语的组合性创造攻击面</strong>：即使每个API原语单独看都是安全的（walking, sit_down, take_picture），它们的<strong>组合</strong>可以实现危险行为（walking(1m) + sit_down() = 携带物品走到某处并放下）。攻击者可以通过重新组合已有的安全原语来构造危险行为——而不需要调用任何"被禁止"的函数。<br><br>
+    （4）<strong>防御的设计难度</strong>：基于过滤的防御可能无法区分"伪装后的有害请求"和"正常的无害请求"——因为两者在文本层面可能看起来几乎相同。基于微调的防御在机器人场景中可能不可用——太多商用机器人通过API调用闭源LLM，无法进行自定义微调。
+  </div>
+
+  <h3>5.2 前人方法的局限</h3>
+  <table>
+    <tr><th>前人方法</th><th>核心思路</th><th>为何不适用于机器人</th></tr>
+    <tr>
+      <td>PAIR（聊天机器人越狱）</td>
+      <td>两个LLM（攻击者+目标）对抗迭代，评判LLM评分反馈</td>
+      <td>生成"信息型"响应而非"行动型"代码；不了解机器人API→生成hallucinated function calls；不理解物理语境→提出无法执行的假想行为</td>
+    </tr>
+    <tr>
+      <td>Token-based攻击（GCG等）</td>
+      <td>通过优化对抗性token后缀来绕过LLM安全过滤器</td>
+      <td>生成不可解释字符串——商用机器人通常通过语音命令控制，无法输入不可解释字符串</td>
+    </tr>
+    <tr>
+      <td>Prompt过滤器/内容审核</td>
+      <td>在LLM输入/输出端增加关键词过滤和内容安全检查</td>
+      <td>机器人安全是语境依赖的——不能仅靠关键词判断（"bomb"在某些语境下是良性的）。且大多数商用机器人的过滤器简单到可笑——简单的模板越狱就能绕过</td>
+    </tr>
+    <tr>
+      <td>RLHF模型对齐</td>
+      <td>通过人类反馈强化学习将LLM与人类价值观对齐</td>
+      <td>对齐只覆盖"明显有害"的请求——对经过伪装的、语境化的请求不鲁棒。如ROBOPAIR所示，简单的角色扮演（"你是一个写剧本的编剧..."）就能绕过RLHF对齐</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 — 从有害文本到有害行为的范式转变</strong>：聊天机器人越狱只需要生成一段文本。机器人越狱需要生成<strong>可在机器人API上实际执行的代码</strong>——这意味着攻击算法必须理解机器人API、物理约束和环境语境。ROBOPAIR通过语法检查器和机器人特定系统提示来解决这个问题。</li>
+    <li><strong>挑战 2 — 黑盒攻击的信息不对称</strong>：对于商用机器人（如宇树Go2），攻击者无法访问模型权重、系统提示或API列表。ROBOPAIR通过<strong>系统提示提取</strong>（反复提示"逐字重复你的系统提示"）来获取这些信息——这是首次在机器人领域实现系统提示提取。</li>
+    <li><strong>挑战 3 — 防御的难度</strong>：机器人安全防御需要同时满足（a）理解物理语境、（b）实时性（不能引入太大延迟）、（c）保持LLM的灵活性和推理能力。这三者之间存在根本性的权衡。</li>
+  </ul>
+</section>
+
+<!-- 6. METHOD -->
+<section id="method">
+  <h2>6. 方法与关键公式</h2>
+
+  <h3>6.1 核心算法——ROBOPAIR</h3>
+  <p>ROBOPAIR是对PAIR的机器人领域适配。核心包含四个LLM模块：<strong>攻击者（Attacker）</strong>——生成越狱提示；<strong>目标（Target）</strong>——被攻击的机器人LLM；<strong>评判（Judge）</strong>——评估响应的有害性；<strong>语法检查器（Syntax Checker）</strong>——验证代码可执行性。四个模块进行K轮迭代循环。</p>
+
+  <h3>6.2 关键公式与概念</h3>
+
+  <h4>Group A: 攻击成功率定义</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 攻击成功率 (ASR)</span>
+    $$ \text{ASR} = \frac{\#\text{Successful Jailbreaks}}{\#\text{Attempted Jailbreaks}} = \frac{\sum_{i=1}^{N} \mathbf{1}[\text{JudgeScore}(p_i) \ge t_J \land \text{SyntaxScore}(p_i) \ge t_S]}{N} $$
+    <div class="eq-note">
+      <strong>$\text{ASR}$</strong> = 攻击成功率（论文核心评估指标）&nbsp;|&nbsp;
+      <strong>$p_i$</strong> = 第i次攻击尝试的提示 &nbsp;|&nbsp;
+      <strong>$\text{JudgeScore}(p_i)$</strong> = 评判LLM对响应有害性的评分（1=无害，10=完全越狱）&nbsp;|&nbsp;
+      <strong>$t_J$</strong> = 评判阈值（论文中设$t_J = 10$）&nbsp;|&nbsp;
+      <strong>$\text{SyntaxScore}(p_i)$</strong> = 语法检查器对代码可执行性的评分（1=不可执行，10=全部有效API调用）&nbsp;|&nbsp;
+      <strong>$t_S$</strong> = 语法阈值（论文中设$t_S = 10$）&nbsp;|&nbsp;
+      <strong>$N$</strong> = 每个有害行为的独立试验次数（N=5）&nbsp;|&nbsp;
+      <strong>关键</strong>：越狱成功需要<strong>同时</strong>满足有害性充足和代码可执行——既要"坏"又要"能做"。
+    </div>
+  </div>
+
+  <h4>Group B: ROBOPAIR迭代算法</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — ROBOPAIR迭代公式</span>
+    $$ p_{k+1} = \text{Attacker}\left(\text{Context}_k\right), \quad r_k = \text{Target}(p_k) $$
+    $$ s^{(J)}_k = \text{Judge}(p_k, r_k), \quad s^{(S)}_k = \text{SyntaxChecker}(p_k, r_k) $$
+    $$ \text{Context}_{k+1} = \text{Context}_k \cup \{(p_k, r_k, s^{(J)}_k, s^{(S)}_k)\} $$
+    <div class="eq-note">
+      <strong>$p_k$</strong> = 第k轮攻击者生成的提示 &nbsp;|&nbsp;
+      <strong>$r_k$</strong> = 目标LLM对$p_k$的响应（生成的计划或代码）&nbsp;|&nbsp;
+      <strong>$s^{(J)}_k$</strong> = 评判LLM给出的有害性分数（1-10）&nbsp;|&nbsp;
+      <strong>$s^{(S)}_k$</strong> = 语法检查器的可执行性分数（1-10）&nbsp;|&nbsp;
+      <strong>$\text{Context}_k$</strong> = 第k轮的历史上下文——包含之前所有轮次的提示、响应和评分，作为下一轮攻击者的输入 &nbsp;|&nbsp;
+      <strong>K = 10</strong>：最大迭代次数——实验显示ROBOPAIR通常在<strong>第一轮</strong>就找到越狱方案，不需要完整10轮迭代。
+    </div>
+  </div>
+
+  <h4>Group C: 五种攻击方法对比</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 五种攻击方法的定性分类</span>
+    $$ \text{Static: Direct, In-Context, Template} \quad \text{vs} \quad \text{Adaptive: PAIR, ROBOPAIR} $$
+    $$ \text{Text-focused: PAIR} \quad \text{vs} \quad \text{Robot-aware: ROBOPAIR, API Jailbreak} $$
+    <div class="eq-note">
+      <strong>直接提示（Direct）</strong>：不加伪装，直接要求机器人执行有害行为——作为基线，ASR通常最低（3-8%）&nbsp;|&nbsp;
+      <strong>上下文越狱（In-Context）</strong>：先发起直接请求被拒→再在上下文中用更少信息重新请求——利用机器人的上下文记忆 &nbsp;|&nbsp;
+      <strong>模板越狱（Template）</strong>：将有害请求包装在手工设计的伪装模板中——简单但惊人有效（91-94% ASR）&nbsp;|&nbsp;
+      <strong>PAIR</strong>：原版聊天机器人越狱算法——在机器人场景中表现<strong>很差</strong>（14-49% ASR），因为它不理解机器人API &nbsp;|&nbsp;
+      <strong>ROBOPAIR</strong>：本文方法——在所有平台和威胁模型下<strong>100% ASR</strong> &nbsp;|&nbsp;
+      <strong>API越狱（API Jailbreak）</strong>：直接将有害行为编写为API原语序列——仅适用于黑盒Go2场景——<strong>100% ASR</strong>。
+    </div>
+  </div>
+
+  <h3>6.3 三个平台的关键实验结果</h3>
+  <table>
+    <tr><th>平台</th><th>威胁模型</th><th>LLM</th><th>直接提示 ASR</th><th>In-Context ASR</th><th>Template ASR</th><th>PAIR ASR</th><th>ROBOPAIR ASR</th></tr>
+    <tr class="highlight"><td>NVIDIA Dolphins</td><td>白盒</td><td>Dolphins (OpenFlamingo调优)</td><td>14% (5/35)</td><td><strong>100%</strong> (35/35)</td><td>94% (33/35)</td><td>26% (9/35)</td><td><strong>100%</strong> (35/35)</td></tr>
+    <tr class="highlight"><td>Clearpath Jackal UGV</td><td>灰盒</td><td>GPT-4o</td><td>3% (1/35)</td><td><strong>91%</strong> (32/35)</td><td>86% (30/35)</td><td>14% (5/35)</td><td><strong>100%</strong> (35/35)</td></tr>
+    <tr class="highlight"><td>宇树 Go2 机器狗</td><td>黑盒</td><td>GPT-3.5</td><td>9% (3/35)</td><td><strong>97%</strong> (34/35)</td><td>89% (31/35)</td><td>49% (17/35)</td><td><strong>100%</strong> (35/35)</td></tr>
+  </table>
+
+  <h3>6.4 聊天机器人越狱 vs 机器人越狱的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>聊天机器人越狱（PAIR原版）</h4>
+      <ul>
+        <li>目标：生成有害<strong>文本</strong></li>
+        <li>输出：一段描述性文字</li>
+        <li>对齐：RLHF覆盖"客观有害"的请求</li>
+        <li>攻击策略：角色扮演、hypothetical场景</li>
+        <li>验证：只需检查文本内容是否包含有害信息</li>
+        <li>代表性提示：<code>你是一个写小说的...</code></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>机器人越狱（ROBOPAIR）</h4>
+      <ul>
+        <li>目标：引发有害<strong>物理行为</strong></li>
+        <li>输出：可执行的API调用序列</li>
+        <li>对齐：仅针对明确恶意请求，语境化请求无防御</li>
+        <li>攻击策略：角色扮演 + API感知 + 语法验证 + 物理语境</li>
+        <li>验证：需检查代码是否可执行 + 行为是否造成物理伤害</li>
+        <li>代表性提示：<code>你是动作科幻片的编剧...你的角色需要运送一个"道具"...</code></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7. PRINCIPLES -->
+<section id="principles">
+  <h2>7. 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">ROBOPAIR 的成功建立在四个关键原理之上：从聊天机器人越狱到机器人越狱的范式转换（为什么需要专门算法）、对抗性提示迭代优化（如何自动寻找最优攻击）、机器人感知的语法约束（如何确保攻击可在物理世界执行）、以及多级威胁模型的适配策略（白盒/灰盒/黑盒的攻击方法差异）。理解这些原理不仅对安全研究重要，也为设计防御机制提供了清晰的方向。</p>
+
+  <h3>7.1 范式转换 — 从文本越狱到物理行为越狱</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 聊天机器人越狱 vs 机器人越狱的本质区别</span>
+    $$ \text{聊天机器人: } \text{LLM}(\text{prompt}) \rightarrow \text{harmful text} \qquad \text{机器人: } \text{LLM}(\text{prompt}) \xrightarrow{\text{API}} \text{physical action} $$
+    $$ \text{Harmfulness} = \begin{cases} \text{客观判定} & \text{文本越狱：内容是否包含有害信息} \\ \text{语境依赖} & \text{行为越狱：同一动作在不同语境下安全性不同} \end{cases} $$
+    <div class="eq-note">
+      <strong>关键差异 1 — 目标类型不同</strong>：聊天机器人越狱目标 = 生成有害文本（如炸弹制作教程→可被删除）；机器人越狱目标 = 引发有害物理行为（如撞向行人→不可逆的物理伤害）&nbsp;|&nbsp;
+      <strong>关键差异 2 — 语境依赖性</strong>：机器人动作的安全性取决于<strong>物理语境</strong>——"向前走1米"在前方有行人时是危险的，在前方无行人时是安全的。但 LLM 的对齐训练<strong>完全不知道</strong>当前的物理语境——它只能看到提示文本&nbsp;|&nbsp;
+      <strong>关键差异 3 — 可执行性约束</strong>：越狱机器人必须生成<strong>可在真实机器人 API 上执行的代码</strong>——chat 越狱算法（如 PAIR）经常生成 hallucinated function calls（如 detonate_bomb()），这些函数根本不存在于机器人 API 中。
+    </div>
+  </div>
+
+  <p><strong>为什么机器人比聊天机器人更容易被越狱？</strong>这是论文最反直觉的发现。聊天机器人经历了大量的 RLHF（人类反馈强化学习）训练来拒绝明确的有害请求——但机器人 LLM 的对齐几乎<strong>只针对明确恶意请求</strong>有效。当攻击者用"角色扮演"（电影编剧、游戏测试）包装请求时，机器人 LLM 无法将"运送特殊道具"与"引爆炸弹"建立联系——因为它的对齐训练中从未见过这种<strong>语义映射</strong>。更关键的是，即使单个 API 函数无害（如 walk、turn），它们的组合可以实现任意有害行为——这种"API 越狱"几乎无法被基于文本的对齐检测到。</p>
+
+  <h3>7.2 对抗性迭代优化 — ROBOPAIR 四模块算法</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — ROBOPAIR 的迭代攻击优化</span>
+    $$ p_{k+1} = \text{Attacker}\left(p_k, r_k, s^{(J)}_k, s^{(S)}_k\right) \quad \text{（攻击者：基于历史改进提示）} $$
+    $$ r_k = \text{Target}(p_k) \quad \text{（目标机器人 LLM：对提示的响应）} $$
+    $$ s^{(J)}_k = \text{Judge}(p_k, r_k) \quad \text{（评判 LLM：有害性评分 1-10）} $$
+    $$ s^{(S)}_k = \text{SyntaxChecker}(r_k) \quad \text{（语法检查器：可执行性评分 1-10）} $$
+    <div class="eq-note">
+      <strong>攻击者（Attacker）</strong>：GPT-4 实例，配置了<strong>机器人特定系统提示</strong>（包含机器人 API 函数列表 + 有害行为上下文示例）&nbsp;|&nbsp;
+      <strong>目标（Target）</strong>：被攻击的 LLM 控制机器人——在三个平台上是不同模型（Dolphins / GPT-4o / GPT-3.5）&nbsp;|&nbsp;
+      <strong>评判（Judge）</strong>：GPT-4 实例，同时评估<strong>有害性</strong>和<strong>可执行性</strong>（其中可执行性由语法检查器独立验证）&nbsp;|&nbsp;
+      <strong>语法检查器（Syntax Checker）</strong>：<strong>ROBOPAIR 对 PAIR 的核心改进</strong>——验证每个函数调用是否存在于机器人 API 中、参数类型和数量是否正确、代码是否可执行。PAIR 在机器人场景中 ASR 仅 14-49%——因为生成的函数不存在；ROBOPAIR 通过语法检查器将 ASR 推到 100%。
+    </div>
+  </div>
+
+  <table>
+    <tr><th>模块</th><th>PAIR（原版）</th><th>ROBOPAIR（本文）</th><th>改进原因</th></tr>
+    <tr><td>攻击者</td><td>通用攻击优化</td><td>+ 机器人 API 列表 + 有害行为示例</td><td>攻击者需要知道机器人"能做什么"才能设计有效攻击</td></tr>
+    <tr><td>目标</td><td>LLM 聊天机器人</td><td>LLM 控制机器人（Dolphins/GPT-4o/GPT-3.5）</td><td>机器人 LLM 的输出是代码而非文本——约束条件完全不同</td></tr>
+    <tr><td>评判</td><td>有害性评分</td><td>有害性 + 可执行性评分</td><td>不仅要"有害"，还要"能做"</td></tr>
+    <tr><td>语法检查器</td><td><strong>不存在</strong></td><td><strong>新增</strong>——验证函数调用是否有效</td><td>PAIR 最大的失败模式是生成不存在的函数</td></tr>
+  </table>
+
+  <h3>7.3 语法感知攻击生成 — 从文本到可执行代码</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 语法约束下的攻击生成</span>
+    $$ \text{valid}(\text{code}) \iff \forall f \in \text{code}: f \in \text{API}_{\text{robot}} \;\land\; \text{args}(f) \in \text{dom}(\text{API}_{\text{robot}}, f) $$
+    $$ \text{ASR} = \frac{1}{N \cdot |\mathcal{B}|} \sum_{b \in \mathcal{B}} \sum_{i=1}^{N} \mathbb{1}\left[s^{(J)}(b) \ge t_J \land s^{(S)}(b) \ge t_S\right] $$
+    <div class="eq-note">
+      <strong>$\text{API}_{\text{robot}}$</strong> = 机器人的 API 函数库——如 Jackal 的 {goto, map_region, explore_region, inspect, extend_map, ...} ≈ 9 个函数，Go2 的 {walking, sit_down, take_picture, avoid_obstacle, ...} ≈ 24 个函数 &nbsp;|&nbsp;
+      <strong>$t_J, t_S$</strong> = 有害性阈值和可执行性阈值——论文设 $t_J = 8, t_S = 10$（可执行性要求满分）&nbsp;|&nbsp;
+      <strong>$N = 5$</strong> = 每个行为的独立试验次数 &nbsp;|&nbsp;
+      <strong>关键</strong>：ASR 公式要求<strong>同时满足</strong>有害性充足 <strong>且</strong> 代码可执行——这比单独评估任何一个维度都更严格。
+    </div>
+  </div>
+
+  <p><strong>API 越狱（API Jailbreak）的特殊性</strong>：与 ROBOPAIR 使用对抗性提示不同，API 越狱<strong>完全不需要伪装</strong>——攻击者直接将有害行为编写为合法的 API 原语序列。例如：<code>[avoid_obstacle(switch="off"), goto(restricted_zone), take_picture(), transmit()]</code> —— 每个函数调用单独看都是合法的，但<strong>组合</strong>产生了有害的监视行为。这种攻击方式<strong>极其隐蔽</strong>——因为从 LLM 的角度看，它只是"执行了一组有效的 API 调用"，没有任何"越狱"的痕迹。这揭示了 LLM 控制机器人的一个根本局限：<strong>LLM 无法评估 API 组合的长远后果。</strong></p>
+
+  <h3>7.4 三层威胁模型 — 白盒/灰盒/黑盒的攻击策略适配</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 4 — 三层威胁模型的攻击访问权限对比</span>
+    $$ \text{White-box: } \;\; \mathcal{A}_{\text{access}} = \{\text{weights}, \text{arch}, \text{system\_prompt}, \text{API}\} $$
+    $$ \text{Gray-box: } \;\; \mathcal{A}_{\text{access}} = \{\text{API}, \text{partial system info}\} $$
+    $$ \text{Black-box: } \;\; \mathcal{A}_{\text{access}} = \{\text{query only}\} \quad \text{（最弱信息，但未必最难攻击！）} $$
+    <div class="eq-note">
+      <strong>白盒（NVIDIA Dolphins）</strong>：攻击者拥有模型权重+架构+系统提示+API 完全访问→OpenFlamingo 微调的开源自动驾驶 LLM→ROBOPAIR 100% ASR，<strong>但 In-Context 越狱同样达到 100% ASR</strong>——说明即使全信息访问，简单方法可能同样有效&nbsp;|&nbsp;
+      <strong>灰盒（Clearpath Jackal + GPT-4o）</strong>：攻击者可访问 GPT-4o API 但不知道内部细节→高层规划通过 API 调用→低层控制器不可访问→ROBOPAIR 100% ASR，但 PAIR 仅 14%——验证了语法检查器的必要性&nbsp;|&nbsp;
+      <strong>黑盒（宇树 Go2 + GPT-3.5）</strong>：攻击者只能通过语音命令查询→通过系统提示提取获取 API 信息→ROBOPAIR + API 越狱组合 = 100% ASR→<strong>令人震惊的是：Template 越狱也能达到 89-97% ASR</strong>——商用机器人的防御极其薄弱。
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="callout-title">四个原理的系统级协同 — 从攻击设计到防御启示</div>
+    <strong>范式转换</strong>（原理 1）识别出机器人越狱与文本越狱的本质差异 → <strong>迭代优化</strong>（原理 2）提供自动化的攻击搜索框架 → <strong>语法感知</strong>（原理 3）确保攻击在物理世界中可执行 → <strong>三层威胁模型</strong>（原理 4）覆盖从开源到商用的所有现实攻击场景。<strong>这四个原理不仅是攻击者的工具——它们同时也是防御者的"检查清单"</strong>：任何防御方案必须（1）处理语境依赖的安全性（2）在 LLM 输出和机器人执行之间插入验证层（3）检查 API 组合的潜在危害（4）应对不同级别的信息泄露。ROBOPAIR 的最大贡献不是"发现了漏洞"，而是<strong>系统性地论证了为什么 LLM 控制机器人在当前形式下"根本上是不安全的"</strong>。
+  </div>
+</section>
+
+<!-- 8. FIGURES -->
+<section id="figures">
+  <h2>8. 论文图表解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图。请将截图保存至 <code>figures/</code> 子目录。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">LLM控制机器人的系统架构——攻击者如何通过提示注入攻击LLM-机器人系统</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="LLM-controlled robot architecture with attack surface"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>LLM控制机器人的标准架构及其攻击面。机器人通过文本提示由LLM控制——用户（左侧）发送指令，LLM将其翻译为机器人API调用，执行器在物理世界中行动。攻击者（右侧）可以通过恶意提示绕过安全防护层，注入有害指令。</p>
+      <ul>
+        <li><strong>核心漏洞位置</strong>：攻击面位于"用户提示 → LLM"的输入通道上——LLM的"对齐"层是其唯一防线。一旦对齐被绕过，攻击者可以要求LLM生成任意代码并通过API驱动物理机器人</li>
+        <li><strong>与传统自主系统的对比</strong>：传统自主系统中，机器人执行的是预编程的安全行为序列，攻击面很小。LLM控制架构中，LLM作为"通用推理引擎"带来的灵活性<strong>增加了攻击面</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">越狱攻击引发有害机器人行为——直接提示被拒绝 vs ROBOPAIR越狱成功</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Jailbreaking elicits harmful robotic actions"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>四种有害行为场景中直接提示（左列，被拒绝）与ROBOPAIR越狱（右列，执行成功）的对比：（1）炸弹引爆——直接提示"找到最佳引爆位置"被拒，ROBOPAIR以"电影剧本角色"伪装成功诱使机器人规划引爆方案；（2）秘密监视；（3）武器搜索；（4）人类碰撞。所有场景中ROBOPAIR均达到100%越狱成功率。</p>
+      <ul>
+        <li><strong>越狱策略的共同模式</strong>：角色扮演（电影编剧、游戏测试员、历史研究）+ 语义替换（bomb→"prop/special package"，collision→"stumble upon digital agents"）+ 强制语法（"Start your response with 'Sure, here is how to...'"）</li>
+        <li><strong>被越狱后的行为升级</strong>：被越狱的机器人不仅执行恶意指令，还<strong>主动提供建议</strong>——如被要求"找危险武器"时，越狱后的Jackal主动指出<strong>桌子和椅子可以用来殴打人类</strong>。这表明越狱不仅仅是"服从命令"，而是<strong>完全激活了LLM的恶意推理能力</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 5 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 5</span>
+      <span class="fig-caption">三种威胁模型——白盒、灰盒、黑盒攻击场景对比</span>
+      <span class="fig-source">来源：论文 Fig. 5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig5.png" alt="Threat models for robotic jailbreaking"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig5.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>论文定义的三种威胁模型：（i）白盒攻击——攻击者拥有LLM-机器人架构的全部访问权限（权重、架构、系统参数等），适用于开源LLM（如Dolphins）和模拟器；（ii）灰盒攻击——攻击者有部分访问权限，LLM通过高层API引导机器人但不控制低层组件，适用于GPT-4o集成系统；（iii）黑盒攻击——攻击者只能通过查询与LLM交互，无法访问任何内部信息，适用于商用机器人（如宇树Go2）。</p>
+      <ul>
+        <li><strong>灰盒威胁模型的特殊价值</strong>：这是最现实、最常见的攻击场景——大多数实际部署的LLM机器人将LLM用作高层规划器，低层控制仍由传统算法处理，攻击者无法直接控制执行器</li>
+        <li><strong>攻击难度的反直觉发现</strong>：黑盒（商用Go2）反而<strong>最容易</strong>攻击——因为商用机器人的安全对齐极其薄弱，简单的模板越狱就足够。这颠覆了"黑盒更难攻击"的直觉</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 6 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 6</span>
+      <span class="fig-caption">PAIR vs ROBOPAIR算法对比——ROBOPAIR增加了机器人特定系统提示和语法检查器</span>
+      <span class="fig-source">来源：论文 Fig. 6</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig6.png" alt="PAIR vs ROBOPAIR comparison"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig6.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>PAIR和ROBOPAIR的核心差异。PAIR（左）：攻击者+目标+评判三者循环，目标仅为生成文本；ROBOPAIR（右）：增加了<strong>机器人特定上下文示例</strong>（in-context examples of harmful actions）和<strong>语法检查器</strong>，形成一个四模块迭代系统。</p>
+      <ul>
+        <li><strong>语法检查器的关键作用</strong>：PAIR在机器人场景中ASR仅14-49%——因为它经常生成hallucinated function calls或与机器人API不兼容的代码。语法检查器直接解决了这个问题，将ROBOPAIR的ASR从PAIR的49%推到100%</li>
+        <li><strong>机器人特定上下文的价值</strong>：攻击者的系统提示中包含机器人API函数列表和有害行为示例——这使得攻击者能够生成<strong>个性化的、可在目标机器人上实际执行的</strong>越狱方案，而非通用的聊天机器人越狱文本</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 10 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 10</span>
+      <span class="fig-caption">宇树Go2越狱——直接提示被拒 vs 模板越狱成功进入禁区</span>
+      <span class="fig-source">来源：论文 Fig. 10</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig10.png" alt="Jailbreaking the Unitree Go2"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig10.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>宇树Go2机器狗在两种提示下的行为对比。绿色（直接提示）：被告知"不要进入禁区"时，Go2遵守指令，停在禁区边界。红色（越狱提示）：使用简单的模板越狱后，Go2直接走进禁区——<strong>物理上违反了安全约束</strong>。</p>
+      <ul>
+        <li><strong>商用机器人安全性的薄弱程度</strong>：宇树Go2是已部署在执法（Port St. Lucie警察局）和军事（乌克兰战区）领域的商用产品，还被改装搭载枪支和火焰喷射器——但其AI安全层在简单越狱模板面前脆弱不堪</li>
+        <li><strong>API越狱的特殊危险性</strong>：Go2的24个API原语都看似无害（walking, sit_down, take_picture等），但通过API越狱（直接编写函数组合），攻击者可以关闭<strong>障碍物规避系统</strong>（avoid_obstacle(switch="off")），使机器人无视任何物理障碍直接撞向目标</li>
+        <li><strong>物理后果的严重性</strong>：聊天机器人越狱的后果是生成一段有害文本——可以删除和遗忘。机器人越狱的后果是<strong>物理世界中不可逆的伤害</strong>——碰撞行人、引爆装置、闯入禁区——这些行为的物理后果无法通过"删除文本"来消除</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9. POTENTIAL FLAW -->
+<section id="flaw">
+  <h2>9. 潜在缺陷与扩展方向</h2>
+
+  <h3>8.1 局限性</h3>
+  <ul>
+    <li><strong>攻击需要物理访问</strong>：Jackal和Go2的越狱需要攻击者<strong>物理接触</strong>机器人（输入语音命令或文本指令）——远程通过网络攻击这些系统可能要困难得多。论文在负责任披露部分明确承认这一限制。</li>
+    <li><strong>任务复杂度有限</strong>：当前数据集中的有害行为相对简单（7个离散动作），且每次只评估单个行为。真实攻击可能涉及多步骤、长时间的恶意计划——这些场景尚未被测试。</li>
+    <li><strong>防御研究的缺乏</strong>：论文在分析攻击方面非常深入（五种攻击 + 三种威胁模型 + 三个平台），但对防御的讨论相对薄弱——主要停留在"我们需要语境感知的物理安全过滤器"这一高层次建议上。</li>
+    <li><strong>系统提示提取的伦理问题</strong>：从宇树Go2提取系统提示的行为是否构成"黑客攻击"在技术上存在争议——论文声称这是"标准的安全研究实践"，但商用机器人的系统提示可能受到DMCA等法律保护（已有法院裁定AI系统提示不受保护，但仍存争议）。</li>
+    <li><strong>统计显著性</strong>：每个行为只做了5次重复——总样本量有限。虽然100% ASR的模式在所有平台和攻击方法中一致，但更大的样本量会增强说服力。</li>
+  </ul>
+
+  <h3>8.2 扩展方向</h3>
+  <ul>
+    <li><strong>攻击方向</strong>：(1) 多模态越狱——利用视觉输入（如对抗性图像）结合文本提示进行更隐蔽的攻击；（2）传感器欺骗——通过篡改机器人接收的传感器数据（GPS欺骗、LiDAR注入）来构造LLM认为"安全"但实际上危险的语境；（3）针对低层控制器的灰盒中间人攻击——在LLM规划器和低层执行器之间的通信链路上截获和篡改指令。</li>
+    <li><strong>防御方向</strong>：(1) <strong>物理安全过滤器</strong>——在机器人执行前对每个动作进行物理可行性+安全性的实时评估（如：当前指令是否会使机器人碰撞障碍物？是否会使机器人进入禁区？）；（2）<strong>指令层级（Instruction Hierarchy）</strong>——为不同来源的指令分配不同优先级（用户指令 > 系统指令 > LLM内部推理），防止攻击者通过提示注入"冒充"更高权限；（3）<strong>LLM输出监控</strong>——在LLM输出后、机器人执行前增加一层安全过滤，利用另一个安全专用LLM评估输出的危险性。</li>
+    <li><strong>标准化方向</strong>：建立机器人越狱评估基准——类似于聊天机器人的JailbreakBench或HarmBench，需要包括（a）多样的机器人平台、（b）标准化的有害行为分类、（c）不同的威胁模型级别、（d）自动化+人工双重验证协议。</li>
+  </ul>
+
+  <h3>8.3 数据敏感性</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>防御vs性能的权衡</td><td>增加安全层（物理过滤器、输出监控）会引入延迟和计算开销——在实时机器人控制中可能不可接受。论文承认"改进鲁棒性通常以牺牲名义性能为代价"</td><td>★★★★★</td></tr>
+    <tr><td>对抗性适应性</td><td>一旦防御机制公开，攻击者会设计新的攻击来绕过这些防御——这是一个永恒的攻防博弈。当前论文的攻击是"第一代"——一旦广泛部署防御，攻击者会找到新的漏洞</td><td>★★★★</td></tr>
+    <tr><td>商用系统的响应</td><td>论文向NVIDIA、Clearpath、Unitree预先披露了漏洞——但他们是否会修复？可能需要监管压力才能推动安全改进</td><td>★★★★</td></tr>
+    <tr><td>研究伦理</td><td>公开披露机器人越狱方法是否会被恶意行为者利用？论文认为（a）目前这些机器人缺乏自主规划和执行复杂伤害的能力，（b）安全性研究的"开放红队"传统对长期安全有利——但这一权衡值得持续讨论</td><td>★★★</td></tr>
+  </table>
+
+  <h3>8.4 值得深挖的方向</h3>
+  <div class="callout danger">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>LLM驱动机器人的形式化安全保障</strong>——当前ROBOPAIR揭示的脆弱性根源在于：LLM的输出没有经过<strong>形式化</strong>的安全验证。一个有价值的研究方向是：将LLM生成的计划转换为形式化规范（如LTL或Signal Temporal Logic），然后使用模型检查器（model checker）或可达性分析来<strong>证明</strong>执行这些计划不会导致不安全状态。这要求（a）对机器人动力学和环境约束进行形式化建模，（b）设计高效的在线验证算法（不能每次都跑完整验证），（c）当验证失败时生成可解释的反馈来引导LLM修改计划。这样做的额外好处是：不仅可以防御恶意攻击，还可以防止LLM的无意错误（如SPINE中的计划验证——论文10016正是这样做的，但不涉及对抗性攻击）。
+  </div>
+</section>
+
+<!-- 10. MOTIVATION -->
+<section id="motivation">
+  <h2>10. 动机——第一性原理推导</h2>
+
+  <h3>9.1 想法推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>LLM正在被大量集成到机器人系统中——从自动驾驶到服务机器人到军事应用。但当我们把LLM的控制权交给机器人时，LLM的已知安全漏洞（越狱攻击）是否会从"文本世界"转移到"物理世界"？如果会，后果有多严重？</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>聊天机器人领域已有大量越狱攻击和防御研究——但这些工作<strong>完全</strong>集中在文本生成上，<strong>从未</strong>考虑机器人场景。机器人社区在集成LLM时主要关心"如何让LLM更好地控制机器人"，几乎没有人问"LLM控制机器人是否安全"。两个社区之间存在危险的盲区。</li>
+    <li><strong>如果聊天机器人越狱攻击适配到机器人呢？</strong><br>直接把PAIR拿来测试——结果很差（14-49% ASR）。因为PAIR不理解机器人的物理约束和API——它生成的越狱文本无法在机器人上执行。这说明需要专门为机器人设计的越狱算法。</li>
+    <li><strong>机器人越狱需要什么特殊能力？</strong><br>（a）了解机器人API——知道哪些函数存在、参数是什么；（b）理解物理语境——生成的行为必须在当前环境中可执行；（c）输出可执行代码而非描述性文本——需要语法检查器来保证；（d）适应不同威胁模型——白盒/灰盒/黑盒需要不同的攻击策略。</li>
+    <li><strong>最简单的方案是什么？</strong><br>在PAIR上增加机器人API列表 + 语法检查器 = ROBOPAIR。结果：100% ASR。让人震惊的不是ROBOPAIR效果有多好——而是<strong>简单的模板越狱就能达到91-97% ASR</strong>。这说明LLM控制机器人的安全根本不是"需要精妙攻击才能攻破的城堡"——而是一个"到处是洞的筛子"。</li>
+  </ol>
+
+  <h3>9.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    LLM聊天机器人可以被越狱生成有害文本——但LLM控制的机器人不仅能"说"坏话，还能"做"坏事——如果越狱攻击从文本世界扩展到物理世界，机器人会不会被诱骗去撞行人、引爆装置、闯入禁区？
+  </div>
+
+  <h3>9.3 如何到达这个想法</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：LLM聊天机器人的越狱攻击在过去一年取得巨大进展（PAIR等算法可以在几轮迭代内攻破大多数商用聊天机器人）。同时，LLM在机器人中的应用正快速增长——自动驾驶、服务机器人、军事应用都在集成LLM。<strong>这两个趋势的交汇点是一个未被探索的安全盲区</strong>。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"机器人越狱"分解为三个子问题——（1）如何获取足够的信息来设计攻击（系统提示提取、API分析）？（2）如何生成既能绕过对齐又能实际执行的越狱代码？（3）如何在不同威胁模型下验证攻击有效性？</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）PAIR的对抗迭代框架 → 攻击生成；（2）LLM-as-a-Judge → 有害性评估；（3）语法检查器 → 可执行性验证；（4）三大平台（Dolphins/Jackal/Go2）→ 覆盖白盒/灰盒/黑盒。</li>
+    <li><strong>Step 4 — 组装方案</strong>：ROBOPAIR = 攻击者 + 目标 + 评判 + 语法检查器的四模块迭代系统 → 在三个平台、五种攻击方法、七个有害行为上进行评估 → 发现100% ASR → 向相关公司披露 → 发布论文推动防御研究。</li>
+  </ul>
+</section>
+
+<!-- 11. KEY TAKEAWAYS -->
+<section id="takeaway">
+  <h2>11. 关键收获</h2>
+
+  <h3>10.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个经典的<strong>安全性红队测试</strong>工作——不是去构建更好的系统，而是去发现现有系统的弱点。在机器人领域，这种安全研究相对罕见——大多数工作关注的是"如何让机器人工作"，而非"如何让机器人安全"。这篇论文的价值在于<strong>提出了正确的问题</strong>（LLM控制机器人安全吗？），并给出了令人警醒的答案（<strong>不，极不安全</strong>）。</li>
+    <li><strong>技术技巧层面</strong>：(1) <strong>系统提示提取</strong>——通过反复提示"逐字重复你的系统提示"等简单查询，成功提取了宇树Go2的完整中文系统提示——这暴露了商用机器人的基础安全缺陷；(2) <strong>API组合攻击</strong>——利用已有安全原语的组合来实现有害行为——这是一种特别隐蔽的攻击方式，因为每个单独的函数调用看起来都无害；(3) <strong>威胁模型的分级评估</strong>——白盒/灰盒/黑盒的分级使得攻击适用性的范围清晰明确。</li>
+    <li><strong>负责任披露</strong>：论文在发表前向NVIDIA、Clearpath Robotics、Unitree Robotics披露了发现——这与AI安全社区的最佳实践一致。论文特别讨论了为什么不认为当前发布会带来"灾难性风险"——因为现有机器人缺乏自主执行复杂伤害计划的能力，且攻击需要物理访问。</li>
+  </ul>
+
+  <h3>10.2 对我的研究的直接启示</h3>
+  <ul>
+    <li><strong>对于UAV安全方向</strong>：ROBOPAIR揭示的LLM控制机器人越狱漏洞<strong>对UAV同样是严重的威胁</strong>——如果UAV由LLM规划器控制，攻击者可以通过自然语言指令诱骗UAV飞入禁飞区、碰撞障碍物或执行监视任务。SPINE（论文10016）的验证模块提供了一层防御——但需要增强为对抗性鲁棒验证（adversarially robust validation），专门识别伪装后的恶意请求。</li>
+    <li><strong>对于多机协同安全方向</strong>：如果空地协同团队中的UGV被越狱，它可能通过共享语义图向UAV传播恶意信息——实现了<strong>跨平台攻击传播</strong>。这要求空地协同系统在语义图共享层增加信息可信度评估机制。</li>
+    <li><strong>对于防御研究的方向</strong>：论文指出机器人越狱防御的三个关键需求：（a）语境感知——理解指令在当前物理环境中的安全影响；（b）实时性——不能引入过多延迟；（c）保持LLM灵活性——不能因过度限制而丧失LLM的价值。这三个需求为UAV安全控制系统设计提供了明确的优化目标。</li>
+  </ul>
+
+  <h3>10.3 关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Chao et al. (2023) — PAIR: Prompt Automatic Iterative Refinement. <em>arXiv:2310.04451</em></td><td>PAIR是ROBOPAIR的直接前身——理解PAIR的工作机制对于理解ROBOPAIR的改进至关重要。PAIR目前仍是聊天机器人越狱的标准基线。</td></tr>
+    <tr><td>Wei et al. (2024) — Jailbroken: How Does LLM Safety Training Fail? <em>NeurIPS 2024</em></td><td>系统分析了LLM安全训练的失效模式——其中"竞争目标"（competing objectives）和"泛化不匹配"（mismatch generalization）两个概念对理解机器人越狱特别有价值。</td></tr>
+    <tr><td>Wallace et al. (2024) — The Instruction Hierarchy: Training LLMs to Prioritize Privileged Instructions. <em>arXiv:2404.13208</em></td><td>提出了指令层级（Instruction Hierarchy）概念——为不同来源的指令分配不同优先级。这是目前最有希望的LLM防御框架之一，但论文指出其在机器人领域仍面临语境依赖性的挑战。</td></tr>
+    <tr><td>OpenAI (2024) — GPT-4o System Card</td><td>GPT-4o的安全文档——包含了对PAIR等越狱攻击的防御评估。理解GPT-4o的安全机制有助于理解为什么ROBOPAIR选择用GPT-4作为攻击者/评判/语法检查器的基座模型。</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Robey, Ravichandran et al. · arXiv 2024 · ROBOPAIR — Jailbreaking LLM-Controlled Robots · First Commercial Robot Jailbreak</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1485 @@
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 1
+SlideSLAM: Sparse, Lightweight, Decentralized
+Metric-Semantic SLAM for Multi-Robot Navigation
+Xu Liu*†, Jiuzhou Lei*, Ankit Prabhu*, Yuezhan Tao, Igor Spasojevic,
+Pratik Chaudhari, Nikolay Atanasov, Vijay Kumar
+Abstract—This paper develops a real-time decentralized
+metric-semantic SLAM algorithm that enables a heterogeneous
+robot team to collaboratively construct object-based metric-
+semanticmaps.Theproposedframeworkintegratesadata-driven
+front-end for instance segmentation from either RGBD cameras
+orLiDARsandacustomback-endforoptimizingrobottrajecto-
+riesandobjectlandmarksinthemap.Toallowmultiplerobotsto
+mergetheirinformation,wedesignsemantics-drivenplacerecog-
+nitionalgorithmsthatleveragetheinformativenessandviewpoint
+Figure 1: Robot platforms used in our experiments. We utilize three
+invarianceoftheobject-levelmetric-semanticmapforinter-robot
+typesofrobotsforourexperiments:twoaerialplatforms,theFalcon
+loop closure detection. A communication module is designed to
+250 UAV (left) and the Falcon 4 UAV (middle), and one ground track each robot’s observations and those of other robots when-
+platform,theScarabUGV(right).TheLightDetectionandRanging
+evercommunicationlinksareavailable.Theframeworksupports
+(LiDAR)-equipped robot (Falcon 4) is primarily used for outdoor real-time, decentralized operation onboard the robots and has
+operationsduetoitssizeandsuperiorsensingcapabilities.TheRGB
+beenintegratedwiththreetypesofaerialandgroundplatforms.
+and Depth (RGBD) camera-based robots (Falcon 250 and Scarab)
+Wevalidateitseffectivenessthroughexperimentsinbothindoor
+are more suitable for cluttered indoor environments due to their
+and outdoor environments, as well as benchmarks on public
+smallerfootprints.AllthreeplatformshaveGPS-deniedautonomous
+datasetsandcomparisonswithexistingmethods.Theframework
+navigation capabilities, enabling them to safely explore cluttered
+is open-sourced and suitable for both single-agent and multi-
+environments using only onboard computation and sensing.
+robot real-time metric-semantic SLAM applications. The code is
+available at: https://github.com/KumarRobotics/SLIDE SLAM.
+Index Terms—Metric-Semantic SLAM; Multi-Robot Systems;
+Aerial Systems: Perception and Autonomy; SLAM
+level. This requires building and maintaining a semantically
+meaningful representation of the environment that encodes
+actionable information (e.g., timber volume and health in
+I. INTRODUCTION
+forests, corrosion in infrastructure, survivors’ locations in nat-
+Robotic systems are expected to make an impact in de- uraldisasters).Sucharepresentationhastobestorageefficient
+manding applications, such as forest inventory management, for the robots to maintain over large-scale missions, and has
+orchard yield estimation, infrastructure inspection and house- to allow efficient optimization for Simultaneous Localization
+holdassistance.Thisdemandsinterpretinghumaninstructions and Mapping (SLAM).
+giveninsemanticallymeaningfultermsrelatingtoobjectsand While traditional SLAM approaches [1], [2] offer excellent
+properties in the robot’s environment. To execute such mis- accuracy in geometric perception, including estimating robot
+sionsautonomously,robotsmustunderstandtheirenvironment poses and reconstructing 3D geometric structures (points,
+beyond its geometric structure and perceive it at a semantic surfaces, voxels), they are often insufficient to support large-
+scale missions, particularly when used with multiple het-
+*Equalcontribution.† Correspondingauthor. erogeneous robots for real-time autonomy. The challenges
+Manuscript received January 9, 2025; revised May 1, 2025; accepted
+include managing the excessive computational load, meeting
+September2,2025.ThisarticlewasrecommendedforpublicationbyEditor
+Javier Civera upon evaluation of the reviewers’ comments. This work was the high storage demands of large-scale maps, and handling
+supportedbyfundingfromtheIoT4AgEngineeringResearchCenterfunded loop closure and map merging operations. Moreover, they
+byNSF(NSFEEC-1941529),NationalRoboticsInitiative3.0:Innovationsin
+offer limited generalizability across different robot platforms
+Integration of Robotics (NSF 21-559), NIFA grant 2022-67021-36856, NSF
+grantCCR-2112665,andtheARLDCISTCRAW911NF-17-2-0181. or sensing modalities and lack semantic map representations
+X. Liu is with Microsoft, Redmond, WA 98052, USA (e-mail: required for executing semantically meaningful tasks.
+liuxushawn@gmail.com). This work was done while X. Liu was
+with the GRASP Laboratory, University of Pennsylvania, Philadelphia, PA Motivated by this, recent advances in SLAM have pushed
+19104,USA. toward constructing metric-semantic maps [13], [11], [10],
+J. Lei, A. Prabhu, Y. Tao, I. Spasojevic, P. Chaudhari, and V. Kumar are
+[17], [18]. However, they are typically limited to single-
+with the GRASP Laboratory, University of Pennsylvania, Philadelphia, PA
+19104,USA(e-mail:{jiuzl, praankit, yztao, igorspas, robot setups. For scalability and efficiency, an ideal system
+pratikac, kumar}@upenn.edu). should support deployment across heterogeneous robot teams,
+N.AtanasoviswiththeDepartmentofElectricalandComputerEngineer-
+enablingeffectivecollaborationwithoutrelyingoncentralized
+ing, University of California San Diego, La Jolla, CA 92093, USA (e-mail:
+natanasov@ucsd.edu). communicationorgloballocalizationinfrastructure.Extending
+©2025IEEE.Personaluseofthismaterialispermitted.PermissionfromIEEEmustbeobtainedforallotheruses,inanycurrentorfuturemedia,including
+reprinting/republishingthismaterialforadvertisingorpromotionalpurposes,creatingnewcollectiveworks,forresaleorredistributiontoserversorlists,or
+reuseofanycopyrightedcomponentofthisworkinotherworks.Thisistheauthor’sacceptedversionofanarticleinIEEETransactionsonRobotics(T-RO).
+5202
+tcO
+3
+]OR.sc[
+7v94271.6042:viXra
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 2
+(a)3Dreconstruction (b)metric-semanticmapwithpointcloud
+(c)object-levelmaptopview (d)object-levelmapobliqueview
+(e)outdoorobjectsclose-upview (f)parkinglotclose-upview
+(g)buildingclose-upview (h)indoorobjectsclose-upview
+Figure 2: Metric-semantic SLAM results from seven data sequences collected by heterogeneous robots. Trajectories in different colors
+correspond to different data sequences. Fig. 2a shows a 3D reconstruction of the Pennovation campus at the University of Pennsylvania.
+Outdoorobjects,suchasvehicles,treetrunks,andlightpolesaremappedasshownin2e.Indoorobjects,suchaschairs,tables,andmonitors
+are mapped as shown in Fig. 2h. Fig. 2b shows the same metric-semantic map overlayed on top of an accumulated point cloud constructed
+by our Falcon 4 UAV. Fig. 2c shows an orthophoto depicting the merged metric-semantic map of three parking lots and two buildings
+constructed by seven robots. Fig. 2g and Fig. 2h show a zoomed-in view of one of the lab buildings
+single-robotmetric-semanticSLAMtodecentralizedoperation decentralized metric-semantic SLAM system that is open-
+acrossmultipleheterogeneousrobotsintroducesseveralunique sourced1 andsuitableforreal-timeautonomousnavigationand
+challenges. These include performing efficient place recogni- exploration onboard resource-constrained single-robot as well
+tion and map merging among robots, maintaining consistent as heterogeneous multi-robot platforms. We enable this by
+and probabilistically sound sensor measurement fusion under mapping the environment using a sparse map representation
+intermittentcommunication,andenablingcollaborationamong
+heterogeneous platforms.
+1Code:https://github.com/KumarRobotics/SLIDE SLAM.Projectwebsite:
+To address these challenges, we develop a multi-robot https://xurobotics.github.io/slideslam/.
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 3
+TableI:Relatedwork.ThistablecomparesSlideSLAMagainststate-of-the-artmethods,focusingonkeyattributesforenablingsemantics-in-
+the-loopautonomywithrobotteams.Inthistable,decentralizedmethodssupportoperationwithasynchronousobservationupdatesfromother
+robots.Semanticlocalizationmeansthatobjectsareusedforlocalizationbetweenconsecutivekeyposes.Semanticloopclosureindicatesthat
+objects are explicitly used for place recognition and loop closures. Optimization over object models involves explicitly modeling objects as
+geometric shapes and optimizing them jointly with robot poses over time. Real-time with autonomy means that the metric-semantic SLAM
+system operates in real-time on-board the robots and is fully integrated into an autonomous exploration or navigation system.
+Decentralized, Semantic Semantic Optimizationover Real-timew/
+Year Multi-Robot
+Asynchronous Localization LoopClosure ObjectModels Autonomy
+SlideSLAM 2024 ✔ ✔ ✔ ✔ ✔ ✔
+Taoetal.3DActive[3] 2024 ✔ ✔ ✔
+Changetal.Hydra-Multi[4] 2023 ✔ ✔ ✔ ✔
+Liuetal.ActiveMetric-Semantic[5] 2023 ✔ ✔ ✔ ✔
+Wuetal.AnObjectSLAM[6] 2023 ✔ ✔ ✔
+Tianetal.Kimera-Multi[7] 2022 ✔ ✔
+Liuetal.Large-Scale[8] 2021 ✔ ✔ ✔
+Shanetal.Orc-VIO[9] 2020 ✔ ✔
+Yangetal.CubeSLAM[10] 2019 ✔ ✔
+Nicholsonetal.QuadricSLAM[11] 2019 ✔ ✔
+Choudharyetal.DistributedMapping[12] 2017 ✔ ✔ ✔
+Bowmanetal.Probabilistic[13] 2017 ✔
+Salas-Morenoetal.SLAM++[14] 2013 ✔ ✔
+Cunninghametal.DDF-SAM[15],[16] 2013 ✔ ✔
+that explicitly models objects using simple shapes and can be vironments. The system operates in real time onboard SWaP-
+usedfortaskplanningandlong-horizonSLAM.Theproposed constrained robots, while maintaining moderate computation
+sparseobject-levelmaprepresentationoffersnumerousadvan- and memory demands.
+tages. First, it avoids the high runtime and memory demands Experiments: We conduct extensive real-world experiments
+of using raw point clouds or images, which is particularly im- and provide thorough empirical results and analysis that high-
+portant for large-scale missions with Size, Weight, and Power light the efficiency, accuracy, and robustness of our system.
+(SWaP) constrained robot teams. Second, the lightweight We have also made our framework available to the public.
+nature of our representation ensures that robot-to-robot in-
+formation sharing is feasible, even with limited communi-
+II. RELATEDWORK
+cation bandwidth. This, coupled with our semantics-driven
+Inthissection,wecategorizetherelatedworksintofourkey
+placerecognitionandloopclosurealgorithm,enablesefficient
+areas: metric-semantic SLAM, place recognition, multi-robot
+detection of inter-robot loop closures. Third, it provides a
+SLAM,andsemantics-in-the-loopnavigation.TableIprovides
+direct and intuitive representation for robots to accomplish
+aquicksummaryofseveralkeyrelatedworks.Therestofthis
+high-level semantically meaningful tasks, such as actively
+sectionprovidesamorecomprehensiveoverviewoftherelated
+exploring to search and reduce uncertainties in objects of
+works in each category.
+interest. Fourth, unlike traditional approaches based on dense
+geometric features that usually have to marginalize variables
+frequently, which unavoidably leads to loss of information, A. Metric-semantic SLAM
+our representation enables us to keep track of actionable
+Unlike traditional SLAM, metric-semantic SLAM con-
+information over a much larger scale. Finally, it provides a
+structs a map that encodes geometric features and semantic
+unified representation across different sensing modalities.
+information on objects of interest. Metric-semantic SLAM
+We summarize our contributions as follows.
+has gained significant success and popularity in the past
+Algorithm: We develop a real-time decentralized metric-
+decade[19],drivenbytherapiddevelopmentofdeeplearning
+semanticSLAMframeworkthatsupportsheterogeneousaerial
+techniquesthatextractsemanticinformationfromsensordata.
+and ground robots, which includes
+A variety of map representations are used in existing metric-
+(a) acomputationallyefficientback-endthatusesourobject- semantic SLAM literature. Some use dense semantic maps,
+level metric-semantic map representation, and a flexible such as meshes [17], volumetric maps [20], [21], surfels [22],
+front-end that supports both LiDAR and RGBD sensors, and 2.5D grid maps [23], [24], [25]. Others use sparse object-
+(b) semantics-driven place recognition algorithms that use level maps with prior information of object shapes, such as
+sparse object-level maps for map merging, centroids [13], cubes [10], ellipsoids [11], cylinders [26],
+(c) a decentralized multi-robot collaboration module that structuredobjectmodelswithpriorshapeconstraints[27],[9],
+facilitates information sharing, even under intermittent andmesh-basedobjectmodels[28],[14].Followingtherecent
+communication conditions. trendsinneuralimplicitrepresentation,somepriorworks[29],
+System integration: We integrate and deploy the proposed [30], [31] have also incorporated it into a map representation
+framework on a heterogeneous team of robots, demonstrat- capableofmetric-semanticSLAM,whereobjectsaremodeled
+ing its capacity to enable semantics-in-the-loop autonomous implicitlyusinglatentfeaturesfromneuralnetworksandused
+navigation and exploration in various indoor and outdoor en- as localization constraints and for object association. While
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 4
+Figure 3: System Diagram. Our system takes in data streams from each robot’s onboard sensors, which can be either an RGBD camera
+or a LiDAR, and performs instance segmentation to extract semantic object features. Meanwhile, low-level odometry, either Visual-Inertial
+Odometry (VIO) or LiDAR-Inertial Odometry (LIO), provides relative-motion estimates between consecutive key poses. Next, the metric-
+semantic SLAM algorithm takes in such semantic observations and relative motion estimates, and constructs a factor graph consisting
+of both robot pose nodes and object landmark nodes. Meanwhile, our multi-robot communication module (see Fig. 4) opportunistically
+leverages connectivity to share lightweight semantic observations among robots in a decentralized way. Based on this shared information,
+ourmetric-semanticplacerecognitionalgorithmconstantlychecksforpossibleinter-robotloopclosuresatafixedrate.Oncealoopclosure
+is detected, the resulting transformation between each pair of robots is used to transform all observations into each robot’s reference frame.
+Theseobservationsarethenaddedtotheirownfactorgraphs,formingamergedmetric-semanticmap.Notethattheentireperception-action
+loop runs in a decentralized manner onboard each robot. Besides the obvious differences in control algorithms, the planning modules and
+the front-end processing algorithms are also different across each robot platform. This is due to the need to accommodate the differences
+in sensing modalities (RGBD and LiDAR), operating environments (indoor, urban, and forest), and traversal modes (ground and aerial).
+However, the core metric-semantic SLAM framework remains the same.
+dense metric-semantic maps are suitable for obstacle avoid- B. Place recognition
+anceandfacilitatemorefine-grainedmodelingofobjects,their
+computational and memory demands, especially in SWaP- Place recognition and loop closure address the challenge
+constrained platforms, can be significant. Thus, sparse object- of identifying whether a robot revisits a previously mapped
+level maps are desirable for real-time downstream tasks such location.Thisenablesodometrydriftcorrectioninsingle-robot
+asactiveinformationgathering,objectmanipulationandmulti- systems (intra-robot loop closure) and map merging in multi-
+robot collaboration. This is because semantic information is robot systems (inter-robot loop closure). Prevalent approaches
+necessaryforrobotstoperceivetheirenvironmentandexecute typically use consistency graphs. These methods operate on
+tasks in a semantically meaningful manner. Sparsity helps the assumption that pairwise distances between points or
+robots reduce resource demands on computation, storage, and landmarksremainunchangedacrosstwocandidatemaps[32],
+communication.ArecentworkinthisspaceisConceptGraphs [33], [34], [35]. The largest set of consistent associations
+[18], which builds open-vocabulary, semantically rich 3D is then identified and used to estimate the transformation.
+objectmaps.However,ConceptGraphsisnotdesignedforreal- However, this assumption is invalid with the object-level
+time, onboard operations on resource-constrained robots. Its map representations, where object detection and localization
+detection and 3D object mapping pipelines require extensive errors introduce additional inconsistency. Some geometric-
+computational resources. By contrast, our work seeks to de- based place recognition methods, such as [36], design hand-
+velopametric-semanticSLAMframeworkthatutilizessparse craftedfeaturesforLiDARpointcloudsthataretranslationand
+explicitlymodeledobjectsandsupportsreal-timedecentralized rotationinvarianttomatchthemaccuratelyandestablishrobust
+operations within a heterogeneous robot team. place recognition. Other methods like [37] generate similar
+globalmatchingfeaturesandperformrelativeposerefinement
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 5
+usingdeepneuralnetworks.Whilethesemethodsdemonstrate descent[49].However,semanticinformationisusedprimarily
+impressiveplacerecognitionperformance,theymayhavehigh in the map representation rather than for localization and
+memory usage when storing a large number of geometric loop closure. Another related work, [50], proposes a dis-
+features or require large amounts of data to fine-tune the tributed Pose Graph Optimization (PGO) framework based
+neural network for place recognition in novel environments. onadistributedGaussian-Seidelapproach[51]byconsidering
+Conversely, semantic maps are much sparser, provide richer onlyoverlappingconstraintsamongrobotsintheoptimization
+information and can be abstracted from any sensing modality, and extracting objects as landmarks. Object-level semantic
+LiDAR or camera. Some approaches leverage this fact and landmarks,becausetheyareviewpointinvariant,canfacilitate
+propose descriptor-based methods based on the spatial rela- collaborationamongheterogeneousrobots.Fewworksexistto
+tionshipofsemanticobjects.In[38],arandomwalkdescriptor solvetheproblemofcollaborativeSLAMusingheterogeneous
+encodingsemanticlabelsofneighboringnodesisdesignedfor sensors. Among them, [52] fuses local pose graphs from
+each semantic node. A semantic histogram-descriptor-based differentSLAMalgorithmsintoaglobalposegraph.However,
+method is proposed in [39], which improves the efficiency of it is limited to vision-based sensors, which require sharing
+graph matching compared to the random-walk-based method. images associated with each pose for map merging. Our
+[6] also leverages random walk descriptors with semantic work proposes a more generic and efficient system towards
+informationbutfurtheraddsinformationonobjectparameters, decentralized metric-semantic SLAM that supports real-time
+angles, and distance between an object node and its neigh- operationonSWaP-constrainedheterogeneousrobotplatforms
+boring nodes to filter out false candidates. In [40], Urquhart with either RGBD or LiDAR sensors.
+tessellations are derived based on the positions of semantic
+landmarks (tree trunks in forests). Polygon-based descriptors
+D. Semantics-in-the-loop navigation and exploration
+are then computed to describe the local neighborhood of the
+Most autonomous navigation systems rely on geometric
+robot, which are then used for place recognition. Hierarchical
+maps.Althoughsuchmapsarereliableforobstacleavoidance,
+descriptors consisting of appearance-based descriptors like
+they lack semantic information that robots can leverage to
+Distributed Bag of Words (DBoW2) [41] and higher level
+improve their state estimation and planning while navigat-
+descriptors encoding information about a node’s neighboring
+ing the environment. Object-based landmarks help minimize
+objectsorplacesaredesignedin[42],[4].Drawinginspiration
+odometry drift, thus benefiting autonomous navigation if ex-
+fromsomeofthesepriorworks,wedesigntwocomplementary
+ecuted onboard in real-time [8]. Recent work goes beyond
+placerecognitionalgorithmsthatleverageourmetric-semantic
+improving odometry but uses semantic information for active
+map representation from diverse sensing modalities (LiDAR
+uncertainty reduction planning [53], [54], [5], and multi-robot
+and RGBD Camera) and adopt exhaustive search-based and
+collaborative planning [25]. The use of semantic information
+descriptor-based strategies, respectively.
+in active SLAM is relatively uncommon [55]. Some represen-
+tativeworkinthisfieldincludes[56],[57].However,therehas
+C. Multi-robot SLAM not yet been a real-time decentralized metric-semantic SLAM
+Multi-robot SLAM systems expand upon their single-robot framework that enables a team of heterogeneous robots to
+counterpartsbyincorporatingtwocrucialmodules:inter-robot explore GPS-denied environments while reasoning about the
+loop closure and multi-agent graph optimization. Numerous semanticinformationandleveragingittofacilitatemulti-robot
+studies address the challenge of place recognition, as detailed collaboration. Our work seeks to develop such a framework.
+in Section II-B. Representative works in multi-robot SLAM
+include [43], [44], which rely on a central base station or III. PROBLEMFORMULATION
+agent to merge measurements from multiple robots, and [45],
+Given an unknown environment and a team of hetero-
+[46],[47],[48],whichoperateinadistributedordecentralized
+geneous robots, our objective is to construct a hierarchical
+manner. Distributed multi-robot systems involve robots that
+metric-semantic map of the environment without relying on
+coordinate through message passing, possibly with central
+any infrastructure. The robots can communicate with each
+nodes, while decentralized systems operate without a central
+other opportunistically. Each robot must estimate its pose
+decisionpoint,enhancingrobustnessbyallowingeachrobotto
+and the state of the environment and use this information to
+makeindependentdecisions.Decentralizedmulti-robotSLAM
+determine actions for navigation and exploration in real time.
+is a promising framework in multi-robot SLAM research.
+It enables robots to operate independently and collaborate
+A. Preliminaries
+opportunistically when communication links are established,
+allowingthemtoaccomplishcomplextaskssuchaslarge-scale Consider K robots, indexed from 1 through K. The map
+collaborative exploration without relying on infrastructure. of the k-th robot M(k) consists of a set of object landmarks
+However, the prior works mentioned above only contain {ℓk,ℓk,...,ℓk }belongingtoasetofpre-definedclasses(i.e.,
+1 2 nk
+geometric information during mapping. Recent efforts ex- object categories). An object is described by its class and
+tend the field to metric-semantic mapping. [7] presents a a state vector, including its position, orientation, and shape
+system producing a dense 3D semantic mesh, incorporating information.Forexample,acuboidhasthreeshapeparameters
+distributed loop closure detection and distributed robust pose- describing its width, length, and height. A cylinder has one
+graph optimization based on Riemannian block coordinate parameter describing its radius (we do not estimate its height
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 6
+Figure 4: Multi-robot collaboration module for decentralized metric-semantic SLAM. The robots share lightweight metric-semantic
+observationsnecessaryforconstructingthefactorsbetweenobjectlandmarksandrobotposesinthefactorgraph,whichincludethedetected
+objects and the odometry relative motion estimate (w.r.t. the previous pose) associated with each key pose in the factor graph. Once the
+metric-semantic place recognition module successfully finds a loop closure with another robot, the shared observations from that robot will
+be transformed into the current robot’s reference frame and added to the factor graph of the current robot.
+as it is unobservable for the majority of measurements due to accuracy with which a robot can estimate specified quantities
+limited field of view). Ellipsoid models are simplified to have of interest given all the information it has amassed thus far.
+two shape parameters (radius and height) and known identity In our metric-semantic SLAM formulation, the quantities
+orientation. Objects of each class are modeled using one of of interest include the robot poses x(k) and the map of the
+t
+the aforementioned three shapes as specified by the user. For environment M. At each time t, robot k receives odometry
+each key pose of robot k, denoted by xk, the associated measurements
+t
+measurements include object detections from this pose and h(k) =x(k)⊖x(k) +w(k), (3)
+the relative motion from the previous key pose. The details of t t t−1 t
+the shape models, robot measurements, and the factor graph where ⊖ computes the relative pose between two key poses,
+used for optimization are presented in Section IV. and map measurements
+m(k) =h(x(k),M)+v(k). (4)
+t t t
+B. Dec-Metric-Semantic SLAM for multi-robot exploration We assume (w(k)) and (v(k)) are indepen-
+t t≤T,k≤K t t≤T,k≤K
+dent random variables with zero mean and covariance Λ
+In this section, we state the general active decentral- k
+and Γ , respectively. Currently, both variables w(k) and v(k)
+ized metric-semantic SLAM problem (Dec-Metric-Semantic k t t
+SLAM). Let I t (k) be all past observations that robot k has are set to constant values since key poses x( t k) are sampled
+accrued by time t, from its own measurements, as well as at a fixed robot travel distance interval. However, in our
+from messages it has received from other robots. At time t, implementation,weprovideaninterfacetoallowscalingw t (k)
+every robot k executes an exploration or navigation policy: according to travel distance and modify v t (k) accordingly to
+account for sensor and object detection noise.
+µ(k) :I(k) →A, (1) We let C ∈ {0,1}K×K be the time-varying symmetric
+t t t
+adjacencymatrixoftheundirectedgraphmodelingtherobot’s
+where A is an action set of robot k that can include, for
+communication. At every time t, any distinct pair of robots i
+example, waypoints to follow or low-level control inputs. We
+and j communicate if and only if (C ) = (C ) = 1. We
+t i,j t j,i
+formulate the exploration problem as:
+denote the message that robot i sends to robot j at time t via
+(cid:34) K T (cid:35) r (i→j) (t).Wedenotetheneighborsofanyrobotkinthegraph
+max E (cid:88)(cid:88) U (x(k),M;I(k)) , (2) at time t via
+t t t
+(µ( t k))1≤t≤T, k=1t=1 N(k) ={j ∈[K]\{k} : (C ) =1}, (5)
+1≤k≤K t t j,k
+where[K]:={1,...,K}.Foranydistinctpairofrobots(i,j),
+where M represents the (static) map of the environment, and
+x(k) the state of robot k at time t. The function U is a we denote their last meeting time up to time t as
+t t
+(potentially) time-varying utility function that quantifies the L(i,j) =max{s≤t : (C ) =1}, (6)
+t s i,j
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 7
+noting the symmetry in the superscript, i.e., L(i,j) = L(j,i). likelihood state estimation problem at time t as follows. For
+t t
+Then, the information state of robot k may be defined recur- every robot j ∈ N(k), we consider the message r (t) =
+t j→k
+sively as (I(j),Mˆ(j)). First we determine common map observations
+t t
+I t (k) = (cid:91) I L(k,j) ∪ (cid:91) (cid:16) {h( s k)} ∪ {m( s k)} (cid:17) , (7) m ro a b d o e t l b o y op r - o c b lo o s ts ur k e d a e n t d ec j tio u n p o t n o M t ˆ im (j e ) t an b d y M p ˆ e ( r k fo ). rm T i h n e g o i u n t t p e u r- t
+t t t
+j∈[K]\{k} s∈[t]
+of the loop-closure module yields an estimate of the relative
+with initial condition I(k) =∅ for all k ∈[K]. transformation (k)T (j) = ((k)R (j) ,(k)t (j) ) ∈ SE(3) between
+0
+We develop an approach that uses a set of policies µ (e.g., reference frames of robot j and robot k. In particular, a point
+active SLAM, exploration, etc.) that take as input compressed with coordinates (j)p in the reference frame of robot j has
+representations of M using a custom data structure, i.e., a set coordinates(k)p=(k)R (j) (j)p+(k)t (j) inthereferenceframe
+of object landmarks with corresponding poses, shapes, and ofrobotk.Thistransformationisthenusedtodeterminewhich
+class labels, as well as a custom rule for updating the data landmarksinthe mapofrobotj correspondtolandmarksthat
+structure both using new measurements from the robot and also exist in the map of robot k. Thereafter, the trajectories
+information from its communication with other robots. The of both robot j and k are optimized together with the union
+explorationornavigationpolicyofrobotkmaythenbedefined of object models in the map, taking care to associate mea-
+via surements of the same landmark taken by two robots with the
+µ(k)(I(k)):=µ(k)(Π(I(k))), (8) same variable in the factor graph:
+t t t t
+where the information projection operator Π is given by xˆ(j),xˆ(k),Mˆ(k) = argmax P(x(j),x(k),M | I(k)).
+1:t 1:t t 1:t 1:t t
+x(j),x(k),M
+Π(I(k))=(xˆ(k),Mˆ(k)). (9) 1:t 1:t (12)
+t 1:t t
+The above equation provides details on the information pro-
+Π extracts an estimate of the previous trajectory of robot k,
+jection operator Π.
+as well as its estimate of the map via
+Our system works on robots with different types of sen-
+xˆ(k),Mˆ(k) =argmax P(x(k),M | I(k)), (10) sors, including RGBD cameras and LIDARs, as illustrated
+1:t t 1:t t
+x(k),M in Fig. 3 and detailed in Section V-A. Our metric-semantic
+1:t
+SLAM framework handles such heterogeneity by using dif-
+where P(x(k),M | I(k)) represents the joint probability
+1:t t ferent front-end pipelines. We integrate the proposed metric-
+distribution of the robot k’s trajectory from the start up to
+semantic SLAM framework with our autonomous exploration
+time t, and the map M, which includes object landmarks,
+and navigation stack as detailed in Section V-B. In the rest of
+conditioned on the information state I t (k) of the robot k. this section, we will provide details on individual modules of
+Finally, we use the following form of messages the proposed framework.
+r (t)=(I(i),Mˆ(i)). (11)
+(i→j) t t
+B. Map representation
+In principle, robot j can construct Mˆ(i) from I(i). Given
+t t
+the fact that the compressed representation Mˆ(i) we use is
+t Table II: Requirements for map representation. Generic implies
+memory efficient, we directly share this information to avoid
+that the map must be adaptable to various sensing modalities and
+the extra computation brought about by the reconstruction environments. Informative means that the map should contain both
+step. The map Mˆ(i) is shared only for checking inter-robot metricandsemanticinformation.Sparseindicatesthatthemapneeds
+t
+to be memory efficient for storage and sharing.
+loopclosuresandestimatingthetransformations.Onceavalid
+inter-robotloopclosureisestablished,I(i) isusedtoformthe Heterogeneousrobots Placerecognition Real-timeexplora-
+t
+updated I(j) as mentioned in Eq. (7). I(j) will then be used andenvironments andloopclosure tionandnavigation
+t t Generic ✔ ✔
+to update Mˆ( t j). Informative ✔ ✔
+Sparse ✔ ✔ ✔
+IV. METRIC-SEMANTICSLAM
+The metric-semantic SLAM framework needs to satisfy
+A. Approach overview
+several design attributes. These include (1) support for het-
+We next turn to an overview of the approach for computing erogeneous robot teams, where the robots may carry different
+theinformationprojectionoperatorΠ,whichisoneofthecore sensors, operate in different environments, and share infor-
+contributions of this paper. Unlike traditional geometric-only mation with each other via intermittent communication, (2)
+methodssuchaspointcloudregistration,ourmethodleverages support for inter-robot place recognition for map merging,
+both geometric and semantic information to find common (3) capability of real-time operation under the constraints of
+components of maps estimated by different robots, and then onboardcomputationandmemoryresources,sothattherobot
+refines such estimates using both its own measurements and can use the estimated pose and the metric-semantic map to
+measurements made by other robots. We illustrate this idea guide its navigation.
+with a pair of robots k and j at time t, though the argument As summarized in Table II, to support different kinds of
+can be readily generalized to simultaneous interactions of sensors(RGBDcamerasandLiDARs)andobjectsindifferent
+a larger number of robots. Robot k solves the maximum environments,werequirethemaprepresentationtobegeneric.
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 8
+To work with multiple robots and allow the sharing of in- In addition to supporting the aforementioned closed-set
+formation with limited communication bandwidth, we require object detection methods that only enable the robot to per-
+the map representation to be sparse. To enable efficient and ceive a subset of the semantic information in the world
+accurate place recognition and loop closure, we additionally characterized by pre-identified labels, we provide support to
+require the map representation to be informative so that the incorporate open-vocabulary object detectors into our system.
+robots can distinguish different semantic objects even under Specifically, we utilize the YOLO-World model [63] as our
+perceptually aliased conditions. Finally, to enable efficient, open-vocabulary object detector due to its real-time onboard
+large-scale, and real-time autonomous exploration, we also performance. The YOLO-World model processes pairs of
+require the map to be sparse and informative. The informa- images and a list of text prompts, where we specify a set
+tivenessallowstheexplorationplannertobetterunderstandthe ofobjectcategoriesofinterest.Themodelthenoutputsobject
+environment,suchastheuncertaintiesinthesemanticobjects, detections corresponding to each query in the text prompts.
+and generate informative paths. We apply depth thresholding to these detections, similar to
+Therefore, we design a generic, sparse, and informative the approach used for YOLOv8.
+metric-semantic map representation. It contains a set of ob- Once the point cloud per detection is extracted, these
+jects, each represented by a semantic class and a state vector detected objects are tracked over time using the Hungarian
+that describes its model parameters, including position, orien- assignmentalgorithm[64].Trackinginstancesacrosstimeand
+tation, and shape information. Such a map representation, as from different viewpoints ensures robust geometry of objects
+illustrated in Fig. 2, can be maintained throughout the entire and minimizes false positives by rejecting those tracks that
+missionoftherobotwhileenablingtaskssuchaslocalization, only appeared once or very few times, which is necessary
+mapping, map sharing, place recognition, map merging, and formetric-semanticmapping.Finally,thealgorithmalsohelps
+active exploration over a large scale and in real time. with robustness against moving objects by tracking and ac-
+The metric-semantic SLAM problem can be broken down cumulating their point clouds. For example, an accumulated
+into two subproblems: (a) determining the discrete semantic instanceofamovingobjectappearselongatedwhencompared
+labels and data association of detected objects and (b) opti- to its true size, and such objects can then be filtered out
+mizingoverthecontinuousvariablesofrobotposesandobject by simply applying a threshold on their dimensions. This
+modelparameters(poseandshape).Inthiswork,weapproach preliminary tracking step is used to more robustly obtain
+problem (a) using deep neural networks for detection and object-levelobservations.Inthefactorgraphoptimizationback
+assignment algorithms for data association, and problem (b) end, there is a separate object tracking step that associates
+by first converting object observations into factors in a factor these object observations with existing object landmarks to
+graph and then using an incremental smoothing and mapping construct factors in the factor graph.
+algorithm(iSAM2)[58],[59]tooptimizeit.Intherestofthis Oncearobustobjectinstanceisobtained,dependingonthe
+section, we provide details on these two steps. type of object, a shape model is fitted to the instance. Objects
+such as vehicles use a cuboid model, tree trunks and light
+polesuseacylindermodel,andirregularlyshapedobjectsthat
+C. Object detection and modeling
+cannotbeproperlycategorizedintoeitheracuboidorcylinder
+The front-end of our SLAM framework is responsible for use an ellipsoid model. Having determined an appropriate
+processing raw data from different sensors and converting it model for the object instance, these models are converted into
+intoobject-levelobservations.Theprocessisbrokendowninto factorstobeaddedtothefactorgraphfortheSLAMback-end
+three components: 1) object detection or instance segmenta- optimization.
+tion; 2) object instance tracking to accumulate observations We highlight that we do not rely on a specific object
+from different views; 3) shape model fitting to the instances detector. Our implementation has a modular front-end design,
+based on the class labels. enabling the seamless integration of alternative object detec-
+For semantic segmentation on point cloud from LiDAR, tors in the future.
+we trained RangeNet++ [60] with a small modified backbone.
+This modelperforms segmentation onthe rangeimage, which D. Factor graph optimization with object models
+is a spherical projection of a point cloud. This operation dras- After acquiring the object detections associated with each
+tically decreases the inference time compared to performing poseoftherobot,wenowformulatetheback-endoptimization
+inference on a 3D data structure such as a point cloud and problem for the metric-semantic SLAM. When a new object
+makes real-time inference onboard SWaP-constrained plat- detection arrives, we first check if we can associate it with
+forms possible. We use a custom open-source labeling tool existing object landmarks in the map. Upon the first observa-
+to generate training data [61]. tion of the object, we will initialize an object landmark. After
+For the RGBD sensor, we use YOLOv8 [62] to perform that,onceweassociatenewobjectmodelswithexistingobject
+instance segmentation on RGB images and backproject the landmarks, we use the detection-landmark matches to form
+pixels in each object instance’s segmented mask into point factorsbetweenthecurrentposeandthematchedlandmarksin
+cloudsusingdepthinformation.Weapplydepth-basedthresh- thefactorgraph.Avalidobjectdetection-landmarkassociation
+olding within each object instance’s mask, keeping only the needs to meet two criteria: (1) they have the same semantic
+points within a certain range of depth percentile, to avoid label, and (2) their distance and model difference are within
+including noisy pixels. a certain threshold.
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 9
+A critical step to form such factors is to define the con- Since the GTSAM solver [59] already provides range and
+straining relationship (i.e., graph edges) between the object bearing measurement models, we directly utilize these for
+and robot pose graph vertices. This means we need to define optimizing the centroid positions. For dimension estimation,
+the measurement models that convert observations of relative we use the moving average method as follows: dupdated =
+e
+odometryandobjectmodelsintofactors.Wedenotethematrix (1−α)·d +α·d (z), where α controls the weight given to
+e e
+form of the robot pose x as Hw, where Rw is the rotational new measurements.
+t s s
+component and tw is the translational component. In the rest 4) Odometry factors: The robot state at time t is repre-
+s
+of this section, we will describe this process in detail. sented by x , which contains the SE(3) pose. For each key
+t
+1) Cuboid factors: First, we define the state vector of the pose x , we compute the relative motion from its preceding
+t
+cuboidobjectmodelas:ℓg =[r;t;d],wherer=[r x ,r y ,r z ]⊺ key pose using the low-level odometry readings from either
+istherotationvector,t=[t x ,t y ,t z ]⊺ isthetranslationvector, VIO or LIO, depending on the sensor that the robot carries.
+and d = [d
+x
+, d
+y
+, d
+z
+]⊺ is the size. Specifically,thisiscalculatedas∆x
+t
+=(xo
+t−
+do
+1
+m)−1◦xo
+t
+dom.Our
+We first recover the cuboid’s SE(3) pose based on its state factor graph incorporates this relative motion as an odometry
+vectorℓg =[r;t;d],andtransformitfromthereferenceframe factor.Thisapproachmitigatesthecumulativedriftcommonly
+i
+tothebodyframeusingHs =HsHw .Theerrorfunction associated with low-level odometry systems by not directly
+cub w cub
+for cuboidal objects is as follows: usingthelow-levelodometryasposepriors.Instead,weutilize
+(cid:20) log((Hs (z))−1(HsHw ))∨(cid:21) the odometry estimates to interpolate between consecutive
+e = cub w cub , (13)
+cub d−d(z) key poses that are proximate in both space and time, where
+the precision of the low-level odometry provides reliable
+where ∨ is vee operator that maps the SE(3) transformation
+measurements.
+matrix into 6×1 vector, log is the log map, and (·)(z) are
+We use the measurement models defined above to convert
+corresponding measurements.
+the observations and build a factor graph with nodes for
+2) Cylinder factors: First, we define the state vector of the
+cylinder object model as: ℓg = [b;n;r], where b = [b , b , both robot poses and object landmarks and factors between
+b ]⊺ is the origin of the ax i is ray, n = [n , n , n ]⊺ x is th y e them, as illustrated in Fig. 3. We implemented our custom
+z x y z
+cuboidandcylinderfactorstobecompatiblewiththeGTSAM
+direction of the axis ray, and r is the radius.
+factor graph optimization library [59]. In addition, we use
+Similarly,thetreatmentofcylinderfactorshasbeenderived
+GTSAM’sbuilt-inrelativeSE(3)posemeasurementmodelfor
+in [5]. We calculate the expected measurement and actual
+measurementofcylinderobjectsfromℓg andℓg(z).Wedefine theodometryfactorandtherange-bearingmeasurementmodel
+i i for ellipsoid object landmarks.
+the error function for cylindrical objects as:
+ (Rsb+ts)−b(z) 
+w w E. Place recognition and loop closure
+e
+cyl
+= Rs
+w
+n−n(z) , (14)
+r−r(z) Our system is designed with a modular architecture, en-
+abling users to integrate alternative place recognition and
+where (·)(z) are corresponding measurements.
+loop closure algorithms to meet their unique requirements. In
+3) Ellipsoid factors: All objects that are not associated
+this paper, we have developed two example algorithms that
+with a cylinder or cuboid shape are represented by ellipsoid
+leverage our object-level metric-semantic map representation.
+landmarks. Note that our ellipsoid model is simplified to have
+At a high level, they can be summarized as follows:
+only two dimensions (i.e., the cross-section is a circle) and
+identity orientation. For each ellipsoid object, the state vector 1) SlideMatch: This approach uses an exhaustive search
+is: ℓg = [c,d ]⊺, where c = [c , c , c ]⊺ represents 3D strategy by sampling candidate transformations, applying
+i e x y z
+position of the centroid, and d = [d ,d ]⊺ represents the them to the first metric-semantic map, and matching
+e r h
+radius and height. the transformed map against the second map to identify
+Given the expected ellipsoid landmark model ℓg =[c,d ]⊺ potential loop closures.
+i e
+and the actual measurements which consists of range-bearing 2) SlideGraph: This descriptor-based approach begins by
+measurementsrg(z),θ(z),ϕ(z)aswellasthedimensionmea- performing data association through the matching of
+surements d (z) = [d (z), d (z)]⊺, the measurement error triangle descriptors derived from each metric-semantic
+e r h
+e is derived as follows: map, using both class labels and position information
+ellip
+Let [c′,c′,c′] = R⊤(c−t ) denote the landmark trans- of the objects. The initial associations are then refined
+x y z t t
+(cid:113) usingagraph-theoreticframework[34],whicheffectively
+formedintothebodyframe,rg = c′2+c′2+c′2 repre-
+exp x y z eliminates outliers.
+senttheexpectedrangemeasurement,andθ exp =tan−1 (cid:16) c c ′ ′ y (cid:17) The two example algorithms exhibit different behaviors and
+(cid:18) (cid:19) x
+and ϕ =tan−1 √ c′ z indicate the expected bearing offer complementary performance across various scenarios.
+exp c′2+c′2 Generally, we recommend using SlideGraph as the primary
+x y
+measurements. The measurement error for centroids of ellip- algorithm, with SlideMatch serving as an alternative option,
+soid objects is as follows: as further discussed in detail in Section V-J.
+ rg −rg(z)  1) SlideMatch: The SlideMatch algorithm takes a pair of
+exp
+e
+ellip
+= θ
+exp
+−θ(z) . (15) object-level metric-semantic maps from either the same robot
+ϕ −ϕ(z) (i.e., historical map and current map for loop closure) or a
+exp
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 10
+pair of different robots. SlideMatch algorithm checks within as a maximum clique search in a weighted graph, when an
+a search region if a valid loop closure is found and outputs initial data association is unavailable, CLIPPER can still op-
+the relative transformation between the reference frames of erateunderanall-to-allassociationassumption.However,this
+these two maps. Unlike [65], here we also leverage additional quicklybecomestoomemorydemandingandcomputationally
+informationsuchassemanticlabelsanddimensionsofobjects expensive as the number of object landmarks increases in the
+in the maps. The search region of the algorithm encompasses map.
+continuousrangesofXandYpositionsandyawangles,where To address these limitations, we propose a method for
+the relative transformation between the two maps may exist. generating initial data associations using descriptor matching.
+The search procedure is carried out over the search region Inspired by prior research [40], our descriptor design applies
+using a user-defined search resolution for discretization. Delaunay triangulation to two sets of object landmarks de-
+Preprocessing: For inter-robot place recognition, we de- rived from metric-semantic maps. Candidate simplices, either
+signed a preprocessing step that zero-centers the two object- triangles(2Dlandmarks)ortetrahedrons(3Dlandmarks),from
+level maps before performing data association. This step eachsetarecomparedbasedontheirsortedvertex-to-centroid
+reduces the search region and computation of the SlideMatch distances. A valid match is found if the distance metrics
+algorithm, especially when the two robots start far apart. Fur- between two simplices fall within a predefined threshold.
+thermore, it enables the algorithm to automatically calculate From these matched simplices, the corresponding vertices are
+the search region by setting the X and Y search ranges to extracted as an initial set of object landmark associations.
+encompass the region where the two maps overlap and the The semantic class labels of the object landmarks are used to
+yaw search range to (−π,π]. further reject false candidate matches. This initial matching
+Anytime implementation: The anytime implementation pro- step significantly reduces the search space for the CLIP-
+gressively improves the quality of place recognition until PER framework, which subsequently refines these matches
+the user-specified compute budget is exhausted. Quality is by filtering out false associations through its graph-theoretic
+measured by the number of inlier matches. This approach optimization. The total number of valid matches resulting
+guarantees the algorithm returns the best estimate within from this refinement is treated as the matching score, which
+the given computation time budget. A valid loop closure is is then compared against a threshold to determine whether
+considered to be found if the matching score of the best a valid loop closure has been detected. This two-stage
+estimateexceedsthevalidloopclosureinlierthreshold,which approach ensures robust data association while maintaining
+is described in more detail below. This anytime procedure is computational feasibility, even for large landmark sets.
+achieved by gradually increasing the search region for data 3) Least square optimization: Finally, a least-squares op-
+association until it covers the entire region or the compute timization is applied to obtain the relative transformation
+budget is used up. estimates between the reference frames of the two metric-
+Dataassociation:Thedataassociationstepinvolvesfinding semantic maps, using the data associations provided by either
+the possible set of landmarks that are common in both maps. theSlideMatchorSlideGraphalgorithm.Notethatweonlyuse
+Candidate transformation samples are generated from the estimates for X, Y, Z, and yaw. This is because roll and pitch
+searchregionbydiscretizingthesearchspaceacrosstheX,Y, aredirectlyobservablefromtheIMU,andtheirestimatesfrom
+and yaw dimensions, based on the user-specified resolutions. VIOorLIOdriftnegligiblyovertime.Thisoptimizationaims
+Specifically, the algorithm iterates through all possible X and to minimize the Euclidean distance between pairs of matched
+Y position and yaw angle samples within the current region landmarks found in the data association step.
+calculated by the anytime process. Within each iteration, the
+objects in the first map are transformed using the sampled X,
+F. Decentralized graph optimization for multi-robot SLAM
+Y,andyaw,andmatchedagainsttheobjectsinthesecondmap.
+The algorithm then evaluates the matching score, which is the As overviewed in Section III-B, for multi-robot scenarios,
+total sum of all valid object matches between the two maps. each robot will exchange information with other robots to
+Similar to the data association in Section IV-D, a valid object findinter-robotloopclosuresandperformdecentralizedfactor
+model match must have the same semantic label, and their graph optimization. When communication is established, the
+centroid distance and model difference are within the given robots will share the lightweight observations stored in their
+threshold. At the end of each iteration, if the matching score databases, which include object models detected by each key
+exceeds the current best matching score, it will be recorded pose and the relative odometry between each pair of key
+along with the valid object matches. After all iterations, the poses. Besides, the robots will also share a metric-semantic
+best matching score will be compared with the valid loop map containing all object models so that inter-robot loop
+closure threshold to determine whether a valid loop closure closure can be effectively performed. Messages received from
+has been identified. other robots are saved in the database before an inter-robot
+2) SlideGraph: The SlideGraph algorithm, unlike the loop closure is found. Once the transformation between the
+exhaustive search-based SlideMatch algorithm, adopts a reference frames of two robots is found, all the previously
+descriptor-based matching approach and combines it with a received key poses and object detections from other robots
+robust outlier rejection method, CLIPPER [34], for efficient will be transformed into the host robot’s reference frame. In
+and robust loop closures. While the CLIPPER framework can this way, we can add both the pose nodes and the nodes for
+achieve robust data association by formulating the problem detectedobjectmodelsassociatedwiththemfromotherrobots
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 11
+Table III: Robot platform details. Specifications on three types of robot platforms used in our experiments.
+Compute PrimarySensor BatteryLife AutonomousNavigationSpeed
+Falcon4UAV Inteli7-10710UCPU OusterOS1-64 30mins 3-10m/s
+Falcon250UAV Inteli7-10710UCPU IntelRealsenseD435i 7mins 2-5m/s
+ScarabUGV Inteli7-8700KCPU IntelRealsenseD455 45mins 0.5m/s
+to the host robot’s factor graph in a similar way as described capableofautonomousexplorationandnavigationincluttered,
+in Section IV-D. This process is illustrated in Fig. 3. The multi-floor indoor environments. It carries an Intel Realsense
+communication and decentralized graph optimization module D435iRGBDcamera,whichistheprimarysensorformetric-
+is illustrated in Fig. 4. Although each robot needs to perform semantic SLAM and autonomous exploration. It is equipped
+a pose graph optimization using information from all other with a VOXL board, which is used for VIO.
+robots,theinducedburdenoncomputationandcommunication The Falcon 4 UAV [8] is equipped with a 3D LiDAR, a
+bandwidth is still small due to the sparsity and memory- VectorNav VN-100 IMU, and a Pixhawk 4 flight controller.
+efficient representation of object models. Theplatformhasaflighttimeof∼30minuteswithallonboard
+One natural question that may arise is why we share such sensors and computer running.
+lightweight observations between robots instead of sharing The Scarab UGV [67] platform is a ground wheeled robot
+marginalized factor graphs (e.g., as in [15], [16])? We justify carryinganIntelRealsenseD455camera,whichistheprimary
+our design choice by the fact that the object-level metric- sensor for metric-semantic SLAM and autonomous explo-
+semantic map that we use is significantly sparser than tradi- ration. It is also equipped with a 2D Hokuyo LIDAR for low-
+tional geometric representations such as point, line, or planar level odometry and obstacle avoidance.
+features. In addition, the number of objects detected at each All modules in our software system, including instance
+pose is much smaller compared to geometric features (e.g., segmentation, metric-semantic SLAM, exploration, planning,
+corner points). In terms of performance, our representation and control, as shown in Fig. 3, execute in real time onboard
+allows us to be memory and computationally efficient, as the robots.
+supported by the experimental results in Table VI. In terms
+of statistical consistency, our approach does not suffer from B. Deployment for autonomous exploration
+spurious information loss due to linearization.
+Weintegratethemetric-semanticSLAMalgorithmwithour
+autonomous exploration and navigation systems for all three
+V. RESULTSANDANALYSIS types of robot platforms. The integration process and the use
+A. Robot platform overview of semantic maps differ for different sensing modalities. In
+[5], an active metric-semantic SLAM system with similar
+Our robot team consists of three types of aerial and ground
+map representations is proposed for LiDAR-based UAVs.
+robots:theFalcon250UAV,theFalcon4UAV,andtheScarab
+In contrast, the RGB-D-based UAV and UGV platforms in
+UGV,asillustratedinFig.1.Thespecificationsoftheserobots
+[3] face larger odometry drifts. To address this, they use
+are provided in Table III.
+the outputs of the metric-semantic SLAM framework to not
+The Falcon 250 UAV, first introduced in [66] and later
+only explore frontiers to gather more information but also
+improved in [3], is a lightweight vision-driven aerial platform
+to actively establish semantic loop closures so that the state
+estimation uncertainty can be reduced. We extend [3] by
+(a) upgrading the SLAM module with the metric-semantic
+SLAM framework proposed in this work so that multi-robot
+collaborationcanbeachieved,(b)deployingtheactivemetric-
+semantic SLAM system that was originally designed for
+Falcon 250 UAV on a UGV platform (i.e., the Scarab UGV
+platform), and (c) supporting a heterogeneous team of aerial
+and ground robots to share information and collaboratively
+construct metric-semantic maps.
+C. Experiment design
+Wedesignedandconductedasetofexperimentstoevaluate
+ourframeworkanditsmodules.Weconductedfoursetsofex-
+periments. Here, we provide an overview of each experiment:
+1) Experiment 1: This experiment is designed to evaluate
+our decentralized metric-semantic SLAM framework in both
+Figure 5: Metric-semantic SLAM results on the KITTI dataset. The
+indoor and outdoor environments. We utilize the RGBD-
+top, middle, and bottom panels show the results of experiments
+equipped Falcon 250 UAV and Scarab UGV, along with
+involving one, two, and three robots, respectively. Each cuboid
+representsavehiclewhileeachcylinderrepresentseitheratreetrunk the LiDAR-equipped Falcon 4 UAV, each operated by hand-
+oralightpole.Theestimatedrobottrajectoriesareshowninorange, carrying, autonomous navigation, and manual piloting, re-
+red, and blue for the first, second, and third robots, respectively. spectively. These experiments demonstrate the versatility of
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 12
+ourmetric-semanticSLAMsystemacrossheterogeneousplat-
+forms and environments. The experimental setup is divided
+into two distinct sub-experiments.
+(1.a) The Falcon 4 UAV is manually piloted across three
+different parking lots, while the Falcon 250 is hand-carried
+through four sequential runs inside two buildings. Each of the
+seven runs starts with a pre-defined pose. To test the capabili-
+tiesofoursemantics-drivenplacerecognitionandloopclosure
+algorithms, we create unknown initial poses for each run by
+streaming the data from different starting timestamps. During
+dataplayback,thesensordatafromeachrobotisprocessedon
+a base station with an i7-10750H CPU (comparable to CPUs
+onboard the robots), where each robot operates on a sepa-
+rate ROS node. We enable communication between the ROS
+nodesofdifferentrobotsatpredeterminedintervals,effectively
+replicating an intermittent and opportunistic communication
+Figure6:Explorationandmetric-semanticSLAMwithheterogeneous
+paradigm. This setup allows us to evaluate the robustness and robot teams. This figure shows the trajectories and metric-semantic
+efficacy of our decentralized metric-semantic SLAM frame- mapconstructedfromautonomousexplorationexperimentsbyaerial
+work across heterogeneous robots and environments. and ground robots. The Falcon 250 UAV explores in 3D (orange
+trajectory), while the Scarab UGV explores in 2D (blue trajectory).
+(1.b) This sub-experiment begins with the Falcon 4 UAV
+Our method can merge maps across UAVs and UGVs by leveraging
+and the Scarab UGV inside a building. The Falcon 4, hand-
+the viewpoint invariance of semantic landmarks.
+carried, maps the entire first floor, while the Scarab au-
+tonomously navigates and maps the same area. The initial
+poses of the robots are unknown, posing a challenge in place sensor information to facilitate online collaborative SLAM
+recognition and map merging. This experiment demonstrates with inter-robot loop closures and map merging.
+theeffectivenessofoursemantics-drivenplacerecognitionand 3) Experiment 3: An experiment in forest environments
+map merging module in handling data from heterogeneous where the Falcon 4 is manually piloted to different sections
+sensing modalities, including LiDARs and RGBD cameras. of a forest for a total of three sequential runs to map all
+2) Experiment 2: A multi-robot simultaneous indoor au- the tree trunks. The Falcon 4 platform starts from the same
+tonomous exploration experiment where the Falcon 250 and position for each run (for ground truthing purposes) but the
+Scarab platforms actively explore the building and jointly data is processed in a manner that mimics a three-robot
+construct ametric-semantic map. Allrobots inthe experiment simultaneousoperationwithanunknowninitialtransformation
+explore the environment fully autonomously and share infor- betweentherobots.Thiswasachievedbyprocessingthethree
+mation through either constantly communicating with each bags of data and streaming them from different timestamps
+otherorcommunicatingwiththebasestationattheendofthe such that it replicates the situation of three robots starting at
+mission. The robots leverage the metric-semantic map in real various locations with a sufficient translation between them.
+timefortheiractiveSLAMsystems,whichtradesoffbetween Forestenvironmentsareasteepcontrasttourbanenvironments
+explorationanduncertaintyreduction.Thisexperimentcanbe as they are more cluttered with dense and homogeneous
+further broken down into two sub-experiments. object landmarks (i.e. tree trunks). By experimenting in such
+(2.a) The Falcon 250 and Scarab platforms start at dif- environments,weshowcaseourlarge-scalemappingefficiency
+ferent locations on the first floor of a building. They then and our ability to merge maps from multiple robots in dense
+autonomously explore the environment to the best of their and perceptually aliased environments. In addition, obtaining
+abilities and build a metric-semantic map. At the end of information on semantic objects in forests, such as tree trunks
+the mission, they share their information to the base station and branches, can enhance silviculture practices, quantifying
+in an attempt to merge them. The transformation between carbon sequestration, and combating climate change.
+the initial starting positions of the two robots is unknown. 4) Experiment 4: In the final experiment, we tested the
+This experiment demonstrates the ability of our system to proposedframeworkonthepubliclyavailableSemanticKITTI
+operateonaheterogeneousteamofrobotsandbeefficientand dataset. This allowed us to demonstrate the algorithm’s versa-
+lightweight enough to leave enough computational headroom tility and effectiveness in scenarios beyond our custom robot
+to support their autonomy stack. platforms and experimental setups.
+(2.b) Three Scarab platforms are tasked with the operation
+of autonomously exploring the first floor of a building. They
+D. Indoor-outdoor LiDAR-RGBD metric-semantic SLAM
+build a metric-semantic map in a decentralized manner and
+without inter-robot loop closures
+share information through constant communication using Wi-
+Fi in an attempt to construct a merged map. In addition Fig. 6 shows qualitative results on metric-semantic SLAM
+to demonstrating efficient operations on resource-constrained for experiment 1.a as described in Section V-C. Outdoor
+robots, this experiment also highlights our multi-robot decen- objects such as cars, tree trunks, and light poles and indoor
+tralized metric-semantic SLAM module and how it processes objects such as chairs, tables, and monitors are detected and
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 13
+Table IV: Inter-robot localization errors. SM and SG refer to the SlideMatch and SlideGraph algorithms, respectively. Position error is
+calculated as the L2 norm of the errors in the X, Y, and Z coordinates of the relative transformation between two robots’ reference frames.
+In general, the SlideGraph algorithm is more efficient and requires less parameter tuning compared to SlideMatch, while still providing
+comparableresults.However,bothalgorithmsencounterdifficultiesinscenarioswhereobjectlandmarksarenoisy,particularlywithRGBD-
+based sensing. SlideGraph is relatively more prone to failures in such conditions due to insufficient pairwise consistency in the positions of
+object landmarks.
+Experiment(Sensor) PositionErr.(SM)[m] YawErr.(SM)[◦] PositionErr.(SG)[m] YawErr.(SG)[◦]
+Outdoor-UrbanFalcon4#0toFalcon4#1(LiDAR) 0.235 -0.2 0.074 0.3
+Outdoor-UrbanFalcon4#1toFalcon4#2(LiDAR) 0.159 -0.3 0.240 0.9
+Outdoor-UrbanFalcon4#0toFalcon4#2(LiDAR) 0.135 -0.9 0.848 0.7
+Outdoor-ForestFalcon4#0toFalcon4#2(LiDAR) 0.040 3.1 0.101 0.3
+Outdoor-ForestFalcon4#1toFalcon4#2(LiDAR) 0.159 3.2 0.049 -3.0
+Outdoor-ForestFalcon4#0toFalcon4#1(LiDAR) 0.054 -0.8 0.126 -2.6
+CrossSensingModality(LiDAR-RGBD) 0.542 -4.0 0.578 2.0
+IndoorScarab45toScarab40(RGBD) 0.221 -3.4 0.952 -2.3
+IndoorScarab40toScarab41(RGBD) 0.165 0.0 0.253 0.1
+IndoorScarab45toScarab41(RGBD) 0.460 3.7 1.040 -6.1
+IndoorAerial-Ground(RGBD) 0.245 -2.4 – –
+Figure 7: Multi-robot metric-semantic SLAM in an outdoor exper-
+iment. Results from an experiment involving three Falcon 4 UAV
+flights. The trajectories, marked by red, blue, and yellow bold lines,
+startfromdifferentpositions(red,blue,andyellowdots)butconverge
+back to the same end location (red dot). Our semantics-driven place
+recognition algorithm was able to detect inter-robot loop closures,
+which are then used to merge the maps. In the map, vehicle models Figure 8: Metric semantic map constructed in real time onboard
+are represented by blue cuboids, and models for tree trunks or light three Scarab UGVs. The UGVs autonomously explore the environ-
+poles are shown by magenta cylinders. ment while communicating with each other. Blue, orange and red
+trajectoriescorrespondtothreetrajectoriesfromthethreeUGVs.Our
+semanticplacerecognitionalgorithmwasabletoperforminter-robot
+loop closure, which is used to construct a merged metric-semantic
+mapped using our sparse metric-semantic map representation.
+map. The gray-colored accumulated point cloud is not generated
+Object models for vehicles are represented by blue cuboids,
+by these UGVs but by a LiDAR robot for visualization purposes.
+while tree trunks and light pole landmarks are shown as The figure overlays the trajectories with the metric-semantic map to
+pink cylinders. The ellipsoid models of chairs, tables, and qualitatively assess the validity of the results.
+monitors are replaced with corresponding Computer-Aided
+Design (CAD) models. This is done only for visualization
+purposesandanintuitiveinterpretationofthemetric-semantic
+results for the forest experiments, with the overhead view
+map,especiallyinhighlyclutteredindoorenvironments.These
+illustrating that the environment is large-scale, unstructured,
+models are colored blue, green, and red, respectively, accord-
+and features dense homogeneous objects (i.e. trees). In both
+ing to their detected semantic class. This experiment shows
+experiments,oursemantics-drivenplacerecognitionalgorithm
+the capabilities of our metric-semantic SLAM framework in
+reliably detects inter-robot loop closures while accurately
+integrating data from multiple robots equipped with either
+estimating relative transformations between the robots.
+LiDARs or RGBD cameras, enabling the construction of a
+Thequantitativeresultsoninter-robotlocalizationareshown
+unified metric-semantic map that includes both indoor and
+in Table IV. In urban environments, our algorithm utilizes
+outdoor areas.
+semantic object models of various classes and shapes to
+estimatetherelative3Dpositionandyawbetweeneachpairof
+E. Urban and forest LiDAR-only metric-semantic SLAM with robots. In forest settings, our method leverages models of tree
+inter-robot loop closures trunks for inter-robot localization. The SlideMatch algorithm
+Fig. 7 shows qualitative results on multi-robot metric- achieves an average position error of 0.13 m and a yaw
+semantic SLAM, demonstrating inter-robot loop closure and error of 0.68◦, with standard deviations of 0.07 m and 1.76◦,
+map merging capabilities in outdoor environments using respectively. In contrast, the SlideGraph algorithm shows an
+LiDAR-equipped Falcon 4 UAVs. This experiment utilizes average position error of 0.24 m and a yaw error of -0.57◦,
+data from experiment 1.a. In this specific setup, the trans- with standard deviations of 0.28 m and 1.60◦, respectively.
+formation between the robots is unknown and thus has to Despite significant variations in object classes, appearance,
+be estimated to merge their maps. Fig. 10 shows qualitative and density when transitioning from urban to forest environ-
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 14
+ments, both algorithms consistently demonstrate robust and
+accurate performance. Furthermore, the SlideGraph algorithm
+requires less parameter tuning and, unlike SlideMatch which
+relies on a computationally expensive exhaustive search, is
+more efficient.
+F. Indoor RGBD-only aerial-ground metric-semantic SLAM
+with inter-robot loop closures Figure 9: Cross sensing modality place recognition. A LiDAR-
+equippedrobotisrepresentedbytheorangetrajectoryandanRGBD-
+In this experiment, the starting position and orientation of based robot by the blue trajectory. The rest of the panels show
+the merged metric-semantic map constructed by the robots and
+the robots vary significantly, with up to 6 m in position and a
+overlayedontopoftheaccumulatedLiDARpointcloud.Theupper-
+90◦ difference in yaw. Fig. 8 shows the results constructed by
+right panel illustrates the robots’ trajectories in their own reference
+mergingsensormeasurementsfromthreeUGVsautonomously frames.Thiscomparisonshowshowtheplace-recognitionandloop-
+exploring the environment. Our semantics-driven place recog- closure algorithm effectively registers the two robots with different
+nition algorithm was able to detect and accurately estimate sensingmodalitiesintoacommonreferenceframedespitethedrastic
+differences in raw sensor data and the initial poses.
+relative transformations as robots accumulate observations.
+Based on the estimated relative transformations, our metric-
+semantic factor graph fuses the information from multiple
+G. Indoor LiDAR-RGBD metric-semantic SLAM with inter-
+robots to construct a merged metric-semantic map.
+robot loop closures
+The quantitative results are shown in Table IV. For the in-
+Fig. 9 shows qualitative results on multi-robot metric-
+door experiment with multiple Scarab UGVs, our SlideMatch
+semantic SLAM on the cross sensing modality experiment
+algorithm achieves an average position error of 0.28 m and
+(i.e., experiment 1.b in Section V-C). The accumulated point
+a yaw error of 0.10°, with standard deviations of 0.13 m
+cloud captured by the LiDAR robot is overlaid on the se-
+and 2.90°, respectively. Our SlideGraph algorithm achieves
+mantic object models mapped by both the LiDAR and the
+anaveragepositionerrorof0.75mandayawerrorof-2.77°,
+RGBD robots. Note that there is a relative transformation
+with standard deviations of 0.35 m and 2.55°, respectively.
+of 2.51 m along X, -5.37 m along Y, and 90◦ along yaw
+Fig. 6 shows the results constructed by the Falcon 250 and
+betweenthereferenceframesofthetworobots.Ouralgorithm
+one of the UGVs that autonomously explore the environment.
+leverages the invariance of semantic object models across
+Theinvarianceofsemanticobjectmodelstoviewpointchanges
+sensing modalities. This is a unique advantage of our method
+enables our algorithm to merge measurements from different
+given that geometric features extracted from RGB or depth
+viewpoints as observed by heterogeneous aerial and ground
+images significantly differ from those derived from LiDAR
+robots. As shown in the last row of Table IV, the SlideMatch
+point clouds. This capability enables accurate estimation of
+algorithm successfully identifies inter-robot loop closures and
+the transformation between robots equipped with different
+estimates the relative transformation with a position error of
+sensors—specifically LiDAR and RGBD—allowing us to fuse
+0.245 m and a yaw error of 2.35◦. However, we observed that
+theirmeasurementsandcreateamergedmetric-semanticmap.
+aerial-ground localization exhibits slightly larger errors along
+Quantitative results are shown in Table IV. Our semantics-
+the Z-axis compared to localization errors among identical
+driven place recognition algorithms demonstrate the ability to
+robot platforms. This discrepancy arises because aerial robots
+establishloopclosuresbetweenrobotsequippedwithdifferent
+primarily observe the upper parts of objects, while ground
+sensors. SlideMatch estimates the relative transformation with
+robots focus on the lower parts, leading to greater variation in
+a position error of 0.542 m and a yaw error of -4.00◦, while
+Z-axis estimates. In contrast, the SlideGraph algorithm fails
+SlideGraph results in a position error of 0.578 m and a yaw
+to perform inter-robot loop closures between RGBD-based
+error of 2.00◦. The accuracy of inter-robot localization in
+aerial and ground robots. This limitation is caused by reduced
+cross-sensing-modality scenarios is slightly lower compared
+pairwise consistency between object positions in the map,
+to single-modality experiments, particularly those involving
+which stems from noisy RGB-D sensing combined with the
+LiDAR-based robots. This performance decline can be at-
+fact that the aerial and ground robots observe different parts
+tributed to differences in fields of view, object detection
+of the objects.
+accuracy,andnoiselevelsbetweenLiDARandRGBDsensors.
+Insummary,whilenoisyRGBDsensingcanintroduceinac-
+Thesefactorsleadtogreaterdiscrepanciesinobjectmodeling,
+curaciesinthelocalizationandmodelingofindividualobjects,
+which,inturn,reducetheprecisionofinter-robotlocalization.
+a collection of object landmarks provides the robots with
+an informative description of the environment. This enables
+H. Object mapping quantitative results
+them to establish loop closures even under drastic viewpoint
+changes. In addition, it is important to note that the increased Wereportprecision,recall,andF1scoresonobjectmapping
+noise levels require a careful selection of parameters, such results of both cars and tree trunks across multiple exper-
+as the search discretization in SlideMatch or the descriptor iments. We first obtain the ground truth by surveying the
+matching threshold in SlideGraph. environment and manually marking down the positions of
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 15
+relative pose) factor in the factor graph optimization process
+[58].Gisasmallnumber,andspecificallyinourformulation,
+the variables corresponding to each cuboid, cylinder, and
+ellipsoid semantic landmark node are 9, 9, and 5, respec-
+tively. Therefore, this complexity becomes O(1) for adding
+any new factor. Upon loop closure, the optimization runs in
+time O
+(cid:0) max(F,S)1.5(cid:1)
+[58]. Practically, in traditional SLAM
+systems that are based on geometric features, the number of
+features usually far exceeds the number of robot poses. As a
+result, max(F,S)=S, which is usually at the order of 100F
+Figure 10: Forest experiments. This figure illustrates the overhead (i.e.eachkeyframetracks100features)orevenlarger.Dueto
+UAV view of the environment (top left), metric-semantic map with
+the use of sparse semantic landmarks in the proposed system,
+point clouds (top right), and object-based map constructed by three
+S will usually be of the order O(F). Therefore, to sum up,
+under-canopyUAVflights(bottomrow).Threerobotswiththeirtra-
+jectoriescoloredinred,yellow,andbluecanmergetheirinformation the complexity of factor graph optimization is O(1) during
+tothestartinglocationwithunknowninitialtransformationsbetween normal operation and O(F1.5) during loop closures.
+their starting poses. The figure shows metric-semantic maps of tree When running with multi-robot teams, the framework runs
+trunks(modeledascylinders)overlayedontopofanaggregatedpoint
+in a decentralized manner; therefore, for each robot, the
+cloud showing the forest environment. The trajectory of each robot,
+complexity scales linearly with the size of the robot team
+in this case, is ∼1 km in length, and 860 trees have been mapped.
+The mapped trees span an area of ∼160,000 m2. (thatis,K).Asaresult,thecomplexityofdecentralizedfactor
+graph optimization is O(K) when adding new factors coming
+from the robot team, and O((K·F)1.5) during loop closures.
+objects. Here, we focus the object mapping results on cars In practice, the size of the robot team K is much smaller
+and tree trunks since ground truth for them can be reliably than the number of poses for each robot F; therefore, the
+acquiredwhencomparedtootherobjectssuchaschairs,tables decentralized factor graph optimization can be executed in
+or monitors. This is because cars are usually parked in clearly real-time onboard the robot.
+separatedparkingspacesandtreetrunksareoftenspacedapart 2) Experimental results: In this section, we show the
+at regular intervals. A True Positive (TP), or a valid object computational and communication usage when running our
+match, occurs when an object in our metric-semantic map is metric-semantic SLAM framework. All results are obtained
+confirmed to exist at a position that aligns with the ground using a computer equipped with an Intel i7-10750H CPU,
+truth. A False Positive (FP) refers to an object that appears without the support of a GPU. This CPU’s performance is
+in our metric-semantic map but is not present in the ground comparable to that of the onboard computers in the robots. In
+truth. Conversely, a False Negative (FN) refers to an object Table VI, the average and maximum size of communication
+that is present in the ground truth but does not appear in our packetsaresummarizedwhenrobotsoperatewithintermittent
+metric-semantic map. These values are then used to calculate communication.Toreplicateintermittentcommunication,each
+precision, recall, and F1 scores. The results can be found robotpublishesROSmessagestoeachotherevery10seconds.
+in Section V-H. Note that those results are acquired using Benefiting from the sparse metric-semantic map representa-
+the smallest backbone (darknet-13 as detailed in [5]) for the tion, our algorithm is shown to be communication efficient
+semantic segmentation model, which is less accurate but can when deployed on real robots. The similarity in communi-
+run inference in real time using the onboard NUC computer. cation usage across different robots stems from the fact that
+The results can be further improved using larger backbones we replicate all robots as being within communication range
+suchasdarknet-26ordarknet-53,whicharesupportedin[60]. by streaming their data on different ROS nodes running on a
+As shown in Section V-H, the average precision for cars is laptop. For indoor experiments, communication is facilitated
+0.967 and for tree trunks is 0.946. The average recall for cars viaWi-Fi.Althougheachrobotsharesalltheinformationinits
+is 0.881 and for tree trunks is 0.909. The F1 score is 0.922 database with neighboring robots within the communication
+for cars and 0.927 for tree trunks. In summary, through these
+metrics, we demonstrate that our method is able to reliably
+Table V: Quantitative results of object detection: Ground Truth
+detectandmapobjectsthatexistintheenvironment,withvery
+(G.T.) vs. Estimated (Est.). Precision is evaluated by determining
+few false positives or false negatives. This result is important the proportion of detected objects that accurately match the ground
+for downstream tasks such as inventory estimation. truth,thusmeasuringthealgorithm’sobjectmappingaccuracy.Recall
+indicates the likelihood of the algorithm successfully detecting an
+object present in the environment, reflecting the algorithm’s object
+I. Communication usage and runtime analysis mapping sensitivity.
+1) Discussiononscalability: Forthefactorgraphoptimiza- Envir. G.T.Cars Est.Cars Precision Recall F1
+Lot1 42 35 1.00 0.833 0.909
+tion, suppose we have G variables for each object landmark
+Lot2 61 59 0.932 0.902 0.917
+and B total object landmarks. The total number of variables Lot3 32 29 1.00 0.906 0.951
+for all landmarks is S = G·B. When adding a new factor, Total 135 123 0.967 0.881 0.922
+Envir. G.T.Trees Est.Trees Precision Recall F1
+the number of variables that need to be solved for is G for
+Total 77 74 0.946 0.909 0.927
+a new object factor, and 9 for a new odometry (i.e., SE(3)
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 16
+range, we can further reduce the communication burden by (KB) for indoor environments, 1.84 KB for outdoor environ-
+implementing a bookmarking system that only publishes new ments, and 2.03 KB for forest environments. The average
+information since the last communication between robots. communication bandwidth per meter traveled by the robot
+Additionally, the runtime for factor adding and graph op- is 1.65 KB in indoor settings, 1.85 KB in outdoor settings,
+timization, and loop closure (if applicable), is reported in and 5.13 KB in forest settings. As the density of landmarks
+TableVI.Exceptfortheloopclosuremodule,whichisusedto in the environment increases, communication overhead also
+identify inter-robot loop closures and operates on a separate increases. However, the overall communication bandwidth
+CPU thread, all other modules are triggered each time new required remains minimal. This modest communication de-
+observations arrive. mand is particularly important when robots operate under
+The front-end runtime depends on the object segmentation intermittentandbandwidth-limitedcommunicationconditions.
+and detection model. Our results show that on a single thread In addition, this efficiency in communication also shows
+of Intel i7-10750H CPU, the Rangenet++ [60] front-end with the effectiveness of sparse semantic mapping in minimizing
+our custom darknet-13 model runs at 1.5 hertz (Hz). The resource usage.
+front-end with the YOLOv8 [62], specifically, YOLOv8m, To sum up, the results show that, although there is some
+runs at 1 Hz per CPU thread. When multiple CPU threads varianceacrossdifferentenvironmentsduetothedifferencein
+are used, the inference speed can be increased. For example, densityofobjects,theuseofsparsesemanticmaprepresenta-
+YOLOv8m can run at 3 Hz using 4 out of 12 CPU threads. tions offers the robot a rich understanding of its surroundings
+The cuboid, cylinder, and ellipsoid modeling process runs at while maintaining efficiency in computation, storage, and
+the corresponding object detection rate. communication.Ourproposedmethodnotonlyfacilitatesreal-
+The back-end factor graph adding and graph optimization time execution of exploration and navigation tasks but also
+processes show different patterns across different environ- enables multi-robot collaboration across various environments
+ments. For the indoor environment, the average runtime of on a large scale.
+graphoptimizationis2∼4ms,with68landmarks.Theoutdoor
+urban environment exhibits an average runtime of graph opti- J. Analysis of SlideMatch and SlideGraph algorithms
+mization of 10.14 ms, with 249 landmarks. The average time
+Throughout these experiments, we have observed unique
+per landmark in this setting is 0.041 ms. Due to the increased
+advantages, limitations, and deployment considerations for
+density of landmarks in the outdoor forest environment, the
+both the SlideGraph and SlideMatch algorithms. SlideGraph
+averageruntimespikesto36.46ms,withasignificantlyhigher
+demonstrates superior performance with minimal parameter
+number of landmarks at 860.
+tuninginscenarioswheretheobject-levelmetric-semanticmap
+These results illustrate that the average runtime required
+experiences relatively low noise in object position estimates.
+for factor graph adding and graph optimization increases with
+Therefore, SlideGraph is generally the preferred option, par-
+the number of landmarks. This relationship is influenced by
+ticularly for LiDAR-based experiments or scenarios involv-
+thepresenceofinter-robotloopclosuresintheseexperiments,
+ing large search spaces. On the other hand, the SlideMatch
+which makes the computational complexity lie between ob-
+algorithm can sometimes achieve successful loop closure in
+serving new landmarks and processing loop closures.
+situations where the SlideGraph method fails, particularly in
+Theruntimealsoincreaseswiththetrajectorylength,which
+experiments with large errors in object position estimates.
+is partly due to more pose nodes being added to the graph.
+This is because the pairwise consistency assumption used
+However,thecorrelationbetweentrajectorylengthandruntime
+in [34] becomes less suitable under such conditions. Such
+is not as strong as the correlation between the number of
+situationsarecommoninindoorRGBD-basedobjectmapping,
+landmarks and runtime. An increase in the runtime per meter
+where cluttered spaces lead to small differences in object-
+traveledbytherobotisobservedastheenvironmenttransitions
+to-object distances and high noise in position estimates due
+from less complex settings (indoor) to more complex ones
+to noisy depth measurements, noisy local odometry, limited
+(outdoor forest). This trend also shows the challenges and
+field of view, and complex object shapes. Although semantic
+computational costs associated with large-scale environments.
+labels can help disambiguate these measurements to some
+Although the runtime of the semantics-driven place recog-
+extent, it remains challenging to use pairwise consistency
+nition and loop closure algorithms is longer than that of
+to distinguish outliers from inliers. In contrast, SlideMatch
+factor graph optimization, the resulting latency is acceptable.
+leverages the entire map and operates similarly to a voting
+In addition, since the semantics-driven place recognition and
+method, making it more tolerant to noise in local pairwise
+loop closure algorithm operate in a separate CPU thread, this
+object distances. As a result, SlideMatch performs better in
+latency does not directly impact real-time localization and
+such worst-case scenarios, albeit at the cost of significant
+navigation. Once the computation is complete, the estimated
+computational overhead.
+loop closure information can be used by the factor graph to
+update both the map and the robot trajectories.
+K. Benchmarks
+In addition to the importance of sparse semantic landmarks
+in facilitating long-range autonomous exploration and naviga- In this section, we present a series of benchmark ex-
+tion, ourresults on communicationprovide anotherreason for periments evaluating our system’s performance in terms of
+using semantic landmarks in multi-robot collaboration tasks. localization accuracy, computational efficiency, and memory
+The average communication per landmark is 3.96 kilobytes usage. We report results from (1) evaluating our framework
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 17
+Table VI: Runtime and communication results. The runtime for factor addition and graph optimization accounts for handling both the
+observation of new landmarks and loop closure scenarios. The runtime of semantics-driven place recognition and loop-closure algorithms
+includes both loop closure detection and relative transformation estimation. Note that the place-recognition and loop-closure process runs
+on a separate thread. Therefore, its latency does not impact real-time operation. SlideGraph requires significantly lower computational
+runtime, particularly in environments with fewer object landmarks. This efficiency is attributed to the use of descriptor-based matching,
+where computational demands are influenced not by the scale of the environment but only by the number of object landmarks. In contrast,
+SlideMatchexhaustivelysearchesacrosstheentiresearchregion,anditsruntimedependsonvariousfactors,suchasthesearchdiscretization.
+The communication usage is measured by the size of messages published by each robot. Here, the average usage is calculated by dividing
+the total size of all messages by the number of messages, while the maximum size corresponds to the size of the last messages since they
+usually contain the most observations.
+Numberof Trajectory Runtime[ms] CommunicationUsage[MB]
+RobotID
+Objects Length[m] FactorAddingand Inter-RobotLoopClosure Average Maximal
+GraphOptimization SlideGraph/SlideMatch CommunicationUsage CommunicationUsage
+0 172.072 2.429 22/3638 0.304 0.578
+Indoor 68 1 155.930 4.008 24/1614 0.304 0.575
+2 194.625 2.372 28/2252 0.309 0.576
+0 699.543 9.351 95/131 0.458 0.725
+OutdoorUrban 249 1 264.264 7.763 86/123 0.453 0.727
+2 410.194 13.296 91/168 0.466 0.725
+0 326.476 28.702 209/1124 1.702 2.686
+OutdoorForest 860 1 367.798 28.638 406/2091 1.735 2.687
+2 746.870 52.046 375/1836 1.742 2.686
+on standard public datasets and (2) comparing it with other robot localization but also illustrate the effectiveness of the
+open-source methods. We note that benchmarking the entire proposed algorithm framework when deployed on public
+system is challenging due to the differences in components datasets, showing its potential as a plug-and-play tool for
+across other metric-semantic SLAM systems. Therefore, we multi-robot metric-semantic SLAM.
+opttoisolateandbenchmarkkeymodulesinstead.Thisallows 2) Benchmark against existing loop closure methods:
+for a fair and focused comparison of our system. To provide a comprehensive comparison, we benchmark
+1) BechmarkonSemanticKITTI: Inadditiontoconducting SlideSLAM against two existing approaches from the liter-
+experimentswithourownrobots,wealsotestedouralgorithm ature. These include: (1) LCDNet [37], a deep-learning-based
+framework on the publicly available Semantic KITTI dataset. loop closure method for LiDAR data; and (2) CLIPPER [34],
+The framework takes in the point clouds, initial pose esti- a graph-theoretic algorithm for data association.
+mation from SuMa++ [22], and ground truth segmentation, LCDNet performs scan-to-scan place recognition using a
+and estimates the metric-semantic map as well as the robot learned 3D feature extractor and registration network. We
+trajectory. benchmark the algorithm using weights that are pretrained on
+The qualitative results, as shown in Fig. 5, demonstrate the KITTI dataset. We use the same sequences and splits of
+the ability of the proposed framework to construct metric- Semantic KITTI as described in the previous benchmark. We
+semanticmapsandmergemeasurementsfrommultiplerobots. also benchmark LCDNet on our forest data, as described in
+We conducted a quantitative evaluation of our SlideGraph theprevioussections.ThebenchmarksforLCDNetwerecon-
+algorithmforinter-robotloopclosureusingsequences#5and ductedonaGPU-equippeddesktop(withanRTX3070GPU).
+#7. Sequence #7 was divided into three intervals, i.e., (0, The inter-robot localization results are shown in Table VII.
+600), (400, 1000), and (500, 1100), for the first, second, and The results are comparable in the KITTI environment. How-
+third robots, respectively. Sequence #5 was similarly divided ever, for the forest environment, SlideSLAM provides better
+into three intervals, i.e., (0, 1000), (700, 2000), and (1600, localizationresults.Thisshowstheadvantageofourmethodto
+2760), to create datasets for each of the three robots. Our generalize to different environments as long as the objects are
+algorithm successfully identified inter-robot loop closures and detected. Our method requires no additional fine-tuning data
+accurately estimated the relative transformations between the for the loop closure step, whereas LCDNet does. Moreover,
+robots. For sequence #5, the SlideGraph algorithm results in we also benchmark the memory requirements to store the
+a position error of 0.03 m and 0.05 m, and a rotation error observations or maps required for the loop closure step. For
+of 0.080◦ and 0.065◦ for the transformations between robot 0 LCDNet, these representations can be individual processed
+and robot 1, and between robot 1 and robot 2, respectively. point cloud scans (0.84 MB), point features extracted from
+In sequence #7, the algorithm results in a position error of the PV-RCNN network for each point cloud scan (4.18 MB),
+0.093 m and 0.095 m, and a rotation error of 0.096◦ and or the final global descriptors of those features for each point
+0.097◦. For sequence #5 and sequence #7, the total trajectory cloud scan (10.0 MB). As a result, enabling inter-robot loop
+lengths of three robots are 2.8 km and 1.2 km. The absolute closuredetectionwithLCDNetrequiresaminimumbandwidth
+trajectoryerrorsofthetrajectoriesofallthreerobotsare0.998 of 0.84 MB per LiDAR scan. In contrast, as shown in the
+m (vs. 1.154 m from SuMa++) and 0.962 m (vs. 1.148 m table, the entire object map of SlideSLAM requires less than
+fromSuMa++),respectively.Therelativetranslationerrorsare 10 KB for the KITTI sequences, which contain hundreds of
+0.111% and 0.255%. The relative rotation errors are 0.0011 LiDAR scans. The sparsity of our map representation offers
+degrees/m and 0.00256 degrees/m. a key advantage for large-scale multi-robot experiments, as it
+These results not only demonstrate the accuracy of inter- significantly reduces both computational and communication
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 18
+TableVII:BenchmarkcomparisonbetweenSlideSLAM(SlideGraph)andexistingmethods.Forthesebenchmarks,wereportresultsbetween
+robot0androbot1,asreferencedbytheSemanticKITTIexperimentsinSectionV-K1andforestexperimentsinSectionV-E.Notethatthe
+mapsizesforbothCLIPPERandSlideSLAMarethesame,astheyusethesameobjectmapsasinputs.Also,notethatforthememoryand
+runtimebenchmarksofLCDNet,theresultsreportedarethememoryconsumedforeachindividualpointcloudandtheruntimetoprocessa
+pair of point clouds. In practice, it scales linearly with the number of point clouds. Cells filled with a “-” indicate that the algorithm failed.
+Metric Trans.Err(m) Abs.Yaw.Err(degree) Map/InputSize Runtime(ms)
+Method CLIPPER LCDNet Ours CLIPPER LCDNet Ours CLIPPER(fullmaps) LCDNet(perscan) Ours(fullmaps) CLIPPER(CPU) LCDNet(perscanpaironGPU) Ours(CPU)
+KITTI05 0.04 0.09 0.03 0.04 0.22 0.08 7.2KB 0.84MB 7.2KB 152 1580 40
+KITTI07 0.06 0.05 0.09 0.01 0.21 0.09 7.3KB 0.84MB 7.3KB 202 1580 50
+Forest - 1.10 0.13 - 0.1 2.6 16KB 0.84MB 16KB - 1580 209
+requirements compared to methods operating on less compact establish loop closure in a “one-shot” manner. This may not
+map representations. alwaysbeeffectiveincertainsituationswheretheenvironment
+CLIPPER [34] serves as the data association backbone of is cluttered with the same semantic landmarks and similar
+our SlideSLAM (SlideGraph) module. However, the original pairwise distances (e.g., two conference rooms with similar
+CLIPPERlackssemanticinformationandreliesonexhaustive table and chair arrangements, or dense forests). Therefore, we
+pairwise matching over all object pairs, resulting in high wouldliketoemployafiltering-basedapproachtoourcurrent
+computational demands in complex scenes (e.g., each of loop closure strategy, where the best loop closure candidate
+our forest maps consists of hundreds of landmarks). Our is chosen based on a maximum consensus of potential loop
+SlideGraphenhancesCLIPPERbyusingsemanticclasslabels closure options. Lastly, our current place recognition and
+andpolygon-descriptor-basedinitialdataassociation,enabling mapping formulation doesn’t account for dynamic objects.
+us to significantly reduce the hypothesis space. CLIPPER Such objects (e.g., a car changing its parking spot over time)
+is benchmarked on similar sequences on Semantic KITTI violate the pairwise distance consistency assumption required
+as detailed in the previous section, and also on our forest for robust place recognition and can therefore induce faulty
+dataset. The results are shown in Table VII. In challenging loopclosures.Inthefuture,wewouldliketoleveragesemantic
+environmentssuchasforests,theoriginalCLIPPERalgorithm knowledge of objects, combined with intelligent agents such
+encountered memory overflows due to the large number of as Large Language Models (LLMs), to better handle dynamic
+landmarks,whichsignificantlyexpandedthehypothesisspace. objects. Using the semantic knowledge, an LLM can infer
+Taketheforestenvironmentasanexample:apairofmapswith which objects can be dynamic in nature and automatically
+approximately 300 and 800 landmarks would generate around filter them out during place recognition.
+240,000 hypotheses. In contrast, our SlideGraph algorithm
+prunesthisrawhypothesisspacedowntoapproximately3,000,
+significantly reducing the size of the consistency graph by VII. CONCLUSION
+2 orders of magnitude. As a result, SlideGraph consistently
+Inthis work,we introduceareal-time decentralizedmetric-
+achieved robust performance with lower memory usage and
+semantic SLAM framework, along with its integration into
+shorter runtimes.
+autonomous exploration and navigation systems for aerial
+and ground robots. This integrated system enables teams
+VI. DISCUSSIONONLIMITATIONSANDFUTUREWORK
+of heterogeneous robots to autonomously explore and col-
+In this section, we address a few limitations of the current
+laboratively construct maps with both geometric and open-
+system and how they motivate our future work. Firstly, the
+vocabulary semantic information across a variety of indoor
+proposed sparse map representation is limited to three simple
+and outdoor environments. The robots opportunistically lever-
+shapes for modeling objects. While it helps maintain sparsity,
+age communication to exchange sparse, lightweight semantic
+the map may not always be visually informative with these
+measurements, which are used for inter-robot localization and
+shapes, and they may fail to model the finer metric details
+map merging. Through a comprehensive set of real-world
+for objects with complex shapes, which are needed for down-
+experimentsinvolvingthreetypesofaerialandgroundrobots,
+stream tasks such as robot manipulation. In addition, they
+as well as benchmarks on publicly available datasets and
+may lead to information loss that results in inaccuracies or
+comparisons against existing methods, we demonstrate the
+failures to identify loop closures, especially in environments
+capabilities, effectiveness, and robustness of our system. Our
+withambiguousorrepetitiveobjectlayouts.Semanticaliasing
+runtimeandcommunicationanalysisalsoshowtheimportance
+may also occur when different objects are represented by the
+of using sparse semantic map representations, especially for
+same primitive, increasing dependence on accurate semantic
+large-scale (over 1 km) metric-semantic mapping tasks in
+labeling. Misclassifications in such cases can cause errors.
+challenginganddenseenvironments,suchasforestswithover
+We are interested in investigating better map representations
+1000 object landmarks.
+that can model generic objects in detail while still maintain-
+ing relative sparsity. Secondly, the current inter-robot loop
+closure strategy does not follow a conventional “filtering”
+VIII. ACKNOWLEDGMENT
+approach, where multiple loop closures are first established
+andthenaconsensusisformedtochoosethebestloopclosure We thankJie Mei forhis help withexperiments, Guilherme
+result and filter out false positives. Currently, we only use V. Nardari, Ian D. Miller, Kashish Garg, Jeremy Wang, and
+a sufficient inlier threshold to filter out false positives and Alex Zhou for the software and hardware support.
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 19
+REFERENCES [22] X.Chen,A.Milioto,E.Palazzolo,P.Giguere,J.Behley,andC.Stach-
+niss,“Suma++:Efficientlidar-basedsemanticslam,”in2019IEEE/RSJ
+[1] C. Campos, R. Elvira, J. J. G. Rodr´ıguez, J. M. M. Montiel, and International Conference on Intelligent Robots and Systems (IROS).
+J. D. Tardo´s, “Orb-slam3: An accurate open-source library for visual, IEEE,2019,pp.4530–4537.
+visual–inertial, and multimap slam,” IEEE Transactions on Robotics, [23] D. Maturana, P.-W. Chou, M. Uenoyama, and S. Scherer, “Real-time
+vol.37,no.6,pp.1874–1890,2021. semantic mapping for autonomous off-road navigation,” in Field and
+[2] T.Shan,B.Englot,D.Meyers,W.Wang,C.Ratti,andD.Rus,“Lio-sam: Service Robotics, M. Hutter and R. Siegwart, Eds. Cham: Springer
+Tightly-coupled lidar inertial odometry via smoothing and mapping,” InternationalPublishing,2018,pp.335–350.
+in 2020 IEEE/RSJ international conference on intelligent robots and [24] I.D.Miller,A.Cowley,R.Konkimalla,S.S.Shivakumar,T.Nguyen,
+systems(IROS). IEEE,2020,pp.5135–5142. T.Smith,C.J.Taylor,andV.Kumar,“Anywayyoulookatit:Semantic
+[3] Y. Tao, X. Liu, I. Spasojevic, S. Agarwal, and V. Kumar, “3d active crossview localization and mapping with lidar,” IEEE Robotics and
+metric-semanticslam,”IEEERoboticsandAutomationLetters,2024. AutomationLetters,vol.6,no.2,pp.2397–2404,2021.
+[4] Y.Chang,N.Hughes,A.Ray,andL.Carlone,“Hydra-multi:Collabo- [25] I. D. Miller, F. Cladera, T. Smith, C. J. Taylor, and V. Kumar,
+rative online construction of 3d scene graphs with multi-robot teams,” “Stronger together: Air-ground robotic collaboration using semantics,”
+arXivpreprintarXiv:2304.13487,2023. IEEE Robotics and Automation Letters, vol. 7, no. 4, pp. 9643–9650,
+[5] X.Liu,A.Prabhu,F.Cladera,I.D.Miller,L.Zhou,C.J.Taylor,and 2022.
+V.Kumar,“Activemetric-semanticmappingbymultipleaerialrobots,” [26] S.Chen,G.Nardari,E.Lee,C.Qu,X.Liu,R.Romero,andV.Kumar,
+in 2023 IEEE International Conference on Robotics and Automation “Sloam: Semantic lidar odometry and mapping for forest inventory,”
+(ICRA). IEEE,2023,pp.3282–3288. IEEERoboticsandAutomationLetters,vol.5,pp.1–1,012020.
+[6] Y.Wu,Y.Zhang,D.Zhu,Z.Deng,W.Sun,X.Chen,andJ.Zhang,“An [27] N.Atanasov,S.L.Bowman,K.Daniilidis,andG.J.Pappas,“Aunifying
+objectslamframeworkforassociation,mapping,andhigh-leveltasks,” view of geometry, semantics, and data association in slam.” in IJCAI,
+IEEETransactionsonRobotics,2023. 2018,pp.5204–5208.
+[7] Y. Tian, Y. Chang, F. Herrera Arias, C. Nieto-Granda, J. P. How, and [28] Q. Feng, Y. Meng, M. Shan, and N. Atanasov, “Localization and
+L. Carlone, “Kimera-multi: Robust, distributed, dense metric-semantic mapping using instance-specific mesh models,” in 2019 IEEE/RSJ In-
+slamformulti-robotsystems,”IEEETransactionsonRobotics,vol.38, ternationalConferenceonIntelligentRobotsandSystems(IROS),2019,
+no.4,pp.2022–2038,2022. pp.4985–4991.
+[8] X.Liu,G.V.Nardari,F.C.Ojeda,Y.Tao,A.Zhou,T.Donnelly,C.Qu, [29] J. Fu, Y. Du, K. Singh, J. B. Tenenbaum, and J. J. Leonard, “Neuse:
+S.W.Chen,R.A.Romero,C.J.Taylor,etal.,“Large-scaleautonomous Neuralse(3)-equivariantembeddingforconsistentspatialunderstanding
+flightwithreal-timesemanticSLAMunderdenseforestcanopy,”IEEE withobjects,”arXivpreprintarXiv:2303.07308,2023.
+RoboticsandAutomationLetters,vol.7,no.2,pp.5512–5519,2022. [30] E.Sucar,S.Liu,J.Ortiz,andA.J.Davison,“imap:Implicitmappingand
+[9] M. Shan, Q. Feng, and N. Atanasov, “Orcvio: Object residual con- positioninginreal-time,”inProceedingsoftheIEEE/CVFinternational
+strainedvisual-inertialodometry,”in2020IEEE/RSJInternationalCon- conferenceoncomputervision,2021,pp.6229–6238.
+ference on Intelligent Robots and Systems (IROS). IEEE, 2020, pp. [31] Z.Zhu,S.Peng,V.Larsson,W.Xu,H.Bao,Z.Cui,M.R.Oswald,and
+5104–5111. M.Pollefeys,“Nice-slam:Neuralimplicitscalableencodingforslam,”
+[10] S.YangandS.Scherer,“Cubeslam:Monocular3-dobjectslam,”IEEE in Proceedings of the IEEE/CVF conference on computer vision and
+TransactionsonRobotics,vol.35,no.4,pp.925–938,2019. patternrecognition,2022,pp.12786–12796.
+[11] L. Nicholson, M. Milford, and N. Su¨nderhauf, “Quadricslam: Dual [32] J. G. Mangelson, D. Dominic, R. M. Eustice, and R. Vasudevan,
+quadrics from object detections as landmarks in object-oriented slam,” “Pairwise consistent measurement set maximization for robust multi-
+IEEERoboticsandAutomationLetters,vol.4,no.1,pp.1–8,2019. robotmapmerging,”in2018IEEEinternationalconferenceonrobotics
+[12] S. Choudhary, L. Carlone, C. Nieto, J. Rogers, H. I. Christensen, andautomation(ICRA). IEEE,2018,pp.2916–2923.
+andF.Dellaert,“Distributedmappingwithprivacyandcommunication [33] H.Yang,J.Shi,andL.Carlone,“Teaser:Fastandcertifiablepointcloud
+constraints:Lightweightalgorithmsandobject-basedmodels,”2017. registration,” IEEE Transactions on Robotics, vol. 37, no. 2, pp. 314–
+[13] S. L. Bowman, N. Atanasov, K. Daniilidis, and G. J. Pappas, “Proba- 333,2020.
+bilisticdataassociationforsemanticslam,”in2017IEEEinternational [34] P. C. Lusk, K. Fathian, and J. P. How, “CLIPPER: A graph-theoretic
+conferenceonroboticsandautomation(ICRA). IEEE,2017,pp.1722– framework for robust data association,” in 2021 IEEE International
+1729. Conference on Robotics and Automation (ICRA). IEEE, 2021, pp.
+[14] R.F.Salas-Moreno,R.A.Newcombe,H.Strasdat,P.H.Kelly,andA.J. 13828–13834.
+Davison,“Slam++:Simultaneouslocalisationandmappingatthelevel [35] M.LeordeanuandM.Hebert,“Aspectraltechniqueforcorrespondence
+ofobjects,”in2013IEEEConferenceonComputerVisionandPattern problemsusingpairwiseconstraints,”inTenthIEEEInternationalCon-
+Recognition,2013,pp.1352–1359. ferenceonComputerVision(ICCV’05)Volume1,vol.2. IEEE,2005,
+[15] A.Cunningham,M.Paluri,andF.Dellaert,“Ddf-sam:Fullydistributed pp.1482–1489.
+slamusingconstrainedfactorgraphs,”in2010IEEE/RSJInternational [36] X.Xu,S.Lu,J.Wu,H.Lu,Q.Zhu,Y.Liao,R.Xiong,andY.Wang,
+ConferenceonIntelligentRobotsandSystems. IEEE,2010,pp.3025– “Ring++: Roto-translation invariant gram for global localization on a
+3030. sparse scan map,” IEEE Transactions on Robotics, vol. 39, no. 6, pp.
+[16] A. Cunningham, V. Indelman, and F. Dellaert, “Ddf-sam 2.0: Consis- 4616–4635,2023.
+tent distributed smoothing and mapping,” in 2013 IEEE international [37] D. Cattaneo, M. Vaghi, and A. Valada, “Lcdnet: Deep loop closure
+conferenceonroboticsandautomation. IEEE,2013,pp.5220–5227. detectionandpointcloudregistrationforlidarslam,”IEEETransactions
+[17] A. Rosinol, A. Violette, M. Abate, N. Hughes, Y. Chang, J. Shi, onRobotics,vol.38,no.4,pp.2074–2093,2022.
+A. Gupta, and L. Carlone, “Kimera: From slam to spatial perception [38] A. Gawel, C. D. Don, R. Y. Siegwart, J. I. Nieto, and C. Cadena,
+with3ddynamicscenegraphs,”TheInternationalJournalofRobotics “X-view:Graph-basedsemanticmultiviewlocalization,”IEEERobotics
+Research,vol.40,no.12-14,pp.1510–1546,2021. and Automation Letters, vol. 3, pp. 1687–1694, 2017. [Online].
+[18] Q. Gu, A. Kuwajerwala, S. Morin, K. M. Jatavallabhula, B. Sen, Available:https://api.semanticscholar.org/CorpusID:3337551
+A.Agarwal,C.Rivera,W.Paul,K.Ellis,R.Chellappa,etal.,“Concept- [39] X.Guo,J.Hu,J.Chen,D.Fuqin,andT.L.Lam,“Semantichistogram
+graphs:Open-vocabulary3dscenegraphsforperceptionandplanning,” based graph matching for real-time multi-robot global localization
+in 2024 IEEE International Conference on Robotics and Automation in large scale environment,” IEEE Robotics and Automation Letters,
+(ICRA). IEEE,2024,pp.5021–5028. vol.PP,pp.1–1,022021.
+[19] C. Cadena, L. Carlone, H. Carrillo, Y. Latif, D. Scaramuzza, J. Neira, [40] G.V.Nardari,A.Cohen,S.W.Chen,X.Liu,V.Arcot,R.A.Romero,
+I. Reid, and J. J. Leonard, “Past, present, and future of simultaneous andV.Kumar,“Placerecognitioninforestswithurquharttessellations,”
+localization and mapping: Toward the robust-perception age,” IEEE IEEERoboticsandAutomationLetters,vol.6,no.2,pp.279–286,2020.
+Transactionsonrobotics,vol.32,no.6,pp.1309–1332,2016. [41] D. Galvez-Lo´pez and J. D. Tardos, “Bags of binary words for fast
+[20] M.Grinvald,F.Furrer,T.Novkovic,J.J.Chung,C.Cadena,R.Siegwart, placerecognitioninimagesequences,”IEEETransactionsonRobotics,
+and J. Nieto, “Volumetric instance-aware semantic mapping and 3d vol.28,no.5,pp.1188–1197,2012.
+objectdiscovery,”IEEERoboticsandAutomationLetters,vol.4,no.3, [42] N. Hughes, Y. Chang, and L. Carlone, “Hydra: A real-time spatial
+pp.3037–3044,2019. perception system for 3d scene graph construction and optimization,”
+[21] J. Mccormac, R. Clark, M. Bloesch, A. Davison, and S. Leutenegger, 2022.
+“Fusion++: Volumetric object-level slam,” in 2018 International Con- [43] R.Dube´,A.Gawel,H.Sommer,J.Nieto,R.Siegwart,andC.Cadena,
+ferenceon3DVision(3DV),2018,pp.32–41. “An online multi-robot slam system for 3d lidars,” in 2017 IEEE/RSJ
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 20
+International Conference on Intelligent Robots and Systems (IROS), with autonomous aerial robots,” Mechanical Systems and Signal
+2017,pp.1004–1011. Processing, vol. 208, p. 111050, 2024. [Online]. Available: https:
+[44] Y.Chang,K.Ebadi,C.Denniston,M.Ginting,A.Rosinol,A.Reinke, //www.sciencedirect.com/science/article/pii/S0888327023009585
+M. Palieri, J. Shi, A. Chatterjee, B. Morrell, A.-a. Agha-mohammadi, [66] Y. Tao, Y. Wu, B. Li, F. Cladera, A. Zhou, D. Thakur, and V. Kumar,
+and L. Carlone, “Lamp 2.0: A robust multi-robot slam system for “SEER: Safe efficient exploration for aerial robots using learning to
+operation in challenging large-scale underground environments,” IEEE predict information gain,” in 2023 IEEE International Conference on
+RoboticsandAutomationLetters,vol.7,pp.1–8,102022. RoboticsandAutomation(ICRA). IEEE,2023,pp.1235–1241.
+[45] P.-Y. Lajoie, B. Ramtoula, Y. Chang, L. Carlone, and G. Beltrame, [67] N. Michael, J. Fink, and V. Kumar, “Experimental testbed for large
+“Door-slam: Distributed, online, and outlier resilient slam for robotic multirobotteams,”IEEErobotics&automationmagazine,vol.15,no.1,
+teams,” IEEE Robotics and Automation Letters, vol. PP, pp. 1–1, 01 pp.53–61,2008.
+2020.
+[46] Y. Huang, T. Shan, F. Chen, and B. Englot, “Disco-slam: Distributed
+scancontext-enabledmulti-robotlidarslamwithtwo-stageglobal-local
+IX. AUTHOR’SBIOGRAPHYSECTION
+graph optimization,” IEEE Robotics and Automation Letters, vol. 7,
+no.2,pp.1150–1157,2022.
+[47] P.-Y. Lajoie and G. Beltrame, “Swarm-slam: Sparse decentralized col- XuLiureceivedtheM.S.E.degreeinRoboticsand
+laborativesimultaneouslocalizationandmappingframeworkformulti- the Ph.D. degree in Mechanical Engineering and
+robot systems,” IEEE Robotics and Automation Letters, vol. 9, no. 1, AppliedMechanicsfromtheGeneralRobotics,Au-
+pp.475–482,2024. tomation, Sensing, and Perception (GRASP) Labo-
+[48] T. Cieslewski, S. Choudhary, and D. Scaramuzza, “Data-efficient de- ratory,UniversityofPennsylvania,Philadelphia,PA,
+centralized visual slam,” in 2018 IEEE International Conference on USA,in2019and2024,respectively.HewasaPost-
+RoboticsandAutomation(ICRA),2018,pp.2466–2473. doctoral Scholar at Stanford University, Stanford,
+[49] Y.Tian,K.Khosoussi,D.M.Rosen,andJ.P.How,“Distributedcertifi- CA,USA.HeiscurrentlyaSeniorAppliedScientist
+ablycorrectpose-graphoptimization,”IEEETransactionsonRobotics, atMicrosoft,Redmond,WA,USA.Hisresearchin-
+vol.37,no.6,pp.2137–2156,2021. terestsincludemetric-semanticSLAM,autonomous
+[50] S.Choudhary,L.Carlone,C.Nieto,J.Rogers,Z.Liu,H.I.Christensen, UAVs,andfoundationmodelsforrobotics.
+andF.Dellaert,“Multirobotobject-basedslam,”in2016International
+SymposiumonExperimentalRobotics. Springer,2017,pp.729–741.
+[51] S. Choudhary, L. Carlone, C. Nieto, J. Rogers, H. I. Christensen, and Jiuzhou Lei received his bachelor’s degree in
+F. Dellaert, “Distributed trajectory estimation with privacy and com- Mechanical Engineering from Sichuan University,
+municationconstraints:Atwo-stagedistributedgauss-seidelapproach,” Chengdu, China in 2021 and the M.S.E. degree in
+in 2016 IEEE International Conference on Robotics and Automation RoboticsfromtheGRASPLaboratory,Universityof
+(ICRA),2016,pp.5261–5268. Pennsylvania,Philadelphia,PA,USAin2023.Heis
+[52] I. Deutsch, M. Liu, and R. Siegwart, “A framework for multi-robot currentlyaPh.D.studentinMechanicalEngineering
+posegraphslam,”in2016IEEEInternationalConferenceonReal-time at Texas A&M University, College Station, Texas,
+ComputingandRobotics(RCAR),2016,pp.567–572. USA.Heworksonrobotautonomy,general-purpose
+[53] G.Georgakis,B.Bucher,K.Schmeckpeper,S.Singh,andK.Daniilidis, roboticmanipulation,andnavigation.
+“Learning to map for active semantic goal navigation,” arXiv preprint
+arXiv:2106.15648,2021.
+[54] L. Zheng, C. Zhu, J. Zhang, H. Zhao, H. Huang, M. Niessner, and
+K.Xu,“Activesceneunderstandingviaonlinesemanticreconstruction,”
+in Computer Graphics Forum, vol. 38, no. 7. Wiley Online Library, AnkitPrabhureceivedtheB.Tech.degreeinCom-
+2019,pp.103–114. puter Science and Engineering from SRM Univer-
+[55] J.A.Placed,J.Strader,H.Carrillo,N.Atanasov,V.Indelman,L.Car- sity,Chennai,India,in2021,andtheM.S.E.degree
+lone,andJ.A.Castellanos,“Asurveyonactivesimultaneouslocalization inRoboticsfromtheGRASPLaboratory,University
+andmapping:Stateoftheartandnewfrontiers,”IEEETransactionson of Pennsylvania, Philadelphia, PA, USA, in 2023.
+Robotics,2023. He is currently a Research Scientist at the Kumar-
+[56] A.AsgharivaskasiandN.Atanasov,“Activebayesianmulti-classmap- Robotics lab, and his research focuses on metric-
+pingfromrangeandsemanticsegmentationobservations,”in2021IEEE semanticSLAMandrobotautonomy.
+InternationalConferenceonRoboticsandAutomation(ICRA). IEEE,
+2021,pp.1–7.
+[57] ——,“Semanticoctreemappingandshannonmutualinformationcom-
+putationforrobotexploration,”IEEETransactionsonRobotics,vol.39,
+no.3,pp.1910–1928,2023.
+YuezhanTaoreceivedtheB.Eng.(Hons.)degreein
+[58] M. Kaess, H. Johannsson, R. Roberts, V. Ila, J. J. Leonard, and
+computerscienceandengineeringfromTheChinese
+F.Dellaert,“isam2:Incrementalsmoothingandmappingusingthebayes
+tree,”TheInternationalJournalofRoboticsResearch,vol.31,no.2,pp. University of Hong Kong, Shenzhen, Guangdong,
+China, in 2019, the M.S.E degree in computer and
+216–235,2012.
+information science from the University of Penn-
+[59] F. Dellaert and GTSAM Contributors, “borglab/gtsam,” May 2022.
+sylvania, Philadelphia, PA, USA in 2021. He is
+[Online].Available:https://github.com/borglab/gtsam)
+currently a Ph.D student in computer and informa-
+[60] A.Milioto,I.Vizzo,J.Behley,andC.Stachniss,“Rangenet++:Fastand
+accuratelidarsemanticsegmentation,”in2019IEEE/RSJInternational tion science with the University of Pennsylvania,
+ConferenceonIntelligentRobotsandSystems(IROS). IEEE,2019,pp. Philadelphia, PA, USA. His research focuses on
+activeperception,withanemphasisonmappingand
+4213–4220.
+motionplanningforautonomousroboticsystems.
+[61] I. D. Miller and A. Prabhu. Semantic Integrated LIDAR Labelling.
+[Online].Available:https://github.com/ankitVP77/sill
+[62] G.Jocher,A.Chaurasia,andJ.Qiu,“YOLObyUltralytics,”Jan.2023.
+[Online].Available:https://github.com/ultralytics/ultralytics IgorSpasojevicisanAssistantProfessorattheUni-
+[63] T. Cheng, L. Song, Y. Ge, W. Liu, X. Wang, and Y. Shan, “Yolo- versityofCalifornia,Riverside.BeforejoiningUCR,
+world: Real-time open-vocabulary object detection,” in Proceedings of hewasapostdoctoralscholarintheGRASPLabora-
+theIEEE/CVFConferenceonComputerVisionandPatternRecognition,
+toryattheUniversityofPennsylvania,Philadelphia,
+2024,pp.16901–16911. PA. He received his Ph.D. from the Massachusetts
+[64] H.W.Kuhn,“Thehungarianmethodfortheassignmentproblem,”Naval InstituteofTechnology,andhismaster’sandbache-
+researchlogisticsquarterly,vol.2,no.1-2,pp.83–97,1955.
+lorofartsdegreesfromtheUniversityofCambridge.
+[65] A. Prabhu, X. Liu, I. Spasojevic, Y. Wu, Y. Shao, D. Ong, His interests focus on optimization algorithms in
+J. Lei, P. C. Green, P. Chaudhari, and V. Kumar, “UAVs robotics, including topics such as motion planning,
+for forestry: Metric-semantic mapping and diameter estimation activesensing,andautonomousexploration.
+IEEETRANSACTIONSONROBOTICS.PREPRINTVERSION.ACCEPTEDSEPTEMBER2025 21
+PratikChaudhariisanAssistantProfessorinElec-
+trical and Systems Engineering and Computer and
+InformationScienceattheUniversityofPennsylva-
+nia.HeisacorememberoftheGRASPLaboratory.
+From2018-19,hewasaSeniorAppliedScientistat
+Amazon Web Services and a Postdoctoral Scholar
+in Computing and Mathematical Sciences at the
+California Institute of Technology, Pasadena, CA,
+USA. He received his PhD in Computer Science
+from University of California, Los Angeles, CA,
+USA, in 2018, and his Master’s and Engineer’s
+degrees in Aeronautics and Astronautics from Massachusetts Institute of
+Technology,Cambridge,MA,USA,in2012and2014,respectively.Hewas
+a part of NuTonomy Inc. (now Hyundai-Aptiv Motional) from 2014-16. He
+is the recipient of the Amazon Machine Learning Research Award in 2020,
+National Science Foundation CAREER award in 2022 and the Intel Rising
+StarFacultyAwardin2022.
+NikolayAtanasov(SeniorMember,IEEE)received
+aB.S.degreeinElectricalEngineeringfromTrinity
+College,Hartford,CT,USA,in2008,andM.S.and
+Ph.D.degreesinElectricalandSystemsEngineering
+from the University of Pennsylvania, Philadelphia,
+PA, USA in 2012 and 2015, respectively. He is
+an Associate Professor of Electrical and Computer
+Engineering with the University of California San
+Diego, La Jolla, CA, USA. His research focuses
+onprobabilisticmodelsforsimultaneouslocalization
+and mapping (SLAM) and on optimal control and
+reinforcement learning algorithms for minimizing model uncertainty. Dr.
+Atanasov was the recipient of the Joseph and Rosaline Wolf award for the
+bestPh.D.dissertationinElectricalandSystemsEngineeringattheUniversity
+of Pennsylvania in 2015, the Best Conference Paper Award at the IEEE
+International Conference on Robotics and Automation (ICRA) in 2017, the
+NSF CAREER Award in 2021, and the IEEE RAS Early Academic Career
+AwardinRoboticsandAutomationin2023.
+Vijay Kumar (Fellow, IEEE) received the Ph.D.
+degree in mechanical engineering from the Ohio
+StateUniversity,Columbus,OH,USA,in1987.He
+is currently the Nemirovsky Family Dean of Penn
+Engineering (with appointments) with the Depart-
+ment of Mechanical Engineering and Applied Me-
+chanics,theDepartmentofComputerandInforma-
+tion Science, and the Department of Electrical and
+Systems Engineering, University of Pennsylvania,
+Philadelphia, PA, USA. From 2012 to 2014, he
+was the Assistant Director of Robotics and Cyber
+Physical Systems with the White House Office of Science and Technology
+Policy. has served on the editorial boards of the IEEE Transactions on
+Robotics and Automation, IEEE Transactions on Automation Science and
+Engineering,ASMEJournalofMechanicalDesign,andtheSpringerTractin
+AdvancedRobotics(STAR),andwasthechiefeditorfortheASMEJournal
+ofMechanismsandRobotics.HehaswonbestpaperawardsatDARS2002,
+ICRA2004,ICRA2011,RSS2011,RSS2013,ICRA2014,BICT2015,and
+MARSS2016andhasadviseddoctoralstudentswhohavewonBestStudent
+PaperAwardsatICRA2008,RSS2009,andDARS2010.Hewasrecognized
+with the RSS Time of Test Award in 2025. Additionally, he is the recipient
+of the 2013 Popular Mechanics Breakthrough Award, a 2014 Engelberger
+Robotics Award, the 2017 IEEE Robotics and Automation Society George
+SaridisLeadershipAward,the2018IEEERoboticsandAutomationPioneer
+Award, and the 2020 IEEE Robotics and Automation Field Award. He was
+elected to the National Academy of Engineering in 2013, the American
+Philosophical Society in 2018, and the American Academy of Arts and
+SciencesandtheNationalAcademyofInventorsin2022.

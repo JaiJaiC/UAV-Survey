@@ -1,0 +1,1279 @@
+5202
+yaM
+41
+]OR.sc[
+1v80190.5052:viXra
+Air-Ground Collaboration for
+Language-Specified Missions in
+Unknown Environments
+Fernando Cladera*1, Zachary Ravichandran*1, Jason Hughes*1, Varun Murali1, Carlos
+Nieto-Granda2, M. Ani Hsieh1, George J. Pappas1, Camillo J. Taylor1, and Vijay Kumar1
+1GRASPLaboratory,UniversityofPennsylvania,Philadelphia,Pennsylvania
+2U.S.DEVCOMArmyResearchLaboratory(ARL),Adelphi,Maryland
+∗EqualContribution
+Correspondingauthors:FernandoCladera(fclad@seas.upenn.edu),ZacharyRavichandran(zacravi@seas.upenn.edu),
+andJasonHughes(jasonah@seas.upenn.edu).
+WegratefullyacknowledgethesupportofARLDCISTCRAW911NF-17-2-0181,NIFAgrant2022-67021-36856,theIoT4AgEngineering
+ResearchCenterfundedbytheNationalScienceFoundation(NSF)underNSFCooperativeAgreementNumberEEC-1941529,NVIDIA,
+andtheNSFGraduationResearchFellowshipProgram.
+ABSTRACT As autonomous robotic systems become increasingly mature, users will want to
+specify missions at the level of intent rather than in low-level detail. Language is an expressive
+and intuitive medium for such mission specification. However, realizing language-guided robotic
+teamsrequiresovercomingsignificanttechnicalhurdles.Interpretingandrealizinglanguage-specified
+missions requires advanced semantic reasoning. Successful heterogeneous robots must effectively
+coordinate actions and share information across varying viewpoints. Additionally, communication
+betweenrobotsistypicallyintermittent,necessitatingrobuststrategiesthatleveragecommunication
+opportunities to maintain coordination and achieve mission objectives. In this work, we present a
+first-of-its-kind system where an unmanned aerial vehicle (UAV) and an unmanned ground vehicle
+(UGV) are able to collaboratively accomplish missions specified in natural language while reacting
+to changes in specification on the fly. We leverage a Large Language Model (LLM)-enabled planner
+to reason over semantic-metric maps that are built online and opportunistically shared between an
+aerialandagroundrobot.Weconsidertask-drivennavigationinurbanandruralareas.Oursystem
+must infer mission-relevant semantics and actively acquire information via semantic mapping. In
+both ground and air-ground teaming experiments, we demonstrate our system on seven different
+natural-language specifications at up to kilometer-scale navigation.
+INDEX TERMS AI-Enabled Robotics; Field Robots; Human-Robot Collaboration; Multi-Robot
+Systems; Search and Rescue Robots; Semantic Scene Understanding; Task Planning.
+I. INTRODUCTION offresolutionforaltitudeandflyhigherwhenafastscene
+Exploration of unknown unstructured environments is overview is required. Moreover, high-altitude UAVs can
+one of the quintessential field robotics applications, with actasobstacle-freecommunicationnodes,achievingline-
+applications to infrastructure inspection [1], search and of-sight with other nodes on the ground. Unfortunately,
+rescue [2], disaster response [3], law enforcement [4], and the low size, weight, and power (SWaP) constraints on
+crop inspection [5], among others. Heterogeneous teams UAVs restrict the payload, compute, and operation time
+ofaerialandgroundrobotshaveadistinctadvantagefor of UAVs. Contrarily, UGVs are not affected by these
+fast exploration missions, by providing complementary power limitations: they can carry heavier payloads and
+capabilities compared to a team of identical robots. operate for extended periods. However, UGVs speed is
+Forexample,UAVsflyingathighaltitudesmoveinan limited as they have to plan trajectories to avoid static
+obstacle-free space; thus, they can achieve higher speeds and dynamic obstacles and consider the traversability of
+and provide an elevated vantage point. UAVs can trade the terrain where they operate.
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+(3) Answer to ground robot:
+Here is a preliminary version
+of the aerial graph with your
+requested objects.
+Reasoning: I need to look for
+barrels in this area.
+(1) Inferred semantics: I’ll look
+for [barrels, people, …]. (2) Request to UAV: (4) Planning on road
+map looking for
+Can you look for
+[barrels, people].
+[barrels, people]?
+(5) Search for ground robot to
+update map. Here is an updated
+version of the aerial graph.
+(7) Found a barrel. Reporting
+(6) Update local graph with
+this finding to the operator.
+new information from UAV.
+Replan on new roads looking
+for [barrels, people].
+FIGURE1. Examplemissionspecification.TheUAVandUGVsstarttheirmissioninthesamelocation.TheUGVscantasktheUAVwithalistoflabelsto
+lookfor.Onceitreceivesagraph,theUGVscanplanontheUAVmap,lookingforobjectsofinterest.Satelliteimageinthebackgroundisonlyprovidedfor
+representationpurposes.
+Liu et al. [6] identified different roles UAVs and UGVs and step-by-step instructions. Given a user’s mission
+perform in a team, such as sensor, actuator or auxiliary. specification, the robot team would infer the required
+We focus on applications where UAVs and UGVs subtasks, reason about each platform’s constraints and
+act cooperatively to perform a mission. However, abilities,andexecuteaplansuitedtotheenvironmentof
+in most examples of the literature [6], the tasks are operation. Realizing this vision on robotic systems, and
+pre-defined for the robots. For instance, UAVs may be particularly air-ground robotics, remains a significant
+used for to localize ground robots [7] or generate maps challenge. Existing literature generally assumes mission
+and traversability information [8]. Miller et al. [9] were specifications are fixed. Creating planners that reason
+one of the first to use UAVs in a multi-role setting, overdynamicmissionspecifications,wherenotaskispre-
+where the UAV generated a map and acted as an active specified on either the aerial or ground vehicle, remains
+communication relay [10]. an open research question. Correspondingly, existing
+Still, the state of the art is far from a seamless literature fix semantics upfront or only share metric
+collaboration of aerial and ground robots, where tasks information among robots. However, dynamically con-
+are not pre-encoded. For example, leading systems in figuring semantics is a desirable property. Finally, robot
+the DARPA SubT challenge, including Nebula [11] and mobility should not be limited by the communication
+Cerberus [12], were designed for object search over a networkinfrastructure,androbotsshouldnotneedbein
+specificsemanticset.Recentliteratureproposesplanners continuous communication range. Creating robot teams
+for language-specified tasks in single-robot, small-scale, that leverage fully opportunistic communications is an
+structured environments (e.g., indoors) [13]–[15]. How- ongoing challenge.
+ever, such work assumes favorable conditions, including This work builds upon our air-ground collaboration
+near-perfectenvironmentknowledgeandperfectcommu- work[8],[9],includingcomponentsofopportunisticcom-
+nications [16]. munication [10] and language-driven planning [17]. We
+As autonomous robotic systems become increasingly aim to address the challenges posed in [18] by proposing
+mature, we envision a heterogeneous robotic team that a language-driven air-ground teaming system with the
+users can task at the level of intent rather than detailed following novel contributions:
+• The first air-ground teaming system for language- mapsaresimilarbutdonotincludeahierarchy[28],[29].
+specified missions in unknown environments. Recent work incorporates foundation models into map-
+• A decentralized and compact semantic mapping ap- pingpipelinestocreateopen-vocabularyrepresentations.
+proach that enables the UAV and UGVs to share Mappers, including ConceptGraphs [30], HOVSG [14],
+observations and dynamically set mission-relevant and Clio [31], assign semantic feature vectors to entities
+semantics of interest to map. in the map. Semantic labels are then produced at run-
+We performed experimental validation and system de- time, depending on the task.
+ployment in kilometer-scale experiments in semi-urban Effectiverepresentationsformulti-robotteamingshare
+and rural environments. An example mission scenario is manyoftheaforementionedproperties.Oneofthemajor
+shown in Fig. 1. The supplementary material for this additional challenges is that they require a consistent
+work is available online1. frame between robots. Consistent multi-robot state esti-
+mation is addressed by works such as Kimera-multi [32].
+Similarly,Hydra-Multibuildsscenegraphsacrossarobot
+II. RELATED WORK
+team via loop-closure detection and relative state esti-
+A. Air-ground Robot Teaming
+mation[33].Alternatively,theSPOMPsystemaddresses
+Cooperative air-ground collaboration in robotics has
+thisproblemwithasemantics-basedrelativelocalization
+more than twenty years of development [6]. The initial
+module[9].However,thisapproachrequiresanorthomap
+works of Elfes et al. used robotics blimps to transmit
+to be constructed in real time and transmitted to the
+aerial images to ground robots, which used them for
+ground robots. Sparsity is another desirable property, as
+visual navigation [19]. Other early works also use aerial
+communication and compute may be limited, which this
+vehicles for localization, tracking, and obstacle avoid-
+work addresses.
+ance [7], [20], [21]. In these works, the UAV acts as an
+This work introduces a sparse map representa-
+eye in the sky, providing information that compliments
+tionsharedbytheUAVandUGV.Wedemonstrate
+ground robot knowledge. One of the first examples of
+howtheUAVcanbuildthemapinreal-timeandhowthe
+air-ground mapping is described in [3] and [22], where
+UGV can use such representation to execute its mission
+a team of robots was deployed to assess the damages
+while augmenting it with newly observed information.
+of historical buildings after earthquakes in Italy and
+Japan. These works proved the potential of air-ground
+teamsindisasterscenariosbyreducingtheriskofrescue C. Language-specified mission planning
+personnel. Motivated by the increasing maturity and accessibility
+Most existing air-ground robot teaming literature fo- of LLMs, the robotics community has studied the use
+cusesonstatictaskassignments,wheretherobots’tasks of language for specifying tasks and missions. LLM-
+are pre-agreed. For example, the UAV provides aerial enabledplannershavebeendevelopedformobilemanip-
+information for mapping or obstacle avoidance. In some ulation [13], [16], [34], service robotics [35], autonomous
+works [9], [10], the UAV has multiple roles as a map driving[36],navigation[37]–[40],andfaultdetection[41],
+provider and communication relay. Still, few works show [42] These methods typically configure a pre-trained
+an explicit tasking of the UAV-UGV team. In this LLM, such as GPT-4 [43], via in-context prompts. This
+work, we aim to address this issue by allowing approachavoidsfine-tuningorretraininganLLM,which
+the UGV to task the UAV towards an integrated is computationally expensive, but it still channels the
+semantic exploration task. LLM’s common sense into a specific problem [44]. The
+LLM-enabled planner is then provided a set of behav-
+B. Semantic Representations for Navigation iors such as graph navigation goals [36], predicates in
+Semantic planning requires representations that contain a formal planning language [15], lower-level APIs for
+the contextual information for high-level planning and code generation [45]–[47], or learned behaviors [13]. At
+traversability information for lower-level control. The runtime, the LLM is given an environment map, such as
+perception community has advanced online semantic a graph [16] or semantic regions [44]. A line of research
+planning for tasks such as active exploration and object plans over formal languages such as Linear Temporal
+search[9],[23]–[25].Mostofthesemanticmappinglitera- Logic (LTL) or Planning Domain Definition Language
+turefocusesonsingle-robotapplications.Intheseworks, (PDDL) [15], [48]–[53]. Recent literature also considers
+scene graphs have emerged as a popular representation language-specifiedmissionsformulti-robotsystems[54]–
+forsemanticplanning,astheycaptureobjects,topology, [58].However,theseworksconsidercontrolledsimulation
+andtraversableregions.Hydraprovidesareal-timescene or closed-world manipulation environments with perfect
+graph engine [26] designed for indoor environments. or near-perfect environment knowledge.
+Strader et al. [27] relax this assumption. Topological In the above approaches, instructions typically state
+therequiredsubtasksandrequiredsemantics[59].While
+1http://tfr-air-ground.fcladera.com works such as SayPlan consider less well-specified tasks
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+Low-level planner
+Sensors Map Rece S d u i b n t g a h sk o s rizon Validated Global planner in
+Shu G t l t o e b r a R l G B Gro D u IN nd O ing Segm M SA e o M n d t e 2 a l tion c e o s o t U i r m T di M a n t a o t r e Con G s r t a ru p c h t ion updates P L la L n M G -e e n n a e b ra le t d o r Plan Validator subtasks semantic graph
+Feedback Move_base local
+IMU Aerial graph construction Localizer SPINE planner
+GPS Jac c k o a n l t l r o o w ll - e le r vel
+Mission-driven
+semantic
+Robot Semantic Semantic configuration Robot
+Hardware Graph Graph Hardware
+Sensors
+Ex
+m
+p
+i
+l
+s
+o
+s
+ra
+io
+ti
+n
+on Otracvceurpsaanbcilyit yM easptpiminagt ivoina LiDAR
+P C X o 4 n t F ro li l g le h r t Communication w P a r y e p d o e i fi n n t e s d e t Output pro G c r e a s p s h i ng oa Opneb dnj e-mvcou t cl L ta ti o rpb a c lu ce al k- lah i e zryr ya p tdo ioeth ntee vcs ita ios r Odometry GPS
+mission Aerial
+air_router graph Mapper SVeimsiaonnt iLca Dnegsucargipe tMioond: evila RGB+D
+UGV MOCHA MOCHA
+odometry Aerial Odometry
+Label set tran R s O la S t o rs graph tran R s O la S t o rs Label set
+Distributed Distributed
+Falcon 4 UAV database database Jackal UGV
+Physical Network
+FIGURE2. Systemoverview.GreenlinesrepresentinformationthatistransmittedtoandfromMOCHAandthusarecommunicatedtootherrobotsinthe
+system.
+(“find me something to drink”), they still assume pre- Rendezvousapproachesrelyonestablishedguarantees
+mapped or highly-structured indoor scenes [16], [34]. forcommunicationasrobotsphysicallymeettoexchange
+Other research relaxes the requirement of a pre-built information [63], [64]. Alternatively, robots can form
+semanticmapbyincorporatingfeedbackfromperception continuous communication networks and venture out to
+systems [34], [41], [44] or specifying semantics at run- areas without communications [65], [66], with success-
+time [59], [60]. However, perception is limited to object ful application in underground mapping at the SubT
+detection or designed for small room-centric environ- challenge.Still,thesetechniqueslimitmobilitywhenthe
+mentswheretheplannercanleverageclearhierarchyand number of robots is reduced.
+natural bounds on the environment. In [9], [10], we introduced MOCHA, a fully oppor-
+We recently introduced the SPINE planning architec- tunistic communication approach for air-ground teams.
+ture,whichservesasthebaseofourUGVplanner[17].In MOCHA is based on a gossip communication ap-
+contrast to the above works, SPINE reasons over under- proach[67],thatenableslarge-scaleexploration,ascom-
+specified missions where the user provides high-level municationconstraintsdonotlimitrobotoperations.To
+intent. Furthermore, the environment is only partially- avoid robots in isolated situations, the aerial robot acts
+known or unknown at runtime, so the system must as a data mule, finding ground robots and physically
+actively acquire task-relevant information. Compared carrying data from them. We showed that MOCHA
+to our previous work, we extend SPINE to enable performs well in large-scale environments, in simula-
+taskingtheUAV,allowingittogenerateabetterprior tion and real-world experiments. This work leverages
+for the UGV mission. MOCHA for communication between the robots,
+and for the communication-aware planner of the
+D. Multi-robot communications UAV.
+Communication in air-ground teams can be broadly
+grouped into three groups: a) ensured network connec- E. Robot teaming with human in the loop
+tivity, b) rendezvous approaches, and c) opportunistic Human-in-the-loop frameworks have become pivotal in
+communication. Ensured network communication ap- improvingrobotteamingbyintegratinghumanoversight
+proaches focus on deploying a group of robots such that and domain-specific tasking into multi-robot systems.
+there is guaranteed communication between all network Measuringtheefficacyofhuman-robotteaminghasbeen
+nodes [61], [62]. Continuous communication approaches studied extensively in [68]–[70]. Specifically, Novitzky et
+arekeywhenahumanoperatorisrequiredintheloopor al. uses the game “capture the flag” in [68] and [71] to
+when robots need to report to a centralized base station assess effective ways to task robot teammates. Robot
+continuously. The main disadvantage of this approach teams with humans in-the-loop have been developed in
+is that the experiment area is limited by the commu- [72]–[74]forvariousinspectiontasks.Alloftheserelyon
+nication channel quality, and it can be severely limited predefining what is to be inspected before the system is
+in environments with non-line-of-sight (LOS) between running by hard-coding in [74] or predefining semantic
+robots. labels as in [73]. All of these systems lack the ability
+C. Communications
+Producer Name Messagetype Size
+The list of messages transmitted by each robot over
+UGV UGV_odometry Posestamped 74B MOCHA is described in Tab. 1, with a representative
+UGV label_set String(JSON) 2B size for each compressed message 10 minutes after the
+UAV aerial_graph String(JSON) 40.2KB start of the mission.
+TABLE1. MessagestransmittedbetweenrobotsusingMOCHA,ouroppor- We used Rajant [78] breadcrumb radios for our phys-
+tunisticcommunicationsframework,after10minutesofanexperiment. ical communication layer which MOCHA runs on top
+of. Robots use the Rajant DX-2 and Cardinal radios,
+for the human to re-task the robot team on the fly like whereas the base station runs a FE1 radio. The Rajant
+our system can. Prior work has used different interfaces BreadcrumbAPIisusedtoobtaininformationregarding
+tointeractwiththerobotteam,includingmapinterfaces the link quality, such as the received signal strength
+[75]thatallowforgotocommandsorsearchcommands, indicator (RSSI). This information is used to trigger a
+and virtual reality [76] and gesture control [77], which communication exchange between two robots.
+allow for advanced teleoperation of the robot. These We also deployed dummy ME4 nodes to act as com-
+interfaces require more input from the human-in-the- munication relays for LLM API calls for SPINE. These
+loop, which means the robot system is making fewer nodes do not participate actively in the opportunistic
+decisions.Alloftheseinterfacesfailtobeasexpressiveas communication process.
+natural language for the human as our implementation
+of large language models in a human-robot team. In
+IV. METHODOLOGY
+comparison, we present the first heterogeneous
+This section describes the components running onboard
+teamingsystemwithahumanintheloopcapable
+theUAVandUGVandhowtheycomplementeachother.
+of interacting through natural language.
+A key component of the approach is to use an open-
+set semantic-metricmapthatcanbesharedbetweenthe
+robots (compact communication) and efficiently supply
+III. SYSTEM OVERVIEW
+updates in a structured format to the LLM-based deci-
+A. Mission specification
+sion maker. The core representation used by SPINE on
+This section describes the overall system architecture
+theUGVsisasemantic-topologicalgraph.Asiscommon
+and mission specification using language as depicted in
+in the semantic mapping literature, each node is either
+Fig. 1. A human operator requests assistance with a
+a region or an object. Regions are traversable points
+particulartaskfromoneormoreUGVs,whichinfersthe
+in freespace [14], [26]. An edge between two regions
+semanticsinthescenethatneedtobefound.TheUGVs
+indicates that there is an obstacle-free path. Localized
+also infers a list of labels that it will request the UAV to
+objectsarerepresentedasobjectnodes.Anedgebetween
+search for, in addition to traversable classes, like paved
+an object and a region node indicates that the object
+roads.
+can be observed from that region. Regions and objects
+The UAV then produces an initial graph with
+may be enriched with additional semantic information
+traversable regions and objects of interest, which is in-
+crementally transmitted through MOCHA to the UGVs.
+New labels can be added on-demand by the UGV and
+senttotheUAV.TheUAValsoactsasacommunication
+relay,carryingmessagesbetweenthedifferentrobotsand
+the operators if needed.
+Once a graph has been received, the UGVs plan a tra-
+jectory using the graph to objects of interest. If objects
+arefound,theyarereportedtotheoperator.Ourcurrent
+system can run as many ground robots as required, but
+no coordination occurs between them. Additionally, we
+canpre-generateapartialenvironmentgraphusingother
+data sources, such as satellite images.
+B. System architecture
+A system overview is presented in Fig. 2. The different
+sub-components are described in Sec. IV. We use a
+FIGURE3. UAVMappingsystemwithdynamicinputfromtheUGV.(1)A
+Global Navigation Satellite System (GNSS) to establish
+userdefinesataskwhichispassedtotheSPINEplanner.(2)TheSPINE
+the positions of the different robots, as well as to anno- PlannerassignstheUAVsemanticclassestolookfor.(3)TheUAVmapper
+tate the coordinates of the nodes in the graph. parsesthedetectionsfromGroundedSAM2toproduceamap.(4)Themap
+issharedwiththeUGVs.
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+FIGURE4. Anexampleofthegeneratedsemantic-metricmapfromtheaerialrobotisshownatdifferentmappingiterationsoverlayedonMapbox[79]
+satelliteimagery.Theestimatedtraversablegraphisshowninblueandthesemantics(inthisexampleorange barrel)isshowningreen.Left:Mapping
+iteration=4,Center:Mappingiteration=12;Right:Mappingiteration=25.
+(e.g., thisbridgeisblockedbyavehicle),whichprovides Performance vs Compute Tradeoffs. Our system
+additional context for planning. Both UGV and UAV allows for abstract task specifications. This underspeci-
+mappingapproachesuseGroundingDINO[80]todetect fied nature can result in several objects of interest being
+objects of interest and incorporate information into the identified for mapping. We notice empirically that when
+map to account for their particular visual and compute smaller objects need to be detected that are harder
+capabilities, which are described in the following sec- to see from the air, the memory requirements of the
+tions. detection model exceeds the available memory. In this
+case, we optionally use a smaller segmentation module
+A. UAV Semantic Mapper SlimSAM [85] to ensure that the compute stays within
+This module is designed to build an object-centric se- budget. We note that this will result in noisy locations
+mantic map that is grounded in a common frame of of objects being added to the graph but the UGV can
+reference. It also maintains a region network of the use it’s additional compute capabilities to verify and
+environment that the UGVs can use for global planning. correctthegraphwhilestillingestingacoarseprior.The
+ThecomponentsoftheUAVsemanticmapperareshown implicationsofthistradeoffisdiscussedinSec.IV.Band
+in Fig. 3, and an example of such a map is shown in demonstrated in Sec. VI.
+Fig. 4. For the purpose of this work, we assume that the
+Graph Construction.Giventhedetections,theobject
+traversablecomponentfortheUGVsisthesemanticclass
+coordinates are estimated by applying a distance trans-
+road.Still,oursystemcanhandleotherclassesifdesired
+form on their associated pixel centroids. Each object is
+or required by the operation environment or mission.
+assigned the furthest point from the mask boundary as
+Atthestartofeachmission,thesetoflabelsiscommu-
+its coordinate. The pixel coordinates are then converted
+nicated to the aerial robot using MOCHA. The mapper
+to UTM for a pre-specified origin with known camera
+then listens for images and their associated GNSS loca-
+intrinsics. To construct a region graph we use road
+tion and orientation from a custom GNSS/INS system.
+as the semantic class. We first take the largest road
+Localization. From our past work [8], [81], a major mask in each image and only add a region node if
+challenge in building useful aerial maps is the quality of the mask is more than 20% of the image. We also use
+orientation estimation and synchronization between the the class building and car as negative objects, i.e.
+imageryandtheodometry.Inhighwindscenarioswhere objectsthatwedonotreport.Withoutthemthenetwork
+the UAV may maintain a significant pitch, localized often misclassifies buildings and cars as road, leading to
+pointsintheimageprojectedontothegroundplanemay untraversableedgesinthegraph.Thesefilteringmethods
+be incorrect by several meters. We use GTSAM [82] to helps reduce the number of misclassifications of other
+fuse GNSS coordinates and IMU data to get a high rate objects in the scene as roads. When there is a large
+stateestimatebetweenGNSSreadings.Thisallowsusto road segment we compute the same distance transform
+get an accurate pose for each image. Further details on as before and assign the road point to the furthest point
+the implementation can be found in the Appendix. A.3 fromthemaskboundary.Thispointisthentransformed
+Object Detection and Masking. We use Grounded to UTM coordinates and added to the region graph
+SAM2 [83] for aerial object detections because of its network by connecting it to the nearest region node.
+zero-shotopen-setperformance,evenonaerialdata.The This pipeline is shown in Fig. 3 and results of the aerial
+model uses Grounding DINO [80] for open-set object semantic graph are shown in Fig. 4.
+detection and SAM2 [84] for accurate segmentation of
+theobjects.Weuseabaseandlargemodel,respectively, B. UGV Semantic Mapper
+which combine to 12 GB of VRAM, with a latency of 3 TheUGVmapperalsomaintainsalocaloccupancymap,
+to5secondswhenrunningonboardtheUAV,depending which the planner uses for free space exploration. The
+on how many objects are detected. semantic graph constructed by the UAV provides an
+initial map estimate (see Sec. IV A), and the UAV can
+User
+iteratively provide map updates during the mission.
+OurUGVsemanticmappingimplementationisshown
+(5) Answer User
+(1) Task: I need
+in Fig. 2. The mapper takes RGB + Depth, LiDAR, to get across answer(I found a car in
+town quickly. the parking lot)
+and semantic configuration as inputs. LiDAR is used
+for odometry estimation (Faster-LIO [86]) and local (4) Perception Update
+occupancy map construction (GroundGrid [87]). The add_node(car) (3) Mobility and active
+SPINE sensing
+occupancy map is used to add and remove regions and explore_region
+(2) Active Sensing (parking_lot)
+edges from the map based on connectivity. RGB+D
+set_labels(car)
+is used for object localization and captioning. Objects
+are detected using GroundingDino [80]). Detections are
+then clustered and localized with a multiple-hypothesis Mapper Controller
+tracker. A vision-language model (LLaVA [88]) enriches
+the semantic information available to the planner (see
+Fig. 10). Outputs from these modules are used to add
+and remove nodes and enrich them with semantic in-
+formation. A Semantic configuration is provided by the FIGURE5. ExampleAPIuseduringmission.(1)userspecifiesamission.
+(2)SPINEinfersrelevantsemanticcategoriesandconfiguresperception
+plannerandisusedtosetthelabelsoftheobjectdetector
+labels.(3)SPINEthenreasonsaboutexplorationtargets.(4)Perception
+and provide queries to the vision language model. The findsacarandnotifiesplanner.(5)Plannerinformsuser.
+detectionandtrackingmodulesrunat∼5Hz,thevision-
+historyaremaintainedin-contextviatheprovidedAPIs.
+language model runs at ∼ 1Hz, and occupancy map
+SeeFig.5foranexampleaction-control-perceptionloop.
+construction runs well over 10Hz, all onboard.
+Plan Validation. To create subtasks, the planner must
+correctlyinvokeitsbehaviorlibrarywhilereasoningover
+C. SPINE Planning
+constraints such as traversability. Since LLMs are prone
+The backbone planner used in this work is based on
+to hallucinate this information, we filter LLM-generated
+SPINE, first presented in [17]. This section summarizes
+plans through a validation module, which ensures all
+some of the key ideas relevant to teaming.
+plans are syntactically correct and physically realizable.
+SPINE’s plan generator uses an LLM to infer a task
+Ifagiventaskisinvalid,thevalidatorformsstate-specific
+sequencefromamissionspecificationandsemanticmap.
+feedback to the LLM. While this validation procedure
+We configure a pre-trained LLM via a system prompt
+provides valuable planning safeguards, the spatial con-
+with three components: role description, the mapping
+straints are contingent on perception.
+interface, and a description of the behavior library.
+Online Map Correction. SPINE uses prior semantic
+Mapping Interface. The mapping interface provides a graphs constructed from a UAV or satellite image. Such
+textual representation of the semantic graph. The plan priors offer valuable contextual and traversability infor-
+generator first receives a JSON representation of the mation, however they may contain spurious traversabil-
+graph.Then,ateachplanningiteration,allmapupdates ity edges. Identifying such errors online so that SPINE
+are provided to the LLM in-context via the following canreplanisvitaltoarobustautonomysolution.SPINE
+API, which captures high-level graph manipulations: thus uses feedback from the downstream controllers to
+add_nodes, remove_nodes, add_edges, remove_edges, infer spurious edges and remove them from the graph. If
+andupdate_nodes.Thenodesaredefinedasadictionary SPINEsendsanavigationcommand acrossanedgethat
+of attributes, which allows for providing nodes with rich thecontrollercannottraverse,SPINEremovesthatedge
+semantic descriptions (example in Fig. 12). from the graph.
+PlanGeneration.SPINEcomposesplansviabehaviors D. Mission Execution
+fornavigation,activemapping,anduserinteraction.The The UAV is tasked with an initial exploration mission
+LLM generates a receding horizon behavior sequence at over the area of interest. For our experiments, a pre-
+each planning iteration, and this sequence is provided to defined waypoint set is provided to avoid flying over
+thevalidationmodule.An“answer”behaviorterminates unsafe regions in the area. However, waypoints can be
+a mission and notifies the user of results, and a “clarify” generated with any coverage algorithm.
+behavior is used to gain further instructions, if needed. After a timer t has elapsed, the UAV transitions into
+i
+Weenforcechain-of-thoughreasoningbyrequiringthe search and communication modes, looking for ground
+LLM to provide a justification for each action sequence, robots to transmit the graph. The last known pose is
+which reduces hallucinations or otherwise ungrounded used as a heuristic for where to find the ground robot.
+behavior [89]. All inputs to the planner and action Once the ground robot has been found and all the
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+strate air-ground teaming in unknown environments
+Controller
+given language-specified missions, in controlled settings
+Controller
+navigate towards (Sec V.C).
+goal
+goto(road_1)
+Platforms. We used the Falcon 4 [90] as our UAV
+platform. The UAV is controlled by a flight controller
+running PX4 firmware [91]. The primary sensors are
+Controller tries to
+navigate around a Blackfly S U3-32S4C-C RGB global-shutter camera,
+obstacles
+and a VectorNav VN-100-T inertial measurement unit
+SPINE
+(IMU). The platform uses a U-blox ZED F9P GNSS
+sensor for localization. Finally, all the data is processed
+If unsuccessful, by an onboard Nvidia Jetson Orin NX.
+edge is removed
+Our UGV platform consists of a Clearpath Jackal
+Feedback: Could not traverse edge.
+Path must be blocked equipped with an AMD Ryzen 3600 CPU with 32 GB
+API Update:
+remove_egdge([road_1, road_0]) of RAM and an Nvidia RTX 4000 Ada SFF GPU. An
+Ouster OS1-64 LiDAR is used for obstacle avoidance,
+FIGURE6. Examplemapcorrection.SPINEattemptstotraverseaninvalid path planning, and odometry, while a ZED 2i stereo
+edge(greenline).Greenpointsdenotegroundandredpointsdenote camera provides sensing for object detection. We also
+obstacles.Thecontrollercannotfindatrajectoryaroundtheobstacle,andit
+use a U-blox ZED-F9P GNSS to record the initial po-
+timesoutafterapre-specifiedduration.Theincorrectedgeisremovedfrom
+thegraph,andthatfeedbackissenttoSPINE. sition of the UGV, which establishes a common refer-
+ence frame with the overhead graph. Finally, we use a
+Vectornav VN-100 for global heading corrections. More
+detailsaboutthehardwareplatformscanbefoundinthe
+Appendix.
+Environments. We perform Ground Autonomy exper-
+iments in two rural environments termed Bucker and
+Range 15, shown in Fig. 10 and Fig. 11, respectively.
+Eachenvironmentstressesauniquecomponentoftheau-
+tonomystack.Range15islargeandsemanticallysparse.
+We use this environment to evaluate the autonomy’s
+reasoning over long-horizon missions, state estimation,
+andcommunicationsatscale.Bucknerissmallerinscale
+FIGURE7. Exampleimagesofthedetectiononboardtheaerialrobotfor butfeaturesrichersemantics,suchasbridges,gates,and
+thePennovationexperiment,showingthequalityofthezero-shottransferto parking lots, all within a few hundred meters. Buckner
+theaerialdata.TheredlineindicatetheflightpathoftheUAVoverlayed
+experiments evaluate the UGV autonomy’s ability to
+onMapbox[79]satelliteimagery.
+reason over richer or ambiguous specifications.
+data has been transmitted, the UAV transitions again We demonstrate the full air-ground system in Pen-
+into exploration mode, covering all the waypoints in its novation, an urban office park with fields, buildings,
+mission. parkinglots,andotherstructures.Wealsousedatafrom
+OntheUGV,SPINEsendsnavigationsubtaskstothe these demonstrations to evaluate the aerial autonomy
+low-level planner. These commands reference paths on performance.Allenvironmentswereuncontrolled.There
+the semantic graph (note that exploration commands were dynamic entities such as cars and people moving
+firstextendthesemanticgraph).Graphnavigationpaths during experiments, and the environments contained
+are then sent to the ROS Move Base controller 2, which many obstacles, both positive (fences, walls) and neg-
+plans trajectories realized by the Jackal controller. ative (ditches).
+V. EXPERIMENTS A. Aerial Mapping
+We evaluate our system over three sets of experiments. In this section, we evaluate the components of the UAV
+We first evaluate the incremental graph construction of mapping system. The important qualities of our aerial
+the Aerial Autonomy component of our system (Sec. maps are: 1) Resolution, task relevance, semantic de-
+V A). We then evaluate the Ground Autonomy’s abil- tections; 2) Small size for transmission between robots;
+ity to realize language-specified missions in partially- 3) Accurate estimate of the traversable portions of the
+known environments (Sec. V.B). Finally, we demon- environment. We design experiments to measure the
+effectiveness of our proposed method for these qualities.
+2http://wiki.ros.org/move_base We first test the quality of the object detector, and we
+Specification TotalDetections FalsePositives Precision Specification TotalDetections FalsePositives Precision
+Pennovation1 708 127 82.1% Pennovation1 82 9 89.0%
+Pennovation2 388 59 84.8% Pennovation2 24 2 91.6%
+TABLE 2. Performance of the aerial object detection module based on TABLE3. Performanceofthetraversableedgedetectionmodule.
+GroundedSAM2,zero-shottransfer.
+aerial semantic graph generated by the UAV compared
+to the previously used dense maps.
+then measure the size of the stored maps relative to the
+distance traveled.
+Traversability Estimation. Finally, to measure the
+quality of the estimated road network, we manually
+Object Detections. To evaluate our object detection
+annotate the true positives and false positives in the
+module, we manually annotate the desired objects in 2
+detected roads. The results of this analysis are shown
+ofourdatasetsandevaluatethefalsepositiverateofthe
+in Table 3. These results are encouraging: accurate road
+detector. The desired labels for this evaluation are task
+maps improve the performance of the ground autonomy
+specific to these datasets and are not the same across
+stack.
+bothdatasets.Theresultsofthisevaluationareshownin
+Tab. 2. As shown, the object detector is able to perform
+B. Ground Autonomy
+remarkablywellwithzero-shottransfertoourdata.The
+WeevaluatetheUGVautonomyplatformindependently
+results are surprising considering the viewpoint of the
+of the UAV. We design experiments to assess the UGV
+UAV camera. The qualitative evaluation of the detected
+autonomy’s ability to complete missions with differing
+objects is shown in Fig. 7 & Fig. 8.
+specifications, environments, and priors. In contrast to
+Incremental Graph Construction. To evaluate the
+the System Demonstration in Sec. V C and VI, we gen-
+quality of the constructed graph, we show an example
+eratethepriorsfromregisteredsatellitedata.Thepriors
+of the incremental semantic-metric map generated by
+contain traversability information and some relevant se-
+the robot overlaid onto a satellite image in Fig. 4. An
+mantics. However, the priors are imperfect and contain
+advantage of our method is the size of the map that is
+irrelevant information and mistakes that the UGV must
+stored. We show in Fig. 9 that the maps are roughly
+correct online. Our experiments evaluate the UGV’s
+linear in the distance traveled, and areas of size 20,000
+m2 can be stored in just kilobytes. ability to infer navigation, exploration, and information
+acquisition goals from natural language specifications,
+Compared to our previous work [8], [9], the messages
+react to findings, and use findings to complete the user’s
+transmittedbetweenrobotsaresignificantlysmaller.For
+mission.
+instance, the size of the uncompressed graph after flying
+1000 m is approximately 12 to 17 KB, compared to
+Experimental Setup. We consider five mission speci-
+530 to 699 KB of the semantic map image generated
+fications, as summarized in Table 4, and evaluate each
+by ASOOM. These results showcase the efficiency of the
+specification one to four times. We construct priors for
+each environment; however, the priors are not designed
+for a specific tasks. One of the primary purposes of the
+103
+102
+101
+100
+10−1
+0 500 1,000 1,500
+FIGURE8. SemanticdetectionresultsforRange15,showingthezero-shot Distance (m)
+transfercapabilitiesofGrounded-SAM2toaruralenvironment.Theread
+lineshowstheflightpathoftheUAVoverlayedonMapbox[79]satellite
+imagery.
+)BK(
+eziS
+This work - Exp 1
+This work - Exp 2
+ASOOM [8] - Exp 2
+ASOOM [8] - Exp 1
+FIGURE9. Sizeoftheuncompressedmapasafunctionofthedistance
+traveledbytheUAV.
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+2
+1 1
+25m
+100m 2
+Communication nodes
+FIGURE10. ExamplemissionfromS3.“Igotreportsthatthebridgewas
+blocked.Gocheck.”TheUGVstartsitsmissionatthebottomleftofthe
+FIGURE11. ExamplemissionfromS1.“Iheardofactivitynearthered
+trajectory(1).TheUGVtheninfersanmappingtarget(bridge).After
+houses.Gocheck.”Atthestart(1),theUGVidentifiesexplorationtargets
+navigationandmapping,itidentifiesseveralobstaclesandreportsits
+(redhouses,bottom)andnavigatestherefromitsstartlocation(2).The
+findingstotheuser(2).
+UGVsuccessfullyidentifiesseveralpeople.Thegroundvehicle
+communicatesitsfindingsinrealtimeviatext.Itthenreturnstoitsstarting
+locationtooffloadmissiondata.
+priorwastokeeptherobotawayfromnegativeobstacles,
+suchasditches,whichcouldnotbedetectedbytheUGV.
+the UGV to return to the starting location to offload
+Results and Discussion. We summarize the experi-
+data. Overall the mission requires the UGV to traverse
+mentalresultsforeachmissionspecificationinTab5.We
+1200 meters, which test all layers of the autonomy stack
+report mission success, distance traveled, and the num-
+including the odometry and communication network.
+ber of API calls. The number of API calls indicates how
+SPINE uses active perception to resolve errors in the
+many subtask steps SPINE inferred during its mission.
+mission specification. Examples about active perception
+The UGV was successful in achieving S2 through S5.
+are presented in the Appendix.
+There were two unsuccessful missions during S1, each of
+which failed due to the large scale of the environment.
+C. Air-Ground Teaming Evaluation
+Inoneoutcome,agustofleavesblewaroundtheground
+We evaluate the performance of our air-ground team-
+vehicle’s LiDAR, which caused unrecoverable odometry
+ing system as compared to single-UGV variants against
+drift(seeFig.15).Inthesecond,theUGVlostcommuni-
+language-specified missions in unknown environments.
+cations and could not perform the LLM queries required
+The first baseline (“UGV w/ GT”) receives a full
+for planning.
+map constructed from satellite imagery, which estimates
+We highlight two emblematic missions. Fig. 10
+upper-boundperformanceofthemissiongivenourUGV
+shows the UGV trajectory from a mission with the
+autonomy stack. The second baseline (“UGV”) receives
+specification: “I heard the bridge was blocked. Can
+no prior map, and this baseline must explore to accom-
+you check?”. SPINE infers that the relevant seman-
+plish the mission. We consider a triaging mission where
+tics are bridge, car, truck, bicycle, pedestrian, con-
+the system must respond to a chemical spill by inferring
+struction cone, debris, and barrier. The planner then
+relevant semantic (i.e., chemical barrels, people), map
+navigates to the bridge by constructing the follow-
+the relevant area, and report its findings. The system
+ingplangoto(road_5), map_region(bridge_1).Upon
+is given the specification “triage the chemical spill 100
+mapping the bridge, SPINE discovers several obstacles,
+includingaperson,car,andconstructionbarrier.SPINE
+uses the VLM to get a more detailed description, as
+shown in Fig. 12, and reasons over this information to VLM Query: You are a robot. Describe where you are so you can plan.
+VLM Answer: Road with a silver car and a woman
+respond “The path across the bridge is likely blocked
+due to the presence of a construction cone and a person.
+There is also a silver car and a woman on the bridge,
+which may indicate a temporary blockage.”
+Fig. 11 overviews a mission in which the UGV was
+provided the task: “I heard of suspicious activity near
+the red houses. Go check.” The UGV had red houses on
+itspriormap,soitinfersaplantomapthose.Alongthe
+way, it observes cars and people. Because those objects
+are not near the red houses, the UGV records those in
+its map but does not consider them as relevant to the FIGURE12. Intheaboveexample,thegroundvehiclemustlearnifthe
+bridgeisblocked.Thegroundvehicle(Specification3).Thegroundvehicle’s
+task. Finally, the UGV reaches the red houses, discovers
+planner,SPINE,usesaVisionLanguageModelrunningonboardtoobtain
+people,andreportsthemtotheuser.Theuserthenasks detailedsemanticinformationfortheuser.
+Specification Location Priors Desiredoutcome
+(S1)Iheardofactivitynearthered Range15 Redhouses.Noobjects Identityandreportseveralpeopleneartwo
+houses.Gocheck redhouses.
+(S2) Go inspect the black vehicle Range15 Black vehicle is at the begin- Planneridentifiesmisspecificationandcor-
+attheendofthedriveway ningofthedriveway rectlyfindscar.
+(S3) I got reports that the bridge Buckner Bridge,noblockage Planner identities vehicle blocking the
+wasblocked.Gocheck. bridge
+(S4)Isthereactivitynearthegate Buckner Gate,objects Planneridentifiesandreportsaperson
+(S5) Identify the parking lot 30 Buckner Bridge,butnoparkinglot Plannerexplorecorrectareaandidentifies
+meterseastofthebridge parkinglot
+TABLE4. Missionspecifications,locationsandpriorsusedtotestthegroundautonomy.
+meters X,” where X is a location prior. Note the system
+Method Success(%) Dist.(m) Autonomous(%)
+is not explicitly provided the relevant semantics (i.e.,
+barrels);rather,itmustinfer.Werepeatthisexperiment UGV 0 54.9 94.6
+threetimesforeachbaselineandsixtimesforoursystem, UAV-UGV 83.3 104.9 99.3
+with location priors to the north and northeast. UGVw/GT 100 100.7 99.7
+We report results in Table 6, as measured by success TABLE 6. Experiments with air-ground teaming compared to UGV-only
+rate, distance traveled by the UGV, and the percentage methods.GTcorrespondstoapre-computedmapfromsatelliteimagery.
+of time spent in autonomous mode. Unsurprisingly, the
+UGV obtains a 100% success rate when given a full of the ground robots, the opportunistic communication,
+prior map of the environments. Our system achieves an and the behavior of the air-ground team. Note that
+83.3% success rate while spending a compatible amount in addition to the components evaluated previously, we
+of time in autonomous mode. Our system also travels a stress the human-in-the-loop aspect of our system. In
+similar distance, indicating that the prior map provided particular, the operator is constantly receiving updates
+by the UAV offers efficient paths. Without a prior map, and retasking the robot.
+the UGV is unable to find the goal. We find that the We report the total distance traveled, mission dura-
+UGV increasingly struggles with long-scale exploration, tion,humaninteractions,APIcalls,prioredgesremoved,
+as indicated in Fig. 13. and percent of the time the UGV was in autonomous
+mode. As the system experiments feature human in the
+loop tasking, we report the number of user interactions.
+VI. System Demonstration
+We also report the number of API calls, the number of
+Through the previous sections, we demonstrated the
+edges removed by the planner, and percent of time the
+use of the system in relatively controlled settings. In
+UGV was in autonomous mode. All results are reported
+this section, we show qualitative demonstrations of the
+in Table 7.
+system in underspecified missions that require reasoning
+and the sub-tasks have to be inferred by the system. System Demonstration 1: Mapping and Inspec-
+As mentioned in Sec. IV.A, a smaller model is used to tion The first mission was specified by the query “I
+generate the object masks to keep the compute feasible. heardofconstructionaroundtheeasternroads.Canyou
+Wedemonstratethefullsystemthroughtwoexperiments check?.” The planner inferred that the following classes
+in the Pennovation environment shown in Fig. 16. The were relevant: crane, bulldozer, cement mixer, construc-
+missionconceptfollowsfromtheonedescribedinFig.1. tion sign, scaffolding, excavator, hard hat, construction
+Large-scale demonstrations stress the autonomy stack worker,truck,andbarrier.TheUAVincrementallybuilt
+asemanticgraphandprovidedittotheUGV.Through-
+out the mission, the UGV reported relevant findings to
+Spec. Outcomes Dist.(m) APICalls Failuremodes the human operator, who would then retask the UGV
+based on those findings. Overall, the UGV traveled 756
+S1 1/3 1200 2 Odom.,Comm.
+meters and received 21 updates from the operator. The
+S2 2/2 231 4 N/A
+UGV spent nearly 90% of its time in autonomous mode.
+S3 4/4 265 2 N/A
+The manual takeovers came primarily from dynamic
+S4 1/1 132 2 N/A
+obstacles,suchasbusesortrucks,orsmallobstaclesthat
+S5 1/1 450 3 N/A
+the UGV obstacle detection could not identify, such as
+TABLE5. UGVautonomyoutcomes.SPINEcompletedallmissionsexcept
+puddles or potholes. The ratio of API calls to user inter-
+fortwoduringthefirstspecification,whichfailedduetoodometrydriftand
+actions is lower than in the UGV-only experiments (See
+communicationloss.
+Table 5). This is because, in the UGV-only experiments,
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+the ground robot inferred all decisions autonomously,
+whereas in this experiment the UGV would reach back
+to the human operator. Throughout the mission, the
+UGV provides this information via detected objects and
+scene captions associated with the graph. Importantly,
+the UGV also provides negative information (e.g., “this
+is a parking lot with no construction activity”).
+System Demonstration 2: Triaging The second mis-
+sion was specified by the query “you are working with
+a high-altitude UAV to search for people.” During mis-
+sion execution, the user provided additional details. For
+example, the user first instructed the UGV to look 30
+south and 50 meters east, in order to complement the
+UAV’s flight path. SPINE infers the relevant classes are
+person, tree, car, bicycle, bench, backpack, streetlight,
+trash can, and umbrella. Following a similar mission
+concept, the UAV is provided with the same list of
+classes to generate and provide a semantic map. SPINE
+alsoprovidesaninterpretableexplanationforthechosen
+classes: For instance, ‘Bench’, ‘backpack’, and ‘trash
+can’ indicate places where people might be found or
+have left their belongings. ‘Buildings’ and ‘streetlights’
+provide “structural context to the environment”. The
+UGV works with the user to explore the environment.
+Throughout the mission, the UGV provides natural
+language description of the previously unexplored area,
+whichprovidessituationalawarenesstotheuserandaids
+in planning. Snapshots of the experiment are shown in
+Fig.16.Overall,theUGVcorrectlyidentifiedfivepeople.
+The detection system made one false positive, and one
+person was in the UGVs field of view, but the tracker
+failed to register that person.
+100
+80
+60
+40
+20
+0
+20 40 60 80 100
+Goal distance (m)
+)%(
+sseccuS
+noissiM
+ylno-VGU
+600
+400
+200
+0
+0 500 1,000 1,500 2,000 2,500
+Time (s)
+FIGURE13. UGV-onlymissionsuccessasgoaldistanceincreases.Without
+priors,theUGVmustbuildamapentirelyfromexploration,whichit
+strugglestodoasthegoaldistanceincreases.
+sedoN
+fo
+rebmuN
+Mission 1
+Mission 2
+FIGURE14. Sizeofgraphasafunctionofthemissiontimefortheground
+vehicles.Groundvehiclesreceivegraphupdatesfromonboardmappingand
+theaerialvehicle,thusthemapgrowssubstantiallyoverthemission.
+FIGURE15. Exampleofodometryfailure.Agustofleavesblewaroundthe
+groundvehiclesLiDAR.Thespuriousreturnscausedunrecoverable
+odometrydrift.
+VII. DISCUSSION, CONCLUSION, AND FUTURE WORK
+We conclude the paper by discussing our results, sum-
+marizing our key contributions, and outlining promising
+directions for future work.
+A. Discussion
+UGV traversability estimation was a primary system
+bottleneck. The UGV struggled to identify negative
+and small positive obstacles, limiting the area that the
+UGV could safely explore. For example, Fig. 17 shows
+a portion from the second system demonstration where
+the UGV failed to identify a curb. While the semantic
+graph from the UAV provided valuable traversability
+information,itcontainedfalsepositivessuchasbuildings
+marked as roads. The UGV often identified these errors
+online and corrected its path. However, the safety oper-
+ator had to take over when false positives brought the
+UGV through curbs or other challenging obstacles. This
+isparticularlyapparentinSec.VIwherethespecificityof
+the task islowerand asmaller model isused togenerate
+the object masks leading to harder trajectories for the
+Update: I found several vehicles and
+streetlights, indicating human activity. I found a parking lot with buses…No
+However, no people were directly observed people were found.
+Update: I detected a person Scene description: Parking lot Update: I detected a person
+FIGURE16. Snapshotsofthesecondsystemdemonstration.TheairgroundteamistaskedwithfindingpeopleinthePennovationenvironment.Theground
+vehicleprovidesupdatesinnaturallanguageaboutmissionfindings(people)andbroadercontext(scenedescription,etc).Becausetheenvironmentis
+unknownatruntime,suchcontextprovidesvaluablesituationalawarenesstotheuser.
+Specification UGVDistance(m) Time(s) UserInteractions APIcalls RemovedEdges (%)Autonomous
+(S6)Iheardofconstruction 765 2097 21 41 8 90
+around the eastern roads.
+Canyoucheck?
+(S7) You are working with 695 2390 19 37 15 93
+a high-altitude UAV to
+searchforpeople.
+TABLE7.Systemdemonstrationresultsovertwodifferentspecifications.BothmissionsrequiretheairgroundsystemtoacquireinformationinthePennovation
+environment,thustheresultingmetricsaresimilar.
+UGV to follow leading to less time spent in autonomous aerial vehicle intermittently provides a map update to
+mode. The system used GNSS to register maps between the ground vehicle via an opportunistic communication
+robots, but the UGV used LiDAR odometry only for network. We evaluate our system over seven different
+state estimation. While LiDAR odometry is typically specifications in urban and rural environments in up to
+a robust state estimation solution, it suffers from drift kilometer-scale navigation missions.
+in highly dynamic scenes, as shown in Fig. 15. Finally,
+we observed that the LLM-enabled planner was unable
+perform robust exploration, as evidenced by our UGV-
+only exploration experiments (see Fig 13), which made
+the UGV dependent on a strong prior from the UAV. Obstacles
+Ground
+B. Conclusion
+In summary, we present an air-ground teaming system
+fornatural-languagemissionsinunknownenvironments.
+The system infers relevant semantics given a specifi-
+cation. An aerial vehicle then incrementally builds a
+mission-relevant semantic map, which is relayed to a
+ground vehicle. The ground vehicle then uses an LLM-
+enabledplannertoinferandrealizesubtasksthatrealize
+the mission, and the planner leverages online semantic UGV View
+mapping to augment and correct the semantic map
+FIGURE17. Examplereasonformanualtakeover.Curbs(circled)arenot
+received from the aerial vehicle. During the mission, the detectedbytraversabilityestimation,thusUGVtriestodriveoverthem.
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+culty traversing potholes, speed bumps, or curbs, which
+maybeincludedinaroadsegmentation.Incorporatinga
+robot-based traversability would be a valuable addition
+to this work. For instance, in addition to the pre-defined
+road label, we can task the aerial robot to find semantic
+classes that align with the robot’s experience or claimed
+capability to paths better suited to the robot.
+Finally, in future work we plan to use dense depth
+images to find smaller objects like tree roots or potholes
+that robots can avoid based on their capabilities. In
+this framework, we can also imagine re-tasking of UAVs
+to regions in the environment that are semantically
+meaningful. Our pipeline is able to accommodate the
+geometric clustering of semantically meaningful objects
+into regions. This in turn could be used to interactively
+ask the aerial robot to survey desired locations in the
+environment with tasks such as “Map all the cars in
+parklot_01".
+ACKNOWLEDGMENTS
+We would like to acknowledge Katie Mao, Frank Gonza-
+lez, Dexter Ong, and Kashish Garg for their help during
+FIGURE18. Examplemisclassificationsmadebyopen-vocabularyobject the field experiments for this work. We would like to
+detection.Dependingonthemissionspecification,misclassificationscanbe acknowledge Dr. Michael Novitzky and Tyler Errico for
+benign(falselydetectedstreetsign,top)ordetrimentaltothemission
+theirhelpandsupportduringfieldexperimentsatUSMA
+(falselydetectedperson,bottom).
+West Point.
+C. Future Work & Open Challenges REFERENCES
+Weseeseveralinterestingdirectionsforfuturework.This [1] D. Lattanzi and G. Miller, “Review of robotic infrastruc-
+workusesLLMstotranslateandactuponinstructionsin ture inspection systems,” Journal of Infrastructure Systems,
+vol.23,no.3,p.04017004,2017.
+natural language and leverages a structured map format
+[2] T. H. Chung, V. Orekhov, and A. Maio, “Into the robotic
+for in-context updates. While this empirically works, we
+depths: analysis and insights from the darpa subterranean
+lose information in the construction of the maps and are challenge,” Annual Review of Control, Robotics, and Au-
+explicitly reliant on an uplink to communicate with the tonomousSystems,vol.6,no.1,pp.477–502,2023.
+[3] G.-J.M.Kruijff,F.Pirri,M.Gianni,P.Papadakis,M.Pizzoli,
+language model API.
+A.Sinha,V.Tretyakov,T.Linder,E.Pianese,S.Corraoetal.,
+Onboard Language Models. In this work, we use “Rescue robots at earthquake-hit mirandola, Italy: A field
+the OpenAI GPT 4o model, which makes us reliant report,” in 2012 IEEE international symposium on safety,
+security, and rescue robotics (SSRR). IEEE, 2012, pp. 1–
+on a robust communication infrastructure. In our ideal
+8.
+system, we would be able to decompose the main task [4] H.G.NguyenandJ.P.Bott,“Roboticsforlawenforcement:
+from the user into subtasks that onboard LLMs can Applicationsbeyondexplosiveordnancedisposal,”inEnabling
+Technologies for Law Enforcement and Security, vol. 4232.
+handle. Keeping the interface between the robots to be
+SPIE,2001,pp.433–454.
+naturallanguageallowsustomaintainthesparsityofthe [5] S. Fountas, N. Mylonas, I. Malounas, E. Rodias, C. Hell-
+communication between the robots and interpretable by mannSantos,andE.Pekkeriet,“Agriculturalroboticsforfield
+operations,”Sensors,vol.20,no.9,p.2672,2020.
+humans in the loop.
+[6] C. Liu, J. Zhao, and N. Sun, “A review of collaborative air-
+Traversability Estimation. While segmenting aerial ground robots research,” Journal of Intelligent & Robotic
+images appears to have good zero-shot performance, Systems,vol.106,no.3,p.60,2022.
+imperfections in the detections can lead to catastrophic [7] L. Chaimowicz, B. Grocholsky, J. F. Keller, V. Kumar, and
+C. J. Taylor, “Experiments in multirobot air-ground coordi-
+failureinaUGVwithanaivelocalplanner.Failurecases
+nation,” in IEEE International Conference on Robotics and
+such as minor localization errors, inability to perceive Automation,2004.Proceedings.ICRA’04.2004,vol.4. IEEE,
+thinobjectslikefences,andthechangeindepthbetween 2004,pp.4053–4058.
+[8] I.D.Miller,F.Cladera,T.Smith,C.J.Taylor,andV.Kumar,
+roads and curbs may result in collision for a naive
+“Stronger together: Air-ground robotic collaboration using
+UGV planner. Additionally, while a coarse traversability semantics,” IEEE Robotics and Automation Letters, vol. 7,
+estimationcanbecomputedbysegmentingroads,paths, no.4,pp.9643–9650,2022.
+[9] ——, “Air-ground collaboration with SPOMP: Semantic
+and grass, these are not always meaningful for all robot
+panoramiconlinemappingandplanning,”IEEETransactions
+modalities. For example, smaller robots will have diffi- onFieldRobotics,vol.1,pp.93–112,2024.
+[10] F. Cladera, Z. Ravichandran, I. D. Miller, M. A. Hsieh, [Online]. Available: https://arashasgharivaskasi-bc.github.io/
+C.Taylor,andV.Kumar,“Enablinglarge-scaleheterogeneous SSMI_webpage/
+collaboration with opportunistic communications,” in 2024 [24] Y.Tao,X.Liu,I.Spasojevic,S.Agarwal,andV.Kumar,“3d
+IEEE International Conference on Robotics and Automation activemetric-semanticslam,”IEEERoboticsandAutomation
+(ICRA). IEEE,2024,pp.2610–2616. Letters,vol.9,no.3,pp.2989–2996,2024.
+[11] A. Agha, K. Otsu, B. Morrell, D. D. Fan, R. Thakker, [25] M. S. Kurtz, S. Prentice, Y. Veys, L. Quang, C. Nieto-
+A.Santamaria-Navarro,S.-K.Kim,A.Bouman,X.Lei,J.Ed- Granda, M. Novitzky, E. Stump, and N. Roy, “Real-world
+lundetal.,“Nebula:Questforroboticautonomyinchallenging deployment of a hierarchical uncertainty-aware collaborative
+environments; team costar at the darpa subterranean chal- multiagent planning system,” 2024. [Online]. Available:
+lenge,”arXivpreprintarXiv:2103.11470,2021. https://arxiv.org/abs/2404.17438
+[12] M. Tranzatto, T. Miki, M. Dharmadhikari, L. Bernreiter, [26] N. Hughes, Y. Chang, S. Hu, R. Talak, R. Abdulhai,
+M.Kulkarni,F.Mascarich,O.Andersson,S.Khattak,M.Hut- J. Strader, and L. Carlone, “Foundations of spatial
+ter, R. Siegwart et al., “Cerberus in the darpa subterranean perception for robotics: Hierarchical representations and
+challenge,”ScienceRobotics,vol.7,no.66,p.eabp9742,2022. real-time systems,” The International Journal of Robotics
+[13] M. Ahn, A. Brohan, N. Brown, Y. Chebotar, O. Cortes, Research, 2024. [Online]. Available: https://doi.org/10.1177/
+B. David, C. Finn, C. Fu, K. Gopalakrishnan, K. Hausman, 02783649241229725
+A.Herzog,D.Ho,J.Hsu,J.Ibarz,B.Ichter,A.Irpan,E.Jang, [27] J. Strader, N. Hughes, W. Chen, A. Speranzon, and L. Car-
+R. J. Ruano, K. Jeffrey, S. Jesmonth, N. Joshi, R. Julian, lone, “Indoor and outdoor 3d scene graph generation via
+D. Kalashnikov, Y. Kuang, K.-H. Lee, S. Levine, Y. Lu, language-enabledspatialontologies,”IEEERoboticsandAu-
+L.Luu,C.Parada,P.Pastor,J.Quiambao,K.Rao,J.Retting- tomationLetters,vol.9,no.6,pp.4886–4893,2024.
+house,D.Reyes,P.Sermanet,N.Sievers,C.Tan,A.Toshev, [28] S.Garg,K.Rana,M.Hosseinzadeh,L.Mares,N.Suenderhauf,
+V. Vanhoucke, F. Xia, T. Xiao, P. Xu, S. Xu, M. Yan, and F.Dayoub,andI.Reid,“Robohop:Segment-basedtopological
+A. Zeng, “Do as i can and not as i say: Grounding language maprepresentationforopen-worldvisualnavigation,”arXiv,
+in robotic affordances,” in arXiv preprint arXiv:2204.01691, 2023.
+2022. [29] H.-T. L. Chiang, Z. Xu, Z. Fu, M. G. Jacob, T. Zhang,
+[14] A.Werby,C.Huang,M.Büchner,A.Valada,andW.Burgard, T.-W. E. Lee, W. Yu, C. Schenck, D. Rendleman, D. Shah,
+“Hierarchical open-vocabulary 3d scene graphs for language- F. Xia, J. Hsu, J. Hoech, P. Florence, S. Kirmani, S. Singh,
+grounded robot navigation,” Robotics: Science and Systems, V. Sindhwani, C. Parada, C. Finn, P. Xu, S. Levine, and
+2024. J.Tan,“Mobilityvla:Multimodalinstructionnavigationwith
+long-context vlms and topological graphs,” 2024. [Online].
+[15] J. X. Liu, Z. Yang, I. Idrees, S. Liang, B. Schornstein,
+Available:https://arxiv.org/abs/2407.07775
+S. Tellex, and A. Shah, “Lang2ltl: Translating natural
+[30] Q.Gu,A.Kuwajerwala,S.Morin,K.Jatavallabhula,B.Sen,
+language commands to temporal robot task specification,”
+A. Agarwal, C. Rivera, W. Paul, K. Ellis, R. Chellappa,
+in Conference on Robbot Learning (CoRL), 2023. [Online].
+C. Gan, C. de Melo, J. Tenenbaum, A. Torralba, F. Shkurti,
+Available:https://arxiv.org/abs/2302.11649
+and L. Paull, “Conceptgraphs: Open-vocabulary 3d scene
+[16] K.Rana,J.Haviland,S.Garg,J.Abou-Chakra,I.Reid,and
+graphsforperceptionandplanning,”InternationalConference
+N. Suenderhauf, “Sayplan: Grounding large language models
+onRoboticsandAutomation,2024.
+using3dscenegraphsforscalabletaskplanning,”in7thAn-
+[31] D. Maggio, Y. Chang, N. Hughes, M. Trang, D. Griffith,
+nualConferenceonRobotLearning,2023.[Online].Available:
+C.Dougherty,E.Cristofalo,L.Schmid,andL.Carlone,“Clio:
+https://openreview.net/forum?id=wMpOMO0Ss7a
+Real-timetask-drivenopen-set3dscenegraphs,”2024.
+[17] Z. Ravichandran, V. Murali, M. Tzes, G. J. Pappas, and
+[32] Y. Tian, Y. Chang, F. Herrera Arias, C. Nieto-Granda, J. P.
+V.Kumar,“Spine:Onlinesemanticplanningformissionswith
+How, and L. Carlone, “Kimera-multi: Robust, distributed,
+incomplete natural language specifications in unstructured
+dense metric-semantic slam for multi-robot systems,” IEEE
+environments,” To appear in ICRA 2025, 2024. [Online].
+TransactionsonRobotics,vol.38,no.4,pp.2022–2038,2022.
+Available:https://arxiv.org/abs/2410.03035
+[33] Y. Chang, N. Hughes, A. Ray, and L. Carlone, “Hydra-
+[18] F. Cladera, I. D. Miller, Z. Ravichandran, V. Murali,
+multi: Collaborative online construction of 3d scene graphs
+J.Hughes,M.A.Hsieh,C.Taylor,andV.Kumar,“Challenges
+with multi-robot teams,” in 2023 IEEE/RSJ International
+and opportunities for large-scale exploration with air-ground
+ConferenceonIntelligentRobotsandSystems(IROS). IEEE,
+teams using semantics,” arXiv preprint arXiv:2405.07169,
+2023,pp.10995–11002.
+2024.
+[34] D. Honerkamp, M. Büchner, F. Despinoy, T. Welschehold,
+[19] A. Elfes, M. Bergerman, J. R. H. Carvalho, E. C. de Paiva, and A. Valada, “Language-grounded dynamic scene graphs
+J.Ramaos,andS.S.Bueno,“Air-groundroboticensemblesfor forinteractiveobjectsearchwithmobilemanipulation,”arXiv
+cooperative applications: Concepts and preliminary results,” preprintarXiv:2403.08605,2024.
+in Proceedings of the International Conference on Field and [35] Z. Hu, F. Lucchetti, C. Schlesinger, Y. Saxena, A. Freeman,
+ServiceRobotics,vol.1999,1999. S.Modak,A.Guha,andJ.Biswas,“Deployingandevaluating
+[20] A. T. Stentz, A. Kelly, P. Rander, H. Herman, O. Amidi, llms to program service mobile robots,” IEEE Robotics and
+R. Mandelbaum, G. Salgian, and J. Pedersen, “Real-time, AutomationLetters,2024.
+multi-perspective perception for unmanned ground vehicles,” [36] S.Sharan,F.Pittaluga,V.KumarBG,andM.Chandraker,
+in Proceedings of Unmanned Systems Symposium (AUVSI “Llm-assist: Enhancing closed-loop planning with language-
+’03),July2003. basedreasoning,”arXivpreprintarXiv:2401.00125,2023.
+[21] M.A.Hsieh,A.Cowley,J.F.Keller,L.Chaimowicz,B.Gro- [37] Q.Xie,T.Zhang,K.Xu,M.Johnson-Roberson,andY.Bisk,
+cholsky,V.Kumar,C.J.Taylor,Y.Endo,R.C.Arkin,B.Jung “Reasoningabouttheunseenforefficientoutdoorobjectnav-
+et al., “Adaptive teams of autonomous aerial and ground igation,”2023.
+robots for situational awareness,” Journal of Field Robotics, [38] D. Shah, M. R. Equi, B. Osiński, F. Xia, B. Ichter, and
+vol.24,no.11-12,pp.991–1014,2007. S.Levine,“Navigationwithlargelanguagemodels:Semantic
+[22] N. Michael, S. Shen, K. Mohta, V. Kumar, K. Nagatani, guesswork as a heuristic for planning,” in Proceedings of
+Y. Okada, S. Kiribayashi, K. Otake, K. Yoshida, K. Ohno The 7th Conference on Robot Learning, ser. Proceedings
+et al., “Collaborative mapping of an earthquake damaged of Machine Learning Research, J. Tan, M. Toussaint, and
+building via ground and aerial robots,” in Field and service K. Darvish, Eds., vol. 229. PMLR, 06–09 Nov 2023,
+robotics:resultsofthe8thinternationalconference. Springer, pp. 2683–2699. [Online]. Available: https://proceedings.mlr.
+2014,pp.33–47. press/v229/shah23c.html
+[23] A. Asgharivaskasi and N. Atanasov, “Semantic octree [39] D. Shah, B. Osiński, b. ichter, and S. Levine, “Lm-nav:
+mapping and shannon mutual information computation for Roboticnavigationwithlargepre-trainedmodelsoflanguage,
+robot exploration,” IEEE Transactions on Robotics, 2023. vision, and action,” in Proceedings of The 6th Conference
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+on Robot Learning, ser. Proceedings of Machine Learning [57] J. Wang, G. He, and Y. Kantaros, “Safe task planning for
+Research, K. Liu, D. Kulic, and J. Ichnowski, Eds., vol. 205. language-instructedmulti-robotsystemsusingconformalpre-
+PMLR, 14–18 Dec 2023, pp. 492–504. [Online]. Available: diction,”arXivpreprintarXiv:2402.15368,2024.
+https://proceedings.mlr.press/v205/shah23b.html [58] K. Liu, Z. Tang, D. Wang, Z. Wang, B. Zhao, and
+[40] C. Huang, O. Mees, A. Zeng, and W. Burgard, “Visual lan- X. Li, “Coherent: Collaboration of heterogeneous multi-
+guagemapsforrobotnavigation,”in2023IEEEInternational robot system with large language models,” arXiv preprint
+Conference on Robotics and Automation (ICRA), 2023, pp. arXiv:2409.15146,2024.
+10608–10615. [59] B.Quartey,E.Rosen,S.Tellex,andG.Konidaris,“Verifiably
+[41] R. Sinha, A. Elhafsi, C. Agia, M. Foutter, E. Schmerling, followingcomplexrobotinstructionswithfoundationmodels,”
+and M. Pavone, “Real-time anomaly detection and reactive arXiv,vol.abs/2402.11498,2024.
+planning with large language models,” in Robotics: Science [60] B. Chen, F. Xia, B. Ichter, K. Rao, K. Gopalakrishnan,
+andSystems,2024. M. S. Ryoo, A. Stone, and D. Kappler, “Open-vocabulary
+[42] A.Tagliabue,K.Kondo,T.Zhao,M.Peterson,C.T.Tewari, queryable scene representations for real world planning,” in
+and J. P. How, “Real: Resilience and adaptation using large 2023IEEEInternationalConferenceonRoboticsandAutoma-
+languagemodelsonautonomousaerialrobots,”Conferenceon tion(ICRA). IEEE,2023,pp.11509–11522.
+RobotLearning(CoRL),2023. [61] M. A. Hsieh, A. Cowley, V. Kumar, and C. J. Taylor,
+[43] OpenAI et al., “Gpt-4 technical report,” 2024. [Online]. “Maintainingnetworkconnectivityandperformanceinrobot
+Available:https://arxiv.org/abs/2303.08774 teams,”Journaloffieldrobotics,vol.25,no.1-2,pp.111–131,
+[44] W. Huang, F. Xia, T. Xiao, H. Chan, J. Liang, P. Florence, 2008.
+A. Zeng, J. Tompson, I. Mordatch, Y. Chebotar, P. Ser- [62] E. Stump, N. Michael, V. Kumar, and V. Isler, “Visibility-
+manet, N. Brown, T. Jackson, L. Luu, S. Levine, K. Haus- based deployment of robot formations for communication
+man, and B. Ichter, “Inner monologue: Embodied reasoning maintenance,” in 2011 IEEE International Conference on
+through planning with language models,” in arXiv preprint RoboticsandAutomation,2011,pp.4498–4505.
+arXiv:2207.05608,2022.
+[63] N. Roy and G. Dudek, “Collaborative robot exploration and
+[45] J. Liang, W. Huang, F. Xia, P. Xu, K. Hausman, B. Ichter,
+rendezvous: Algorithms, performance bounds and observa-
+P. Florence, and A. Zeng, “Code as policies: Language
+tions,”AutonomousRobots,vol.11,pp.117–136,2001.
+model programs for embodied control,” in arXiv preprint
+[64] X.YuandM.A.Hsieh,“Synthesisofatime-varyingcommuni-
+arXiv:2209.07753,2022.
+cationnetworkbyrobotteamswithinformationpropagation
+[46] Y. J. Ma, W. Liang, G. Wang, D.-A. Huang, O. Bastani,
+guarantees,” IEEE Robotics and Automation Letters, vol. 5,
+D.Jayaraman,Y.Zhu,L.Fan,andA.Anandkumar,“Eureka:
+no.2,pp.1413–1420,2020.
+Human-levelrewarddesignviacodinglargelanguagemodels,”
+[65] M. Saboia, L. Clark, V. Thangavelu, J. A. Edlund, K. Otsu,
+arXivpreprintarXiv:Arxiv-2310.12931,2023.
+G. J. Correa, V. S. Varadharajan, A. Santamaria-Navarro,
+[47] Y. J. Ma, W. Liang, H. Wang, S. Wang, Y. Zhu, L. Fan,
+T. Touma, A. Bouman, H. Melikyan, T. Pailevanian, S.-
+O. Bastani, and D. Jayaraman, “Dreureka: Language model
+K. Kim, A. Archanian, T. S. Vaquero, G. Beltrame,
+guidedsim-to-realtransfer,”inRobotics:ScienceandSystems
+N.Napp,G.Pessin,andA.-a.Agha-mohammadi,“ACHORD:
+(RSS),2024.
+Communication-AwareMulti-RobotCoordinationWithInter-
+[48] Z. Dai, A. Asgharivaskasi, T. Duong, S. Lin, M.-E.
+mittent Connectivity,” IEEE Robotics and Automation Let-
+Tzes, G. Pappas, and N. Atanasov, “Optimal scene graph
+ters,vol.7,no.4,pp.10184–10191,2022.
+planningwithlargelanguagemodelguidance,”2024.[Online].
+[66] M.F.Ginting,K.Otsu,J.A.Edlund,J.L.Gao,andA.akbar
+Available:https://arxiv.org/abs/2309.09182
+Agha-mohammadi, “CHORD: Distributed Data-Sharing via
+[49] J. X. Liu, Z. Yang, I. Idrees, S. Liang, B. Schornstein,
+Hybrid ROS 1 and 2 for Multi-Robot Exploration of Large-
+S. Tellex, and Shah, “Grounding complex natural language
+Scale Complex Environments,” IEEE Robotics and Automa-
+commands for temporal tasks in unseen environments,”
+tionLetters,vol.6,pp.5064–5071,2021.
+in Proceedings of The 7th Conference on Robot Learning,
+[67] K. Birman, “The promise, and limitations, of gossip proto-
+ser. Proceedings of Machine Learning Research, J. Tan,
+cols,”ACMSIGOPSOperatingSystemsReview,vol.41,no.5,
+M. Toussaint, and K. Darvish, Eds., vol. 229. PMLR,
+pp.8–13,2007.
+06–09 Nov 2023, pp. 1084–1110. [Online]. Available: https:
+//proceedings.mlr.press/v229/liu23d.html [68] M. Novitzky, R. Semmens, and P. Robinette, “Toward mea-
+[50] Y.Chen,R.Gandhi,Y.Zhang,andC.Fan,“Nl2tl:Transform- suresofhuman-robotteamingeffectiveness,”Transactionson
+ingnaturallanguagestotemporallogicsusinglargelanguage Human-RobotInteraction,2021.
+models,”arXivpreprintarXiv:2305.07766,2023. [69] T.KauppandA.Makarenko,“Measuringhuman-robotteam
+[51] Y.Chen,J.Arkin,Y.Zhang,N.Roy,andC.Fan,“Autotamp: effectivenesstodetermineanappropriateautonomylevel,”in
+Autoregressive task and motion planning with llms as trans- 2008IEEEInternationalConferenceonRoboticsandAutoma-
+latorsandcheckers,”arXivpreprintarXiv:2306.06531,2023. tion,2008,pp.2146–2151.
+[52] K. Garg, J. Arkin, S. Zhang, N. Roy, and C. Fan, [70] L. M. Ma, M. Ijtsma, K. M. Feigh, and A. R. Pritchett,
+“Large language models to the rescue: Deadlock resolution “Metrics for human-robot team design: A teamwork
+in multi-robot systems,” 2024. [Online]. Available: https: perspective on evaluation of human-robot teams,” J. Hum.-
+//arxiv.org/abs/2404.06413 Robot Interact., vol. 11, no. 3, Sep. 2022. [Online]. Available:
+[53] B. Liu, Y. Jiang, X. Zhang, Q. Liu, S. Zhang, J. Biswas, https://doi.org/10.1145/3522581
+and P. Stone, “Llm+p: Empowering large language mod- [71] M. Novitzky, P. Robinette, M. R. Benjamin, C. Fitzger-
+els with optimal planning proficiency,” arXiv preprint ald, and H. Schmidt, “Aquaticus: Publicly available datasets
+arXiv:2304.11477,2023. from a marine human-robot teaming testbed,” in 2019 14th
+[54] Y. Chen, J. Arkin, Y. Zhang, N. Roy, and C. Fan, “Scalable ACM/IEEEInternationalConferenceonHuman-RobotInter-
+multi-robotcollaborationwithlargelanguagemodels:Central- action(HRI),2019,pp.392–400.
+ized or decentralized systems?” in 2024 IEEE International [72] C.ReardonandJ.Fink,“Air-groundrobotteamsurveillance
+Conference on Robotics and Automation (ICRA). IEEE, of complex 3d environments,” in 2016 IEEE International
+2024,pp.4311–4317. SymposiumonSafety,Security,andRescueRobotics(SSRR),
+[55] S. S. Kannan, V. L. Venkatesh, and B.-C. Min, “Smart-llm: 2016,pp.320–327.
+Smart multi-agent robot task planning using large language [73] I. D. Miller, F. Cladera, A. Cowley, S. S. Shivakumar, E. S.
+models,”arXivpreprintarXiv:2309.10062,2023. Lee, L. Jarin-Lipschitz, A. Bhat, N. Rodrigues, A. Zhou,
+[56] Z. Mandi, S. Jain, and S. Song, “Roco: Dialectic multi-robot A.Cohen,A.Kulkarni,J.Laney,C.J.Taylor,andV.Kumar,
+collaborationwithlargelanguagemodels,”in2024IEEEIn- “Minetunnelexplorationusingmultiplequadrupedalrobots,”
+ternationalConferenceonRoboticsandAutomation(ICRA), IEEERoboticsandAutomationLetters,vol.5,no.2,pp.2840–
+2024,pp.286–299. 2847,2020.
+[74] J. Hughes, D. Kim, S. Henderson, and P. Manjunath, “To- [92] C.Forster,L.Carlone,F.Dellaert,andD.Scaramuzza,“On-
+wards collaborative aerial swarming architecture for military manifold preintegration for real-time visual–inertial odome-
+applications,”in202323rdInternationalConferenceonCon- try,”IEEETransactionsonRobotics,vol.33,no.1,pp.1–21,
+trol,AutomationandSystems(ICCAS),2023,pp.1049–1054. 2016.
+[75] D. Larkin, M. Novitzky, J. Kim, and C. M. Korpela, “Atak [93] M. Kaess, H. Johannsson, R. Roberts, V. Ila, J. J. Leonard,
+integration through ros for autonomous air-ground team,” in andF.Dellaert,“isam2:Incrementalsmoothingandmapping
+2021InternationalConferenceonUnmannedAircraftSystems using the bayes tree,” The International Journal of Robotics
+(ICUAS),2021,pp.1116–1122. Research,vol.31,no.2,pp.216–235,2012.
+[76] D. Kim and P. Y. Oh, “Aerial manipulation using a human-
+embodieddroneinterface,”in2022IEEEInternationalCon-
+ferenceonAdvancedRoboticsandItsSocialImpacts(ARSO),
+2022,pp.1–7.
+[77] K. N. Lavanya, D. R. Shree, B. R. Nischitha, T. Asha, and
+C.Gururaj,“Gesturecontrolledrobot,”in2017International
+ConferenceonElectrical,Electronics,Communication,Com-
+puter,andOptimizationTechniques(ICEECCOT),2017,pp.
+465–469.
+[78] “Breadcrumb Wireless Network Nodes | Rajant
+Networks — rajant.com,” https://rajant.com/products/
+breadcrumb-wireless-nodes/,[Accessed29-11-2024].
+[79] Mapbox, “Mapbox,” 2025, accessed: 2025-04-27. [Online].
+Available:https://www.mapbox.com/
+[80] S. Liu, Z. Zeng, T. Ren, F. Li, H. Zhang, J. Yang, C. Li,
+J.Yang,H.Su,J.Zhuetal.,“Groundingdino:Marryingdino
+with grounded pre-training for open-set object detection,”
+arXivpreprintarXiv:2303.05499,2023.
+[81] F.Cladera,K.Chaney,M.A.Hsieh,C.J.Taylor,andV.Ku-
+mar,“Evmapper:Highaltitudeorthomappingwitheventcam-
+eras,”arXivpreprintarXiv:2409.18120,2024.
+[82] F.Dellaert,“Factorgraphsandgtsam:Ahands-onintroduc-
+tion,”GeorgiaInstituteofTechnology,Tech.Rep,vol.2,no.4,
+2012.
+[83] T. Ren, S. Liu, A. Zeng, J. Lin, K. Li, H. Cao, J. Chen,
+X. Huang, Y. Chen, F. Yan, Z. Zeng, H. Zhang, F. Li,
+J. Yang, H. Li, Q. Jiang, and L. Zhang, “Grounded sam:
+Assemblingopen-worldmodelsfordiversevisualtasks,”2024.
+[Online].Available:https://arxiv.org/abs/2401.14159
+[84] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma,
+H. Khedr, R. Rädle, C. Rolland, L. Gustafson, E. Mintun,
+J. Pan, K. V. Alwala, N. Carion, C.-Y. Wu, R. Girshick,
+P. Dollár, and C. Feichtenhofer, “Sam 2: Segment anything
+in images and videos,” 2024. [Online]. Available: https:
+//arxiv.org/abs/2408.00714
+[85] Z. Chen, G. Fang, X. Ma, and X. Wang, “0.1% data makes
+segment anything slim,” arXiv preprint arXiv:2312.05284,
+2023.
+[86] C. Bai, T. Xiao, Y. Chen, H. Wang, F. Zhang, and X. Gao,
+“Faster-lio: Lightweight tightly coupled lidar-inertial odome-
+try using parallel sparse incremental voxels,” IEEE Robotics
+andAutomationLetters,vol.7,no.2,pp.4861–4868,2022.
+[87] N. Steinke, D. Goehring, and R. Rojas, “Groundgrid: Lidar
+point cloud ground segmentation and terrain estimation,”
+IEEERoboticsandAutomationLetters,vol.9,no.1,pp.420–
+426,2024.
+[88] H. Liu, C. Li, Q. Wu, and Y. J. Lee, “Visual instruction
+tuning,”inNeurIPS,2023.
+[89] J. Wei, X. Wang, D. Schuurmans, M. Bosma, b. ichter,
+F. Xia, E. Chi, Q. V. Le, and D. Zhou, “Chain-of-thought
+prompting elicits reasoning in large language models,”
+in Advances in Neural Information Processing Systems,
+S. Koyejo, S. Mohamed, A. Agarwal, D. Belgrave,
+K. Cho, and A. Oh, Eds., vol. 35. Curran Associates,
+Inc., 2022, pp. 24824–24837. [Online]. Available:
+https://proceedings.neurips.cc/paper_files/paper/2022/file/
+9d5609613524ecf4f15af0f7b31abca4-Paper-Conference.pdf
+[90] X.Liu,G.V.Nardari,F.Cladera,Y.Tao,A.Zhou,T.Don-
+nelly, C. Qu, S. W. Chen, R. A. F. Romero, C. J. Taylor,
+andV.Kumar,“Large-scaleautonomousflightwithreal-time
+semanticslamunderdenseforestcanopy,”IEEERoboticsand
+AutomationLetters,vol.7,no.2,pp.5512–5519,2022.
+[91] L.Meier,D.Honegger,andM.Pollefeys,“Px4:Anode-based
+multithreadedopensourceroboticsframeworkfordeeplyem-
+beddedplatforms,”in2015IEEEinternationalconferenceon
+roboticsandautomation(ICRA). IEEE,2015,pp.6235–6240.
+Cladera*,Ravichandran*,Hughes*etal.:Air-GroundCollaborationforLanguage-SpecifiedMissionsinUnknownEnvironments
+t>ti found=1
+start INIT SEARCH COMM
+found = 0
+t>te
+.AND.t>ts
+comm_end=1
+EXPL
+.OR.t>tc
+FIGUREA.3. UAVmissionexecutedduringtheair-groundexperiments.
+FIGUREA.1. Falcon4platformconfiguredforhigh-altitudesemantic
+Figurefrom[10].
+mappingmissions.
+FIGUREA.4. Communicationnodesusedforfieldexperiments.Left:FE1
+FIGUREA.2. UGVplatformusedforgroundexperiments.
+basestationnode.Right:dummy ME4nodeusedforLLMAPIcalls.
+APPENDIX
+A.1. Platforms
+While our methodology can support other platforms, we A.3. UAV Localization
+use a custom built quadcopter and a ClearPath Jackal In order to localize objects within images accurately we
+forthiswork.Figs.A.1andA.2showstheplatformsused need an extremely accurate pose estimate for when each
+during our experiments. Both platforms are suited with image was taken. To this end, we use GTSAM [82] to
+compute capabilities to generate the semantic mapper fuse GPS position estimates with IMU readings. For
+onboard.Thechoiceofcomputeonboardtheseplatforms our IMU we use a Vectornav V100T which runs its
+is the result of several iterations of field experiments ownKalmanFiltertofusemagnetometerwithgyroscope
+andaretargetedtowardsthemaximumavailableCPU& and accelerometer readings. This gives us north aligned
+GPU compute for the power budgets for the respective orientation data from the IMU at 400 hz. We get 5 hz
+platforms. The power budget allowed for the Jackal global position readings from the GPS which we model
+is 200W and the UAV is allowed a power budget of asunaryposefactors[82]andusethepreintegratedIMU
+100W. The UGV and UAV both have a battery life of measurements [92] to constrain the pose graph. As the
+approximately 30 minutes. Both platforms were fitted UAVcan cover several kilometers we usethe iSAM2[93]
+with Rajant mesh radios. We also used dummy nodes optimizer to maintain a reasonable latency over large
+(Fig. A.4) as communication relays for SPINE, as de- distances. We run the optimizer at each GPS measure-
+scribed in Sec. III.C. ment. We ensure that we do not include erroneous GPS
+measurements by ensuring that they lie within 2σ of the
+A.2. Air router & State machine estimated pose and covariance. We also predict the pose
+We relied on air_router [18] to guide the UAV during at100hzbyintegratingtheIMUmeasurementsfromthe
+the experiments. This high-level state machine, illus- last optimized pose to the current time. We note that
+trated in Fig. A.3, transitions the UAV between an while we use this particular set of sensors in this work,
+exploration and a communication mission. It also looks theframeworkcouldbeextendedtoincludeothersensors
+for ground robots (based on the last known position or such as barometers (for height) and raw magnetometer
+last known goal) to deliver messages if communication readings directly. This allows us to get sub one-tenth of
+has not occurred recently. a second pose estimates for each image.
+Provide Answer Task:
+b a v e n e g s h i w i n e c n r l i ( e n I g c f o o o n f u n n e t d c h t e t e h d d e r t i b o v l e a t w c h a k e y ) ve t T h h i h e c e i l d n e re r s a i p v i t s e e t c w a h t e a b i y t l e . . a n G c d k o o f 2
+SPINE
+Perception Update Active sensing
+u T p h d e a t v e e _ h n i o c d l e e _ a i t s t r b i l b a u c t k e ) s( i i n s s p t e h c e v t e ( c h v o i e l c h o l i r e c ? l o ) e f , t w h h i a s t
+3
+Perception
+Inspection 1
+query Start
+Answer VLM
+Image of
+object
+<- 20 meters ->
+FIGUREA.5. ExampleofSPINEusingactiveperceptiontocorrectmission
+misspecification.Usertasksgroundvehiclewithinspectingablackvehicleat
+theendofthedriveway(1).However,thereisnogroundvehicleattheend
+ofthedriveway(2).Thegroundvehicleidentifiesseveralcarsandtrucksat
+thestartofdriveway,andinspectsthose.Thegroundvehicleformsa
+mission-relevantperceptionquery“isthisvehicleblack”inordertoresolve
+themission.
+FIGUREA.6. UGVtrajectoryfromthefirstsystemdemonstration.Using
+theUAV-generatedgraph,theUAVtravelsover700meterswhilefinding
+objectsanddescribingregionsoftheenviroment.
+A.4. Active Perception
+SPINE uses active perception to resolve errors in the
+missionspecification.Fig.A.5showsamissionwherethe
+UGVisprovidedthetask:“Thereisablackvehicleatthe
+endofthedriveway.Goinspectit.”TheUGVgoestothe
+end of the driveway but does not find a vehicle. During
+navigation, it observes the vehicle at the beginning of
+the driveway. So, it doubles back to observe those, and
+queries perception to find the color of the vehicle.
+A.5. Large-scale demonstrations
+We plot the UAV path from the first system demon-
+stration, as reported in Sec VI, in Fig. A.6. Please note
+thatthetrajectoryisoverlayedonaGoogleEarthimage,
+so the vehicles displayed were not present in the actual
+experiment.

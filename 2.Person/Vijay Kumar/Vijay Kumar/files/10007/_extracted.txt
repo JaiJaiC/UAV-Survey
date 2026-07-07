@@ -1,0 +1,575 @@
+SPAR: Scalable LLM-based PDDL Domain Generation
+for Aerial Robotics
+Songhao Huang∗1, Yuwei Wu∗1, Guangyao Shi2, Gaurav S. Sukhatme2, Vijay Kumar1
+Abstract—We investigate the problem of automatic do-
+main generation for the Planning Domain Definition Lan-
+guage (PDDL) using Large Language Models (LLMs), with
+a particular focus on unmanned aerial vehicle (UAV) tasks.
+Although PDDL is a widely adopted standard in robotic Fig.1. TheSPARframeworkfordomaingenerationandplanning.
+planning, manually designing domains for diverse applications
+generatingdomainfilesremainssubstantiallymorechalleng-
+such as surveillance, delivery, and inspection is labor-intensive
+and error-prone, which hinders adoption and real-world de- ing.Unlikeproblemfiles,domainfilesdefinereusableaction
+ployment. To address these challenges, we propose SPAR, a schemas that model the structure, dynamics, and constraints
+frameworkthatleveragesthegenerativecapabilitiesofLLMsto ofaplanningenvironment,requiringabstraction,consistency,
+automaticallyproducevalid,diverse,andsemanticallyaccurate
+and logical reasoning. Consequently, automating domain
+PDDL domains from natural language input. To this end, we
+generation and transfer has attracted increasing research
+first introduce a systematically formulated and validated UAV
+planning dataset, consisting of ground-truth PDDL domains attention [7]–[11]. Nevertheless, these reasoning capabilities
+and associated problems, each paired with detailed domain remain difficult for LLMs to reliably demonstrate.
+and action descriptions. Building on this dataset, we design
+Moreover, the success of LLM-based domain generation
+a prompting framework that generates high-quality PDDL
+is highly sensitive to the amount and quality of information
+domainsfromlanguageinput.Thegenerateddomainsareeval-
+uated through syntax validation, executability, feasibility, and provided. Existing studies often assume access to detailed
+interpretability.Overall,thisworkdemonstratesthatLLMscan task descriptions, expert knowledge, or ground-truth domain
+substantially accelerate the creation of complex planning do- models [12, 13]. While such conditions yield promising re-
+mains,providingareproducibledatasetandevaluationpipeline
+sults,theydonotreflectrealisticscenarioswherenon-experts
+that enables application experts without prior experience to
+provide ambiguous or incomplete descriptions of unfamiliar
+leverage it for practical tasks and advance future research in
+aerial robotics and automated planning. tasks, or they don’t have access to real-world environments.
+In these cases, LLM-generated domain files frequently ex-
+I. INTRODUCTION hibit syntactic and semantic errors, logical inconsistencies,
+and incomplete action definitions. This discrepancy raises
+The Planning Domain Definition Language (PDDL) [1]
+a critical question: How can we empower LLMs to au-
+is a fundamental formalism in automated planning, widely
+tomatically construct reliable PDDL domain definitions
+used in diverse areas such as robot task planning, logistics,
+for novel tasks, even when faced with unfamiliar actions
+and human-robot interactions [2]–[4]. Despite its expressive
+and limited prior knowledge?
+power, creating correct PDDL domain and problem files is
+To address these challenges, we study UAV planning
+oftentime-consumingandrequiressignificantexpertise,even
+as a representative and demanding domain involving com-
+for experienced users, which limits its broader adoption in
+plex tasks with diverse constraints. To enable a systematic
+planning systems for real-world applications, particularly in
+evaluation of LLMs in generating diverse and previously
+dynamic and safety-critical domains like Unmanned Aerial
+unseen planning domains, our first step involves the follow-
+Vehicle (UAV) operations. These domains involve complex
+ing procedures: (1) define a domain complexity metric that
+three-dimensionalenvironments,GPS-deniedconditions,ex-
+quantifies difficulty across planning domains; (2) create a
+ternal disturbances, and limited observations, making speci-
+new PDDL domain evaluation dataset, which covers hand-
+fication technically non-trivial.
+craftedandLLM-generateddomainsfromdiversesourcesto
+RecentadvancesinLargeLanguageModels(LLMs)offer
+ensure novelty relative to LLM training data. This dataset
+promisingopportunitiestoautomatethegenerationofPDDL
+includes a wide range of UAV scenarios (e.g., navigation,
+from natural language descriptions. Prior work has demon-
+inspection, delivery) and diverse actions (e.g., detection,
+stratednotablesuccessingeneratingPDDLproblemfiles[5,
+loading, recharging); and (3) defines a set of evaluation
+6], which specify concrete initial states and goals. However,
+metricsforassessingbothsyntacticandsemanticcorrectness.
+Building on this foundation, we introduce SPAR (Fig. 1),
+∗Equalcontribution.1SonghaoHuang,YuweiWu,andVijayKumarare
+a generation framework designed to address two common
+withtheGRASPLab,UniversityofPennsylvania,Philadelphia,PA19104,
+USA.Email:{songhaoh, yuweiwu, kumar}@seas.upenn.edu. issues in LLM-generated domains: syntax errors and se-
+2 Guangyao Shi and Gaurav S. Sukhatme are with the Department of mantic errors. To mitigate syntax errors, the framework
+Computer Science, University of Southern California, Los Angeles, CA
+adopts an action-by-action generation process with a func-
+90089,USA.Email:{shig, gaurav}@usc.edu.
+WealsothankJonathanDillerforprovidinghelpfulcomments. tional syntax checker in a feedback loop for iterative cor-
+5202
+peS
+71
+]OR.sc[
+1v19631.9052:viXra
+rection. To mitigate semantic errors, it incorporates chain- B. Planning Domain Generation
+of-thought (CoT) reasoning to guide step-by-step action
+Generating planning domains with LLMs requires strong
+generation. Furthermore, inspired by retrieval-augmented
+reasoningcapabilities.Priorworkhasexploredseveralstrate-
+generation (RAG) [14], the framework retrieves the most
+gies to improve the quality of LLM-generated PDDL. Guan
+relevant examples from a curated dataset to support in-
+et al. [22] employed in-context learning with curated exam-
+context reasoning. Our main contributions are as follows:
+plestoimprovesyntacticcorrectness,whileZhangetal.[13]
+• Wepresentafirst multi-domainPDDLdatasetforUAV introduced Zone of Proximal Development (ZPD) prompt-
+applications, consisting of 30 domain-problem pairs ing to enhance reasoning and support open-domain genera-
+with aligned natural language descriptions. The dataset tion. Mahdavi et al. [12] further proposed an environment-
+includes both logical and numeric domains designed to feedbacklooptorefinedomainsbasedonsemanticsimilarity.
+be unseen for current LLMs. A key challenge in domain generation lies in the quan-
+• We propose a domain generation framework that com- tity and quality of input information. Providing additional
+bines CoT prompting, relevant-example retrieval, and knowledge, such as predicates [11, 13] or structural descrip-
+an action-by-action feedback generation schema to im- tions [12] often improves accuracy, but such inputs are not
+prove generation ability. alwaysavailableinreal-worldscenarios[22].Toaddressthis,
+• WebenchmarkmultipleLLMsandpromptingstrategies we leverage RAG to retrieve the most relevant examples for
+on our dataset across multiple evaluation metrics and in-contextlearningunderlimitedinputconditionstoimprove
+validatetheframeworkinUAVsimulationexperiments, semantic fidelity. Feedback mechanisms are also crucial for
+demonstrating the practical feasibility for downstream domain quality. Guan et al. [22] proposed a syntax validator
+planning and execution. withhuman-in-the-looprefinement,whileSmirnovetal.[23]
+and Mahdavi et al. [12] automated feedback through con-
+II. RELATEDWORK
+sistency checks or environment evaluation. However, these
+A. Using LLMs in Task Planning
+methods often assume access to the ground-truth (GT) envi-
+LLMs have recently been explored in various capacities ronment. Moreover, many validators (e.g., Tarski [24]) lack
+to assist with task planning in symbolic domains. support for numeric conditions. Since our dataset includes
+a) LLMs as task planners: One line of research at- numeric operators, we extend the validator from Guan et
+tempts to use LLMs as task planners to generate valid, al. [22] and incorporate LLM-friendly feedback to improve
+executable plans directly from natural language instructions. syntax correctness during action-by-action generation.
+However, naively prompting LLMs often leads to issues
+C. UAV Task Planning Benchmark
+withcorrectnessandcompleteness,especiallyforcomplexor
+long-horizontasks[15]–[18].Tomitigatetheseissues,recent Existing UAV task planning benchmarks primarily focus
+works propose augmenting LLMs with high-level reasoning, on a single task type or the UAV platform itself, such as
+optimization methods, or domain-specific priors to improve inspection with heterogeneous UAVs [25], object detection
+reliability [19, 20]. In the context of PDDL-based planning, [26], and goal navigation [27]. With VLA/VLN, more UAV
+few-shot prompting has been explored [19], showing that benchmarks have been proposed in both simulation and
+careful prompt engineering and example selection can sub- real-world settings [28, 29]. To broaden UAV applications,
+stantiallyimprovethequalityandvalidityofgeneratedplans. our dataset encompasses not only standard tasks such as
+b) LLMs for problem or goal generation: Since LLMs navigation,detection,coordination,andexploration,butalso
+struggle to serve directly as planners with correctness guar- non-standard scenarios, including aerial transportation with
+antees, an alternative approach is to use them for generating aerial manipulators, flying cars, and others. In addition, few
+PDDL problem specifications from natural language, given works have introduced PDDL-based benchmarks for UAV
+a known domain model. These generated problems can then task planning. To bridge this gap, we formulate all task
+be solved using traditional structured and symbolic planning planningproblemsinPDDL,extendingthestandardSTRIPS
+approaches.Forexample,LLM+P[5]isdesignedtogenerate formalism[30]toincorporatenumericalcases,therebymak-
+PDDL problem instances in robotic settings by conditioning ing our dataset more representative of real-world conditions.
+onboththedomainfileandnaturallanguageinput.Similarly,
+III. PROBLEMFORMULATION
+Xie et al. [21] showed that LLMs are capable of converting
+A. Preliminaries
+high-level natural language goals into structured, machine-
+interpretable representations. These efforts illustrate how The PDDL is a standardized language used in artificial
+LLMs can serve as problem generators, bridging flexible intelligence and robotics to formally describe planning
+language interfaces with robust symbolic planning systems. problems. It separates a problem into two parts: the domain,
+However,alloftheabovemethodsassumetheavailability which defines the general rules of the world (such as types
+of a predefined symbolic world model, specifically a PDDL of objects, predicates, and actions), and the problem, which
+domain. Therefore, PDDL domain generation becomes a specifies a particular scenario with initial conditions and
+more foundational challenge, since the accuracy and utility goals. For example, in a UAV surveillance task, the domain
+of problem generation and plan synthesis are determined by might define actions such as fly, take-photo, and
+the quality of the underlying domain model. return-to-base, along with predicates like (at ?uav
+Fig.2. TheSPARDomainGenerationandEvaluationPipeline.
+?location) and (photo-taken ?location). specifiedorLLM-generated),aclassicalplannerC solvesthe
+Then, a specific problem could describe a UAV starting taskTˆ ={Dˆ,Pˆ},producingaplanPlan⊆Aˆthattransitions
+at the base, visiting two waypoints, and taking photos at the system from the initial state to the goal state.
+each. Using PDDL, a planner can automatically generate a
+IV. APPROACH
+sequence of actions to fulfill the task, such as (fly base
+waypoint1) → (take-photo waypoint1) → Inthissection,wewillfirstdescribethebenchmarkdataset
+(fly waypoint1 waypoint2) → (take-photo wecreatedandthenexplaintheproposeddomaingeneration
+waypoint2) → (fly waypoint2 base). Such a and evaluation pipeline as illustrated in Fig. 2.
+structured representation makes it easier to design, share,
+A. Dataset Generation
+and solve planning tasks across different domains.
+1) PDDL dataset: We introduce a multi-domain PDDL
+B. Problem Statement dataset for UAV applications that consists of 30 domains,
+We formally introduce the notation used throughout this each representing a distinct UAV-related planning scenario.
+paper. A planning problem T is defined in PDDL as a tuple To reduce the risk of evaluating LLMs on data seen dur-
+T = {D,P}, where D denotes the PDDL domain, which ing training, we curate the domains from diverse sources,
+specifies the general planning environment, and P denotes including academic literature on UAV planning, practical
+the PDDL problem, which grounds a specific planning in- application studies, and modified versions of domains from
+stance within that environment. We assume that the problem the International Planning Competition (IPC) [31]. Unlike
+P will be available after the domain D is generated. prior datasets that often rely on procedural, step-by-step
+The domain D consists of a set of fluents F and a instructional text [13], our domains are designed to cap-
+set of actions A. Fluents represent the state variables of ture the underlying structure of UAV environments, ensur-
+the environment, typically including both predicates and ing semantic coherence beyond surface-level instructions.
+numeric functions. Each action a∈A is defined by a set of In addition, several domains incorporate numeric fluents,
+parameters, along with its preconditions Pre(a), which must extending beyond the classical STRIPS to model realistic
+hold before the action is executed, and its effects Eff(a), UAV planning problems. Each domain is paired with 9
+whichdescribehowtheenvironmentchangesafterexecution. problem instances: 3 simple, 3 medium, and 3 hard. Simple
+We denote the natural language description of the domain problems can be solved with 1–2 actions, medium problems
+as N , and the natural language description of the ith action involve nearly the full action set, and hard problems require
+d
+a ∈A by N . We say that N is incomplete if it does not the complete set of actions while introducing additional
+i ai ai
+explicitly describe all the conditions in Pre(a ) and Eff(a ) complexity, such as multi-robot coordination.
+i i
+using natural language one-by-one. Additionally, we denote 2) PDDL Domain Complexity Metric: To systematically
+thedeclaredparametertypesandrequirementsofthedomain quantify the complexity of a PDDL domain, we introduce a
+as Extern. Before generation, LLM does not have access to composite metric that captures both structural and semantic
+the GT domain; that is, it has no prior knowledge of the characteristics of the domain. Specifically, the metric incor-
+environment’s state or actions. poratesthefollowingninecomponents:1)Numberofactions,
+Given a tuple (N ,N ,Extern), where some action de- object types, predicates, and functions; 2) Average number
+d A
+scriptions N ∈ N may be incomplete, we aim to use of preconditions and effects per action; 3) Interdependency
+LLMs to au a t i omatica A lly generate a PDDL domain Dˆ = score: the average number of actions referencing a given
+(Fˆ,Aˆ).WithacorrespondingprobleminstancePˆ (manually predicate or function; 4) Action coupling: the number of
+conditions in an action’s effects that appear as preconditions original and abstracted forms, retaining key elements like
+in other actions. The final complexity score is computed as ‘uav’,‘move’,and‘increase’,whilereplacingotherspecifics
+a weighted sum of each component. with placeholders. We encode all abstracted action represen-
+Across our dataset, domain complexity scores range tations into embeddings using the all-mpnet-base-v2
+from 2.79 to 15.23, capturing a broad spectrum of diffi- model[33],andstoretheminasearchableembeddingindex.
+culty—from simple navigation tasks to multi-agent coor- The retrieval process consists of two stages. In the coarse
+dination and numeric reasoning challenges. This diversity stage, we abstract the target action description N and
+ai
+enables robust evaluation of LLMs across varying lev- embed it as a query (Eg. 1); cosine similarities are com-
+els of domain complexity. For reference, the well-known puted across the stored index, and the top-K most relevant
+BLOCKSWORLD [32] domain (complexity: 5.23) ranks examples are retrieved. In the fine stage, these top-K can-
+17thoutof30,frommosttoleastcomplex.Basedonthis,we didates are fed into LLMs to re-order and select the most
+divide the dataset into 14 simple (≤ 5.23) and 16 complex semantically relevant example for in-context learning.
+(> 5.23) domains-a split used throughout our evaluation.
+2) Prompt with Chain of Thought: To improve
+the reasoning capability of LLMs in PDDL domain
+B. Generate PDDL domain with LLMs
+generation, we employ a CoT prompting that directs the
+We adopt an action-by-action strategy to generate each
+model to explicitly decompose the problem. The CoT
+action within a domain. For action aˆ, given the input tuple
+i process is embedded within context examples across
+(N d ,N ai ,Extern), we employ a coarse-to-fine approach to three progressive reasoning steps. First, we ask What
+retrieve the most relevant example from our dataset for in- are the objects?, prompting LLM to infer which
+context learning. We then construct a prompt using a chain-
+objects are involved in the action based on the given
+of-thought method and feed it into LLM. The resulting
+context. This helps the model determine the correct action
+PDDL action is validated by a syntax checker, which pro- parameters. Second, we ask For each object, what
+vides feedback if syntax errors are detected. This process is are the preconditions? State them using
+repeated by re-prompting LLMs with feedback until either predicates or functions. This encourages the
+a syntactically correct output is generated or a maximum
+model to reason about the conditions for action execution
+iteration number is reached.
+from the perspective of each object. Precondition can be
+either newly created or retrieved from an existing fluent
+Example 1: Action Description Abstraction
+list, and is paired with a natural language explanation
+OriginalActionDescription to reinforce understanding. Third, we ask For each
+This action enables a uav to move from its current object, what are the effects? State them
+position to a new position if two positions are using predicates or functions. which mirrors
+connected. This costs one unit of energy. For example,
+the uav moves from position_1 to position_2 if there the second question but focuses on the state changes
+is a connection between them. This costs one unit of resulting from the action. This reinforces object-centered
+energy.
+reasoning and ensures the model considers the outcome
+AfterAbstraction comprehensively.Finally,wepromptWrite the action
+This action enables a uav to move from [position1] to in the following format to elicit a well-structured
+[position2] if [position1] and [position2] are
+[state1]. This action will increase [value1] by PDDL action.
+[value2].
+3) Iterative Generation of Actions: Because the set of
+1) Retrieval for Most Relevant In-context Example: In- fluentsisunknowninadvance,wemaintainadynamiclistof
+context learning is critical for enabling LLMs to perform fluents throughout the generation process. After generating
+structuredgenerationtaskssuchasPDDLdomainmodeling, each action, LLMs identify newly generated fluents, which
+especially in zero-shot or low-resource settings. Similarly are then added to the list and reused in subsequent actions.
+to RAG, we utilize our dataset as an external source of This strategy mitigates LLM context length limitations and
+domain-specific knowledge. We extract all actions from the enablesincrementaldomainconstruction,reducingredundant
+dataset and convert each into an abstract representation or inconsistent fluents.
+using LLM to focus on semantic structures rather than Providing feedback to LLMs is key for iterative refine-
+lexicalsimilarity,mitigatinglexicalnoise.Specifically,LLM ment.Whilepriorworksrelyonhuman[22]orenvironment-
+replacesconcretenouns,adjectives,andnumericvalueswith level feedback [12], these methods face scalability and ac-
+abstract placeholders such as [object], [state], and [value], cessibilitychallenges.ExistingPDDLsyntaxcheckers/parser
+whilepreservingsubjectandverbtokenstoemphasizeaction also lack support for domains involving numeric. Here, we
+semantics. LLM maintains a list of commonly used verbs. extend a simple STRIPS-style syntax validator in [22] to
+If a verb in the description is semantically similar to one support numeric checking and producing error feedback
+in the list, it is replaced. Otherwise, it is added to the list that can be directly used in the prompt, enabling a self-
+and retained in the abstraction. We hypothesize that actions improvement loop. For instance (Eg. 2), consider the erro-
+with similar semantic structures often correspond to similar neous precondition expression in the summation operator,
+PDDL formulations. The example below shows an action’s where we can’t add a predicate to a numerical function.
+Example 2: Syntax Checker In total, we evaluate 30 domains, consisting of 14 simple
+(S.)domainsand16complex(C.)domainsasdeterminedby
+Incorrectnumericalinputinprecondition:
+domaincomplexityscores,andwesummarizethesedomain
+(uav-number ?r - region); A function returning the
+; number of UAV in region categories in Tab. I. The domains are grouped into seven
+(is-uav ?u - uav); A predicate indicating whether categories: Navigation (autonomous flight), Transportation
+; ?u is a UAV
+(+ (uav-number ?r) (is-uav ?u)) ; erroneous summation (logistics), Manipulation (object interactions), Monitoring
+(assessment),Exploration(coverage),AerialOperations,and
+Syntaxcheckerfeedback:
+Adaptation.Together, theyspantasksfrom low-levelcontrol
+Head ‘at‘ in ‘Preconditions‘ is a predicate but should
+be a function. Please revise to fix this error. to high-level decision-making. Note that for FS and Ours,
+Note that you can always create new functions, but you which treat the dataset as an external source and retrieve
+should also reuse existing functions whenever possible.
+examplesfromit,weexplicitlyexcludeallinformationfrom
+domain Dˆ itself to prevent bias. As shown in Fig. 2, after
+V. EVALUATION
+generating the domain, we evaluate it based on the number
+This section presents a series of evaluations conducted on
+ofsyntaxcorrections,errortypes,problem-solvingcapability,
+our dataset to assess our prompt design. We aim to validate
+and its overall feasibility and interpretability.
+the following hypotheses:
+• H1: The proposed prompt designs will mitigate syntax TABLEII
+errors, leading to a syntactically correct domain. NUMBEROFEACHERRORTYPEACROSSALLDOMAINS.
+• H2: The proposed prompt designs will increase the GPT-4.1-Mini
+semantic correctness of the generated domains. Format FCoT FS Ours
+Error Type
+Semantic correctness is assessed using three criteria: 1) (S./C./T.) (S./C./T.) (S./C./T.) (S./C./T.)
+Executability, defined as the problem-solving success rate;
+object type 0/14/14 0/0/0 0/3/3 0/0/0
+2) Feasibility, which measures whether plans generated
+predicate names 2/2/4 1/7/8 2/2/4 2/4/6
+in a domain can be executed on the GT domain; and 3) predicate format 1/5/6 1/5/6 0/1/1 0/1/1
+Interpretability, which measures whether the GT plan can predicate usage 5/8/13 7/7/14 0/2/2 0/1/1
+be executed within the generated domain. function names 0/3/3 0/0/0 0/1/1 0/1/1
+We evaluate two LLMs: GPT-4.1-mini-2025-04-14 (GPT) function format 0/0/0 0/0/0 0/0/0 0/0/0
+and DeepSeek-Chat , using four existing prompting varia- function usage 0/0/0 0/3/3 1/3/4 0/13/13
+tions as benchmark methods. The compared methods and numeric usage 0/1/1 0/1/1 0/4/4 0/1/1
+Total error count 8/33/41 9/23/32 3/16/19 2/21/23
+their abbreviations are: 1) Format [22]: Prompted with two
+regular examples for format referencing. 2) Format+CoT DeepSeek-Chat
+(FCoT): Prompted with two regular examples for format Format FCoT FS Ours
+Error Type
+referencing, both including chain-of-thought reasoning. 3) (S./C./T.) (S./C./T.) (S./C./T.) (S./C./T.)
+Format+Semantic(FS):Promptedwithoneregularexample
+object type 0/4/4 0/1/1 0/5/5 0/2/2
+forformatreferencingandonesemanticallyrelevantexample predicate names 1/3/4 1/4/5 0/0/0 0/0/0
+for content referencing. 4) Retrieval+CoT (Ours): Our predicate format 6/11/17 1/5/6 2/1/3 0/1/1
+framework retrieves one regular example for format refer- predicate usage 5/8/13 2/16/18 0/28/28 0/4/4
+encing and one semantically relevant example for content function names 0/1/1 0/1/1 0/0/0 0/0/0
+referencing, both including chain-of-thought reasoning. function format 0/0/0 0/0/0 0/0/0 0/0/0
+function usage 1/12/13 1/2/3 0/2/2 0/1/1
+TABLEI numeric usage 0/10/10 2/0/2 0/10/10 0/7/7
+DOMAINCATEGORIESINSPAR. Total error count 13/49/62 7/29/36 2/46/48 0/15/15
+Category Domains
+Navigation 2DNavigation, HouseNavigation, Multi-
+A. Evaluation of Syntax Corrections and Error Types
+CamLand,SimpleNavigation
+Transportation AirPassenger, CityCargo, Delivery, Deliv- We inspect and summarize the following syntax error
+eryCapacity,DeliveryDurative,DeliveryPri-
+types and their correction number: 1) Object type: The
+ority, MedsDelivery, MedsDeliveryEnergy,
+MealDelivery type in the action parameter does not match any type in
+Manipulation BlockWorld, CeilingPaint, GraspDelivery, the Extern input. 2) Predicate and function names: The
+GraspFruit,Watering
+name of fluents conflicts with object type, existing predicate
+Monitoring AirPollution, ForestFireCollaboration,
+or function name, or PDDL keywords. 3) Predicate and
+MaintenanceComponent,MovableObs
+Exploration GridExplore,MarsExploration function format: Incorrect PDDL format inside predicates
+AerialOperations Gate, Landing, Perching, Tracking, Wind- and functions. 4) Predicate and function usage: Incorrect
+Disturbance
+usageofpredicatesandfunctionswithrespecttotheirPDDL
+Adaptation TerrainAdapt,SpeedAdapt
+definitions. 5) Numeric usage: Incorrect PDDL format and
+Given an input tuple (N ,N ,Extern) for domain Dˆ usage of numeric operators.
+d A
+in our dataset, we apply these four different methods to During generation, a syntax checker is employed to iden-
+generate the corresponding PDDL domain Dˆ, respectively. tify errors and provide feedback for LLMs to correct them.
+Fig.3. Executability(%),Feasibility(%),andInterpretability(%)scoresforeachmethodacross30generateddomains,andevaluatedonatotalof270
+problems(90Simple,90Medium,and90Hard).
+If the number of correction attempts exceeds the maximum the problem-solving rate of all four methods across our
+allowed, we manually fix the remaining errors. The results dataset. We first use LLMs to generate 9 problem files (3
+are presented in Table II. simple, 3 medium, and 3 hard problems) for each generated
+Overall, GPT-4.1-Mini produces fewer total errors across domain.Eachproblemsharesthesameinitialstatesandgoals
+all four methods compared to DeepSeek-Chat. The domi- with its corresponding GT problem in our dataset. We then
+nant error types for GPT are object type, predicate usage, feed both the generated domain and its generated problem
+and function usage, whereas DeepSeek-Chat’s errors are files into a classical planner, the ENHSP-20 solver [34], and
+primarily concentrated in predicate format, predicate usage, report the results in the first row of Fig. 3. Overall, the
+function usage, and numeric usage. This suggests that both GPTmodeloutperformsDeepSeek-Chatinsolvingrate.The
+models struggle with generating fluent expressions that are FCoTmethodimprovesperformancebyapproximately16%
+aligned with their definitions. whenusingGPT.Incontrast,theFSshowslimitedvariation
+Among benchmark methods, Ours consistently yields the across the two models. The solving rate generally decreases
+relativelylownumberoferrorsacrossbothLLMs,especially as the problem level increases and the domain complexity
+for predicate usage errors. Comparing Ours with FCoT and increases. Among the four methods, Ours achieves the
+with FS, we observe that combining structured CoT reason- highest solving rate of 95.19%, surpassing the Format
+ing with relevant in-context examples improves generation method by about 14%. The next best performers are FS
+qualityintermsofsyntax,regardlessofthemodel’sintrinsic and FCoT, suggesting that both chain-of-thought prompting
+ability. In contrast, Format results in the highest error count andexampleretrievalcontributepositivelytosolvingperfor-
+for both LLMs, with a particularly high error count from mance, while their combination yields greater improvement.
+DeepSeek-Chat. While FS achieves the lowest error count However, successfully solving a problem merely indicates
+withGPT,itsurprisinglyexhibitsahighnumberofpredicate that a valid sequence of actions can be found from the
+usage errors with DeepSeek-Chat. This instability may arise initial state to the goal, i.e., the LLM-generated logic can
+because the retrieved examples occasionally lack syntactic be executable by a planner. This does not imply that the
+similarity to the target actions, leading DeepSeek-Chat to solutionissemanticallymeaningfulorfeasibleforexecution
+incorrectly transfer structural patterns from the examples to by a robot in the ground-truth domain. Therefore, further
+the current generation task. FCoT also results in relatively evaluation of semantic correctness is essential.
+high error counts. However, it notably reduces object type
+errors, suggesting that the reasoning steps in CoT prompts 2) Feasibility and Interpretability: To further assess the
+help the model recall type constraints more accurately. semantical correctness of the generated domains and verify
+It is noteworthy that function-related syntax errors remain whether the solved plans are feasible, we adopt a bidirec-
+consistently absent across all methods and models, which tional domain validation strategy, inspired by [11, 12]. We
+can be attributed to the smaller and more uniform nature of treat the GT Domain as the optimal formulation of the
+functionsetscomparedtopredicates,makingtheirstructures environment, and the GT Plan was solved from the GT
+easier for LLMs to reproduce reliably. In contrast, the Domain and GT Problem as a valid and feasible action
+majority of errors arise in complex domains, supporting the sequencefromtheinitialstatetothefinalgoal.Intheforward
+expectation that greater domain complexity increases the validation, we assess the feasibility of the generated domain
+likelihood of syntactic mistakes. by executing the plan (Gen Plan) produced in the generated
+domain on the GT Domain using VAL [35]. If the Gen
+B. Evaluation of Semantic Correctness
+Plan can be executed on the GT Domain, it implies that the
+1) Executability: From the previous steps, the generated generated domain produces a feasible plan. The higher the
+domainsareensuredtobesyntax-errorfree.Wethenevaluate numberoffeasibleGenPlans,themorereliablethegenerated
+domain is in terms of feasibility.
+domain: uavWatering; problem: watering-hard-3
+In inverse validation, we assess domain interpretability by u1 u2 l3
+executing the GT Plan within the generated domains (see
+l1 l4 5: (move u2 l2 l1)
+Fig.2).SuccessfulexecutionoftheGTPlanindicatesthatthe 1: (move u2 l1 l2) 3: (move u1 l1 l2) 6: (refill u1 p2 l2)
+2: (refill u2 p1 l2) 4: (load-pot u1 p2 l2) 7: (watering-pour-to-
+fill u2 p1 l1)
+generated domain can reproduce the same action behaviors
+astheGTDomain,therebydemonstratingitsinterpretability. l2 0: (load-pot u2 p1 l1)
+A higher number of executable GT Plans reflects greater
+interpretabilityofthegenerateddomain.Feasibilityandinter-
+pretability results are presented in the second and third rows
+of Fig. 3. Overall, interpretability scores are consistently
+higher than feasibility scores across all generated domains.
+8: (move u2 l1 l4)
+9: (watering-pour-to-fill u2 p1 l4) 10: (move u2 l4 l3)
+The highest feasibility and interpretability are achieved by
+the Ours method using GPT. Notably, the FCoT method
+yields slightly lower feasibility and interpretability scores
+compared to the Format, indicating that CoT alone does
+not improve domain feasibility or interpretability. However,
+incorporating relevant examples (FS and Ours) significantly 11: (watering-pour-to-fill u1 p2 l2) 13: (move u1 l2 l3)
+12: (refill u1 p2 l2) 14: (watering-pour-to-fill u1 p2 l3)
+boosts performance in both metrics. Fig. 5. Simulation of two UAVs serving four regions in the Watering
+domain. Example PDDL plan for watering-hard-3. UAVs u1 and u2 coor-
+VI. SIMULATIONASSETSOFSPAR dinatetoloadpots,movebetweenlocations,refillatwatersources(l1and
+l2),andperformsequentialwateringactions.Theactionwatering-pour-to-
+To test the domains generated by our framework in sim-
+fillrepresentspouringwatertomeetalocation’sdemand.
+ulation, we customized a diverse set of 20 Gazebo environ-
+ments spanning all domain categories described in Sec. V.
+A. Case Study: UAV Watering tasks
+This collection provides comprehensive coverage of tasks
+This domain models a UAV-based watering system where
+representative of real-world aerial robotic scenarios within a
+each UAV carries a single pot, refills at water sources, and
+fully autonomous pipeline. Fig. 4 shows the complete set of
+pours water into target regions. The amount poured depends
+environments. SPAR is designed to be long-term and easily
+on the pot’s level and the location’s demand. The domain is
+extensible: new environments and tasks can be incorporated
+extendable to multi-UAV settings. As shown in Fig. 5, two
+as additional use cases arise. In this paper, we report on
+UAVscoordinatebyloadingpots,movingbetweenlocations,
+the current set of problems, with future releases to expand
+refilling at sources, and performing watering actions.
+therepositoryaccordingly.Inthefollowing,weillustratethe
+resultsusingtwocomplexgenerateddomainsascasestudies. B. Case Study: Multi-Robot Coordination
+This domain simulates a heterogeneous team of UAVs
+and unmanned ground vehicles (UGVs) in a discretized
+environment where positions may be free, blocked by fixed
+obstacles, or blocked by movable obstacles. UAVs can fly
+between positions to detect obstacles and determine their
+type, while UGVs can only traverse clear positions but are
+capable of pushing movable obstacles to adjacent locations
+to clear paths. We demonstrate a medium-level problem in
+Fig. 6, where a UAV detects a movable object, verifies
+clearance, and then enables the UGV to complete the push
+action for coordinated obstacle removal.
+VII. CONCLUSION
+In this work, we introduced a framework for automatic
+PDDL domain generation via LLMs, with UAV planning as
+a representative scenario. By developing a validated dataset
+of UAV domains and problems and designing a prompt
+framework tailored for domain generation, we demonstrated
+that LLMs can effectively produce domains that are both
+syntactically valid and semantically accurate. Our evalu-
+Fig.4. Gazebosimulationenvironmentsacrossdifferentdomains(ordered ations show that the generated domains not only satisfy
+as in Tab. I). Row 1: Navigation (2D, House, MultiCamLand, Simple). structural requirements but also have strong feasibility and
+Row2:Transportation.Row3:Manipulation.Row4:Monitoring.Row5:
+interpretabilityrelativetoground-truthcounterparts,enabling
+Exploration (left two) and Aerial Operations (right two). The Adaptation
+domaincombinesvariationsoftheseenvironments,whileWindDisturbance faster development, testing, and evaluation cycles. The pro-
+ismodeledasanadditionalwindfieldindependentoftheenvironment. posed dataset and pipeline also have significant potential
+[13] T.Zhang,L.Zhang,Z.Hou,Z.Wang,Y.Gu,P.Clark,C.Callison-
+domain: MovableObs; problem: detect-mov-then-push
+Burch, and N. Tandon, “PROC2PDDL: Open-domain planning rep-
+p3 resentations from texts,” in Proc. of the 2nd Workshop on Natural
+p1
+LanguageReasoningandStructuredExplanations,Aug.2024,pp.13–
+24.
+p2 [14] P. Lewis, E. Perez, A. Piktus, F. Petroni, V. Karpukhin, N. Goyal,
+0: (uav-detect-mov u1 p2) H. Ku¨ttler, M. Lewis, W.-t. Yih, T. Rockta¨schel, S. Riedel, and
+D. Kiela, “Retrieval-augmented generation for knowledge-intensive
+nlp tasks,” in Proc. of the 34th International Conference on Neural
+InformationProcessingSystems,2020.
+[15] S. Yao, J. Zhao, D. Yu, N. Du, I. Shafran, K. Narasimhan, and
+Y.Cao,“React:Synergizingreasoningandactinginlanguagemodels,”
+preprintarXiv:2210.03629,2022.
+1: (move-uav u1 p2 p3)
+2: (uav-detect-clear u1 p3) 3: (push g1 p1 p2 p3) (1) [16] M. Aghzal, E. Plaku, G. J. Stein, and Z. Yao, “A survey on large
+languagemodelsforautomatedplanning,”preprintarXiv:2502.12435.
+[17] P.Cao,T.Men,W.Liu,J.Zhang,X.Li,X.Lin,D.Sui,Y.Cao,K.Liu,
+andJ.Zhao,“Largelanguagemodelsforplanning:Acomprehensive
+andsystematicsurvey,”preprintarXiv:2505.19683,2025.
+[18] J.-W. Choi, Y. Yoon, H. Ong, J. Kim, and M. Jang, “Lota-bench:
+Benchmarkinglanguage-orientedtaskplannersforembodiedagents,”
+3: (push g1 p1 p2 p3) (2) 3: (push g1 p1 p2 p3) (3) in The 12th International Conference on Learning Representations,
+2024.
+[19] T. Silver, S. Dan, K. Srinivas, J. B. Tenenbaum, L. Kaelbling, and
+Fig.6. Simulationofadetect-mov-then-pushintheMovableObsdomain.
+M.Katz,“Generalizedplanninginpddldomainswithpretrainedlarge
+AUAV(u1)collaborateswithaUGV(g1)toremoveobstacles.TheUAV
+languagemodels,”inProc.oftheThirty-EighthAAAIConferenceon
+detectsamovableobjectatp2,verifiesclearanceatp3,andtheUGVatp1
+ArtificialIntelligence. AAAIPress,2024.
+pushestheobjectfromp2top3.
+[20] Y.Wu,Y.Tao,P.Li,G.Shi,G.S.Sukhatme,V.Kumar,andL.Zhou,
+“Hierarchical llms in-the-loop optimization for real-time multi-robot
+for extending automatic domain generation to other robotic targettrackingunderunknownhazards,”preprintarXiv:2409.12274,
+2024.
+platforms, multi-agent planning, and real-world deployment,
+[21] Y.Xie,C.Yu,T.Zhu,J.Bai,Z.Gong,andH.Soh,“Translatingnatural
+opening new opportunities at the intersection of language language to planning goals with large-language models,” preprint
+models and automated planning. arXiv:2302.05128,2023.
+[22] L.Guan,K.Valmeekam,S.Sreedharan,andS.Kambhampati,“Lever-
+agingpre-trainedlargelanguagemodelstoconstructandutilizeworld
+REFERENCES modelsformodel-basedtaskplanning,”inThirty-seventhConference
+onNeuralInformationProcessingSystems,2023.
+[1] C.Aeronautiques,A.Howe,C.Knoblock,I.D.McDermott,A.Ram, [23] P. Smirnov, F. Joublin, A. Ceravola, and M. Gienger, “Generat-
+M. Veloso, D. Weld, D. W. Sri, A. Barrett, D. Christianson et al., ing consistent pddl domains with large language models,” preprint
+“Pddl—the planning domain definition language,” Technical Report, arXiv:2404.07751,2024.
+Tech.Rep.,1998. [24] G.France´s,M.Ramirez,andCollaborators,“Tarski:AnAIplanning
+[2] M.Ramirez,M.Papasimeon,N.Lipovetzky,L.Benke,T.Miller,A.R. modelingframework,”https://github.com/aig-upf/tarski,2018.
+Pearce, E. Scala, M. Zamani et al., “Integrated hybrid planning and [25] M.Cao,T.-M.Nguyen,S.Yuan,A.Anastasiou,A.Zacharia,S.Pa-
+programmedcontrolforrealtimeuavmaneuvering.”inAAMAS,2018, paioannou, P. Kolios, C. G. Panayiotou, M. M. Polycarpou, X. Xu
+pp.1318–1326. et al., “Cooperative aerial robot inspection challenge: A benchmark
+[3] M.Han,Y.Zhu,S.-C.Zhu,Y.N.Wu,andY.Zhu,“Interpret:Interac- forheterogeneousmulti-uncrewed-aerial-vehicleplanningandlessons
+tivepredicatelearningfromlanguagefeedbackforgeneralizabletask learned,”IEEERobot.Autom.Mag.,2025.
+planning,”inProc.ofRobot.:Sci.andSyst.,2024. [26] K. Ye, H. Tang, B. Liu, P. Dai, L. Cao, and R. Ji, “More clear,
+[4] C. R. Garrett, T. Lozano-Pe´rez, and L. P. Kaelbling, “Pddlstream: moreflexible,moreprecise:Acomprehensiveorientedobjectdetection
+Integrating symbolic planners and blackbox samplers via optimistic benchmarkforuav,”preprintarXiv:2504.20032,2025.
+adaptive planning,” Proc. of the Intl. Conf. on Automated Planning [27] J.Xiao,Y.Sun,Y.Shao,B.Gan,R.Liu,Y.Wu,W.Gua,andX.Deng,
+andScheduling,vol.30,no.1,pp.440–448,Jun.2020. “Uav-on: A benchmark for open-world object goal navigation with
+aerialagents,”preprintarXiv:2508.00288,2025.
+[5] B.Liu,Y.Jiang,X.Zhang,Q.Liu,S.Zhang,J.Biswas,andP.Stone,
+[28] J.Xie,K.Zhang,J.Chen,T.Zhu,R.Lou,Y.Tian,Y.Xiao,andY.Su,
+“Llm+p: Empowering large language models with optimal planning
+proficiency,”preprintarXiv:2304.11477,2023. “Travelplanner: A benchmark for real-world planning with language
+agents,”in41stInternationalConferenceonMachineLearning,2024.
+[6] G. Dagan, F. Keller, and A. Lascarides, “Dynamic planning with a
+[29] X. Wang, D. Yang, Y. Liao, W. Zheng, B. Dai, H. Li, S. Liu et al.,
+llm,”preprintarXiv:2308.06391,2023.
+“Uav-flowcolosseo:Areal-worldbenchmarkforflying-on-a-worduav
+[7] V. Strobel and A. Kirsch, MyPDDL: Tools for Efficiently Creating
+imitationlearning,”preprintarXiv:2505.15725,2025.
+PDDL Domains and Problems. Cham: Springer International Pub-
+[30] R.E.FikesandN.J.Nilsson,“Strips:Anewapproachtotheappli-
+lishing,2020,pp.67–90.
+cationoftheoremprovingtoproblemsolving,”ArtificialIntelligence,
+[8] P. Smirnov, F. Joublin, A. Ceravola, and M. Gienger, “Generat-
+vol.2,no.3,pp.189–208,1971.
+ing consistent pddl domains with large language models,” preprint
+[31] “Internationalplanningcompetition,”http://ipc.icaps-conference.org/.
+arXiv:2404.07751,2024.
+[32] D. Pellier and H. Fiorino, “Pddl4j: a planning domain description
+[9] V. Khandelwal, A. Sheth, and F. Agostinelli, “Pddlfuse: A tool for
+library for java,” Journal of Experimental & Theoretical Artificial
+generatingdiverseplanningdomains,”preprintarXiv:2411.19886.
+Intelligence,vol.30,no.1,pp.143–176,2018.
+[10] A. Aguinaldo, E. Patterson, and W. Regli, “Automating transfer of
+[33] “all-mpnet-base-v2: a sentence-transformers model,” https:
+robottaskplansusingfunctorialdatamigrations,”IEEETrans.Autom.
+//huggingface.co/sentence-transformers/all-mpnet-base-v2.
+Sci.Eng.,vol.22,pp.19484–19498,2025.
+[34] E. Scala, A. Saetti, I. Serina, and A. E. Gerevini, “Search-guidance
+[11] J. Oswald, K. Srinivas, H. Kokel, J. Lee, M. Katz, and S. Sohrabi,
+mechanisms for numeric planning through subgoaling relaxation,”
+“Largelanguagemodelsasplanningdomaingenerators,”inProc.of
+Proc.oftheIntl.Conf.onAutomatedPlanningandScheduling,vol.30,
+theIntl.Conf.onAutomatedPlanningandScheduling,2024.
+no.1,pp.226–234,Jun.2020.
+[12] S.Mahdavi,R.Aoki,K.Tang,andY.Cao,“Leveragingenvironment [35] “Val,”https://github.com/KCL-Planning/VAL.
+interaction for automated PDDL translation and planning with large
+languagemodels,”inTheThirty-eighthAnnualConferenceonNeural
+InformationProcessingSystems,2024.

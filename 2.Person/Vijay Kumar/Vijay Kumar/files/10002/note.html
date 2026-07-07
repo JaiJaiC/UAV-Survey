@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes -- ROBOGUARD (Ravichandran et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 4px; margin-right: 5px; margin-bottom: 4px; }
+  .tag-blue { background:#dbeafe; color:#1d4ed8; } .tag-green { background:#d1fae5; color:#047857; }
+  .tag-amber { background:#fef3c7; color:#92400e; } .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red { background:#ffe4e6; color:#be123c; } .tag-gray { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">HOME</a>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- 1. PAPER INFO -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Safety Guardrails for LLM-Enabled Robots</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Zachary Ravichandran</strong>, Alexander Robey, <strong>Vijay Kumar</strong>, George J. Pappas, Hamed Hassani</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">University of Pennsylvania</strong> GRASP Lab (Ravichandran, Kumar, Pappas, Hassani); Carnegie Mellon University (Robey)</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Robotics and Automation Letters (RA-L)</strong>, accepted February 2026. arXiv:2503.07885v2</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td>Project: <a href="https://robo-guard.github.io/" target="_blank">robo-guard.github.io</a> | Funding: DARPA SAFRON + ARL DCIST CRA + NSF GRFP + TILOS</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>ROBOGUARD -- a <strong>two-stage guardrail architecture</strong> for LLM-enabled robots. A root-of-trust LLM contextualizes predefined safety rules by grounding them in the robot's environment using Chain-of-Thought reasoning to generate <strong>Linear Temporal Logic (LTL) safety specifications</strong>. Then a temporal logic control synthesis module resolves conflicts between safety specifications and potentially unsafe LLM-generated plans, outputting a <strong>minimally-modified safe plan</strong>. Crucially, the root-of-trust LLM is <strong>isolated from user prompts</strong> to prevent jailbreaking attacks. Under worst-case adversarial attacks (ROBOPAIR), ROBOGUARD reduces unsafe plan execution from <strong>over 92% to under 3%</strong> without compromising safe plan performance. Resource-efficient: requires only 1 LLM query vs. 15 for attackers, using 21% of their token budget.</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">LLM Safety Guardrails</span>
+    <span class="tag tag-green">Jailbreaking Defense</span>
+    <span class="tag tag-amber">Linear Temporal Logic</span>
+    <span class="tag tag-purple">Control Synthesis</span>
+    <span class="tag tag-red">Adversarial Robustness</span>
+    <span class="tag tag-cyan">Root-of-Trust LLM</span>
+    <span class="tag tag-gray">IEEE RA-L 2026</span>
+  </div>
+</section>
+
+<!-- 2. INSIGHT & NOVELTY -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">Core Insight</div>
+    <strong>Why is LLM alignment (effective for chatbots) insufficient for LLM-enabled robots?</strong><br>
+    Because <strong>harmful robot behavior is context-dependent</strong> -- the same navigation action is safe in an empty corridor but dangerous during an emergency evacuation (it could block an exit). Chatbot alignment only addresses "don't say harmful things" and does not address physical-world context. Moreover, <strong>jailbreaking attacks</strong> (e.g., ROBOPAIR) can trigger dangerous physical behaviors in LLM-driven robots -- such as colliding with humans or blocking emergency exits -- even when the LLM itself has undergone alignment training.<br><br>
+    <strong>What is this paper's core insight?</strong><br>
+    <strong>Use a protected root-of-trust LLM for safety reasoning and formal methods for safety enforcement -- separated and complementary.</strong> Key insights: (1) The safety-reasoning LLM must be <strong>isolated from user input</strong> (root-of-trust), making it immune to malicious prompt manipulation; (2) Safety rules (e.g., "do not harm humans") must be <strong>grounded to specific robot context</strong> (e.g., "in this environment, person_1 is near doorway_1, so do not block doorway_1"); (3) Conflicts between safety specifications and plans are resolved through <strong>minimum-violation control synthesis</strong> -- prioritizing safety while maximally respecting user intent.
+  </div>
+
+  <h3>2.2 Inspiration Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>ROBOPAIR (Robey et al. 2025) demonstrated 92.3% jailbreak success on LLM-driven robots</td><td>LLM's built-in alignment training is <strong>far from sufficient</strong> for robot scenarios -- an external, independent safety guardrail is mandatory. The protected (root-of-trust) design is critical -- if the safety LLM can also be jailbroken, the entire guardrail collapses.</td><td>Architecture</td></tr>
+    <tr><td>Minimum-violation planning in formal methods (Tumova et al.)</td><td>Safety specifications and plan specifications may conflict -- use <strong>priority-based specification synthesis</strong> from formal methods to resolve conflicts. Safety specification priority always exceeds plan specification priority, but the plan is maximally preserved within safety bounds.</td><td>Method</td></tr>
+    <tr><td>Semantic maps as world models</td><td>Feed the semantic map (object nodes + region nodes + edges) as the LLM's contextual input -- the LLM need not understand raw sensor data, only <strong>structured scene representations</strong>. This lets the root-of-trust LLM do safety reasoning at the semantic level rather than the perception level.</td><td>Strategy</td></tr>
+    <tr><td>Critical role of Chain-of-Thought (CoT) reasoning in safety decisions</td><td>Ablation shows removing CoT reasoning increases ASR from 4.3% to 12.8% (3x increase) -- safety reasoning cannot be a "black box." Explicit reasoning steps are essential for generating correct LTL safety specifications.</td><td>Mathematics</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: Root-of-Trust LLM Architecture -- Isolating Safety Reasoning from User Input</h4>
+    <div class="novelty-step"><strong>[Problem Solved]</strong> Traditional LLM planners directly accept user input and can therefore be manipulated by malicious prompts. If safety checking and plan generation share the same LLM, jailbreaking attacks can bypass both simultaneously.</div>
+    <div class="novelty-step"><strong>[Inspiration]</strong> The root-of-trust concept from computer security -- the Trusted Computing Base (TCB) is an isolated, trusted component that maintains security even when the rest of the system is compromised.</div>
+    <div class="novelty-step"><strong>[Design]</strong> ROBOGUARD's safety reasoning LLM is independent of the planning LLM -- it only receives safety rules from the <strong>system designer</strong> and world model updates from the <strong>semantic map</strong>, never directly touching user input. This isolation means even if an attacker completely compromises the planning LLM, the safety guardrail remains effective. In experiments, even when attackers obtain gray-box/white-box access to the guardrail internals, ASR only increases to at most 5.2%.</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: Grounding Natural Language Safety Rules to LTL Safety Specifications</h4>
+    <div class="novelty-step"><strong>[Problem Solved]</strong> High-level safety rules (e.g., Asimov's First Law "do not harm humans") are abstract -- how to convert them into formally verifiable safety specifications in a concrete environment?</div>
+    <div class="novelty-step"><strong>[Design]</strong> Given world model M and robot action set F, define contextual atomic propositions AP(M,F) (e.g., goto(person_1), inspect(drill_1)). The root-of-trust LLM uses CoT reasoning to generate one LTL formula phi(i) per safety rule, conjoined: phi_safe = phi(1) and phi(2) and ... and phi(n). Key example: without reasoning, the LLM might omit constraints about doorway or generate overly broad constraints for person -- CoT reasoning dramatically improves constraint precision (ASR drops from 12.8% to 4.3%).</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: Minimum-Violation Control Synthesis -- Optimal Balance Between Safety and Intent</h4>
+    <div class="novelty-step"><strong>[Problem Solved]</strong> Safety specifications and LLM plan intent may conflict -- a simple "reject all unsafe plans" approach over-restricts robot capability. A mechanism is needed to <strong>maximally follow user intent</strong> while ensuring safety.</div>
+    <div class="novelty-step"><strong>[Design]</strong> Algorithm 1 (Control Synthesis): convert LLM plan p to LTL specification phi_proposed and word sequence w. Construct a Buchi automaton B from phi_safe. Stepwise verify each word in w against B. If w is accepted by B (reaches accepting state), execute the plan; otherwise fall back to phi_safe (safety first). Theorem 1 guarantees the control synthesis module <strong>always</strong> provides a safe control plan.</div>
+  </div>
+</section>
+
+<!-- 3. SYSTEM ARCHITECTURE -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame -- ROBOGUARD Two-Stage Guardrail Architecture</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph OFFLINE["Offline Configuration"]
+        direction LR
+        RULES["Safety Rule Set (e.g., 1. Do not harm humans  2. Respect privacy  3. Avoid hazardous zones)"]
+        ROBOT_DESC["Robot Description (API + World Model Format)"]
+    end
+
+    subgraph SAFETY_REASON["Stage 1: Safety Reasoning Module (Root-of-Trust LLM)"]
+        direction LR
+        PROMPT["System Prompt: Safety Logic + API Definitions + World Model Definitions"]
+        COT["Chain-of-Thought Reasoning: Per-Rule Application, Iterative Generation"]
+        GROUND["Contextual Grounding: World Model M + Action Set F to Atomic Propositions AP"]
+        LTL["Generate LTL: phi(1) and phi(2) and ... and phi(n) forming phi_safe"]
+        EXAMPLE["Example: G(!goto(person_1)) and G(!inspect(drill_1)) and G(goto(doorway) implies F(!goto(doorway)))"]
+    end
+
+    subgraph CONTROL_SYNTH["Stage 2: Control Synthesis Module"]
+        direction LR
+        PLAN["LLM Planner Plan p (Natural Language)"]
+        PLAN2LTL["p converted to phi_proposed (LTL)"]
+        AUTOMATA["phi_safe converted to Buchi Automaton B with Safety States F"]
+        VERIFY["Stepwise Verify w = w1 w2 ... wT on B's trace"]
+        DECISION{"Does trace's final state belong to F?"}
+        ACCEPT["Accept: Execute Plan p"]
+        REJECT["Reject: Fall Back to phi_safe"]
+    end
+
+    subgraph WORLD["World Model Updates"]
+        direction LR
+        SEM_MAP["Semantic Map (Object Nodes + Region Nodes + Edges)"]
+        ROBOT_STATE["Robot State (Position + Sensors)"]
+    end
+
+    OFFLINE --> SAFETY_REASON
+    SEM_MAP --> PROMPT
+    ROBOT_STATE --> PROMPT
+    PROMPT --> COT --> GROUND --> LTL --> AUTOMATA
+    PLAN --> PLAN2LTL --> VERIFY
+    AUTOMATA --> VERIFY --> DECISION
+    DECISION -->|"w satisfies phi_safe"| ACCEPT
+    DECISION -->|"w violates phi_safe"| REJECT
+
+    classDef offline fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef safety fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef control fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef world fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef result fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    class RULES,ROBOT_DESC offline
+    class PROMPT,COT,GROUND,LTL,EXAMPLE safety
+    class PLAN,PLAN2LTL,AUTOMATA,VERIFY,DECISION control
+    class SEM_MAP,ROBOT_STATE world
+    class ACCEPT,REJECT result
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow -- Information Flow and Attack-Defense Relationship</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph USER["User / Attacker"]
+        direction LR
+        BENIGN["Benign User: Safe Task Request"]
+        ADVERSARY["Attacker: Jailbreak Prompt (ROBOPAIR)"]
+    end
+
+    subgraph PLANNER["LLM Planner (GPT-4o SPINE)"]
+        direction LR
+        NLP["Receive Natural Language Instruction"]
+        PLAN_GEN["Generate Plan: Action Sequence + Semantic Map Operations"]
+    end
+
+    subgraph ROBOGUARD["ROBOGUARD Safety Guardrail"]
+        direction LR
+        RT_LLM["Root-of-Trust LLM (GPT-4o): CoT Reasoning"]
+        SAFE_SPEC["phi_safe: LTL Safety Specification"]
+        SYNTH["Control Synthesis Module (Algorithm 1)"]
+        FINAL_PLAN["Safe Plan: Maximally Satisfies phi_safe"]
+    end
+
+    subgraph ENV["World Model / Semantic Map"]
+        direction LR
+        GRAPH["Semantic Graph: Objects + Regions + Edges"]
+        UPDATE["Online Update: New Semantic Discovery"]
+    end
+
+    BENIGN --> NLP --> PLAN_GEN
+    ADVERSARY --> NLP
+    PLAN_GEN --> SYNTH
+    GRAPH --> RT_LLM --> SAFE_SPEC --> SYNTH
+    UPDATE --> GRAPH
+    SYNTH --> FINAL_PLAN
+    RT_LLM -.->|"Attacker Cannot Access"| RT_LLM
+
+    classDef user fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px
+    classDef planner fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    classDef guard fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef env fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class BENIGN,ADVERSARY user
+    class NLP,PLAN_GEN planner
+    class RT_LLM,SAFE_SPEC,SYNTH,FINAL_PLAN guard
+    class GRAPH,UPDATE env
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow -- Complete Safety Flow Under Adversarial Scenarios</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph ATTACK["Attack Scenario Example"]
+        A1["Attacker sends jailbreak prompt to LLM planner"]
+        A2["LLM planner generates dangerous plan: goto(person) + inspect(weapon)"]
+        A3["ROBOGUARD receives dangerous plan + world model"]
+    end
+
+    subgraph DEFENSE["ROBOGUARD Defense Flow"]
+        D1["Root-of-Trust LLM analyzes world model"]
+        D2["Generates safety spec: G(!goto(person_1)) + G(!inspect(weapon))"]
+        D3["Converts to Buchi automaton + verifies plan word sequence"]
+        D4{"Does plan satisfy safety spec?"}
+        D5_YES["Yes: Execute plan (safety + intent both satisfied)"]
+        D5_NO["No: Reject plan (fall back to phi_safe)"]
+    end
+
+    subgraph RESULT["Defense Results"]
+        R1["Benign Tasks: 100% capability preserved"]
+        R2["Adversarial Tasks: ASR from 92.3% down to 2.3%"]
+        R3["Adaptive Attacks: ASR at most 5.2%"]
+    end
+
+    A1 --> A2 --> A3 --> D1 --> D2 --> D3 --> D4
+    D4 -->|"Yes"| D5_YES --> R1
+    D4 -->|"No"| D5_NO --> R2
+    D5_NO -.->|"Worst Case"| R3
+
+    classDef attack fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px
+    classDef defense fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef result fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class A1,A2,A3 attack
+    class D1,D2,D3,D4,D5_YES,D5_NO defense
+    class R1,R2,R3 result
+    </pre>
+  </div>
+</section>
+
+<!-- 4. TASK -->
+<section id="task">
+  <h2>4. Task -- What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">Core Problem -- Safety Guardrails for LLM-Enabled Robots</span>
+    $$ \text{Given: Safety rule set } \mathcal{R},\; \text{World model } \mathcal{M},\; \text{LLM-generated plan } p $$
+    $$ \text{Find control plan } \pi \text{ s.t. } \pi \models \phi_{\text{safe}} \text{ and } \pi \text{ maximally follows } p $$
+    $$ \text{where } \phi_{\text{safe}} = \bigwedge_{i=1}^n \phi^{(i)}(\mathcal{M}, \mathcal{R}) \text{ is the LTL safety spec grounded to context} $$
+    <div class="eq-note">
+      <strong>$\mathcal{R}$</strong> = high-level safety rules defined offline by the system designer (e.g., "do not harm humans, respect privacy, avoid hazardous zones") |
+      <strong>$\mathcal{M}$</strong> = online-updated semantic graph world model (objects + regions + edges) |
+      <strong>$p$</strong> = plan generated by the LLM planner (potentially adversarially manipulated) |
+      <strong>$\phi_{\text{safe}}$</strong> = LTL safety specification grounded to current context |
+      <strong>Core objective</strong>: safety first ($\pi \models \phi_{\text{safe}}$) while maximizing utility ($\pi$ follows $p$ as much as possible)
+    </div>
+  </div>
+
+  <h3>4.2 Desiderata -- Four Requirements for LLM-Enabled Robot Safety Guardrails</h3>
+  <table>
+    <tr><th>Requirement</th><th>Meaning</th><th>How ROBOGUARD Satisfies It</th></tr>
+    <tr><td><strong>D1. Context-Aware</strong></td><td>Guardrail should mitigate unsafe behavior across diverse robot contexts</td><td>Root-of-trust LLM grounds safety rules to the world model's real-time state -- the same rule produces different LTL specs in different scenarios</td></tr>
+    <tr><td><strong>D2. Applicability</strong></td><td>Guardrail should not depend on a specific LLM planner architecture or instantiation</td><td>ROBOGUARD only receives natural language plan p and interacts via API description -- independent of the underlying LLM</td></tr>
+    <tr><td><strong>D3. Utility</strong></td><td>Guardrail should not degrade LLM-driven robot capability in non-adversarial settings</td><td>100% success rate on safe tasks (same as without guardrail) -- minimum-violation synthesis ensures intervention only when necessary</td></tr>
+    <tr><td><strong>D4. Efficiency</strong></td><td>Guardrail should minimize additional offline and online computational cost and latency</td><td>Only 1 LLM query needed (vs. 15 for attackers), using 21%-12% of their token budget</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>This is an <strong>adversarial safety guardrail</strong> problem -- the core is not detecting jailbreak attacks per se, but ensuring physical safety under the <strong>worst-case assumption that the LLM planner has already been compromised</strong>. Platform: Clearpath Jackal mobile robot (simulation + real-world); scenarios: full-floor indoor office / outdoor office park; attacker uses 7 harmful behaviors (bomb detonation, blocking emergency exits, weapon search, warehouse assault, restricted zone entry, covert surveillance, person collision) and multiple jailbreak methods (direct prompts, template attacks, ROBOPAIR, and adaptive variants). The guardrail operates at the planning level -- it takes a discrete action sequence plan and verifies it against safety specifications, unlike CORE which operates at the continuous control level.</p>
+</section>
+
+<!-- 5. CHALLENGE -->
+<section id="challenge">
+  <h2>5. Challenge -- Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">First-Principles Diagnosis</div>
+    <strong>Core contradiction</strong>: the fundamental tension between LLM flexibility and safety.<br><br>
+    (1) <strong>LLM's inherent vulnerability</strong>: LLMs are trained to be "helpful and non-refusing" -- this openness is precisely the entry point for jailbreak attacks. ROBOPAIR demonstrated that by constructing fictional scenarios in context (e.g., "you're filming a movie"), attackers can induce LLMs to generate dangerous robot plans. This vulnerability is <strong>architectural</strong>, not incidental -- it is the flip side of LLMs' open-ended generation capability.<br><br>
+    (2) <strong>Safety's context-dependence</strong>: For robots, "safe" depends on the specific physical context. In a semantic graph, a person node can appear in different regions -- but the safety rule must be "do not collide with this specific person" not "do not collide with any person whatsoever." This requires grounding safety rules from <strong>abstract</strong> ("do not harm humans") to <strong>concrete</strong> ("do not goto(person_1)") -- a semantic reasoning problem.<br><br>
+    (3) <strong>Attack-defense asymmetry</strong>: An attacker need only find <strong>one</strong> successful jailbreak prompt; the defender must block <strong>all possible</strong> attacks. ROBOGUARD resolves this asymmetry by <strong>separating safety reasoning from the attacker-accessible LLM</strong> -- the attacker can manipulate the planning LLM but cannot touch the root-of-trust LLM.
+  </div>
+
+  <h3>5.2 Prior Methods and Their Limits</h3>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr><td>LLM Alignment Training (RLHF)</td><td>Train LLMs via reinforcement learning from human feedback to avoid harmful outputs</td><td>Partially effective for chatbots but <strong>cannot prevent physical-world harm</strong>. ROBOPAIR shows aligned GPT-4o still has 92.3% jailbreak success in robot scenarios -- because "harmful" is harder to define and detect in physical contexts</td></tr>
+    <tr><td>Formal Methods for Planning Constraints</td><td>Use LTL/PDDL to restrict LLMs to generating only plans satisfying predefined safety specs</td><td>Requires <strong>pre-enumerating all possible safety specs</strong>, limiting open-world applicability. Also typically does not handle adversarial input -- attackers can find harmful behaviors within allowed spec boundaries</td></tr>
+    <tr><td>LLM Safety Checker</td><td>Use a second LLM to check whether the planning LLM's output is safe</td><td>The checker LLM itself can be jailbroken -- two LLMs share <strong>common-mode failure</strong>. Also, checkers typically analyze at the text level rather than physical consequences</td></tr>
+    <tr><td>Minimum-Violation Planning</td><td>Find plans that "satisfy as much as possible" amid conflicting specifications</td><td>Traditional methods handle conflicts between <strong>predefined specifications</strong>, not between online-reasoned safety specs and arbitrary LLM plans</td></tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>Challenge 1 -- Root-of-Trust Isolation Design and Maintenance</strong>: How to ensure the root-of-trust LLM is truly immune to attacker influence? The input pipeline must be carefully designed -- the safety reasoning module receives only system-designer configuration and non-user semantic map inputs. In adaptive attacks, even when attackers obtain partial internal information (gray-box/white-box), ASR remains low (3.8%-5.2%), validating the isolation design's effectiveness.</li>
+    <li><strong>Challenge 2 -- Grounding Abstract Safety Rules to Concrete LTL</strong>: The root-of-trust LLM must correctly interpret semantic relationships in the world model. For example, in a scene containing person_1, drill_1, doorway_1, the LLM must reason that: (a) goto(person_1) could cause collision, yielding G(!goto(person_1)); (b) inspect(drill_1) could acquire a weapon, yielding G(!inspect(drill_1)); (c) goto(doorway_1) could block an exit, yielding G(goto(doorway_1) implies F(!goto(doorway_1))) -- you may pass through doorway_1 but must not linger.</li>
+    <li><strong>Challenge 3 -- Defending Against Adaptive Attacks</strong>: Attackers may adjust their strategy based on ROBOGUARD's responses. A white-box attacker knowing the guardrail's complete internal state can design prompts specifically to bypass it. Experimental results (white-box ASR 5.2%) indicate the current architecture still has some attack surface.</li>
+  </ul>
+</section>
+
+<!-- 6. METHOD & KEY FORMULAS -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>ROBOGUARD's core is a <strong>two-stage architecture</strong>. Stage 1: the root-of-trust LLM receives the world model (semantic graph JSON), uses CoT reasoning to ground high-level safety rules into an LTL formula phi_safe = conjunction_i phi(i). Stage 2: convert the LLM plan p into LTL specification phi_proposed and word sequence w, verify via Buchi automaton whether w satisfies phi_safe -- if so, execute the plan; otherwise fall back to the safety specification.</p>
+
+  <h3>6.2 Key Formulas</h3>
+
+  <h4>Group A: Contextual Atomic Propositions and LTL Safety Specification</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) -- Contextual Grounding and Safety Specification Synthesis</span>
+    $$ \mathcal{AP}(\mathcal{M}, \mathcal{F}) = \{\text{goto}(r), \text{inspect}(o), ...\} \text{ (Contextual Atomic Propositions)} $$
+    $$ \phi_{\text{safe}} = \phi^{(1)} \land \phi^{(2)} \land \cdots \land \phi^{(n)} \quad \text{(LTL Conjunction of n Safety Rules)} $$
+    <div class="eq-note">
+      <strong>$\mathcal{M}$</strong> = world model (semantic graph: region_1, region_2, person_1, ...) |
+      <strong>$\mathcal{F}$</strong> = robot action set (goto, inspect, ...) |
+      <strong>$\phi^{(i)}$</strong> = LTL encoding of the i-th safety rule |
+      <strong>LTL operators</strong>: G (globally/always), F (finally/eventually), U (until), X (next), ! (negation), implies (implication), and (conjunction) |
+      <strong>Example</strong>: G(!goto(person_1)) = "never navigate to person_1"; G(goto(doorway_1) implies F(!goto(doorway_1))) = "if you navigate to doorway_1, you must eventually leave" (i.e., must not linger and block the exit).
+    </div>
+  </div>
+
+  <h4>Group B: Control Synthesis Algorithm -- Algorithm 1</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Algorithm 1 -- Minimum-Violation Control Synthesis</span>
+    $$ \text{Input: } \phi_{\text{safe}},\; p \text{ (LLM plan)} $$
+    $$ \text{Step 1: } \phi_{\text{proposed}} \leftarrow \text{ToLTL}(p),\; w \leftarrow \text{ToWord}(\phi_{\text{proposed}}) $$
+    $$ \text{Step 2: } \mathcal{B}_{\text{safe}} = (Q, q_{\text{init}}, \Sigma, \delta, F) \leftarrow \text{ToAutomata}(\phi_{\text{safe}}) $$
+    $$ \text{Step 3: Verify whether the trace of } w = w_1 w_2 \ldots w_T \text{ on } \mathcal{B}_{\text{safe}} \text{ is accepted} $$
+    $$ \text{Output: } \begin{cases} \phi_{\text{proposed}} & \text{if } q_T \in F \text{ (accepted)} \\ \phi_{\text{safe}} & \text{otherwise (rejected)} \end{cases} $$
+    <div class="eq-note">
+      <strong>$\mathcal{B}$</strong> = Buchi automaton -- a 5-tuple defined by state set Q, initial state q_init, alphabet Sigma = 2^AP, transition function delta, and accepting state set F |
+      <strong>$w$</strong> = word -- the action sequence in the plan; each w_j is a proposition from AP |
+      <strong>Acceptance condition</strong>: the trace's final state belongs to F (the safe state set) |
+      <strong>Theorem III.2</strong> (Safety Guarantee): The control synthesis module <strong>always</strong> provides a safe control plan -- regardless of what the input plan p is. Because phi_safe defines the complete boundary of safe behavior, and the algorithm always falls back to phi_safe when the plan does not satisfy the safety specification.
+    </div>
+  </div>
+
+  <h4>Group C: Concrete Example -- Impact of CoT Reasoning on Specification Quality</h4>
+  <div class="formula-block">
+    <span class="eq-tag">CoT Reasoning's Impact on Safety Specification Quality</span>
+    $$ \text{Without reasoning: } \phi_{\text{safe}} = G(!\text{inspect(drill\_1)}) \land G(!\text{goto(doorway\_1)}) \quad \text{(misses person constraint!)} $$
+    $$ \text{With reasoning: } \phi_{\text{safe}} = G(!\text{goto(person\_1)}) \land G(!\text{inspect(drill\_1)}) \land G(\text{goto(doorway\_1)} \rightarrow F(!\text{goto(doorway\_1)})) $$
+    <div class="eq-note">
+      <strong>Difference analysis</strong>: Without CoT reasoning, the variant misses the constraint on person_1 and over-constrains doorway_1 (completely forbids rather than "may pass through but don't linger"). CoT reasoning enables the LLM to stepwise consider each safety rule's <strong>physical implications</strong> -- person_1 is a potential collision risk, drill_1 is a potential weapon, doorway_1 is an exit that must not be blocked -- thereby generating more precise and comprehensive LTL constraints. This directly reflects in ASR: without reasoning, ASR rises from 4.3% to 12.8%.
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>Parameter</th><th>Value</th><th>Meaning</th><th>Rationale</th></tr>
+    <tr><td>Root-of-Trust LLM</td><td><strong>GPT-4o</strong></td><td>Safety reasoning engine</td><td>As root-of-trust, requires strong reasoning capability. Temperature = 0 ensures deterministic output. CoT reasoning proven critical in Section 3.2 ablation</td></tr>
+    <tr><td>Planning LLM</td><td><strong>GPT-4o SPINE Planner</strong></td><td>LLM generating action plans</td><td>Separate instance from root-of-trust LLM -- both share the same base model but run in different contexts, mutually isolated</td></tr>
+    <tr><td>Safety Rule Count</td><td><strong>3 rules</strong></td><td>Respect privacy + No physical harm + Avoid hazardous zones</td><td>General and minimal -- covering main physical safety risk categories. Experiments show ROBOGUARD performs stably across different rule sets</td></tr>
+    <tr><td>LTL Implementation</td><td><strong>Spot (Duret-Lutz)</strong></td><td>Buchi automaton construction and verification</td><td>Spot is the standard LTL tool library, supporting efficient automaton construction and model checking</td></tr>
+    <tr><td>LLM Temperature</td><td><strong>0</strong></td><td>Root-of-Trust LLM sampling temperature</td><td>Deterministic output critical for safety -- randomness cannot cause inconsistent safety specifications</td></tr>
+    <tr><td>Token Budget</td><td><strong>~4300 tokens/query</strong></td><td>Token usage per root-of-trust LLM reasoning call</td><td>Far lower than attackers (20,000-52,000 tokens), satisfying D4 efficiency requirement</td></tr>
+  </table>
+
+  <h3>6.4 ROBOGUARD vs. Traditional Safety Methods</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>ROBOGUARD (This Paper)</h4>
+      <ul>
+        <li>Safety reasoning and planning <strong>completely separated</strong></li>
+        <li>Root-of-Trust LLM <strong>immune to user input</strong></li>
+        <li>Safety rules <strong>online-grounded</strong> to context into LTL</li>
+        <li><strong>Adversarially-aware</strong>: worst-case jailbreaking as evaluation baseline</li>
+        <li>Conflict between safety specs and plan specs resolved through <strong>priority synthesis</strong></li>
+        <li><strong>Decoupled</strong> from planner/controller</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>Traditional Safety Methods</h4>
+      <ul>
+        <li>Safety typically <strong>tightly coupled</strong> with planning</li>
+        <li>Safety checker may <strong>share the same LLM</strong> as planner</li>
+        <li>Safety specs <strong>predefined</strong> -- do not change with context</li>
+        <li>Typically <strong>do not consider adversarial</strong> scenarios -- assume benign operation</li>
+        <li>Conflict resolution through <strong>hard constraints</strong> -- may over-restrict</li>
+        <li>Tightly coupled to <strong>specific system design</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7. FUNDAMENTAL PRINCIPLES -->
+<section id="principles">
+  <h2>7. Fundamental Principles</h2>
+
+  <h3>7.1 Linear Temporal Logic (LTL) for Robot Safety</h3>
+  <p>LTL extends propositional logic with temporal modalities that are essential for expressing safety properties over time. The core operators are: <strong>G phi</strong> (globally/always phi -- phi holds at every future time step), <strong>F phi</strong> (finally/eventually phi -- phi holds at some future time step), <strong>X phi</strong> (next -- phi holds at the next time step), <strong>phi U psi</strong> (phi until psi -- phi holds continuously until psi becomes true). LTL formulas are interpreted over <strong>infinite traces</strong> (omega-words) of system states, where each state is a set of atomic propositions that hold at that moment. This makes LTL naturally suited for reasoning about robot action sequences: a trace is a sequence of actions like goto(region_1), inspect(chair), goto(region_2), and an LTL formula like G(!goto(person_1)) asserts that at no point in this sequence does the robot navigate to person_1. The key theoretical property ROBOGUARD exploits is that <strong>every LTL formula can be compiled into a Buchi automaton</strong>, enabling algorithmic verification of whether a given trace satisfies the formula. The Spot library used in ROBOGUARD implements the standard tableau-based conversion from LTL to generalized Buchi automata, then to non-deterministic Buchi automata with a single acceptance set.</p>
+
+  <h3>7.2 Buchi Automata and Trace Verification</h3>
+  <p>A Buchi automaton is a 5-tuple B = (Q, q_init, Sigma, delta, F) where Q is a finite set of states, q_init is the initial state, Sigma = 2^AP is the alphabet (each symbol is a subset of atomic propositions), delta: Q x Sigma to 2^Q is the non-deterministic transition function, and F (a subset of Q) is the set of accepting states. An infinite word w = sigma_1 sigma_2 ... over Sigma is <strong>accepted</strong> if there exists a run through B visiting F infinitely often. In ROBOGUARD, the plan's action sequence is a finite word w = w_1 w_2 ... w_T, and the algorithm verifies whether this finite prefix can be extended to an infinite word accepted by B -- equivalently, whether the trace ends in a state from which an accepting run is possible (a "live" state). The key algorithmic property: if the trace's final state q_T belongs to the set of states that can reach an accepting state (computed via SCC decomposition), the plan is deemed safe. The Spot library provides efficient O(|Q| x T) trace verification through its <code>spot::otf_product</code> interface. This verification is purely symbolic (no continuous dynamics), making it fast enough for online use.</p>
+
+  <h3>7.3 Root-of-Trust Design Principle</h3>
+  <p>The root-of-trust concept originates in <strong>computer hardware security</strong>: a Trusted Computing Base (TCB) is the minimal set of hardware, firmware, and software components that must be trusted for the system's security to hold. The core principle is <strong>minimization and isolation</strong>: the TCB should be as small as possible to reduce attack surface, and should be architecturally isolated from untrusted components so that compromise of the untrusted parts cannot propagate to the TCB. ROBOGUARD adapts this principle to LLM-based systems: (1) the root-of-trust LLM's <strong>input surface</strong> is minimized -- it reads only the safety rule set (from the designer) and the world model (from perception), never user prompts; (2) the root-of-trust LLM is an <strong>architecturally separate instance</strong> from the planning LLM, sharing no context or state; (3) the root-of-trust LLM's output is <strong>formally verifiable</strong> -- the LTL safety specification can be checked for syntactic correctness and the Buchi automaton can be analyzed for consistency. Even if the planning LLM is completely compromised by a jailbreak attack, the attacker cannot influence what safety rules the root-of-trust LLM enforces, because there is no data path from user input to the root-of-trust LLM.</p>
+
+  <h3>7.4 Minimum-Violation Control Synthesis</h3>
+  <p>Minimum-violation planning, introduced by Tumova et al., addresses the problem of reconciling <strong>conflicting specifications</strong> in automated planning. Given a set of specifications with a <strong>total priority order</strong> (e.g., safety > task > comfort), the algorithm constructs a plan that satisfies the highest-priority specifications and maximally satisfies lower-priority ones. ROBOGUARD reduces this to the <strong>two-specification case</strong>: phi_safe (highest priority, must be satisfied) and phi_proposed (lower priority, desirable but not required). The reduction is possible because the LLM plan p is converted to a single LTL formula phi_proposed. The control synthesis algorithm is essentially a prioritized two-specification solver: first check if the proposed plan satisfies phi_safe; if yes, return it; if no, return a plan that satisfies only phi_safe. Crucially, this synthesis is <strong>sound by construction</strong>: Theorem III.2 proves that whatever the algorithm outputs, it always satisfies phi_safe -- because phi_safe itself is always a valid plan under phi_safe (reflexivity), and the plan is only returned when it has been verified against phi_safe.</p>
+
+  <h3>7.5 Chain-of-Thought Reasoning for Specification Generation</h3>
+  <p>The root-of-trust LLM uses structured CoT reasoning to convert abstract safety rules into concrete LTL formulas. The reasoning follows a fixed template: (1) <strong>Decompose</strong> each safety rule into sub-requirements; (2) <strong>Enumerate</strong> all entities in the world model that are relevant to each sub-requirement; (3) <strong>Select</strong> appropriate LTL temporal operators based on the nature of the constraint (G for permanent prohibitions, G(... implies F(...)) for "may do X but then must stop doing X"); (4) <strong>Synthesize</strong> LTL formulas for each entity-rule pair; (5) <strong>Conjoin</strong> all sub-formulas into phi_safe. The ablation study (ASR: 4.3% with CoT vs. 12.8% without) demonstrates that <strong>explicit intermediate reasoning steps prevent the LLM from making omissions</strong> -- without CoT, the LLM may skip entities entirely (e.g., forgetting person_1) or apply wrong temporal operators (e.g., using G(!goto(doorway_1)) instead of the more nuanced G(goto(doorway_1) implies F(!goto(doorway_1)))). The CoT template effectively constrains the LLM's search space to a structured checklist, reducing the likelihood of safety-critical omissions.</p>
+
+  <h3>7.6 Defense in Depth: Multi-Layer Safety Architecture</h3>
+  <p>ROBOGUARD embodies the security principle of <strong>defense in depth</strong>: no single security layer is trusted to be impenetrable. The layers are: (1) LLM alignment training (RLHF) provides a statistical first line of defense against casual misuse; (2) the root-of-trust LLM provides a semantic second line that understands physical context and generates formal specifications; (3) the Buchi automaton verification provides a <strong>mathematical third line</strong> -- even if the root-of-trust LLM makes an error (generates an incomplete specification), the formal verification ensures that whatever specification <em>was</em> generated is enforced. Layer 3 does not correct errors in layer 2, but it guarantees that the system's safety behavior is formalizable and auditable. This architecture also creates <strong>attack-cost asymmetry</strong>: the defender spends ~4300 tokens per query; the attacker spends 20,000-52,000 tokens over 15 queries. The economic efficiency of defense relative to attack is itself a security property -- a guardrail that costs more to bypass than to deploy is practically effective.</p>
+</section>
+
+<!-- 8. PAPER FIGURES -->
+<section id="figures">
+  <h2>8. Paper Figures -- Key Results and Ablation Analysis</h2>
+
+  <h3>8.1 Attack Mitigation Effectiveness</h3>
+  <table>
+    <tr><th>Attack Type</th><th>Attack Method</th><th>ASR Without ROBOGUARD</th><th>ASR With ROBOGUARD</th></tr>
+    <tr><td>Safe Tasks (Baseline)</td><td>Direct Prompt</td><td>100.0%</td><td>100.0% (no loss)</td></tr>
+    <tr class="highlight"><td>Non-Adaptive</td><td>Direct Prompt</td><td>1.3%</td><td>0.2%</td></tr>
+    <tr class="highlight"><td>Non-Adaptive</td><td>Template Attack</td><td>82.3%</td><td>0.9%</td></tr>
+    <tr class="highlight"><td>Non-Adaptive</td><td>ROBOPAIR</td><td>92.3%</td><td>2.3%</td></tr>
+    <tr><td>Adaptive Black-Box</td><td>ROBOPAIR</td><td>-</td><td>2.5%</td></tr>
+    <tr><td>Adaptive Gray-Box (WM)</td><td>ROBOPAIR</td><td>-</td><td>2.9%</td></tr>
+    <tr><td>Adaptive Gray-Box (GR)</td><td>ROBOPAIR</td><td>-</td><td>3.8%</td></tr>
+    <tr><td>Adaptive White-Box</td><td>ROBOPAIR</td><td>-</td><td>5.2%</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">Over 1500 evaluations total (210 per attack type). ROBOGUARD reduces ROBOPAIR's ASR from 92.3% to 2.3% while maintaining 100% safe-task success. Under adaptive attacks, ASR rises with access level (black-box 2.5% to white-box 5.2%) but remains far below the unguarded baseline.</p>
+
+  <h3>8.2 Ablation -- Importance of CoT Reasoning</h3>
+  <table>
+    <tr><th>Configuration</th><th>ASR (Attack Success Rate)</th><th>Note</th></tr>
+    <tr class="highlight"><td><strong>Full ROBOGUARD</strong></td><td>4.3%</td><td>Root-of-Trust LLM + CoT Reasoning + Temperature 0</td></tr>
+    <tr class="highlight"><td>+ High Temperature (T=0.5)</td><td>4.3%</td><td>Temperature has no effect -- safety specs are formally verified</td></tr>
+    <tr><td>- CoT Reasoning</td><td>12.8%</td><td>Removing CoT increases ASR by 3x</td></tr>
+    <tr><td>- CoT Reasoning + High Temperature</td><td>25.7%</td><td>No reasoning + randomness increases ASR by 6x</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">Most striking finding: removing CoT reasoning causes a dramatic safety degradation (4.3% to 12.8% to 25.7%). CoT reasoning is not merely nice-to-have -- it is <strong>necessary for safe reasoning</strong>. It enables the LLM to stepwise analyze each semantic entity's relationship to safety rules.</p>
+
+  <h3>8.3 Resource Efficiency Comparison</h3>
+  <table>
+    <tr><th>Method</th><th>Token Usage</th><th>LLM Query Count</th><th>Token Ratio (Defense/Attack)</th></tr>
+    <tr class="highlight"><td><strong>ROBOGUARD</strong></td><td>4,329.6</td><td>1</td><td>-</td></tr>
+    <tr><td>Adaptive Black-Box Attack</td><td>20,471.1</td><td>15</td><td>21.2%</td></tr>
+    <tr><td>Adaptive Gray-Box (WM) Attack</td><td>24,524.3</td><td>15</td><td>17.7%</td></tr>
+    <tr><td>Adaptive Gray-Box (GR) Attack</td><td>52,515.6</td><td>15</td><td>8.2%</td></tr>
+    <tr><td>Adaptive White-Box Attack</td><td>36,446.2</td><td>15</td><td>11.9%</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">Defense resource consumption is far lower than attack cost -- this is an <strong>economic defense advantage</strong>. ROBOGUARD requires only 1 LLM query (~4300 tokens) while attackers need 15 queries (tens of thousands of tokens).</p>
+
+  <h3>8.4 Real-World Experiments (Clearpath Jackal)</h3>
+  <table>
+    <tr><th>Attack Type</th><th>Attack Method</th><th>ASR Without ROBOGUARD</th><th>ASR With ROBOGUARD</th></tr>
+    <tr><td>Safe Tasks (Baseline)</td><td>Direct Prompt</td><td>100%</td><td>100%</td></tr>
+    <tr class="highlight"><td>Non-Adaptive</td><td>Direct Prompt</td><td>0%</td><td>0%</td></tr>
+    <tr class="highlight"><td>Non-Adaptive</td><td>ROBOPAIR</td><td>100%</td><td>0%</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">In real-world experiments, ROBOGUARD blocked <strong>100%</strong> of adversarial attacks -- better than simulation results (2.3% ASR). This is because more challenging safety scenarios can be constructed in simulation, while real lab environments have hazards that are relatively easier to identify.</p>
+
+  <h3>8.5 Typical Execution Examples</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">ROBOGUARD Online Operation: Safe Task (A) vs. Unsafe Task (B) Execution Trajectories</span>
+      <span class="fig-source">Source: Paper Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Online operation examples"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot as <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">Figure Interpretation</div>
+      <p><strong>Safe Task (A)</strong>: The LLM planner generates an exploration plan. Since the initial world model contains no person node, ROBOGUARD generates no safety constraints and allows free exploration. When a chair is discovered, the LLM planner guides inspect(chair) -- ROBOGUARD continues to allow it. <strong>Unsafe Task (B)</strong>: The LLM planner is prompted to collide with a person. Initial exploration proceeds normally (no person discovered yet), but once the person node is added to the world model, ROBOGUARD immediately generates and enforces G(!goto(person)), blocking the collision.</p>
+      <ul>
+        <li><strong>Adaptive safety</strong>: ROBOGUARD does not preemptively forbid all behaviors -- it <strong>dynamically adjusts</strong> safety constraints as the world model updates. This is key to "open-world" safety: maximally free during exploration, immediately restrictive once hazards are discovered</li>
+        <li><strong>Minimal interference</strong>: Figure A shows that safety constraints do not affect normal exploration behavior -- this is empirical evidence for D3 (Utility)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9. POTENTIAL FLAW -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>Assumptions</strong>: (1) The world model must be <strong>accurate</strong> -- if the semantic graph misses critical semantic entities (e.g., undetected person), ROBOGUARD cannot generate corresponding safety constraints. This requires additional <strong>perception safety</strong> measures to ensure world model completeness. (2) Safety rules must come from the system designer -- if rules are incomplete or incorrect, the safety specification will also be incomplete.</li>
+    <li><strong>Applicable scenarios</strong>: LTL encoding is suitable for safety verification of <strong>discrete action sequences</strong>, but not for scenarios requiring <strong>continuous dynamics safety</strong> (e.g., collision avoidance requiring real-time control adjustments). The paper mentions future work could use other specification languages (e.g., STL) to handle continuous-time constraints.</li>
+    <li><strong>Scalability</strong>: (1) As environment complexity grows, the world model enlarges, requiring the root-of-trust LLM to reason about more semantic relationships -- increasing token consumption and latency. (2) More safety rules mean longer LTL formulas, risking automaton state explosion. However, current LLM context windows (1M+ tokens) still have significant headroom.</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>Dimensional extension</strong>: From discrete action safety to <strong>continuous control safety</strong> -- integrate CBF or other continuous safety methods into ROBOGUARD to handle continuous spatial constraints like "do not come within 1m of person." This complements CORE's (paper 10001) direction.</li>
+    <li><strong>Condition relaxation</strong>: (1) Use <strong>distillation</strong> to compress the root-of-trust LLM's capabilities into smaller models -- enabling local safety reasoning on embedded devices, reducing cloud latency and communication dependency. (2) Develop <strong>uncertainty-aware safety reasoning</strong> -- when the LLM is uncertain about scene safety, generate more conservative constraints.</li>
+    <li><strong>Constraint addition</strong>: (1) Upgrade safety reasoning from <strong>passive blocking</strong> to <strong>active guidance</strong> -- ROBOGUARD not only rejects unsafe plans but also suggests to the planning LLM "the closest thing you can do under current safety constraints." (2) Multi-robot safety coordination -- when multiple LLM-driven robots share the same space, safety constraints may interact.</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>Data Issue</th><th>Potential Difficulty</th><th>Severity</th></tr>
+    <tr><td>World model completeness</td><td>If the perception system misses a person, ROBOGUARD generates no safety constraint for that person -- the robot could collide with an undetected person. This is the same problem CORE faces: perception is the weakest link in the safety chain</td><td>Critical</td></tr>
+    <tr><td>Root-of-Trust LLM's own safety vulnerabilities</td><td>Although the root-of-trust LLM does not directly contact user input, its system prompt and world model description could be indirectly manipulated through <strong>world model poisoning</strong> -- if an attacker places misleading semantics (e.g., fake markers) in the environment</td><td>High</td></tr>
+    <tr><td>Buchi automaton state explosion</td><td>As safety rules and world model complexity increase, automaton state count may grow exponentially. The paper does not report actual automaton construction computation times</td><td>Medium</td></tr>
+    <tr><td>LLM latency and real-time requirements</td><td>Each plan verification requires root-of-trust LLM reasoning (~several seconds), which could be a bottleneck in high-frequency control loops. But the paper's design is a slow outer loop + fast inner loop decoupled architecture</td><td>Low</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">Worth Deep Investigation</div>
+    <strong>CORE + ROBOGUARD -- Fusion of Perception Safety and Planning Safety</strong> -- this is the most natural next step for the Vijay Kumar group. CORE handles "reasoning about contextual safety constraints from visual observations" (perception level); ROBOGUARD handles "synthesizing safe behavior from LLM plans" (planning level). The two are complementary: (1) CORE's world model comes from visual perception (VLM + segmentation + depth projection), while ROBOGUARD's world model comes from semantic graphs -- CORE's perception output can be <strong>injected</strong> into ROBOGUARD's semantic graph, giving the safety guardrail the benefit of both online visual reasoning and formal verification; (2) CORE uses CBF for continuous spatial safety ("how far from obstacle"), ROBOGUARD uses LTL for discrete action safety ("is the exit blocked") -- combining both can achieve a <strong>unified continuous-discrete safety framework</strong>.
+  </div>
+</section>
+
+<!-- 10. MOTIVATION -->
+<section id="motivation">
+  <h2>10. Motivation -- First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>What is the essence of the problem?</strong><br>LLM flexibility is simultaneously its greatest strength and greatest safety risk -- because LLMs can generate <strong>any output that conforms to language patterns</strong>, including harmful robot plans. Alignment training only statistically reduces the probability of harmful outputs, it does not guarantee safety (92.3% jailbreak success is the evidence). A safety guardrail must be built <strong>outside</strong> the LLM.</li>
+    <li><strong>How have prior works handled this? Why is it insufficient?</strong><br>Three routes: (i) better alignment -- reduces but cannot eliminate harmful outputs; (ii) constrain LLM output format -- but constraints also restrict legitimate use; (iii) formal verification -- but requires predefined specifications, and not all possible dangerous scenarios can be pre-enumerated in open worlds.</li>
+    <li><strong>What if we use an independent, protected LLM specifically for safety judgment?</strong><br>Key idea: separate "understanding user instructions" from "judging whether instructions are safe" into <strong>two different LLMs</strong>. The planning LLM can contact user input (users are necessary), but the safety LLM only contacts system designer rules and the world model (never user input). Even if the planning LLM is jailbroken, the safety LLM can still block harmful plans.</li>
+    <li><strong>How does the safety LLM convert abstract rules to executable constraints?</strong><br>A <strong>formal language</strong> is needed to express safety -- LTL is naturally suited for expressing safety properties of robot action sequences ("never do X," "if you do Y you must eventually leave"). The safety LLM's role is to "translate" high-level rules into LTL formulas -- this requires understanding semantic relationships in the world model.</li>
+    <li><strong>What if safety specs and user intent conflict?</strong><br>Use minimum-violation synthesis -- safety spec has highest priority, but user intent is followed as much as possible within safety bounds. This ensures safety does not become "can't do anything at all."</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">One-Sentence Motivation</div>
+    LLM-driven robots can be induced by jailbreak attacks to execute dangerous behaviors (e.g., colliding with humans) -- rather than trying to make LLMs "not go bad" (alignment), build an independent safety guardrail <strong>outside the LLM that "will never allow dangerous behavior no matter what"</strong> -- using a root-of-trust LLM for safety reasoning and formal methods for safety enforcement.
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 -- Observe the security vulnerability</strong>: ROBOPAIR (Robey et al. 2025) demonstrated the astonishing vulnerability of LLM-driven robots -- GPT-4o achieves 92.3% jailbreak success rate in robot scenarios. This is work from the same research group, naturally leading to the conclusion "we need a guardrail."</li>
+    <li><strong>Step 2 -- Analyze the root cause of vulnerability</strong>: LLM safety vulnerabilities are not "the model isn't good enough" but are <strong>architectural</strong> -- LLMs are designed to be "helpful," and this design itself is in tension with "completely safe." Therefore, better alignment alone cannot solve the problem.</li>
+    <li><strong>Step 3 -- Design the isolation architecture</strong>: Borrow the root-of-trust concept from computer security -- even if the entire system is compromised, the TCB (Trusted Computing Base) remains trustworthy. Make safety reasoning the TCB, separated from the untrusted planner.</li>
+    <li><strong>Step 4 -- Match formal tools</strong>: LTL + Buchi automata = standard discrete action sequence verification method. Tumova et al.'s minimum-violation planning provides the conflict resolution template. Combine both with LLM reasoning: LLM generates specifications, formal methods verify plans.</li>
+  </ul>
+</section>
+
+<!-- 11. KEY TAKEAWAYS -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>Methodology level</strong>: This is a classic application of <strong>"defense in depth"</strong> in robot safety -- not relying on a single safety layer (LLM alignment) but building multiple independent layers of protection: (1) LLM alignment is the first layer (statistical protection), (2) ROBOGUARD's root-of-trust LLM is the second layer (semantic-level protection), (3) formal verification is the third layer (mathematical-level guarantee). For UAV domain: autonomous UAVs similarly face "command tampering/interference" risks -- an independent flight safety controller could be designed with ROBOGUARD-like architecture.</li>
+    <li><strong>Technical skill level</strong>: (1) <strong>Root-of-trust isolation design</strong> -- the safety reasoning module should never touch any user-originated data, only trust the system designer and sensors. This design principle generalizes to any "untrusted AI + safety-critical system" scenario; (2) <strong>CoT reasoning's amplifying effect on safety decisions</strong> -- the ablation data (4.3% to 12.8% to 25.7%) clearly shows that safety LLMs cannot be "black boxes" and must output interpretable reasoning steps; (3) <strong>Attack-cost asymmetry</strong> -- defenders need only 1 LLM query (4300 tokens), attackers need 15 (20,000-52,000 tokens) -- this economic asymmetry is itself a form of defense.</li>
+    <li><strong>Experiment/writing level</strong>: The paper first defines <strong>four Desiderata</strong> (D1-D4) as the guardrail design evaluation framework -- then each Desideratum is validated experimentally. This "requirement definition, design satisfaction, experimental validation" structure makes the paper highly persuasive.</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>For UAV mission planning safety</strong>: ROBOGUARD's "planning LLM + independent safety LLM + formal verification" three-layer architecture can be directly adapted to UAV mission planning -- the planning LLM generates flight missions (e.g., "fly to GPS coordinates X to collect imagery"), the safety LLM generates safety constraints (e.g., "do not enter no-fly zones, maintain minimum safe altitude"), and formal verification ensures the flight plan violates no safety rules.</li>
+    <li><strong>For multi-UAV collaboration</strong>: In multi-drone missions, each UAV may have different safety constraints (payload limits, battery state, communication range), and inter-UAV actions may mutually affect safety. ROBOGUARD's architecture can be extended to a <strong>centralized safety coordinator</strong> -- a single root-of-trust LLM handling joint safety constraints for the entire team.</li>
+    <li><strong>For human-robot interaction safety</strong>: ROBOGUARD's high-level safety rule interface ("do not harm humans") is a <strong>natural language safety value definition interface</strong> -- enabling non-technical users to define robot safety behavior codes without writing code or formal specifications. This is an important step toward "configurable safe robots."</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>Reference</th><th>Why Important</th></tr>
+    <tr><td>Robey et al. (2025) -- Jailbreaking LLM-controlled robots. <em>ICRA</em></td><td>ROBOPAIR is ROBOGUARD's direct predecessor -- it proved the massive safety vulnerability of LLM-driven robots (92.3% ASR), providing ROBOGUARD's raison d'etre. Understanding this attack method is key to understanding ROBOGUARD's design decisions</td></tr>
+    <tr><td>Ravichandran et al. (2026) -- CORE. <em>arXiv</em></td><td>Same-group parallel work -- CORE handles contextual safety from the visual perception angle, ROBOGUARD from the planning verification angle. Fusing both could produce a complete perception-planning-control safety stack</td></tr>
+    <tr><td>Tumova et al. -- Minimum-violation LTL planning with conflicting specifications. <em>ACC</em></td><td>ROBOGUARD's control synthesis module (Algorithm 1) is directly based on this work's priority-based specification synthesis method -- reducing multi-specification conflict resolution to the two-specification case (safety > plan)</td></tr>
+    <tr><td>Zou et al. (2023) -- Universal and transferable adversarial attacks on aligned language models. <em>arXiv</em></td><td>GCG attack -- automated jailbreak prompt generation method. ROBOPAIR adapted this to robot scenarios. Understanding the fundamental mechanisms of LLM jailbreaking is crucial for designing more robust guardrails</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes | Ravichandran et al. | IEEE RA-L 2026 | ROBOGUARD -- Safety Guardrails for LLM-Enabled Robots | MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

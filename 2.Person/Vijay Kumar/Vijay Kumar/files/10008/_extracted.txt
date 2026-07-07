@@ -1,0 +1,631 @@
+1
+RT-GuIDE: Real-Time Gaussian Splatting for
+Information-Driven Exploration
+Yuezhan Tao, Dexter Ong, Varun Murali, Igor Spasojevic, Pratik Chaudhari and Vijay Kumar
+Abstract—We propose a framework for active mapping and
+exploration that leverages Gaussian splatting for constructing
+dense maps. Further, we develop a GPU-accelerated motion
+planning algorithm that can exploit the Gaussian map for real-
+time navigation. The Gaussian map constructed onboard the
+robot is optimized for both photometric and geometric quality
+whileenablingreal-timesituationalawarenessforautonomy.We
+show through viewpoint selection experiments that our method
+yieldscomparablePeakSignal-to-NoiseRatio(PSNR)andsimilar
+reconstruction error to state-of-the-art approaches, while being
+orders of magnitude faster to compute. In closed-loop physics-
+based simulation and real-world experiments, our algorithm
+achieves better map quality (at least 0.8dB higher PSNR and
+more than 16% higher geometric reconstruction accuracy) than
+mapsconstructedbyastate-of-the-artmethod,enablingsemantic
+segmentation using off-the-shelf open-set models. Experiment
+videos and more details can be found on our project page:
+https://tyuezhan.github.io/RT GuIDE/
+IndexTerms—ViewPlanningforSLAM;Mapping;Perception-
+Action Coupling
+I. INTRODUCTION
+Figure 1: Key elements of our proposed approach. [A] Robot building a
+ACTIVEmappingisaproblemofoptimizingthetrajectory Gaussian map onboard in real-time and using it to avoid obstacles in the
+environment. Synthesized color and depth images from the Gaussian map
+of an autonomous robot in an unknown environment to
+arepresentednexttothecorrespondingobservationsfromtheRGBDsensor.
+construct an informative map in real-time. It is a critical com- [B]Robotnavigatingtounobservedareas(right)withhighinformationgain
+ponent of numerous real-world applications such as precision whilemaximizinginformationalongthetrajectory.Mapregionscoloredlight
+todarkinincreasingestimatedinformationgain.
+agriculture, infrastructure inspection, and search and rescue
+missions. While nearly all tasks rely on recovering accurate gain. Further, we consider the problem of generating high-
+metric informationto enable pathplanning, manyalso require qualitymapsthatarecapableofnovel-viewsynthesisthatcan
+more fine-grained information. Recent advances in learned be used for downstream applications.
+map representations from the computer vision and graphics Fig. 1 shows the elements of our approach. We use the
+communities[1,2]haveopenedupnewpossibilitiesforactive Gaussian splatting approach proposed in SplaTAM [8] to
+mappingandexplorationwhilemaintainingbothgeometrically generate maps. We propose an efficient information gain
+and visually accurate digital twins of the environment. metricanduseahierarchicalplanningframeworktoplanhigh-
+While prior work effectively solves the problem of level navigation targets that yield maximal information in the
+information-driven exploration [3, 4] or frontier-based ex- environmentandlow-levelpathsthataredynamicallyfeasible,
+ploration [5, 6], in this work we consider the additional collision-free and maximize the local information of the path.
+problem of generating radiance fields while also performing We utilize 3DGS as a unified representation for both mapping
+autonomousnavigation.Priorworkhasalsoproposedinforma- and planning. We avoid the cost of maintaining additional
+tionmetricsusingnovellearnedscenerepresentationsthatare volumetricrepresentations–achievingthesamegranularityof
+capableofhighqualityvisualreconstructionbutareincapable a3DGSmapwithavoxelmapwouldrequirearound19.2GB
+ofrunninginreal-timeonboardarobot[7].Toenableefficient ofRAMfora40m×40m×3mspaceat1cmresolution.With
+mapping and planning in these novel representations, we con- ourGPU-basedtrajectoryplanner,weachievean18xspeedup
+siderapproximationtechniquesforcomputingtheinformation compared to a CPU-based implementation, as detailed in
+Sec. V-B. This allows us to generate collision-free trajectories
+This work was supported by TILOS under NSF Grant CCR-2112665,
+onmillionsofGaussiansefficiently.Oursystemrunsreal-time
+IoT4Ag ERC under NSF Grant EEC-1941529, NSF grant CMMI-2415249,
+NSFNRI/USDAaward2022-67021-36856,theARLDCISTCRAW911NF- onboardafullyautonomousunmannedgroundvehicle(UGV)
+17-2-0181,DSONationalLaboratoriesandNVIDIA. to explore an unknown environment while generating a high-
+All authors are with GRASP Laboratory, University of Pennsylvania
+fidelity visual representation of the environment.
+{yztao, odexter, mvarun, igorspas, pratikac,
+kumar}@seas.upenn.edu. In summary, the contributions of this paper are:
+5202
+tcO
+4
+]OR.sc[
+3v22181.9042:viXra
+2
+1) Aunifiedframeworkforonlinemappingandplanning approximationofinformationgainforexploration.Sim-to-real
+built only on Gaussian splatting,eliminating the need for approachesleverageradiancefieldsasasimulatorforimitation
+maintaining additional volumetric representations. learning [25]. Adamkiewicz et al. [26] utilize the geometric
+2) Aninformationgainheuristicthatiseasytocomputeand fidelity of the representation to first map the environment and
+capable of running in real-time onboard a robot. then perform trajectory optimization to plan paths in these
+3) A real-time exploration system built on Gaussian splat- environments. Splat-nav [14] uses a pre-generated Gaussian
+ting, comprehensively validated in both simulation map to compute safe polytopes to generate paths. The proba-
+and real-world experiments across diverse indoor bilistic representations of free space has also been utilized for
+and outdoor environments. We will release the full motion planning [27] where authors use uncertainties in the
+autonomy framework as open-source. learned representation to provide guarantees on collision-free
+paths. While prior work considers planning in radiance fields,
+they typically maintain a separate volumetric representation
+II. RELATEDWORK
+forplanningwhichrequiresadditionalmemoryusageonboard
+Map Representation. To effectively construct a map of the robot. On the other hand, maintaining a secondary repre-
+the environment, numerous map representations have been sentation may lead to inconsistencies in collision checks for
+proposed in the robotics community. The most intuitive but planning. Existing work that performs collision checking with
+effective volumetric representation has been widely used. 3DGSrequiressubsamplingtoprovidesoftconstraints.Inthis
+Voxel-based representation could maintain information such work, our proposed planning module performs dense checks
+as occupancy [9] or signed distance [10]. With the recent ap- directly against all Gaussians for collision avoidance.
+plicationofsemanticsegmentation,semanticmapsthatcontain
+additionaltask-relevantinformationhavebeenproposed[11]– III. PROBLEMSPECIFICATION&PRELIMINARIES
+[13]. With the recent advances in learned map representa-
+OurgoalistoconstructanestimateGˆ ofthetruemapofthe
+tions in the computer vision community, Neural Radiance
+environment G∗, which is a priori unknown. The quality of
+Fields (NeRF) [1] and 3D Gaussian Splatting (3DGS) [2]
+the constructed map Gˆ is evaluated using a hidden test set T
+have become popular representations for robotic motion plan-
+oftuplesofposesandcorrespondingnoise-freemeasurements,
+ning [7, 14, 15]. In this work, we study the problem of active
+(x∗ ,y∗ ) . We aim to solve the following problem
+mapping with the 3DGS representation. test test test∈T
+Active Mapping. The problem of exploration and active argmin (cid:88) L(y∗ ,h(x∗ ,Gˆ))
+test test
+Simultaneous Localization and Mapping (SLAM) has been Gˆ, x1:T test∈T (1)
+widely studied in the past decade. The classical exploration s.t Gˆ =Φ(x ,y ),
+1:T 1:T
+framework uses a model-based approach to actively navigate
+towards frontiers [5] or waypoints that have the highest where L(·) captures the difference between a synthesized and
+informationgain[3,4,7].Somerecentworkcombinestheidea
+atruemeasurement,Φ(·)isthefunctionthatconstructsGˆfrom
+of frontier exploration and the information-driven approach to the set of measurements y 1:T obtained at poses x 1:T , h(·) is
+further improve efficiency [16]–[18]. However, most of the the rendering function that synthesizes a measurement given
+existing work developed their approaches based on classical a pose and a map, and T is the time budget for exploration.
+map representations. In this work, we instead consider the The problem above is ill-posed, as the set of test poses
+activemappingproblemwitha3DGSrepresentation.Bayesian and measurements T is hidden. We approach this challenge
+neural networks [19, 20] and deep ensembles [7] are com- by solving the following two problems in a receding horizon
+mon approaches for estimating uncertainty in learned repre- scheme. At time k ≤ T, we first solve a mapping problem
+sentations. Radiance field representations provide additional that involves minimizing the difference between the observed
+possibilities for estimating uncertainty through the volumetric measurements y 1:k and synthesized measurements yˆ 1:k :
+rendering process [21]. NARUTO [22] uses an uncertainty-
+k
+learning module to quantify uncertainty for active reconstruc- Φ(x ,y ):=argmin (cid:88) L(y ,h(x ,Gˆ)). (2)
+1:k 1:k s s
+tion. CG-SLAM [23] uses the difference between rendered Gˆ
+s=1
+depth and observations, and the alignment of α-blended and
+Given the posterior estimate of the map Gˆ, we find the
+mediandepthasmeasuresofuncertainty.FisherRF[24]lever-
+subsequent viewpoint x that maximizes the information
+ages Fisher information to compute pixel-wise uncertainty on k+1
+gain I(·) given by the mutual information between the map
+rendered images. Where prior work in implicit and radiance
+Gˆ and the measurement y at the corresponding pose:
+field representations use indirect methods like ensembles and k+1
+rendering for estimating uncertainty in the representation, a max I(Gˆ;y |x ). (3)
+k+1 k+1
+maprepresentedbyGaussiansencodesphysicalparametersof xk+1
+the scene, which motivates estimating information from the Gaussian Splatting. We use 3D Gaussian Splatting
+Gaussian parameters directly without rendering. (3DGS) [2] to represent the environment as a collection of
+Planning in Radiance Fields. Prior work has also con- isotropic Gaussians Gˆ. Each Gaussian is parameterized with
+sidered planning directly in radiance fields. GS-planner [15] 8 values representing RGB intensities (c), 3D position (µ),
+plans trajectories in a Gaussian map and uses observability radius (r), and opacity (α). To generate the measurement at
+coverage and reconstruction loss stored in a voxel grid as an a given camera pose of the estimated map Gˆ, 3D Gaussians
+3
+Figure2:Theproposedactivemappingframework.Theproposedframeworkcontainstwomajorcomponents,theplanningmoduleandthemappingmodule.
+Ascanbeseeninthefigure,theMappingmodule([A])takesinRGB,depthandposemeasurements,andupdatesthemaprepresentationateverystepand
+computestheutilityofcuboidalregions(Sec.IV-B1).Theutilityofeachregionisthenpassedtotheplanningmodulewhichcomprisesthetopologicalgraph
+and motion primitive library ([B]). The trajectory planner in turn attempts to plan a path to goal that maximizes information gathering (queried from the
+mapper).Theplannedtrajectoryisexecutedbytherobottogetanewsetofobservations.
+are sorted in increasing order of depth relative to the camera new Gaussians at positions corresponding to the current color
+pose and are then splatted onto the image plane. In particular, and depth measurements. The parameters of these Gaussians
+each splatted Gaussian will have a projected 2D mean (µ ) are refined through backpropagation. As in [2], we prune
+2D
+and radius (r ) on the image plane, Gaussians with low opacity or large radius.
+2D
+⊺ Uncertainty Estimation. The objective for finding the next-
+µ 2D = KR k (µ d −T k ) , r 2D = f d r , d=e ⊺ 3 R k ⊺ (µ−T k ), best-view can then be expressed as maximizing the mutual
+information
+where K is the intrinsic matrix, R and T are the rotational
+k k x∗ =argmaxI(y ;Gˆ |x ),
+and translational components of the camera pose in the world k+1 k+1 k+1
+frame at time k, f is the focal length, and e 3 =[0,0,1]⊺. = . H x ( k y +1 |x )−H(y |Gˆ,x ) (5)
+For a given pixel p in the image, its color C(·) can be k+1 k+1 k+1 k+1
+obtained as where H(·) is the Shannon entropy. We have
+C(p)= (cid:88) n cf(p) i (cid:89) −1 (1−f (p)),f(p)=α exp (cid:40) − ||p−µ 2D,i ||2 (cid:41) . H(y k+1 |x k+1 )=− (cid:90) p(y k+1 |x k+1 )logp(y k+1 |x k+1 ))dy k+1
+i i j i i 2r2
+i=1 j=1 2D,i (cid:90)
+with p(y |x )= p(y |Gˆ,x )p(Gˆ)dGˆ and
+Similarly,thedepthD(·)canbeobtainedbyreplacingc with k+1 k+1 k+1 k+1
+i
+d i . At every iteration, we render color image yˆ c and depth H(y |Gˆ,x )=− (cid:82) p(Gˆ)
+k+1 k+1
+image yˆ . We set the function L (from eq. (2)) to
+d (cid:20) (cid:21)
+(cid:82) p(y |Gˆ,x )logp(y |Gˆ,x )dy dGˆ
+1 (cid:88) k+1 k+1 k+1 k+1 k+1
+L= (|yˆ −y |+λ |yˆ −y |)+λ (1−SSIM(yˆ,y )) (4)
+N d d 1 c c 2 c c
+p p∈y We make the following assumptions in this work to
+which is a weighted combination of the L1 loss on depth approximate the information gain efficiently: (a) Gˆ ∼
+and rendered pixel colors and the structured similarity index N(E[G],Var[G]), where G is the random variable that de-
+measure (SSIM) to update the parameters of the Gaussians, notes the map; (b) p(y k+1 | Gˆ) = N(h(x k+1 ,Gˆ),Σ y );
+and N p is the number of pixels in the image. with (c) constant isotropic variance Σ y . For the marginal
+entropy H(y | x ), given assumptions (a) and (b),
+k+1 k+1
+IV. METHOD and linearization of h(·) around E[G], we can approximate
+⊺
+the distribution p(y | x) = N(h(x,E[G]),J Var[G]J ),
+Our proposed framework comprises a mapping module and k+1 k+1
+where J = ∂h(x ,Gˆ)/∂G. Under assumptions (b) and
+a planning module, as illustrated in Fig. 2. The mapping k+1 k+1
+(c), the conditional entropy does not depend on G. Recall the
+module (Sec. IV-A) accumulates measurements and poses to
+entropyofad dimensionalGaussiandistributionN(µ ,Σ )
+reconstruct the environment and computes the uncertainty of Z Z Z
+Gaussiansinthemap.Thisisthenpassedtotheplanningmod- is d 2 Z log(2πe)+1 2 logdet(Σ Z ). Dropping the constant terms,
+the information gain can be simplified to
+ule for planning guidance paths (Sec. IV-B1) and trajectories
+(Sec. IV-B2). I(y ;Gˆ |x )= 1 logdet(I+Σ−1J Var[G]J ⊺ ). (6)
+k+1 k+1 2 y k+1 k+1
+Using the first order approximation of logdet about the
+A. Mapping & Uncertainty Estimation
+identity, we can define a proxy metric for scoring next best
+We build the 3DGS mapping module upon SplaTAM [8] view as
+withisotropicGaussians.Asin[8],wesetλ =0.4,λ =0.1.
+1 2 x∗ =argmaxTr(Σ−1J Var[G]J ⊺ ). (7)
+At the beginning of each mapping iteration, we initialize k+1 y k+1 k+1
+xk+1
+4
+As in [24], assumption (c) allows us to simplify the op- use the Gaussian uncertainty estimates to identify regions of
+timization by ignoring the effect of Σ−1. Evaluating J the map that should be visited next. We evenly partition the a
+y k+1
+is computationally expensive because it typically requires prioriknownenclosingspaceofthedesiredmapintocuboidal
+rendering at new poses. To achieve real-time evaluation of regions. At time k, for a region o, denote the cardinality of
+multiple candidate viewpoints, we replace the Jacobian term theGaussiansintheregionbyM .Wecomputethemeanun-
+k (cid:16) (cid:17)
+J k+1 with a binary matrix that corresponds to its sparsity certainty of that region Ω k =1/M k (cid:80) µ∈o ∥µ k −µ k−1 ∥ 2 .
+pattern. Intuitively, this captures the set of Gaussians within We formulate a high-level guidance path that allows us to
+the field of view at pose x k+1 . The key insight behind these (i) navigate to regions of high uncertainty; and (ii) utilize
+approximations is that we estimate information gain using the known traversable space to plan long-range trajectories
+the current uncertainty, based on the assumption that local without computationally expensive collision checks. At the
+measurements lead to precise local map estimates. We show highlevelofourplanner,weconstructatreebyincrementally
+empirically that the exploration performance based on our addingnodesalongthetraveledpath.Thetreeconsistsoftwo
+metric (in Sec. V-A2) is similar to the performance based types of nodes: odometry nodes and viewpoint nodes. As the
+on eq. (7). We propose a heuristic for estimating uncertainty robot moves, it verifies the presence of a nearby odometry
+Var[G] based on the magnitude of the change in means node; if none exist, a new odometry node is added to the tree
+(µ) of the Gaussians, associating larger displacements with andconnectedtothenearestexistingodometrynodes.Ateach
+higher uncertainty. The motivation behind this is that Var[G] planning iteration, we sample a fixed number of viewpoints
+can be approximated with the empirical Fisher Information aroundtheidentifiedregions.Wecomputetheshortestviewing
+matrix [28], Var[G] ≈ ∇ G L(x k ,y k )∇ G L(x k ,y k )⊺, which in distancefromtheGaussianregioncentroidtotheopticalcenter
+turn can be directly linked to the square of the updates of of the camera, given the camera intrinsics. Each sampled
+Gaussian parameters tuned by the gradient descent algorithm. viewpointisthenassignedtheutilitycomputedforthatregion
+Inpractice,weobservethatthesquareofthemagnitudeofthe and connected to the closest odometry node in the tree as a
+updates outlined above is sensitive to measurement noise (in viewpoint node. We then use Dijkstra’s algorithm to find the
+Sec. V-A3), so we use the magnitude of the change instead. shortest path from the current robot location in the tree to
+Empirically,weobservethatthemeansofGaussianslocated all the viewpoint nodes in the tree. Finally, we compute the
+near boundaries between observed and unobserved space ex- cost-benefit of a path using Ω/ed where Ω is the estimated
+hibit significant changes over successive updates, indicating information gain and d is the distance to the node [29]. The
+high uncertainty, as visualized in Fig. 2. Consequently, di- maximal cost-benefit path is sent to the trajectory planner.
+recting exploration toward these high-uncertainty Gaussians 2) Trajectoryplanner: WepartitionthecurrentmapGˆ into
+is analogous to following frontiers in grid-based exploration, three disjoint subsets: Gˆ , which consists of Gaussians with
+H
+making this heuristic effective for autonomous exploration. high uncertainty, Gˆ , which consists of Gaussians with low
+L
+Through careful bookkeeping, Gaussians that remain un- uncertainty, and Gˆ for the rest. For a Gaussian g ∈ Gˆ
+O
+changed in the most recent update retain their previously and pose x, we define the binary visibility function v(x,g)
+computed displacement values, ensuring that our heuristic capturing whether g is in the field of view of x. To avoid
+provides a consistent measure of each Gaussian’s movement rendering each view to check for occlusions, we cull the
+overtime.Inadditiontotheboundariesbetweenobservedand Gaussians that are beyond the perception range of the sensor.
+unobservedspace,areaswithinobservedspacethathaveinsuf- To maximize information gain while exploring the envi-
+ficient measurements also exhibit relatively high uncertainty. ronment, we aim to obtain viewpoints with high utility ξ
+Thisfurtherdirectstherobottoexploretheseareasandgather that maximize the number of high-uncertainty Gaussians and
+more information, improving the overall map quality. minimizethenumberoflow-uncertaintyGaussiansinthefield
+of view. Trajectories are evaluated based on the sum of the
+utilities of the viewpoints in each trajectory given by
+B. Hierarchical Planning
+In spite of the approximations introduced in the previous ξ(x,Gˆ)= (cid:88) v(x,g)−λ ξ (cid:88) v(x,g). (8)
+section to compute information gain obtained by navigating g∈Gˆ H g∈Gˆ L
+to a given area in space in a computationally efficient way, The first term in eq. (8) encourages additional observations
+the task of finding such a region is still a challenging opti- of parts of the scene with high uncertainty. The second term
+mization problem. For this reason, we address the latter task penalizesobservationofstableGaussiansinexploredareasand
+through a hierarchical planning framework. The high-level encourages exploration of unseen parts of the environment.
+planner provides guidance to map particular regions of the The two terms are weighted by λ .
+ξ
+environment and a path to that region from the known space Giventhepathgeneratedbythehigh-levelplanner,weselect
+in the environment. The low-level (trajectory) planner finds a the furthest point p along the path that lies within a local
+goal
+trajectory that is dynamically-feasible (i.e. obeys the robot’s planning range R , and set it as the center of the goal region
+H
+physical constraints), collision-free and locally maximizes the X . We use the unicycle model as the robot dynamics f(·).
+goal
+information gain along the path. The robot state x = [p,θ] ∈ R2×S1 consists of its position
+1) High-level planner: In contrast to traditional mapping (p) and heading (θ). The control inputs u = [v,ω] ∈ R2
+representations, the Gaussian map does not encode occluded consist of linear velocity (v) and angular velocity (ω). We
+andfreespace.Insteadofcomputing(geometric)frontiers,we solve the trajectory planning problem in 2 steps: (i) finding
+5
+feasible, collision-free trajectory candidates, and (ii) selecting InformationMaximization.Astatesequence{x (lτ/L)|l∈
+i
+a trajectory that maximizes the information gain. The first {0,...,L}} containing the end state of each of L segments
+problem is defined as follows: in the i-th trajectory is used for evaluating the information
+alongthetrajectory.Theinformationofeachstateisevaluated
+Problem 1. Trajectory Candidate Generation. Given an
+according to eq. (8). Finally, the trajectory with the highest
+initial robot state x ∈ X , and goal region X , find
+0 free goal information
+the control inputs u(·) defined on [0,τ] that solve:
+L (cid:18) (cid:18) (cid:19)(cid:19)
+(cid:90) τ (cid:88) lτ
+argmax ξ x , l∈{0,...,L} (10)
+u
+m
+(·
+i
+)
+n
+,τ
+λ t τ +
+0
+u(t)Tu(t)dt i∈{1,...,Ntraj}
+l=0
+i L
+s.t. ∀t∈[0,τ], x(0)=x 0 , x(τ)∈X goal , (9) is selected and executed by the robot.
+x˙(t)=f(x(t),u(t)), x(t)∈X ,
+free
+||v(t)|| ≤v , |ω(t)|≤ω C. Implementation Details
+2 max max
+We implemented the proposed method using PyTorch2.4
+where λ weights the time cost with the control effort, v
+t max
+and the mapping module following [8]. We note that our
+andω areactuationconstraints,andx istheinitialstate.
+max 0
+framework is compatible with other Gaussian splatting ap-
+proaches if they can meet the compute and latency require-
+Motion Primitive Tree Generation. Inspired by [30], we ments. The parameters of the mapper were set to the default
+solve problem 1 by performing a tree search on the mo- configuration of [8] for the TUM dataset. For viewpoint
+tion primitives tree. Motion primitives are generated with selectionexperiments,weused50mappingiterations.Forreal-
+fixed control inputs over a time interval with known initial world experiments, to enable real-time mapping and collision
+states. Given the actuation constraints v max and ω max of avoidance, we reduced the number of mapping iterations to
+the robot, we uniformly generate N v × N ω samples from 10 and pruned Gaussians once per mapping sequence. The
+[0,v max ] × [−ω max ,ω max ] as the finite set of control in- mapping and planning modules are both set to 1Hz onboard
+puts. Subsequently, motion primitives are constructed given the robot. For trajectory viewpoint evaluation, we set the
+the dynamics model, the controls u, and time discretization. threshold for high and low uncertainty Gaussians at half a
+Collision Checking. We sample a fixed number of points on standard deviation above and below the average magnitude of
+each motion primitive to conduct collision checks. Since we parameter updates, respectively. We found Gaussians on the
+have an uncertain map, we relax x ∈ X free to a chance ground plane to be particularly noisy in indoor environments
+constraint. Let d κ be the minimum distance between a test due to reflections off the floor. This necessitated the removal
+point and the set of Gaussians. Our constraint then amounts of Gaussians on the ground plane for planning. We set the
+to the probability of the distance between the test point and Gaussian region size to 2.5m, λ = 1 and λ = 3. For
+ξ g
+thesetofGaussiansinthescenebeinglessthansomeallowed planning, we set N =3, v =0.6, N =5, ω =0.9,
+v max ω max
+tolerance γ with probability η i.e. P(d κ < γ) ≤ η. When and time discretization 1s.
+checking for collisions, each sampled point is bounded with
+a sphere of radius r and the radius r of each Gaussian
+robot V. RESULTS
+is scaled by a factor of λ . The truth value of the test is
+g
+A. Information Metric Evaluation & Ablation
+determined by comparing the distance to all Gaussians with
+γ := r +λ r, as illustrated in Fig. 2. Note that setting 1) Experimentsetup&Baselines: Toevaluateourproposed
+robot g
+λ = 3 is equivalent to the test proposed by [15]. However, heuristic on viewpoint selection, we conducted simulation
+g
+unlikethecontinuoustrajectoryoptimizationapproachin[15], experimentswiththeAI2-THORsimulator[31]ontheiTHOR
+which requires subsampling to provide soft constraints, our dataset.Intheseexperiments,timebudgetisnotimposed,and
+search-based method allows dense checks. We are implicitly werunexperimentsonalltestsceneswith100stepseach.The
+assuming that 3DGS accurately captures geometry of the iTHOR dataset consists of indoor scenes including kitchens,
+scene and we notice this holds empirically since we initialize bedrooms,bathroomsandlivingrooms.Ateachstep,theagent
+Gaussians in the map using the depth measurements from the is allowed to translate 0.5m in both x and y positions and a
+RGB-D sensor. In the case of collision checking against non- discretesetofpossibleorientations.Thesecandidatepositions,
+isotropic Gaussians, the principal axis of the Gaussian can be along with their corresponding yaw angles, define the full set
+taken as the radius. We develop a GPU-accelerated approach of potential viewpoints. Each viewpoint is evaluated using an
+for testing collisions of all sampled points with all Gaussians uncertainty metric, and the one with the highest uncertainty
+from the map at once while growing the search tree. This is selected as the next action. The simulations were run on
+allows the real-time expansion of the search tree. a desktop computer with an AMD Ryzen Threadripper PRO
+Tree Search. The cost of each valid motion primitive is 5975WX and NVIDIA RTX A4000 (16GB).
+definedbyProb.1.Sincethemaximumvelocityoftherobotis For each scene, we synthesized novel views from the
+boundedbyv ,weconsidertheminimumtimeheuristicas generated maps from a set of uniformly sampled test poses
+max
+h(p) := ||p −p|| /v . We use A* to search through and computed the image metrics against the ground truth
+goal 2 max
+the motion primitives tree and keep top N candidate images. We evaluate the Peak Signal-to-Noise Ratio (PSNR),
+traj
+trajectories for the information gain maximization. Structural Similarity Index (SSIM) [32], Learned Perceptual
+6
+TableI:InformationmetricbenchmarkexperimentsoniTHOR ·104
+2
+PSNR SSIM LPIPS RMSE t/step
+Methods
+[dB]↑ ↑ ↓ [m]↓ [s]↓ 1.5
+Ensemble 21.489 0.762 0.360 0.350 2.667
+FisherRF† 24.171 0.849 0.270 0.285 1.299 1
+RTGuIDE 22.946 0.820 0.305 0.343 0.013
+† ViewpointselectedusinginformationmetricfromFisherRF. 0.5
+TableII:InformationmetricablationexperimentsoniTHOR 0
+PSNR SSIM LPIPS RMSE t/step
+105 106
+Methods [dB]↑ ↑ ↓ [m]↓ [s]↓ NumberofGaussians
+RTGuIDE 22.946 0.820 0.305 0.343 0.013
+RTGuIDE-sum 20.279 0.740 0.371 0.512 0.007
+RTGuIDE-sq 22.489 0.802 0.308 0.343 0.014
+RTGuIDEw.noise 22.541 0.801 0.329 0.344 0.013
+RTGuIDE-sqw.noise 21.445 0.779 0.351 0.386 0.013
+Image Patch Similarity (LPIPS) [33] on the RGB images
+and Root Mean-Square-Error (RMSE) on the depth images.
+We evaluate the proposed method (denoted as Ours) on
+viewpoints following eq. (8) against two other view selection
+methods.ForFisherRF,wefollowtheoriginalimplementation
+toevaluateviewpointsbasedontheFisherinformation.Forthe
+Ensemblebaseline,wetrainanensembleof5modelswiththe
+leave-one-out procedure at each step. We compute the patch-
+wise variance across the rendered images for each sampled
+viewpoint and ensemble model, and select the viewpoint with
+the highest variance as the next action.
+2) Benchmark experiments: The averaged results over all
+test scenes are presented in Tab. I. Our heuristic performs
+comparably with FisherRF and outperforms Ensemble across
+all metrics, while being more than an order of magnitude
+faster in computation time. FisherRF renders images at every
+sampled viewpoint to approximate the information gain with
+the full map parameters, while we avoid such computational
+cost by computing the uncertainty directly on the parameters
+of the Gaussians. This trades off the approximation accuracy
+with efficiency. This efficiency in computation is crucial for
+real-time operation where we evaluate potentially hundreds of
+viewpoints in each planning iteration.
+3) Ablation experiments: For ablation experiments, we
+implemented RTGuIDE-sum, which solely considers the
+sum of the uncertainty of Gaussians in the camera view.
+RTGuIDE-sq evaluates the uncertainty of Gaussians as the
+squared L2 norm following the original derivation in eq. (7)
+andusingeq.(8)toevaluatetheuncertaintyofviewpoints.To
+simulate real-world noisy measurements, we added Gaussian
+noise (µ = 0,σ2 = 0.1) to depth measurements in the simu-
+lation to evaluate RTGuIDE w. noise and RTGuIDE-sq
+w. noise.
+As shown in Tab. II, the ablation experiments on different
+metrics demonstrate that our proposed approach outperforms
+the simple uncertainty summation (RTGuIDE-sum), which
+focuses purely on exploitation. Furthermore, the results show
+that both the squared (RTGuIDE-sq) and standard L2 norms
+(RTGuIDE) achieve comparable performance when perfect
+depth measurements are available. However, when noise is
+introduced, the experiments confirm that our chosen metric is
+more robust and better suited for real-world scenarios where
+measurement noise is inevitable.
+)sm(emiT
+MPL-CPU
+MPL-GPU
+Desiredlatency
+Figure 3: Time spent to plan a trajectory with a 5m horizon (including 129
+collisioncheckingpoints)versusthenumberofGaussiansinthemap.
+TableIII:Closed-loopExperimentsonMP3DinUnitySimulator
+PSNR SSIM LPIPS RMSE Coverage
+Methods
+[dB]↑ ↑ ↓ [m]↓ [%]↑
+Ensemble 10.71 0.24 0.76 2.14 38.93
+FisherRF 15.37 0.49 0.59 1.06 66.40
+RTGuIDE 16.32 0.56 0.54 0.71 92.36
+GT 18.13 0.65 0.47 0.50 –
+B. Planner Performance
+WeevaluatethenecessityofourproposedGPU-basedplan-
+ningapproachinenablingreal-timeplanning.Inparticular,we
+conducted experiments on trajectory planning with a 5-meter
+horizon, evaluating both GPU-accelerated collision checking
+andafullyCPU-basedimplementation.AsillustratedinFig.3,
+theplanningtimeofCPU-basedplannerincreasessignificantly
+with the number of Gaussians. For example, a 40m × 40m
+outdoor parking lot can contain around 3 × 106 Gaussians.
+In this case, the CPU-based planner requires 11.65 seconds,
+whereastheGPU-basedplannertakes0.62seconds,achieving
+18×speedup.TheGPU-basedcollisiontestingenablesparallel
+growth of the search tree at each layer, along with simultane-
+ous and efficient collision checks between all test points and
+Gaussians directly on the GPU.
+C. Closed-loop Simulation Experiments
+1) Experiment setup & Baselines: We conducted experi-
+ments in a Unity-based simulator with ROS and a simulated
+ClearpathJackalrobotwithanRGBDsensorandgroundtruth
+odometry.Thissetofexperimentswasdesignedtoevaluateall
+methodswithreal-timeandclosed-loopoperation,considering
+robot dynamics and collision avoidance.
+The original implementation of FisherRF [24] does not
+modeldynamicsorincludereal-worldexperimentalresults,so
+we implement a closed-loop version of it. We first construct
+both a voxel map and a Gaussian splatting map online. We
+detect and cluster frontiers from the voxel map and use A*
+to generate reference paths to frontier clusters. Camera views
+alongeachpathareevaluatedtocomputeinformationgain.To
+generate collision-free and dynamically-feasible trajectories,
+we generate trajectories along waypoints in the path through
+MPL [30] in the voxel map. We similarly implement an
+Ensemble method as described in Sec. V-A1.
+We obtained the ground truth (GT) by tele-operating the
+robottouniformlysurveytheenvironment.Thecollecteddata
+was used to build a 3DGS map for GT and also served
+as test poses for the other methods. This represents the
+upper bound of the evaluation metrics with the Gaussian
+7
+TableIV:QuantitativeResultsofReal-worldExperiments.
+Methods Env. Budget(Time)[s] PSNR[dB]↑ SSIM↑ LPIPS↓ RMSE[m]↓ Coverage[%]↑ mIoUa ↑
+Ensemble 6.27 0.204 0.839 2.051 98.48 0.071
+FisherRF Indoor1 16.80 0.665 0.393 0.242 99.86 0.314
+300
+RTGuIDE 72m2 17.83 0.737 0.334 0.202 99.95 0.338
+GT 20.56 0.805 0.237 0.158 – 0.420
+Ensemble 10.41 0.269 0.787 2.410 84.10 0.156
+FisherRF Indoor2 14.88 0.588 0.451 1.170 72.80 0.248
+600
+RTGuIDE 189m2 16.40 0.711 0.299 0.689 100.00 0.391
+GT 18.39 0.803 0.243 0.454 – 0.422
+Ensemble 10.59 0.392 0.637 1.705 48.30 0.549
+FisherRF Outdoor1 17.58 0.687 0.349 0.519 85.81 0.600
+600
+RTGuIDE 252m2 20.00 0.744 0.296 0.369 100.00 0.622
+GT 22.95 0.828 0.241 0.195 – 0.631
+Ensemble 16.79 0.538 0.576 1.422 49.59 0.159
+FisherRF Outdoor2 19.44 0.680 0.439 0.773 60.95 0.177
+900
+RTGuIDE 480m2 20.27 0.750 0.345 0.399 98.35 0.174
+GT 24.19 0.835 0.285 0.227 – 0.246
+a Indoor1classes:[floor,chair,table,refrigerator,cabinet,backpack,plants].Indoor2classes:[floor,chair,table,couch,cushion,trashcan,
+television,plants].Outdoor1classes:[pavement,plants,barrel,trafficcone].Outdoor2classes:[pavement,grass,tree,bench,lamppost].
+splatting method. The exploration budget for all methods is
+set to approximately 5 times the duration needed to fully
+survey the environment with tele-operation. For the baseline
+methods, we set the voxel resolution to 5cm. We rendered
+Figure4:Visualizationofonboardconstructedmap
+500 novel views at the ground truth test poses for evaluation.
+The same image metrics on the rendered RGB and depth
+images are used as in Sec. V-A. We evaluated all methods
+on5MP3D[34]scenes[17DRP5sb8fy, HxpKQynjfin,
+2t7WUuJeko7, 8194nk5LbLH, YVUC4YcDtcY] with
+a time budget of 1500s, 480s, 1500s, 1200s and 1800s re-
+spectively. These scenes consist of multi-room indoor envi-
+ronments with varying size and clutter.
+2) Results: The averaged statistics of the experiments are
+presented in Table III. We note that there are signifcant
+errors in the meshes in MP3D which affect the reconstruction Figure5:Qualitativeresults
+results for all methods including the ground truth. Our pro- 2) Qualitative results: We evaluated the quality of the
+posedmethodachieves0.95dBand5.61dBhigherPSNRthan Gaussian splatting maps that were constructed in real-time
+FisherRF and Ensemble. The significantly higher coverage onboard the robot by rendering novel views with a set of
+demonstrates the importance of efficient viewpoint selection test poses. A visualization of the onboard constructed map
+in real-time missions with limited operational budget. isshowninFig.4,andexamplesofrenderedcolorimagesare
+presentedinFig.5.Constructedinrealtimeonboardtherobot,
+our Gaussian splatting map provides a detailed representation
+D. Real-world Experiments & Benchmarks
+oftheenvironment.Beingabletorenderphotorealisticimages
+1) Experiment setup & Baselines: To evaluate the effec- from the map benefits downstream tasks such as semantic
+tiveness of our proposed framework in real-world settings, segmentation, which are analyzed in the next section.
+we compared it with two baselines onboard the robot. We 3) Quantitativeresults: AsshowninTab.IV,inreal-world
+followed the same setup as in the closed-loop simulation scenarioswhentheoperationalbudgetislimited,ourproposed
+experiments for the baselines and the ground truth GT. frameworkconstructsmapsofhigherqualitythanthebaselines
+Wedeployedourmethodandthebaselinesinfourdifferent onboard the robot. To validate that our approach generates
+real-world environments on a Clearpath Jackal robot outfitted maps of reasonable quality, we also present maps generated
+with an AMD Ryzen 5 3600 and RTX 4000 Ada SFF. In with the ground truth samples. Results on novel view image
+addition,theplatformisequippedwithanOusterOS1LiDAR rendering show that the maps constructed with our approach
+for state estimation and a ZED 2i stereo camera for mapping. achieve 0.8-2.4 higher PSNR than FisherRF and 3.5-11.6
+We used [35] to provide odometry and truncated the depth higher PSNR than Ensemble. Furthermore, when evaluated
+measurements at 5 meters for all methods in all of our on depth reconstruction, our method reduces the RMSE of
+experiments. The same evaluation setup from Sec. V-C is the rendered depth by 16.5%-48% compared to FisherRF, and
+employed. To verify the usefulness of the generated Gaussian by 71.4%-90.2% compared to Ensemble. These results reflect
+map representation for downstream tasks in robotics, we also that our method outperforms the baselines in achieving good
+performedanevaluationonthetaskofsemanticsegmentation. coverage of the environments while also optimizing for map
+WeusedGroundedSAM2[36]toobtainsegmentationmasks quality during exploration.
+of the rendered and groundtruth images and computed the For semantic segmentation, our approach achieves better
+mean Intersection over Union (mIoU). mIoU scores for most experiments, indicating higher fidelity
+8
+of the rendered images compared to the baselines. [15] R.Jin,Y.Gao,Y.Wang,Y.Wu,H.Lu,C.Xu,andF.Gao,“Gs-planner:
+4) Discussion: We attribute the performance of our ap- A gaussian-splatting-based planning framework for active high-fidelity
+reconstruction,”inProc.IEEE/RSJInt.Conf.Intell.RobotsSyst. IEEE,
+proach to two key factors. First, the use of an information
+2024,pp.11202–11209.
+metric that is efficient to compute onboard the robot enables [16] B.Zhou,Y.Zhang,X.Chen,andS.Shen,“Fuel:Fastuavexploration
+smooth and continuous operation. Second, since our method using incremental frontier structure and hierarchical planning,” IEEE
+Robot.Automat.Lett.,vol.6,no.2,pp.779–786,2021.
+does not rely on frontiers extracted from the voxel map for
+[17] Y. Tao, Y. Wu, B. Li, F. Cladera, A. Zhou, D. Thakur, and V. Kumar,
+geometric coverage, it allows for revisiting of areas in the “SEER: Safe efficient exploration for aerial robots using learning to
+environment to further improve map quality. predict information gain,” in Proc. IEEE Int. Conf. Robot. Automat.
+IEEE,2023,pp.1235–1241.
+[18] Y. Tao, X. Liu, I. Spasojevic, S. Agarwal, and V. Kumar, “3d active
+VI. LIMITATIONSANDFUTUREWORK metric-semantic slam,” IEEE Robot. Automat. Lett., vol. 9, no. 3, pp.
+2989–2996,2024.
+In this work, we present a framework for real-time active [19] X. Pan, Z. Lai, S. Song, and G. Huang, “Activenerf: Learning where
+exploration and mapping with Gaussian splatting. A future toseewithuncertaintyestimation,”inProc.Eur.Conf.Comput.Vision.
+Springer,2022,pp.230–246.
+direction is to consider semantic features together with the
+[20] S. Lee, K. Kang, and H. Yu, “Bayesian nerf: Quantifying uncer-
+Gaussian splatting maps to perform complex tasks in the tainty with volume density in neural radiance fields,” arXiv preprint
+environment like object search and represent dynamic scenes arXiv:2404.06727,2024.
+[21] S.Lee,L.Chen,J.Wang,A.Liniger,S.Kumar,andF.Yu,“Uncertainty
+in our framework. In this work, we study the active mapping
+guidedpolicyforactiverobotic3dreconstructionusingneuralradiance
+problem which assumes perfect state estimation. In future fields,” IEEE Robot. Automat. Lett., vol. 7, no. 4, pp. 12070–12077,
+work, we aim to incorporate the state estimation uncertainty 2022.
+[22] Z. Feng, H. Zhan, Z. Chen, Q. Yan, X. Xu, C. Cai, B. Li, Q. Zhu,
+and formulate this entire framework using a single sensor.
+andY.Xu,“Naruto:Neuralactivereconstructionfromuncertaintarget
+observations,”inProc.IEEEConf.Comput.Vis.PatternRecognit.,2024,
+REFERENCES pp.21572–21583.
+[23] J.Hu,X.Chen,B.Feng,G.Li,L.Yang,H.Bao,G.Zhang,andZ.Cui,
+[1] B.Mildenhall,P.P.Srinivasan,M.Tancik,J.T.Barron,R.Ramamoorthi, “Cg-slam:Efficientdensergb-dslaminaconsistentuncertainty-aware
+andR.Ng,“Nerf:Representingscenesasneuralradiancefieldsforview 3dgaussianfield,”inProc.Eur.Conf.Comput.Vision. Springer,2024,
+synthesis,”Commun.ACM,vol.65,no.1,pp.99–106,2021. pp.93–112.
+[2] B. Kerbl, G. Kopanas, T. Leimku¨hler, and G. Drettakis, “3d gaussian [24] W.Jiang,B.Lei,andK.Daniilidis,“Fisherrf:Activeviewselectionand
+splatting for real-time radiance field rendering,” ACM Trans. Graph., mapping with radiance fields using fisher information,” in Proc. Eur.
+vol.42,no.4,pp.1–14,2023. Conf.Comput.Vision. Springer,2024,p.422–440.
+[3] L.Schmid,M.Pantic,R.Khanna,L.Ott,R.Siegwart,andJ.Nieto,“An [25] V.Murali,G.Rosman,S.Karamn,andD.Rus,“Learningautonomous
+efficientsampling-basedmethodforonlineinformativepathplanningin drivingfromaerialviews,”inProc.IEEE/RSJInt.Conf.Intell.Robots
+unknownenvironments,”IEEERobot.Automat.Lett.,vol.5,no.2,pp. Syst. IEEE,2024.
+1500–1507,2020. [26] M. Adamkiewicz, T. Chen, A. Caccavale, R. Gardner, P. Culbertson,
+[4] M. Dharmadhikari, T. Dang, L. Solanka, J. Loje, H. Nguyen, J. Bohg, and M. Schwager, “Vision-only robot navigation in a neural
+N. Khedekar, and K. Alexis, “Motion primitives-based path planning radiance world,” IEEE Robot. Automat. Lett., vol. 7, no. 2, pp. 4606–
+for fast and agile exploration using aerial robots,” in Proc. IEEE Int. 4613,2022.
+Conf.Robot.Automat.,2020,pp.179–185. [27] T. Chen, P. Culbertson, and M. Schwager, “Catnips: Collision avoid-
+[5] B.Yamauchi,“Afrontier-basedapproachforautonomousexploration,” ancethroughneuralimplicitprobabilisticscenes,”IEEETrans.Robot.,
+inProc.IEEEInt.Symp.Comput.Intell.Robot.Automat. IEEE,1997, vol.40,pp.2712–2728,2024.
+pp.146–151. [28] J. Martens, “New insights and perspectives on the natural gradient
+[6] J.Yu,H.Shen,J.Xu,andT.Zhang,“Echo:Anefficientheuristicview- method,”J.Mach.Learn.Res.,vol.21,no.146,pp.1–76,2020.
+point determination method on frontier-based autonomous exploration [29] C.Gomez,M.Fehr,A.Millane,A.C.Hernandez,J.Nieto,R.Barber,
+for quadrotors,” IEEE Robot. Automat. Lett., vol. 8, no. 8, pp. 5047– and R. Siegwart, “Hybrid topological and 3d dense mapping through
+5054,2023. autonomousexplorationforlargeindoorenvironments,”inProc.IEEE
+[7] H. Siming, C. D. Hsu, D. Ong, Y. S. Shao, and P. Chaudhari, “Active Int.Conf.Robot.Automat.,2020,pp.9673–9679.
+perception using neural radiance fields,” in 2024 American Control [30] S. Liu, N. Atanasov, K. Mohta, and V. Kumar, “Search-based motion
+Conference(ACC). IEEE,2024,pp.4353–4358. planningforquadrotorsusinglinearquadraticminimumtimecontrol,”
+[8] N. Keetha, J. Karhade, K. M. Jatavallabhula, G. Yang, S. Scherer, in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. IEEE, 2017, pp.
+D.Ramanan,andJ.Luiten,“Splatam:Splat,track&map3dgaussians 2872–2879.
+fordensergb-dslam,”inProceedingsoftheIEEE/CVFConferenceon [31] E. Kolve, R. Mottaghi, W. Han, E. VanderBilt, L. Weihs, A. Herrasti,
+ComputerVisionandPatternRecognition,2024. M. Deitke, K. Ehsani, D. Gordon, Y. Zhu, et al., “Ai2-thor: An inter-
+[9] A.Hornung,K.M.Wurm,M.Bennewitz,C.Stachniss,andW.Burgard, active3denvironmentforvisualai,”arXivpreprintarXiv:1712.05474,
+“Octomap: An efficient probabilistic 3d mapping framework based on 2017.
+octrees,”Auton.Robots,vol.34,pp.189–206,2013. [32] Z.Wang,E.Simoncelli,andA.Bovik,“Multiscalestructuralsimilarity
+[10] H.Oleynikova,Z.Taylor,M.Fehr,R.Siegwart,andJ.Nieto,“Voxblox: forimagequalityassessment,”inTheThrity-SeventhAsilomarConfer-
+Incremental 3d euclidean signed distance fields for on-board mav enceonSignals,Systems&Computers,2003,vol.2,2003,pp.1398–
+planning,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst., 2017, pp. 1402Vol.2.
+1366–1373. [33] R. Zhang, P. Isola, A. A. Efros, E. Shechtman, and O. Wang, “The
+[11] N. Hughes, Y. Chang, and L. Carlone, “Hydra: A real-time spatial unreasonable effectiveness of deep features as a perceptual metric,” in
+perception system for 3D scene graph construction and optimization,” Proc.IEEEConf.Comput.Vis.PatternRecognit.,2018.
+Robot.:Sci.Syst.,2022. [34] A. Chang, A. Dai, T. Funkhouser, M. Halber, M. Niessner, M. Savva,
+[12] A. Asgharivaskasi and N. Atanasov, “Semantic octree mapping and S. Song, A. Zeng, and Y. Zhang, “Matterport3d: Learning from rgb-d
+shannon mutual information computation for robot exploration,” IEEE datainindoorenvironments,”Int.Conf.3DVision,2017.
+Trans.Robot.,vol.39,no.3,pp.1910–1928,2023. [35] C. Bai, T. Xiao, Y. Chen, H. Wang, F. Zhang, and X. Gao, “Faster-
+[13] X. Liu, J. Lei, A. Prabhu, Y. Tao, I. Spasojevic, P. Chaudhari, lio: Lightweight tightly coupled lidar-inertial odometry using parallel
+N.Atanasov,andV.Kumar,“Slideslam:Sparse,lightweight,decentral- sparse incremental voxels,” IEEE Robot. Automat. Lett., vol. 7, no. 2,
+ized metric-semantic slam for multi-robot navigation,” arXiv preprint pp.4861–4868,2022.
+arXiv:2406.17249,2024. [36] T. Ren, S. Liu, A. Zeng, J. Lin, K. Li, H. Cao, J. Chen, X. Huang,
+[14] T.Chen,O.Shorinwa,J.Bruno,A.Swann,J.Yu,W.Zeng,K.Nagami, Y.Chen,F.Yan,Z.Zeng,H.Zhang,F.Li,J.Yang,H.Li,Q.Jiang,and
+P.Dames,andM.Schwager,“Splat-nav:Safereal-timerobotnavigation L.Zhang,“Groundedsam:Assemblingopen-worldmodelsfordiverse
+ingaussiansplattingmaps,”IEEETrans.Robot.,2025. visualtasks,”2024.

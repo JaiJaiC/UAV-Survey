@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Image-Based Visual Servoing of Quadrotors to Arbitrary Flight Targets (Wang, Qin et al., 2023)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Image-Based Visual Servoing of Quadrotors to Arbitrary Flight Targets（基于图像的视觉伺服用于四旋翼追踪任意飞行目标）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Guojie Wang</strong>（王国杰）、<strong>Jiahu Qin</strong>（秦家虎，corresponding，IEEE Senior Member）、Qingchen Liu（刘庆晨）、<strong>Qichao Ma</strong>（马麒超，IEEE Member）、Cong Zhang（张聪）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">中国科学技术大学</strong>（University of Science and Technology of China, USTC），自动化系；秦家虎同时隶属于合肥综合性国家科学中心人工智能研究院</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Robotics and Automation Letters (RA-L)</strong>，<strong>2023年4月</strong>，Vol. 8, No. 4, pp. 2022–2029</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://doi.org/10.1109/LRA.2023.3245416" target="_blank">10.1109/LRA.2023.3245416</a> | Received: 2022-08-04 | Accepted: 2023-01-22 | Published: 2023-02-15</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>针对四旋翼无人机在<strong>三维空间中追踪任意自由飞行目标</strong>的难题，提出了一种基于虚拟相机（virtual camera）方法的 IBVS 控制方案。核心创新：（1）通过将目标点重投影到始终垂直于地面的<strong>虚拟图像平面</strong>，消除了俯仰和偏航运动对图像误差的耦合影响；（2）提出改进的图像误差项，使误差中位数和四分位距分别降低 <strong>22.37% 和 35.10%</strong>；（3）基于完整动力学模型（而非简化模型）设计控制器，在仿真和实物实验中均验证了对直线、正弦、螺旋线三种目标轨迹的有效跟踪。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Image-Based Visual Servoing</span>
+    <span class="tag tag-green">Virtual Camera</span>
+    <span class="tag tag-amber">Quadrotor Tracking</span>
+    <span class="tag tag-purple">Lyapunov Stability</span>
+    <span class="tag tag-red">Underactuated System</span>
+    <span class="tag tag-cyan">IEEE RA-L 2023</span>
+    <span class="tag tag-gray">Arbitrary Flight Target</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么已有的 IBVS 方法难以追踪三维空间中的自由飞行目标？</strong><br>
+    答：因为四旋翼是欠驱动、强耦合的非线性系统——六个自由度仅由四个独立输入（总推力 f + 三轴力矩 τ）控制。在追踪过程中，无人机的俯仰和偏航机动会直接改变相机视角，使得目标在真实图像平面上的投影坐标受到<strong>姿态运动与相对位置变化的双重耦合影响</strong>——误差信号中既包含位置误差也包含姿态误差，导致控制器设计极其复杂。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>引入一个始终垂直于地面的虚拟相机坐标系</strong>——其 Xv 轴始终平行于世界坐标系的 Xe 轴。将目标点重投影到这个虚拟图像平面上后，误差信号的动力学<strong>与俯仰角和偏航角解耦</strong>，即虚拟图像平面上特征点的运动仅依赖于无人机在虚拟相机系下的线速度和滚转角速度。这使得原本强耦合的 IBVS 控制器设计被简化为"平移控制器 + 滚转控制器 + 偏航阻尼"的分层架构。更进一步，在虚拟图像平面上定义改进的误差项，避免了直接将真实图像坐标用于反馈所带来的姿态扰动放大问题。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>虚拟相机方法在固定/平面目标 IBVS 中的应用（Lee et al. 2012; Zheng et al. 2017）</td><td>→ 将虚拟相机的 Xv 轴始终对齐世界坐标 Xe 轴，可以将俯仰/偏航从视觉伺服动力学中解耦。但此前工作均假设目标固定或仅作平面运动——本文首次将这一思路<strong>推广到三维空间任意运动目标</strong></td><td>架构</td></tr>
+    <tr><td>完整动力学模型 vs 简化动力学模型（Yang & Quan 2020 的局限）</td><td>→ 简化模型（假设 φ, θ ≈ 0）限制了无人机的机动能力，无法应对目标的大范围机动。本文基于<strong>完整刚体动力学</strong>设计控制器，保留了姿态回路的全部自由度，使跟踪飞行器可以执行更大范围的姿态调整</td><td>方法</td></tr>
+    <tr><td>Lyapunov 稳定性分析 + 充分条件推导</td><td>→ 通过构造 Lyapunov 函数 $V_i = \frac{1}{2}e_i^T e_i$，推导出<strong>飞行速度与目标距离之间的权衡条件</strong>：$v_x^2 + v\dot{v}_x \le k_1$——即距离越远时跟踪速度不能太快，否则容易丢失特征。这个条件为实际飞行中的速度规划提供了理论指导</td><td>数学 / 控制</td></tr>
+    <tr><td>KCF（Kernelized Correlation Filter）在线视觉跟踪</td><td>→ 在实物实验中，使用 KCF 算法在视频帧中实时跟踪入侵者目标，为 IBVS 控制器提供连续的目标图像坐标。将经典计算机视觉跟踪器与控制理论结合，形成了完整的感知-控制闭环</td><td>工程 / 集成</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 首次将虚拟相机 IBVS 方法推广到三维空间任意运动目标</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>现有 IBVS 方法（如基于球面图像矩、透视图像矩的工作）均假设目标固定或仅作平面运动。当目标在三维空间中自由飞行时，无人机追踪过程中的俯仰和偏航变化会严重扰动图像误差信号，导致控制器性能急剧下降甚至发散。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>虚拟相机方法在 VTOL 自主着陆（Lee et al. 2012）、固定目标追踪（Zheng et al. 2017）中已有成功应用，但从未被用于三维自由飞行目标</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>定义虚拟相机坐标系 V，其 Xv 轴始终平行于世界系 Xe 轴。将入侵者中心点 P 投影到虚拟图像平面，推导视觉伺服方程 $\dot{p} = J_v r_v$，其中 $r_v = [v^T, \dot{\phi}]^T \in \mathbb{R}^4$ 与俯仰角和偏航角速度完全无关——实现了动态解耦。这是作者所知的<strong>首次将虚拟相机方法应用于三维任意运动目标的追踪 IBVS</strong>。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 改进的图像误差项——误差中位数降低 22.37%，四分位距降低 35.10%</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统方法直接在真实图像平面上定义误差 $e = [u - u_d, v - v_d]^T$，但真实图像坐标受姿态运动（尤其是俯仰和偏航）的强烈影响，导致误差信号抖动大、收敛慢。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>虚拟图像平面的解耦特性——既然虚拟图像平面上的特征运动不受俯仰/偏航影响，那么在该平面上定义的误差也应该更"干净"</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在虚拟图像平面上定义误差 $e_i = p - p_d$（$p_d = [0, 0]^T$ 表示期望目标图像位于虚拟图像中心），基于 Lyapunov 方法设计控制器 $v_{vy} = k_1 v_u$、$v_{vz} = k_2 v_n$。消融实验（Fig. 9 + Table I）表明：在直线/平面/三维三种轨迹下，改进误差项的中位数平均降低 <strong>22.37%</strong>，四分位距（IQR）平均降低 <strong>35.10%</strong>，且异常值（outliers）显著减少。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 基于完整动力学模型的控制器 + 距离估计算法</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>最相关的前人工作（Yang & Quan 2020, ICRA）使用简化刚体动力学模型——隐含小角度假设（φ, θ ≈ 0），限制了跟踪无人机的机动能力。此外，单目相机无法直接测量与目标的距离，缺乏距离信息容易导致"追上又飞过头"的问题。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>完整四旋翼动力学模型（位置 + 速度 + 姿态 + 角速度共 12 阶状态）+ 单目测距思路（利用目标在图像中的像素占比估计距离）</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）平移控制器基于完整位置动力学方程，推力公式 $f = \frac{m}{\cos\phi\cos\theta}[\dot{v}_{vz}\sin\theta + k_3(v_{vz} - k_2 v_n)\cos\theta + g]$；（2）滚转控制器 $\omega_1 = -\sin\phi\tan\theta \cdot \omega_2 - \cos\phi\tan\theta \cdot \omega_3 - k_\phi e_\phi$ 保证指数收敛；（3）距离估计算法（Algorithm 1）利用目标图像的水平像素数 N 与相机水平分辨率 Ne 的比值 $d \approx (N_e/N)d_e$ 估算距离，当距离小于阈值 $d^*$ 时停止逼近。对比实验（Fig. 13）表明：本文方法的最终距离误差（10.30 m）显著小于 [23]（20.83 m），且姿态误差在接近目标过程中保持稳定。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph PERCEPTION["感知层 — 视觉输入"]
+      direction LR
+      CAM["前视单目相机 · 640×480 · 20fps · FOV 1.047rad"]
+      KCF["KCF在线跟踪器 · 首帧手动框选 · 逐帧输出目标中心坐标"]
+    end
+
+    subgraph VIRTUAL["虚拟相机层 — 动态解耦"]
+      direction LR
+      PROJECT["重投影: 真实图像平面 → 虚拟图像平面 · Xv∥Xe"]
+      DECOUPLE["解耦效果: 特征运动与俯仰/偏航无关 · rv∈R⁴"]
+      JACOBIAN["图像雅可比 Jv · 透视投影方程"]
+    end
+
+    subgraph CONTROL["控制层 — 控制器设计"]
+      direction LR
+      ERR["改进误差: ei = p - pd · pd=[0,0]ᵀ"]
+      TRANS["平移控制: vvy=k1·vu · vvz=k2·vn · 推力f"]
+      ROLL["滚转控制: ω1 指数稳定 · φd=0"]
+      YAW["偏航阻尼: ω3=kψ(ψ-ψd) · ψd=0"]
+    end
+
+    subgraph PLATFORM["平台层 — 四旋翼硬件"]
+      direction LR
+      IMU["IMU · 角速度+欧拉角估计"]
+      PX4["Pixhawk自驾仪 · PX4固件"]
+      MOTOR["电机控制信号 · 推力+三轴力矩"]
+    end
+
+    CAM --> KCF
+    KCF --> PROJECT --> DECOUPLE --> JACOBIAN
+    JACOBIAN --> ERR
+    ERR --> TRANS
+    ERR --> ROLL
+    ERR --> YAW
+    TRANS --> MOTOR
+    ROLL --> MOTOR
+    YAW --> MOTOR
+    MOTOR --> PX4
+    IMU --> ROLL
+    IMU --> YAW
+    IMU --> PROJECT
+
+    ROLL -.->|"指数收敛 · eφ→0"| ERR
+    YAW -.->|"偏航稳定 · ψ→0"| DECOUPLE
+    TRANS -.->|"稳定性条件 · vx²+v·vx≤k1"| ERR
+
+    classDef percept fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef virtual fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef control fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef platform fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class CAM,KCF percept
+    class PROJECT,DECOUPLE,JACOBIAN virtual
+    class ERR,TRANS,ROLL,YAW control
+    class IMU,PX4,MOTOR platform
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 从图像到电机指令的闭环数据流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph IMAGE["图像采集与目标检测"]
+      direction LR
+      FRAME["相机帧 640×480@20fps"] --> DETECT["KCF跟踪器 · 输出(u,v)真实图像坐标"]
+    end
+
+    subgraph REPROJ["虚拟相机重投影"]
+      direction LR
+      RPY["IMU提供 φ,θ,ψ 欧拉角"] --> RV["构造旋转矩阵 Rv"]
+      COORD["真实坐标(u,v)"] --> VIRT["虚拟图像平面坐标(vu,vn)"]
+      RV --> VIRT
+    end
+
+    subgraph CTRL["反馈控制计算"]
+      direction LR
+      ECOMP["误差计算: ei=[vu,vn]ᵀ-[0,0]ᵀ"] --> TRANS_CMD["平移指令: vvy=k1vu, vvz=k2vn"]
+      ECOMP --> THRUST["推力计算: f=f(φ,θ,vvz,vn,m,g)"]
+      ECOMP --> ROLL_CMD["滚转指令: ω1=-sφtθ·ω2-cφtθ·ω3-kφeφ"]
+      ROLL_CMD --> OMEGA["角速度指令 ω = [ω1,ω2,ω3]ᵀ"]
+      YAW_CMD["偏航指令: ω3=kψ(ψ-0)"] --> OMEGA
+    end
+
+    subgraph EXEC["执行与状态反馈"]
+      direction LR
+      THRUST --> MOTORS["Pixhawk · 电机PWM"]
+      OMEGA --> MOTORS
+      MOTORS --> QUAD["四旋翼 · m=1.55kg · J=diag{...}"]
+      QUAD --> STATE["状态反馈: ξ,V,φ,θ,ψ,Ω"]
+      STATE --> RPY
+    end
+
+    IMAGE --> REPROJ --> CTRL --> EXEC
+    STATE -.->|"循环: 20Hz视觉+高频IMU"| FRAME
+
+    classDef img fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef reproj fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef ctrl fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef exec fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class FRAME,DETECT img
+    class RPY,RV,COORD,VIRT reproj
+    class ECOMP,TRANS_CMD,THRUST,ROLL_CMD,YAW_CMD,OMEGA ctrl
+    class MOTORS,QUAD,STATE exec
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 从待命到完成追踪的完整流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph INIT["阶段1: 系统初始化与起飞"]
+      direction LR
+      I1["地面待命 · 预检传感器/估计器"] --> I2["Position模式起飞 · 悬停10m高度"] --> I3["切换Offboard模式 · 相机启动"] --> I4["首帧手动框选入侵者 · KCF初始化"]
+    end
+
+    subgraph TRACK["阶段2: 视觉伺服追踪循环"]
+      direction LR
+      T1["KCF逐帧输出目标中心 (u,v)"] --> T2["虚拟相机重投影 → (vu,vn)"] --> T3["计算图像误差 ei = (vu,vn)-(0,0)"] --> T4["控制器输出: 推力f + 角速度ω"]
+    end
+
+    subgraph CONVERGE["阶段3: 逐步逼近目标"]
+      direction LR
+      C1["平移控制引导接近 · vvy=k1vu"] --> C2["距离估计算法: d≈(Ne/N)·de"] --> C3["d < d*时停止前向逼近 · vvx=0"] --> C4["图像误差 ei→0 · 目标居中"]
+    end
+
+    subgraph COMPLETE["阶段4: 追踪完成"]
+      direction LR
+      M1["图像补丁居中 · vu→0, vn→0"] --> M2["距离收敛 · UAV靠近入侵者"] --> M3["追踪目标达成 · 监控/拦截就绪"]
+    end
+
+    INIT -->|"开始追踪"| TRACK
+    TRACK -->|"误差收敛"| CONVERGE
+    CONVERGE -->|"任务完成"| COMPLETE
+
+    T4 -.->|"闭环反馈 · IMU数据"| T1
+    C3 -.->|"停止条件触发"| T4
+    M2 -.->|"距离反馈"| C2
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef track fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef converge fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef complete fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class I1,I2,I3,I4 init
+    class T1,T2,T3,T4 track
+    class C1,C2,C3,C4 converge
+    class M1,M2,M3 complete
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \lim_{t \to \infty} e_i(t) = \lim_{t \to \infty} (p(t) - p_d) = 0 \quad \text{s.t.} \quad \dot{\xi} = V,\; m\dot{V} = mge_z - fRe_z,\; \dot{R} = R \cdot sk(\Omega),\; J\dot{\Omega} = -\Omega \times J\Omega + \tau $$
+    <div class="eq-note">
+      <strong>$e_i = p - p_d$</strong> = 虚拟图像平面上的跟踪误差（$p_d = [0,0]^T$，即目标图像居中）&nbsp;|&nbsp;
+      <strong>$\xi, V$</strong> = 四旋翼在世界系的位置和速度 &nbsp;|&nbsp;
+      <strong>$R, \Omega$</strong> = 旋转矩阵和机体角速度 &nbsp;|&nbsp;
+      <strong>$f, \tau$</strong> = 总推力和三轴力矩（仅有的 4 个控制输入）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：四旋翼是欠驱动系统（4 输入 vs 6 自由度），且目标在三维空间中不受控地自由运动。必须在仅依赖单目相机（无 GPS/RTK 目标定位）的条件下，克服姿态运动对图像误差的耦合干扰，实现稳定跟踪。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>前视单目相机图像序列（640x480 @ 20fps）+ IMU 数据（角速度 + 欧拉角）</td><td>图像：目标边界框中心 $(u, v)$；IMU：$[\phi, \theta, \psi, \omega_1, \omega_2, \omega_3]$</td></tr>
+    <tr><td><strong>输出</strong></td><td>四旋翼控制指令：总推力 $f$ + 三轴角速度指令 $[\omega_1, \omega_2, \omega_3]$</td><td>推力（N）+ 角速度（rad/s）→ 电机 PWM</td></tr>
+    <tr><td><strong>目标</strong></td><td>使目标图像补丁始终位于虚拟图像平面中心 $(0,0)$，同时无人机与目标之间的距离逐渐收敛到最小值</td><td>误差中位数降低 22.37%（vs 传统方法），IQR 降低 35.10%</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>基于视觉反馈的非线性控制问题</strong>——核心在于将欠驱动四旋翼的强耦合动力学与图像空间的特征运动关联起来，并设计一个在 Lyapunov 意义下稳定的反馈控制器。与端到端学习方法不同，本文的方法是<strong>基于模型的（model-based）</strong>：显式推导四旋翼动力学和虚拟相机投影方程，通过构造 Lyapunov 函数推导控制律和稳定性充分条件。平台：四旋翼无人机（m = 1.55 kg，轴距 0.47 m），场景：室外三维空间追踪自由飞行入侵者（直线/正弦/螺旋线三种轨迹），任务：视觉伺服追踪 + 接近。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：四旋翼的欠驱动特性 vs 三维自由目标追踪所需的全部机动自由度。<br><br>
+    （1）<strong>欠驱动的本质困境</strong>：四旋翼有 6 个自由度（位置 x, y, z + 姿态 φ, θ, ψ），但只有 4 个独立控制输入（总推力 f + 三轴力矩 τ_x, τ_y, τ_z）。水平方向的平移运动<strong>必须通过滚转/俯仰倾斜机体来间接产生</strong>——这意味着任何水平追踪机动都会同时改变相机视角，使图像平面上的目标投影坐标发生不可预测的变化。<br><br>
+    （2）<strong>姿态-图像耦合</strong>：在真实图像平面上，目标坐标 $(u, v)$ 的变化来源于两个无法区分的因素——（a）无人机与目标之间的相对位置变化（这是需要控制的误差）；（b）无人机自身的俯仰和偏航机动（这是产生水平推力的必要副作用）。当目标在三维空间中自由机动时，追踪无人机需要频繁调整姿态，图像误差信号中<strong>姿态扰动分量远大于位置误差分量</strong>——控制器实际上在"对抗自己产生的扰动"。<br><br>
+    （3）<strong>单目深度不可观测</strong>：单目相机无法直接测量与目标的距离。而距离信息对追踪控制至关重要——没有距离反馈，无人机无法判断自己是"正在逼近"还是"正在远离"。此前方法要么假设距离已知，要么依赖于额外的距离传感器（增加重量和复杂度）。<br><br>
+    <strong>将这三点放在一起</strong>：你需要在一个仅靠单目相机感知、仅靠四旋翼自身机动能力执行追踪的系统中，同时解决（1）动力学欠驱动导致的控制自由度不足，（2）姿态机动对视觉反馈的自我干扰，（3）缺失深度信息导致的逼近行为不确定性。这三个问题相互纠缠——虚拟相机方法是同时解耦（1）和（2）的关键钥匙。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>球面图像矩 IBVS（Hamel & Mahony 2002; Guenard et al. 2008）</td>
+      <td>使用球面投影几何定义图像矩特征，利用透视投影的几何不变性获得部分解耦的动力学方程</td>
+      <td>虽然球面投影比平面投影具有更好的旋转不变性，但<strong>仅适用于固定或平面运动目标</strong>。当目标在三维空间中随机飞行时，球面图像矩无法消除所有姿态耦合——尤其是目标快速横向移动时，图像矩的非线性使其控制设计变得极其复杂。</td>
+    </tr>
+    <tr>
+      <td>虚拟相机 IBVS（Lee et al. 2012; Zheng et al. 2017）</td>
+      <td>将图像特征重投影到虚拟图像平面（Xv∥Xe），虚拟平面上的特征运动与俯仰/偏航解耦，从而简化 IBVS 控制器设计</td>
+      <td>效果优秀——但<strong>仅针对固定或平面运动目标进行了验证</strong>。Zheng et al. (2017) 需要已知无人机线速度的假设。这些方法没有在三维自由飞行目标场景下接受过考验——本文的工作正是填补了这一空白。</td>
+    </tr>
+    <tr>
+      <td>简化动力学 + 拦截 IBVS（Yang & Quan 2020, ICRA）</td>
+      <td>用简化刚体动力学模型（忽略高阶姿态耦合项，隐含小角度假设）设计 IBVS 控制器用于无人机拦截</td>
+      <td>这是与本文<strong>最相关的前人工作</strong>。但简化模型隐含了小角度假设（φ, θ ≈ 0），导致跟踪无人机的<strong>机动能力受限</strong>——当目标做大范围机动时，简化模型的控制精度急剧下降。对比实验中该方法在 y 方向的跟踪误差大幅抖动，最终距离误差（20.83 m）是本文方法（10.30 m）的约两倍。</td>
+    </tr>
+    <tr>
+      <td>基于学习的视觉伺服（Shi et al. 2018; Sampedro et al. 2018）</td>
+      <td>用 Q-learning 或深度强化学习端到端地学习视觉伺服策略，避免显式建模复杂动力学</td>
+      <td>学习过程需要<strong>大量的仿真训练和特定的环境参数</strong>——如果实际飞行环境与训练环境不同（光照、背景、目标外观），性能会急剧下降。此外，学习型方法缺乏稳定性保证——控制器可能在状态空间的某些区域产生不可预测的行为，这在安全关键的拦截任务中是不可接受的。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 欠驱动飞行器追踪三维自由目标的控制自由度不足</strong>：四旋翼只有 4 个控制输入，而目标在三维空间中的运动需要 3 个平移 + 至少 2 个旋转自由度来保持相机对准。必须设计一种方法使得即使在姿态需要变化的情况下，视觉误差的收敛也不受影响。</li>
+    <li><strong>挑战 2 — 姿态机动对图像误差的自我干扰</strong>：这是 IBVS 追踪自由飞行目标最独特的困难。追踪过程中无人机必然要俯仰以产生前向推力、偏航以对准目标方向——而这两个动作恰好会<strong>最大程度地改变目标在图像平面上的位置</strong>。控制器收到的误差信号中，姿态的贡献往往超过位置误差的贡献，形成"自激干扰"——控制器为了修正一个由自身姿态引起的"伪误差"而发出更大的姿态指令，进一步恶化误差。</li>
+    <li><strong>挑战 3 — 单目深度估计与逼近停止策略</strong>：在无法直接测量距离的情况下，需要设计一个可靠的"停止逼近"机制——否则无人机会飞越目标甚至与之碰撞。本文的距离估计算法（Algorithm 1）利用目标图像像素数与相机分辨率的比值，但这一方法在目标姿态变化（侧向 vs 正向面对相机）时会引入估计误差。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心是一个<strong>基于模型的视觉伺服控制方案</strong>，由四个相互衔接的技术模块构成：（1）虚拟相机重投影——将目标坐标从真实图像平面映射到虚拟图像平面，消除俯仰/偏航耦合；（2）改进的图像误差项——在虚拟平面上定义误差，降低姿态扰动对反馈信号的影响；（3）Lyapunov 平移控制器——基于虚拟平面误差的李雅普诺夫函数推导控制律和稳定性充分条件；（4）滚转/偏航姿态控制器——分别保证滚转指数收敛和偏航阻尼稳定。以下逐一拆解关键公式。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: Quadrotor Dynamics -->
+  <h4>Group A: 四旋翼完整动力学模型</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1-4) — 四旋翼刚体动力学</span>
+    $$ \dot{\xi} = V $$
+    $$ m\dot{V} = mge_z - fRe_z $$
+    $$ \dot{R} = R \cdot sk(\Omega) $$
+    $$ J\dot{\Omega} = -\Omega \times J\Omega + \tau $$
+    <div class="eq-note">
+      <strong>$\xi = [x, y, z]^T \in \mathbb{R}^3$</strong> = 世界坐标系下的位置 &nbsp;|&nbsp;
+      <strong>$V \in \mathbb{R}^3$</strong> = 世界系下的线速度 &nbsp;|&nbsp;
+      <strong>$m, g$</strong> = 质量和重力加速度（1.55 kg, 9.8 m/s²）&nbsp;|&nbsp;
+      <strong>$f$</strong> = 总推力（标量，沿机体 Zb 轴方向）&nbsp;|&nbsp;
+      <strong>$R: \mathcal{B} \to \mathcal{E}$</strong> = 从机体坐标系到世界坐标系的旋转矩阵 &nbsp;|&nbsp;
+      <strong>$\Omega = [\omega_1, \omega_2, \omega_3]^T$</strong> = 机体角速度 &nbsp;|&nbsp;
+      <strong>$J$</strong> = 惯性矩阵（$J = \text{diag}\{0.029125, 0.029125, 0.055225\}$ kg·m²）&nbsp;|&nbsp;
+      <strong>$sk(\cdot)$</strong> = 反对称矩阵算子：$sk(a)b = a \times b$ &nbsp;|&nbsp;
+      <strong>关键洞察</strong>：本文使用<strong>完整 12 阶动力学模型</strong>（ξ, V, R, Ω），而非简化的小角度假设模型。这使得跟踪无人机可以执行更大的姿态机动，是对前人工作的关键改进。
+    </div>
+  </div>
+
+  <!-- Formula Group B: Virtual Camera Model -->
+  <h4>Group B: 虚拟相机投影与视觉伺服方程</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5-6) — 虚拟相机视觉伺服</span>
+    $$ {}^vp = R_v^T({}^ep - O_v) \qquad \dot{v}_p = -sk(e_x)v_p - v $$
+    $$ p = \begin{bmatrix} v_u \\ v_n \end{bmatrix} = \frac{\lambda}{v_x} \begin{bmatrix} v_y \\ v_z \end{bmatrix} \qquad \dot{p} = J_v r_v $$
+    $$ J_v = \begin{bmatrix} v_u/v_x & -\lambda/v_x & 0 & -v_n \\ v_n/v_x & 0 & -\lambda/v_x & v_u \end{bmatrix} \qquad r_v = [v^T, \dot{\phi}]^T \in \mathbb{R}^4 $$
+    <div class="eq-note">
+      <strong>${}^vp = [v_x, v_y, v_z]^T$</strong> = 目标点 P 在虚拟相机坐标系 V 下的三维坐标 &nbsp;|&nbsp;
+      <strong>$R_v$</strong> = 从世界系到虚拟相机系的旋转矩阵（绕 Xe 轴的滚转旋转）&nbsp;|&nbsp;
+      <strong>$O_v$</strong> = 虚拟相机原点（与真实相机重合）&nbsp;|&nbsp;
+      <strong>$p = [v_u, v_n]^T$</strong> = 目标在虚拟图像平面上的投影坐标 &nbsp;|&nbsp;
+      <strong>$\lambda$</strong> = 相机焦距 &nbsp;|&nbsp;
+      <strong>$J_v \in \mathbb{R}^{2 \times 4}$</strong> = 虚拟相机的图像雅可比矩阵 &nbsp;|&nbsp;
+      <strong>$r_v = [v_{vx}, v_{vy}, v_{vz}, \dot{\phi}]^T$</strong> = 虚拟相机系下的速度向量——<strong>仅含滚转角速度 $\dot{\phi}$，不含 $\dot{\theta}$ 和 $\dot{\psi}$</strong>。这是实现动态解耦的核心：俯仰和偏航角速度不再影响虚拟图像平面上特征的运动。
+    </div>
+  </div>
+
+  <!-- Formula Group C: Lyapunov-based Translation Controller -->
+  <h4>Group C: 基于 Lyapunov 的平移控制器</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(7) — Lyapunov 函数与控制器</span>
+    $$ e_i = p - p_d = \begin{bmatrix} v_u \\ v_n \end{bmatrix} \quad (p_d = [0,0]^T) $$
+    $$ V_i = \frac{1}{2}e_i^T e_i \qquad \dot{V}_i = \frac{\lambda}{v_x}v_u^2 - \frac{\lambda v_{vy}}{v_x}v_u + \frac{\lambda}{v_x}v_n^2 - \frac{\lambda v_{vz}}{v_x}v_n $$
+    $$ \text{控制器：} v_{vy} = k_1 v_u,\; v_{vz} = k_2 v_n \quad \Rightarrow \quad \dot{V}_i = -\frac{\lambda}{v_x}\left[v_u^2(k_1 - \frac{v\dot{v}_x}{\lambda}) + v_n^2(k_2 - \frac{v\dot{v}_x}{\lambda})\right] $$
+    <div class="eq-note">
+      <strong>$e_i$</strong> = 虚拟图像平面上的跟踪误差（期望值 $p_d=[0,0]^T$ 表示目标图像居中）&nbsp;|&nbsp;
+      <strong>$V_i$</strong> = 候选 Lyapunov 函数（正定二次型）&nbsp;|&nbsp;
+      <strong>$v_{vy} = k_1 v_u$, $v_{vz} = k_2 v_n$</strong> = 比例型平移控制律（$k_1=6, k_2=8$）&nbsp;|&nbsp;
+      <strong>稳定性充分条件</strong>：为使 $\dot{V}_i \le -W(e_i)$，需要 $v_x^2 + v\dot{v}_x \le k_1$ 且 $v_x^2 + v\dot{v}_x \le k_2$——这意味着<strong>飞行速度与目标距离之间存在权衡</strong>：距离越远时速度不能太快，否则可能丢失特征。$k_1, k_2, \lambda > 0$ 均为正常数。
+    </div>
+  </div>
+
+  <!-- Formula Group D: Thrust and Attitude Controllers -->
+  <h4>Group D: 推力与姿态控制器</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(10,14) — 推力与滚转控制</span>
+    $$ f = \frac{m}{\cos\phi\cos\theta}\left[\dot{v}_{vz}\sin\theta + k_3(v_{vz} - k_2 v_n)\cos\theta + g\right] $$
+    $$ \omega_1 = -\sin\phi\tan\theta \cdot \omega_2 - \cos\phi\tan\theta \cdot \omega_3 - k_\phi e_\phi \quad (e_\phi = \phi - \phi_d,\; \phi_d = 0) $$
+    $$ \omega_3 = k_\psi(\psi - \psi_d) \quad (\psi_d = 0) $$
+    <div class="eq-note">
+      <strong>$f$</strong> = 由 Ze 轴位置动力学反解得到的总推力（$k_3=3$ 为垂直方向控制增益）&nbsp;|&nbsp;
+      <strong>$\omega_1$</strong> = 滚转角速度指令——代入误差动力学得 $\dot{e}_\phi = -k_\phi e_\phi$，保证<strong>指数收敛</strong>（$k_\phi=2$）&nbsp;|&nbsp;
+      <strong>$\phi_d = 0$</strong> = 期望滚转角为零——因为追踪过程期望平滑稳定，不希望机体倾斜 &nbsp;|&nbsp;
+      <strong>$\omega_3$</strong> = 偏航角速度指令——将偏航角驱动到零（$k_\psi=3.5$），使机头始终朝向目标方向 &nbsp;|&nbsp;
+      <strong>$\psi_d = 0$</strong> = 期望偏航角——使相机光轴指向目标，确保目标保持在视场中心附近。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>控制增益 $k_1, k_2$</td><td><strong>6, 8</strong></td><td>平移控制器的比例增益（$v_{vy} = k_1 v_u$, $v_{vz} = k_2 v_n$）</td><td>需要在响应速度（增益大 → 收敛快）与稳定性（满足 $v_x^2 + v\dot{v}_x \le k_i$ 的条件）之间平衡。$k_2 > k_1$ 因为垂直方向的跟踪精度对飞行安全影响更大</td></tr>
+    <tr><td>控制增益 $k_3$</td><td><strong>3</strong></td><td>垂直速度跟踪增益（推力公式中的阻尼项）</td><td>较低的增益值提供适度的垂直阻尼，避免推力指令出现过大的振荡</td></tr>
+    <tr><td>滚转增益 $k_\phi$</td><td><strong>2</strong></td><td>滚转误差反馈增益（$\dot{e}_\phi = -k_\phi e_\phi$）</td><td>保证指数收敛速率适中——过快会导致滚转指令过大（可能超出飞行包线），过慢则姿态稳定不及时</td></tr>
+    <tr><td>偏航增益 $k_\psi$</td><td><strong>3.5</strong></td><td>偏航阻尼增益（$\omega_3 = k_\psi(\psi - 0)$）</td><td>较高增益使偏航迅速收敛到零，确保机头对准目标方向——这对于前视单目相机保持目标在视场内至关重要</td></tr>
+    <tr><td>相机参数</td><td><strong>640x480 @ 20fps, FOV 1.047 rad</strong></td><td>前视单目相机的分辨率和视场角</td><td>640x480 提供足够的像素分辨率用于 KCF 跟踪；20fps 匹配视觉伺服的控制频率（低于 IMU 的更新率）；60° FOV 在目标覆盖范围与控制精度之间取得平衡</td></tr>
+    <tr><td>飞行器质量与惯性</td><td><strong>m = 1.55 kg, J = diag{0.029, 0.029, 0.055}</strong></td><td>四旋翼的质量和惯性张量</td><td>中等尺寸四旋翼（轴距 0.47 m），载重能力足够搭载 ZED 相机 + NVIDIA TX2 + Pixhawk；对称惯性设计（$J_{xx} \approx J_{yy}$）简化了滚转-俯仰动力学</td></tr>
+  </table>
+
+  <h3>6.4 虚拟相机方法 vs 传统 IBVS 的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>📷 虚拟相机 IBVS（本文）</h4>
+      <ul>
+        <li>图像平面：<strong>虚拟图像平面</strong>（始终垂直于地面，Xv ∥ Xe）</li>
+        <li>特征运动与姿态的关系：仅与<strong>滚转角速度 $\dot{\phi}$</strong> 相关</li>
+        <li>俯仰和偏航的影响：<strong>被完全消除</strong></li>
+        <li>控制器输入：$r_v = [v_{vx}, v_{vy}, v_{vz}, \dot{\phi}]^T \in \mathbb{R}^4$</li>
+        <li>误差中位数：平均降低 <strong>22.37%</strong></li>
+        <li>误差 IQR：平均降低 <strong>35.10%</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>📹 传统 IBVS（真实图像平面）</h4>
+      <ul>
+        <li>图像平面：<strong>真实图像平面</strong>（随相机指向而变化）</li>
+        <li>特征运动与姿态的关系：与<strong>全部三个角速度</strong> ($\dot{\phi}, \dot{\theta}, \dot{\psi}$) 相关</li>
+        <li>俯仰和偏航的影响：<strong>完全耦合</strong>——水平推力必需俯仰 → 俯仰改变图像 → 误差增大</li>
+        <li>控制器输入：需要处理全姿态耦合的 6 维速度向量</li>
+        <li>误差中位数：较大且分散</li>
+        <li>误差 IQR：较大，异常值多</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个关键原理：虚拟相机的几何解耦原理（为什么重投影能消除俯仰/偏航耦合）、基于 Lyapunov 的 IBVS 控制器设计流程（如何从图像误差到稳定控制律）、欠驱动飞行器的分层控制架构（平移-滚转-偏航的解耦逻辑）。</p>
+
+  <h3>7.1 虚拟相机几何解耦原理 — 为什么重投影能消除俯仰/偏航耦合</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 虚拟相机坐标变换的本质</span>
+    $$ {}^vp = R_v^T({}^ep - O_v) \quad \text{其中 } R_v = \begin{bmatrix} 1 & 0 & 0 \\ 0 & \cos\phi & \sin\phi \\ 0 & -\sin\phi & \cos\phi \end{bmatrix} $$
+    <div class="eq-note">
+      <strong>$R_v$</strong> = 从世界坐标系 E 到虚拟相机坐标系 V 的旋转矩阵——仅包含绕 Xe 轴的滚转旋转，<strong>不含俯仰和偏航分量</strong>。这意味着世界系中的任意目标点 P 映射到虚拟相机系时，只经历了滚转变换。&nbsp;|&nbsp;
+      <strong>${}^vp$ 的时间导数</strong>：$\dot{v}_p = -sk(e_x)v_p - v$——其中 $v = [v_{vx}, v_{vy}, v_{vz}]^T$ 是虚拟相机系下的线速度，$sk(e_x)$ 仅引入滚转角速度 $\dot{\phi}$。整个动力学中<strong>没有 $\dot{\theta}$ 和 $\dot{\psi}$</strong>。&nbsp;|&nbsp;
+      <strong>直观理解</strong>：虚拟相机就像一台始终"端平"的摄像机（无论机身如何俯仰偏航，虚拟画面始终水平）。目标在其上的投影位置只关心"目标在水平面内相对于机头的方位"和"目标的高度"——这两个量恰好是平移控制所需的全部信息。
+    </div>
+  </div>
+
+  <p><strong>为什么真实图像平面不行？</strong>真实相机的光轴随俯仰角 $\theta$ 和偏航角 $\psi$ 变化。当无人机俯仰以产生前向推力时，真实图像平面随之倾斜——原本在图像中心的目标会立即偏离中心。控制器将这个偏离解读为"位置误差"，发出更强的俯仰指令来"修正"，形成恶性循环。虚拟相机方法通过在<strong>图像层面</strong>而非<strong>动力学层面</strong>消除耦合，避开了欠驱动系统的结构限制——你不需要额外的执行器，只需要在软件中改变"看"目标的方式。</p>
+
+  <h3>7.2 基于 Lyapunov 的 IBVS 控制器设计 — 从图像误差到稳定控制律</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — Lyapunov 直接法在 IBVS 中的应用流程</span>
+    $$ \text{Step 1: 定义误差 } e_i = p - p_d \quad \text{Step 2: 构造 } V_i = \frac{1}{2}e_i^T e_i \quad \text{Step 3: 求导 } \dot{V}_i = \frac{\partial V_i}{\partial e_i}\dot{e}_i $$
+    $$ \text{Step 4: 代入动力学 } \dot{e}_i = \dot{p} = J_v r_v \quad \text{Step 5: 设计 } r_v \text{ 使 } \dot{V}_i < 0 \quad \text{Step 6: 推导稳定性充分条件} $$
+    <div class="eq-note">
+      <strong>与传统 IBVS 的关键区别</strong>：传统 IBVS 通常直接设计 $\dot{p} = -\lambda e_i$ 的指数衰减形式，但这种方法在四旋翼上无法直接实现——因为 $p$ 的动力学 $J_v r_v$ 受到欠驱动约束（$r_v$ 只有 4 个分量，但要控制 2 个图像坐标 + 1 个距离 + 姿态）。&nbsp;|&nbsp;
+      <strong>本文的方法</strong>：将 $v_{vy}$ 和 $v_{vz}$ 作为"虚拟控制输入"（不考虑它们如何物理实现），设计比例控制律使 $\dot{V}_i$ 负定。然后<strong>反过来</strong>通过推力公式和姿态控制器实现所需的 $v_{vy}$ 和 $v_{vz}$——这正是 backstepping 的思想：将高阶系统分解为级联的低阶子系统，逐级设计控制器。
+    </div>
+  </div>
+
+  <p><strong>稳定性充分条件的物理直觉</strong>：条件 $v_x^2 + v\dot{v}_x \le k_1$ 中的 $v_x$ 是虚拟相机系下目标在 Xv 方向的距离。当距离 $v_x$ 较大时，$v_x^2$ 项增大，需要通过减小 $v\dot{v}_x$（即控制飞行加速度）来满足不等式——这就是"距离远时不能飞太快"的数学表达。反之，距离足够近时（$v_x$ 小），可以允许更大的飞行速度和加速度。这个条件为实际飞行中的<strong>速度自适应调节</strong>提供了理论依据。</p>
+
+  <h3>7.3 欠驱动飞行器的分层控制架构 — 平移-滚转-偏航的解耦逻辑</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 四旋翼的分层控制结构</span>
+    $$ \text{平移层: } (v_{vy}, v_{vz}, f) \longleftarrow \text{图像误差 } e_i \quad \text{滚转层: } \omega_1 \longleftarrow e_\phi = \phi - 0 \quad \text{偏航层: } \omega_3 \longleftarrow \psi - 0 $$
+    <div class="eq-note">
+      <strong>分层逻辑</strong>：平移层负责"让目标图像居中"——这是任务的核心目标；滚转层负责"让机体保持水平"——这是稳定飞行的前提；偏航层负责"让机头对准目标"——这是保持目标在视场内的保障。三个层次<strong>各司其职</strong>，通过虚拟相机的解耦实现了互不干扰。&nbsp;|&nbsp;
+      <strong>与传统全耦合方法的对比</strong>：传统 IBVS 中，平移指令和姿态指令通过同一个图像雅可比矩阵耦合在一起——你无法独立调节其中任何一个而不影响另一个。虚拟相机方法通过"降维"（将 6 维速度映射到 4 维 $r_v$）实现了<strong>功能上的分层</strong>——每个控制层只需要关心自己负责的误差信号。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    虚拟相机将图像误差从姿态耦合中解放出来 → Lyapunov 方法利用解放后的误差设计稳定控制律 → 分层架构将控制律分配到底层执行器 → <strong>三个原理环环相扣</strong>，共同实现了"用欠驱动的四旋翼稳定追踪三维自由飞行目标"这一此前被认为极其困难的任务。任何一个原理的缺失都会让系统失效：没有虚拟相机，误差就不干净；没有 Lyapunov 分析，稳定性就没有保证；没有分层架构，执行器指令就无法协调。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig3.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">整体研究场景：四旋翼追踪三维空间中的任意飞行入侵者</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Overall research scenario of the paper"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：论文的整体研究场景——一架入侵者无人机在三维空间中任意飞行（蓝色轨迹），而追踪四旋翼（红色）基于机载前视相机捕获的图像，运行 IBVS 追踪算法自动跟踪入侵者。追踪算法运行在机载计算机（NVIDIA TX2）上，相机为固定安装的前视单目相机。</p>
+      <ul>
+        <li><strong>场景的核心约束</strong>：追踪无人机仅依赖单目相机和 IMU——没有 GPS 对入侵者的定位、没有 RTK、没有 LiDAR。入侵者的运动是完全未知且不受控的——这比固定目标或已知轨迹的跟踪难度大一个数量级</li>
+        <li><strong>视觉伺服闭环</strong>：相机 → KCF 跟踪器 → 目标图像坐标 → 虚拟相机重投影 → 误差计算 → 控制器 → 推力/角速度指令 → Pixhawk → 电机 → 无人机运动 → 相机视角变化 → 下一帧图像——形成完整的感知-控制闭环</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">坐标系与图像平面：虚拟相机帧与虚拟图像平面的定义</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Coordinate frames and image planes"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：整篇论文最核心的几何概念——虚拟相机坐标系和虚拟图像平面。虚线表示虚拟相机帧 V = {Xv, Yv, Zv} 及其对应的虚拟图像平面。实线表示真实相机帧 C 和真实图像平面。目标点 P 在虚拟图像平面上的投影 p（蓝点）被用于构建视觉伺服模型。</p>
+      <ul>
+        <li><strong>虚拟相机的关键几何特性</strong>：原点 Ov 与真实相机原点 Oc 重合（两者在空间中的位置相同），但 Xv 轴始终平行于世界坐标系的 Xe 轴——这意味着虚拟相机<strong>永远"端平"</strong>，不受无人机俯仰和偏航的影响</li>
+        <li><strong>世界-虚拟坐标系转换</strong>：${}^vp = R_v^T({}^ep - O_v)$——仅通过滚转角 $\phi$ 构造旋转矩阵 $R_v$。俯仰角 $\theta$ 和偏航角 $\psi$ 被完全排除在虚拟相机坐标系的定义之外</li>
+        <li><strong>透视投影</strong>：$p = [v_u, v_n]^T = \frac{\lambda}{v_x}[v_y, v_z]^T$——与标准针孔相机模型一致，区别仅在于使用的是虚拟图像平面而非真实图像平面</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">仿真环境中的追踪过程快照：起飞、悬停、追踪与完成</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Snapshots of tracking process in simulation environment"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：Gazebo 仿真环境中四旋翼追踪自由飞行入侵者的四个关键阶段。追踪无人机（绿色边界框）和入侵者（红色边界框）均为四旋翼模型，尺寸均为 0.47 m x 0.47 m x 0.11 m。</p>
+      <ul>
+        <li><strong>(a) 起飞</strong>：追踪无人机从地面起飞，进入 Position 模式悬停。此阶段仅依赖 PX4 内部的位置控制器，IBVS 尚未激活</li>
+        <li><strong>(b) 悬停</strong>：在 10 m 高度保持悬停，等待追踪算法启动。相机已开始采集图像，但无人机尚未进入追踪模式</li>
+        <li><strong>(c) 追踪</strong>：切换到 Offboard 模式后，IBVS 控制器接管。无人机开始主动追踪入侵者，两架无人机在三维空间中进行动态追逐</li>
+        <li><strong>(d) 完成</strong>：追踪无人机成功逼近入侵者，图像补丁居中，三维距离收敛。此时任务目标达成，可用于后续的监控或拦截操作</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 9: Ablation experiment -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 9</span>
+      <span class="fig-caption">消融实验：改进误差项（虚拟图像平面）vs 传统误差项（真实图像平面）的图像误差箱线图对比</span>
+      <span class="fig-source">来源：论文 Fig. 9 + Table I</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig9.png" alt="Ablation experiments: medians and variation ranges of image errors"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig9.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：改进图像误差项（ours，蓝色）与传统误差项（previous，橙色）在三种目标轨迹（直线、平面、三维）上的统计对比。箱线图显示中位数、四分位数、上下界和异常值。</p>
+      <ul>
+        <li><strong>定量结果（Table I）</strong>：在三种轨迹上，改进误差项的中位数平均降低 <strong>22.37%</strong>，四分位距（IQR）平均降低 <strong>35.10%</strong>。在三维螺旋线轨迹中改进最为显著——此时俯仰和偏航的变化最剧烈，传统方法的误差波动最大</li>
+        <li><strong>异常值显著减少</strong>：在全部三个消融实验中，蓝色箱线图的"须"（whiskers）长度和异常值数量都明显少于橙色——说明改进误差项不仅降低了平均误差，还大幅缩小了误差的波动范围，提高了追踪的<strong>一致性</strong>和可靠性</li>
+        <li><strong>中位数更接近零</strong>：在所有实验中，蓝色箱线图的中位数都更接近零线——验证了虚拟图像平面上误差的渐近收敛特性。这是 Lyapunov 稳定性理论在实验数据中的直接体现</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 13: Comparative experiment -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 13</span>
+      <span class="fig-caption">实物对比实验：本文方法（实线）vs Yang & Quan 2020 方法（虚线）的速度跟踪误差、相对位置与姿态误差</span>
+      <span class="fig-source">来源：论文 Fig. 13</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig13.png" alt="Comparative experiment: our method vs Yang & Quan 2020"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig13.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：实物飞行实验中本文方法（实线）与最相关的前人工作 Yang & Quan 2020（虚线）的全面对比。三张子图分别为速度跟踪误差、UAV-入侵者距离、姿态角误差。两种方法在相同初始条件下进行对比。</p>
+      <ul>
+        <li><strong>(a) 速度跟踪误差</strong>：两种方法在 x 和 z 方向的误差范围相似，但在 <strong>y 方向</strong>本文方法的抖动明显更小——这是因为 [23] 基于简化动力学模型，小角度假设限制了 y 方向的机动能力，而本文的完整模型保留了全部姿态自由度</li>
+        <li><strong>(b) 距离误差</strong>：50 秒后，本文方法的距离误差收敛到 <strong>10.30 m</strong>，而 [23] 的距离误差为 <strong>20.83 m</strong>——本文方法在相同时间内将距离缩小了近一倍。这直接证明了完整动力学模型能产生更有效的逼近行为</li>
+        <li><strong>(c) 姿态误差</strong>：本文方法的滚转和偏航误差在整个追踪过程中保持稳定且较小；而 [23] 的姿态误差<strong>随距离减小而逐渐增大</strong>——这印证了简化模型在接近目标时（需要更精细的姿态机动）性能退化的根本问题</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：（1）假设追踪无人机的速度始终快于入侵者——否则跟踪无法完成。论文未讨论当入侵者速度快于追踪者时系统如何降级或切换策略。（2）目标必须被 KCF 跟踪器成功检测和跟踪——KCF 在目标快速机动、遮挡、光照剧变时可能丢失目标，论文未讨论重检测机制。（3）虚拟相机方法需要 IMU 提供欧拉角——IMU 漂移（尤其是偏航角的累积误差）会逐渐降低重投影精度，论文未讨论在线校正方案。</li>
+    <li><strong>适用场景</strong>：单目距离估计 $d \approx (N_e/N)d_e$ 的精度依赖于目标实际尺寸已知（$d_e$ 需在地面测试中预标定）——如果追踪不同尺寸的入侵者，$d_e$ 需要重新标定。此外，当目标侧向飞行时（目标图像宽度不等于实际宽度），像素占比法会产生显著距离估计误差。</li>
+    <li><strong>可扩展性</strong>：稳定性充分条件 $v_x^2 + v\dot{v}_x \le k_1$ 本质上限制了飞行器在远距离时的速度——如果入侵者突然加速远离，控制增益 $k_1$ 需要在线调节，但论文未讨论自适应增益策略。多机协同追踪的方向论文仅在结论中提及，无具体方案论证。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从单机追踪 → <strong>多机协同追踪</strong>（论文在结论中提及的未来工作）。多机可以从不同视角覆盖目标的运动盲区，同时通过视觉基线实现三角测距——从根本上解决单目深度不可观测的问题。另一个方向是多类型机器人协同——UAV + UGV 空地协同追踪。</li>
+    <li><strong>条件放松</strong>：（1）<strong>自适应增益调度</strong>——根据实时估计的距离 $v_x$ 和目标速度动态调整 $k_1, k_2$，使系统在保持稳定性的同时最大化追踪速度；（2）<strong>特征丢失恢复</strong>——当 KCF 跟踪置信度低于阈值时，利用 IMU 和上一次已知目标位置进行"盲跟"（dead-reckoning tracking），直到重新检测到目标。</li>
+    <li><strong>约束加入</strong>：（1）加入<strong>视场（FOV）约束</strong>——通过 Barrier 函数或 MPC 将目标始终限制在相机视场内，防止边缘丢失；（2）加入<strong>避碰约束</strong>——在多机协同场景中，追踪无人机之间不能发生碰撞；（3）加入<strong>输入饱和约束</strong>——四旋翼有最大推力和最大角速度限制，直接的 Lyapunov 设计未考虑这些约束，实际飞行中需要控制限幅。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>KCF 跟踪失败（遮挡、快速机动、光照变化）</td><td>IBVS 控制器完全依赖目标图像坐标——一旦 KCF 输出错误坐标，控制器会驱动无人机飞向错误方向。论文未提及跟踪失败时的 fallback 策略。这是实际部署中最致命的单点故障</td><td>★★★★★</td></tr>
+    <tr><td>IMU 偏航角漂移</td><td>虚拟相机重投影需要准确的欧拉角 $(\phi, \theta, \psi)$。MEMS IMU 的偏航角会随时间漂移（缺少磁力计校正时尤其严重），导致虚拟图像平面逐渐偏离真实的"水平"姿态，解耦效果下降</td><td>★★★★</td></tr>
+    <tr><td>单目距离估计误差</td><td>$d \approx (N_e/N)d_e$ 假设目标实际尺寸已知且目标正对相机。实际追踪中目标可能在任意姿态下被观测——侧向时的图像宽度小于正面宽度，导致距离被高估，无人机可能过早停止逼近</td><td>★★★★</td></tr>
+    <tr><td>控制增益对飞行条件的敏感度</td><td>仿真中使用的 $k_1=6, k_2=8, k_3=3, k_\phi=2, k_\psi=3.5$ 在仿真和特定实物实验中有效，但论文未讨论这些增益在不同飞行条件（风速、目标速度）下的鲁棒性。实物实验在室外进行，风干扰的影响未被系统性分析</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>带视场约束的自适应 IBVS 多机协同追踪</strong>——这是将本文方法从"单机演示"推向"实用反入侵系统"最关键的一步。核心问题：（1）如何将 FOV 约束形式化为控制障碍函数（Control Barrier Function, CBF），与 Lyapunov 稳定控制器通过二次规划（QP）融合——保证目标不丢失的同时尽可能快地追踪？（2）多机之间如何分配追踪角色——领机负责逼近、僚机负责侧翼观测以提供三角测距？（3）当入侵者速度快于追踪者时，如何从"追踪"模式切换到"区域围堵"模式——通过多机形成包围圈限制入侵者的逃逸空间？（4）这个方向如果成功，将把 IBVS 从学术问题推进到实际的反无人机/安防应用中——在机场、军事基地等禁飞区的入侵者拦截场景有巨大需求。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>你需要一架无人机去追踪另一架在三维空间中自由飞行的"入侵者"——只靠一个前视相机。这是一个在实际安防/军事场景中有明确需求的问题（机场、军事基地的无人机入侵监测与拦截）。但现有 IBVS 方法都假设目标是固定或仅作平面运动的——为什么？因为三维空间中的自由目标追踪太难了：无人机自身的姿态机动（为了产生追踪所需推力）会扰动相机看到的画面——你在追目标的同时也在"晃自己"，而你的控制器恰好依赖这个被晃过的画面。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>四条路线：（i）球面/透视图像矩——通过几何变换获得部分解耦，但无法完全消除姿态耦合，且局限于固定/平面目标；（ii）虚拟相机——已经证明了在固定和平面目标上非常有效（Zheng et al. 2017），但从未被用于三维自由飞行目标——没人知道它在目标也在飞的时候是否仍然有效；（iii）简化动力学（Yang & Quan 2020）——用简化模型回避了耦合问题，但代价是限制了无人机的机动能力；（iv）端到端学习——不需要建模，但泛化性差、无稳定性保证。</li>
+    <li><strong>如果把虚拟相机的思路向前推一步呢？</strong><br>虚拟相机的核心洞察是：Xv ∥ Xe → 俯仰和偏航从视觉伺服方程中消失。这个几何事实<strong>与目标是否运动无关</strong>——无论目标是静止还是飞行，虚拟图像平面上的投影方程 $\dot{p} = J_v r_v$ 的形式都一样。唯一的区别是目标运动会导致 ${}^vp$ 中包含目标的运动分量——但这可以被视为一种"外部扰动"，不影响 $r_v$ 与 $\dot{\theta}, \dot{\psi}$ 无关的结构性质。所以，虚拟相机方法<strong>天然适用于三维运动目标</strong>——只是此前没有人尝试过。</li>
+    <li><strong>如果还不够，还需要什么？</strong><br>还需要：（1）一个在完整动力学模型下的控制器——因为三维追踪需要的机动范围远大于平面追踪，简化模型（小角度假设）不够用；（2）一种验证新误差项确实比传统方法好的方式——消融实验，在同一场景下切换不同的误差定义，用统计指标（中位数、IQR）量化改进幅度。</li>
+    <li><strong>最简单的方案是什么？</strong><br>虚拟相机重投影 → 虚拟图像平面误差 → Lyapunov 控制律 → 完整动力学模型下的推力 + 姿态指令 → 一个简单的距离估计停止条件。整条链路每个环节都有数学保证（Lyapunov 稳定性 + 指数收敛），且不需要任何学习或自适应（全部增益 $k_1$~$k_5$ 固定）。这个"最简单的方案"之所以此前未被实现，是因为需要同时理解：透视投影几何（虚拟相机）、非线性控制（Lyapunov + backstepping）、刚体动力学（完整四旋翼模型）——三个学科的交叉点恰好是本文作者的专业方向。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    传统 IBVS 追踪三维自由飞行目标的最大障碍是——四旋翼为了产生追踪所需的水平推力必须俯仰/偏航，而这些姿态机动会<strong>反过来污染图像误差信号</strong>（误差中被混入了姿态的"伪分量"），使得控制器在对抗自己的副作用——那为什么不把目标图像重投影到一个<strong>永远水平的虚拟图像平面</strong>上（Xv 轴始终平行于世界坐标），让这个平面上的特征运动与俯仰/偏航完全解耦，然后只在这个"干净"的平面上设计控制器？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：在实际飞行中，当你操控无人机追踪一个运动目标时，有没有注意到——每次你推俯仰杆加速前进，画面中的目标就会往上漂？这不是因为目标在往上飞，而是因为你俯仰了——相机的光轴向下倾斜了。控制器收到"目标偏上"的误差信号后会怎么反应？它会尝试让无人机向下平移——但这需要减少推力——然后高度下降——然后画面中目标更偏上了……这是一个经典的 IBVS 自我干扰问题。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"追踪自由飞行目标"分解为三个子问题：（1）如何让图像误差信号不受自身姿态干扰？（2）如何基于干净的误差信号设计稳定控制器？（3）如何在缺少深度信息的条件下判断是否已经足够接近目标？</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）虚拟相机——将一个"永远水平"的虚拟图像平面作为误差的定义域，消除俯仰/偏航耦合；（2）Lyapunov 直接法——构造二次型 Lyapunov 函数，通过选择虚拟控制输入使导数负定，推导稳定性充分条件；（3）单目距离估计——利用目标图像像素占比 $N/N_e$ 反推距离。</li>
+    <li><strong>Step 4 — 组装方案</strong>：将三者整合为完整的 IBVS 控制方案——虚拟相机解耦 + Lyapunov 平移控制 + 滚转/偏航姿态稳定 + 距离估计停止条件。在 Gazebo + ROS + PX4 仿真环境中验证三种目标轨迹（直线/正弦/螺旋线），在实物飞行中与最相关方法（Yang & Quan 2020）进行对比。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：本文展示了一个<strong>"通过坐标系变换实现问题降维"</strong>的经典案例——面对强耦合的非线性系统（四旋翼 + IBVS），不是试图设计更复杂的控制器来"硬扛"耦合，而是通过引入一个巧妙的虚拟坐标系（虚拟相机）<strong>在问题建模阶段就消除了耦合</strong>。这比任何控制器设计技巧都更优雅、更根本。对于 UAV 研究者的启示：<strong>在尝试设计更复杂的算法之前，先想想能否通过变换坐标系或重新定义特征来简化问题本身</strong>——这比死磕控制器结构效率高得多。</li>
+    <li><strong>技术技巧层面</strong>：（1）虚拟相机的 Xv ∥ Xe 设计——一个看似简单的几何约束，产生了"特征运动与俯仰/偏航解耦"的强大效果；（2）Lyapunov 函数中"故意"留下含 $v\dot{v}_x$ 的交叉项，不是为了消掉它，而是从中<strong>反推出稳定性充分条件</strong>——这恰好给出了"速度 vs 距离"的权衡关系，对实际飞行有直接指导意义；（3）消融实验的标准做法——固定场景和目标轨迹，只改变误差定义方式，用箱线图的统计指标（中位数、IQR、异常值）量化改进——这是比"看图说话"更有说服力的实验设计；（4）对比实验选择"最相关的前人工作"（Yang & Quan 2020）而非"最容易打败的 baseline"——这体现了学术诚信和自信。</li>
+    <li><strong>实验/写作层面</strong>：Table I（改进误差 vs 传统误差的定量对比表）与 Fig. 9（箱线图）的组合形成了"数值 + 可视化"的双重论证，非常有效。写论文时应当学习这种呈现方式——一个表给出精确数字，一个图展示分布全貌，两者互相印证。此外，三种目标轨迹（直线-正弦-螺旋线）的递进式实验设计——从简单到复杂逐步验证——是实验设计的一个优秀范本。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 IBVS / 视觉伺服方向</strong>：本文的虚拟相机思路可以直接推广到<strong>任意需要"消除特定自由度耦合"的视觉伺服场景</strong>——不一定非要四旋翼追踪。核心思想是：定义一个虚拟坐标系，使其某几个轴始终与特定世界方向对齐，从而将该方向上的姿态变化从视觉伺服方程中排除。这个思路可以用于固定翼 IBVS（消除滚转耦合）、机械臂手眼协调（消除腕部旋转耦合）等。</li>
+    <li><strong>对于 UAV 控制方向</strong>：本文的分类控制架构（平移层 + 滚转层 + 偏航层）是在欠驱动约束下进行控制器设计的一个优秀范本。特别是"将 $v_{vy}$ 和 $v_{vz}$ 作为虚拟控制输入 → 再通过推力公式反解"的 backstepping 式思维——这种<strong>"先假设某变量可控，再回头实现它"</strong>的设计方法可以广泛应用于各类欠驱动系统的控制器设计。</li>
+    <li><strong>对于多机协同 / 反无人机方向</strong>：本文的追踪框架可以作为<strong>多机协同拦截系统的基础模块</strong>——每个追踪无人机跑相同的虚拟相机 IBVS 控制器，但通过分配不同的虚拟图像期望位置 $p_d$ 来实现编队围堵（例如：领机 $p_d=[0,0]$ 正面逼近，僚机 $p_d=[u_{offset}, 0]$ 侧翼包抄）。这是本文未来工作（multi-UAV surveillance system）的直接延伸。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Zheng et al. (2017) — Image-Based Visual Servoing of a Quadrotor Using Virtual Camera Approach. <em>IEEE/ASME Trans. Mechatron.</em> 22(2), 972–982</td><td>虚拟相机 IBVS 方法的直接前身——首次将虚拟相机用于四旋翼 IBVS，但限于固定目标。本文在此基础上<strong>推广到三维任意运动目标</strong>，并加入了完整动力学模型和改进误差项。理解两篇论文的异同是把握本文贡献核心的关键。</td></tr>
+    <tr><td>Yang & Quan (2020) — An Autonomous Intercept Drone with Image-Based Visual Servo. <em>IEEE ICRA</em>, 2230–2236</td><td>本文最直接的对比对象——同样用 IBVS 实现无人机追踪/拦截。关键区别：Yang & Quan 使用简化动力学模型（小角度假设），本文使用完整模型。Fig. 13 的实物对比实验直接展示了完整模型的优势——距离误差从 20.83 m 降到 10.30 m。</td></tr>
+    <tr><td>Hamel & Mahony (2002) — Visual Servoing of an Under-actuated Dynamic Rigid-body System: An Image-based Approach. <em>IEEE Trans. Robot. Automat.</em> 18(2), 187–198</td><td>IBVS 用于欠驱动系统的开山之作——提出了基于球面图像矩的 IBVS 方案。虽然局限于固定目标，但为后续所有四旋翼 IBVS 工作（包括本文）奠定了理论基础。</td></tr>
+    <tr><td>Chaumette & Hutchinson (2006, 2007) — Visual Servo Control Parts I & II. <em>IEEE Robot. Automat. Mag.</em></td><td>视觉伺服领域的经典教程（Part I: 基本方法; Part II: 高级方法）。任何从事 IBVS 研究的必读文献。本文的虚拟相机方法可以被视为 Part II 所讨论的"advanced approaches"中"坐标系变换"策略的自然延伸。</td></tr>
+    <tr><td>Henriques et al. (2015) — High-Speed Tracking with Kernelized Correlation Filters. <em>IEEE Trans. Pattern Anal. Mach. Intell.</em> 37(3), 583–596</td><td>KCF 跟踪器——本文实物实验中使用的视觉跟踪算法。KCF 以高速（数百 fps）和高成功率著称，其速度远高于相机帧率（20 fps），为 IBVS 控制器提供了低延迟的目标坐标反馈。理解 KCF 的工作原理有助于评估本文视觉感知链路的性能瓶颈。</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Wang, Qin et al. · IEEE RA-L 2023 · Image-Based Visual Servoing of Quadrotors to Arbitrary Flight Targets · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

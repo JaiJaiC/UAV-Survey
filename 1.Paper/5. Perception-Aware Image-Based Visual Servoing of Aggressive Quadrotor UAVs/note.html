@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Perception-Aware IBVS of Aggressive Quadrotor UAVs (Qin et al., 2023)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">1.信息</a>
+  <a href="#insight">2.洞察</a>
+  <a href="#architecture">3.架构</a>
+  <a href="#task">4.任务</a>
+  <a href="#challenge">5.难点</a>
+  <a href="#method">6.方法</a>
+  <a href="#principles">7.原理</a>
+  <a href="#figures">8.图表</a>
+  <a href="#flaw">9.缺陷</a>
+  <a href="#motivation">10.动机</a>
+  <a href="#takeaway">11.总结</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Perception-Aware Image-Based Visual Servoing of Aggressive Quadrotor UAVs（感知感知的图像视觉伺服用于 aggressive 四旋翼无人机）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Chao Qin</strong>（秦超，多伦多大学）、<strong>Qiuyu Yu</strong>（余秋雨，上海交通大学）、<strong>H. S. Helson Go</strong>（多伦多大学）、<strong>Hugh H.-T. Liu</strong>（通讯作者，多伦多大学）</td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">多伦多大学</strong>（University of Toronto）航空航天研究所（UTIAS），上海交通大学航空航天学院</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">IEEE/ASME Transactions on Mechatronics</strong>，<strong>2023年8月</strong>，Vol. 28，No. 4，pp. 2020–2028</td></tr>
+    <tr><td><strong>链接</strong></td><td><a href="https://doi.org/10.1109/TMECH.2023.3276211" target="_blank">10.1109/TMECH.2023.3276211</a> | 投稿: 2023-01-06 | 录用: 2023-05-10 | 发表: 2023-05-31 | 代码: <a href="https://github.com/FSC-Lab/fsc_aggressive_ibvs" target="_blank">GitHub</a> | 视频: <a href="https://www.youtube.com/watch?v=wvtgll-iRx4" target="_blank">YouTube</a></td></tr>
+    <tr><td><strong>核心贡献</strong></td><td>提出一种<strong>感知感知的鲁棒 IBVS 方案</strong>，解决四旋翼在 aggressive 机动中目标特征容易离开相机视场的核心难题。基于 NMPC 框架，设计了<strong>欠驱动补偿机制</strong>消除虚拟相机帧需求，从而在真实图像平面定义目标可见性约束；引入<strong>四元数球面视觉特征表示</strong>处理 2-球面上的非光滑向量场问题。在快速着陆、aggressive 长距离飞行、动态目标跟踪三个任务中实现 <strong>100% 目标可见率</strong>，最大俯仰 21.04 度、最大速度 6.87 m/s。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">IBVS 视觉伺服</span>
+    <span class="tag tag-green">NMPC 模型预测控制</span>
+    <span class="tag tag-amber">目标可见性约束</span>
+    <span class="tag tag-purple">四元数球面特征</span>
+    <span class="tag tag-red">欠驱动补偿机制</span>
+    <span class="tag tag-cyan">Aggressive 机动</span>
+    <span class="tag tag-gray">IEEE TMECH 2023</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>为什么之前所有 IBVS 方法都无法在 aggressive 四旋翼机动中保证目标可见性？</strong><br>
+    答：两个根本原因——(1) <strong>虚拟相机方法的信息丢失</strong>：将特征旋转到虚拟相机平面后，真实相机旋转信息丢失，导致可见性约束定义在错误的空间中（虚拟 FOV 而非真实 FOV），目标可能已经离开真实相机视场而约束却未激活；(2) <strong>级联控制的响应滞后</strong>：外环计算速度/加速度指令再由内环姿态控制器跟踪，额外动态延迟导致目标离开 FOV 时四旋翼来不及响应。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>先预测再补偿，而非先补偿再预测</strong>——利用 NMPC 的预测能力，在真实图像平面预测未来视觉特征坐标，加上真正的可见性约束，再在目标函数中用<strong>未来姿态预测</strong>进行旋转补偿。这逆转了传统虚拟相机方法的操作顺序，从而保留旋转信息、定义正确约束。同时用四元数表示球面视觉特征，解决了 2-球面上图像雅可比矩阵不光滑（毛球定理）导致的 NMPC 收敛慢问题。
+  </div>
+
+  <h3>2.2 灵感来源及其对应的洞察</h3>
+  <table>
+    <tr><th>灵感来源</th><th>所启发的洞察</th><th>类型</th></tr>
+    <tr><td>虚拟相机方法的"可见性悖论"（Fig. 1a）——目标在虚拟相机 FOV 内但已离开真实相机 FOV</td><td>虚拟相机方法的根本缺陷不是约束设计问题，而是<strong>特征变换丢失了真实相机旋转信息</strong>。解决方法是让 NMPC 在真实图像平面预测特征坐标并施加约束——即"先预测再补偿"范式</td><td>架构</td></tr>
+    <tr><td>Bloesch et al. (2015) 视觉惯性里程计——用四元数参数化球面上的点以实现光滑 EKF 更新</td><td>将四元数球面参数化<strong>迁移到 IBVS 的特征表示</strong>——用四元数 q 表示球面视觉特征，定义 SO(3) 上的 box-plus / box-minus 算子，推导光滑的图像运动学模型，避免 2D 最小表示的奇异性问题，也避免 3D 单位向量的"毛球定理"非光滑问题</td><td>数学</td></tr>
+    <tr><td>NMPC 的预测能力——可以在有限时域内前向预测系统状态</td><td>将<strong>视觉特征坐标作为 NMPC 状态变量</strong>（连同四旋翼动力学和 range 动力学），在前向预测时间窗内评估每个离散点的可见性约束，使 MPC 能够"预见"特征即将出界并提前调整姿态</td><td>方法</td></tr>
+    <tr><td>TTC（预计碰撞时间）在人类感知和机器人栖停中的应用（Zhang et al. 2018）</td><td>将 TTC 约束引入 IBVS——不是简单的距离约束，而是 <code>r / r_dot</code> 的下界约束，既能避免碰撞，又能<strong>平滑减速</strong>，防止近距离急刹车导致的大幅旋转失稳和视野丢失</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 创新点详解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1: 欠驱动补偿机制——消除虚拟相机帧依赖</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>虚拟相机方法将视觉特征旋转到虚拟平面获得旋转不变的图像运动学，但丢失了真实相机旋转信息，导致可见性约束定义在错误空间。此前所有带可见性约束的方法（Zhang 2021, Zheng 2019, Mcfadyen 2013）都基于虚拟相机框架，本质上无法保证真实目标可见性。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>虚拟相机方法本质是"先补偿旋转再预测特征位置"；如果能利用 NMPC 的未来姿态预测能力，就可以"在真实图像平面预测特征位置，再在目标函数中用未来姿态做补偿"。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在 NMPC 状态向量中直接包含真实图像平面的视觉特征 q 和 range r，利用四元数球面图像运动学模型前向预测。可见性约束 <code>s_min &lt; s(q) &lt; s_max</code> 直接作用于真实像素坐标。动作目标函数中用预测的未来姿态 <code>C(q_wb)</code> 对视觉特征进行旋转补偿，而非预先将特征旋转到虚拟平面。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2: 四元数球面视觉特征——克服 2-球面上雅可比矩阵的非光滑性</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统球面特征参数化方案各有缺陷：2D 最小表示（如球坐标）存在图像雅可比奇异性；3D 单位向量表示受"毛球定理"限制——连续向量场在 S^2 上至少有一个奇点，导致 NMPC 求解器收敛缓慢。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Bloesch et al. (2015) 在 VIO 中用四元数参数化球面特征点以实现光滑的 EKF 状态更新——该思想可以迁移到 IBVS 的特征运动学推导。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将 2D 图像点通过相机内参映射为 3D 单位向量，然后计算到参考方向 e_z 的最小旋转向量，转为四元数 q。定义 SO(3) 上的 box-plus 和 box-minus 算子，推导光滑的图像运动学：<code>q_dot = N(q)^T * (-n(q)^wedge * v_c / r - omega_c)</code>，雅可比矩阵在整个 S^2 上均光滑。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3: 动态 range 状态 + TTC 约束——增强预测精度与安全减速</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>此前方法（Zhang 2021, Mcfadyen 2013）将深度设为定值，在 aggressive 机动中深度变化剧烈时预测精度大幅下降，可见性评估失准。同时纯距离约束在近距离时无法提供速度调节，导致急刹车引起大幅旋转。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>人类利用 TTC（预计碰撞时间）进行安全感知和减速决策；Zhang et al. (2018) 将 TTC 用于飞行器栖停轨迹生成。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将 range r 作为 NMPC 状态变量（而非固定参数），推导其动力学 <code>r_dot = -n(q)^T * v_c</code>，每一步都传播更新。引入 TTC 约束 <code>r / r_dot &ge; t_c_min</code>（或 <code>r_dot &lt; 0</code> 时自动满足），既保证碰撞安全，又实现自然平滑减速。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 整体架构——子系统与层级关系</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph 感知层["感知层：视觉特征提取"]
+      direction LR
+      相机["针孔相机 · 1280x640 px · 30 Hz"]
+      检测["YOLOv5 目标检测器 · 赛门边界框"]
+      特征["球面特征提取 · 像素坐标 ➜ 3D单位向量 · ◆ ➜ 四元数 q"]
+      距离["距离估计 · r = f*d_gate/max(w,h)"]
+    end
+
+    subgraph 控制层["NMPC 层：ACADO + qpOASES 求解器"]
+      direction LR
+      模型["全状态 IBVS 系统模型 · x = [v_w, q_wb, q, r] · u = [c, Omega_b]"]
+      预测["前向预测 · 1.0s 时域 · dt=0.05s · 20 节点"]
+      约束["约束评估 · 执行器限制 · 真实可见性约束 · TTC 约束"]
+      目标["目标函数 · 动作代价 + 感知代价 · 预测姿态旋转补偿"]
+      求解["RTI 方案求解 · 准备阶段线性化 · 反馈阶段 QP · 5-10 ms"]
+    end
+
+    subgraph 执行层["飞行控制层"]
+      direction LR
+      指令["推力 c + 角速率 Omega_b · 直接低层驱动 · 无级联姿态环"]
+      飞控["角速率 PID · PixRacer 飞控 · 跟踪 Omega_b 指令"]
+      电机["电机混合 · 各旋翼推力分配 · 最大推力 20N · 最大角速率 3.0 rad/s"]
+    end
+
+    相机 --> 检测 --> 特征 --> 距离
+    特征 --> 模型
+    距离 --> 模型
+    模型 --> 预测 --> 约束 --> 目标 --> 求解
+    求解 --> 指令 --> 飞控 --> 电机
+    电机 -.->|"状态反馈: v_w, q_wb"| 模型
+    特征 -.->|"视觉反馈: q, r"| 模型
+
+    classDef sensing fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef control fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef actuator fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class 相机,检测,特征,距离 sensing
+    class 模型,预测,约束,目标,求解 control
+    class 指令,飞控,电机 actuator
+    </pre>
+  </div>
+
+  <h3>3.2 数据流——从图像到控制的完整信息传递链</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph 输入["系统输入"]
+      direction LR
+      视觉目标["视觉目标 · 赛门/地面标记点 · 4个共面点"]
+      参考轨迹["参考轨迹 · 期望位置 p_ref · 期望速度 v_ref · 期望图像坐标 s_ref"]
+    end
+
+    subgraph 感知管线["感知管线"]
+      direction LR
+      原始图像["原始图像 · 752x480(仿真) / 1280x640(实验)"]
+      目标检测["目标检测 · YOLOv5 边界框 · d_gate=75cm 已知"]
+      球面投影["球面投影 · s ➜ mu = K^{-1}s / ||K^{-1}s||"]
+      四元数转换["四元数转换 · mu ➜ 旋转向量 phi ➜ 四元数 q"]
+    end
+
+    subgraph 优化求解["NMPC 最优控制问题"]
+      direction LR
+      前向预测["前向预测 · 1.0s 窗口 · x_{k+1}=f(x_k,u_k)"]
+      约束评估["约束评估 · 可见性: s(q_k)∈[s_min,s_max] · TTC: r_k/r_dot_k · 执行器: u_min<u_k<u_max"]
+      代价累计["代价累计 · 动作代价: 位姿+速度+姿态+输入 · 感知代价: 图像坐标偏差"]
+      QP求解["RTI 求解 · ACADO 代码生成 · qpOASES QP 求解器 · 5-10 ms/次"]
+    end
+
+    subgraph 输出["控制输出"]
+      direction LR
+      推力输出["质量归一化推力 c · 标量 0~20 N"]
+      角速率输出["机体角速率 Omega_b · 3D 向量"]
+      低层驱动["低层执行 · 电机 RPM 指令 · 直接驱动无级联"]
+    end
+
+    视觉目标 --> 原始图像
+    参考轨迹 --> 代价累计
+    原始图像 --> 目标检测 --> 球面投影 --> 四元数转换
+    四元数转换 -->|"q_0, r_0"| 前向预测
+    前向预测 --> 约束评估 --> 代价累计 --> QP求解
+    QP求解 --> 推力输出
+    QP求解 --> 角速率输出
+    推力输出 --> 低层驱动
+    角速率输出 --> 低层驱动
+    低层驱动 -.->|"状态测量: v_w, q_wb, q, r"| 前向预测
+    约束评估 -.->|"可见性违反? ➜ 调整姿态"| 前向预测
+
+    classDef inputC fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef percep fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef opt fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef outC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class 视觉目标,参考轨迹 inputC
+    class 原始图像,目标检测,球面投影,四元数转换 percep
+    class 前向预测,约束评估,代价累计,QP求解 opt
+    class 推力输出,角速率输出,低层驱动 outC
+    </pre>
+  </div>
+
+  <h3>3.3 工作流程——从任务定义到飞行执行的完整管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph 阶段1["阶段一：问题设置"]
+      direction LR
+      任务定义["定义视觉伺服任务 · 快速着陆/长距离飞行/动态跟踪 · 设定参考位姿、速度、图像坐标"]
+      配置相机["配置相机与目标 · 着陆用下视相机 · 飞行/跟踪用前视相机 · 目标: 4个共面点/赛门"]
+      设置参数["设置 NMPC 参数 · 时域 1.0s · dt 0.05s · 权重 Q_p Q_v Q_q Q_s R · 可见性边界 · TTC 阈值"]
+    end
+
+    subgraph 阶段2["阶段二：实时 NMPC 循环 (ROS + C++)"]
+      direction LR
+      接收图像["接收图像测量 · YOLOv5 检测赛门/点 · 计算 q 和 r"]
+      更新状态["更新 NMPC 初始状态 · x_0 = [v_w, q_wb, q, r] · 来自 T265 里程计+视觉"]
+      求解OCP["求解 OCP via ACADO RTI · 准备阶段: 在当前估计解处线性化 · 反馈阶段: qpOASES 求解 QP · 5-10 ms"]
+      提取指令["提取第一步控制输入 · u*_0 = [c*, Omega_b*] · 发送至 PixRacer 飞控"]
+      PID跟踪["PID 跟踪角速率 · PixRacer 内环 · 电机混合 · ESC 输出"]
+    end
+
+    subgraph 阶段3["阶段三：约束监控"]
+      direction LR
+      可见性监控["可见性约束是否激活? · 检查 s(q_pred) vs [s_min, s_max] · 特征接近边界 ➜ 限制旋转"]
+      TTC监控["TTC 约束是否激活? · 检查 r/r_dot vs t_c_min · 接近过快 ➜ 平滑减速"]
+      冲突解决["约束冲突解决 · 可见性 vs 动作目标权衡 · 感知权重 Q_s 平衡 aggressiveness"]
+    end
+
+    subgraph 阶段4["阶段四：性能评估"]
+      direction LR
+      TVR计算["TVR 计算 · 目标可见率 = 含有特征的帧数/总帧数 · 目标: 100%"]
+      性能指标["性能指标 · 最大速度 · 最大俯仰/滚转 · 收敛时间 · 跟踪误差 · vs 虚拟相机基线对比"]
+    end
+
+    阶段1 -->|"配置参数"| 阶段2
+    阶段2 -->|"运行时数据"| 阶段3
+    阶段3 -->|"安全保证"| 阶段4
+
+    求解OCP -.->|"预测特征轨迹"| 可见性监控
+    求解OCP -.->|"预测距离"| TTC监控
+    可见性监控 -.->|"限制俯仰/滚转/偏航"| 求解OCP
+    TTC监控 -.->|"限制接近速度"| 求解OCP
+    冲突解决 -.->|"权重自适应"| 求解OCP
+    PID跟踪 --> TVR计算
+    PID跟踪 --> 性能指标
+
+    classDef phase1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef phase2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef phase3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef phase4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class 任务定义,配置相机,设置参数 phase1
+    class 接收图像,更新状态,求解OCP,提取指令,PID跟踪 phase2
+    class 可见性监控,TTC监控,冲突解决 phase3
+    class TVR计算,性能指标 phase4
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义——解决了什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \min_{\mathbf{u}(t)} \int_{t_0}^{t_f} \Big( \|\mathbf{p}_{\text{ref}} - P(\mathbf{x})\|_{\mathbf{Q}_p}^2 + \|\mathbf{s}_{\text{ref}} - \pi(\mathbf{q})\|_{\mathbf{Q}_s}^2 + \ldots \Big) dt \quad \text{s.t.} \quad \mathbf{s}_{\min} \le \pi(\mathbf{q}(t)) \le \mathbf{s}_{\max},\; \frac{r}{\dot{r}} \ge t_c^{\min} $$
+    <div class="eq-note">
+      <strong>目标</strong>：在满足真实目标可见性约束的前提下，最小化四旋翼位姿误差和视觉特征偏差 &nbsp;|&nbsp;
+      <strong>$\pi(\mathbf{q})$</strong> = 四元数球面特征映射回 2D 像素坐标 &nbsp;|&nbsp;
+      <strong>$\mathbf{s}_{\min}, \mathbf{s}_{\max}$</strong> = 指定的图像区域（通常小于完整图像尺寸）&nbsp;|&nbsp;
+      <strong>关键区别</strong>：约束定义在<strong>真实图像平面</strong>而非虚拟相机平面——这是与所有先前方法的根本差异。
+    </div>
+  </div>
+
+  <h3>4.2 输入输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>相机图像（30 Hz）、四旋翼速度与姿态估计（T265）、目标检测结果（YOLOv5 边界框）</td><td>图像 1280x640 px（实验）/ 752x480 px（仿真）</td></tr>
+    <tr><td><strong>输出</strong></td><td>质量归一化推力 <code>c</code> 和机体角速率 <code>Omega_b</code>，发送至 PixRacer 飞控进行角速率跟踪</td><td>1D 推力 + 3D 角速率 = 4D 控制输入</td></tr>
+    <tr><td><strong>目标</strong></td><td>在 aggressive 机动中保持 100% 目标可见率（TVR），同时完成伺服任务（着陆、飞行、跟踪）</td><td>最大速度 6.87 m/s、最大俯仰 21.04 度下 TVR = 100%</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>控制算法创新</strong>——不是新硬件或新传感器，而是<strong>在 NMPC 框架内重新设计了 IBVS 的视觉特征表示、运动学模型和约束定义方式</strong>。三个典型任务：(1) <strong>快速着陆</strong>——从 [3, 3, 10] m 以 4.63 m/s 最大速度降落到 [0, 0, 1.5] m，下视相机；(2) <strong>Aggressive 长距离飞行</strong>——20 m 水平飞行，前视相机，最大俯仰 21.04 度，验证可见性约束如何主动限制姿态以保护视野；(3) <strong>动态目标跟踪</strong>——真人手持赛门在 5x4.3x3 m 室内空间中移动，四旋翼跟随，速度 1.92 m/s，滚转 14.93 度。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. 核心难点——为什么这个问题很难？</h2>
+
+  <h3>5.1 本质分析（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：四旋翼是欠驱动系统——它必须通过旋转来产生平移运动，但这种旋转恰恰会导致相机偏离目标方向。<br><br>
+    (1) <strong>欠驱动的本质矛盾</strong>：四旋翼只有 4 个自由度（推力 + 3 轴角速率），但需要同时满足 6D 位姿伺服和 2D 图像可见性约束。当任务要求俯仰前倾以加速时，前视相机也跟着向下倾斜，目标特征向图像边缘移动——在 aggressive 机动中这种冲突尤其剧烈。<br><br>
+    (2) <strong>虚拟相机框架的致命缺陷</strong>：虚拟相机方法将特征旋转到水平虚拟平面以解耦旋转和平移，但这一变换<strong>不可逆地丢失了真实相机旋转信息</strong>。Fig. 1a 展示了核心悖论：目标在虚拟相机 FOV 内完美可见，但在真实相机中早已离开 FOV——因为前方俯仰后，虚拟相机平面仍然"认为"目标在前方，而真实相机已经向下倾斜。<br><br>
+    (3) <strong>级联控制延迟</strong>：外环计算速度/加速度指令给内环姿态控制器——双重动态（外环 MPC + 内环 PID）导致的响应滞后，在 aggressive 机动中足以让目标在四旋翼反应过来之前就离开 FOV。需要<strong>直接输出推力和角速率</strong>，消除中间层的姿态控制器。<br><br>
+    (4) <strong>球面特征的数学难题</strong>：2-球面 S^2 上不存在全局光滑的连续向量场（毛球定理）。2D 最小表示有奇异性，3D 单位向量表示的雅可比矩阵有非光滑点——都会导致 NMPC 梯度优化收敛慢。
+  </div>
+
+  <h3>5.2 前人方法及其局限性</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">表头使用英文，正文使用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Virtual Camera IBVS（虚拟相机 IBVS）<br/>Zhang 2021, Zheng 2019, Heshmati-alamdari 2014</td>
+      <td>将检测到的视觉特征旋转到虚拟水平图像平面，获得旋转不变的图像运动学，然后在此虚拟平面设计 IBVS 控制器和可见性约束</td>
+      <td>特征变换到虚拟相机帧后<strong>丢失了真实相机旋转信息</strong>。即使虚拟相机 FOV 内定义了可见性约束，该约束也无法反映真实相机 FOV 中的目标位置。Fig. 1a 展示：目标在虚拟 FOV 内始终可见，但在真实相机中已出界。这是所有虚拟相机方法的结构性缺陷——<strong>不是参数调节问题，是框架本身的问题</strong>。</td>
+    </tr>
+    <tr>
+      <td>Rotation-Invariant Feature Methods（旋转不变特征方法）<br/>Guo & Leang 2020, Fomena 2011, Tahri 2013</td>
+      <td>设计具有旋转不变图像运动学的特殊视觉特征（如球面三点距离、不变矩），使得特征本身不受相机旋转影响</td>
+      <td>不变特征虽然消除了旋转依赖，但<strong>难以表达可见性目标和约束</strong>——因为不变特征通常不是直观的像素坐标。所有此类方法都将目标可见性当作<strong>给定条件</strong>，没有显式处理视野约束。在 aggressive 机动中，目标仍可能离开 FOV。</td>
+    </tr>
+    <tr>
+      <td>Cascaded Control IBVS（级联控制 IBVS）<br/>Zheng 2018, Sheng 2019, Mebarki 2015</td>
+      <td>外环 IBVS 产生速度/加速度指令，内环姿态控制器跟踪——标准的级联控制架构</td>
+      <td>内环姿态控制器的动态<strong>增加了响应延迟</strong>——外环计算的指令经过内环动态后才作用到机体。当目标快速移向图像边缘时，这种延迟可能导致四旋翼<strong>来不及响应</strong>。aggressive 机动中，特征可能已经出界而控制器仍在处理上一帧的指令。</td>
+    </tr>
+    <tr>
+      <td>Fixed-Depth IBVS（固定深度 IBVS）<br/>Zhang 2021, Mcfadyen 2013</td>
+      <td>将目标深度设为固定值，简化图像运动学，减少状态维度</td>
+      <td>深度固定意味着<strong>特征预测不准确</strong>。aggressive 着陆中深度从 10 m 变化到 1.5 m，固定深度会导致预测位置偏离真实值，可见性评估失准——可能"以为"特征在安全区内但实际已出界。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 — 真实可见性约束的定义与执行</strong>：如何在 NMPC 优化问题中定义作用于<strong>真实图像平面</strong>的可见性约束？这需要 (a) 保留特征的真实相机旋转信息，(b) 在预测时域内每个离散点都评估约束，(c) 约束违反时主动限制四旋翼姿态。本文方案：四元数视觉特征作为 NMPC 状态，在真实像素坐标上施加 box 约束。</li>
+    <li><strong>挑战 2 — 欠驱动系统的旋转-平移耦合</strong>：四旋翼必须旋转来平移，但旋转会移动相机视野。当可见性约束激活时，姿态必须受限——这与快速完成任务的平移需求直接冲突。需要在<strong>视野保护与任务执行之间做实时权衡</strong>——NMPC 的权重调谐决定了"aggressiveness vs. safety"的平衡点。</li>
+    <li><strong>挑战 3 — 球面特征的光滑雅可比矩阵</strong>：球面特征（S^2 上的点）的任何参数化都面临数学障碍。2D 表示有奇点，3D 表示有非光滑点——对 NMPC 这种依赖梯度的优化器来说，非光滑雅可比会导致收敛缓慢甚至失败。需要一种全局光滑的表示——本文发现了四元数这个巧妙的解决方案。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. 方法与核心公式</h2>
+
+  <h3>6.1 核心算法</h3>
+  <p>本文的核心方法是一个<strong>基于 NMPC 的 IBVS 控制方案</strong>，包含三个关键创新：(1) 四元数球面视觉特征的运动学推导；(2) 欠驱动补偿机制——在真实图像平面施加可见性约束，在目标函数中用预测姿态做旋转补偿；(3) 动态 range 状态与 TTC 约束。</p>
+
+  <h3>6.2 核心公式</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。符号解释使用中文。</p>
+
+  <!-- Formula Group A: Spherical Feature Conversion -->
+  <h4>公式组 A: 球面视觉特征——从像素到四元数</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1)-(2) — 球面投影与四元数特征构造</span>
+    $$ \boldsymbol{\mu} = \frac{\mathbf{K}^{-1}\mathbf{s}}{\|\mathbf{K}^{-1}\mathbf{s}\|_2}, \qquad \boldsymbol{\phi} = \Phi(\boldsymbol{\mu}, \mathbf{e}_z), \qquad \mathbf{q} = \begin{bmatrix} \cos\frac{\|\boldsymbol{\phi}\|}{2} \\ \frac{\boldsymbol{\phi}}{\|\boldsymbol{\phi}\|_2}\sin\frac{\|\boldsymbol{\phi}\|}{2} \end{bmatrix} $$
+    <div class="eq-note">
+      <strong>$\mathbf{s} = (u, v, 1)^T$</strong> = 齐次像素坐标（来自目标检测）&nbsp;|&nbsp;
+      <strong>$\mathbf{K} \in \mathbb{R}^{3\times3}$</strong> = 相机内参矩阵（焦距、主点）&nbsp;|&nbsp;
+      <strong>$\boldsymbol{\mu} \in S^2$</strong> = 3D 单位球面上的投影点 &nbsp;|&nbsp;
+      <strong>$\Phi(\boldsymbol{\mu}, \mathbf{e}_z)$</strong> = 从参考方向 $\mathbf{e}_z = [0,0,1]^T$ 到 $\boldsymbol{\mu}$ 的最小旋转向量 &nbsp;|&nbsp;
+      <strong>$\mathbf{q} \in SO(3)$</strong> = 四元数视觉特征——"将 $\mathbf{e}_z$ 通过 $\mathbf{q}$ 旋转后得到的单位向量恰好对齐 $\boldsymbol{\mu}$"
+    </div>
+  </div>
+
+  <!-- Formula Group B: Image Kinematics -->
+  <h4>公式组 B: 球面图像运动学——四元数特征的时间导数</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(14)-(15) — 视觉特征运动学与距离运动学</span>
+    $$ \dot{\mathbf{q}} = \mathbf{N}(\mathbf{q})^T\left(-\frac{\mathbf{n}(\mathbf{q})^\wedge \mathbf{v}_c}{r} - \boldsymbol{\omega}_c\right), \qquad \dot{r} = -\mathbf{n}(\mathbf{q})^T \mathbf{v}_c $$
+    <div class="eq-note">
+      <strong>$\mathbf{N}(\mathbf{q}) = [C(\mathbf{q})\mathbf{e}_x,\; C(\mathbf{q})\mathbf{e}_y] \in \mathbb{R}^{3\times2}$</strong> = 切空间基矩阵，列空间张成 $\mathbf{q}$ 处的切平面 &nbsp;|&nbsp;
+      <strong>$\mathbf{n}(\mathbf{q}) = C(\mathbf{q})\mathbf{e}_z$</strong> = 四元数恢复的单位方向向量 &nbsp;|&nbsp;
+      <strong>$\mathbf{v}_c$</strong> = 相机坐标系下的线速度 &nbsp;|&nbsp;
+      <strong>$\boldsymbol{\omega}_c$</strong> = 相机坐标系下的角速度 &nbsp;|&nbsp;
+      <strong>$r$</strong> = 目标距离（range）&nbsp;|&nbsp;
+      <strong>$(\cdot)^\wedge$</strong> = 向量的斜对称矩阵 &nbsp;|&nbsp;
+      <strong>核心特性</strong>：此雅可比矩阵在<strong>整个 S^2 上光滑</strong>，克服了 2D 表示的奇异性问题和 3D 单位向量的"毛球定理"非光滑问题。
+    </div>
+  </div>
+
+  <!-- Formula Group C: NMPC OCP -->
+  <h4>公式组 C: NMPC 最优控制问题——目标函数与约束</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(16),(21)-(25) — 完整的连续时间 OCP</span>
+    $$ \min_{\mathbf{x}(t),\mathbf{u}(t)} \int_{t_0}^{t_f} \Big( L_a(\mathbf{x},\mathbf{u}) + L_p(\mathbf{x},\mathbf{u}) \Big) dt $$
+    $$ L_a = \|\mathbf{p}_{\text{ref}} - P(\mathbf{x})\|_{\mathbf{Q}_p}^2 + \|\mathbf{v}_{\text{ref}} - \mathbf{v}_w\|_{\mathbf{Q}_v}^2 + \|\mathbf{q}_{wb}^{\text{ref}} - \mathbf{q}_{wb}\|_{\mathbf{Q}_q}^2 + \|\mathbf{u} - \bar{\mathbf{u}}\|_{\mathbf{R}}^2 $$
+    $$ L_p = \|\mathbf{s}_{\text{ref}} - \pi(\mathbf{q})\|_{\mathbf{Q}_s}^2, \qquad P(\mathbf{x}) = C(\mathbf{q}_{wb})\big(C(\mathbf{q}_{bc})\mathbf{n}(\mathbf{q})r + \mathbf{p}_{bc}^b\big) $$
+    <div class="eq-note">
+      <strong>$L_a$</strong> = 动作目标函数——调节四旋翼相对于目标物体的位姿 &nbsp;|&nbsp;
+      <strong>$L_p$</strong> = 感知目标函数——将视觉特征对齐到期望图像坐标 &nbsp;|&nbsp;
+      <strong>$P(\mathbf{x})$</strong> = <strong>旋转补偿后的机器人中心位置</strong>——<strong>这是欠驱动补偿的关键</strong>：用 NMPC 预测的未来姿态 $C(\mathbf{q}_{wb})$ 对视觉特征进行旋转补偿，而非提前将特征旋转到虚拟平面。这意味着特征始终在真实图像平面传播，但目标函数中的位置误差已经消除了旋转的影响 &nbsp;|&nbsp;
+      <strong>约束</strong>：$\mathbf{u}_{\min} \le \mathbf{u} \le \mathbf{u}_{\max}$（执行器限制）、$\mathbf{s}_{\min} \le \pi(\mathbf{q}) \le \mathbf{s}_{\max}$（真实可见性约束）、$r/\dot{r} \ge t_c^{\min}$（TTC 约束）
+    </div>
+  </div>
+
+  <!-- Formula Group D: Box Operators -->
+  <h4>公式组 D: SO(3) 流形上的算子——光滑优化的数学基础</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(6),(8) — Box-Plus 和 Box-Minus 算子</span>
+    $$ \boxplus: SO(3) \times \mathbb{R}^2 \to SO(3), \quad \mathbf{q} \boxplus \mathbf{a} = \exp(\mathbf{N}(\mathbf{q})\mathbf{a}) \otimes \mathbf{q} $$
+    $$ \boxminus: SO(3) \times SO(3) \to \mathbb{R}^2, \quad \mathbf{q}_1 \boxminus \mathbf{q}_2 = \mathbf{N}(\mathbf{q}_2)^T \big(\mathbf{n}(\mathbf{q}_1), \mathbf{n}(\mathbf{q}_2)\big) $$
+    <div class="eq-note">
+      <strong>$\boxplus$</strong> = 将切空间中的增量 $\mathbf{a} \in \mathbb{R}^2$ 通过指数映射和四元数乘法作用到流形上的点 $\mathbf{q}$，得到新的流形点 &nbsp;|&nbsp;
+      <strong>$\boxminus$</strong> = 计算两个流形点之间的"差"，输出 2D 切空间向量 &nbsp;|&nbsp;
+      <strong>$\exp(\cdot)$</strong> = 从李代数 $\mathfrak{so}(3)$ 到李群 $SO(3)$ 的指数映射 &nbsp;|&nbsp;
+      <strong>用途</strong>：这些算子让 NMPC 的数值优化在 $SO(3)$ 流形上正确地进行——增量在局部切空间（2D）中定义，避免了直接在 3D 空间中对单位向量做无约束优化时违反 $\|\boldsymbol{\mu}\|=1$ 约束的问题。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>NMPC 预测时域</td><td><strong>1.0 s</strong></td><td>前向预测的时间窗口长度</td><td>足够长以"预见"特征即将出界并提前调整姿态；足够短以保证实时性（5-10 ms 求解）</td></tr>
+    <tr><td>离散化时间步长</td><td><strong>0.05 s（20 个节点）</strong></td><td>预测时域内的离散采样间隔</td><td>每个节点都评估可见性约束。20 个节点在精度和计算量间平衡</td></tr>
+    <tr><td>NMPC 求解器</td><td><strong>ACADO + qpOASES</strong></td><td>代码生成 + 实时迭代 QP 求解</td><td>ACADO 的 RTI 方案将非线性 OCP 转为序列 QP，qpOASES 高效求解——平均 5-10 ms</td></tr>
+    <tr><td>最大推力 / 角速率</td><td><strong>20 N / 3.0 rad/s</strong></td><td>Hummingbird 四旋翼的执行器限制</td><td>仿真中 qpOASES 的 QP 类型——保证全局最优</td></tr>
+    <tr><td>目标检测器</td><td><strong>YOLOv5</strong></td><td>深度学习目标检测器，输出赛门边界框</td><td>实时性（30 Hz）+ 高精度，满足 aggressive 飞行的感知需求</td></tr>
+    <tr><td>可见性约束区域</td><td><strong>451x288 px（仿真）/ 绿色框（实验）</strong></td><td>视觉特征必须保持在此图像区域内</td><td>小于完整图像尺寸（752x480），留出安全裕度——一旦特征接近边界，NMPC 主动限制姿态</td></tr>
+  </table>
+
+  <h3>6.4 本文方法 vs 虚拟相机方法的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>本文方法（Perception-Aware IBVS）</h4>
+      <ul>
+        <li>特征在<strong>真实图像平面</strong>传播和预测</li>
+        <li>可见性约束施加于<strong>真实像素坐标</strong></li>
+        <li>目标函数中<strong>用预测的未来姿态补偿旋转</strong></li>
+        <li>操作顺序：<strong>先预测 → 再补偿</strong></li>
+        <li>保留了真实相机旋转的全部信息</li>
+        <li>100% TVR（所有 aggressive 任务）</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>虚拟相机方法（Zhang 2021 等）</h4>
+      <ul>
+        <li>特征先旋转到<strong>虚拟水平平面</strong></li>
+        <li>可见性约束施加于<strong>虚拟像素坐标</strong></li>
+        <li>目标函数对<strong>已有旋转不变特征</strong>做优化</li>
+        <li>操作顺序：<strong>先补偿 → 再预测</strong></li>
+        <li><strong>不可逆地丢失了真实旋转信息</strong></li>
+        <li>74% TVR（12 m/s 参考速度时）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个关键基础原理：(1) 球面视觉特征的流形表示——为什么四元数能解决 S^2 上的光滑性问题；(2) 欠驱动系统 IBVS 的旋转-平移耦合——为什么"先预测再补偿"比"先补偿再预测"更优；(3) NMPC 中可见性约束的实时执行——RTI 方案如何实现 5-10 ms 求解。</p>
+
+  <h3>7.1 球面视觉特征的流形表示——为什么四元数比单位向量更好</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 毛球定理与四元数解决方案</span>
+    $$ \text{毛球定理（Hairy Ball Theorem）：} S^2 \text{ 上不存在全局光滑的非零连续切向量场} $$
+    $$ \Downarrow $$
+    $$ \text{3D 单位向量表示的雅可比矩阵 } \frac{\partial \boldsymbol{\mu}}{\partial t} \text{ 在 } S^2 \text{ 上至少有 1 个非光滑点} $$
+    $$ \text{四元数表示：通过 SO(3) 上的 } \boxplus / \boxminus \text{ 算子，雅可比在整个 } S^2 \text{ 上光滑} $$
+    <div class="eq-note">
+      <strong>毛球定理</strong>：你不能把一个毛球梳得完全光滑——总至少有一个旋涡点。数学上，S^2（2-球面）上没有处处非零的连续切向量场。<strong>这意味着</strong>任何用 3D 单位向量直接表示的球面特征，其图像雅可比矩阵必然至少有一个非光滑点（函数不可微）。&nbsp;|&nbsp;
+      <strong>为什么 NMPC 在意光滑性？</strong>：NMPC 依赖梯度信息进行数值优化。雅可比非光滑 → 梯度跳跃 → 求解器收敛慢甚至发散——在 aggressive 机动中特征点可能恰好经过非光滑区域。&nbsp;|&nbsp;
+      <strong>四元数如何绕过？</strong>：四元数 q 不是直接表示球面上的点，而是表示"从 e_z 出发所需的最小旋转"。切空间更新通过 box-plus 算子（指数映射 + 四元数乘法）完成，整个映射在 SO(3) 上是光滑的——等价地，S^2 上对应的雅可比也是光滑的。
+    </div>
+  </div>
+
+  <p><strong>为什么选择 2D 切空间增量而非 3D 更新？</strong>四元数有 4 个分量但 $SO(3)$ 只有 3 个自由度，球面特征点 $S^2$ 只有 2 个自由度。本文在切空间 $\mathbb{R}^2$ 中做增量（而非 $\mathbb{R}^3$），恰好匹配 2 自由度，避免过参数化的冗余约束问题。$\mathbf{N}(\mathbf{q})$ 矩阵将 $\mathbb{R}^2$ 映射到 $\mathbb{R}^3$ 切空间，再通过 $\exp$ 映射到 $SO(3)$。</p>
+
+  <h3>7.2 "先预测再补偿" vs "先补偿再预测"——欠驱动补偿的本质</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 两种 IBVS 范式的信息流对比</span>
+    $$ \text{虚拟相机方法（先补偿再预测）：} \quad \mathbf{s}_{\text{virtual}} = \pi_{\text{virtual}}(C_{\text{level}} \cdot \boldsymbol{\mu}) \xrightarrow{\text{预测}} \hat{\mathbf{s}}_{\text{virtual}} $$
+    $$ \text{本文方法（先预测再补偿）：} \quad \mathbf{s}_{\text{real}} \xrightarrow{\text{预测}} \hat{\mathbf{s}}_{\text{real}} \xrightarrow{\text{目标函数中补偿}} P(\mathbf{x}) = C(\hat{\mathbf{q}}_{wb})(C(\mathbf{q}_{bc})\mathbf{n}(\hat{\mathbf{q}})r + \mathbf{p}_{bc}^b) $$
+    <div class="eq-note">
+      <strong>虚拟相机方法</strong>：先将检测特征通过一个水平旋转矩阵投影到虚拟平面（丢失真实相机倾斜信息），然后在虚拟平面进行 IBVS 控制。问题是：$C_{\text{level}}$ 是人为定义的固定旋转（通常将当前相机姿态的 roll/pitch 分量消除），<strong>特征一旦被变换，真实相机是否能看到该特征的信息就永久丢失了</strong>。&nbsp;|&nbsp;
+      <strong>本文方法</strong>：特征始终在真实图像平面传播和预测（保留完整相机姿态信息），可见性约束直接作用于真实像素坐标。只有在<strong>目标函数</strong>中计算位置误差时，才用 NMPC 预测的未来姿态对特征进行旋转补偿——这种补偿发生"在优化器的内部"，不影响约束评估，也不丢失信息。
+    </div>
+  </div>
+
+  <p><strong>工程直觉</strong>：虚拟相机方法就像"闭上眼睛做手术"——你把看到的图像旋转到一个舒服的角度，然后在这个幻想的视角下做控制，但忘记了真实的眼睛仍然在原位。本文方法则"睁着眼睛做手术"——你始终知道目标在视野中的真实位置，只是在评估"我需要怎么移动才能对准目标"时才考虑姿态的影响。</p>
+
+  <h3>7.3 NMPC 实时迭代（RTI）方案——如何实现 5-10 ms 求解</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 实时迭代方案的核心思想</span>
+    $$ \text{完整 OCP: } \min_{\mathbf{u}} \Phi(\mathbf{x}_N) + \sum_{k=0}^{N-1} l(\mathbf{x}_k, \mathbf{u}_k) \quad \text{s.t.} \quad \mathbf{x}_{k+1} = f(\mathbf{x}_k, \mathbf{u}_k),\; h(\mathbf{x}_k, \mathbf{u}_k) \le 0 $$
+    $$ \Downarrow \text{序列二次规划（SQP）} $$
+    $$ \text{每个 SQP 迭代: } \min_{\Delta\mathbf{u}} \frac{1}{2}\Delta\mathbf{u}^T H \Delta\mathbf{u} + \mathbf{g}^T\Delta\mathbf{u} \quad \text{s.t.} \quad \mathbf{A}\Delta\mathbf{u} \le \mathbf{b} $$
+    $$ \text{RTI 关键: 仅做 1 次 SQP 迭代 per 时间步 → 隐式地随时间收敛} $$
+    <div class="eq-note">
+      <strong>RTI 的核心技巧</strong>：标准 SQP 在每个时间步内需要多次迭代直到收敛——计算量大。RTI 观察到：如果时间步足够小，相邻两步的最优解非常接近——<strong>每步只做一次 SQP 迭代，让问题随系统演化隐式收敛</strong>。&nbsp;|&nbsp;
+      <strong>准备阶段（Preparation Phase）</strong>：在当前估计解处线性化动力学和约束，计算梯度 g 和 Hessian H 的近似 &nbsp;|&nbsp;
+      <strong>反馈阶段（Feedback Phase）</strong>：获取最新状态测量，求解一个 QP 子问题（qpOASES），提取第一步控制输入发送给执行器 &nbsp;|&nbsp;
+      <strong>5-10 ms 的关键</strong>：ACADO 将 NMPC 问题<strong>自动生成优化 C 代码</strong>——消除了解释性开销，所有矩阵运算都是编译后的高效实现。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    四元数球面特征提供光滑雅可比 → NMPC 梯度优化快速收敛 → RTI 方案实现实时求解 → 真实可见性约束被正确且高效地评估 → 四旋翼在 aggressive 机动中始终保护视野。如果任何一个环节缺失——非光滑雅可比（收敛慢）、虚拟相机（约束错误）、级联控制（响应慢）、固定深度（预测不准）——整个系统都无法保证 100% TVR。这也是为什么之前的团队都没能做到。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig8.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">问题阐述：虚拟相机方法的根本缺陷与本文方法的效果展示</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Virtual camera FOV vs real camera FOV problem illustration"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了整篇论文的核心动机</strong>。(a) 虚拟相机方法的根本问题：四旋翼前向俯仰后，目标在虚拟相机 FOV（粉色锥体）内仍然可见，但在真实相机 FOV（绿色锥体）中已经丢失——因为虚拟相机将特征旋转到水平面，丢失了俯仰信息。可见性约束（粉色锥体边界）因此形同虚设——目标在真实世界中已不可见，而约束仍未激活。(b) 本文方法的实验结果：aggressive 飞行穿越赛门时，视觉特征（门中心点）始终保持在指定图像区域（绿色矩形）内，证明了真实可见性约束的有效性。</p>
+      <ul>
+        <li><strong>虚拟相机方法的结构性缺陷</strong>：不是调参问题，是方法本身的信息丢失问题——特征变换到虚拟平面后，真实相机旋转信息<strong>不可逆地丢失</strong></li>
+        <li><strong>本文切入点的精确性</strong>：Fig. 1a 的解释是本文立论的核心——一旦理解了"信息丢失"，就理解了为什么需要重新设计整个 IBVS 架构</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">坐标系定义与球面投影几何</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Coordinate frames: world, body, camera"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图定义了全文的坐标系统</strong>。三个坐标系：世界系 $\mathcal{F}_w$、机体系 $\mathcal{F}_b$、相机系 $\mathcal{F}_c$。世界坐标系中标定点 $\mathbf{p}_{lw}^w$ 通过相机投影映射到图像坐标 $\mathbf{s}$。相机到机体的外参为 $(\mathbf{p}_{bc}^b, \mathbf{q}_{bc})$——即相机在机体中的安装位置和方向。</p>
+      <ul>
+        <li><strong>视觉伺服的核心几何关系</strong>：$\mathbf{p}_{lw}^w = C(\mathbf{q}_{wc})\mathbf{p}_{lc}^c + \mathbf{p}_{wc}^w$——目标在世界系中的位置 = 相机到世界的旋转 x 目标在相机系中的位置 + 相机在世界系中的位置</li>
+        <li><strong>球面投影</strong>：图像坐标 $\mathbf{s}$ 通过相机内参 $\mathbf{K}$ 反投影到单位球面，得到 3D 单位向量 $\boldsymbol{\mu}$——这是构建四元数视觉特征的几何基础</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">四元数球面特征表示与流形算子</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Quaternion representation on unit sphere with box-plus/minus operators"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了本文最关键的数学创新——四元数球面特征表示。</strong>3D 单位向量 $\boldsymbol{\mu}_1$（指向 landmark）被等价表示为四元数 $\mathbf{q}_1$（即 $\mathbf{n}(\mathbf{q}_1) = \boldsymbol{\mu}_1$）。矩阵 $\mathbf{N}(\mathbf{q}_1) = [\mathbf{N}(\mathbf{q}_1)_x, \mathbf{N}(\mathbf{q}_1)_y]$ 的列张成该点的切空间——使得 $\boxplus$ 和 $\boxminus$ 算子可以唯一定义。</p>
+      <ul>
+        <li><strong>$\boxplus$ 算子</strong>：输入一个切空间增量 $\mathbf{a} \in \mathbb{R}^2$，通过指数映射和四元数乘法，将 $\mathbf{q}_1$ 旋转到新的位置 $\mathbf{q}_2$</li>
+        <li><strong>$\boxminus$ 算子</strong>：输入两个流形点 $\mathbf{q}_1$ 和 $\mathbf{q}_2$，输出它们在切空间中的差 $\mathbf{a} \in \mathbb{R}^2$——即从 $\mathbf{n}(\mathbf{q}_2)$ 到 $\mathbf{n}(\mathbf{q}_1)$ 所需的"最小旋转量"的切空间表示</li>
+        <li><strong>为什么是 2D 而非 3D？</strong>球面上的点只有 2 个自由度——切空间恰好是 $\mathbb{R}^2$，这种紧致的参数化避免了过参数化带来的冗余约束问题</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4: Control Diagram -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">整体控制框图——从感知到控制的完整系统架构</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Overall control system diagram"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了完整的控制架构</strong>——从图像采集到目标检测（YOLOv5）、球面特征提取（s → q）、NMPC 优化求解（ACADO + qpOASES），再到低层角速率控制（PixRacer PID）和电机输出。关键架构特点：NMPC 直接输出推力和机体角速率，<strong>绕过了传统级联结构中的姿态控制器</strong>——这是实现高响应速度的前提。</p>
+      <ul>
+        <li><strong>信息流</strong>：相机 → 目标检测 → 球面特征 q + range r → NMPC（状态更新 → OCP 求解）→ 推力 + 角速率指令 → 角速率 PID → 电机</li>
+        <li><strong>状态估计</strong>：T265 追踪相机提供速度估计，相机外参 $(q_{bc}, p_{bc}^b)$ 已知</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 5: Fast Landing Results -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 5</span>
+      <span class="fig-caption">快速着陆仿真结果——轨迹、图像特征坐标、速度与姿态</span>
+      <span class="fig-source">来源：论文 Fig. 5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig5.png" alt="Fast landing simulation results"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig5.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图验证了可见性约束在快速着陆场景中的有效性。</strong>(a) 四旋翼以最大 4.63 m/s 的速度从 [3, 3, 10] m 成功降落到 [0, 0, 1.5] m。(b) 视觉特征从初始位置 [511, 377] px 移动到图像右上角（可见性约束边界），然后回到中心。(c) 可见性约束在 1.84-5.1 s 间活跃——此时速度和大角度旋转同时发生。(d) 最大滚转 9.30 度、俯仰 5.88 度、偏航 20.53 度。</p>
+      <ul>
+        <li><strong>约束激活的时序</strong>：1.84 s 时四旋翼开始大幅倾斜以加速下降，特征向边界移动，约束激活并限制进一步倾斜——NMPC 主动调节偏航角以保持特征在安全区域内</li>
+        <li><strong>无约束对比</strong>：如果移除可见性约束（Fig. 6a），目标将完全移出图像边界，任务失败</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 6: Constraint Comparison -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 6</span>
+      <span class="fig-caption">无约束版本与虚拟相机方法的视觉特征轨迹对比</span>
+      <span class="fig-source">来源：论文 Fig. 6</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig6.png" alt="Visual feature trajectories comparison"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig6.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图对比了三种情况下的视觉特征轨迹</strong>。(a) 本文方法但无可见性约束——特征直接移出图像边界，任务失败。(b) 虚拟相机方法的可见性约束——特征同样离开图像边界，因为约束定义在虚拟相机帧而非真实图像平面。这证明了两个关键结论：(1) 可见性约束是必要的；(2) 但仅仅是"有约束"不够——约束必须定义在正确的空间（真实图像平面）。</p>
+      <ul>
+        <li><strong>虚拟相机约束失效的根本原因</strong>：约束评估的是虚拟平面的特征位置，而非真实相机的特征位置——这是所有虚拟相机 IBVS 方法的结构性缺陷</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 7: Aggressive Flight -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 7</span>
+      <span class="fig-caption">Aggressive 长距离飞行——轨迹与时间响应</span>
+      <span class="fig-source">来源：论文 Fig. 7</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig7.png" alt="Aggressive long-distance flight trajectories"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig7.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了 20 m aggressive 长距离飞行的完整结果</strong>。参考速度 10 m/s 下，四旋翼以最大速度 6.87 m/s 到达目标位置，TVR 保持 100%。最大俯仰 21.04 度——在此姿态下前视相机大幅倾斜，但可见性约束有效限制了进一步俯仰以保护视野。</p>
+      <ul>
+        <li><strong>速度饱和现象</strong>：实际最大速度 6.87 m/s < 参考速度 10 m/s——这是因为可见性约束在俯仰约 21 度时激活，主动限制了前向加速度</li>
+        <li><strong>"主动限制"是优点</strong>：当 aggressiveness 与视野保护冲突时，正确地优先选择视野保护——这正是"perception-aware"的含义</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 8: TVR Comparison -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 8</span>
+      <span class="fig-caption">本文方法与虚拟相机方法的 TVR 和性能对比</span>
+      <span class="fig-source">来源：论文 Fig. 8</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig8.png" alt="TVR and performance comparison"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig8.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图是整篇论文最关键的定量对比结果。</strong>(a) 不同参考速度下的 TVR：本文方法在 4-12 m/s 的所有参考速度下均保持 <strong>100% TVR</strong>；虚拟相机方法的 TVR 从 8 m/s 起开始下降，12 m/s 时降至 <strong>74%</strong>。(b) 最大实际速度和最大俯仰角随参考速度的变化——本文方法在参考速度约 6 m/s 后开始主动限制四旋翼的 aggressiveness（速度不再随参考速度增大而增大，俯仰角被约束在约 21 度），而虚拟相机方法允许更大的旋转但以丢失目标为代价。</p>
+      <ul>
+        <li><strong>74% vs 100%</strong>：虚拟相机方法在高速下仍有 74% TVR 的原因可能是偶然的——姿态恰好没有将特征转到完全出界的程度，但这不是方法本身保证的</li>
+        <li><strong>本文方法的速度"平台"</strong>：从 6 m/s 到 12 m/s 参考速度，实际最大速度几乎不变——可见性约束成为限制 aggressiveness 的瓶颈</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 9: Vertical Image Coordinate -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 9</span>
+      <span class="fig-caption">不同参考速度下垂直图像坐标与俯仰角的轨迹对比</span>
+      <span class="fig-source">来源：论文 Fig. 9</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig9.png" alt="Vertical image coordinate and pitch angle under different reference velocities"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig9.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图揭示了可见性约束如何随 aggressiveness 增加而逐步激活</strong>。从 4 m/s 递增到 10 m/s 参考速度，展示了垂直图像坐标 v 和俯仰角的轨迹。(a) 4 m/s 时两者几乎相同——约束未激活。(b) 6 m/s 时虚拟相机方法开始有特征出界（持续 0.1318 s）。(c)-(d) 8-10 m/s 时，本文方法产生围绕约束边界的振荡轨迹，俯仰角也相应振荡——这是约束激活后的典型行为。虚拟相机方法的俯仰角更大但特征已出界。</p>
+      <ul>
+        <li><strong>振荡是约束激活的标志</strong>：特征被"推"到约束边界上，NMPC 在边界附近微调姿态以保持特征在安全区内——振荡说明约束正在工作</li>
+        <li><strong>虚拟相机方法的"假安全感"</strong>：俯仰角更大意味着飞行更 aggressive——但代价是特征丢失</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 11: Dynamic Object Tracking -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 11</span>
+      <span class="fig-caption">动态目标跟踪实验结果——轨迹与视觉特征</span>
+      <span class="fig-source">来源：论文 Fig. 11</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig11.png" alt="Dynamic object tracking experiment results"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig11.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了真实硬件实验中的动态目标跟踪结果。</strong>(a) 四旋翼与目标（手持赛门）在 5x4.3x3 m 室内空间中的 3D 轨迹——跟踪成功且稳定。(b) 视觉特征在图像平面中的轨迹——颜色编码表示四旋翼速度。最大速度 1.92 m/s，最大滚转 14.93 度——在这些 aggressive 机动下，视觉特征始终保持在指定图像区域（绿色矩形）内，TVR = 100%。</p>
+      <ul>
+        <li><strong>从仿真到实验的桥接</strong>：仿真中的关键结果（可见性约束有效性）在真实硬件实验中得到复现——证明了方法的实用性和鲁棒性</li>
+        <li><strong>速度-颜色编码</strong>：图像中特征点的颜色反映了四旋翼的瞬时速度——可以直观看出在高速段特征是否接近边界</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在缺陷与扩展方向</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 视觉特征检测完美——假设 YOLOv5 始终能检测到目标并提供准确的边界框。在真实环境中，运动模糊、光照变化、遮挡都可能导致检测失败或精度下降，此时 range 估计（依赖边界框尺寸）也会失效。(2) 速度估计可用——依赖 T265 追踪相机或外部运动捕捉系统提供速度，在没有外部定位的 GPS-denied 环境中可能无法获得。(3) 目标物体尺寸已知——range 估计公式 $r = \|f_{cam} \cdot d_{gate} / \max(w_{box}, h_{box})\|$ 要求已知赛门直径 $d_{gate}$，对于未知尺寸的目标不适用。</li>
+    <li><strong>适用场景</strong>：目前仅处理单个视觉特征——在仿真中通过 4 个共面点的中心来构造一个代表性的特征点。对于多特征场景（如同时观察多个目标点），需要扩展状态向量并定义多个可见性约束。此外，目标物体被假定为静态或准静态——在动态目标跟踪实验中虽有人持赛门移动，但未考虑目标自身动力学的预测。</li>
+    <li><strong>可扩展性</strong>：NMPC 的计算成本随状态维度和预测时域节点数线性增长。扩展到多特征（每个特征增加 4 个状态维度：q + r），求解时间可能超出 5-10 ms 的实时预算。RTI 方案虽然高效，但仅做一次 SQP 迭代——在状态变化剧烈时可能无法充分收敛，导致次优控制。</li>
+  </ul>
+
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从单特征 → 多特征 IBVS——每个特征有独立的 q 和 r，共享四旋翼状态。可以利用多个特征的冗余信息提高对检测噪声的鲁棒性，并在部分特征被遮挡时仍保持控制。代价是状态维度增加、实时性挑战加大。</li>
+    <li><strong>条件放松</strong>：<strong>目标动力学预测</strong>——文中明确提出未来工作将纳入目标动力学模型以提升跟踪性能。对于高速移动目标，单纯依赖 NMPC 的 reactive 响应可能滞后——如果能在预测模型中包含目标运动估计（如卡尔曼滤波预测目标轨迹），可以更主动地保持视野。另一个方向是<strong>消除偏航角的外部估计依赖</strong>——通过多特征几何关系恢复偏航信息。</li>
+    <li><strong>约束加入</strong>：(1) 避障约束——在复杂环境中同时满足可见性和避障；(2) 控制屏障函数（CBF）与 NMPC 的融合——将可见性约束转化为连续时间的安全性证书，提供更强的理论保证（而不仅仅是离散节点的约束检查）；(3) 自适应感知权重——根据任务阶段动态调整 $Q_s$（如在巡航时降低感知权重、在着陆时提高）。</li>
+  </ul>
+
+  <h3>9.3 数据敏感性</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>目标检测失败（运动模糊 / 遮挡）</td><td>range 估计直接依赖边界框尺寸——检测失败意味着整个 IBVS 环路中断。在 aggressive 机动中，运动模糊尤其严重。可能的缓解：多特征冗余、特征预测在短时间遮挡内继续传播状态</td><td>★★★★★</td></tr>
+    <tr><td>Range 估计误差</td><td>$r = f_{cam} \cdot d_{gate} / \max(w_{box}, h_{box})$ 对方程假设（门直径已知、边界框紧贴、相机模型准确）非常敏感。range 不准 → 特征运动学预测不准 → 可见性约束失准 → 可能"以为"特征在安全区但实际已出界</td><td>★★★★</td></tr>
+    <tr><td>速度估计漂移（无 GPS / 弱光）</td><td>T265 在弱纹理或高速运动时精度下降。速度是 NMPC 状态的核心分量——速度误估导致整个预测失准。但相比纯视觉方案，T265 已经提供了较好的短期精度</td><td>★★★</td></tr>
+    <tr><td>NMPC 权重调谐敏感</td><td>$Q_s$（感知权重）vs $Q_p$（位置权重）的平衡直接决定 aggressiveness vs. safety。在一个场景中调好的权重可能在另一个场景中过于保守或过于激进。自适应权重是必要的后续工作</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>可见性约束与控制屏障函数（CBF）的理论融合</strong>——当前 NMPC 中的可见性约束是<strong>离散节点上的不等式约束</strong>：它只能保证在 20 个离散时间点上特征在框内，但节点之间（0.05 s 间隔内）的特征位置没有被约束。如果目标在节点间快速穿越约束边界又返回，约束仍显示"满足"。CBF 提供<strong>连续时间的安全性保证</strong>——通过构造一个在安全集边界上增长的条件函数，可以证明如果初始状态在安全集内，系统永远不会离开安全集。将可见性约束转化为 CBF 形式并在 NMPC 中作为硬约束加入，可以为 100% TVR 提供理论证明（而不仅仅是实验统计）。这需要：(1) 推导球面视觉特征的 CBF 形式；(2) 证明在 NMPC 离散化下 CBF 条件仍然保持；(3) 处理控制输入有限时的 CBF 可行性问题。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机推导——第一性原理演绎</h2>
+
+  <h3>10.1 思路推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>四旋翼 IBVS 在 aggressive 机动中的目标可见性问题是<strong>欠驱动系统固有的结构性问题</strong>——不是传感器不够好或算力不够，而是"用旋转来产生平移"的物理本质导致相机朝向与运动方向之间存在不可消除的矛盾。在悬停或慢速飞行中这个矛盾不突出，但在 aggressive 机动中变得致命。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：(i) 虚拟相机方法——把特征旋转到水平虚拟平面来解耦旋转和平移，但这一变换<strong>不可逆地丢失了真实旋转信息</strong>，导致可见性约束失效；(ii) 旋转不变特征——设计对旋转不敏感的特征，但<strong>难以表达可见性约束</strong>；(iii) 限制四旋翼的 aggressive 程度——通过限制最大速度/姿态来被动保证可见性，但这<strong>牺牲了四旋翼的机动能力</strong>。</li>
+    <li><strong>如果不丢失旋转信息，能否直接定义真实可见性约束？</strong><br>这就是本文的核心思路逆转——不将特征变换到虚拟平面，而是在<strong>真实图像平面</strong>中预测特征运动并施加约束。但要实现这一点，需要：(a) 一个能预测特征未来位置的运动学模型；(b) 一个能利用未来信息做决策的优化框架；(c) 一种在流形上光滑表示球面特征的方法。NMPC + 四元数恰好满足这三个需求。</li>
+    <li><strong>为什么之前没有人这么做？</strong><br>因为三个看似独立的问题恰好需要被同时解决：(a) 虚拟相机范式的惯性——大多数研究者沿着"优化虚拟相机"的思路深挖，没有质疑其根本前提；(b) 四元数球面特征不是显而易见的选择——它需要一个从视觉里程计到 IBVS 的跨领域迁移；(c) NMPC 的实时性在过去难以保证——RTI 方案的成熟和 ACADO 代码生成工具的发展才使 5-10 ms 求解成为可能。</li>
+    <li><strong>最简单的方案是什么？</strong><br>相机 → YOLOv5 检测 → 球面特征提取（4 行数学）→ NMPC（ACADO 自动生成代码）→ 推力 + 角速率 → 飞控。整个方案不需要新硬件、不需要激光雷达、不需要运动捕捉系统——仅依赖单目相机和机载 IMU/视觉里程计。100% TVR，开源代码可用。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    四旋翼需要俯仰/滚转来平移——但这恰恰让相机偏离目标；传统虚拟相机方法把图像"掰直"后再做控制，却不可逆地丢失了相机是否真的能看见目标的信息——那为什么不反过来：<strong>在真实图像平面预测特征运动并施加可见性约束，只在评估控制效果时才用预测的姿态做旋转补偿？</strong>
+  </div>
+
+  <h3>10.3 如何推导出这篇文章</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：运行 Zhang 2021 的虚拟相机方法，发现明明可见性约束显示"安全"，但目标还是丢失了。调试中发现：四旋翼前倾时，特征在虚拟相机平面仍靠近中心（因为虚拟平面是水平的），但在真实图像中已经接近甚至超出边界。这不是 bug，是<strong>方法本身的结构性缺陷</strong>。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"保证 aggressive IBVS 中目标可见性"分解为三个子问题——(1) 如何定义作用在真实图像平面的约束？→ 需要特征始终在真实坐标系中传播；(2) 如何在优化中补偿旋转？→ 可以在目标函数中利用预测姿态做补偿；(3) 如何保证数值优化的光滑性？→ 需要球面特征的光滑参数化。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：(1) NMPC——天然适合做有限时域预测和多约束优化；(2) 四元数流形——Bloesch 在 VIO 中用的技术，恰好提供了光滑的球面表示；(3) ACADO + qpOASES——提供代码生成和 RTI 方案，使实时 NMPC 成为可能。</li>
+    <li><strong>Step 4 — 组装方案</strong>：在真实图像平面用四元数表示特征并前向预测 → 在每个离散节点上评估可见性约束 → 在目标函数中用预测姿态做欠驱动补偿 → RTI 方案保证实时性 → 直接输出推力和角速率绕过级联延迟。100% TVR，验证成功。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 关键总结</h2>
+
+  <h3>11.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：本文是一个经典的<strong>"逆转操作顺序"</strong>创新——不是发明新组件，而是把"先补偿再预测"翻转为"先预测再补偿"。这个看似简单的顺序改变彻底解决了虚拟相机框架的结构性问题。对于 UAV 控制领域的启示：<strong>当发现某个框架有根本缺陷时，不要试图在其内部修修补补——退一步检查是否有信息在框架的某个步骤中被不可逆地丢失了</strong>。</li>
+    <li><strong>技术技巧层面</strong>：(1) 四元数球面表示——利用 SO(3) 流形的光滑性克服 S^2 的拓扑障碍，这是一个优美的跨领域迁移（VIO → IBVS）；(2) RTI 方案——每步只做一次 SQP 迭代，让优化随时间隐式收敛，是在算力受限平台上实现 NMPC 的关键技巧；(3) 直接输出推力和角速率——消除姿态控制器的中间层，显著降低响应延迟；(4) 动态 range——将深度作为状态而非参数，在剧烈深度变化时大大提高了预测精度。</li>
+    <li><strong>实验/写作层面</strong>：论文的 Fig. 1a 是一张教科书级的"问题阐述图"——用一个视觉对比（虚拟 FOV vs 真实 FOV）清晰展示了核心问题，任何读者都能立即理解为什么虚拟相机方法有缺陷。Fig. 8 用 TVR-vs-速度曲线简洁地量化了本文方法 vs 虚拟相机方法的性能差异——100% vs 74%，一目了然。写论文时应当学习这种"一张图讲清楚问题 + 一张图展示优越性"的呈现方式。</li>
+  </ul>
+
+  <h3>11.2 对我的研究的直接启发</h3>
+  <ul>
+    <li><strong>对于视觉伺服方向</strong>：本文的欠驱动补偿机制可以直接用于改进任何基于 IBVS 的四旋翼控制方案——核心思想是"不要在特征空间做旋转补偿，而是在目标函数中用预测姿态做补偿"。如果你的 IBVS 系统在 aggressive 机动中经常丢失目标，检查你是在哪个空间定义可见性约束的——如果答案不是"真实图像平面"，你就遇到了和 Zhang 2021 一样的问题。</li>
+    <li><strong>对于 NMPC 在 UAV 中的应用</strong>：本文展示了如何将<strong>感知约束</strong>自然地嵌入 NMPC 框架——不仅是传统的执行器约束和避障约束，还包括视野约束、TTC 约束等。这打开了一个方向：将更多"感知质量"指标（如特征可分辨性、图像对比度、检测置信度）作为 NMPC 约束或目标函数的一部分——实现真正的"perception-aware"控制。</li>
+    <li><strong>对于极端机动（如穿越狭小空间）</strong>：Aggressive 机动中的可见性问题与狭小空间穿越有本质联系——两者都需要在高速大姿态下保持视觉特征的可见性。本文的方法可以直接作为<strong>aggressive 穿越的视觉底层控制器</strong>，在上层规划器输出参考轨迹后，确保执行过程中目标（如穿越门框）始终在视野中。</li>
+  </ul>
+
+  <h3>11.3 关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Zhang et al. (2021) — Robust nonlinear model predictive control based visual servoing of quadrotor UAVs. <em>IEEE/ASME Trans. Mechatronics</em> 26(2), 700-708</td><td>本文方法的<strong>直接对比基准</strong>——同样使用 NMPC + IBVS + 可见性约束，但基于虚拟相机框架。本文证明了其可见性约束在 aggressive 机动中无法保证真实目标可见性（TVR 降至 74%），而这正是本文的核心贡献所在。</td></tr>
+    <tr><td>Bloesch et al. (2015) — Robust visual inertial odometry using a direct EKF-based approach. <em>IEEE/RSJ IROS</em>, 298-304</td><td>四元数球面特征表示的<strong>灵感来源</strong>——Bloesch 用四元数参数化球面特征以实现光滑的 EKF 更新，本文将此思想迁移到 IBVS 的特征运动学推导中，解决了球面表示的核心数学障碍。</td></tr>
+    <tr><td>Falanga et al. (2018) — PAMPC: Perception-aware model predictive control for quadrotors. <em>IEEE/RSJ IROS</em>, 1-8</td><td>"Perception-aware" 这一术语的来源——Falanga 在 NMPC 框架中将视觉特征可观测性作为目标函数的一部分，但未处理可见性约束。本文在此基础上进一步：<strong>将可见性作为硬约束而非软目标</strong>，提供了更强保证。</td></tr>
+    <tr><td>Hamel & Mahony (2002) — Visual servoing of an under-actuated dynamic rigid-body system: An image-based approach. <em>IEEE Trans. Robot. Autom.</em> 18(2), 187-198</td><td><strong>球面 IBVS 的理论基础</strong>——首次证明球面图像特征对于欠驱动系统（如四旋翼）具有良好的几何特性。本文的四元数球面特征是对 Hamel 的 3D 单位向量表示的改进——解决了光滑性问题。</td></tr>
+    <tr><td>Houska et al. (2011) — ACADO toolkit. <em>Optimal Control Appl. Methods</em> 32(3), 298-312</td><td>ACADO 工具包的原始论文——本文的 NMPC 实现基于 ACADO 代码生成 + qpOASES 求解。理解 ACADO 的 RTI 方案和代码生成机制是复现本文方法的前提。</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Qin, Yu, Go &amp; Liu · IEEE/ASME TMECH 2023 · Perception-Aware IBVS of Aggressive Quadrotor UAVs · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

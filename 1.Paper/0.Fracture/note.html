@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — CoulombFly (Shen, Peng et al., 2024)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Sunlight-powered sustained flight of an ultralight micro aerial vehicle（太阳能驱动的超轻型微型飞行器持续飞行）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Wei Shen</strong><sup>†</sup>、<strong>Jinzhe Peng</strong><sup>†</sup>（共同一作），Rui Ma，Jiaqing Wu，Jingyi Li，Zhiwei Liu，Jiaming Leng，<strong>Xiaojun Yan</strong>（corresponding），<strong>Mingjing Qi</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">北航</strong>（Beihang University），能源与动力工程学院 / 航空发动机协同创新中心 / 航空发动机气动热力国家级重点实验室 / 北京市航空发动机结构与强度重点实验室</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">Nature</strong>，<strong>2024年7月</strong>，Vol. 631，pp. 537–542</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://doi.org/10.1038/s41586-024-07609-4" target="_blank">10.1038/s41586-024-07609-4</a> | Received: 2024-01-29 | Accepted: 2024-05-23 | Published: 2024-07-17</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>CoulombFly</strong>——世界上首架完全靠自然太阳光实现无系留持续飞行的超轻型 MAV（仅 4.21 g / 20 cm 翼展）。核心创新：<strong>静电电机 + 超轻型千伏电源系统</strong>，升力-功率效率高达 30.7 g/W，是传统电磁电机方案的 2~3 倍，且几乎不发热。将太阳能飞行器从米级/公斤级缩小到厘米级/克级（1/600 质量）。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Electrostatic Motor</span>
+    <span class="tag tag-green">Solar-Powered MAV</span>
+    <span class="tag tag-amber">High Voltage Power Converter</span>
+    <span class="tag tag-purple">Cockcroft-Walton Multiplier</span>
+    <span class="tag tag-red">Lift-to-Power Efficiency</span>
+    <span class="tag tag-cyan">Nature 2024</span>
+    <span class="tag tag-gray">Ultralight UAV</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么超轻型 MAV（&lt;10 g）的飞行时间普遍不超过 10 分钟？</strong><br>
+    答：因为传统电磁电机在微型化时效率急剧下降——摩擦损耗和电阻损耗随尺寸减小而增大，导致升力-功率效率（lift-to-power efficiency）很低。同时，现有高效率替代方案（压电、介电弹性体）仍然依赖地面供能系统（激光、强光、射频），无法真正实现"自由飞行"。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>静电电机在微型尺度下比电磁电机有本质优势</strong>——（1）低电流（μA级）意味着极低的焦耳热损耗和几乎不发热；（2）扭矩恒定、转速自适应当前负载，不受电磁电机启动/堵转大电流的困扰；（3）配合超轻型高压电源（1.13g 产生 9kV），整个推进系统实现了传统方案 2~3 倍的升力-功率效率。这打破了"微型飞行器 = 短航时"的固有认知。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>静电电机历史（Jefimenko, 18 世纪起）与 MEMS 静电微电机</td><td>→ 静电电机在小尺度下具有天然优势：无绕组、结构简单、低电流——但此前从未被用于飞行器推进。将 MEMS 领域的成熟原理"逆向放大"到厘米尺度 MAV，可以同时获得高效率与足够推力</td><td>架构</td></tr>
+    <tr><td>电刷式电荷转移 vs 电晕放电</td><td>→ 传统静电电机依赖电晕效应进行电荷转移，电压损耗大、效率低。用<strong>机械电刷</strong>（20 μm 铝箔激光切割）替代电晕放电，虽然引入微小摩擦但消除了巨大的电压损耗，使得电机可以在 5~9 kV 下高效运转</td><td>方法</td></tr>
+    <tr><td>Cockcroft-Walton 电压倍增器（1932 年诺贝尔奖相关工作）</td><td>→ 将 12 级 Cockcroft-Walton 倍增器与 forward-flyback 拓扑结合，利用耦合电感的寄生参数（无需独立磁化电感），在 1.13g 内实现 900~2000 倍升压比（4.5 V → 9 kV），电压-质量比 7.09 kV/g，比此前最轻的高压发生器轻 55%</td><td>数学 / 电路</td></tr>
+    <tr><td>砷化镓（GaAs）薄膜太阳能电池（航天级）</td><td>→ 能量转换效率 30%、功率密度 0.8 W/g——在自然光照（1 sun = 920 W/m²）下即可驱动整个系统，不需要激光或聚光器（3 sun），真正实现了"自然光自由飞行"</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 静电驱动推进系统——将静电电机首次用于飞行器推进</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>电磁电机在克级尺度下效率骤降（摩擦 + 电阻损耗），导致 MAV 的升力-功率效率极低（通常 2~4 g/W），飞行时间 &lt;10 min。压电/介电弹性体等替代方案效率更高但仍需地面供能。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>静电电机在 MEMS 中已有数十年历史，但仅用作传感器，从未被用于产生推进力</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>转子 64 片叶片（20 μm 碳纤维 + 1 μm 铝箔）+ 定子 8 对正负电极（交替排列成环形）→ 16 个周向静电场驱动转子旋转。核心：用<strong>电刷</strong>（2 mm 长铝箔）实现机械式电荷转移，取代电晕放电，大幅降低电压损耗。电机仅 1.52 g，堵转时电流几乎为零（安全性极高），连续运行 1h 无性能衰减、不发热。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 超轻型千伏电源系统——1.13g 产生 9kV 高压</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>静电电机需要 kV 级工作电压，但传统高压电源（flyback 拓扑）输出鲜超数百伏，且高匝数比变压器漏感大、需要庞大缓冲电路。在 MAV 严格的重量约束下（总共只有 4.21 g），必须设计一种"极致轻量"的高压电源。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Cockcroft-Walton 电压倍增器（1932 年，首个人工核嬗变实验），以及 forward-flyback 转换器拓扑</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>forward-flyback 转换器 + 1:50 耦合电感 + 12 级 Cockcroft-Walton 电压倍增器，焊接在 0.05 mm 厚聚酰亚胺柔性 PCB 上（激光烧蚀制造）。总重 1.13 g，升压比 900~2000，电压-质量比 7.09 kV/g，比此前最轻的高压发生器（4.32 kV / 951 mg）轻 55%。86 kHz / 0.2 占空比下输出 9.0 kV，整机能耗 0.568 W。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 系统级集成——首次实现自然太阳光驱动的无系留持续飞行</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>此前所有太阳能飞行器要么是固定翼大翼展（米级/公斤级），要么依赖地面激光/强光/射频供电。没有任何 MAV 能在自然太阳光下实现无系留持续飞行。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>系统级协同优化：高效推进 + 超轻电源 + 高效光伏 = 从"不可能"到"首次实现"</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>CoulombFly = 静电推进系统（1.96 g）+ 千伏电源系统（2.09 g）+ 连接结构（0.16 g）= <strong>4.21 g</strong>。2 片 GaAs 太阳能电池串联（6.04 V 开路电压），在自然日光 920 W/m² 下 1 秒内起飞并持续飞行 1 小时。总升力-功率效率 7.6 g/W，是其他无系留 MAV 的 2~3 倍。将太阳能飞行器缩小到现有最轻方案的 <strong>1/600</strong>。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph ENERGY["能量采集层 (0.96 g)"]
+      SUN["自然太阳光 · 920 W/m² · 48°入射角"]
+      GAAS["GaAs 薄膜电池 ×2 · 0.48g/片 · 效率30%"]
+    end
+
+    subgraph POWER["电力变换层 (1.13 g · 0.568 W)"]
+      INPUT["输入: 4.50 V DC · 开路 6.04 V"]
+      COUPLED["耦合电感 1:50 · 前向反激拓扑 · 86 kHz"]
+      CW["12级 CW 倍压器 · 每级 2C+2D · 升压 900~2000 倍"]
+      OUTPUT["输出: 9.0 kV · 7.09 kV/g 电压质量比"]
+    end
+
+    subgraph MOTOR["静电驱动层 (1.52 g · 0.137 W)"]
+      STATOR["定子: 8对正负电极 · 环形交替 · 碳纤维+铝箔"]
+      FIELD["16个周向静电场 · 9 kV 驱动 · 库仑力 F=qE"]
+      ROTOR["转子: 64叶片 · 20μm碳纤维+1μm铝箔 · 玻纤连接环"]
+      BRUSH["电刷: 2mm铝箔 · 软接触电荷转移 · 替代电晕放电"]
+    end
+
+    subgraph THRUST["气动升力层 (0.44 g)"]
+      PROP["螺旋桨 R=100mm · 最大升力 5.8g · 升重比 2.9"]
+      LIFT["整机 4.21g · 推进1.96+电源2.09+结构0.16"]
+    end
+
+    SUN --> GAAS
+    GAAS --> INPUT
+    INPUT --> COUPLED --> CW --> OUTPUT
+    OUTPUT --> STATOR
+    STATOR --> FIELD --> ROTOR --> BRUSH
+    BRUSH --> PROP
+    PROP --> LIFT
+
+    LIFT -.->|"反馈: 1h无衰减 · 不发热"| ROTOR
+    OUTPUT -.->|"效率24.1% · 可优化至58%"| CW
+    ROTOR -.->|"堵转电流≈0 · 本质安全"| FIELD
+
+    classDef solar fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef power fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef motor fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef thrust fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef result fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    class SUN,GAAS solar
+    class INPUT,COUPLED,CW,OUTPUT power
+    class STATOR,FIELD,ROTOR,BRUSH motor
+    class PROP thrust
+    class LIFT result
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 能量流 + 信号流 + 反馈</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph OPTICAL["光能 → 电能"]
+      direction LR
+      SUN["太阳光 920 W/m²"] --> PV["GaAs电池×2 · 4.50V · ~0.57W"]
+    end
+
+    subgraph CONV["DC-DC升压 (HVPC 1.13g)"]
+      direction LR
+      MOSFET["MOSFET斩波 86kHz"] --> XFMR["耦合电感 1:50"] --> CWLADDER["12级CW倍增器 900~2000倍"] --> HVOUT["高压输出 9.0kV"]
+    end
+
+    subgraph MOTOR["静电电机 (1.52g)"]
+      direction LR
+      ESTATOR["定子: 16个交替电场 · F=qE"] --> EROTOR["转子+电刷: 64叶片 · 电荷转移"] --> ETORQUE["扭矩: 恒定 · 转速自适应"]
+    end
+
+    subgraph AERO["螺旋桨 + 飞行"]
+      direction LR
+      EPROP["螺旋桨 R=100mm · 升力5.8g · 效率30.7g/W"] --> EFLIGHT["持续飞行 · 1秒起飞 · ≥1小时"]
+    end
+
+    subgraph CONTRAST["对比: 电磁 vs 静电"]
+      EM_MOTOR["电磁电机 SKEYE Pico: 7g · 飞7分钟 · 发热严重"]
+      ES_MOTOR["静电电机(本文): 相同负载 · 室温 · 零发热"]
+    end
+
+    OPTICAL --> CONV --> MOTOR --> AERO
+    AERO --> CONTRAST
+
+    ETORQUE -.->|"电流自调节 · 转速∝负载 · 扭矩恒定"| EROTOR
+    EFLIGHT -.->|"1h耐久 · 电机无温升 · 零衰减"| EROTOR
+    HVOUT -.->|"负载反馈 · 效率24.1%"| CWLADDER
+    EM_MOTOR -.->|"发热严重"| ES_MOTOR
+
+    classDef solar fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef convert fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef motor fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef aero fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef compare fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class SUN,PV solar
+    class MOSFET,XFMR,CWLADDER,HVOUT convert
+    class ESTATOR,EROTOR,ETORQUE motor
+    class EPROP,EFLIGHT aero
+    class EM_MOTOR,ES_MOTOR compare
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 从设计到飞行的完整工程管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph DESIGN["阶段1: 系统设计"]
+      direction LR
+      D1["问题定义: <10g MAV · 飞行<10min"] --> D2["驱动选型: 静电 vs 电磁 · F=qE"] --> D3["拓扑选型: 前向反激+CW倍压"] --> D4["参数优化: 4.21g · 升力-功率-质量平衡"]
+    end
+
+    subgraph FAB["阶段2: 制造与组装"]
+      direction LR
+      F1["激光切割: 碳纤维·铝箔·Mylar·柔性PCB"] --> F2["三维组装: 定子+转子+电刷"] --> F3["质控: μm间隙 · 电刷一致性"] --> F4["螺旋桨: R=100mm · 0.44g"]
+    end
+
+    subgraph TEST["阶段3: 测试与验证"]
+      direction LR
+      T1["部件测试: HVPC 86kHz/9kV · 堵转≈0"] --> T2["系留飞行: 升力>自重 · 5.8g@8.5kV"] --> T3["阳光飞行: 北京·920W/m² · 1秒起飞"] --> T4["1h耐久: 零温升 · 零衰减"]
+    end
+
+    subgraph MINI["阶段4: 微型化验证与未来"]
+      direction LR
+      M1["毫米原型: φ8mm·9mg · 10860rpm"] --> M2["性能: 0.97mW · 9.2g/W · 2倍优势"] --> M3["未来: 多旋翼+自主 · 电池24h · HVPC→58%"]
+    end
+
+    DESIGN -->|"设计参数"| FAB
+    FAB -->|"原型机"| TEST
+    TEST -->|"验证成功 · Nature 2024"| MINI
+
+    T4 -.->|"反馈: 优化HVPC效率"| D4
+    T3 -.->|"反馈: 增加载荷1.59g"| D1
+    M2 -.->|"反馈: 制造精度瓶颈"| F2
+
+    classDef design fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef fab fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef testing fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef mini fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class D1,D2,D3,D4 design
+    class F1,F2,F3,F4 fab
+    class T1,T2,T3,T4 testing
+    class M1,M2,M3 mini
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \max_{\text{design}} \; t_{\text{flight}} = \frac{E_{\text{available}}}{P_{\text{system}}} \quad \text{s.t.} \quad F_{\text{lift}} \ge m_{\text{total}} \cdot g,\quad m_{\text{total}} \le 10\,\text{g},\quad P_{\text{in}} = P_{\text{solar}} $$
+    <div class="eq-note">
+      <strong>$t_{\text{flight}}$</strong> = 飞行时间（目标：无限——只要有光照）&nbsp;|&nbsp;
+      <strong>$F_{\text{lift}}$</strong> = 推进系统产生的升力 &nbsp;|&nbsp;
+      <strong>$m_{\text{total}}$</strong> = 飞行器总质量（本文实现：4.21 g）&nbsp;|&nbsp;
+      <strong>$P_{\text{solar}}$</strong> = 自然太阳光功率（~920 W/m² × 电池面积 × 效率）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：在 &lt;10 g 质量预算内，推进系统必须产生 &gt;自身重量的升力，且功耗必须 &lt;太阳能电池在自然光下的输出功率（约 0.57 W）。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>自然太阳光（约 920 W/m²，北京春季正午）</td><td>光强、入射角（48°）、湿度（34%）</td></tr>
+    <tr><td><strong>输出</strong></td><td>持续飞行：垂直方向稳定升力，横向由导轨约束（单自由度）</td><td>升力 5.8 g（max），飞行时间 ≥1h（测试极限）</td></tr>
+    <tr><td><strong>目标</strong></td><td>实现完全靠自然太阳光驱动的无系留持续飞行——此前在此尺度下从未实现</td><td>升力-功率效率 30.7 g/W（推进系统）/ 7.6 g/W（整机）</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>硬件系统级创新</strong>——不是算法或控制问题，而是<strong>在极端物理约束（质量 &lt; 5 g、功率 &lt; 0.6 W）下，从执行器原理到电源拓扑全面重新设计微型飞行器的能量-推进架构</strong>。平台：单旋翼直升机（20 cm 翼展），场景：室外自然光照环境下的持续悬停飞行，任务：证明"自然光 + 超轻型 MAV + 无限续航"在物理上可行。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：微型飞行器的质量-功率-升力三角困境。<br><br>
+    （1）<strong>尺度律的反噬</strong>：电磁电机的效率 ∝ 特征尺寸。尺寸越小 → 摩擦损耗占比越高 → 电流增大 → 焦耳热增大 → 效率急剧下降。这就是为什么 7 g 的四旋翼（SKEYE Pico）只能飞 7 min，3.1 g 的扑翼机（DelFly Micro）只能飞 3 min。<br><br>
+    （2）<strong>太阳能电池的功率密度天花板</strong>：在 1 sun（~1000 W/m²）自然光照下，即使使用 30% 效率的 GaAs 电池，每克电池最多产生约 0.8 W。对于 4.21 g 的飞行器，太阳能电池只能贡献 ~0.96 g，提供约 0.57 W 可用电功率。这意味着<strong>整机功耗必须 &lt; 0.57 W</strong>。<br><br>
+    （3）<strong>高压-低功耗的矛盾</strong>：静电电机需要 kV 级电压但仅消耗 μA 级电流。传统高压电源（flyback 拓扑）的变压器和缓冲电路太重——如何在 1.13 g 内将 4.5 V 升压到 9 kV，同时保持可接受的效率？<br><br>
+    <strong>将这三点放在一起</strong>：你需要在 &lt;5 g 的总质量内，设计一个总功耗 &lt;0.6 W、能产生 &gt;4.21 g 升力的飞行系统。此前所有方案都至少有一个维度无法满足——这是本文首次让三个约束同时成立。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Electromagnetic Motor（传统电磁电机 MAV）</td>
+      <td>永磁体 + 线圈绕组产生旋转扭矩，广泛用于消费级微型四旋翼（如 SKEYE Pico 7 g）</td>
+      <td>微型化时摩擦损耗和电阻损耗<strong>急剧增大</strong>。SKEYE Pico（7 g）仅能飞 7 分钟，DelFly Micro（3.1 g）仅 3 分钟。根本问题：电磁电机效率 ∝ 尺寸³——尺度律决定了在克级尺度下效率不可能高。</td>
+    </tr>
+    <tr>
+      <td>Piezoelectric / Dielectric Elastomer Actuator（压电 / 介电弹性体扑翼 MAV）</td>
+      <td>利用压电陶瓷或介电弹性体在高频电场下的形变驱动翅膀扑动（如 RoboBee X-Wing、DEA FWMAV）</td>
+      <td>效率较高（可达 ~4 g/W），但<strong>仍然无法离开地面供能</strong>：RoboBee 需要激光供电，DEA 扑翼机需要高压射频或 3 sun 聚光。它们证明了"可以飞"，但没有解决"自由飞"的能源自主问题。</td>
+    </tr>
+    <tr>
+      <td>Fixed-Wing Solar-Powered UAV（固定翼太阳能无人机）</td>
+      <td>大翼展（数十米）铺设大面积太阳能电池，驱动电磁电机推进（如 NASA Helios、Airbus Zephyr）</td>
+      <td>固定翼需要<strong>巨大翼展</strong>来同时提供升力面积和太阳能电池铺设面积，导致体积和质量巨大（Airbus Zephyr 8/S 翼展 25 m / 质量数十 kg）。无法缩小到手持尺寸，不适用于 MAV 场景。</td>
+    </tr>
+    <tr>
+      <td>Solar-Powered Quadcopter（太阳能四旋翼，Goh et al. 2019）</td>
+      <td>最小实现完全太阳能飞行的旋翼机——2 m 尺寸、2.6 kg</td>
+      <td>升力-功率效率 8.6 g/W，但<strong>质量和体积仍然太大</strong>：2.6 kg 是 CoulombFly 的 600 倍。根本原因仍然是电磁电机在更小尺度下效率下降。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 克级尺度下的高效推进</strong>：在 &lt;2 g 的推进系统质量预算内，产生 &gt;4.21 g 的升力且功耗 &lt;0.2 W。传统电磁电机在此尺度效率只剩个位数的 g/W。需要一种随尺度缩小反而更有优势的驱动原理。</li>
+    <li><strong>挑战 2 — 超轻量高压电源</strong>：静电电机需要 kV 级电压（4~9 kV）。传统高压电源重量在数十克以上——而本文总质量预算仅 4.21 g。需要在 1.13 g 内实现 900~2000 倍升压，且效率可接受（24%）。这涉及变压器设计、寄生参数利用、拓扑选择的联合优化。</li>
+    <li><strong>挑战 3 — 太阳能电池的能量预算极致压缩</strong>：2 片 GaAs 电池（0.96 g）在自然光下输出约 0.57 W。整机功耗必须控制在此范围内——静电电机 0.137 W + HVPC 损耗 0.431 W = 总计 0.568 W，刚好在边界内。任何一个环节的效率下降都会导致系统无法起飞。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心不是算法而是<strong>硬件系统设计</strong>，但有几个关键的物理/电路原理构成了整个系统的理论支柱：（1）静电电机的库仑驱动力原理；（2）Cockcroft-Walton 电压倍增器的倍压整流原理；（3）forward-flyback 转换器的能量传输原理。以下逐一拆解。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: 静电电机工作原理 -->
+  <h4>Group A: 静电电机——库仑力驱动与电荷转移</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 静电驱动力</span>
+    $$ F = qE \qquad \tau = \sum_{i} r_i \times F_i $$
+    <div class="eq-note">
+      <strong>$F$</strong> = 转子叶片受到的库仑力 &nbsp;|&nbsp;
+      <strong>$q$</strong> = 叶片在电刷处获得的电荷量（通过接触正/负电极板交替充放电）&nbsp;|&nbsp;
+      <strong>$E$</strong> = 正负电极板之间的电场强度（由 9 kV 高压在环形排列的 8 对电极间产生）&nbsp;|&nbsp;
+      <strong>$\tau$</strong> = 转子总扭矩（64 片叶片 × 16 个电场区域的合力矩）&nbsp;|&nbsp;
+      <strong>核心特征</strong>：扭矩在整个转速范围内保持恒定（Fig. 2e 红线），不受负载变化影响——这与电磁电机"扭矩-转速曲线随负载变化"有本质区别。转速通过电流自动调节（Fig. 2e 蓝线）。
+    </div>
+  </div>
+
+  <!-- Formula Group B: HVPC 升压原理 -->
+  <h4>Group B: 超轻型千伏电源——Cockcroft-Walton 级联倍压</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — N 级 CW 电压倍增器理想输出</span>
+    $$ V_{\text{out}} \approx 2N \cdot V_{\text{peak}} \quad \text{（本文：} N=12,\; V_{\text{peak}} \approx 375\,\text{V} \text{）} $$
+    $$ \Rightarrow V_{\text{out}} \approx 2 \times 12 \times 375 = 9000\,\text{V} = 9\,\text{kV} $$
+    <div class="eq-note">
+      <strong>$N$</strong> = 电压倍增器级数（本文用 12 级）&nbsp;|&nbsp;
+      <strong>$V_{\text{peak}}$</strong> = 每级输入交流电压的峰值（由 1:50 耦合电感将 4.5 V 直流斩波为交流脉冲，峰值约 375 V）&nbsp;|&nbsp;
+      <strong>工作原理</strong>：每一级由 2 个电容 + 2 个二极管组成半波倍压器，12 级串联后理论输出 = 2N × Vpeak。Forward-flyback 拓扑的关键优势：<strong>无论 MOSFET 开关处于导通还是关断状态</strong>，能量都可以通过耦合电感传输到 CW 倍增器（不像传统 flyback 只在关断期间传输能量）。耦合电感的<strong>寄生漏感不被视为损耗</strong>，反而为电路提供了必要的谐振特性。
+    </div>
+  </div>
+
+  <!-- Formula Group C: 升力-功率效率 -->
+  <h4>Group C: 升力-功率效率——核心性能指标</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 升力-功率效率定义</span>
+    $$ \eta_{\text{lift-power}} = \frac{F_{\text{lift}}}{P_{\text{input}}} \quad \left[\text{g/W}\right] $$
+    $$ \text{推进系统：} \frac{4.21\,\text{g}}{0.137\,\text{W}} = 30.7\,\text{g/W} \qquad \text{整机：} \frac{4.21\,\text{g}}{0.568\,\text{W}} = 7.4\,\text{g/W} $$
+    <div class="eq-note">
+      <strong>$\eta_{\text{lift-power}}$</strong> = 每瓦电功率能产生多少克升力——这是衡量 MAV 推进效率的最核心指标 &nbsp;|&nbsp;
+      <strong>$F_{\text{lift}}$</strong> = 推进系统实际产生的升力 &nbsp;|&nbsp;
+      <strong>$P_{\text{input}}$</strong> = 输入电功率 &nbsp;|&nbsp;
+      <strong>30.7 g/W（推进系统）vs 7.4 g/W（整机）</strong>：差距来自 HVPC 的能量转换损耗（效率 24.1%）——能量从太阳能电池（4.5 V）→ HVPC（9 kV）→ 静电电机（旋转扭矩）→ 螺旋桨（气动升力），每一级都有损耗。优化 HVPC 效率（当前仅 24.1%，但可在更低负载电阻下达到 58%）是未来提升整机效率的最大杠杆。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>飞行器总质量</td><td><strong>4.21 g</strong></td><td>推进（1.96 g）+ 电源（2.09 g）+ 结构（0.16 g）</td><td>太阳能电池在自然光下仅能提供 ~0.57 W，质量和功率之间的权衡极度紧张。每增加 0.1 g 都需要对应的高效升力补偿</td></tr>
+    <tr><td>静电电机工作电压</td><td><strong>4.0~9.0 kV</strong></td><td>定子电极板间的高压直流偏置</td><td>电压越高 → 电场越强 → 扭矩越大 → 升力越大。但受限于 HVPC 输出能力和空气击穿电压（高湿度时击穿电压降低）</td></tr>
+    <tr><td>Cockcroft-Walton 级数</td><td><strong>12 级</strong></td><td>电压倍增器的级联级数</td><td>每增加 1 级增加约 2×Vpeak 的输出电压，但也会增加电路质量。12 级是电压增益与重量之间的最优平衡</td></tr>
+    <tr><td>HVPC 开关频率</td><td><strong>86 kHz</strong></td><td>MOSFET 的 PWM 开关频率</td><td>在输出特性曲线（Fig. 3c）中选择输出高且稳定性好的频率点。频率过低 → 输出电压不足；频率过高 → 开关损耗增大</td></tr>
+    <tr><td>太阳能电池类型</td><td><strong>GaAs 薄膜（30%）</strong></td><td>砷化镓薄膜太阳能电池，单片 0.48 g</td><td>在单位质量功率密度（0.8 W/g @ 1 sun）上远超硅电池（~0.1 W/g），是克级太阳光飞行的唯一可行选择</td></tr>
+    <tr><td>转子叶片数 / 定子电极对数</td><td><strong>64 片 / 8 对</strong></td><td>转子上的叶片数量和定子上交替排列的正负电极对数</td><td>叶片数越多 → 扭矩越平滑；电极对数 = 每次旋转的换向次数。64/8 的组合实现了扭矩恒定（最大程度消除转矩脉动）</td></tr>
+  </table>
+
+  <h3>6.4 静电电机 vs 电磁电机的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>⚡ 静电电机（本文）</h4>
+      <ul>
+        <li>驱动力来自<strong>库仑力</strong>：$F = qE$</li>
+        <li>电流极小（μA 级）→ 几乎不发热</li>
+        <li>堵转时电流 ≈ 0（安全）</li>
+        <li>扭矩 <strong>恒定</strong>，转速自适应负载</li>
+        <li>无绕组、无永磁体、结构极简单</li>
+        <li>需要 kV 级高压（核心工程挑战）</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🔧 传统电磁电机</h4>
+      <ul>
+        <li>驱动力来自<strong>洛伦兹力</strong>：$F = IL \times B$</li>
+        <li>电流大（A 级）→ 焦耳热严重</li>
+        <li>堵转时电流最大（烧毁风险）</li>
+        <li>扭矩-转速曲线随负载变化</li>
+        <li>需要绕组、永磁体、轴承</li>
+        <li>需要低压大电流（~3.7 V / ~1 A）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 CoulombFly 需要掌握三个关键基础原理：静电电机（为什么小尺度优于电磁）、Cockcroft-Walton 倍压器（如何用轻量级电路实现 kV 级升压）、Forward-Flyback 转换器（如何在开关全周期传输能量）。</p>
+
+  <h3>7.1 静电电机原理 — 为什么小尺度下库仑力战胜洛伦兹力</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 两种电磁力的尺度律对比</span>
+    $$ F_{\text{Coulomb}} = qE \propto A \quad\text{（表面力）}\qquad F_{\text{Lorentz}} = IL \times B \propto V \quad\text{（体积力）} $$
+    <div class="eq-note">
+      <strong>$F_{\text{Coulomb}} = qE$</strong> = 电荷在电场中受到的库仑力，力的来源是表面电荷积累 → 面积律（∝ L²）&nbsp;|&nbsp;
+      <strong>$F_{\text{Lorentz}} = IL \times B$</strong> = 载流导体在磁场中受到的洛伦兹力，力的来源是体积电流 → 体积律（∝ L³）&nbsp;|&nbsp;
+      <strong>尺寸缩小 10 倍</strong>：库仑力缩小 100 倍（面积），洛伦兹力缩小 1000 倍（体积）——<strong>静电力的相对优势随尺寸缩小而增大</strong>。
+    </div>
+  </div>
+
+  <p>这就是为什么 MEMS 领域大量使用静电驱动（微米级执行器），而宏观世界以电磁电机为主。CoulombFly 的关键洞察是：<strong>在厘米/克级尺度下，静电力的"面积律优势"仍然足够显著</strong>，可以用 1.52 g 的静电电机产生 30.7 g/W 的升力-功率效率——是同等尺寸电磁电机的 2~3 倍。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>⚡ 静电电机工作机制（本文）</h4>
+      <p><strong>步骤 1</strong>：9 kV 高压施加到定子的 8 对正负交替排列的电极板上，在圆周方向形成 16 个静电场。</p>
+      <p><strong>步骤 2</strong>：转子叶片的电刷在旋转过程中依次接触正电极和负电极——接触正电极时叶片带上正电荷，接触负电极时带上负电荷（往复式电荷转移）。</p>
+      <p><strong>步骤 3</strong>：带电叶片在电场中受到库仑力 $F = qE$，推动转子持续旋转。关键：<strong>扭矩在整个转速范围内保持恒定</strong>（与电磁电机"转速越高扭矩越低"截然不同）。</p>
+      <p><strong>为什么堵转安全？</strong>：转子停止时，电刷不与电极接触 → 电荷不再转移 → 电流 ≈ 0 → 无焦耳热、无烧毁风险。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>🔧 电磁电机工作机制（传统方案）</h4>
+      <p><strong>步骤 1</strong>：电池提供低压大电流（如 3.7 V / 1 A），通过换向器馈入转子绕组。</p>
+      <p><strong>步骤 2</strong>：载流绕组在永磁体磁场中受到洛伦兹力，产生扭矩。</p>
+      <p><strong>步骤 3</strong>：扭矩随转速变化——负载增大 → 转速下降 → 反电动势减小 → 电流增大 → 发热加剧。</p>
+      <p><strong>为什么堵转危险？</strong>：转子停止 → 反电动势为零 → 电流达到最大值 → 焦耳热急剧上升 → 烧毁风险。</p>
+    </div>
+  </div>
+
+  <h3>7.2 Cockcroft-Walton 电压倍增器 — 如何用轻量级电路实现 2000 倍升压</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — N 级 CW 倍压器工作原理</span>
+    $$ V_{\text{out}} \approx 2N \cdot V_{\text{peak}} \quad \text{（理想空载）} $$
+    <div class="eq-note">
+      <strong>$N$</strong> = 倍压器级数（本文：12 级）&nbsp;|&nbsp;
+      <strong>$V_{\text{peak}}$</strong> = 每级输入交流电压峰值（由 1:50 耦合电感提供，约 375 V）&nbsp;|&nbsp;
+      <strong>$V_{\text{out}}$ ≈ 2 × 12 × 375 V = 9.0 kV</strong>（实测）&nbsp;|&nbsp;
+      <strong>工作原理</strong>：每一级由 2 个电容和 2 个二极管组成——在交流正半周期对一个电容充电，负半周期串联叠加到下一级——就像电荷被一级一级"泵"上更高的电位。N 级叠加后输出电压是输入峰值电压的 2N 倍。
+    </div>
+  </div>
+
+  <p><strong>CW 倍增器的核心优势是"重量-电压比"</strong>：每一级的元件完全相同（2 个二极管 + 2 个电容），增加电压只需增加级数，不需要更大更重的变压器。这使得在 1.13 g 的极端质量约束下实现 9 kV 成为可能。</p>
+
+  <table>
+    <tr><th>对比维度</th><th>传统 Flyback 变压器方案</th><th>Cockcroft-Walton 方案（本文）</th></tr>
+    <tr><td>升压方式</td><td>单一高匝数比变压器（如 1:2000）</td><td>中等匝数比变压器（1:50）+ 12 级倍压</td></tr>
+    <tr><td>变压器重量</td><td>匝数比越大 → 绕组越多 → 越重</td><td>只承担 50 倍升压，剩余由轻量的电容二极管完成</td></tr>
+    <tr><td>电压应力</td><td>全部集中在变压器次级和整流二极管</td><td>每级只承受 2×Vpeak 的电压差，元件耐压要求低</td></tr>
+    <tr><td>重量-电压比</td><td>典型：~2-3 kV/g（较重）</td><td><strong>7.09 kV/g</strong>（比此前最轻方案轻 55%）</td></tr>
+  </table>
+
+  <h3>7.3 Forward-Flyback 转换器 — 在开关全周期传输能量</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — Forward-Flyback vs 传统 Flyback 的能量传输对比</span>
+    $$ \text{传统 Flyback: 仅在 MOSFET OFF 期间传输能量} $$
+    $$ \text{Forward-Flyback: MOSFET ON 和 OFF 期间均传输能量} $$
+    <div class="eq-note">
+      <strong>传统 Flyback</strong>：MOSFET 导通 → 变压器磁芯储能；MOSFET 关断 → 磁芯释能到次级 → 整流输出。能量只在<strong>关断半周期</strong>传输，占空比受限，需要更大磁芯存储能量。&nbsp;|&nbsp;
+      <strong>Forward-Flyback</strong>：MOSFET 导通 → 能量通过耦合电感<strong>直接前向传输</strong>到次级 + 磁芯同时储能；MOSFET 关断 → 磁芯储存的能量<strong>反激传输</strong>到次级。能量在<strong>整个开关周期</strong>都在传输，同等功率下磁芯可以更小更轻。
+    </div>
+  </div>
+
+  <p><strong>对 CoulombFly 最重要的工程价值</strong>：因为能量在两个方向（前向+反激）都传输，耦合电感的<strong>寄生漏感不构成损耗</strong>——它实际上为 Cockcroft-Walton 倍增器提供了必要的谐振特性。在传统 flyback 中需要额外缓冲电路来吸收漏感能量，而本文的 Forward-Flyback 拓扑将这一"缺陷"变成了<strong>功能</strong>——这是减轻重量的关键设计技巧。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    静电电机需要 kV 级高压但电流极小 → CW 倍增器可以轻量级实现高压 → Forward-Flyback 利用寄生参数进一步减重 → <strong>三个原理环环相扣</strong>，共同使得"4.21 g 整机 + 自然太阳光 + 持续飞行"从不可能变为现实。任何一个原理的缺失都会让整个系统崩溃——这也是为什么之前的团队都没能做到。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig4.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">CoulombFly 整机及其在自然太阳光下的持续飞行测试</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="CoulombFly integrated vehicle and sunlight-powered sustained flight"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 手掌大小的 CoulombFly 整机——静电驱动推进系统（静电电机 1.52 g + 螺旋桨 0.44 g）+ 超轻型千伏电源系统（HVPC 1.13 g + 太阳能电池 0.96 g）+ 连接结构（0.16 g），总质量仅 4.21 g，翼展 20 cm。太阳能电池位于电机下方，既能确保高低压部件的物理隔离，又降低了整体重心。(b) 飞行测试系统——飞行器由两根垂直导轨约束横向位置，在北京春季正午（11:50）进行室外阳光直射测试，光照强度 920 W/m²，日光入射角 48°，相对湿度 34%。(c) 起飞和持续飞行过程——移开遮光板后，飞行器在 <strong>1 秒内</strong>成功起飞，红色垂直箭头表示飞行高度，红色倾斜箭头表示自然日光方向。</p>
+      <ul>
+        <li><strong>太阳能电池布局的工程巧思</strong>：电池位于电机下方足够距离处，既保证高低压隔离，又确保充足日照——同时降低了整机重心，增强了被动稳定性</li>
+        <li><strong>1 小时持续飞行</strong>：Supplementary Video 5 显示静电电机在 1 小时测试中无性能衰减，验证了静电驱动的长期可靠性——这与电磁电机运行数分钟后即明显发热形成鲜明对比</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">静电驱动推进系统的结构设计、工作原理与输出特性</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Electrostatic-driven propulsion system"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：整篇论文最核心的工程创新。由 8 个子图组成，构成"结构设计→工作原理→电特性→升力特性→对比→热特性"的完整论证链。</p>
+      <ul>
+        <li><strong>(a) 静电电机结构</strong>：红色/蓝色 = 正/负定子电极板（交替排列成环形），灰色 = 转子叶片（64 片）。定子电极由 0.19 mm 碳纤维骨架 + 铝箔（1.5 μm Mylar + 1 μm 铝膜）构成，转子叶片由 20 μm 碳纤维 + 1 μm 铝箔构成——全部通过激光切割技术从二维平面材料加工后三维组装</li>
+        <li><strong>(b) 工作原理（俯视图）</strong>：转子叶片在通过正/负电极的交替过程中，通过电刷进行往复式电荷转移（Approach → Exchange → Leave），形成连续的库仑力驱动。C 表示转子与下一电极板之间的电容，E 表示电极板之间的电场强度</li>
+        <li><strong>(c) 电刷微观结构</strong>：电刷由 20 μm 铝箔激光切割制成，长 2 mm——实现机械式软接触电荷转移，替代传统电晕放电方案，大幅降低电压损耗</li>
+        <li><strong>(d) 瞬态电流曲线</strong>：施加 5 kV 直流电压后，电流从零迅速上升到稳定值。与电磁电机"启动电流最大"相反，静电电机启动电流平滑</li>
+        <li><strong>(e) 转速-电流-电荷量曲线</strong>：蓝色线 = 电流随转速线性变化（转速越高→单位时间换向次数越多→电流越大）；红色水平线 = 每转电荷量恒定——说明<strong>扭矩不受转速影响</strong></li>
+        <li><strong>(f) 升力-功率特性</strong>：电压从 5.0 kV 升到 8.5 kV，功耗从 0.047 W 升至 0.314 W，升力-功率效率在 20.2~43.3 g/W 之间变化</li>
+        <li><strong>(g) 升力-功率效率对比</strong>：CoulombFly 以 7.4 g/W（整机）远超其他无系留 MAV（2.3~3.7 g/W），是有系留方案中最优的 2~3 倍</li>
+        <li><strong>(h) 热成像对比</strong>：相同负载下运行后，静电电机（右上）保持室温，而电磁电机（左上）明显发热——这是低电流（μA 级）带来的根本优势</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">超轻型千伏电源系统的拓扑结构、实物与特性曲线</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Ultralight kilovolt power system"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：实现"4.5 V → 9 kV"这一惊人升压比的核心电路工程。(a) 实物照片——HVPC（1.13 g）焊接在 0.05 mm 厚的聚酰亚胺柔性 PCB 上（激光烧蚀工艺制造），太阳能电池（0.96 g）为 GaAs 薄膜电池。(b) 电路拓扑——耦合电感（1:50 匝数比）+ MOSFET 开关 + 12 级 Cockcroft-Walton 电压倍增器。关键设计细节：利用耦合电感的<strong>寄生参数</strong>（漏感）参与谐振，无需单独的磁化电感，从而减少了元件数量和重量。(c) 输出电压 vs 频率曲线——在特定频率 fH 处输出电压达到最小值，远离 fH 时电压迅速上升。选择 86 kHz / 0.2 占空比 → 9.0 kV 输出。(d) 效率 vs 频率曲线——负载电阻越小效率越高（100 MΩ 时约 15% → 1 GΩ 时约 58%），说明优化静电电机的等效负载阻抗是未来提升整机效率的核心方向。</p>
+      <ul>
+        <li><strong>Forward-flyback vs 传统 Flyback</strong>：传统 flyback 只在 MOSFET 关断期间传输能量，需要更大的变压器和缓冲电路；forward-flyback 在开关的<strong>导通和关断期间都传输能量</strong>，功率密度更高，更适合超轻型设计</li>
+        <li><strong>电压-质量比 7.09 kV/g</strong>：比此前最轻的高压发生器（4.32 kV / 951 mg，Park et al. 2020）轻 55%，且输出更高</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">尺寸对比与进一步微型化的毫米级验证原型</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Size comparison and miniaturization"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 所有已知实现无系留飞行的太阳能飞行器的尺寸-质量散点图。CoulombFly（红点）位于左下角——20 cm 翼展、4.21 g——比此前最小/最轻的太阳能四旋翼（2 m / 2.6 kg）小约 10 倍、轻约 <strong>600 倍</strong>。其他所有太阳能飞行器（固定翼 + 四旋翼）都聚集在右上角的大质量/大尺寸区域。(b) 毫米级原型的有系留飞行——直径仅 8 mm、质量仅 <strong>9 mg</strong>。(c) 毫米级原型的显微照片——展示了极端微型化的可行性。</p>
+      <ul>
+        <li><strong>"不可能三角"的位置</strong>：图 4a 的散点图直观地回答了"为什么之前没有人做到"——其他方案在质量-尺寸-太阳能自主三个维度中至少有一个无法满足。CoulombFly 同时征服了三个维度：小（20 cm）、轻（4.21 g）、太阳能自主（自然光）</li>
+        <li><strong>毫米级原型的惊人指标</strong>：起飞转速 10,860 rpm（$Re \approx 1.2\times10^3$），功耗仅 <strong>0.97 mW</strong>（不到 1 毫瓦！），升力-功率效率 9.2 g/W——超过其他有系留 MAV 的两倍</li>
+        <li><strong>进一步微型化的瓶颈</strong>：制造工艺和结构刚度是限制进一步微型化和放大的主要因素——要在更小尺度上保持结构刚度需要新的材料和制造方法</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 需要充足的自然光照（~920 W/m²），阴天或室内无法飞行；(2) 需要低湿度环境（34%），高湿度会降低空气绝缘性（击穿电压下降），直接影响静电电机性能；(3) 依赖垂直导轨约束横向运动——本质上是单自由度系统，尚未实现自由飞行。</li>
+    <li><strong>适用场景</strong>：目前仅适用于<strong>垂直悬停</strong>（单旋翼构型），无法水平机动飞行。负载能力仅 1.59 g（5.8 g 最大升力 − 4.21 g 自重），可搭载的传感器/控制器非常有限。无法在有云/阴天/室内等光照不足的环境中工作。</li>
+    <li><strong>可扩展性</strong>：毫米级原型（8 mm / 9 mg）证明了缩小路径是可行的，但更大的版本（承载更大 payload）可能面临静电扭矩密度上限的挑战——静电力的面积律可能限制其向上扩展。制造精度和结构刚度也是极端微型化的瓶颈。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从单旋翼 → 多旋翼——用多个静电电机分别驱动，在消除导轨依赖的同时实现姿态控制。多旋翼架构还可以抵消螺旋桨的反扭矩（本文的单旋翼方案依赖导轨来间接约束反扭矩）</li>
+    <li><strong>条件放松</strong>：<strong>太阳能 + 可充电电池混合供电</strong>——文中明确提出此方向，可以在有光照时充电、无光照时放电，实现 24 小时不间断飞行。同时可以平滑光照波动（如云层遮挡），提高环境适应性。另一个方向是降低湿度敏感性——封装或选用更高击穿电压的绝缘材料</li>
+    <li><strong>约束加入</strong>：(1) 搭载微型传感器（光流相机、IMU）和微控制器实现自主悬停；(2) 增加阻尼膜或平衡杆实现被动稳定性（文中引用 Chen et al. 2023 和 Johnson et al. 2023）；(3) HVPC 效率优化——通过设计更低的静电电机等效负载电阻，HVPC 效率可从当前的 24.1% 提升至接近 58%</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>光照强度波动（云层遮挡）</td><td>HVPC 输出随输入电压下降而急剧降低（Fig. 3c 的陡峭斜率），光照突然减弱 → 升力不足 → 飞行器坠落。混合电池方案是解决此问题的最直接路径</td><td>★★★★★</td></tr>
+    <tr><td>空气湿度变化</td><td>高湿度降低空气击穿电压（绝缘强度下降），可能导致电极板间意外放电、推力下降甚至短路。北京春季 34% 湿度是理想条件——夏季/热带地区（>80% 湿度）可能无法正常工作</td><td>★★★★</td></tr>
+    <tr><td>制造公差敏感性</td><td>静电电机的性能依赖于极小的定子-转子间隙（μm 级精度）和电刷接触质量。手工/实验室制造的一致性难以保证——论文提到"不同生产批次的推进系统经过多次重复测试"，暗示了品控仍是挑战</td><td>★★★</td></tr>
+    <tr><td>长期运行退化（电刷磨损）</td><td>电刷在每转中与电极板接触/分离一次（每分钟数千转 × 60 分钟 = 数十万次循环），铝箔电刷的磨损可能导致接触电阻增大、性能退化。1 小时测试不足以评估数月/数年的长期可靠性</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>静电驱动的多旋翼自主飞行器</strong>——这是将 CoulombFly 从"演示验证"推向"实用平台"最关键的一步。核心问题：(1) 如何在 4~10 g 的质量预算内集成姿态传感器（IMU + 光流）和微控制器（如 Cortex-M0 级 MCU 仅 ~10 mg）？(2) 多旋翼架构下，每个静电电机的转速如何独立控制？——HVPC 目前只有一个输出，需要为每个电机配备独立的 HVPC，或者设计一个高压分配网络。(3) 反扭矩如何通过多旋翼对转来消除？(4) 如果这个方向成功了，CoulombFly 将成为世界上最小的自主悬停无人机（比现有最轻的自主悬停无人机轻一个数量级）——在环境监测、室内搜救、农业授粉等场景有巨大潜力。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>MAV 的飞行时间受限于（a）推进效率随尺度缩小而急剧下降（电磁电机的尺度律诅咒），（b）电池能量密度有限（现有锂电池 ~200 Wh/kg 对于克级飞行器只能提供几分钟飞行）——这两个因素共同导致了"越小越短命"的困境。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：（i）继续用电磁电机但优化气动和减重（SKEYE Pico 7 g / 7 min，到天花板了）；（ii）用更高效率的非传统执行器——压电/介电弹性体/线性电磁（效率虽高但仍需要地面供能，不算真正"自由"）；（iii）太阳能固定翼（放大尺寸来容纳太阳能电池，但这与 MAV "小"的本质诉求矛盾）。</li>
+    <li><strong>如果换一种与尺度无关的驱动原理呢？</strong><br>静电力的优势——静电力 ∝ 面积（表面效应），而非体积（体效应）。在宏观尺度上，电磁力（体积力）远强于静电力；但在微观尺度上，面积-体积比增大，静电力变得更有竞争力。这就是为什么 MEMS 中大量使用静电驱动——本文的洞察是将其"逆向放大"到厘米级 MAV 尺度，发现仍然有效。</li>
+    <li><strong>如果还不够，还需要什么？</strong><br>高压电源（kV 级）——这是将静电电机从"实验室玩具"变为"飞行器动力"的关键瓶颈。传统高压电源太重。Cockcroft-Walton 倍增器 + forward-flyback 拓扑 + 激光加工柔性 PCB = 1.13 g 产生 9 kV——这是电路工程和制造技术的完美配合。</li>
+    <li><strong>最简单的方案是什么？</strong><br>一片 GaAs 太阳能电池 → 一个小型高压转换器 → 一个静电电机 → 一个螺旋桨 → 起飞。没有多余的部件。整机 4.21 g，1 秒起飞，1 小时无衰减。这个"最简单的方案"之所以此前从未实现，是因为需要同时跨越三个学科的壁垒：静电电机设计（机械/电子）、超轻型高压电源（电力电子）、高效太阳能电池（材料科学）。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    传统微型飞行器用电磁电机驱动——但电磁电机越小效率越低，导致 &lt;10 g 的 MAV 飞行时间不超过 10 分钟，且太阳能方案因为推进效率不够而只能放大会机身——那为什么不试试<strong>用静电电机（在小尺度下反而更高效的库仑力驱动）</strong>，配合超轻型高压电源，让自然太阳光直接驱动克级飞行器持续飞行？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：MAV 领域的"不可能三角"——小（&lt;10 g）、轻、飞得久（&gt;10 min）。所有现有方案至少牺牲其中一个维度。同时注意到 MEMS 领域的静电微电机在微米到毫米尺度已广泛应用数十年，效率很高——为什么没有人把它放大到厘米级推进飞行器？</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"太阳能持续飞行 MAV"分解为三个可独立优化的子系统——（1）高效推进（克级、&lt;0.2 W、&gt;4 g 升力）；（2）超轻高压电源（克级、4.5 V → 9 kV）；（3）高效能量采集（自然光 → 电能，克级）。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）静电电机——库仑力公式 $F = qE$ 不含质量/体积相关项，在小尺度下不劣化；（2）Cockcroft-Walton 电压倍增器——用多个低压电容和二极管级联实现极高升压比，只需增加级数而非大型变压器；（3）GaAs 薄膜太阳能电池——航天级效率 30%，功率密度 0.8 W/g。</li>
+    <li><strong>Step 4 — 组装方案</strong>：将三者通过系统级质量-功率协同优化整合为 CoulombFly——推进系统 1.96 g + 电源系统 2.09 g + 结构 0.16 g = 4.21 g，整机功耗 0.568 W &lt; 太阳能电池最大输出 0.57 W，升力 5.8 g &gt; 自重 4.21 g。所有约束刚好满足。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个教科书级的<strong>"换道超车"</strong>案例——不是沿着"优化电磁电机"的老路死磕，而是跳出框架问"在克级尺度上，静电力是否比电磁力更优？"一旦确认物理原理的优势，剩下的就是工程实现。对于 UAV 领域的启示：<strong>不要只优化现有方案，要敢于在物理层面重新审视驱动原理</strong>——尤其是在极端尺度（微型/巨型）下，最优物理原理可能完全不同。</li>
+    <li><strong>技术技巧层面</strong>：(1) 电刷替代电晕放电——用微小的机械接触损耗换取巨大的电压效率提升；(2) 利用寄生参数——耦合电感的漏感不是敌人，而是谐振电路的一部分；(3) 激光切割二维材料 → 三维组装——这种"2.5D 制造"方式在克级质量预算下既保证了精度又控制了重量；(4) 热管理为零——静电力不发热，这是一个被严重低估的优势（电磁电机需要额外的散热质量）。</li>
+    <li><strong>实验/写作层面</strong>：论文的图 2 包含了 8 个子图，从结构 → 原理 → 电特性 → 升力 → 对比 → 热成像，构成了一条无可辩驳的逻辑链。写论文时应当学习这种"一张大图讲完一个完整故事"的呈现方式——而不是把信息分散到多张图中。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 总体设计方向</strong>：本文展示了一种在<strong>极端约束下进行多物理域协同优化</strong>的系统工程范式（电磁 → 静电 = 跨物理域创新；电路拓扑 → 制造工艺 = 跨学科创新）。这种"打破学科边界"的设计思路可以直接启发任何受质量/功耗/尺寸严格约束的 UAV 子系统设计。</li>
+    <li><strong>对于飞行器控制方向</strong>：CoulombFly 目前没有自主控制——这恰恰是控制领域研究者的机会。静电电机的"扭矩恒定 + 转速线性可调"特性使得它比电磁电机<strong>更容易建模和控制</strong>（输入-输出关系更线性）。如果能基于这个平台设计出首个自主悬停的太阳能静电 MAV，那将是又一个 Nature/Science 级别的工作。</li>
+    <li><strong>对于视觉伺服 / 感知方向</strong>：1.59 g 的额外载荷余量虽然紧张，但足以搭载一个微型摄像头（~200 mg）+ 低功耗 MCU（~10 mg）——这意味着 CoulombFly 有可能成为<strong>世界上最小的太阳能自主视觉感知飞行器</strong>，在超低功耗视觉 SLAM、光流悬停等方面开辟全新研究方向。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Jafferis et al. (2019) — Untethered flight of an insect-sized flapping-wing microscale aerial vehicle. <em>Nature</em> 570, 491–495</td><td>RoboBee X-Wing——此前最著名的昆虫尺度扑翼 MAV，用压电驱动 + 太阳能电池实现了无系留起飞。但与 CoulombFly 对比：RoboBee 需要 3 sun 光照（≈2760 W/m²）、升力-功率效率仅 ~3 g/W。CoulombFly 在自然光（1 sun）下以 2~3 倍的效率胜出。</td></tr>
+    <tr><td>Goh et al. (2019) — A fully solar-powered quadcopter. <em>Prog. Photovolt.</em> 27, 869–878</td><td>此前唯一实现完全太阳能飞行（无系留）的旋翼机——但 2 m / 2.6 kg。CoulombFly 用静电电机将太阳能旋翼机缩小了 600 倍，是从"米级"到"厘米级"的范式跨越。</td></tr>
+    <tr><td>Park et al. (2020) — Lightweight high voltage generator for untethered electroadhesive perching. <em>IEEE Robot. Autom. Lett.</em> 5, 4485–4492</td><td>此前最轻的高压发生器（4.32 kV / 951 mg），用于电粘附停靠而非飞行推进。CoulombFly 的 HVPC 在此基础上将电压-质量比提升了 55%，且将高压电源用于飞行推进——开创了全新应用场景。</td></tr>
+    <tr><td>Floreano & Wood (2015) — Science, technology and the future of small autonomous drones. <em>Nature</em> 521, 460–466</td><td>小型无人机领域的经典综述——发表于 CoulombFly 前 9 年。当时对"太阳能微型无人机"的展望基本上指向"更大的固定翼"。CoulombFly 的出现完全改写了这个叙事：微型 + 太阳能 + 旋翼 = 可能。</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Shen, Peng et al. · Nature 2024 · CoulombFly — Sunlight-Powered Sustained Flight · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

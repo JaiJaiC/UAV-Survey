@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AC-MPC 学习笔记 — 可微MPC × Actor-Critic × 敏捷飞行</title>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe; --blue-stroke: #3b82f6; --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee; --green-stroke: #10b981; --green-strong: #047857;
+    --amber-fill: #fef7ed; --amber-stroke: #f59e0b; --amber-strong: #b45309;
+    --purple-fill: #f0ebfd; --purple-stroke: #8b5cf6; --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0; --rose-stroke: #f43f5e; --rose-strong: #be123c;
+    --gray-fill: #f3f4f6; --gray-stroke: #9ca3af; --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8; --cyan-stroke: #14b8a6; --cyan-strong: #0f766e;
+    --indigo-fill: #eef2ff; --indigo-stroke: #6366f1; --indigo-strong: #4338ca;
+    --yellow-fill: #fefce8; --yellow-stroke: #eab308; --yellow-strong: #a16207;
+    --teal-fill: #f0fdf4; --teal-stroke: #22c55e; --teal-strong: #166534;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    line-height: 1.7;
+  }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12.5px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 12px; border-radius: 5px;
+    transition: all .15s;
+  }
+  nav a:hover { background: var(--amber-fill); color: var(--amber-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 12px; font-size: 14px; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 20px; font-weight: 700; letter-spacing: -0.2px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--border); margin-bottom: 22px;
+  }
+  h3 { font-size: 15.5px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+
+  p { font-size: 14px; color: #334155; margin-bottom: 10px; }
+  ul, ol { margin: 6px 0 14px 20px; font-size: 14px; color: #334155; }
+  li { margin-bottom: 4px; }
+
+  code {
+    background: #f1f5f9; color: #1e293b; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 5px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1e293b; color: #e2e8f0; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12px; line-height: 1.55; padding: 16px 20px; border-radius: 8px;
+    overflow-x: auto; margin: 10px 0 16px;
+  }
+  pre .kw { color: #93c5fd; }
+  pre .fn { color: #c4b5fd; }
+  pre .cm { color: #64748b; }
+  pre .nm { color: #fde68a; }
+  pre .st { color: #86efac; }
+  pre .op { color: #fca5a5; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 14px 0; font-size: 13.5px;
+  }
+  .callout.info  { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip   { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn  { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger{ background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea  { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+
+  .tricks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; margin: 16px 0; }
+  .trick-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 20px;
+    background: #fafbfc; transition: box-shadow .15s;
+  }
+  .trick-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .trick-num {
+    display: inline-block; width: 26px; height: 26px; line-height: 26px;
+    text-align: center; border-radius: 50%; font-size: 12px; font-weight: 700;
+    margin-right: 8px;
+  }
+  .trick-card h4 { display: inline; font-size: 14px; }
+  .trick-card p, .trick-card li { font-size: 13px; color: #475569; }
+
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 14px 0; }
+  .cmp-col {
+    flex: 1; min-width: 240px; border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; background: #fafbfc;
+  }
+  .cmp-col h4 { margin-top: 0; }
+
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+    border-radius: 4px; margin-right: 4px;
+  }
+  .tag-blue { background:#dbeafe; color:#1d4ed8; }
+  .tag-green { background:#d1fae5; color:#047857; }
+  .tag-amber { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red { background:#ffe4e6; color:#be123c; }
+
+  .svg-wrap { overflow-x: auto; margin: 8px -8px; }
+  .svg-wrap svg { min-width: 1100px; width: 100%; height: auto; }
+
+  blockquote {
+    border-left: 3px solid #cbd5e1; padding: 8px 16px; margin: 10px 0;
+    color: #64748b; font-style: italic; font-size: 13.5px;
+  }
+
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-num { color: #94a3b8; font-size: 12px; float: right; }
+  .formula-block .eq-main { font-size: 15px; color: #1e293b; letter-spacing: 0.3px; margin: 8px 0; }
+  .formula-block .eq-note { font-size: 12.5px; color: #64748b; margin-top: 6px; }
+  .symbol-table { margin: 10px 0; }
+  .symbol-table td:first-child {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 14px; font-weight: 600; color: #1d4ed8; white-space: nowrap; padding-right: 14px;
+  }
+  .symbol-table td:nth-child(2) { font-size: 13px; }
+
+  .fig-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 22px; margin: 16px 0;
+  }
+  .fig-box .fig-title { font-weight: 700; font-size: 14px; color: #1e293b; margin-bottom: 10px; }
+  .fig-box .fig-desc { font-size: 13px; color: #475569; }
+  .fig-box .fig-ascii {
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 11px; line-height: 1.4; color: #334155;
+    background: #f1f5f9; padding: 14px; border-radius: 6px; margin: 10px 0;
+    white-space: pre; overflow-x: auto;
+  }
+
+  .phase-steps { counter-reset: phase; }
+  .phase-step {
+    counter-increment: phase; border-left: 3px solid #f59e0b;
+    padding: 10px 16px; margin: 10px 0; background: #f8fafc;
+    border-radius: 0 8px 8px 0;
+  }
+  .phase-step::before {
+    content: "Phase " counter(phase); font-weight: 700; font-size: 11px;
+    color: #f59e0b; display: block; margin-bottom: 2px;
+  }
+  .phase-step p { margin: 2px 0; font-size: 13px; }
+
+  .rating-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 14px 0; }
+  .rating-item {
+    text-align: center; padding: 16px 10px; border: 1px solid var(--border);
+    border-radius: 8px; background: #fafbfc;
+  }
+  .rating-item .label { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+  .rating-item .stars { font-size: 16px; letter-spacing: 2px; }
+  .rating-item .comment { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav>
+  <span class="brand">🎛️ AC-MPC 学习笔记</span>
+  <a href="#context">背景与含金量</a>
+  <a href="#arch">系统架构</a>
+  <a href="#paper">论文精读</a>
+  <a href="#formulas">算法公式</a>
+  <a href="#dataflow">数据流</a>
+  <a href="#experiments">实验分析</a>
+  <a href="#tricks">科研 Tricks</a>
+  <a href="#philosophy">设计哲学</a>
+  <a href="#transfer">迁移思路</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<section>
+  <h1>🎛️ Actor-Critic Model Predictive Control 学习笔记</h1>
+  <p style="font-size:15px;color:#64748b;margin-bottom:0;">
+    <strong>将可微MPC嵌入Actor-Critic框架——短期预测 + 长期价值，两个时间尺度的融合</strong><br>
+    论文: <em> Actor-Critic Model Predictive Control</em><br>
+    会议: IEEE ICRA 2024, Yokohama · 作者: Angel Romero, Yunlong Song, Davide Scaramuzza<br>
+    实验室: <strong>Robotics and Perception Group (RPG)</strong>, University of Zurich &amp; ETH Zurich
+  </p>
+  <div style="margin-top:14px;">
+    <span class="tag tag-amber">可微MPC</span>
+    <span class="tag tag-blue">Actor-Critic · PPO</span>
+    <span class="tag tag-green">四旋翼敏捷飞行</span>
+    <span class="tag tag-purple">端到端学习</span>
+    <span class="tag tag-red">Sim-to-Real</span>
+    <span class="tag tag-amber">抗扰动鲁棒性</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 0. BACKGROUND & QUALITY ═══════════════ -->
+<section id="context">
+  <h2>0. 背景知识 &amp; 论文含金量评估</h2>
+
+  <h3>0.1 实验室背景：RPG ≠ ASL</h3>
+  <div class="callout info">
+    <div class="callout-title">🏫 UZH 和 ETH Zurich 是两个不同的大学</div>
+    <strong>UZH (Universität Zürich)</strong> = 苏黎世大学，瑞士最大的综合性大学<br>
+    <strong>ETH Zurich (Eidgenössische Technische Hochschule Zürich)</strong> = 苏黎世联邦理工学院，瑞士的"MIT"<br>
+    两所大学都在苏黎世，有密切合作，但<strong>完全独立</strong>。<br><br>
+    <strong>RPG (Robotics and Perception Group)</strong> = Davide Scaramuzza 的实验室，挂靠在 UZH 信息学系 + ETH 神经信息学系（联合聘任），专注于<strong>无人机视觉、敏捷飞行、事件相机</strong>。<br>
+    <strong>ASL (Autonomous Systems Lab)</strong> = ETH 机械工程系的另一个实验室（前主任 Roland Siegwart，现 Marco Hutter），做<strong>腿足机器人、自动驾驶、路径规划</strong>。<br>
+    两个实验室<strong>不是同一个团队</strong>，方向也不同。RPG 是无人机视觉和控制领域世界前三的课题组。
+  </div>
+
+  <h3>0.2 论文含金量评估</h3>
+  <div class="rating-grid">
+    <div class="rating-item">
+      <div class="label">创新性</div>
+      <div class="stars">⭐⭐⭐⭐</div>
+      <div class="comment">架构组合新颖，非范式突破</div>
+    </div>
+    <div class="rating-item">
+      <div class="label">实验质量</div>
+      <div class="stars">⭐⭐⭐⭐⭐</div>
+      <div class="comment">仿真+高保真+真机+消融</div>
+    </div>
+    <div class="rating-item">
+      <div class="label">实用价值</div>
+      <div class="stars">⭐⭐⭐⭐⭐</div>
+      <div class="comment">零样本Sim-to-Real直接部署</div>
+    </div>
+    <div class="rating-item">
+      <div class="label">理论深度</div>
+      <div class="stars">⭐⭐⭐</div>
+      <div class="comment">会议论文篇幅有限，无证明</div>
+    </div>
+    <div class="rating-item">
+      <div class="label">发表平台</div>
+      <div class="stars">⭐⭐⭐⭐</div>
+      <div class="comment">ICRA，机器人顶会（非期刊）</div>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">🏆 综合含金量：7.5 / 10（ICRA 会议论文标准）</div>
+    相当于 JCR Q1 中上水平期刊的工作量。Scaramuzza 组出品，工作扎实、实验完备。核心贡献是<strong>"可微MPC作为Actor最后一层"</strong>这一架构设计，以及<strong>抗风扰实验（83.33% vs 6.5%）</strong>这一令人印象深刻的结果。主要不足在于理论贡献有限、仅验证四旋翼平台、垂直赛道无风时反而不如纯MPC。
+  </div>
+
+  <h3>0.3 论文定位：在同组工作谱系中的位置</h3>
+  <table>
+    <tr><th>论文</th><th>方法</th><th>发表</th><th>与本文关系</th></tr>
+    <tr><td>Song &amp; Scaramuzza [42]</td><td>RL学习高层策略调度MPC（黑箱）</td><td>IROS 2020</td><td><strong>前驱</strong>——梯度靠采样，本文用可微MPC替代</td></tr>
+    <tr><td>Song et al. [14]</td><td>纯PPO端到端无人机竞速</td><td>Science Robotics 2023</td><td><strong>基线</strong>——本文在此基础上加MPC层提升鲁棒性</td></tr>
+    <tr><td>Foehn et al. [9]</td><td>时间最优MPC轨迹规划</td><td>Science Robotics 2021</td><td><strong>提供纯MPC对比基线</strong></td></tr>
+    <tr><td>Amos &amp; Kolter [26]</td><td>可微QP求解器 (OptNet)</td><td>ICML 2017</td><td><strong>核心技术依赖</strong>——提供可微MPC实现</td></tr>
+    <tr><td><strong>本文</strong></td><td><strong>可微MPC嵌入PPO Actor</strong></td><td><strong>ICRA 2024</strong></td><td>站在前四篇肩膀上，补上了"梯度传播"这一关键拼图</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 1. ARCHITECTURE ═══════════════ -->
+<section id="arch">
+  <h2>1. 系统架构全景图</h2>
+  <p>AC-MPC 的核心闭环：<strong>观测 → Cost Map网络(Q,p) → 可微MPC求解QP → 动作(集体推力+体轴角速率) → 四旋翼动力学 → 新观测</strong>。绿色区域是Critic（仅训练时使用），负责估计长期价值。</p>
+
+  <div class="svg-wrap">
+    <svg viewBox="0 0 1320 850" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="a-blue" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#3b82f6"/></marker>
+        <marker id="a-green" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#10b981"/></marker>
+        <marker id="a-amber" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#f59e0b"/></marker>
+        <marker id="a-purple" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#8b5cf6"/></marker>
+        <marker id="a-rose" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#f43f5e"/></marker>
+        <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity=".08"/></filter>
+      </defs>
+
+      <!-- Sections -->
+      <rect x="20" y="20" width="1280" height="170" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="36" y="46" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">TRAINING — PPO with Differentiable MPC Actor</text>
+
+      <rect x="20" y="210" width="400" height="360" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="36" y="236" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">ACTOR — Cost Map + Differentiable MPC</text>
+
+      <rect x="440" y="210" width="300" height="360" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="456" y="236" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">CRITIC (Training Only)</text>
+
+      <rect x="760" y="210" width="540" height="360" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="776" y="236" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">SIMULATION / REAL WORLD — Quadrotor Platform</text>
+
+      <rect x="20" y="590" width="1280" height="240" rx="8" fill="#fafbfc" stroke="#e2e8f0" stroke-dasharray="6,3"/>
+      <text x="36" y="616" font-size="13" font-weight="700" fill="#64748b" letter-spacing="1.2">PPO UPDATE &amp; CLOSED LOOP</text>
+
+      <!-- PPO -->
+      <rect x="44" y="60" width="200" height="60" rx="8" fill="#e8f0fe" stroke="#3b82f6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="144" y="84" text-anchor="middle" font-size="13" font-weight="700" fill="#1d4ed8">PPO Algorithm</text>
+      <text x="144" y="102" text-anchor="middle" font-size="10" fill="#5b6e8c">Actor-Critic · GAE · γ=0.99</text>
+
+      <line x1="244" y1="90" x2="290" y2="90" stroke="#3b82f6" stroke-width="2" marker-end="url(#a-blue)"/>
+      <text x="267" y="82" text-anchor="middle" font-size="9" fill="#3b82f6">policy</text>
+
+      <!-- Env -->
+      <rect x="296" y="56" width="220" height="68" rx="8" fill="#e6f7ee" stroke="#10b981" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="406" y="80" text-anchor="middle" font-size="12" font-weight="700" fill="#047857">Training Environment</text>
+      <text x="406" y="96" text-anchor="middle" font-size="9.5" fill="#047857">Flightmare Simulator (simple)</text>
+      <text x="406" y="112" text-anchor="middle" font-size="9.5" fill="#047857">Random gate configurations</text>
+
+      <rect x="540" y="52" width="280" height="36" rx="4" fill="#eef2ff" stroke="#818cf8" stroke-width="1"/>
+      <text x="680" y="68" text-anchor="middle" font-size="10" font-weight="600" fill="#4338ca">CTDE: Centralized Training · Decentralized Execution</text>
+      <text x="680" y="82" text-anchor="middle" font-size="9" fill="#6366f1">Single quadrotor per policy</text>
+
+      <!-- Experience return -->
+      <path d="M 406 124 L 406 170 L 144 170 L 144 120" stroke="#10b981" stroke-width="1.5" fill="none" marker-end="url(#a-green)"/>
+      <text x="275" y="184" text-anchor="middle" font-size="9" fill="#10b981">collect {s, a, r, s'} → GAE → PPO update</text>
+
+      <!-- Observation -->
+      <rect x="42" y="250" width="188" height="128" rx="8" fill="#f0ebfd" stroke="#8b5cf6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="136" y="274" text-anchor="middle" font-size="11" font-weight="700" fill="#6d28d9">Observation Space</text>
+      <line x1="56" y1="284" x2="216" y2="284" stroke="#c4b5fd" stroke-width="0.5"/>
+      <text x="56" y="302" font-size="9.5" fill="#6d28d9">Vehicle: v ∈ R³, R ∈ R⁹</text>
+      <text x="56" y="318" font-size="9.5" fill="#6d28d9">Track: gate corners Δp</text>
+      <text x="56" y="334" font-size="9.5" fill="#7c5ce7">(relative to next N gates)</text>
+      <rect x="56" y="344" width="158" height="22" rx="3" fill="#ede9fe" stroke="#a78bfa" stroke-width="0.6"/>
+      <text x="135" y="359" text-anchor="middle" font-size="9" fill="#6d28d9">Observation → Cost Map NN</text>
+
+      <line x1="230" y1="314" x2="276" y2="314" stroke="#8b5cf6" stroke-width="2" marker-end="url(#a-purple)"/>
+
+      <!-- Cost Map NN -->
+      <rect x="282" y="250" width="130" height="128" rx="8" fill="#e8f0fe" stroke="#3b82f6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="347" y="274" text-anchor="middle" font-size="11" font-weight="700" fill="#1d4ed8">Cost Map NN</text>
+      <line x1="296" y1="284" x2="398" y2="284" stroke="#bfdbfe" stroke-width="0.5"/>
+      <text x="347" y="302" text-anchor="middle" font-size="9" fill="#1d4ed8">Feedforward MLP</text>
+      <text x="347" y="320" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1d4ed8">Output: Q_k, p_k</text>
+      <text x="347" y="340" text-anchor="middle" font-size="9" fill="#5b6e8c">Q_k: quadratic cost</text>
+      <text x="347" y="356" text-anchor="middle" font-size="9" fill="#5b6e8c">p_k: linear cost</text>
+      <rect x="300" y="364" width="94" height="16" rx="3" fill="#dbeafe" stroke="#60a5fa" stroke-width="0.6"/>
+      <text x="347" y="376" text-anchor="middle" font-size="8.5" fill="#1d4ed8">Learned end-to-end</text>
+
+      <line x1="412" y1="314" x2="460" y2="314" stroke="#f59e0b" stroke-width="2" marker-end="url(#a-amber)"/>
+
+      <!-- Diff MPC -->
+      <rect x="42" y="400" width="370" height="155" rx="8" fill="#fff7ed" stroke="#f59e0b" stroke-width="1.5" filter="url(#sh)"/>
+      <rect x="42" y="400" width="370" height="26" rx="8" fill="#f59e0b"/>
+      <rect x="42" y="418" width="370" height="8" fill="#f59e0b"/>
+      <text x="227" y="418" text-anchor="middle" font-size="12" font-weight="700" fill="white">Differentiable MPC (Quadratic Program)</text>
+      <text x="58" y="444" font-size="9.5" font-weight="600" fill="#b45309">Solves (Eq.1-2):</text>
+      <text x="78" y="462" font-size="10" fill="#92400e" font-family="monospace">min J_Q(x,u) = Σ [x_k;u_k]ᵀQ_k[x_k;u_k] + p_k[x_k;u_k]</text>
+      <text x="78" y="482" font-size="10" fill="#92400e" font-family="monospace">s.t. x_{k+1} = Ax_k + Bu_k,  u_k ∈ U</text>
+      <text x="58" y="504" font-size="9.5" fill="#b45309">Linearized quadrotor dynamics · Input constraints · Analytic gradient via OptNet [26]</text>
+      <text x="58" y="522" font-size="9" fill="#d97706">Key: gradient ∂(solution)/∂(Q,p) computed analytically, NOT sampled</text>
+      <rect x="58" y="532" width="338" height="16" rx="3" fill="#fef3c7" stroke="#fbbf24" stroke-width="0.6"/>
+      <text x="227" y="544" text-anchor="middle" font-size="9" fill="#92400e">Output: collective thrust + body rates → converted from individual rotor thrusts</text>
+
+      <line x1="227" y1="555" x2="227" y2="576" stroke="#f43f5e" stroke-width="2" marker-end="url(#a-rose)"/>
+
+      <!-- Action -->
+      <rect x="42" y="580" width="370" height="28" rx="6" fill="#ffeaf0" stroke="#f43f5e" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="227" y="599" text-anchor="middle" font-size="11" font-weight="700" fill="#be123c">Action: a ∼ N{diffMPC(x, Q(s), p(s)), Σ}  ·  collective thrust + body rates</text>
+
+      <path d="M 412 594 L 490 594" stroke="#f43f5e" stroke-width="2" fill="none" marker-end="url(#a-rose)"/>
+
+      <!-- Critic -->
+      <rect x="496" y="250" width="188" height="128" rx="8" fill="#e6f7ee" stroke="#10b981" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="590" y="274" text-anchor="middle" font-size="11" font-weight="700" fill="#047857">Critic Network V_ω</text>
+      <line x1="512" y1="284" x2="668" y2="284" stroke="#a7f3d0" stroke-width="0.5"/>
+      <text x="590" y="304" text-anchor="middle" font-size="9.5" fill="#047857">State-value function</text>
+      <text x="590" y="322" text-anchor="middle" font-size="9.5" fill="#047857">V_ω(s_k): long-term return</text>
+      <text x="590" y="340" text-anchor="middle" font-size="9" fill="#065f46">Advantage:</text>
+      <text x="590" y="356" text-anchor="middle" font-size="9" fill="#065f46" font-family="monospace">A = r + γV(s_{k+1}) − V(s_k)</text>
+      <rect x="512" y="364" width="156" height="16" rx="3" fill="#d1fae5" stroke="#6ee7b7" stroke-width="0.6"/>
+      <text x="590" y="376" text-anchor="middle" font-size="8.5" fill="#047857">Only used during training</text>
+
+      <rect x="496" y="400" width="188" height="155" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" filter="url(#sh)"/>
+      <text x="590" y="424" text-anchor="middle" font-size="11" font-weight="700" fill="#475569">Two Time Scales</text>
+      <line x1="512" y1="434" x2="668" y2="434" stroke="#e2e8f0" stroke-width="0.5"/>
+      <text x="520" y="456" font-size="9.5" font-weight="600" fill="#f59e0b">MPC → short-term</text>
+      <text x="520" y="474" font-size="9" fill="#b45309">predictive optimization</text>
+      <text x="520" y="492" font-size="9" fill="#b45309">within horizon N</text>
+      <line x1="512" y1="502" x2="668" y2="502" stroke="#e2e8f0" stroke-width="0.3"/>
+      <text x="520" y="520" font-size="9.5" font-weight="600" fill="#10b981">Critic → long-term</text>
+      <text x="520" y="538" font-size="9" fill="#047857">value estimation</text>
+      <text x="520" y="552" font-size="9" fill="#047857">beyond horizon</text>
+
+      <!-- Quadrotor -->
+      <rect x="780" y="250" width="240" height="200" rx="8" fill="#e6faf8" stroke="#14b8a6" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="900" y="276" text-anchor="middle" font-size="12" font-weight="700" fill="#0f766e">Quadrotor Dynamics</text>
+      <line x1="796" y1="286" x2="1004" y2="286" stroke="#99f6e4" stroke-width="0.5"/>
+      <text x="796" y="306" font-size="9.5" fill="#0f766e">State: p, v, R, ω (13D)</text>
+      <text x="796" y="324" font-size="9.5" fill="#0f766e">Input: [T_c, ω_x, ω_y, ω_z]</text>
+      <text x="796" y="342" font-size="9" fill="#115e59">T_c: collective thrust (N)</text>
+      <text x="796" y="358" font-size="9" fill="#115e59">ω: body rates (rad/s)</text>
+      <line x1="796" y1="370" x2="1004" y2="370" stroke="#99f6e4" stroke-width="0.3"/>
+      <text x="796" y="390" font-size="9.5" fill="#0f766e">Single rotor thrust model</text>
+      <text x="796" y="406" font-size="9" fill="#115e59">→ feasible input guarantee</text>
+      <text x="796" y="424" font-size="9" fill="#115e59">T_c, ω computed from rotor thrusts</text>
+      <rect x="796" y="434" width="208" height="16" rx="3" fill="#ccfbf1" stroke="#5eead4" stroke-width="0.6"/>
+      <text x="900" y="446" text-anchor="middle" font-size="8.5" fill="#0f766e">Dynamics linearized for MPC QP</text>
+
+      <rect x="1040" y="250" width="240" height="110" rx="8" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1" filter="url(#sh)"/>
+      <text x="1160" y="274" text-anchor="middle" font-size="11" font-weight="700" fill="#4b5563">Observation (from quad)</text>
+      <line x1="1056" y1="284" x2="1264" y2="284" stroke="#d1d5db" stroke-width="0.5"/>
+      <text x="1066" y="304" font-size="9" fill="#4b5563">o_quad: [v, R] ∈ R¹²</text>
+      <text x="1066" y="320" font-size="9" fill="#4b5563">o_track: Δp to gate corners</text>
+      <text x="1066" y="336" font-size="9" fill="#4b5563">(N future gates)</text>
+      <text x="1066" y="352" font-size="9" fill="#6b7280">→ feeds into Cost Map NN</text>
+
+      <path d="M 1160 360 L 1160 390 L 347 390 L 347 378" stroke="#8b5cf6" stroke-width="1.5" fill="none" marker-end="url(#a-purple)" stroke-dasharray="6,3"/>
+      <text x="753" y="402" text-anchor="middle" font-size="9" fill="#8b5cf6">observation → Cost Map (closed loop)</text>
+
+      <!-- Rewards -->
+      <rect x="1040" y="380" width="240" height="80" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="1160" y="404" text-anchor="middle" font-size="11" font-weight="700" fill="#a16207">Reward Design</text>
+      <line x1="1056" y1="414" x2="1264" y2="414" stroke="#fef08a" stroke-width="0.5"/>
+      <text x="1066" y="432" font-size="9" fill="#854d0e">Progress: gate center distance ↓</text>
+      <text x="1066" y="448" font-size="9" fill="#854d0e">Perception: camera-point error ↓</text>
+
+      <!-- Reward → PPO -->
+      <path d="M 1040 420 L 62 420 L 40 420 L 40 90 L 44 90" stroke="#eab308" stroke-width="1.5" fill="none" marker-end="url(#a-amber)" stroke-dasharray="6,3"/>
+      <text x="540" y="434" text-anchor="middle" font-size="9" fill="#b45309">reward + advantage → PPO update</text>
+
+      <!-- Evaluation -->
+      <rect x="44" y="634" width="280" height="70" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5" filter="url(#sh)"/>
+      <text x="184" y="658" text-anchor="middle" font-size="12" font-weight="700" fill="#166534">High-Fidelity Evaluation</text>
+      <text x="184" y="676" text-anchor="middle" font-size="9" fill="#166534">BEM Simulator [43] — aerodynamic model</text>
+      <text x="184" y="692" text-anchor="middle" font-size="9" fill="#166534">+ Real-world: Agilicious stack [45]</text>
+
+      <rect x="344" y="634" width="400" height="70" rx="8" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1" filter="url(#sh)"/>
+      <text x="544" y="658" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">Comparison Baselines</text>
+      <text x="544" y="676" text-anchor="middle" font-size="9" fill="#475569">AC-MLP (pure PPO) · Pure MPC (tracking optimal traj) · AC-MPC (Ours)</text>
+      <text x="544" y="692" text-anchor="middle" font-size="9.5" fill="#475569">Ablations: horizon N=2,5,10 · wind 11.5N · different init conditions</text>
+
+      <rect x="764" y="634" width="520" height="70" rx="8" fill="#eef2ff" stroke="#818cf8" stroke-width="1" filter="url(#sh)"/>
+      <text x="1024" y="658" text-anchor="middle" font-size="12" font-weight="700" fill="#4338ca">Tasks</text>
+      <text x="1024" y="676" text-anchor="middle" font-size="9" fill="#4338ca">Horizontal gates · Vertical gates · Circle track · SplitS track · Perception-aware flight</text>
+      <text x="1024" y="692" text-anchor="middle" font-size="9" fill="#6366f1">Each task: retrain from scratch · observation space unchanged across tasks</text>
+
+      <!-- Platform info -->
+      <rect x="44" y="720" width="300" height="48" rx="6" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1"/>
+      <text x="194" y="740" text-anchor="middle" font-size="9.5" font-weight="600" fill="#4b5563">Training Platform</text>
+      <text x="194" y="758" text-anchor="middle" font-size="9" fill="#6b7280">Modified Flightmare [44] · PPO implementation · ~hours training</text>
+
+      <rect x="364" y="720" width="300" height="48" rx="6" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1"/>
+      <text x="514" y="740" text-anchor="middle" font-size="9.5" font-weight="600" fill="#4b5563">Real-world Platform</text>
+      <text x="514" y="758" text-anchor="middle" font-size="9" fill="#6b7280">4s racing drone [14] · Agilicious stack [45] · Motion capture</text>
+
+      <rect x="684" y="720" width="600" height="48" rx="6" fill="#f3f4f6" stroke="#9ca3af" stroke-width="1"/>
+      <text x="984" y="740" text-anchor="middle" font-size="9.5" font-weight="600" fill="#4b5563">Inference Time (forward pass)</text>
+      <text x="984" y="758" text-anchor="middle" font-size="9" fill="#6b7280">N=2: 2.5ms · N=5: 3.5ms · N=10: 5.5ms — all real-time capable</text>
+
+      <!-- Bottom bar -->
+      <rect x="20" y="780" width="1280" height="28" rx="5" fill="#1e293b"/>
+      <text x="660" y="799" text-anchor="middle" font-size="10" font-weight="600" fill="#e2e8f0">
+        Closed-Loop: Observation → Cost Map NN(Q_k,p_k) → Differentiable MPC (QP) → a=[T_c,ω] → Quadrotor Dynamics → BEM/Real-world → next Observation → ...
+      </text>
+
+      <rect x="20" y="816" width="1280" height="24" rx="4" fill="#eef2ff" stroke="#818cf8" stroke-width="0.8"/>
+      <text x="660" y="833" text-anchor="middle" font-size="10" fill="#4338ca">
+        Core Innovation: Differentiable MPC as final layer of Actor — gradient analytically propagated through QP optimization · Two time scales: MPC (short-term) + Critic (long-term) · Cost function learned from task reward
+      </text>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. PAPER DEEP DIVE ═══════════════ -->
+<section id="paper">
+  <h2>2. 论文精读</h2>
+
+  <h3>2.1 核心研究问题</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 Open Research Question</div>
+    如何将<strong>无模型RL</strong>（任务灵活、通用奖励优化）的优势与<strong>MPC</strong>（鲁棒性、在线重规划）的优势结合起来？之前的方案要么把MPC当黑箱（梯度靠采样估计[42]），要么用黑箱优化调MPC参数[29-32]——都无法利用MPC内部的结构信息。本文的回答是：<strong>让MPC可微，梯度解析传播</strong>。
+  </div>
+
+  <h3>2.2 核心贡献</h3>
+  <ol>
+    <li><strong>提出AC-MPC架构</strong>：将可微MPC作为Actor网络的最后一层，嵌入PPO训练框架</li>
+    <li><strong>学习代价函数而非策略</strong>：神经网络从观测映射到MPC代价参数（Q_k, p_k），而非直接输出动作——MPC作为solver保证物理可行性</li>
+    <li><strong>梯度解析传播</strong>：利用可微QP求解器[26]，使梯度通过优化问题本身传播——与之前"黑箱MPC+RL"有本质区别</li>
+    <li><strong>两个时间尺度</strong>：MPC处理短视界（N步内精确预测），Critic处理长视界（价值估计）——生物启发的设计（系统1/系统2）</li>
+    <li><strong>验证鲁棒性优势</strong>：抗风扰（11.5N=1.5倍自重）实现83.33%成功率对比AC-MLP的6.5%和纯MPC的0%</li>
+  </ol>
+
+  <h3>2.3 四旋翼模型与感知</h3>
+  <p>动力学模型与Song et al. [14]相同。观测空间分两部分：</p>
+  <ul>
+    <li><strong>机体观测 o_quad</strong> = [v, R] ∈ R¹²（线速度 + 旋转矩阵）</li>
+    <li><strong>赛道观测 o_track</strong> = [δp_1, ..., δp_N]：无人机到未来N个门角的相对位置向量——支持任意数量的未来门</li>
+  </ul>
+  <p>控制输入为<strong>集体推力 + 体轴角速率</strong>（由MPC从单旋翼推力计算得到，保证物理可行性）。所有任务使用相同的观测空间定义，策略从零开始重新训练。</p>
+
+  <h3>2.4 关键对比</h3>
+  <table>
+    <tr><th>维度</th><th>AC-MLP (纯RL)</th><th>纯MPC</th><th>AC-MPC (本文)</th></tr>
+    <tr><td>策略结构</td><td>MLP直接输出动作</td><td>追踪最优轨迹+QP</td><td>Cost Map NN → 可微MPC → 动作</td></tr>
+    <tr><td>代价函数</td><td>隐式（在reward中）</td><td>手工设计</td><td>端到端学习</td></tr>
+    <tr><td>在线重规划</td><td>❌</td><td>✅</td><td>✅（MPC层提供）</td></tr>
+    <tr><td>训练灵活性</td><td>✅ 最高</td><td>❌ 无训练</td><td>中等（结构约束更强）</td></tr>
+    <tr><td>OOD鲁棒性</td><td>差</td><td>中（代价未优化）</td><td>✅ 最优</td></tr>
+    <tr><td>样本效率</td><td>✅ 最优</td><td>N/A</td><td>略差（结构性约束）</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 3. ALGORITHM FORMULAS ═══════════════ -->
+<section id="formulas">
+  <h2>3. 算法公式全解 —— 从MPC到PPO的完整数学链路</h2>
+  <p>论文的数学体系分为<strong>四个层次</strong>：MPC问题建模 → 二次型代价参数化 → 可微MPC梯度传播 → PPO策略优化。</p>
+
+  <!-- ===== 3.1 MPC Formulation ===== -->
+  <h3>3.1 非线性MPC → QP近似</h3>
+
+  <div class="formula-block">
+    <span class="eq-num">Eq.(1)</span>
+    <div class="eq-main">min_{x,u} &nbsp; Σ_{k=0}^N l_k(x_k, u_k) &nbsp; s.t. &nbsp; x_{k+1} = f(x_k, u_k), &nbsp; u_k ∈ U</div>
+    <div class="eq-note">原始的非线性MPC问题——由于实时性要求，通常近似为QP</div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-num">Eq.(2)</span>
+    <div class="eq-main">J_Q(x) = Σ_{k=0}^N [x_k; u_k]^T Q_k [x_k; u_k] + p_k [x_k; u_k]</div>
+    <div class="eq-note">QP形式：Q_k 是二次项矩阵（对称），p_k 是线性项向量。Q_k 和 p_k 就是Cost Map网络的输出</div>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">为什么要学习 Q_k 和 p_k？</div>
+    传统的MPC中，Q和p是手工调参的（比如Q=diag(10,10,1,1,1,1)）。不同任务需要不同的代价——水平飞行和垂直飞行的最优代价肯定不同。<br>
+    本文用神经网络直接从观测学习Q_k和p_k——<strong>"学习代价函数"而非"学习控制策略"</strong>。MPC仍然求解优化问题，但优化的目标函数是学出来的。
+  </div>
+
+  <!-- ===== 3.2 Actor-Critic ===== -->
+  <h3>3.2 Actor-Critic 策略梯度</h3>
+
+  <div class="formula-block">
+    <span class="eq-num">Eq.(3)</span>
+    <div class="eq-main">∇_θ J(π_θ) = (1/N) Σ_{i=1}^N Σ_{k=1}^T ∇_θ log π_θ(a^i_k | s^i_k) · A_ω(s^i_k, a^i_k)</div>
+    <div class="eq-main" style="margin-top:8px;">A(s_k, a_k) = r(s_k, a_k) + γ V_ω(s_{k+1}) − V_ω(s_k)</div>
+    <div class="eq-note">标准Actor-Critic：策略梯度 = 对数概率梯度 × 优势函数。关键差异在于π_θ的结构——本文的Actor包含一个可微MPC层</div>
+  </div>
+
+  <!-- ===== 3.3 AC-MPC Policy ===== -->
+  <h3>3.3 AC-MPC 策略（核心公式）</h3>
+
+  <div class="formula-block">
+    <span class="eq-num">Eq.(4) — 核心</span>
+    <div class="eq-main">u_k ∼ N { diffMPC(x_k, Q(s_k), p(s_k)), &nbsp; Σ }</div>
+    <table class="symbol-table">
+      <tr><td>u_k</td><td>控制指令（集体推力 + 体轴角速率）——从高斯分布采样</td></tr>
+      <tr><td>diffMPC(·)</td><td>可微MPC求解器——输入当前状态x_k和学到的代价参数Q(s_k), p(s_k)，输出最优控制序列的均值</td></tr>
+      <tr><td>Q(s_k), p(s_k)</td><td>Cost Map神经网络的输出——从观测到代价函数的映射</td></tr>
+      <tr><td>Σ</td><td>协方差矩阵（可学习的探索噪声）</td></tr>
+      <tr><td>s_k</td><td>观测（不是完整状态）——包含机体状态和赛道信息</td></tr>
+    </table>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">🔑 Eq.(4) 是整个论文的灵魂</div>
+    与标准Actor-Critic的区别：Actor的输出不是动作，而是<strong>代价函数的参数</strong>。动作是通过求解MPC得到的。<br>
+    与纯MLP-Actor的区别：MLP是"观测→动作"的黑箱映射；AC-MPC是"观测→代价函数→MPC求解→动作"，中间有明确的物理模型。<br>
+    <strong>梯度链路</strong>：reward → advantage → policy gradient → ∂(MPC solution)/∂(Q,p) → ∂(Q,p)/∂θ → update Cost Map NN
+  </div>
+
+  <!-- ===== 3.4 Differentiable MPC ===== -->
+  <h3>3.4 可微MPC——技术核心</h3>
+  <p>本文依赖<strong>Amos &amp; Kolter (ICML 2017) [26]</strong>的可微QP求解器。关键特性：</p>
+  <ul>
+    <li><strong>支持输入约束</strong> u_k ∈ U（如单旋翼推力上下限），但<strong>不支持状态约束</strong>（如避障）</li>
+    <li>通过求解QP的KKT条件，<strong>解析地计算</strong>最优解对代价参数(Q, p)的梯度</li>
+    <li>梯度通过前向/反向传播：每次前向传播需要完整求解一个QP，反向传播需要求解一个相关的线性系统</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="callout-title">⚠️ 计算代价</div>
+    每次forward+backward都需要求解QP。Training时必须反复求解，推理时只需要forward。这解释了为什么训练时间比AC-MLP长（Table II），但推理时间仍在毫秒级（N=2: 2.5ms, N=5: 3.5ms, N=10: 5.5ms）。
+  </div>
+
+  <h3>3.5 代价函数Q_k和p_k的结构</h3>
+  <p>在标准MPC中，Q_k通常是对角矩阵或块对角矩阵。本文直接让Cost Map网络输出Q_k和p_k的所有独立参数。对于N步视界，Q_k和p_k的参数量为O(N)，由网络一次性输出。</p>
+
+  <div class="callout idea">
+    <div class="callout-title">💡 为什么学Q_k和p_k而不是学参考轨迹？</div>
+    之前的工作[29]学的是参考轨迹的偏移量——这让MPC追踪一条"最优轨迹"，但如果环境变了（比如突然来风），轨迹就不对了。<br>
+    学<strong>代价函数</strong>的好处：MPC仍然自己求解最优控制，所以环境变化时它会自动调整——代价函数告诉它"什么状态好/什么状态坏"，而不是"你应该去哪个位置"。这本质上更鲁棒。
+  </div>
+</section>
+
+<!-- ═══════════════ 4. DATA FLOW ═══════════════ -->
+<section id="dataflow">
+  <h2>4. 控制系统数据流全解</h2>
+
+  <h3>4.1 训练时的一步数据流</h3>
+  <div class="fig-box">
+    <div class="fig-ascii">
+Flightmare Simulator (simple model, fast training)
+│
+├─ Observation Extraction:
+│  o_quad  = [v_x, v_y, v_z, R(3×3)]  ← 12D vehicle state
+│  o_track = [Δp_corner1, Δp_corner2, Δp_corner3, Δp_corner4] × N_gates
+│  → concatenated into full observation vector
+│
+├─ FORWARD PASS (Actor):
+│  │
+│  ├─ Cost Map NN: observation → FC layers → Q_k, p_k (for k=0..N)
+│  │   Q_k: symmetric positive-semidefinite matrices
+│  │   p_k: linear cost vectors
+│  │
+│  ├─ Differentiable MPC:
+│  │   solve min Σ [x_k;u_k]ᵀQ_k[x_k;u_k] + p_k[x_k;u_k]
+│  │   s.t. x_{k+1} = Ax_k + Bu_k, u_k ∈ U
+│  │   → optimal control sequence mean μ = [u_0*, ..., u_N*]
+│  │
+│  └─ Sample: u_0 ~ N(μ[0], Σ)  ← stochastic Gaussian policy
+│
+├─ Apply Action:
+│  u_0 → collective thrust + body rates
+│  → individual rotor thrusts (guaranteed feasible by MPC constraints)
+│
+├─ Simulate: Flightmare step → next state
+│
+├─ FORWARD PASS (Critic):
+│  V(s_k) ← from Critic network
+│  V(s_{k+1}) ← from Critic network
+│
+├─ Compute Reward:
+│  r = progress reward (gate center distance reduction)
+│    + perception reward (camera-point alignment, optional)
+│
+├─ Store in Buffer: (s_k, a_k, r_k, s_{k+1}, V(s_k), log_prob(a_k))
+│
+└─ PPO UPDATE (after collecting batch):
+   │
+   ├─ Compute GAE advantages:
+   │   A_k = Σ (γλ)^i · δ_{k+i}
+   │   where δ_t = r_t + γ V(s_{t+1}) - V(s_t)
+   │
+   ├─ Compute policy gradient through MPC:
+   │   ∂log π_θ/∂θ = ∂log π_θ/∂μ · ∂μ/∂(Q,p) · ∂(Q,p)/∂θ
+   │                      ↑ sampled      ↑ diff MPC grad    ↑ NN backprop
+   │
+   └─ Update θ (Actor) and ω (Critic) via Adam</div>
+  </div>
+
+  <h3>4.2 部署时的简化数据流（无Critic，确定性策略）</h3>
+  <div class="fig-box">
+    <div class="fig-ascii">
+Observation → Cost Map NN → Q_k, p_k → diffMPC solve QP → μ
+                                                         → u_0 = μ[0] (deterministic, no Σ)
+                                                         → apply to BEM / real drone</div>
+  </div>
+
+  <h3>4.3 关键维度速查</h3>
+  <table>
+    <tr><th>变量</th><th>维度</th><th>说明</th></tr>
+    <tr><td>观测 o_quad</td><td>12D</td><td>v(3) + R(9)</td></tr>
+    <tr><td>观测 o_track</td><td>12×N_gates</td><td>每个门4个角点 × 3D相对位置</td></tr>
+    <tr><td>Cost Map输出 Q_k</td><td>取决于状态+控制维度</td><td>对称矩阵的非零元</td></tr>
+    <tr><td>Cost Map输出 p_k</td><td>depends</td><td>线性项向量</td></tr>
+    <tr><td>控制 u</td><td>4D</td><td>集体推力 + 3轴角速率</td></tr>
+    <tr><td>MPC视界 N</td><td>2, 5, 10</td><td>ablated in experiments</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 5. EXPERIMENTS ═══════════════ -->
+<section id="experiments">
+  <h2>5. 实验设计与关键结果深度解读</h2>
+
+  <h3>5.1 实验任务总览</h3>
+  <table>
+    <tr><th>任务</th><th>描述</th><th>特点</th></tr>
+    <tr><td>水平赛道</td><td>穿越水平排列的门</td><td>基本导航任务</td></tr>
+    <tr><td>垂直赛道</td><td>穿越垂直排列的门（从下往上）</td><td>需要大幅爬升，推力挑战大</td></tr>
+    <tr><td>圆形赛道</td><td>环形排列的门</td><td>持续转弯 + 真机部署</td></tr>
+    <tr><td>SplitS赛道</td><td>包含翻转机动的赛道</td><td>极限机动 + 真机部署</td></tr>
+    <tr><td>感知感知飞行</td><td>飞行时保持相机对准目标点</td><td>多目标trade-off（速度 vs 感知）</td></tr>
+  </table>
+
+  <h3>5.2 核心实验结果（Table I + Fig.3）</h3>
+  <table>
+    <tr><th>场景</th><th>指标</th><th>AC-MLP</th><th>MPC</th><th>AC-MPC</th><th>分析</th></tr>
+    <tr>
+      <td rowspan="2"><strong>水平</strong></td>
+      <td>成功率</td><td>74.78%</td><td>64.94%</td><td style="background:#fef3c7;font-weight:700;">90.37%</td>
+      <td rowspan="2">AC-MPC成功率最高，但速度略低于AC-MLP</td>
+    </tr>
+    <tr>
+      <td>速度</td><td style="font-weight:700;">7.74 m/s</td><td>4.15 m/s</td><td>6.51 m/s</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><strong>垂直</strong></td>
+      <td>成功率</td><td>53.61%</td><td style="font-weight:700;">72.27%</td><td>64.47%</td>
+      <td rowspan="2">纯MPC反而最高——垂直赛道对轨迹精度要求高，AC-MPC还在"学习"</td>
+    </tr>
+    <tr>
+      <td>速度</td><td>10.56 m/s</td><td>4.25 m/s</td><td style="font-weight:700;">10.05 m/s</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><strong>垂直+阵风</strong></td>
+      <td>成功率</td><td>6.5%</td><td>0.0%</td><td style="background:#fef3c7;font-weight:700;">83.33%</td>
+      <td rowspan="2">🏆 最惊艳的结果——AC-MPC几乎不受影响</td>
+    </tr>
+    <tr>
+      <td>速度</td><td>10.67 m/s</td><td>6.44 m/s</td><td style="font-weight:700;">10.76 m/s</td>
+    </tr>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">🏆 阵风实验：为什么83.33% vs 6.5%？</div>
+    阵风施加11.5N外力（1.5倍自重），从z=10m到z=8m。<br>
+    <strong>AC-MLP失败的原因</strong>：纯神经网络学到的"观测→动作"映射在训练分布外完全不可靠——没有遇到过这么大的风，不知道怎么应对。<br>
+    <strong>MPC失败的原因</strong>：它追踪一条在无风条件下计算的最优轨迹——风来了，轨迹偏差了，它试图回到轨迹但控制权限不够。<br>
+    <strong>AC-MPC成功的原因</strong>：MPC层内置了动力学模型——它<strong>知道</strong>风在把它吹偏，在线重规划计算出新的最优控制，而学到的代价函数告诉它"快速回到赛道比保持原轨迹更重要"。
+  </div>
+
+  <h3>5.3 消融实验：MPC视界N的影响 (Fig.3B)</h3>
+  <p>训练曲线：AC-MPC用不同视界N(2,5,10)与AC-MLP对比。AC-MPC略落后于AC-MLP（结构性约束的代价），但三者最终接近。N越大，MPC看得越远，但计算成本更高、学习更难。</p>
+
+  <h3>5.4 初始条件鲁棒性 (Fig.3C)</h3>
+  <p>在水平赛道中从不同初始位置出发，完成50次试飞。AC-MPC的轨迹束明显更紧（方差小），几乎全是蓝色（成功）；AC-MLP有不少红色（碰撞）。这证明MPC层使策略对初始条件变化更鲁棒。</p>
+
+  <h3>5.5 Sim-to-Real (Fig.4)</h3>
+  <p>圆形赛道和SplitS赛道在真机上零样本部署成功。仿真中的速度分布和轨迹形状与真机高度一致。这证明：</p>
+  <ol>
+    <li>BEM高保真仿真器足够好（气动模型接近真实）</li>
+    <li>MPC层的动力学模型在真机上也适用</li>
+    <li>学到的代价函数对sim-to-real gap不敏感（因为MPC负责处理动力学差异）</li>
+  </ol>
+
+  <h3>5.6 感知感知飞行 (Fig.5)</h3>
+  <p>同时优化飞行速度和相机指向——一个competing reward问题。AC-MLP和AC-MPC都学到了这个行为，但轨迹呈现出"非自然"的形状——因为需要在速度和感知之间trade-off。AC-MPC的轨迹更平滑。</p>
+
+  <h3>5.7 训练与推理时间 (Table II)</h3>
+  <table>
+    <tr><th>方法</th><th>训练时间 (SplitS)</th><th>推理时间 (forward pass)</th></tr>
+    <tr><td>AC-MLP</td><td>~3 hours</td><td>~1 ms</td></tr>
+    <tr><td>AC-MPC (N=2)</td><td>~8 hours</td><td>~2.5 ms</td></tr>
+    <tr><td>AC-MPC (N=5)</td><td>~12 hours</td><td>~3.5 ms</td></tr>
+    <tr><td>AC-MPC (N=10)</td><td>~18 hours</td><td>~5.5 ms</td></tr>
+  </table>
+  <p>训练时间显著更长（因为每次forward/backward都要解QP），但推理时间完全满足实时控制需求（30Hz=33ms，最慢5.5ms）。</p>
+</section>
+
+<!-- ═══════════════ 6. TRICKS ═══════════════ -->
+<section id="tricks">
+  <h2>6. 科研 Tricks —— 哪些可以直接用到你的项目里</h2>
+
+  <div class="tricks-grid">
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#dbeafe;color:#1d4ed8">1</span>
+      <h4>"学习代价函数"而非"学习动作"</h4>
+      <p><strong>核心思想</strong>：不让NN直接输出动作，而是输出MPC的代价参数，让MPC去求解动作。这给策略注入了<strong>物理结构先验</strong>（动力学模型+约束），大幅提升泛化能力。</p>
+      <p>代价：牺牲一点样本效率 + 每次forward都要解QP。收益：OOD鲁棒性质的飞跃。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#d1fae5;color:#047857">2</span>
+      <h4>两个时间尺度的分工</h4>
+      <p>MPC只负责短视界（N步），Critic负责长视界（无限视界折扣回报）。这避免了让MPC处理无限视界（计算不可行），也避免了让纯RL预测短期物理约束。</p>
+      <p><strong>生物启发</strong>：大脑也有"快系统"（直觉/反应）和"慢系统"（推理/规划）——本文的架构正好对应。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#fef3c7;color:#92400e">3</span>
+      <h4>可微性 > 黑箱优化</h4>
+      <p>之前的工作[29][42]把MPC当黑箱，用有限差分或贝叶斯优化调参数——计算量爆炸、梯度噪声大。本文用<strong>可微MPC</strong>[26]，梯度解析计算——几百倍效率提升。</p>
+      <p>这是一个重要的技术趋势：<strong>让传统控制模块可微，嵌入DL pipeline</strong>。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#ede9fe;color:#6d28d9">4</span>
+      <h4>简单仿真器训练 + 高保真仿真器评估</h4>
+      <p>训练用Flightmare（简单快速），评估用BEM（高保真气动）。训练不需要最高精度——RL需要的是大量试错；评估才需要精度。</p>
+      <p>这个策略可以节省大量训练时间，同时保证结果可信。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#ffe4e6;color:#be123c">5</span>
+      <h4>观测空间的一致性设计</h4>
+      <p>所有任务（水平/垂直/圆形/SplitS/感知感知）使用<strong>完全相同的观测空间</strong>。这是好的架构设计——说明观测表示是通用的。如果你的系统需要为每个新任务重新定义观测，那可能观测设计不够好。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#e6faf8;color:#0f766e">6</span>
+      <h4>消融实验设计的层次感</h4>
+      <p>三个维度的消融：(a) wind disturbance → 验证OOD鲁棒性；(b) horizon N → 验证MPC视界影响；(c) initial conditions → 验证对初始状态的鲁棒性。</p>
+      <p>每个消融只改变一个变量，清晰干净——值得学习。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#f0fdf4;color:#166534">7</span>
+      <h4>MPC层提供"免费的"输入可行性保证</h4>
+      <p>MPC内部有u_k ∈ U约束，确保输出的控制不会超出执行器物理范围。纯RL可能需要clip或tanh来约束——但那是"硬截断"而不是"最优约束满足"。</p>
+      <p>对于安全关键系统，这个性质非常有价值。</p>
+    </div>
+
+    <div class="trick-card">
+      <span class="trick-num" style="background:#fce7f3;color:#9d174d">8</span>
+      <h4>Q_k和p_k的参数量与视界N的关系</h4>
+      <p>Cost Map网络一次性输出所有Q_k和p_k（k=0..N）。这意味着输出维度随N线性增长。论文通过实验找到了trade-off（N=5效果最好）。</p>
+      <p>如果你用类似架构，要注意网络输出维度和视界的trade-off——N太大可能导致网络容量不够。</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════ 7. DESIGN PHILOSOPHY ═══════════════ -->
+<section id="philosophy">
+  <h2>7. 设计哲学 —— "结构化策略" 的方法论</h2>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>❌ 常见误区</h4>
+      <ul>
+        <li>把所有问题塞进一个大MLP端到端解决</li>
+        <li>认为"更多数据+更大网络"就能解决OOD问题</li>
+        <li>把MPC当黑箱，用采样估计梯度</li>
+        <li>只为单一任务设计观测和网络</li>
+        <li>忽视传统控制理论几十年的积累</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>✅ 本文的做法</h4>
+      <ul>
+        <li><strong>结构化最后一层</strong>：MPC作为策略的"执行器"，保证物理可行性</li>
+        <li><strong>学习代价函数</strong>而非策略：保留MPC的鲁棒性，用RL优化目标</li>
+        <li><strong>可微性</strong>：让梯度流畅通，高效训练</li>
+        <li><strong>通用观测空间</strong>：一次设计，多任务复用</li>
+        <li><strong>尊重物理</strong>：MPC层内置动力学，RL只学"什么状态好"</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout idea">
+    <div class="callout-title">🎯 本文的核心方法论</div>
+    <strong>不要用神经网络替代物理模型——让神经网络增强物理模型。</strong><br>
+    MPC知道"怎么飞"（动力学），但不知道"飞去哪是好的"（代价函数）。<br>
+    RL知道"什么是好的"（reward），但不知道怎么满足物理约束。<br>
+    两者的结合点：<strong>NN输出代价函数，MPC根据代价函数+动力学求解最优控制。</strong><br>
+    这就是"结构化策略"的精髓——在策略结构中嵌入已知的物理结构，而不是让数据从头学。
+  </div>
+
+  <h3>与纯RL（AC-MLP）的本质区别</h3>
+  <table>
+    <tr><th>维度</th><th>AC-MLP</th><th>AC-MPC</th></tr>
+    <tr><td>策略表示</td><td>观测 → NN → 动作</td><td>观测 → NN → 代价 → MPC → 动作</td></tr>
+    <tr><td>物理知识</td><td>无（从数据中学）</td><td>有（MPC内置动力学+约束）</td></tr>
+    <tr><td>泛化机制</td><td>插值（在训练数据分布内）</td><td>外推（MPC在线重规划）</td></tr>
+    <tr><td>安全性</td><td>无法保证</td><td>输入可行性由MPC约束保证</td></tr>
+    <tr><td>训练速度</td><td>快</td><td>慢（每个step解QP）</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 8. TRANSFER IDEAS ═══════════════ -->
+<section id="transfer">
+  <h2>8. 对 UAV 编队 / 多机研究的迁移思路</h2>
+
+  <h3>8.1 直接迁移：分布式编队 MPC + RL</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 迁移方案</div>
+    将AC-MPC的架构从单机扩展到多机编队：<br>
+    <strong>每个UAV的Actor</strong> = Cost Map NN（学编队代价） → 分布式MPC（解编队QP，含邻居避碰约束） → 控制指令<br>
+    <strong>Critic</strong> = 估计编队整体的长期价值（任务完成度、能耗、通信质量等）<br>
+    <strong>Cost Map学习什么？</strong>编队保持的权重、避障的激进程度、速度vs精度的trade-off——这些在不同场景下应该不同（空旷→高速，狭窄→精密）
+  </div>
+
+  <h3>8.2 三个具体可做的方向</h3>
+  <table>
+    <tr><th>方向</th><th>难度</th><th>描述</th></tr>
+    <tr>
+      <td>AC-MPC + 仿射变换</td>
+      <td>⭐⭐⭐</td>
+      <td>将仿射变换（Liu et al. 2025）计算的目标位置作为MPC的参考轨迹，Cost Map学习如何trade-off跟踪精度和避障——结合两篇论文的优势</td>
+    </tr>
+    <tr>
+      <td>多机分布式AC-MPC</td>
+      <td>⭐⭐⭐⭐</td>
+      <td>每机独立Cost Map + 独立MPC（含邻居UAV作为动态约束），Critic共享或通过通信融合——实现分布式编队学习</td>
+    </tr>
+    <tr>
+      <td>AC-MPC + 固定翼6-DOF</td>
+      <td>⭐⭐⭐⭐⭐</td>
+      <td>将四旋翼的AC-MPC迁移到固定翼（JSBSim/OpenFlight环境），MPC层使用固定翼线性化动力学——挑战在于固定翼的动态耦合更强，QP的建模精度可能不够</td>
+    </tr>
+  </table>
+
+  <h3>8.3 关键挑战</h3>
+  <div class="callout warn">
+    <div class="callout-title">⚠️ 多机场景下需要注意的问题</div>
+    <ul>
+      <li><strong>维度爆炸</strong>：N机编队的联合QP维度 = N × 单机维度。直接用集中式MPC不可行</li>
+      <li><strong>分布式QP的梯度传播</strong>：每个UAV的MPC只优化自己的控制——梯度的信息流被截断，可能丢失编队层面的协调信息</li>
+      <li><strong>非平稳性</strong>：其他UAV的策略也在更新——标准的MARL挑战</li>
+      <li><strong>通信延迟</strong>：真机部署时邻居状态可能有延迟，MPC的模型精度受影响</li>
+      <li><strong>避碰约束</strong>：本文的可微MPC[26]不支持状态约束（如||p_i - p_j|| ≥ r_safe），需要改用支持状态约束的可微MPC或把避碰放进代价函数</li>
+    </ul>
+  </div>
+
+  <h3>8.4 前置知识清单</h3>
+  <table>
+    <tr><th>知识点</th><th>重要性</th><th>推荐资源</th></tr>
+    <tr><td>可微优化 (OptNet)</td><td>⭐⭐⭐⭐⭐</td><td>Amos &amp; Kolter, ICML 2017 [26]</td></tr>
+    <tr><td>PPO + GAE</td><td>⭐⭐⭐⭐⭐</td><td>Schulman et al. 2017 · 本文Algorithm 2</td></tr>
+    <tr><td>MPC基础</td><td>⭐⭐⭐⭐</td><td>Model Predictive Control教材 · QP求解</td></tr>
+    <tr><td>四旋翼动力学</td><td>⭐⭐⭐</td><td>Song et al. Science Robotics 2023 [14]</td></tr>
+    <tr><td>多智能体RL (MARL)</td><td>⭐⭐⭐</td><td>CTDE范式 · 参数共享 · MADDPG</td></tr>
+    <tr><td>分布式MPC</td><td>⭐⭐⭐</td><td>DMPC综述论文</td></tr>
+  </table>
+
+  <h3>8.5 推荐阅读路线</h3>
+  <ol>
+    <li><strong>先读 Song et al. (Science Robotics 2023) [14]</strong> → 理解纯PPO无人机竞速的baseline和实验设置</li>
+    <li><strong>再读 Amos &amp; Kolter (ICML 2017) [26]</strong> → 理解可微QP的核心技术（至少看懂前3页）</li>
+    <li><strong>回来看本文</strong> → 理解如何把[26]嵌入[14]的框架</li>
+    <li><strong>读 Song &amp; Scaramuzza (IROS 2020) [42]</strong> → 理解之前的"黑箱"方案，对比差异</li>
+    <li><strong>拓展：Williams et al. (MPPI)</strong> → 理解采样-based MPC的另一条路线</li>
+  </ol>
+</section>
+
+<!-- ═══════════════ FOOTER ═══════════════ -->
+<footer>🎛️ AC-MPC 学习笔记 · Romero, Song, Scaramuzza · ICRA 2024 · RPG, UZH &amp; ETH Zurich</footer>
+
+</div>
+</body>
+</html>

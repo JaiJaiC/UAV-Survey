@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Actor-Critic Model Predictive Control (Romero, Song, Scaramuzza, 2024)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Actor-Critic Model Predictive Control（Actor-Critic 模型预测控制）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Angel Romero</strong>（first author）、<strong>Yunlong Song</strong>、<strong>Davide Scaramuzza</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">苏黎世大学 &amp; ETH Zurich</strong>（University of Zurich and ETH Zurich），Robotics and Perception Group（机器人学与感知组），Department of Informatics and Department of Neuroinformatics，瑞士</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE ICRA 2024</strong>（International Conference on Robotics and Automation），2024年5月，Yokohama, Japan。arXiv: 2306.09852v5</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td>arXiv: <a href="https://arxiv.org/abs/2306.09852" target="_blank">2306.09852</a> | 项目视频: <a href="https://youtu.be/3epWs63bOGs" target="_blank">YouTube</a> | 代码基于 Flightmare + Agilicious 框架。资助: EU Horizon 2020 AERIAL-CORE (No. 871479) + ERC AGILEFLIGHT (No. 864042)</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>AC-MPC</strong>——将<strong>可微分 MPC</strong>作为 Actor 策略网络的最后一层，嵌入 Actor-Critic (PPO) 强化学习框架中。MPC 负责短期预测优化与在线重规划（利用已知动力学模型），Critic 负责长期价值估计（驱动端到端学习），Neural Cost Map（一个小型 MLP）从观测中学习 MPC 二次代价函数的动态系数 Q 和 p。在四旋翼敏捷穿门飞行（水平/垂直/圆形/SplitS/感知感知飞行）中验证：零样本 sim-to-real 迁移，真实世界最大速度 14 m/s，抗风扰成功率 83%（vs 纯 RL 的 6.5% 和传统 MPC 的 0%）。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Differentiable MPC</span>
+    <span class="tag tag-green">Actor-Critic RL</span>
+    <span class="tag tag-amber">Agile Quadrotor Flight</span>
+    <span class="tag tag-purple">Neural Cost Map</span>
+    <span class="tag tag-red">Sim-to-Real Transfer</span>
+    <span class="tag tag-cyan">ICRA 2024</span>
+    <span class="tag tag-gray">Online Replanning</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么强化学习（RL）和模型预测控制（MPC）各自存在根本性缺陷？</strong><br>
+    答：纯 RL（AC-MLP）的 Actor 是一个随机初始化的 MLP 前馈网络——没有利用任何系统动力学先验知识，训练初期完全随机探索，面对分布外场景（强风扰、新初始条件）仅能依赖网络记忆泛化，没有在线重规划能力。传统 MPC 虽然利用动力学模型进行在线优化，但代价函数必须手工设计且固定不变——在需要"模式切换"的复杂任务（如垂直俯冲中翻转机身）中，固定代价函数容易陷入局部最优（保守的零推力自由落体），且每个新任务都需要重新手工设计代价函数。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>将可微分 MPC 作为 Actor 网络的最后一层，由 Neural Cost Map 从观测中动态学习 MPC 的代价函数参数</strong>。这样实现三个关键解耦：(1) Cost Map 学的是"当前应该优化什么目标"（代价函数），而非"当前应该输出什么动作"——学"目标"比学"动作"在动力学变化时更泛化；(2) MPC 负责"如何在给定目标下求最优动作"——利用已知动力学模型，输出始终满足物理约束；(3) Critic 负责"从长远看这个状态好不好"——其价值函数 V(s) 自动编码了"门通过后目标应切换到下一个门"的任务级模式，通过 Advantage 信号引导 Cost Map 向高回报方向更新。本质上是<strong>将仿人脑的双时间尺度预测机制（短期预测=MPC，长期预测=Critic）嵌入 RL 训练框架</strong>。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>人类大脑的双时间尺度预测机制（Rao &amp; Ballard 1999, Friston 2010）——大脑同时进行短期感觉预测和长期规划</td><td>→ AC-MPC 借鉴了"系统 1（快速直觉）+ 系统 2（慢速推理）"的双过程理论：MPC = 系统 1（利用动力学模型快速优化短时域动作），Critic = 系统 2（学习任务级长期价值评估，指导系统 1 的目标选择）</td><td>架构</td></tr>
+    <tr><td>Differentiable MPC（Amos et al., NeurIPS 2018）——通过对 iLQR 不动点进行隐式微分，使 MPC 优化过程可反向传播梯度</td><td>→ 可微分 MPC 提供了将"优化问题求解器"作为神经网络层的技术基础——前向传播 = 求解 QP，反向传播 = KKT 条件隐式微分。这使得梯度可以从 RL 的奖励信号端到端传播到 Cost Map 的所有参数，解除了此前"MPC 只能零阶调参"的限制</td><td>数学 / 方法</td></tr>
+    <tr><td>Learned Cost for MPC（Song &amp; Scaramuzza, IROS 2020）——用 RL 学习 MPC 的高级策略，但将 MPC 视为黑箱，仅用采样法估计梯度</td><td>→ 采样估计梯度（零阶方法）样本效率极低，参数维度稍大就失效。本文用解析梯度（通过 diffMPC 的 KKT 微分）替代采样——梯度精度和效率都有数量级提升，使得从高维观测直接学习完整代价函数参数成为可能</td><td>策略</td></tr>
+    <tr><td>Gate Progress Reward 驱动的离散模式切换——在穿门任务中，通过一个门后目标门立即切换，要求策略瞬间改变优化方向</td><td>→ 传统 MPC 的固定代价函数无法处理这种"阶段性目标跳变"——需要手工设计状态机来切换代价函数。AC-MPC 的 Neural Cost Map 从观测中自动感知"当前目标门是哪个"，输出适配的代价函数系数——本质上是用神经网络实现了连续空间中的模式切换</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 架构创新——将可微分 MPC 作为 Actor 最后一层，构成结构化策略网络</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>纯 RL（AC-MLP）的 Actor 是黑箱 MLP，训练初期完全随机、动作可能违反物理约束、面对分布外场景缺乏重规划能力。传统 MPC 代价函数需手工设计、固定不变，无法适应任务阶段的动态变化。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>可微分优化层（Differentiable Optimization Layer）的思想——如果 MPC 本质上是求解一个优化问题，而该优化问题可微，那它就可以像普通神经网络层一样插入计算图。Actor 的输出不是动作，而是传递给 MPC 的代价函数参数——MPC 才是真正的"动作生成器"。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>观测 $s_k$ → Cost Map MLP → 输出 $Q(s_k), p(s_k)$（MPC 二次代价函数参数）→ diffMPC 求解器 → 最优控制序列 $u^*_{0:N-1}$ → 取 $u^*_0$ + 探索噪声 → 执行。即使 Cost Map 输出不完美，MPC 始终保证动作满足动力学约束和输入限制——这个"安全层"效应在训练初期和分布外场景中至关重要。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: Neural Cost Map——从观测到 MPC 代价函数的端到端可学习映射</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>标准 MPC 的代价函数参数（Q 矩阵权重、R 矩阵权重、线性项 p）需要手工设计。对于敏捷飞行——穿越一系列空间分布的门——需要代价函数在不同飞行阶段有完全不同的参数配置。手工编码这种"模式切换逻辑"几乎不可能覆盖所有场景。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>观测中包含了"当前目标门在哪里"的信息——代价函数应该是观测的函数，而非全局常数。将代价函数参数化为一组由神经网络预测的观测相关量，就能通过 RL 自动学习"在每个状态下应该优化什么"。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Cost Map = 2 隐藏层（各 512 维）+ ReLU + Sigmoid 输出层。Q 矩阵约束为对角阵（降维：从 $O((n+m)^2)$ 到 $O(n+m)$）。Sigmoid 输出范围 $[0.1, 100000]$——下限 0.1 确保 Q 正定（QP 有解），上限 100000 防止参数发散。输出维度 = $2T(n_{\text{state}} + n_{\text{input}})$（N=2 时为 68 维）。Cost Map 通过 PPO 策略梯度端到端训练，梯度经 diffMPC 的 KKT 隐式微分反向传播。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 双时间尺度决策——MPC 短时域优化 + Critic 长时域价值估计协同驱动模式切换</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>MPC 的预测时域 N=2（约 40ms）太短——无法"看到"远处的下一个门。如果仅靠 MPC 的短视优化，飞行器会在通过当前门后没有动力转向下一个目标。稀疏奖励（仅过门时 +10.0）加剧了这一问题——在数百个中间步中没有任何正奖励信号。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Critic 的价值函数 V(s) 天然编码了"从状态 s 到任务结束的总期望回报"——这是无限时域的。当 Critic 学会"离下一个门更近 = 更高价值"后，Advantage 函数 A(s,a) = r + γV(s') - V(s) 会引导 Cost Map 输出能让飞行器朝高价值区域移动的代价函数参数。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Fig. 2 的价值函数热力图直接展示了这一机制——每通过一个门，高价值区域（黄色）立即从旧门"跳变"到新门。这种离散的模式切换不是手工编码的（没有 if-else），而是 Critic 从稀疏奖励中通过 TD 学习自动涌现的。Cost Map 将 Critic 的长期价值信号转化为 MPC 可执行的短期代价函数——这桥接了"长期目标"与"短期优化"之间的时间尺度鸿沟。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 系统总体框架——AC-MPC 四层架构</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph OBS["观测输入层 (36维)"]
+      direction LR
+      OSTATE["飞行器状态 o_quad: 线速度v + 旋转矩阵R → 12维"]
+      OTRACK["赛道观测 o_track: 下N个门四角点相对位置 → 24维"]
+      ONORM["在线归一化: 每训练步计算均值/标准差"]
+    end
+
+    subgraph ACTOR["策略网络层 · Actor (Cost Map + diffMPC)"]
+      direction LR
+      COSTMAP["Neural Cost Map: 2×512 MLP + Sigmoid · 输入观测s_k · 输出Q/p"]
+      QMAT["对角矩阵 Q(s): 状态/控制的二次代价权重 · [0.1, 1e5]"]
+      PVEC["线性向量 p(s): 状态/控制的线性代价项 · [0.1, 1e5]"]
+      DIFFMPC["可微分MPC求解器: iLQR不动点 · 输入约束 u∈U · 前向求解+反向解析梯度"]
+      ACTOUT["控制输出: u_k ~ N(diffMPC, σ^2) 训练 · u_k = diffMPC 部署"]
+    end
+
+    subgraph CRITIC["价值评估层 · Critic"]
+      direction LR
+      VNET["Value Network V_φ(s): 2×512 MLP · 输入观测 · 输出标量V(s)"]
+      ADV["Advantage: A = r + γV(s') - V(s) · GAE平滑 · λ=0.95"]
+      TDERR["TD误差: MSE(V(s), R̂) · 价值函数回归目标"]
+    end
+
+    subgraph ENV["环境交互层"]
+      direction LR
+      TRAINENV["Flightmare仿真器: 简单动力学 · 快速训练"]
+      EVALENV["NeuroBEM高保真仿真: 气动建模 · 风扰评估"]
+      REALENV["真实四旋翼: Agilicious 4s竞速机 · 动捕定位 · 零样本迁移"]
+      REWARD["奖励: 门进度(稠密) + 过门+10(稀疏) + 碰撞-10 + 完赛+10"]
+    end
+
+    OBS --> ACTOR
+    OBS --> CRITIC
+    ACTOUT -->|"u_k 执行"| ENV
+    ENV -->|"s_{k+1}, r_k"| OBS
+    ADV -->|"策略梯度 ∂J/∂θ"| COSTMAP
+    TDERR -->|"价值函数回归"| VNET
+    REWARD -.->|"稀疏+稠密混合奖励"| ADV
+
+    classDef obs fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef actor fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef critic fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef env fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class OSTATE,OTRACK,ONORM obs
+    class COSTMAP,QMAT,PVEC,DIFFMPC,ACTOUT actor
+    class VNET,ADV,TDERR critic
+    class TRAINENV,EVALENV,REALENV env
+    class REWARD obs
+    </pre>
+  </div>
+
+  <h3>3.2 数据流——训练循环中的前向传播与梯度反向传播路径</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph FORWARD["前向传播: 观测 → 动作 (每条轨迹每步执行)"]
+      direction LR
+      F1["观测 s_k: 速度+姿态+门位置 → 36维归一化"] --> F2["Cost Map(s_k) MLP前向 → Q(s_k), p(s_k) → 68维 (N=2)"]
+      F2 --> F3["diffMPC求解: 构建QP → iLQR迭代 → 收敛得 u*_{0:N-1}"]
+      F3 --> F4["取u*_0 + 探索噪声 σ ~ N(0, σ^2) → 施加到环境"]
+      F4 --> F5["环境步进: (s_k, u_k) → s_{k+1}, r_k · 存储到Rollout Buffer"]
+    end
+
+    subgraph BACKWARD["反向传播: 奖励 → Cost Map梯度 (每条轨迹PPO更新时)"]
+      direction LR
+      B1["从Buffer取mini-batch: (s, a, r, s')"] --> B2["计算Advantage: GAE(λ=0.95) · A = Σ(γλ)^t δ_t"]
+      B2 --> B3["PPO-Clip Loss: L = min(r_t·A, clip(r_t, 1±ε)·A) 对θ求导"]
+      B3 --> B4["∂L/∂u*: 标准策略梯度 · 经高斯分布对数概率"]
+      B4 --> B5["∂u*/∂(Q,p): 可微MPC的KKT隐式微分 · 解析计算"]
+      B5 --> B6["∂(Q,p)/∂θ: 标准MLP反向传播 · 更新Cost Map权重"]
+    end
+
+    subgraph CRITIC_UPD["Critic更新: 价值函数回归 (与Actor交替进行)"]
+      direction LR
+      C1["从Buffer计算R̂_k: 折扣累积回报 · R̂ = Σ γ^t r_{k+t}"] --> C2["V_φ(s)前向: 预测状态价值"]
+      C2 --> C3["MSE Loss: (V_φ(s) - R̂)^2 → 反向传播"]
+      C3 --> C4["更新Critic MLP权重 φ · K个epoch"]
+    end
+
+    subgraph DEPLOY_LOOP["部署循环: 零样本Sim-to-Real (训练完成后)"]
+      direction LR
+      D1["固定Cost Map + Critic权重"] --> D2["每步: 观测s_k → Cost Map → Q(s_k), p(s_k)"]
+      D2 --> D3["diffMPC求解: 确定性u*_0 (σ=0) · 在线重规划"]
+      D3 --> D4["真实四旋翼执行 · 最大14m/s · Circle/SplitS赛道"]
+    end
+
+    FORWARD -->|"收集完整Buffer后"| BACKWARD
+    BACKWARD -->|"K epoch后"| CRITIC_UPD
+    CRITIC_UPD -->|"重复N轮直至收敛 ~11.5h"| FORWARD
+    FORWARD -.->|"训练收敛后 · 固定权重"| DEPLOY_LOOP
+
+    classDef forward fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef backward fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef cupd fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef deploy fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class F1,F2,F3,F4,F5 forward
+    class B1,B2,B3,B4,B5,B6 backward
+    class C1,C2,C3,C4 cupd
+    class D1,D2,D3,D4 deploy
+    </pre>
+  </div>
+
+  <h3>3.3 工作流程——从系统建模到真实部署的完整工程管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1: 系统建模与初始化"]
+      direction LR
+      P1A["定义四旋翼动力学: x_{k+1}=f(x_k,u_k) · 13维状态 · 4维控制"] --> P1B["构建QP形式MPC: 对角Q矩阵 · 输入约束u∈U · 无状态约束"]
+      P1B --> P1C["初始化网络: Cost Map MLP(随机) · Critic MLP(随机) · PPO超参数"]
+      P1C --> P1D["配置环境: Flightmare仿真器 · 门赛道生成器 · 碰撞检测"]
+    end
+
+    subgraph PHASE2["阶段2: PPO端到端训练循环"]
+      direction LR
+      P2A["Rollout收集: 运行当前策略π_θ · N步轨迹 · 动作含探索噪声σ"] --> P2B["Compute GAE Advantage: 基于Critic V(s) · λ=0.95 · γ=0.99"]
+      P2B --> P2C["PPO-Clip更新Actor: 反向通过diffMPC → 解析梯度 → 更新Cost Map"]
+      P2C --> P2D["MSE回归更新Critic: V(s)拟合R̂ · K个epoch · 小批量SGD"]
+      P2D --> P2E["观测在线归一化更新: 当前batch均值/标准差 · 适应分布变化"]
+    end
+
+    subgraph PHASE3["阶段3: 高保真评估与鲁棒性验证"]
+      direction LR
+      P3A["NeuroBEM评估: 高保真气动仿真 · 风扰测试 11.5N · OOD初始条件3m³"] --> P3B["Baseline对比: AC-MLP(纯RL) · 跟踪MPC(时间最优参考)"]
+      P3B --> P3C["消融实验: 成功率 · 平均速度 · 风扰恢复 · 时域长度N的影响"]
+      P3C --> P3D["价值函数可视化: V(s)热力图 · MPC预测叠加 · 模式切换验证"]
+    end
+
+    subgraph PHASE4["阶段4: 真实世界零样本部署"]
+      direction LR
+      P4A["提取策略: Cost Map权重θ* · Critic丢弃(仅训练用)"] --> P4B["部署平台: Agilicious 4s竞速机 · 动捕定位 · 机载/外部计算"]
+      P4B --> P4C["实时控制: 50Hz · 每步观测→Cost Map→diffMPC→u*_0 · 确定性策略"]
+      P4C --> P4D["实飞验证: Circle 14m/s · SplitS · 零样本 · 轨迹由动捕记录"]
+    end
+
+    PHASE1 -->|"建模完成"| PHASE2
+    PHASE2 -->|"训练收敛 ~11.5h"| PHASE3
+    PHASE3 -->|"验证通过"| PHASE4
+    P4D -.->|"反馈: 推理延迟 N=2:13.5ms 可实时"| P2C
+    P3D -.->|"反馈: N=5,10 渐近性能提升 训练时间增加"| P2A
+
+    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class P1A,P1B,P1C,P1D p1
+    class P2A,P2B,P2C,P2D,P2E p2
+    class P3A,P3B,P3C,P3D p3
+    class P4A,P4B,P4C,P4D p4
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \max_{\theta,\phi} \; \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^{T} \gamma^t r(s_t, a_t) \right] \quad \text{s.t.} \quad a_t \in \mathcal{U},\; x_{t+1} = f(x_t, a_t) $$
+    $$ \text{其中} \quad a_t \sim \mathcal{N}\big(\text{diffMPC}\big(x_t, Q_\theta(o_t), p_\theta(o_t)\big), \sigma^2\big) $$
+    <div class="eq-note">
+      <strong>$\pi_\theta$</strong> = 参数为 $\theta$ 的策略（Actor，包含 Cost Map MLP + 可微分 MPC 求解器）&nbsp;|&nbsp;
+      <strong>$V_\phi$</strong> = 参数为 $\phi$ 的价值函数（Critic），估计从状态 $s$ 出发的无限时域折扣总回报 &nbsp;|&nbsp;
+      <strong>$r(s_t, a_t)$</strong> = 即时奖励：门进度（稠密）+ 过门 +10（稀疏）+ 碰撞 -10 + 完赛 +10 &nbsp;|&nbsp;
+      <strong>$f(x_t, a_t)$</strong> = 四旋翼 13 维非线性动力学模型（位置、速度、四元数姿态、角速度）&nbsp;|&nbsp;
+      <strong>$Q_\theta(o_t), p_\theta(o_t)$</strong> = Neural Cost Map 从观测 $o_t$ 预测的 MPC 二次代价函数系数 &nbsp;|&nbsp;
+      <strong>$\text{diffMPC}(\cdot)$</strong> = 以 $Q, p$ 为代价函数求解 MPC 得到的最优控制序列首项 $u^*_0$ &nbsp;|&nbsp;
+      <strong>核心约束</strong>：(1) 控制输入必须在物理可行范围内（单电机推力上下界，映射到集体推力+体速率后约束）；(2) 部署时需实时求解 MPC（推理时间 13.5ms @ N=2，满足 50Hz 控制频率）；(3) Critic 仅在训练时使用，部署时丢弃。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度/范围</th></tr>
+    <tr><td><strong>输入（观测）</strong></td><td>飞行器状态：线速度（3D）+ 旋转矩阵（3x3=9D）= 12D；赛道信息：未来 N=2 个门的 4 角点相对位置（8角×3D=24D）；经 running mean-std 在线归一化</td><td>36 维（12 veh + 24 track）</td></tr>
+    <tr><td><strong>输出（Cost Map → MPC）</strong></td><td>Q 矩阵对角元 + p 线性项：Sigmoid 约束在 [0.1, 1e5]，Q 强制对角化以降低参数量。维度 = 2T(n_state + n_input)</td><td>N=2 时：2×2×(13+4)=68 维</td></tr>
+    <tr><td><strong>输出（动作）</strong></td><td>集体推力（collective thrust）+ 机体角速率（body rates: roll, pitch, yaw rate），由 diffMPC 从单旋翼推力层级计算后混合输出</td><td>4 维（推力 1D + 角速率 3D）</td></tr>
+    <tr><td><strong>目标</strong></td><td>最大化累积折扣回报：以最短时间穿越所有门（进度奖励），避免碰撞（-10 惩罚），平滑飞行（角速率惩罚 b=0.01），保持感知目标居中（感知感知飞行任务额外奖励）</td><td>标量：episode 总回报</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>学习与控制架构的系统级创新</strong>——不是纯控制理论（不提出新的 MPC 变体），不是纯 RL（不提出新的 RL 算法），而是<strong>在架构层面将可微 MPC 作为 RL 策略网络的归纳偏置（inductive bias）嵌入 Actor-Critic 框架</strong>。验证场景：四旋翼敏捷穿门飞行（horizontal / vertical / circular / SplitS / perception-aware 五种赛道配置）。核心验证点：(1) 能否学习需要"模式切换"的复杂机动（垂直俯冲——处于输入空间奇点，需要翻转机身使推力向下）；(2) 对训练分布外扰动的鲁棒性（风扰 11.5N、初始条件从 1m³ 扩大到 3m³）；(3) 零样本 sim-to-real 迁移（仿真训练的 Cost Map 直接部署到真实四旋翼，无微调、无域随机化）。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：端到端学习的灵活性与模型驱动控制的鲁棒性之间存在根本性的"表达能力 vs 泛化能力"权衡。<br><br>
+    （1）<strong>纯 RL 的"无先验"脆弱性</strong>：AC-MLP 的 Actor 是一个随机初始化的 MLP——从零学习 s → a 映射，没有任何物理先验。这导致：(a) 训练初期完全随机探索，动作可能违反物理约束（超出推力极限、要求不可能的姿态变化率）；(b) 学到的映射本质上是"记忆"——训练分布内的 s 映射到 a，分布外的 s 只能靠插值/外推，无任何理论保证；(c) 没有在线纠正机制——一旦因扰动偏离预期轨迹，无法根据当前状态重新计算最优动作。实验证据：AC-MLP 在 11.5N 风扰下成功率仅 6.5%（vs AC-MPC 83.33%）。<br><br>
+    （2）<strong>传统 MPC 的"手工设计"天花板</strong>：标准跟踪 MPC 需要预计算参考轨迹和手工设计代价函数权重。(a) 参考轨迹的生成本身是一个难题——在垂直俯冲任务（需要翻转机身使推力向下加速下降）中，时间最优轨迹可能包含奇异性（欧拉角描述的姿态在翻转点附近数值条件恶化），导致轨迹优化器失败或输出保守解；(b) 代价函数权重是固定的——无法在"平飞保持高度"和"翻转后全力加速"两个阶段之间自动切换；(c) 手工调参是一个新任务一套参数的不可扩展过程。实验证据：跟踪 MPC 在垂直飞行中平均速度仅 4.25 m/s（vs AC-MPC 10.05 m/s），因为它选择了保守的"零推力自由落体"策略。<br><br>
+    （3）<strong>将可微分优化嵌入 RL 训练的计算代价</strong>：每个前向传播需求解一个完整 QP，每个反向传播需通过 KKT 条件计算隐式梯度。N=2 时训练需 11.5h（vs AC-MLP 21min），N=10 时需 39.6h。这种计算开销是因为每次 PPO 更新都需要对 mini-batch 中的每条轨迹运行可微 MPC 的前向+反向——而 MPC 求解本身是迭代的（iLQR 通常需 5-15 次迭代收敛）。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Standard Tracking MPC（基于参考轨迹的传统 MPC）</td>
+      <td>先用轨迹优化（如多项式/时间最优）生成通过所有门的参考轨迹，再用 MPC 在线跟踪该轨迹。代价函数手工设计（位置误差 + 姿态误差 + 输入平滑性），权重固定</td>
+      <td>(1) 参考轨迹生成困难——垂直俯冲任务中，轨迹优化无法找到"翻转再加速"的最优解（奇异性问题），只能输出保守的"零推力自由落体"。平均速度仅 4.25 m/s。(2) 代价函数固定——通过一个门后无法自动切换目标门，需要额外手工设计状态机。(3) 手工调参耗时且不可扩展——每个新赛道需要重新设计代价函数和参考轨迹。在分布外初始条件（3m³）下成功率仅 64.94%</td>
+    </tr>
+    <tr>
+      <td>Black-Box MPC Tuning（贝叶斯优化 / 策略搜索调参 MPC）</td>
+      <td>用贝叶斯优化或 CMA-ES 等零阶优化方法自动搜索 MPC 的最佳超参数（代价权重、时域长度等），每次评估需运行完整轨迹</td>
+      <td>(1) 零阶方法不利用梯度信息——样本效率极低，每评估一组参数需跑完整轨迹。参数维度稍大就不可行——如果每个时间步的 Q/p 都需要独立学习（几十到几百维），搜索空间直接爆炸。(2) 只能学习全局固定参数——无法学习"状态 → 代价函数参数"的动态映射，因此仍然不能处理需要动态模式切换的任务</td>
+    </tr>
+    <tr>
+      <td>Differentiable MPC + Imitation Learning（可微 MPC + 模仿学习）</td>
+      <td>将可微 MPC 用于模仿学习——从专家演示轨迹中学习代价函数参数，使 MPC 输出复现专家行为。损失函数是轨迹级的（位置误差）</td>
+      <td>(1) 依赖专家演示——在极端敏捷飞行中，获取高质量专家轨迹本身就困难（需要最优控制求解，且如前述在某些机动中可能失败）。(2) 模仿学习只能"复制"专家，不能"超越"——无法通过自主探索发现专家未知的更优策略。(3) 损失函数是轨迹级的而非任务级的——学到的代价函数可能不直接服务于"快速安全穿门"这一终极目标</td>
+    </tr>
+    <tr>
+      <td>Pure RL (AC-MLP / PPO)（纯强化学习策略）</td>
+      <td>用 PPO 端到端训练 MLP Actor（观测→动作）和 Critic（观测→价值）。已被证明在敏捷飞行中可达超专家级性能（Science Robotics 2023）</td>
+      <td>(1) 缺少物理先验——训练初期完全随机，浪费大量样本在不可行动作上。需要 21min 训练才能在训练分布内收敛。(2) 泛化靠"记忆"而非"推理"——面对训练分布外场景（强风扰、新初始条件），MLP 没有在线重规划能力，只能依赖网络泛化。风扰成功率仅 6.5%。(3) 分布式脆性——MLP 策略是"点估计"的，对输入的微小变化可能产生大幅输出波动（尤其在非线性饱和区附近）</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 如何让梯度稳定地反向传播通过 MPC 求解器？</strong>diffMPC 的前向是 iLQR 迭代（5-15 次 LQR 反向+前向 rollout），反向需要在收敛点处求解线性系统 $\frac{\partial^2 J}{\partial u^2} \cdot \frac{\partial u^*}{\partial \theta} = -\frac{\partial^2 J}{\partial u \partial \theta}$。这个线性系统的条件数取决于 QP 的 Hessian——如果 Q 接近奇异（训练初期），条件数极大，梯度噪声会淹没有用信号。Cost Map 的 Sigmoid 设下限 0.1 正是为了缓解这一问题——确保 Q 始终可逆。</li>
+    <li><strong>挑战 2 — 稀疏奖励下 Critic 如何学到有意义的长期价值？</strong>在两次门通过之间可能有数百个时间步没有正奖励（只有稠密的进度奖励）。Critic 需要从这些弱信号中推断出"哪些状态区域更有价值"。GAE（Generalized Advantage Estimation, λ=0.95）通过在不同时间尺度上平滑 TD 误差来降低方差——这是关键设计选择。如果 λ 太小（偏重大偏差），优势估计噪声过大；如果 λ 太大（偏重大方差），训练不稳定。</li>
+    <li><strong>挑战 3 — Cost Map 输出空间的维度与约束管理</strong>：N=2 时 Cost Map 输出 68 维——这些参数必须同时满足：(a) Q 的每个对角元 ≥ 0.1（正定性），(b) 不同时间步的 Q/p 应体现时序一致性（不会 t=0 时鼓励向东、t=1 时鼓励向西），(c) 对状态分布的微小变化不应产生剧烈响应（平滑性）。Sigmoid 解决了 (a)，但 (b) 和 (c) 完全靠 RL 训练自然涌现——在某些失败案例中，Cost Map 可能学到不稳定的、振荡的 Q/p 序列。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>AC-MPC 的核心算法（Algorithm 1）是一个修改的 PPO 训练循环，关键区别在于 Actor 的前向和反向传播。每次 PPO 迭代：(1) 用当前策略（Cost Map + diffMPC + 探索噪声）收集轨迹 buffer；(2) 用 Critic 计算 GAE 优势估计；(3) PPO-clip 目标更新 Cost Map——梯度流经 diffMPC 的 KKT 隐式微分；(4) MSE 回归更新 Critic。部署时：丢弃 Critic 和探索噪声，Cost Map 输出 Q/p → diffMPC 确定性求解 → u*_0 直接执行。训练的复杂度全部封装在 diffMPC 层的 forward（求解 QP）和 backward（KKT 隐式微分）实现中——PPO 算法其余部分无需修改。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: Quadratic MPC -->
+  <h4>Group A: 二次规划形式的 MPC——从一般最优控制到可求解的 QP</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 一般最优控制问题</span>
+    $$ \pi(x) = \arg\min_{\mathbf{u}} \; J(x) \quad \text{s.t.} \quad x_0 = x,\; x_{k+1} = f(x_k, u_k),\; u_k \in \mathcal{U} $$
+    <div class="eq-note">
+      <strong>$J(x)$</strong> = 从状态 $x$ 出发的总代价函数（待最小化）&nbsp;|&nbsp;
+      <strong>$f(x_k, u_k)$</strong> = 四旋翼 13 维非线性离散动力学模型 &nbsp;|&nbsp;
+      <strong>$\mathcal{U}$</strong> = 控制输入的可行约束集（单电机推力 $[0, T_{\max}]$，映射为集体推力和体角速率后约束）&nbsp;|&nbsp;
+      <strong>核心意义</strong>：这是 MPC 的数学定义——在动力学约束和输入约束下，找到最小化代价的控制序列。传统 MPC 中 $J$ 由人工设计；AC-MPC 中 $J$ 的参数 $(Q, p)$ 由神经网络从观测中动态预测。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 二次 MPC 代价函数（本文实际使用的 QP 形式）</span>
+    $$ J_Q(x) = \sum_{k=0}^{N} \begin{bmatrix} x_k \\ u_k \end{bmatrix}^T Q_k \begin{bmatrix} x_k \\ u_k \end{bmatrix} + p_k^T \begin{bmatrix} x_k \\ u_k \end{bmatrix} $$
+    $$ Q_k = \text{diag}(Q_{k,x_1}, \ldots, Q_{k,u_1}, \ldots), \quad Q_{k,i}, p_{k,i} \in [0.1,\; 100000] $$
+    <div class="eq-note">
+      <strong>$Q_k$</strong> = 第 $k$ 步的二次项权重矩阵——被约束为<strong>对角阵</strong>（将参数从 $O((n+m)^2)$ 降到 $O(n+m)$），对角元由 Cost Map 经 Sigmoid 输出，下限 0.1 确保半正定性（QP 有唯一解）&nbsp;|&nbsp;
+      <strong>$p_k$</strong> = 第 $k$ 步的线性项系数向量——通过将参考跟踪代价 $(x - x_{\text{ref}})^T Q (x - x_{\text{ref}})$ 展开，$p_k$ 等价于 $-2 Q x_{\text{ref}}$ 的线性项。这意味着 Cost Map 通过调整 $p_k$ 实际上在"隐式选择"一个等价的目标状态 $x_{\text{ref}}$。&nbsp;|&nbsp;
+      <strong>$N$</strong> = MPC 预测时域长度（主干实验 N=2，约 40ms 预测窗口；消融实验测试 N=5, 10）&nbsp;|&nbsp;
+      <strong>为什么采用二次形式？</strong>一般非线性 MPC 的求解太慢——将代价函数近似为 QP 后，可利用 iLQR 的高效性（每步仅需解 LQR 的 Riccati 方程 + 前向 rollout + 线搜索——毫秒级收敛）。
+    </div>
+  </div>
+
+  <!-- Formula Group B: Policy Gradient -->
+  <h4>Group B: PPO 策略梯度——通过可微分 MPC 的反向传播链</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — PPO-Clipped 策略梯度目标函数</span>
+    $$ J^{\text{PPO}}(\theta) = \frac{1}{N} \sum_{i=1}^{N} \sum_{k=1}^{T} \min\left( r_{k}^{i}(\theta) \hat{A}_{k}^{i},\; \text{clip}(r_{k}^{i}(\theta), 1-\varepsilon, 1+\varepsilon) \hat{A}_{k}^{i} \right) $$
+    $$ r_{k}^{i}(\theta) = \frac{\pi_{\theta}(a_{k}^{i} \mid s_{k}^{i})}{\pi_{\theta_{\text{old}}}(a_{k}^{i} \mid s_{k}^{i})},\quad \hat{A}_{k}^{i} = \text{GAE}(r_{k}^{i}, V_{\phi}(s_{k}^{i}), V_{\phi}(s_{k+1}^{i}), \lambda=0.95, \gamma=0.99) $$
+    <div class="eq-note">
+      <strong>$r_k^i(\theta)$</strong> = 新策略 $\pi_\theta$ 与旧策略 $\pi_{\theta_{\text{old}}}$ 在状态 $s_k^i$ 下选择动作 $a_k^i$ 的概率比——用于重要性采样修正 &nbsp;|&nbsp;
+      <strong>$\hat{A}_k^i$</strong> = 优势函数估计——使用 GAE (Generalized Advantage Estimation) 在偏差-方差之间平滑，参数 $\lambda=0.95$（接近 1：偏向低方差），$\gamma=0.99$（接近 1：重视长期回报）&nbsp;|&nbsp;
+      <strong>$\varepsilon = 0.2$</strong> = PPO 的剪切范围——限制单次更新的策略变化幅度，防止策略崩溃 &nbsp;|&nbsp;
+      <strong>梯度链路（核心）</strong>：$\nabla_\theta J^{\text{PPO}} = \frac{\partial J}{\partial \pi} \cdot \frac{\partial \pi}{\partial u^*} \cdot \frac{\partial u^*}{\partial (Q,p)} \cdot \frac{\partial (Q,p)}{\partial \theta}$——其中 $\frac{\partial u^*}{\partial (Q,p)}$ 是<strong>可微 MPC 的核心贡献</strong>：通过 QP 的 KKT 条件隐式微分，在 iLQR 收敛点解析计算"优化问题解相对于代价函数参数的梯度"，无需展开整个迭代过程。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — AC-MPC 的随机策略（训练 vs 部署）</span>
+    $$ u_k \sim \begin{cases} \mathcal{N}\big(\text{diffMPC}(x_k, Q_\theta(s_k), p_\theta(s_k)),\; \sigma^2 I\big) & \text{训练时（探索）} \\[6pt] \text{diffMPC}(x_k, Q_\theta(s_k), p_\theta(s_k)) & \text{部署时（确定性）} \end{cases} $$
+    <div class="eq-note">
+      <strong>训练时</strong>：在 MPC 最优解周围加高斯噪声 $\mathcal{N}(0, \sigma^2)$——噪声加在 MPC 的<strong>输出端</strong>（动作空间）而非 Cost Map 的<strong>输出端</strong>（代价函数参数空间）。这是一个精细的设计选择：在动作空间加噪声能更直接地探索"不同动作的效果"，且噪声的大小由 PPO 自适应调节 $\sigma$。&nbsp;|&nbsp;
+      <strong>部署时</strong>：$\sigma = 0$，策略变为确定性的——MPC 的在线重规划能力确保即使无随机性，策略也能根据当前状态灵活调整动作。这与纯 RL（部署时 MLP 输出是固定映射，无重规划）形成本质区别。
+    </div>
+  </div>
+
+  <!-- Formula Group C: Reward -->
+  <h4>Group C: 敏捷飞行任务奖励——将"快速安全穿门"编码为标量信号</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) — 门进度奖励（每时间步的稠密信号）</span>
+    $$ r(k) = \|g_k - p_{k-1}\| - \|g_k - p_k\| - b \cdot \|\omega_k\| $$
+    $$ \text{过门奖励：} r(k) \mathrel{+}= 10.0 \qquad \text{碰撞惩罚：} r(k) = -10.0 \qquad \text{完赛奖励：} r(k) \mathrel{+}= 10.0 $$
+    <div class="eq-note">
+      <strong>$g_k$</strong> = 当前目标门中心的三维位置 &nbsp;|&nbsp;
+      <strong>$p_k, p_{k-1}$</strong> = 飞行器在当前时刻和前一时刻的位置 &nbsp;|&nbsp;
+      <strong>$\|g_k - p_{k-1}\| - \|g_k - p_k\|$</strong> = 从上一时刻到当前时刻向目标门靠近的距离——正值表示接近门（正奖励），负值表示远离门（负奖励）。这是经典的"进度奖励"形式——等价于在位置空间中对门方向的投影分量。本质上是<strong>稠密的、每步都有信号</strong>的奖励——这对 MPC 的短时域优化至关重要（N=2 步内就能感受到奖励变化）。&nbsp;|&nbsp;
+      <strong>$b\|\omega_k\|$</strong> = 体速率惩罚（$b=0.01$）——抑制过大的角速率变化，鼓励平滑飞行。权重 0.01 很小——不会阻止快速机动所需的急剧角速率变化（如垂直俯冲中的快速翻转），仅起正则化作用。&nbsp;|&nbsp;
+      <strong>稀疏奖励</strong>：过门 +10.0（阶段性正反馈）、碰撞 -10.0（强负反馈立即终止）、完赛 +10.0（终端正反馈）。这些稀疏信号提供了"里程碑"级别的学习引导，弥补稠密进度奖励无法区分"接近门但方向不对"和"接近门且即将通过"的模糊性。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>MPC 预测时域 N</td><td><strong>2</strong>（主干实验）；5, 10（消融）</td><td>MPC 向前预测优化的步数，每步约 20ms（50Hz 控制）</td><td>N=2 是实时性（推理 13.5ms）与预测能力的平衡点。实验表明 N=2 已能学习复杂行为——因为 MPC 每步都重规划，短时域+高频重规划的组合在一定程度上等价于长时域开环规划。更大的 N 提供更长视野但训练时间成倍增长</td></tr>
+    <tr><td>Cost Map 网络结构</td><td><strong>2 隐藏层 × 512 宽 + ReLU + Sigmoid 输出</strong></td><td>从 36 维观测映射到 68 维 MPC 参数（N=2 时）</td><td>512 宽度在表达能力和推理速度间平衡。两层结构避免过深导致的梯度消失/爆炸——梯度还需穿过可微 MPC 的 KKT 微分，路径已经很长。Sigmoid 输出层约束 Q/p 在 [0.1, 1e5]</td></tr>
+    <tr><td>Sigmoid 输出范围</td><td><strong>[0.1, 100000]</strong></td><td>Q/p 参数的允许取值区间</td><td>下限 0.1：确保 Q > 0（严格正定，QP 有唯一解）——这是 MPC 求解的必要条件。上限 100000：防止参数在训练中无限增长（作者观察到不加限制时权重会发散）。100000 足够大以提供充分的表达范围，同时避免数值溢出</td></tr>
+    <tr><td>Critic 网络结构</td><td><strong>2 隐藏层 × 512 宽 + ReLU + 标量输出</strong></td><td>从 36 维观测映射到状态价值 V(s)</td><td>与 Cost Map 对称设计，简化工程实现。标量输出对应单个状态的价值——GAE 利用时序差分构造优势函数，不需要价值分布的完整信息</td></tr>
+    <tr><td>PPO 剪切范围 ε</td><td><strong>0.2</strong></td><td>策略更新的最大比例变化——$r_t(\theta)$ 被截断在 $[1-\varepsilon, 1+\varepsilon]$</td><td>标准 PPO 默认值。由于 diffMPC 的梯度比普通 MLP 更"尖锐"（经过优化求解器的非线性变换），ε=0.2 有助于防止单次更新导致的策略崩塌</td></tr>
+    <tr><td>GAE 参数 λ</td><td><strong>0.95</strong></td><td>优势估计中偏差-方差的权衡参数</td><td>0.95 接近 1 = 偏向低方差（利用更多步的 TD 误差信息加权平均）。因为 diffMPC 的梯度本身已经引入额外方差（穿过优化求解器），需要用平滑的优势估计来补偿</td></tr>
+    <tr><td>角速率惩罚系数 b</td><td><strong>0.01</strong></td><td>控制输入平滑性的正则化权重</td><td>0.01 很小——仅起平滑作用，不主导总奖励。如果 b 太大，策略将回避快速机动所需的急剧角速率变化（垂直俯冲中的快速翻转会被抑制），牺牲任务性能换取平滑性</td></tr>
+    <tr><td>门观测数量 N_gates</td><td><strong>2</strong></td><td>观测中包含的未来门数量（当前门 + 下一个门）</td><td>2 个门提供足够的"前瞻"信息——Cost Map 可以根据下一个门的位置提前调整代价函数（如提前开始转向）。为什么不是 3 或更多？增加门数量会增加观测维度（每个门 12 维）但不一定改善性能——因为 MPC 的 N=2 短时域决定了它只能"看到"很近的未来，更远的门信息主要对 Critic 的长期价值估计有用</td></tr>
+  </table>
+
+  <h3>6.4 AC-MPC vs AC-MLP vs 传统 MPC 的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🧠 AC-MPC（本文）</h4>
+      <ul>
+        <li>Actor 最后一层 = <strong>可微分 MPC 求解器</strong></li>
+        <li>学习的是<strong>代价函数参数 Q/p</strong>（"学目标"）</li>
+        <li>MPC 提供<strong>在线重规划</strong> + 动力学约束保证</li>
+        <li>Cost Map 实现<strong>观测驱动的模式切换</strong></li>
+        <li>训练慢（11.5h @ N=2），但有<strong>物理先验</strong></li>
+        <li>风扰成功率 <strong>83.33%</strong>，分布外成功率 <strong>90.37%</strong></li>
+        <li>推理 13.5~70ms（取决于 N）</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🔲 AC-MLP（纯 RL baseline）</h4>
+      <ul>
+        <li>Actor = <strong>纯 MLP 前馈网络</strong>（无结构）</li>
+        <li>直接学习<strong>观测 → 动作</strong>的映射（"学动作"）</li>
+        <li>无在线重规划——泛化<strong>靠记忆</strong></li>
+        <li>隐式学习模式切换（无显式机制）</li>
+        <li>训练极快（<strong>21min</strong>），但<strong>无物理先验</strong></li>
+        <li>风扰成功率仅 <strong>6.5%</strong>（几乎完全失败）</li>
+        <li>推理 <strong>0.5ms</strong>（极快）</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>📐 传统跟踪 MPC</h4>
+      <ul>
+        <li>代价函数<strong>手工设计、固定不变</strong></li>
+        <li>需要<strong>预计算参考轨迹</strong> + 手工代价</li>
+        <li>在线重规划（MPC 天然能力）</li>
+        <li>无模式切换——代价函数<strong>不随观测变化</strong></li>
+        <li>无需训练（<strong>0h</strong>），但<strong>依赖手工工程</strong></li>
+        <li>垂直飞行<strong>保守</strong>（陷入零推力局部最优），平均速度仅 4.25 m/s</li>
+        <li>每个新赛道需重新设计代价 + 参考轨迹</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 AC-MPC 需要掌握三个关键基础原理：（1）可微分 MPC——如何将优化问题求解器变成可训练的网络层；（2）双层时间尺度——Critic 的长期价值评估如何弥补 MPC 的短视域；（3）代价函数学习 vs 策略学习——为什么学习"目标"比学习"动作"在分布外更具泛化性。</p>
+
+  <h3>7.1 可微分 MPC 原理 — 如何将优化问题求解器嵌入神经网络计算图</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — QP 的 KKT 条件隐式微分</span>
+    $$ u^* = \arg\min_{u} \; J(u; \theta) \quad \Rightarrow \quad \frac{\partial u^*}{\partial \theta} = -\left(\frac{\partial^2 J}{\partial u^2}\right)^{-1} \frac{\partial^2 J}{\partial u \partial \theta} $$
+    <div class="eq-note">
+      <strong>$u^*$</strong> = MPC 求解器输出的最优控制序列（N 步 × 4 维控制 = 4N 维）&nbsp;|&nbsp;
+      <strong>$\theta$</strong> = Cost Map 网络的参数（通过链式法则，Cost Map 输出 Q/p → Q/p 决定 MPC 代价函数 → 代价函数决定最优解）&nbsp;|&nbsp;
+      <strong>$J(u; \theta)$</strong> = 由 $\theta$ 参数化的二次代价函数（通过 Q 和 p 间接参数化）&nbsp;|&nbsp;
+      <strong>隐函数定理的核心</strong>：$u^*$ 是 argmin 的解——在最优解处，一阶必要条件 $\frac{\partial J}{\partial u} = 0$ 是隐函数方程。对这个方程两边关于 $\theta$ 求全微分，即可得到上式。这不需要"展开"优化迭代过程——只需要在收敛点处解一个线性系统。矩阵 $\frac{\partial^2 J}{\partial u^2}$ 就是 QP 的 Hessian——对于凸 QP 始终可逆。&nbsp;|&nbsp;
+      <strong>数值实现</strong>：实际计算中，不直接求逆矩阵，而是通过解线性方程组来计算梯度——这等价于在收敛点做一次额外的"LQR 反向递推"，计算代价与一次 iLQR 迭代相当。
+    </div>
+  </div>
+
+  <p><strong>可微分 MPC 的三个实际操作</strong>：前向传播 = 给定 (Q, p) → iLQR 迭代求解 QP → 返回最优控制序列 $u^*_{0:N-1}$。反向传播 = (1) 接收上游梯度 $\frac{\partial L}{\partial u^*}$ → (2) 在 iLQR 收敛点通过 KKT 隐式微分计算 $\frac{\partial u^*}{\partial (Q,p)}$ → (3) 链式法则乘以上游梯度 → (4) 返回 $\frac{\partial L}{\partial Q}, \frac{\partial L}{\partial p}$ 给 Cost Map MLP。这个流程对 PPO 训练代码完全透明——从 PPO 视角，diffMPC 就是一个特殊的"激活函数"，有标准的 forward() 和 backward() 接口。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>前向传播（推理时：Cost Map + diffMPC）</h4>
+      <p><strong>步骤 1</strong>：观测 $s_k$（36 维归一化）→ Cost Map MLP 前向 → 输出 $Q(s_k), p(s_k)$（68 维，N=2）</p>
+      <p><strong>步骤 2</strong>：将 $Q, p$ 填入 MPC 的 QP 形式（式 2）→ 以当前状态 $x_k$ 为初始条件 → iLQR 求解（5-15 次迭代收敛）→ 最优序列 $u^*_0, \ldots, u^*_{N-1}$</p>
+      <p><strong>步骤 3</strong>：取第一项 $u^*_0$ 作为输出 → 训练时加 $\mathcal{N}(0,\sigma^2)$ 噪声，部署时直接输出</p>
+      <p><strong>总耗时</strong>：Cost Map（0.5ms）+ diffMPC（13ms）= 13.5ms @ N=2</p>
+    </div>
+    <div class="cmp-col">
+      <h4>反向传播（训练时：PPO 损失 → Cost Map 梯度）</h4>
+      <p><strong>步骤 1</strong>：PPO 损失对动作的梯度 $\nabla_{u^*} L^{\text{PPO}}$（标准 RL 反向传播）</p>
+      <p><strong>步骤 2</strong>：diffMPC 的 backward() ——在 iLQR 收敛点处解 KKT 线性系统 → $\nabla_{Q,p} L^{\text{PPO}} = \nabla_{u^*} L^{\text{PPO}} \cdot \frac{\partial u^*}{\partial (Q,p)}$</p>
+      <p><strong>步骤 3</strong>：$\nabla_{Q,p} L^{\text{PPO}}$ 通过 Cost Map MLP 的标准反向传播 → $\nabla_\theta L^{\text{PPO}}$</p>
+      <p><strong>训练总耗时</strong>：AC-MPC (N=2) 11.5h vs AC-MLP 21min——瓶颈在步骤 2</p>
+    </div>
+  </div>
+
+  <h3>7.2 双层时间尺度原理 — Critic 长期价值评估如何引导 Cost Map 的短期优化</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 优势函数将 Critic 的长期评估转化为 Actor 的训练信号</span>
+    $$ A(s_k, a_k) = r(s_k, a_k) + \gamma V_\phi(s_{k+1}) - V_\phi(s_k) $$
+    $$ \text{MPC（短时域 N 步）}：\min_{u_{0:N-1}} \sum_{k=0}^{N} \ell(x_k, u_k; Q, p) \quad \text{Critic（长时域 $\gamma$-折扣）}：V(s) \approx \mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^t r_t \mid s_0 = s\right] $$
+    <div class="eq-note">
+      <strong>$A(s_k, a_k)$</strong> = 在状态 $s_k$ 下采取动作 $a_k$ 相对于 Critic 预期水平的"优势"——正值表示"这个动作比平均好" &nbsp;|&nbsp;
+      <strong>$V_\phi(s_k)$</strong> = Critic 对状态 $s_k$ 的长期价值估计——从当前到任务结束的总期望折扣回报 &nbsp;|&nbsp;
+      <strong>$r + \gamma V(s_{k+1})$</strong> = TD target——即时奖励 + 后续所有步的折扣期望回报 &nbsp;|&nbsp;
+      <strong>MPC vs Critic 的时间尺度分工</strong>：MPC 在 $N=2$ 步（约 40ms）的窗口内优化——处理的是"姿态稳定性、推力分配、短期轨迹"级别的决策。Critic 在整个 episode 的尺度上评估——处理的是"当前离完赛还有多远、下一个门在哪个方向"级别的知识。两者通过优势函数 $A(s,a)$ 连接：Critic 说"这个方向长期来看价值更高"→ $A$ 增大 → PPO 更新 Cost Map 产生指向该方向的 $Q/p$ → MPC 在短时域内执行朝该方向的最优动作。
+    </div>
+  </div>
+
+  <p><strong>模式切换的具体机制（以垂直穿门为例）</strong>：(1) 在初始阶段，飞行器在门的上方——Critic 学到的 $V(s)$ 在"下方"（门的位置）有更高的值。(2) Advantage $A(s,a)$ 对"向下的动作"取正值——引导 Cost Map 学习输出使 MPC 朝下方优化的 $Q/p$。(3) 飞行器通过第一个门后——Critic 的 $V(s)$ 热力图中的高值区域<strong>立即跳变</strong>到下一个门（上方）。(4) Advantage 现在对"向上的动作"取正值——Cost Map 自动调整 $Q/p$ 使 MPC 优化方向反转。(5) 这个"自动反转"不是硬编码的——它是 Critic 通过 TD 学习自然涌现的门通过感知。</p>
+
+  <h3>7.3 代价函数学习 vs 策略学习 — 为什么学习"目标"比学习"动作"更具泛化性</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 代价函数学习的归纳偏置优势</span>
+    $$ \underbrace{\pi_{\text{AC-MPC}} = \text{MPC} \circ \text{CostMap}}_{\text{结构化：代价函数 → 优化求解 → 动作}} \quad \longleftrightarrow \quad \underbrace{\pi_{\text{AC-MLP}} = \text{MLP}}_{\text{非结构化：观测 → 动作}} $$
+    <div class="eq-note">
+      <strong>核心论点</strong>：AC-MPC 学习的不是"什么动作"而是"什么目标"。Cost Map 输出的是 MPC 应该优化的<strong>方向</strong>（二次代价函数的最小值点隐式定义了一个目标状态），MPC 负责根据动力学模型计算实现该目标的<strong>具体动作</strong>。&nbsp;|&nbsp;
+      <strong>为什么这种"目标-动作解耦"带来泛化优势？</strong>"朝门飞"这个目标在不同的动力学条件下（仿真 vs 真实、无风 vs 有风）含义相同——Cost Map 输出的代价函数（指向门）在语义层面不变。但"朝门飞应该用什么推力 + 什么姿态"这个动作取决于当前的动力学条件——MPC 利用建模的动力学 $f(x,u)$ <strong>重新计算</strong>了适配当前条件的动作。相比之下，AC-MLP 将"目标"和"动作"混合在一个黑箱映射中——当动力学变化时（如从仿真到真实），相同的观测可能需要不同的动作，但 MLP 没有模型来"重新计算"——它只能依赖泛化。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    可微分 MPC 提供了"将优化作为网络层"的梯度基础设施 → 双层时间尺度通过 Critic 的价值函数解决了 MPC 短视域无法判断长期好坏的困难 → 代价函数学习通过"学目标而非学动作"的归纳偏置提供了 sim-to-sim 和 sim-to-real 泛化能力。三者环环相扣，使得 AC-MPC 成为一个<strong>"既有模型驱动控制的可靠性（约束满足 + 在线重规划），又有数据驱动学习的灵活性（自动发现代价函数 + 无需专家）"</strong>的统一框架。这也是为什么 AC-MPC 在风扰中成功率为 83% 而纯 RL 仅 6.5%——不是因为 AC-MPC"更聪明"，而是因为它的<strong>架构本身</strong>就包含了应对扰动的机制（MPC 在线重规划）。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig5.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">AC-MPC 系统架构框图——将可微分 MPC 嵌入 Actor-Critic RL 框架</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="AC-MPC system architecture block diagram"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：AC-MPC 的完整系统框图，四个核心组件围成闭环。(a) <strong>Cost Map</strong>——神经网络，接收观测（Observations）输出 MPC 代价函数参数 Q 和 p；(b) <strong>diffMPC</strong>——可微 MPC 求解器，位于 Actor 策略网络的最后一层，以 Cost Map 输出的代价函数和当前状态求解最优控制；(c) <strong>Critic</strong>——价值网络 V(s)，为 PPO 训练提供 Advantage 信号；(d) <strong>Environment</strong>——四旋翼仿真环境，执行动作返回奖励和下一状态。框图传达了核心设计理念：Actor 的输出不是动作——而是"如何指导 MPC 做决策"的参数。</p>
+      <ul>
+        <li><strong>diffMPC 作为 Actor 最后一层的含义</strong>：无论 Cost Map 输出的 Q/p 是好是坏（随机初始化之初可能完全无意义），diffMPC 始终输出满足动力学约束和推力饱和限制的可行控制量——这使训练初期的探索是"安全的探索"。AC-MLP 没有这层保护——从第一天起 MLP 就可能输出不可行的高推力指令，导致无效探索甚至仿真崩溃</li>
+        <li><strong>端到端梯度流的完整性</strong>：从 Rollout Buffer 的经验 → Critic 计算 Advantage → PPO 更新 Cost Map → 梯度反向通过 diffMPC（KKT 隐式微分）→ 到达 Cost Map MLP。整个链路是解析的、连续的、不需要采样估计的——这是"利用梯度信息高效搜索"与"利用模型信息保证可行性"的完美结合</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">水平和垂直穿门飞行的速度剖面与 Value Function 可视化——模式切换的直接证据</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Velocity profiles and value function for horizontal and vertical tracks"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：左侧为水平穿门（4 个门水平排列），右侧为垂直穿门（3 个门高度依次升高）。上半部分：飞行器速度曲线（彩色编码速度大小）叠加在门位置上——显示飞行器如何在门之间加速和减速。下半部分：价值函数热力图——沿实际飞行轨迹上的某个状态点，固定其他状态仅改变 XY（水平）或 XZ（垂直）位置来计算 Critic 的输出 V(s)。黄色 = 高价值（高期望回报），深蓝色 = 低价值。黑色 X 标记 = MPC 在当前状态下预测的 10 个未来位置。</p>
+      <ul>
+        <li><strong>模式切换的可视化证据</strong>：在垂直飞行的价值函数热力图中（右下），黄色高价值区域明显随门的切换而"跳变"——通过第一个门后，高价值区域从下方瞬移到上方（下一个门的方向）。这说明 Critic 自动学会了"门通过后目标应该切换"——不是手工编码的状态机，而是从稀疏奖励（过门 +10.0）中通过 TD 学习自然涌现的任务级知识</li>
+        <li><strong>MPC 预测与 Critic 价值的一致性</strong>：黑色 X（MPC 的短期预测）通常指向黄色区域（高价值）——验证了 Cost Map 学到的 Q/p 确实引导 MPC 朝 Critic 认为的"好方向"优化。如果两者不一致（X 指向蓝色区域），说明 Cost Map 的训练尚未收敛</li>
+        <li><strong>垂直飞行的特殊性</strong>：四旋翼只能沿机体 Z 轴正方向产生推力——快速下降的最优策略是翻转机身使推力向下。AC-MPC 成功学到了这一行为（Z 速度达到 -10 m/s 以上），而传统跟踪 MPC 在此任务中陷入"零推力自由落体"的局部最优（平均速度仅 4.25 m/s）</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">消融实验——风扰鲁棒性、学习曲线、分布外初始条件泛化</span>
+      <span class="fig-source">来源：论文 Fig. 3 + Table I</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Ablation studies: wind robustness, learning curves, OOD initialization"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：三项关键消融实验构成"三角论证"。(A) <strong>风扰测试</strong>——在垂直轨道 z=10m 到 z=8m 区间施加 11.5N（1.5 倍自重）恒定外力。AC-MPC 成功率 83.33%——飞行器主动调整姿态对抗风扰。AC-MLP 仅 6.5%——被吹飞后无法恢复。跟踪 MPC 为 0%——代价函数固定，无法对风扰做出针对性响应。黑色箭头表示姿态。(B) <strong>学习曲线</strong>——AC-MPC 的样本效率略低于 AC-MLP（结构化架构限制了表达灵活性），但随着 N 增大渐近性能提升。(C) <strong>OOD 初始条件</strong>——训练时初始位置在 1m 立方体内随机化，测试时扩展到 3m。蓝色 = 成功轨迹，红色 = 碰撞。AC-MPC 成功率 90.37%（vs AC-MLP 74.78% vs MPC 64.94%）。</p>
+      <ul>
+        <li><strong>为什么 AC-MPC 在风扰中如此鲁棒？</strong>核心原因是 MPC 的<strong>在线重规划</strong>——风扰改变了飞行器位置和速度，但 MPC 在每个时间步都从当前真实状态重新求解最优控制序列。Cost Map 输出的代价函数（"朝门飞"）在语义层面对风是不变的——MPC 负责"如何在这种有风的条件下实现朝门飞"。AC-MLP 没有这个重新计算机制——它学到的 s → a 映射在"有风"的条件下不再适用</li>
+        <li><strong>为什么 AC-MPC 的渐近性能略低于 AC-MLP？</strong>结构化约束的必然代价——Cost Map + diffMPC 的策略空间是 MLP 策略空间的一个子集（因为 MPC 要求动作满足动力学约束）。在训练分布内，AC-MLP 可以利用"物理上不可行但在仿真中恰好有效"的动作（仿真模型的漏洞），获得略高的渐近性能。但这种"漏洞利用"在分布外完全不适用——解释了为什么 AC-MLP 的分布内性能和分布外性能差距巨大</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">圆形赛道与 SplitS 赛道的仿真+实飞轨迹——零样本 sim-to-real 迁移</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Real-world deployment on Circle and SplitS tracks"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：AC-MPC 在真实四旋翼上的飞行结果（完全零样本——无微调、无域随机化、无系统辨识）。(a) 仿真轨迹（上排）——圆形赛道和 SplitS 赛道的 3D 飞行轨迹，彩色编码速度（最高 14 m/s）；(b) 真实世界轨迹（下排）——使用 Agilicious 4s 竞速四旋翼平台实飞，轨迹由动作捕捉系统记录。两组轨迹在空间形状上高度一致——证明了 sim-to-real 迁移的有效性。速度剖面也相似：大半径弧段高速巡航，急转弯处显著减速。</p>
+      <ul>
+        <li><strong>零样本迁移的秘密</strong>：Cost Map 学到的从观测到代价函数的映射是<strong>任务语义级别</strong>的（"当前应该朝哪个方向优化、以多大的激进程度"）——而非动力学级别。当从仿真切换到真实时，MPC 使用<strong>真实飞行器的动力学参数</strong>（质量 0.752kg、推力系数、惯量矩阵等）重新求解——代价函数指向的"目标方向"不变，但实现该目标的具体动作根据真实动力学重新计算。这与 AC-MLP 形成鲜明对比——后者的动作是直接从观测映射的，对动力学差异高度敏感</li>
+        <li><strong>SplitS 赛道的机动复杂度</strong>：SplitS 包含急转弯后迅速下降再翻转的组合机动——对姿态控制极限提出了极高要求。AC-MPC 在真实世界中成功完成（速度 14 m/s），说明 Cost Map 学到的代价函数模式切换策略在真实动力学下同样有效</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 5 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 5</span>
+      <span class="fig-caption">感知感知飞行——在穿门过程中保持目标点位于相机视野中心</span>
+      <span class="fig-source">来源：论文 Fig. 5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig5.png" alt="Perception-aware flight through circular track"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig5.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：AC-MPC 在"感知感知飞行"任务中的表现——飞行器在圆形赛道穿门的同时，需要将某个世界坐标系目标点（橙色五角星，位于赛道中心）保持在相机视野中心。这是一个<strong>竞争性多目标优化</strong>问题——飞行速度与感知精度之间存在根本矛盾：飞得越快 → 穿门奖励越高，但同时 → 相机越难对准目标点 → 感知奖励越低。黑色箭头表示相机 Z 轴方向（即飞行器的"视线"方向）。AC-MLP（左）和 AC-MPC（右）都学会了在穿门的同时调整 yaw 角来保持目标点居中。</p>
+      <ul>
+        <li><strong>非自然轨迹形态的成因</strong>：飞行轨迹出现了不自然的扭曲——这不是控制失败，而是<strong>两个竞争目标在联合优化空间中博弈的自然结果</strong>。在穿越门的同时需要将相机对准侧面的目标点，这意味着飞行器不能以最优气动姿态飞行——需要额外的 yaw 旋转来补偿。yaw 控制是四旋翼有效性最低的控制通道（需要大的执行器变化才能产生小的 yaw 变化），使得这种补偿代价很高</li>
+        <li><strong>对多目标 RL 的验证价值</strong>：这个实验证明了 AC-MPC 框架可以处理<strong>竞争性多目标</strong>——Cost Map 学到的代价函数自动在"速度快"和"看得准"之间寻找 Pareto 最优折中。这是传统手工设计 MPC 极难实现的——手工设计两个竞争目标的权重几乎注定顾此失彼</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 需要解析的系统动力学模型 $f(x_k, u_k)$——如果模型不准确或完全未知（如软体机器人、变形飞行器），diffMPC 的预测和梯度都将不可靠。(2) diffMPC 仅支持输入约束 $u \in \mathcal{U}$（推力上下界），不支持状态约束 $x \in \mathcal{X}$（如"禁止进入某区域"）——这意味着避障等安全约束只能通过奖励函数间接编码（间接且不可靠），而非作为硬约束。(3) 训练需要仿真环境——PPO 的试错式学习在真实系统上直接进行既不安全也不可行（碰撞代价 -10.0 在仿真中只是一条日志，在真实世界是摔机）。</li>
+    <li><strong>适用场景</strong>：目前仅在<strong>四旋翼敏捷穿门飞行</strong>这一特定场景验证——虽然框架声称通用，但其在其他机器人形态（腿足机器人、机械臂、自动驾驶）和其他任务（操作、导航、多智能体协调）上的有效性尚未展示。感知感知飞行实验展示了多目标能力，但两个目标的 reward shaping 仍需人工设计。</li>
+    <li><strong>可扩展性</strong>：训练时间随 MPC 时域 N 超线性增长（N=2: 11.5h, N=5: 22.1h, N=10: 39.6h）。对于需要更长预测视野的任务（如迷宫导航、动态避障），N 需要更大——此时训练和推理都可能超出实时预算。实验发现 N=2 对穿门任务足够——但这依赖于该任务"短视+高频重规划"的特性能补偿短时域——对于规划密集型任务，短时域可能是致命的。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：(1) 从四旋翼 → 其他机器人平台——任何可以写出动力学模型和二次代价函数的系统都可接入 AC-MPC。关键是动力学模型的可微分性——如果模型本身也是可学习的（如神经网络残差动力学），整个系统可以同时学习动力学和代价函数。(2) 从单任务 → 多任务统一策略——训练一个 Cost Map 在未见过的门布局上零样本泛化（真正的"学到穿门"而非"记住赛道"）。</li>
+    <li><strong>条件放松</strong>：(1) 利用新兴可微分 MPC 库（Theseus, PyPose）支持状态约束——将避障等安全约束作为 MPC 的硬约束而非奖励项。(2) 视觉观测替代状态观测——将 Cost Map 的输入从已知位姿+门位置替换为图像（CNN 编码），实现"从像素到 MPC 代价函数"的端到端管道。(3) 离线 RL / 从数据中学习——利用预先收集的数据集训练 Cost Map，消除对在线交互仿真的依赖。</li>
+    <li><strong>约束加入</strong>：(1) 将 Lyapunov 稳定性验证或可达性分析作为 diffMPC 输出的后验证层——确保即使 Cost Map 输出异常的 Q/p 导致 MPC 得出危险动作，也能被拦截。(2) 多智能体扩展——每个机器人独立 Cost Map + diffMPC，但通过共享 Critic 或交互信息实现协调。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>动力学模型精度依赖</td><td>diffMPC 的预测和优化完全依赖 $f(x_k, u_k)$ 的准确性。模型偏差（未建模的气动效应、电机响应延迟、电池电压下降导致的推力衰减）会使 MPC 的"最优解"在实际系统中不最优甚至不稳定。本文通过 NeuroBEM 高保真仿真评估和真实飞行缓解了这一问题——但平台依赖性仍然存在：换一个不同的飞行器可能需要重新辨识动力学模型</td><td>★★★★★</td></tr>
+    <tr><td>状态估计误差（观测噪声）</td><td>实验使用动捕系统提供精确状态——这是一个极强的假设。在无动捕的实际场景（依赖 VIO/视觉 SLAM），状态估计噪声和延迟会通过 Cost Map → diffMPC 管道传播。尤其在极端机动中（高速、大姿态角），VIO 容易丢失跟踪——而 AC-MPC 依赖精确的位姿来初始化 MPC 的当前状态 $x_k$</td><td>★★★★</td></tr>
+    <tr><td>Cost Map 的仿真过拟合风险</td><td>Cost Map 在简单 Flightmare 仿真中训练——尽管 sim-to-real 成功，但并未在动力学差异极大的平台（不同尺寸/重量/推重比）上测试。Cost Map 学到的"什么样的 Q/p 是好的"可能隐含了对训练平台动力学的依赖——例如它可能学到"大推力总是好的"，这在推重比不同的平台上可能不成立</td><td>★★★★</td></tr>
+    <tr><td>训练计算资源需求</td><td>N=2 需 11.5h GPU 训练——对于研究迭代来说时间偏长。N=10 需 39.6h——几乎不可能进行充分的超参数搜索。更高效的 diffMPC 实现（利用 Theseus/PyPose 的 GPU 并行化 iLQR）有望数倍加速——但目前这些库与 PPO 训练框架的集成仍不够成熟</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>可微分 MPC + 可学习动力学 + 视觉前端 = "从像素到控制"的完全端到端管道</strong>——这是将 AC-MPC 推向"只需定义奖励函数就能自主飞行"终极目标的关键一步。当前 AC-MPC 需要已知状态（动捕）和已知动力学（解析模型）——这两者都是昂贵的假设。扩展路径：(1) 用 CNN/Transformer 将图像编码为 Cost Map 的输入（替代动捕状态）——梯度可以从 PPO 损失反向传播通过 Cost Map → diffMPC → CNN。(2) 用神经网络学习动力学模型的残差项 $f(x,u) + g_\psi(x,u)$——其中 $f$ 是名义模型（已知），$g_\psi$ 是学习的残差。(3) 梯度需要同时穿过 diffMPC 的 KKT 微分和学习到的残差动力学——计算代价进一步增大，但带来了"从图像直接学习控制"的能力。如果这个方向成功，将实现"给一架四旋翼和一台相机，告诉它'快速穿门并保持目标在视野中'，它就能通过试错（仿真中）学会完成任务——零人工代价函数设计、零参考轨迹规划、零系统辨识"。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>机器人控制领域存在两条主流技术路线——模型驱动控制（MPC 等）和强化学习——但各自有根本性缺陷，且两者的缺陷恰好互补。MPC 可靠但僵化——在线重规划保证鲁棒性，但代价函数必须手工设计，无法适应复杂任务的动态模式切换。RL 灵活但脆弱——可以从奖励中自主学习任何行为，但学到的策略是黑箱前馈网络，缺乏在线重规划和动力学约束保证。这不是"哪个更好"的问题——而是"能否将两者的优势融合"的问题。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：(i) 零阶优化调 MPC 参数（贝叶斯优化、策略搜索）——不利用梯度，样本效率极低，只能学固定参数；(ii) 可微 MPC + 模仿学习——有梯度但依赖专家，无法探索超越专家；(iii) 纯 RL——不需要专家也不需要模型，但面对分布外场景脆性显著。每条路线都只解决了一半问题。</li>
+    <li><strong>如果把可微 MPC 直接塞进 Actor 网络呢？</strong><br>关键洞察：Actor 的输出不一定是动作——它可以是传递给 MPC 的"指令"（代价函数参数）。Cost Map 学的是"这个状态下 MPC 应该优化什么"（学目标），MPC 负责"给定目标如何求最优动作"（执行）。这种解耦意味着：Cost Map 可以在仿真中学习（学"语义级"的代价函数），部署时 MPC 用真实动力学执行（利用模型的物理保真度）——自然地实现了 sim-to-real 迁移。</li>
+    <li><strong>如果 MPC 的短视域是个问题呢？</strong><br>MPC 的 N=2 步时域只能"看到"约 40ms 的未来——无法判断当前动作对"2 秒后通过下一个门"的影响。这就是 Critic 的作用——Critic 通过 TD 学习估计长期价值 V(s)，通过优势函数 A(s,a) 向 Cost Map 传递"从长远看这个方向好不好"的信号。MPC 负责短期执行，Critic 负责长期引导——两层时间尺度互补。</li>
+    <li><strong>最简单的方案是什么？</strong><br>在标准 PPO 的 Actor 中，将最后一层 MLP 替换为可微 MPC 求解器。Cost Map = 2 层 MLP（输出 Q/p），Critic = 另一个 2 层 MLP（输出 V(s)）。训练流程与 PPO 完全一致——唯一的区别是 Actor 的梯度需要穿过 diffMPC 的 backward()。这个"简单方案"之所以此前从未实现，需要三个条件的成熟：(a) 可微 MPC 的软件基础设施（Amos et al. 2018 后逐渐成熟）；(b) PPO 在大规模机器人仿真中的训练经验（近年的积累）；(c) 对 RL 和 MPC 各自优劣的深刻理解——两者不是"选一个"，而是"找出各自最适合的角色"。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    纯 RL 策略在训练分布内可以超越专家（21min 训练即可），但遇到训练未见过的风扰时几乎完全失效（成功率仅 6.5%）——因为它的 Actor 是一个黑箱 MLP，没有利用飞行动力学模型来做在线重规划——那为什么不把 MPC 直接塞进 Actor 网络作为最后一层，让 MPC 提供"物理推理引擎"，而让 RL 来学习"这个推理引擎应该以什么为目标"（代价函数），从而同时获得 RL 的灵活性和 MPC 的鲁棒性？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：注意 AC-MLP（纯 RL）和跟踪 MPC 在敏捷飞行任务中的失败模式是<strong>严格互补的</strong>。AC-MLP 在训练分布内表现最强（7.74 m/s 水平，10.56 m/s 垂直），但风扰成功率仅 6.5%。跟踪 MPC 风扰下也不成功（0%），但在无风扰+标准初始条件下非常稳定。AC-MLP 垂直飞行速度 10.56 m/s，MPC 仅 4.25 m/s（保守策略）。这意味着：AC-MLP 擅长"找到最优行为"，MPC 擅长"安全执行"——两者的优势完全不重叠，结合它们有望获得 1+1>2 的效果。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"控制策略"分解为两个正交子问题——(A) <strong>目标选择</strong>：当前应该往哪个方向优化？这需要任务级知识（"下一个门在哪个方向"）和灵活性（"根据当前飞行阶段调整激进程度"）；(B) <strong>动作执行</strong>：给定优化方向，如何用动力学模型计算具体动作？这需要物理知识（$f(x,u)$）和优化能力（求解约束 QP）。传统 MPC 把 (A) 和 (B) 混在一起——代价函数同时定义了"目标"和"如何实现"。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：(A) 用 RL 学习"目标选择"——因为 RL 天然擅长从奖励中自动发现复杂行为；(B) 用 MPC 执行"动作生成"——因为 MPC 天然擅长利用动力学模型做在线优化；(C) 用可微分优化连接两者——因为梯度是 RL 的训练信号穿过 MPC 的唯一高效通道。Cost Map 是 (A) 和 (B) 之间的接口——它以神经网络形式实现 (A)，以 Q/p 的形式输出给 (B) 的 MPC。</li>
+    <li><strong>Step 4 — 组装方案</strong>：AC-MPC = Cost Map（2 层 512 MLP + Sigmoid）+ diffMPC（iLQR QP 求解器）+ Critic（2 层 512 MLP），用标准 PPO 训练，梯度经 diffMPC 的 KKT 隐式微分反向传播。部署时丢弃 Critic 和探索噪声——Cost Map → diffMPC 组成确定性策略。在风扰测试中：AC-MPC 83.33% vs AC-MLP 6.5% vs MPC 0%——验证了"架构级鲁棒性"优于"数据级鲁棒性"。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个教科书级的<strong>"归纳偏置注入"</strong>案例——不是让 RL 从零学习一切（弱偏置），也不是让 MPC 完全由人类设计（强偏置、零学习），而是在 RL 架构中<strong>精确地</strong>注入一个结构化的动力学模块（MPC），该模块在训练时可微（允许梯度流动）、在部署时物理可解释（满足约束、可重规划）。对 UAV 控制领域的核心启示：<strong>不要问"RL 还是 MPC"——要问"MPC 的哪部分应该用 RL 来学习，哪部分应该保留为物理模型"</strong>。具体到我们的研究方向：视觉伺服中，投影模型应该保留为可微分层（像 MPC 一样），而"从图像特征到期望运动"的映射可以用学习；编队控制中，相对运动学应保留为结构化层，而"从邻居状态到期望队形调整"的策略可以学习。</li>
+    <li><strong>技术技巧层面</strong>：(1) Q 矩阵对角化——用最小的参数化代价（丧失状态间耦合建模）换取最稳定的 QP 求解（对角正定矩阵的条件数远优于稠密矩阵）；(2) Sigmoid 输出限幅 [0.1, 1e5]——同时解决"QP 需正定"（下限 > 0）和"参数发散"（上限 < ∞）两个问题，是机器学习约束和控制理论约束之间的精巧桥接；(3) 在动作空间加噪声而非代价空间——在 MPC 输出动作上直接添加高斯噪声，保证探索的动作"接近最优"（不会因为 Cost Map 的随机波动产生完全离谱的动作）；(4) 在线观测归一化——每训练步更新均值和标准差，避免训练分布漂移导致的归一化过时。</li>
+    <li><strong>实验/写作层面</strong>：Fig. 2 的价值函数热力图是整篇论文最精彩的可视化——它把一个抽象的"双时间尺度协同"概念转化为直观的"高价值区域随門切换而跳变"的热力图，读者一目了然。Fig. 3 的三项消融测试（风扰、学习曲线、OOD 初始条件）构成"三角论证"——每一项分别揭示 AC-MPC 在一个维度上相对两个 baseline 的优势，且各项优势的机制互不相同（重规划 vs 价值引导 vs 动力学约束），形成了无可辩驳的论证链。写论文时应当学习这种"通过关键可视化传达核心机制"+"通过互补消融构成完整论证"的实验设计范式。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于视觉伺服（IBVS）方向</strong>：AC-MPC 的结构可以直接适配到基于图像的视觉伺服——将图像特征坐标（目标在图像中的位置、门角点的像素坐标）作为 Cost Map 的输入（替代当前的"飞行器状态+门三维位置"）。Cost Map 学习从图像特征到 MPC 代价函数参数的映射。MPC 的动力学模型除了四旋翼动力学外，还包含<strong>可微的相机投影模型</strong>（针孔投影）——使 MPC 能够预测"当前动作将如何影响下一帧的图像特征坐标"。这带来了传统 IBVS 完全不具备的两大能力：(1) 代价函数是学出来的——不需要手工设计特征误差的加权矩阵；(2) MPC 预测未来的特征运动——可以在图像空间中做 look-ahead 优化，提前补偿已知的视觉约束（如视野边界）。</li>
+    <li><strong>对于敏捷飞行控制方向</strong>：AC-MPC 提供了一个在"鲁棒性"和"性能"之间取得更好平衡的控制框架。如果你已经有一个可用的四旋翼动力学模型，用 AC-MPC 替代纯 RL 可以以训练时间增加（11.5h vs 21min）为代价，换取分布外鲁棒性的量级提升（83% vs 6.5% 风扰成功率）。对于安全至上的应用（近地高速飞行、穿越狭窄缝隙），这个 trade-off 完全值得——因为一次失败的真实飞行代价远大于几十小时的 GPU 训练。</li>
+    <li><strong>对于控制架构设计方向</strong>：本文展示了"可微分优化层作为神经网络组件"的通用设计模式——可微 MPC 只是可微优化层的一个实例。其他可类比扩展包括：可微路径规划器（iPlanner）、可微状态估计器（可微 EKF）、可微 SLAM（Differentiable SLAM）。任何一种传统机器人模块，只要核心是求解优化问题，都可以被做成可微层嵌入学习管道——这是一个可以<strong>系统性地将"经典机器人学"与"现代深度学习"融合的范式</strong>，值得在我们的 UAV 控制架构研究中持续探索。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Amos et al. (2018) — Differentiable MPC for End-to-End Planning and Control. <em>NeurIPS</em> 31</td><td>AC-MPC 的直接技术前身。首次提出通过对 iLQR 不动点进行隐式微分实现可微 MPC——这是"将 MPC 作为网络层"得以实现的基础设施。理解其 KKT 条件隐式微分推导是理解 AC-MPC 梯度流的前提。该文仅用于模仿学习——AC-MPC 的创新在于将其从"学专家"升级为"学奖励"</td></tr>
+    <tr><td>Song, Romero et al. (2023) — Reaching the Limit in Autonomous Racing. <em>Science Robotics</em></td><td>AC-MPC 的 baseline（AC-MLP）和实验平台（Agilicious + Flightmare）的来源。该文系统对比了最优控制与 RL 在自主竞速中的极限——为"为什么需要结合两者"提供了实证动机。结论"RL 更强但不鲁棒"直接启发了 AC-MPC 的设计</td></tr>
+    <tr><td>Foehn, Romero &amp; Scaramuzza (2021) — Time-Optimal Planning for Quadrotor Waypoint Flight. <em>Science Robotics</em></td><td>AC-MPC 中跟踪 MPC baseline 的参考轨迹来源。展示了时间最优轨迹规划的极限——也暴露了 MPC 在需要 mode-switching 的极端机动中的局限（坠入零推力局部最优）。这个"失败的 MPC"恰好构成了 AC-MPC 的动机</td></tr>
+    <tr><td>Pineda et al. (2022) — Theseus: A Library for Differentiable Nonlinear Optimization. <em>NeurIPS</em></td><td>开源可微非线性优化库——为 diffMPC 的高效 GPU 并行实现提供了工程基础。Theseus 和 PyPose 等库的发展正在降低"可微优化+深度学习"的技术门槛——将 AC-MPC 迁移到 Theseus 可能显著加速训练和推理</td></tr>
+    <tr><td>Karkus et al. (2023) — DiffStack: A Differentiable and Modular Control Stack. <em>CoRL</em></td><td>展示了"可微分模块组合"的更宏大愿景——将感知、预测、规划、控制全部做成可微模块串联训练。AC-MPC 可视为此范式在"RL 训练"下的特例。将 AC-MPC 的 Cost Map 前增加可微感知模块是实现"从像素到控制"的关键路径</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Romero, Song, Scaramuzza · IEEE ICRA 2024 · Actor-Critic Model Predictive Control · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

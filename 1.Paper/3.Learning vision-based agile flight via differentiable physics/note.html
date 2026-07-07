@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Learning Vision-Based Agile Flight via Differentiable Physics (Zhang, Hu, Song et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- 1. PAPER INFO -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Learning Vision-Based Agile Flight via Differentiable Physics（基于可微分物理的视觉敏捷飞行学习）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yuang Zhang</strong><sup>1,3</sup>、<strong>Yu Hu</strong><sup>1,3</sup>、<strong>Yunlong Song</strong><sup>2,3</sup>（共同一作），<strong>Danping Zou</strong><sup>1</sup>（corresponding），<strong>Weiyao Lin</strong><sup>1</sup>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">1. 上海交通大学</strong>（Shanghai Jiao Tong University）；<strong class="bold-affil">2. 苏黎世大学</strong>（University of Zurich）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">Nature Machine Intelligence</strong>，<strong>2025年6月</strong>，Vol. 7，pp. 954–966</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://doi.org/10.1038/s42256-025-01048-0" target="_blank">10.1038/s42256-025-01048-0</a> | Received: 2024-07-15 | Accepted: 2025-05-01 | Published: 2025-06-16</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出一种<strong>端到端可微分物理仿真训练框架</strong>，通过将损失梯度直接反向传播穿过点质量物理模型来优化神经网络控制策略，实现视觉敏捷飞行。在真实森林环境中达到 <strong>20 m/s</strong>（超越此前模仿学习方法 2 倍），成功率 90%。无需通信的多智能体集群展现出<strong>等待、跟随、退让</strong>等涌现自组织行为。所有计算仅需一块 <strong>US$21 的 ARM 单板计算机</strong>（Mango Pi），成本不到现有 GPU 方案的 5%。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Differentiable Physics</span>
+    <span class="tag tag-green">Vision-Based Agile Flight</span>
+    <span class="tag tag-amber">End-to-End Learning</span>
+    <span class="tag tag-purple">Swarm Navigation</span>
+    <span class="tag tag-red">Point-Mass Model</span>
+    <span class="tag tag-cyan">Nature Machine Intelligence 2025</span>
+    <span class="tag tag-gray">Odometry-Free</span>
+  </div>
+</section>
+
+<!-- 2. INSIGHT & NOVELTY -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>为什么现有无人机视觉导航方法在高速、复杂未知环境中容易失败？</strong><br>
+    答：因为两种主流范式各有根本性缺陷——（1）基于建图的方法：感知-规划-控制级联架构引入延迟且误差逐级累积，在高速飞行（>5 m/s）时建图本身就会漂移，导致规划和控制的输入已经不可靠；（2）基于学习的方法（模仿学习/强化学习）：模仿学习依赖专家示范（在稠密障碍物高速场景下难以获取高质量示范），强化学习需要海量采样且随智能体数量指数增长。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>用可微分物理仿真替代"黑箱"环境交互</strong>——（1）通过点质量可微分模型，策略梯度可以直接用一阶解析梯度（低方差）计算，无需采样估计（零阶梯度），训练效率提升 10 倍；（2）简单物理先验（点质量 + 空气阻力 + 控制延迟/平滑）足以实现零样本 sim-to-real 迁移，不需要高保真仿真器；（3）可微分框架天然支持多智能体训练（每个智能体被建模为其他智能体视角中的运动球体），自组织行为（等待、跟随、退让）从优化中<strong>涌现</strong>，无需显式协作设计。
+  </div>
+
+  <h3>2.2 Inspiration to Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>可微分编程在机器人学中的兴起（DiffTaichi、GradSim 等）</td><td>将可微分物理的思想从四足 locomotion / 系统辨识迁移到<strong>视觉无人机导航</strong>——此前这个领域从未使用过可微分仿真进行真实世界飞行。关键是发现：简单的点质量模型足够产生可迁移的策略，不需要刚体全动力学</td><td>架构</td></tr>
+    <tr><td>Metz et al. (2021) "Gradients are not all you need"——长时间反向传播的梯度爆炸问题</td><td>引入<strong>时间梯度衰减</strong>（exponential gradient decay $e^{-\tau t}$）：在 BPTT 过程中对梯度乘以指数衰减因子，使得监督信号主要来自<strong>近期未来</strong>，消除远期不确定障碍的干扰。这解决了可微分仿真最棘手的数值问题</td><td>方法</td></tr>
+    <tr><td>GRU 门控循环单元（Cho et al. 2014）——序列建模中的隐状态维护</td><td>使用 GRU 维护时序隐状态，使得网络仅依赖<strong>单帧深度图</strong>即可隐式提取运动线索（motion cues）——无需堆叠多帧输入，推理速度更快、更适合资源受限硬件</td><td>策略</td></tr>
+    <tr><td>Softplus 障碍函数（Dugas et al. 2000）——二阶平滑约束</td><td>将障碍物避碰构造为<strong>连续可微的 softplus 势垒函数</strong>——接近速度 $v_c^k$ 作为调节因子，远离障碍物时 loss=0，靠近时平滑增大。这是将传统控制理论中的障碍函数引入可微分学习的经典迁移</td><td>数学</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 可微分物理驱动的端到端视觉飞行策略学习</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>现有学习方法（RL/IL）将系统动力学视为黑箱，用采样数据估计策略梯度（零阶方法），方差大、样本效率低。可微分仿真虽然在其他机器人领域（四足、软体）有应用，但在<strong>视觉无人机导航</strong>领域从未被实际部署到真实世界。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>可微分编程 + 一阶优化理论——解析梯度比零阶梯度方差更低、收敛更快</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>用 PyTorch CUDA 扩展实现点质量可微分物理仿真（含空气阻力 + 控制延迟 + 指数平滑）。损失梯度从输出状态直接反向传播穿过物理模型到达策略参数。训练环境仅含<strong>4 种简单几何体</strong>（平面、长方体、球体、圆柱体）随机摆放——极简环境反而训练出了强泛化策略。64 个环境并行，每步 150 个时间步（dt=1/15s），一阶梯度训练。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 时间梯度衰减——解决可微分物理的梯度爆炸</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>虽然物理仿真可微分，但直接在整个仿真轨迹上反向传播会导致梯度爆炸——远期时间步的梯度累积到大值，优化不稳定。直觉：智能体只需要关心<strong>近未来</strong>的障碍物，远期障碍物超出感知范围、不应当影响当前决策。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Metz et al. (2021) 指出长期 BPTT 的梯度爆炸问题；本文不仅识别问题更给出了工程方案</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在反向传播时将 $x_{t+1}$ 对 $x_t$ 的梯度乘以 $e^{-\tau \cdot \Delta t}$。$\tau$ 控制衰减率（0.25~4 均有效，远优于 vanilla BPTT）。两个关键效果：(1) 衰减远端梯度累积；(2) 监督信号主要来自近期——强调即时目标，过滤远期不确定性。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 无通信多智能体涌现自组织行为 + 超低成本部署</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>集群导航的传统方案（Ego v.2）依赖 UWB 定位 + 网络通信 + 中心化规划——通信不可靠，中心化需精确相对定位。RL 方法采样量随智能体数量指数增长。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>生物集群（蚁群/蜂群）——局部感知 + 去中心化 = 全局自组织</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>训练时每个智能体被建模为其他智能体视角中的一个<strong>运动球体</strong>。部署时各智能体独立运行相同策略，仅依赖深度 + 姿态 + 速度（无通信、无全局位置）。涌现行为：等待（waiting）、跟随（following）、退让（retreating）、相互避碰（mutual avoidance）。所有计算仅需 US$21 Mango Pi（Cortex-A53 1.5GHz + 1GB RAM），整机仅 365 g，推重比 3.8。</div>
+  </div>
+</section>
+
+<!-- 3. SYSTEM ARCHITECTURE -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 系统框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph PERCEPTION["感知层 (Intel RealSense D435i)"]
+      direction LR
+      DEPTH["深度相机 · 15Hz · 16×12 池化"]
+      STATE["状态信息: 目标方向 · 速度估计 · 姿态"]
+    end
+
+    subgraph POLICY["策略网络 (卷积GRU)"]
+      direction LR
+      CNN["CNN编码器: Conv32→64→128 · LeakyReLU"]
+      PROJ["线性投影: 状态→192维 · 融合(逐元素加法)"]
+      GRU["GRU单元 · 隐状态维护 · 时序运动线索提取"]
+      ACTOR["全连接层: 输出期望加速度 + 速度估计"]
+    end
+
+    subgraph PHYSICS["可微分物理仿真 (训练阶段)"]
+      direction LR
+      PMODEL["点质量模型: v_{k+1}=v_k+(a_k+a_{k+1})Δt/2"]
+      DRAG["二次空气阻力 · p_{k+1}=p_k+v_kΔt+0.5a_kΔt²"]
+      FILTER["控制延迟τ+指数平滑α: 卷积响应建模"]
+      RENDER["深度渲染: 姿态外参 → 简单几何体场景"]
+    end
+
+    subgraph CONTROL["飞行控制层 (真实部署)"]
+      direction LR
+      ACCEL["加速度指令 → 期望姿态+总推力"]
+      FC["BetaFlight飞控 · 高频内环跟踪"]
+      MOTOR["1606 3750KV电机 · 3寸桨 · 推重比3.8"]
+    end
+
+    subgraph HARDWARE["硬件平台 (365g · US$21计算机)"]
+      direction LR
+      MANGO["Mango Pi · A53四核1.5GHz · 1GB RAM"]
+      TOWER["Aocoda F7mini飞控 · HAKRC四合一电调"]
+      FRAME["Roma 3寸机架 · 30×65×6mm³"]
+    end
+
+    DEPTH --> CNN
+    STATE --> PROJ
+    CNN --> ACTOR
+    PROJ --> ACTOR
+    GRU --> ACTOR
+    ACTOR -->|"训练: 梯度回传"| PMODEL
+    PMODEL --> DRAG
+    DRAG --> RENDER
+    RENDER -.->|"下一帧渲染"| DEPTH
+    ACTOR -->|"部署: 加速度指令"| ACCEL
+    ACCEL --> FC
+    FC --> MOTOR
+    MOTOR --> FRAME
+
+    RENDER -.->|"loss: 速度匹配+避碰+平滑"| ACTOR
+    FC -.->|"状态反馈"| STATE
+
+    classDef percept fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef policy fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef physics fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef control fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef hw fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    class DEPTH,STATE percept
+    class CNN,PROJ,GRU,ACTOR policy
+    class PMODEL,DRAG,FILTER,RENDER physics
+    class ACCEL,FC,MOTOR control
+    class MANGO,TOWER,FRAME hw
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 —— 训练 + 推理 + 误差回传</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["输入数据"]
+      direction LR
+      DEPTH_IN["深度图 16×12 · 单帧输入"]
+      VEL_IN["速度估计 v_k · 目标方向"]
+      ATT_IN["姿态估计 · 偏航对齐目标"]
+    end
+
+    subgraph FORWARD["前向传播"]
+      direction LR
+      CNN_FWD["CNN特征提取: 2层卷积→192维"]
+      STATE_FWD["状态编码: 线性投影→192维"]
+      FUSION["特征融合: 逐元素加法"]
+      GRU_FWD["GRU隐状态更新: h_k → h_{k+1}"]
+      OUTPUT["输出: 期望加速度 u_k + 隐式速度估计"]
+    end
+
+    subgraph SIM["可微分仿真 (前向+反向)"]
+      direction LR
+      THRUST_FILT["推力滤波: 延迟τ + 指数平滑α"]
+      DRAG_CALC["空气阻力: 二次阻力模型"]
+      ACC_CALC["加速度: a_k = (u_k_filtered + drag)/m"]
+      INTEGRATE["数值积分: v_{k+1}, p_{k+1}"]
+      LOSS_CALC["Loss: L=λ_v·L_v + λ_c·L_c + λ_a·L_a + λ_j·L_j"]
+    end
+
+    subgraph BACKWARD["反向传播 (时间梯度衰减)"]
+      direction LR
+      LOSS_GRAD["∂L/∂x_K → 从终端反向"]
+      DECAY["时间衰减: ∂x_j/∂x_{j-1} × e^{-τ·Δt}"]
+      PARAM_GRAD["策略参数梯度: ∂L/∂θ ← 链式法则"]
+      UPDATE["梯度下降: θ ← θ - η·∂L/∂θ"]
+    end
+
+    subgraph DEPLOY["真实部署 (推理仅前向)"]
+      direction LR
+      INFER["推理: CNN+GRU → 加速度 · ~15Hz"]
+      FC_CMD["飞控指令: 加速度→姿态+推力"]
+      REAL_FLY["真实飞行: 森林/城市/工厂 · 最速20m/s"]
+    end
+
+    INPUT --> FORWARD
+    FORWARD --> SIM
+    SIM --> BACKWARD
+    BACKWARD -.->|"参数更新"| FORWARD
+    FORWARD --> DEPLOY
+
+    LOSS_CALC -.->|"L_v: 速度匹配 · L_c: softplus避碰"| LOSS_GRAD
+    PARAM_GRAD -.->|"一阶梯度 · 方差 < 零阶"| UPDATE
+    DECAY -.->|"缓解梯度爆炸 · 强调近期监督"| PARAM_GRAD
+
+    classDef inputC fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef forwardC fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef simC fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef backC fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef deployC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class DEPTH_IN,VEL_IN,ATT_IN inputC
+    class CNN_FWD,STATE_FWD,FUSION,GRU_FWD,OUTPUT forwardC
+    class THRUST_FILT,DRAG_CALC,ACC_CALC,INTEGRATE,LOSS_CALC simC
+    class LOSS_GRAD,DECAY,PARAM_GRAD,UPDATE backC
+    class INFER,FC_CMD,REAL_FLY deployC
+    </pre>
+  </div>
+
+  <h3>3.3 工作流 —— 从训练到部署的完整管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph TRAIN["阶段1: 可微分仿真训练"]
+      direction LR
+      T1["环境构建: 简单几何体 · 随机摆放 · 64并行"] --> T2["前向仿真: 150步/dt=1/15s · 点质量+阻力+延迟"] --> T3["Loss计算: 速度匹配+softplus避碰+平滑"] --> T4["反向传播: BPTT+时间梯度衰减e^{-τt} · 更新θ"]
+    end
+
+    subgraph VAL["阶段2: 仿真验证与消融"]
+      direction LR
+      V1["单智能体测试: 森林/城市/工厂 · 4~22m/s"] --> V2["多智能体测试: 6~8机 · 窄门换位+并行飞行"] --> V3["消融: 梯度衰减τ · GRU vs MLP/LSTM · 点质量vs刚体"] --> V4["基线对比: Ego v.2 · Agile · PPO · Deep-ILC"]
+    end
+
+    subgraph DEPLOY_REAL["阶段3: 真实世界部署"]
+      direction LR
+      R1["硬件集成: Mango Pi+Realsense+F7mini · 365g"] --> R2["零样本迁移: 策略直接部署 · 无微调"] --> R3["高速度测试: 7~20m/s · 稠密森林 · 动态障碍 · 关门/摆锤"] --> R4["集群实验: 6机窄门换位 · 无通信 · 涌现自组织"]
+    end
+
+    subgraph EXTEND["阶段4: 扩展验证与未来"]
+      direction LR
+      E1["无里程计飞行: 仅依赖深度+姿态 · 匹配Vicon性能"] --> E2["Grad-CAM可视化: 障碍物区域激活验证"] --> E3["速度预测: GRU隐式估计 · 平均误差0.78m/s"] --> E4["未来: 大FOV · 刚体模型特技 · 在线阻力标定"]
+    end
+
+    TRAIN -->|"收敛策略"| VAL
+    VAL -->|"最优策略"| DEPLOY_REAL
+    DEPLOY_REAL -->|"验证成功 · NMI 2025"| EXTEND
+
+    T4 -.->|"反馈: 调整损失权重 v,c,a,j"| T3
+    V4 -.->|"反馈: 对比结果·成功率高+速度快"| T2
+    R3 -.->|"反馈: 漂移导致失败"| E1
+    R4 -.->|"反馈: FOV外碰撞"| E4
+
+    classDef trainC fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef valC fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef deployC fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef extC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class T1,T2,T3,T4 trainC
+    class V1,V2,V3,V4 valC
+    class R1,R2,R3,R4 deployC
+    class E1,E2,E3,E4 extC
+    </pre>
+  </div>
+</section>
+
+<!-- 4. TASK -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \min_{\theta} \; \mathcal{L}(\theta) = \sum_{k=0}^{N-1} l(x_k, u_k) = \sum_{k=0}^{N-1} l\big(x_k, \pi_\theta(o_k)\big) \quad \text{s.t.} \; x_{k+1} = x_k + f(x_k, u_k),\; o_k = h(x_k) $$
+    <div class="eq-note">
+      <strong>$x_k$</strong> = 系统状态（位置、速度）&nbsp;|&nbsp;
+      <strong>$u_k = \pi_\theta(o_k)$</strong> = 策略网络输出（期望加速度）&nbsp;|&nbsp;
+      <strong>$o_k = h(x_k)$</strong> = 观测（深度图 + 目标方向 + 速度）&nbsp;|&nbsp;
+      <strong>$f(x_k, u_k)$</strong> = 可微分动力学（点质量 + 阻力 + 控制延迟）&nbsp;|&nbsp;
+      <strong>$l(x_k, u_k)$</strong> = 物理驱动的可微损失函数（速度匹配 + 避碰 + 平滑）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：策略必须仅依赖单帧深度图 + 低成本 ARM CPU 实时推理（15 Hz），在未知复杂环境中以 >10 m/s 速度飞行，成功率 >90%。Sim-to-real 必须零样本（无微调）。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>RealSense D435i 深度图（16×12 池化）+ 目标方向 + 速度估计（可选）+ 姿态估计</td><td>深度 16×12 + 状态向量 ~6 维</td></tr>
+    <tr><td><strong>输出</strong></td><td>期望加速度向量（3 维：推力大小 + 方向），由飞控转换为姿态 + 总推力</td><td>加速度 ∈ R³</td></tr>
+    <tr><td><strong>目标</strong></td><td>在未知复杂环境中以指定速度无碰撞抵达目标位置——单智能体 90% 成功率，多智能体涌现自组织协同</td><td>最速 20 m/s（森林），成功率 >90%（>10 m/s）</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>端到端视觉运动控制学习问题</strong>——不是传统的"感知→规划→控制"级联架构，而是从深度图直接输出飞行动作指令的<strong>单一神经网络策略</strong>。训练在<strong>可微分物理仿真</strong>中进行（策略参数通过仿真器反向传播更新），部署在<strong>US$21 ARM 计算机</strong>上实时推理。场景涵盖静态稠密障碍物（森林、城市公园、工厂）和动态障碍物（关门、平移障碍、摆锤），任务包括单智能体高速穿越和多智能体无通信集群导航。</p>
+</section>
+
+<!-- 5. CHALLENGE -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：高速视觉飞行的"速度-感知-控制"不可能三角。<br><br>
+    （1）<strong>建图方法的级联失效</strong>：感知（建图）→ 规划（轨迹）→ 控制（跟踪）的级联结构，每一步都引入延迟和误差。在 >5 m/s 的高速下：（a）视觉里程计易漂移（特征追踪困难）；（b）建图计算量大（Ego v.2 的定位 CPU 使用率超过其他所有进程之和）；（c）误差逐级累积——地图错 → 规划错 → 控制错。<br><br>
+    （2）<strong>模仿学习的专家瓶颈</strong>：需要任务特定的专家示范。在稠密障碍物 + 高速场景下，基于采样的专家难以持续找到最优路径，导致受训策略飞行不稳定。更致命的是——<strong>集群专家策略比单智能体专家难设计得多</strong>，因此 Imitation Learning 几乎无法用于集群。<br><br>
+    （3）<strong>强化学习的采样灾难</strong>：RL 将动力学视为黑箱，用零阶方法估计策略梯度——高方差、低效率。多智能体场景下采样量随智能体数量<strong>指数增长</strong>。PPO 在本文集群实验中成功率仅 10~70%。<br><br>
+    <strong>可微分物理的独特挑战</strong>：虽然解析梯度低方差，但长时间 BPTT 导致<strong>梯度爆炸</strong>——远期时间步的梯度累积到极值，优化不稳定。同时，简单仿真与真实世界的 domain gap 也是重大风险——简单的点质量模型真的能迁移到复杂真实环境吗？
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Mapping-Based Navigation（基于建图的导航：FastPlanner, Ego-Planner, Ego v.2）</td>
+      <td>先用视觉/激光构建占据栅格地图或 ESDF，然后用搜索/梯度优化规划轨迹，最后用模型预测控制（MPC）跟踪</td>
+      <td><strong>级联架构的天然缺陷</strong>：每一步引入延迟和误差。高速飞行时：（a）视觉里程计漂移（特征追踪失败）→ 地图错位；（b）建图计算量巨大（Ego v.2 定位 CPU 使用率超其他进程之和）→ 延迟增加；（c）误差累积 → 规划失效。实测中 Ego v.2 仅能在 3 m/s 以下稳定运行。</td>
+    </tr>
+    <tr>
+      <td>Imitation Learning（模仿学习：Agile, Deep Drone Acrobatics）</td>
+      <td>训练策略模仿专家示范（由模型预测控制器或人类飞手生成的轨迹）</td>
+      <td><strong>专家依赖 + 泛化差</strong>：在稠密障碍物 + 高速条件下，基于采样的专家难以持续找到最优路径 → 训练的智能体飞行不稳定。最关键的是——<strong>集群专家策略极难设计</strong>（需要协调多个智能体），因此模仿学习几乎无法用于集群场景。Agile 在未见环境下降明显。</td>
+    </tr>
+    <tr>
+      <td>Reinforcement Learning（强化学习：PPO, Deep-ILC）</td>
+      <td>在环境中试错采样，用零阶梯度（策略梯度定理）优化策略</td>
+      <td><strong>采样效率极低</strong>：零阶梯度高方差、收敛慢。本文方法仅需 PPO 10% 的采样量即可达到更高奖励。多智能体场景下采样量指数增长——PPO 在 6 机换位任务中成功率仅 10~30%，且<strong>未观察到任何自组织行为</strong>（等待/跟随/退让）。</td>
+    </tr>
+    <tr>
+      <td>CNN Direct Regression（端到端 CNN 直接映射：CAD2RL, Giusti et al.）</td>
+      <td>用简单 CNN 直接将图像映射为控制指令，无显式规划</td>
+      <td><strong>缺少时序信息</strong>：单帧图像无法感知动态障碍物的运动趋势。速度慢（通常 <5 m/s）、泛化弱（仅适用于特定场景如森林小径）。缺乏可微分物理先验，训练依赖大量真实数据或 RL 采样。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 梯度爆炸与长时间优化稳定性</strong>：可微分物理仿真的核心计算是沿整个轨迹（150 步 x dt=1/15s = 10s）反向传播梯度。直接 BPTT 导致梯度爆炸——远期障碍物的梯度累积到极大值，优化发散。必须设计一种机制在保持可微分性的同时抑制梯度爆炸，且不能牺牲收敛速度。</li>
+    <li><strong>挑战 2 — 极简仿真到复杂真实世界的零样本迁移</strong>：训练环境仅含 4 种随机摆放的简单几何体——远不如 Flightmare/AirSim 等高保真仿真器逼真。策略能否从如此简单的"沙盒"中泛化到真实森林、城市公园、动态障碍物？这需要物理先验（点质量 + 空气阻力 + 控制延迟）的精确建模，以及合适的 domain randomization 策略。</li>
+    <li><strong>挑战 3 — 超低算力条件下的实时推理</strong>：US$21 的 Mango Pi（Cortex-A53 1.5GHz，无 GPU）必须在 15 Hz 频率下完成 CNN 特征提取 + GRU 序列推理 + 控制指令生成。这要求网络极轻量——同时还要保证策略的感知能力和控制精度。现有方案（Agile 等）依赖 GPU 加速板（如 Jetson TX2），成本高、功耗大。</li>
+  </ul>
+</section>
+
+<!-- 6. METHOD & FORMULAS -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心是<strong>可微分仿真驱动的端到端学习框架</strong>，而非"算法"的传统意义。训练分四个关键步骤：(1) 在 CUDA PyTorch 扩展中实现点质量可微分物理仿真；(2) 前向仿真收集 64 条并行轨迹（150 步/条）；(3) 计算物理驱动的损失函数（速度匹配 + softplus 避碰 + 平滑）；(4) 沿仿真时间轴反向传播策略梯度（使用时间梯度衰减），更新策略参数。以下逐一拆解关键公式。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。符号解释请用中文。</p>
+
+  <!-- Formula Group A: 策略梯度 -->
+  <h4>Group A: 可微分仿真中的一阶策略梯度</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 解析策略梯度（一阶）</span>
+    $$ \nabla_\theta \mathcal{L} = \frac{1}{N} \sum_{k=0}^{N-1} \left( \frac{\partial l_k}{\partial x_k} \sum_{i=0}^{k-1} \left( \prod_{j=i+1}^{k} \frac{\partial x_j}{\partial x_{j-1}} \right) \frac{\partial x_i}{\partial \theta} + \frac{\partial l_k}{\partial u_k} \frac{\partial u_k}{\partial \theta} \right) $$
+    <div class="eq-note">
+      <strong>$\nabla_\theta \mathcal{L}$</strong> = 目标函数对策略参数 $\theta$ 的梯度 &nbsp;|&nbsp;
+      <strong>$\frac{\partial x_j}{\partial x_{j-1}}$</strong> = 动力学系统的雅可比矩阵（由可微分物理仿真提供，解析计算）&nbsp;|&nbsp;
+      <strong>$\frac{\partial l_k}{\partial x_k}$</strong> = 损失对状态的梯度（损失函数设计为可微）&nbsp;|&nbsp;
+      <strong>vs 零阶方法</strong>：RL（PPO）需要采样来估计此梯度——$\nabla_\theta \mathcal{L} \approx \mathbb{E}[\sum \nabla_\theta \log \pi_\theta \cdot \hat{A}]$，方差大、效率低。一阶解析梯度方差更低，收敛更快。
+    </div>
+  </div>
+
+  <!-- Formula Group B: 点质量模型 -->
+  <h4>Group B: 点质量可微分物理模型——简单但足够</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 点质量动力学</span>
+    $$ v_{k+1} = v_k + \frac{a_k + a_{k+1}}{2} \Delta t, \qquad p_{k+1} = p_k + v_k \Delta t + \frac{1}{2} a_k \Delta t^2 $$
+    $$ a_k = u_k^{\text{filtered}} + F_{\text{drag}}(v_k) / m, \qquad u^{\text{filtered}} = u * \psi(t) $$
+    $$ \psi(t) = \begin{cases} 0, & t < \tau \\ \alpha e^{-\alpha(t-\tau)}, & t \ge \tau \end{cases} $$
+    <div class="eq-note">
+      <strong>$v_k$, $p_k$</strong> = 第 k 步的速度和位置 &nbsp;|&nbsp;
+      <strong>$a_k$</strong> = 总加速度 = 滤波后推力 + 二次空气阻力 &nbsp;|&nbsp;
+      <strong>$u_k^{\text{filtered}}$</strong> = 期望加速度经过控制延迟 $\tau$ + 指数平滑 $\alpha$ 后的实际推力（卷积建模飞控内环响应）&nbsp;|&nbsp;
+      <strong>$F_{\text{drag}}$</strong> = 二次空气阻力模型，参数通过真实平台标定 &nbsp;|&nbsp;
+      <strong>为什么点质量而非刚体？</strong>论文实验（Fig. 6e）表明点质量模型收敛最快、渐近性能最好——因为它提供了<strong>更平滑的优化景观（optimization landscape）</strong>。刚体模型收敛更慢但最终性能接近。
+    </div>
+  </div>
+
+  <!-- Formula Group C: 时间梯度衰减 -->
+  <h4>Group C: 时间梯度衰减——解决梯度爆炸</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 带衰减的实用策略梯度</span>
+    $$ \nabla_\theta \mathcal{L} = \frac{1}{N} \sum_{k=0}^{N-1} \left( \frac{\partial l_k}{\partial x_k} \sum_{i=0}^{k-1} \left( \prod_{j=i+1}^{k} \frac{\partial x_j}{\partial x_{j-1}} e^{-\tau \cdot \Delta t} \right) \frac{\partial x_i}{\partial \theta} + \frac{\partial l_k}{\partial u_k} \frac{\partial u_k}{\partial \theta} \right) $$
+    <div class="eq-note">
+      <strong>$e^{-\tau \cdot \Delta t}$</strong> = 指数衰减因子——在每个时间步的雅可比矩阵上乘以该因子 &nbsp;|&nbsp;
+      <strong>$\tau$</strong> = 衰减率参数（论文消融：0.25~4 均大幅优于 vanilla BPTT）&nbsp;|&nbsp;
+      <strong>两个关键效果</strong>：(1) 远期梯度被指数衰减，不再累积爆炸；(2) 监督信号主要集中在<strong>近未来</strong>——符合直觉：智能体只需关心感知范围内的障碍物 &nbsp;|&nbsp;
+      <strong>为什么不直接用更少的仿真步数？</strong>衰减机制更平滑——保留了远期的弱监督信号（不像截断那样完全丢弃），同时防止了梯度爆炸。
+    </div>
+  </div>
+
+  <!-- Formula Group D: 损失函数 -->
+  <h4>Group D: 物理驱动的损失函数——端到端可微优化目标</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 复合损失函数</span>
+    $$ \mathcal{L}_v = \frac{1}{T} \sum_{k=1}^{T} \text{SmoothL1}\left( \|v_k^{\text{set}} - \bar{v}_k\|_2,\; 0 \right) $$
+    $$ \mathcal{L}_c = \frac{1}{T} \sum_{k=1}^{T} v_c^k \left[ \max\big(1 - (d_k - r_q),\; 0\big)^2 + \frac{1}{\beta_2} \ln(1 + e^{2\beta_2(r_q - d_k)}) \right] $$
+    $$ \mathcal{L}_a = \frac{1}{T} \sum \|a_k\|^2,\quad \mathcal{L}_j = \frac{1}{T-1} \sum \left\| \frac{a_k - a_{k+1}}{\Delta t} \right\|^2 $$
+    $$ \mathcal{L} = \lambda_v \mathcal{L}_v + \lambda_c \mathcal{L}_c + \lambda_a \mathcal{L}_a + \lambda_j \mathcal{L}_j \quad (\lambda_v=1, \lambda_c=2, \lambda_a=0.01, \lambda_j=0.001) $$
+    <div class="eq-note">
+      <strong>$\mathcal{L}_v$（速度匹配）</strong>：Smooth L1 损失比较期望速度与实际 2 秒滑动平均速度——滑动平均让智能体可以在避障时局部减速 &nbsp;|&nbsp;
+      <strong>$\mathcal{L}_c$（障碍物避碰）</strong>：由三部分构成——截断二次函数（远离时=0，靠近时惩罚增大）+ softplus 势垒函数（连续可微替代硬约束）+ 接近速度 $v_c^k$ 调节（远离时不惩罚，靠近时放大惩罚）&nbsp;|&nbsp;
+      <strong>$\mathcal{L}_a$（加速度平滑）</strong>：保证动态可行性 &nbsp;|&nbsp;
+      <strong>$\mathcal{L}_j$（Jerk 惩罚）</strong>：加速度变化率惩罚 → 飞行更平稳 → 更适合视觉感知
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>时间步长 $\Delta t$</td><td><strong>1/15 s</strong></td><td>仿真步长（与深度相机帧率匹配）</td><td>与 RealSense D435i 的 15 Hz 帧率一致，避免仿真与真实间的时间不匹配</td></tr>
+    <tr><td>轨迹长度 T</td><td><strong>150 steps = 10 s</strong></td><td>每条训练轨迹的时间跨度</td><td>足够涵盖从起点到终点的完整飞行过程（10 秒 x 20 m/s = 200 m 范围）</td></tr>
+    <tr><td>并行环境数</td><td><strong>64</strong></td><td>每批训练的并行仿真环境数</td><td>平衡 GPU 内存与训练吞吐量。64 条并行轨迹提供足够的多样性</td></tr>
+    <tr><td>衰减率 $\tau$</td><td><strong>0.25~4 均可</strong></td><td>时间梯度衰减系数</td><td>消融研究（Fig. 6c）表明 $\tau$ 在 0.25~4 范围均可大幅优于 vanilla BPTT，说明该方法对超参数不敏感</td></tr>
+    <tr><td>深度图分辨率</td><td><strong>16x12（池化后）</strong></td><td>深度图输入尺寸</td><td>原始分辨率太大（CPU 无法实时处理），16x12 极低分辨率是低算力推理的必要妥协——但论文证明它<strong>足够</strong>提取避障所需的结构信息</td></tr>
+    <tr><td>空气阻力参数</td><td><strong>平台标定</strong></td><td>二次阻力模型系数</td><td>通过真实平台飞行数据标定——这是实现零样本 sim-to-real 的关键细节</td></tr>
+    <tr><td>控制延迟 $\tau$</td><td><strong>以平台标定为准</strong></td><td>飞控内环响应的固定延迟</td><td>在仿真中显式建模控制延迟是实现 sim-to-real 的关键——否则策略会学到"理想响应"而非真实响应</td></tr>
+  </table>
+
+  <h3>6.4 可微分物理 vs 强化学习 vs 模仿学习的本质差异</h3>
+  <table>
+    <tr><th>对比维度</th><th>可微分物理（本文）</th><th>强化学习（PPO）</th><th>模仿学习（Agile）</th></tr>
+    <tr><td>动力学处理</td><td><strong>白箱</strong>——解析雅可比，梯度直接回传</td><td>黑箱——依赖采样估计梯度</td><td>黑箱——不显式建模动力学</td></tr>
+    <tr><td>梯度阶数</td><td><strong>一阶</strong>（低方差）</td><td>零阶（高方差）</td><td>监督学习梯度（无动力学）</td></tr>
+    <tr><td>样本效率</td><td><strong>最高</strong>（10% RL 样本量）</td><td>低（需要海量仿真数据）</td><td>高（但依赖专家数据）</td></tr>
+    <tr><td>多智能体</td><td><strong>天然支持</strong>——涌现自组织</td><td>采样指数增长，成功率低</td><td>几乎不可用（缺集群专家）</td></tr>
+    <tr><td>关键挑战</td><td>梯度爆炸 → 时间衰减解决</td><td>方差 + 效率 → 根本瓶颈</td><td>专家依赖 → 泛化瓶颈</td></tr>
+  </table>
+</section>
+
+<!-- 7. FUNDAMENTAL PRINCIPLES -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本论文需要掌握三个关键基础原理：可微分物理仿真（为什么梯度可以直接穿过物理模型）、时间梯度衰减（如何让可微分优化在长时间序列上稳定）、点质量 vs 刚体建模的优化景观差异（为什么简单模型反而更好）。</p>
+
+  <h3>7.1 可微分物理仿真原理 —— 为什么梯度可以直接穿过物理模型</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 可微分仿真 vs 传统仿真的根本差异</span>
+    $$ \text{传统仿真: } x_{k+1} = f(x_k, u_k) \quad \text{（仅前向）} $$
+    $$ \text{可微分仿真: } x_{k+1} = f(x_k, u_k) \quad \textbf{+} \quad \frac{\partial x_{k+1}}{\partial x_k}, \frac{\partial x_{k+1}}{\partial u_k} \quad \text{（反向用）} $$
+    <div class="eq-note">
+      <strong>关键区别</strong>：传统仿真器（MuJoCo、Flightmare）仅计算前向状态。可微分仿真器<strong>额外提供了雅可比矩阵</strong> $\partial x_{k+1}/\partial x_k$ 和 $\partial x_{k+1}/\partial u_k$，使得损失梯度可以通过<strong>链式法则</strong>从终端状态一路回传到控制输入、进而到策略参数。&nbsp;|&nbsp;
+      <strong>实现方式</strong>：本文用 PyTorch CUDA 扩展实现所有物理计算——点质量积分、空气阻力、控制延迟滤波——全部用 PyTorch 张量操作，因此 autograd 自动追踪计算图并计算梯度。深度渲染也集成在同一 CUDA 环境中。
+    </div>
+  </div>
+
+  <p><strong>为什么这个"简单"的点质量模型是可微分物理的关键优势</strong>：点质量模型的雅可比矩阵具有极简形式——$\partial p_{k+1}/\partial v_k = \Delta t \cdot I$（恒等缩放），$\partial v_{k+1}/\partial a_k = \Delta t/2 \cdot I$——这意味着<strong>梯度信号流畅地在时间轴上传播</strong>，不会像刚体模型那样因旋转矩阵、欧拉角奇点等非线性导致梯度消失或突变。这提供了更平滑的优化景观（optimization landscape），使得一阶梯度下降更高效。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>可微分物理训练流程（本文）</h4>
+      <p><strong>步骤 1</strong>：随机生成简单几何体场景（平面、长方体、球体、圆柱体），64 个环境并行。</p>
+      <p><strong>步骤 2</strong>：策略网络接收深度图 + 状态 → 输出期望加速度 $u_k$。</p>
+      <p><strong>步骤 3</strong>：$u_k$ 经过控制延迟 + 指数平滑 → 滤波推力。加上空气阻力 → 总加速度。数值积分 → $v_{k+1}$, $p_{k+1}$。</p>
+      <p><strong>步骤 4</strong>：计算损失 $\mathcal{L} = \lambda_v \mathcal{L}_v + \lambda_c \mathcal{L}_c + \lambda_a \mathcal{L}_a + \lambda_j \mathcal{L}_j$。</p>
+      <p><strong>步骤 5</strong>：$\partial \mathcal{L}/\partial \theta$ 通过时间梯度衰减 BPTT 直接反传。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>强化学习训练流程（PPO 对比）</h4>
+      <p><strong>步骤 1</strong>：相同仿真环境（但不可微分）。</p>
+      <p><strong>步骤 2</strong>：策略采样动作，环境返回下一状态和奖励。</p>
+      <p><strong>步骤 3</strong>：收集 rollouts，用广义优势估计（GAE）估计 advantage。</p>
+      <p><strong>步骤 4</strong>：用策略梯度定理（零阶）$\approx \mathbb{E}[\nabla \log \pi \cdot A]$ 更新策略。</p>
+      <p><strong>步骤 5</strong>：重复，需要 10x 采样量才能达到可微分物理的性能。</p>
+    </div>
+  </div>
+
+  <h3>7.2 时间梯度衰减 —— 如何让 10 秒的 BPTT 稳定优化</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 指数梯度衰减机制</span>
+    $$ \frac{\partial x_j}{\partial x_{j-1}} \longrightarrow \frac{\partial x_j}{\partial x_{j-1}} \cdot e^{-\tau \cdot \Delta t} $$
+    $$ \text{效果: } \prod_{j=i+1}^{k} \frac{\partial x_j}{\partial x_{j-1}} e^{-\tau \Delta t} = \left( \prod_{j=i+1}^{k} \frac{\partial x_j}{\partial x_{j-1}} \right) \cdot e^{-\tau (k-i) \Delta t} $$
+    <div class="eq-note">
+      <strong>$\tau$</strong> = 衰减率（0.25~4 均可）&nbsp;|&nbsp;
+      <strong>$k-i$</strong> = 梯度传播的时间跨度（步数差）&nbsp;|&nbsp;
+      <strong>效果</strong>：时间跨度为 T 的梯度被乘以 $e^{-\tau T}$——越远的过去对当前 loss 的梯度贡献越小。等价于给了一个指数衰减的时间窗口——智能体只需关心感知范围（数秒）内的障碍物。&nbsp;|&nbsp;
+      <strong>与 Truncated BPTT 的区别</strong>：截断 BPTT 硬性地丢弃了 k 步以外的所有梯度。指数衰减则保留所有时间步的梯度但加权衰减——提供了更平滑的优化信号。
+    </div>
+  </div>
+
+  <p><strong>为什么 vanilla BPTT 会爆炸</strong>：在 150 步的仿真轨迹上反向传播时，每一步的雅可比矩阵 $\partial x_{j}/\partial x_{j-1}$ 可能包含大于 1 的特征值。150 次连乘后，梯度可能达到天文数字。更隐蔽的问题是：即使雅可比特征值略小于 1（梯度不会爆炸成 NaN），但<strong>远期障碍物的梯度贡献远大于近期</strong>——因为梯度从终端累积到早期时间步——导致优化方向由不确定性最高的远期障碍物主导，而非确定性最高的近期障碍物。</p>
+
+  <h3>7.3 点质量 vs 刚体建模 —— 为什么简单反而更好</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 三种物理模型的优化景观差异</span>
+    $$ \text{Point Mass: } \ddot{p} = a \quad \text{vs} \quad \text{CTBR: } \ddot{p} = R(\theta) \cdot [0,0,T]^T + g \quad \text{vs} \quad \text{Rigid Body: } \ddot{p} = \frac{1}{m} R \cdot F, \; \dot{\omega} = I^{-1}(\tau - \omega \times I\omega) $$
+    <div class="eq-note">
+      <strong>Point Mass（点质量，本文选用）</strong>：仅建模位置/速度/加速度的积分关系。雅可比矩阵每步都是单位阵的比例缩放——梯度传播极平滑。&nbsp;|&nbsp;
+      <strong>CTBR（collective thrust body rate）</strong>：策略输出期望总推力和体轴角速度。引入了旋转矩阵 $R(\theta)$ 的非线性 → 优化景观更崎岖。&nbsp;|&nbsp;
+      <strong>Rigid Body（刚体全动力学）</strong>：策略输出期望扭矩和总推力。引入了转动惯量、角速度动力学、科里奥利力 → 优化景观最复杂。&nbsp;|&nbsp;
+      <strong>实验结论（Fig. 6e）</strong>：点质量收敛最快 + 渐近性能最高 → <strong>简单物理先验就是正确先验</strong>。CTBR 和刚体最终也能达到接近性能，但需要更多样本。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    可微分物理提供解析梯度（一阶）→ 时间衰减保持优化稳定 → 点质量模型提供最平滑的优化景观 → <strong>三者环环相扣</strong>。如果去掉可微分物理（退化为 RL），样本效率下降 10 倍。如果去掉时间衰减，梯度爆炸导致完全无法训练。如果换成刚体模型，收敛显著变慢但最终也可用——点质量是效率-精度权衡的最优选择。这就是为什么之前用可微分仿真做<strong>视觉无人机导航</strong>的尝试全部失败：要么忽略了梯度爆炸、要么用了太复杂的模型。
+  </div>
+</section>
+
+<!-- 8. PAPER FIGURES -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig5.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">基于可微分物理的端到端视觉敏捷集群导航概览</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Vision-based agile swarm navigation overview"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：在多种具有挑战性的真实环境中（室内静态+动态障碍物、工业金属框架、废弃工厂），多旋翼无人机仅依赖<strong>US$21 Mango Pi 计算机 + 深度相机</strong>实现高速敏捷集群飞行。所有结果均使用机载视觉传感器，无人机之间<strong>无任何通信</strong>。</p>
+      <ul>
+        <li><strong>场景 a1-a4</strong>：展示了系统的四种核心能力——(a1) 集群穿越窄门、(a2) 动态摆锤避让、(a3) 稠密障碍物环境、(a4) 移动障碍物——全部使用同一策略、零微调</li>
+        <li><strong>场景 b-c</strong>：工业级复杂环境（金属框架、废弃工厂），进一步证明了策略的泛化能力远超训练环境的简单几何体</li>
+        <li><strong>没有出现在图中的</strong>：任何形式的通信模块、GPU 加速板、全局定位系统——这是"最简配置"的视觉飞行</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">高速飞行穿越复杂和动态环境——全部运行在 US$21 计算机上</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="High-speed flight through complex environments"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：从硬件平台到飞行性能的完整实证链条。由 11 个子图组成（a-k），涵盖平台设计、环境多样性、动态避障、速度统计和成功率。</p>
+      <ul>
+        <li><strong>(a) 硬件平台</strong>：Mango Pi（30x65x6 mm, 11 g, Cortex-A53）+ RealSense D435i + Aocoda F7mini 飞控 = 365 g 整机，推重比 3.8——全部组件极其廉价且轻量</li>
+        <li><strong>(b1-b6) 稠密森林第一人称视角</strong>：从起飞到穿越低矮灌木丛，视野中几乎全是树枝——视觉条件极其恶劣，但策略依然成功导航</li>
+        <li><strong>(c) 脚手架</strong>：金属管纵横交错，无纹理深度图极易获取结构信息——这是深度相机的天然优势场景</li>
+        <li><strong>(d-e) 城市公园 + 稠密森林</strong>：第三视角飞行拍摄</li>
+        <li><strong>(f) 高速森林飞行</strong>：<strong>20 m/s</strong>——这是此前模仿学习方案（Agile 等约 10 m/s）的 <strong>2 倍</strong></li>
+        <li><strong>(g-i) 动态障碍物</strong>：(g) 关门反应 1s 内躲避、(h) 平移障碍物 1.2s 安全绕行、(i) 摆锤 0.8s 闪避——GRU 隐状态捕捉运动线索，单帧深度即可感知运动</li>
+        <li><strong>(j) 速度箱线图</strong>：实测最高速度——森林场景 20 m/s，门/城市 7-10 m/s</li>
+        <li><strong>(k) 成功率矩阵</strong>：7 m/s 下几乎所有场景 100% 成功，10 m/s 下多数场景 100% 成功</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">无通信集群导航——涌现自组织行为与基线对比</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Communication-free swarm navigation"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：论文最具亮点的多智能体实验——6 架无人机同时从两侧穿越同一窄门交换位置，<strong>无通信、无全局规划、无集中协调</strong>，展现出涌现的自组织行为。</p>
+      <ul>
+        <li><strong>(a) 换位任务</strong>：两组各 3 机从两侧出发，穿越同一窄门到达对侧——门太窄无法同时通过，必须协调。所有 6 架无人机配备<strong>完全相同的策略</strong>，仅接收自身深度+速度+目标方向</li>
+        <li><strong>(b) 同向穿越</strong>：不同形状障碍物环境中的同向集群飞行</li>
+        <li><strong>(c1-c3) 涌现行为的放大视图</strong>：(c1) <strong>等待</strong>——门被占用时悬停等待；(c2) <strong>跟随+退让</strong>——有来向无人机时主动后退让路；(c3) <strong>相互避碰+穿越</strong>——同时感知到对方时的动态协调</li>
+        <li><strong>(d) 换位任务定量对比</strong>：本文方法成功率 80~100%（2~2.5 m/s），与需要通信+全局定位的 <strong>Ego v.2 持平</strong>。PPO 仅 10~30% 且<strong>无任何自组织行为</strong></li>
+        <li><strong>(e) 8 机并行飞行对比</strong>：本文 100% 成功（4 m/s），完成时间中位值 6.5s < Ego v.2 的 9.0s。PPO 在 6 m/s 时仅 60% 成功</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">无里程计端到端视觉飞行——神经网络隐式状态估计</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Odometry-free flight"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：一个极具说服力的实验——策略网络<strong>完全移除速度输入</strong>后，仅依赖深度图+姿态估计，性能<strong>匹配</strong>使用 Vicon 真值速度的智能体（100% 成功，相同速度）。这说明 GRU 隐状态隐式地估计了自身运动状态。</p>
+      <ul>
+        <li><strong>(a) 测试环境</strong>：前方开阔区（加速）+ 后方障碍物（立方体 + 树木）——测试智能体在不同速度下穿越障碍物的能力</li>
+        <li><strong>(b) 成功率</strong>：无里程计 = Vicon = 100%（4~10 m/s），而 Vins-Fusion（视觉-惯导里程计）在 7 m/s 时仅 90%、10 m/s 时 80%——说明<strong>传统里程计在高速下反而是性能瓶颈</strong></li>
+        <li><strong>(c) 最大速度</strong>：三种方案中位值接近，无里程计方案未因缺失速度信息而降速</li>
+        <li><strong>(d) 隐式速度估计 vs 真值</strong>：GRU 辅助输出速度预测对比 Vicon 真值——全程 5 秒飞行平均误差仅 <strong>0.78 m/s</strong></li>
+        <li><strong>(e) Grad-CAM 激活图</strong>：激活区域精确落在<strong>碰撞威胁最大的障碍物</strong>上——验证了策略确实在使用深度图中的障碍物信息做决策</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 5 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 5</span>
+      <span class="fig-caption">与前沿视觉导航方法的综合对比——三种仿真环境</span>
+      <span class="fig-source">来源：论文 Fig. 5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig5.png" alt="Baseline comparisons"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig5.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：在三种仿真环境（森林、城市、工厂）中与多个前沿方法的综合对比，包括基于建图的（Ego v.2、FastPlanner、Reactive）、基于模仿学习的（Agile）和基于强化学习的（PPO）。</p>
+      <ul>
+        <li><strong>(a) 森林环境</strong>：本文方法在所有速度下<strong>成功率最高</strong>——10 m/s 以上仍保持 >90%。FastPlanner 和 Reactive 在 3 m/s 以上急剧下跌。Agile 在森林表现好但在未见环境下降——说明模仿学习的泛化瓶颈</li>
+        <li><strong>(b) 城市环境（未见）</strong>：本文继续领先，Ego v.2 在低速（<3 m/s）尚可用，超过 10 m/s 完全失败</li>
+        <li><strong>(c) 工厂环境（未见）</strong>：同样趋势——可微分物理方法的泛化优势在未见环境中尤为明显</li>
+        <li><strong>核心结论</strong>：一阶梯度优化的<strong>泛化能力</strong>显著优于零阶方法（PPO）和依赖于专家示范的方法（Agile）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9. POTENTIAL FLAW -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 偏航角始终对准目标方向——策略不输出偏航控制，飞控自动保持目标方向。这意味着无人机<strong>无法主动转动机头观察侧方</strong>，视野始终朝前；(2) 深度相机视野有限（约87度），快速加减速时相机可能朝向地面或天空，丢失前方障碍物信息；(3) 空气阻力参数需要针对不同平台重新标定——论文明确指出这是跨平台迁移的必要步骤。</li>
+    <li><strong>适用场景</strong>：目前仅支持<strong>前向飞行</strong>（偏航固定对准目标），无法实现绕飞、特技飞行（翻滚/俯冲）等需要全姿态控制的复杂机动。多智能体场景中的 FOV 外碰撞（如侧后方来机）是一个已知问题——Supplementary Video 9 记录了此类失败案例。</li>
+    <li><strong>可扩展性</strong>：点质量模型虽然训练效率最高，但限制了可学习的机动类型——论文明确指出来使用全刚体模型可支持特技飞行（但需要更多训练和更好的 sim-to-real 校准）。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从固定偏航（前向飞行）→ 自由偏航——让策略同时输出偏航角速率，实现主动环境扫描。这需要更大的视野或广角/多相机配置。同时，从点质量 → 全刚体模型 → 支持特技飞行（如无人机竞速中的翻转穿越）</li>
+    <li><strong>条件放松</strong>：(1) <strong>在线空气阻力标定</strong>——取代当前的离线标定，让系统在新平台上自动调整阻力参数。可参考 Neural-Fly 的在线适应方法；(2) <strong>适应未知风场</strong>——目前仿真未建模风，可微分仿真中可直接加入风模型作为额外物理项</li>
+    <li><strong>约束加入</strong>：(1) 引入多相机配置（前后双摄）以消除 FOV 盲区；(2) 增加更复杂的环境建模（动态障碍物轨迹预测）；(3) 探索将可微分物理与 model-based RL（如 Dreamer）结合——在 latent space 中进行可微分优化</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>深度相机失效场景（强光直射、透明/镜面物体、远距离）</td><td>RealSense D435i 在室外强光下深度质量下降（红外干涉），且无法探测透明玻璃和镜面。这会导致避碰策略的输入质量骤降——论文未讨论此边界条件</td><td>★★★★★</td></tr>
+    <tr><td>空气阻力标定的平台依赖性</td><td>跨平台迁移需要重新飞行测试并标定阻力参数——这是一个手工步骤，阻碍了即插即用部署。如果标定不准，sim-to-real 策略性能会显著下降</td><td>★★★★</td></tr>
+    <tr><td>低速/悬停场景的策略表现</td><td>训练目标（损失函数）强调速度匹配和避碰——并未包含悬停稳定性目标。在需要悬停等待时（如换位任务中的"等待"行为），策略能否保持稳定尚不明确</td><td>★★★</td></tr>
+    <tr><td>随机种子敏感性</td><td>消融实验使用 5 个随机种子（Fig. 6c-e），训练曲线有明显方差。虽然趋势一致，但最终性能对种子有一定敏感性</td><td>★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>将可微分物理推广到视觉伺服 / 移动目标拦截</strong>——本文展示了可微分物理在"静态障碍物避碰 + 目标导航"场景的巨大优势。一个非常有前景的延伸是：(1) 将目标位置替换为<strong>移动目标的图像坐标</strong>（如 IBVS 中的特征点），在可微分框架中联合优化视觉伺服和避碰——类似于将本文的"目标方向"替换为"图像特征误差"；(2) 多智能体框架可直接用于<strong>集群围捕/拦截</strong>——训练时将被围捕目标建模为运动球体，自组织行为（等待、跟随、退让）天然适用于包围策略；(3) 如果加入预测模块（如目标运动模型），可微分 BPTT 可以同时优化"预测+决策+控制"——这本质上是将 MPC 的思想融入端到端学习，但用一阶梯度替代在线优化。对于视觉伺服方向的研究者，这篇论文提供了一个全新的"可微分训练+轻量部署"范式。
+  </div>
+</section>
+
+<!-- 10. MOTIVATION -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>无人机在未知复杂环境中高速飞行（>10 m/s）同时避免碰撞——这是一个"速度-感知-控制"三者耦合的极端优化问题。速度快 → 感知窗口短 → 控制延迟大 → 碰撞风险高。现有方案通过三种路径试图解决——级联架构（建图→规划→控制）、监督学习（模仿专家）、黑箱试错（RL）——但都在某个维度上存在根本限制。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：(i) 建图方法（Ego v.2、FastPlanner）——在高速下视觉里程计漂移+建图延迟+规划延迟三重叠加，级联失效；(ii) 模仿学习（Agile）——专家示范在高速度+稠密障碍物下质量急剧下降（采样专家找不到最优路径），且无法做集群；(iii) 强化学习（PPO）——零阶梯度+黑箱动力学→样本效率极低，多智能体采样指数爆炸。</li>
+    <li><strong>如果动力学是白箱而非黑箱呢？</strong><br>如果系统动力学可以解析求导——即每一步状态转移的雅可比矩阵是已知的——那么策略梯度可以直接用<strong>一阶链式法则</strong>精确计算，无需采样估计。这本质上是用"数学"替代"试错"——梯度是精确的（低方差），优化方向是正确的。</li>
+    <li><strong>如何让动力学可微分？——选对模型复杂度</strong><br>四旋翼的全刚体动力学包含旋转矩阵、欧拉角奇点、科里奥利力——雅可比矩阵非常复杂。但关键洞察是：<strong>对于避障导航任务（非特技飞行），点质量模型已经足够</strong>——因为策略不直接发送电机指令，而是告诉飞控"朝这个方向加速"，飞控内部处理所有刚体动力学。</li>
+    <li><strong>最简单的方案是什么？</strong><br>一个极简的可微分物理仿真（点质量+阻力+延迟）→ 前向仿真 10 秒轨迹 → 计算损失 → BPTT 带衰减反向传播 → 更新策略。训练环境只需随机几何体——因为物理先验（而非视觉拟真度）才是泛化的关键。部署只需一块 US$21 的单板电脑——因为策略是一个极轻量的 CNN+GRU 网络。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    现有无人机视觉导航方法要么用级联架构（建图→规划→控制）导致高速下延迟-误差双重失控，要么用模仿学习（依赖高质量专家示范）或强化学习（零阶梯度+海量采样）效率太低——那为什么不试试<strong>用可微分物理仿真让策略通过一阶解析梯度直接学会飞行</strong>，就像通过梯度下降训练一个神经网络一样自然？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：RL 训练视觉飞行策略的"样本效率诅咒"——需要数百万次仿真交互才能学到基本避障，且多智能体是灾难。同时注意到可微分物理在四足 locomotion 和软体机器人控制中已展示出极高样本效率——但在<strong>视觉无人机导航</strong>领域是空白。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"视觉高速飞行"分解为三个可独立处理的子问题——(1) 可微分动力学（什么模型足够又易求导？→ 点质量）；(2) 数值稳定性（长时间 BPTT 如何不爆炸？→ 指数衰减）；(3) sim-to-real 迁移（极简仿真如何泛化到真世界？→ 物理先验 + 控制延迟/阻力建模）。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：(1) PyTorch CUDA 扩展——在 GPU 上实现可微分点质量仿真+深度渲染，获得解析雅可比；(2) 时间梯度衰减——$e^{-\tau t}$ 因子简洁有效地解决梯度爆炸；(3) GRU——单帧输入+隐状态维护，无需堆叠多帧，适配低算力硬件。</li>
+    <li><strong>Step 4 — 组装方案</strong>：将三者整合为端到端训练框架——简单几何体随机场景 → 64 并行仿真 → CNN+GRU 策略 → 加速度输出 → 点质量积分 → 复合损失 → 衰减 BPTT 更新。零样本部署到真实四旋翼（365 g / US$21 计算机），在森林中以 20 m/s 飞行，在无通信集群中涌现自组织行为。</li>
+  </ul>
+</section>
+
+<!-- 11. KEY TAKEAWAYS -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一篇<strong>"范式创新"</strong>而非"指标刷榜"的论文。核心贡献不是某个具体数字（成功率/速度），而是展示了一种全新的训练范式——<strong>用可微分物理（一阶梯度）替代强化学习（零阶梯度）来训练视觉飞行策略</strong>——并且在真实世界中证明了它的有效性。对于 UAV 领域的研究者，最重要的启示是：<strong>不要只优化算法，要思考是否可以用"白箱动力学"替代"黑箱交互"来更高效地学习。</strong>可微分仿真正在成为机器人学习的新基础设施——就像 autograd 之于深度学习。</li>
+    <li><strong>技术技巧层面</strong>：(1) 简单物理先验（点质量 + 空气阻力 + 控制延迟）足以实现零样本 sim-to-real——不需要高保真渲染，不需要 domain randomization 的复杂管道；(2) 时间梯度衰减 $e^{-\tau t}$ 是一个应该进入教科书的设计模式——它在"利用所有时间步的梯度"和"防止梯度爆炸"之间实现了优雅平衡；(3) GRU 的单帧+隐状态架构使得极低分辨率深度图（16x12）足以完成高速避障——这对资源受限场景极有价值；(4) softplus 势垒函数的连续可微设计使得"硬约束"变成了"软梯度"——这是将传统控制理论中的障碍函数引入可微分学习的经典迁移。</li>
+    <li><strong>实验/写作层面</strong>：论文的 Figure 3（集群涌现行为）是说服审稿人的"杀手级实验结果"——不是因为指标最高，而是因为它<strong>展示了一个未预期但极具吸引力的涌现现象</strong>（等待、跟随、退让）。值得学习的是：在实验结果中寻找那些"超出预期的涌现行为"，它们比精心设计的指标更有说服力。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于视觉伺服 / IBVS 方向</strong>：本文的可微分训练框架可以直接扩展到<strong>基于图像的视觉伺服</strong>（IBVS）。只需将损失函数中的"目标方向"替换为"图像特征误差"（如点特征、矩特征在图像平面的投影误差），策略网络输入替换为图像（而非深度图），训练框架保持不变。关键优势：可微分 BPTT 可以同时优化特征提取 + 速度决策 + 控制响应——这在传统 IBVS 中需要手工设计每个模块。</li>
+    <li><strong>对于集群/编队控制方向</strong>：本文的多智能体训练方法（将其他智能体建模为运动球体）直接适用于<strong>集群编队控制</strong>。只需修改损失函数——加入编队保持项（如与期望相对位置的距离），自组织行为（等待/跟随/退让）可以从编队任务中自然涌现。而且无需通信——这对于 GPS 拒止环境下的编队飞行意义重大。</li>
+    <li><strong>对于高速拦截/机动目标方向</strong>：本文的点质量模型 + 控制延迟建模框架特别适合<strong>高速移动目标拦截</strong>——将目标建模为另一个点质量体（带预测运动模型），损失函数中加入拦截项（如最小化与目标的距离），策略可以同时学会预测+追踪+避障。一阶梯度优化使得"预测-决策-控制"三者可以端到端联合优化。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Loquercio et al. (2021) — Learning high-speed flight in the wild. <em>Science Robotics</em> 6, 5810</td><td>Agile——此前视觉高速飞行领域最具代表性的模仿学习方法。本文在森林环境中的 20 m/s 速度是 Agile 的 2 倍。更重要的是 Agile 需要专家示范 + DAgger 纠错，而本文完全不需要专家。对比阅读可以理解模仿学习和可微分物理之间的范式差异。</td></tr>
+    <tr><td>Zhou et al. (2022) — Swarm of micro flying robots in the wild. <em>Science Robotics</em> 7, 5954</td><td>Ego v.2——此前最先进的集群无人机系统。本文的集群对比实验（Fig. 3）直接与 Ego v.2 对标。关键差异：Ego v.2 需要 UWB 通信 + 全局定位 + 中心化规划，本文仅需局部感知 + 无通信。</td></tr>
+    <tr><td>Metz et al. (2021) — Gradients are not all you need. <em>arXiv:2111.05803</em></td><td>首次系统性地指出可微分仿真中 BPTT 导致的梯度爆炸问题——本文的"时间梯度衰减"直接针对此问题。理解这篇是理解本文方法动机的关键前置知识。</td></tr>
+    <tr><td>Song et al. (2024) — Learning quadruped locomotion using differentiable simulation. <em>CoRL 2024</em></td><td>将可微分物理用于四足 locomotion 的代表性工作。与本文的关联：方法论同源（都是用可微分物理训练神经网络策略），但迁移到了完全不同的领域（四足行走 vs 无人机视觉飞行）。对比阅读可以理解可微分物理的跨领域适用性。</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Zhang, Hu, Song et al. · Nature Machine Intelligence 2025 · Differentiable Physics Vision-Based Agile Flight · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

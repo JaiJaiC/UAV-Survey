@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>论文精读笔记 — OpenFlight</title>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+    --teal-fill: #f0fdf4;    --teal-stroke: #14b8a6;   --teal-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+
+  /* ── Navigation ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.93); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12.5px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 12px; border-radius: 5px;
+    transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 12px; font-size: 14px; }
+
+  /* ── Layout ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--border); margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 20px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 14px 0 6px; }
+
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+
+  /* ── Code ── */
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1e293b; color: #e2e8f0;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12px; line-height: 1.55; padding: 16px 20px; border-radius: 8px;
+    overflow-x: auto; margin: 10px 0 14px;
+  }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+
+  /* ── Tags ── */
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+
+  /* ── Callout ── */
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+
+  /* ── Formula block ── */
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 16px 20px; margin: 10px 0; overflow-x: auto;
+  }
+  .formula-block .eq-ref   { color: #94a3b8; font-size: 11.5px; float: right; }
+  .formula-block .eq-main  { font-size: 14.5px; color: #1e293b; margin: 6px 0; letter-spacing: 0.3px; }
+  .formula-block .eq-note  { font-size: 12.5px; color: #64748b; margin-top: 4px; }
+
+  /* ── Figure box ── */
+  .fig-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 20px; margin: 14px 0;
+  }
+  .fig-box .fig-title { font-weight: 700; font-size: 13.5px; color: #1e293b; margin-bottom: 8px; }
+  .fig-box .fig-desc  { font-size: 13px; color: #475569; }
+
+  /* ── Novelty card ── */
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 10px 0; background: #fafbfc;
+  }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 6px; padding-left: 12px; border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+
+  /* ── Two-column ── */
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+
+  /* ── Mermaid-style diagram container ── */
+  .diagram-box {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 20px; margin: 12px 0; overflow-x: auto;
+    font-family: "JetBrains Mono","Fira Code",Consolas,monospace;
+    font-size: 11.5px; line-height: 1.5; white-space: pre; color: #334155;
+  }
+
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav>
+  <span class="brand">📄 论文精读笔记</span>
+  <a href="#info">基础信息</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#insight">Insight & Novelty</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#method">方法与公式</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. 基础信息 ═══════════════ -->
+<section id="info">
+  <h2>1. 基础信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td>Learning Minimum-Time Flight Control for Fixed-Wing UAVs in 3D Space with High-Fidelity 6-DOF Dynamics（基于强化学习的固定翼无人机三维空间最短时间飞行控制）</td></tr>
+    <tr><td><strong>作者</strong></td><td>王国政 (Guozheng Wang) et al. — 第一作者兼通讯作者</td></tr>
+    <tr><td><strong>单位</strong></td><td>国防科技大学 (NUDT)</td></tr>
+    <tr><td><strong>期刊/会议</strong></td><td>Journal of Automation and Intelligence (2025)</td></tr>
+    <tr><td><strong>DOI / 链接</strong></td><td>开源代码: github.com/running-mars/OpenFlight</td></tr>
+    <tr><td><strong>一图总结 (瓜)</strong></td><td>首次用RL直接控制固定翼舵面（执行器级控制ALC），比传统PID/MPC飞行时间缩短27.6%</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">RL+6-DOF</span>
+    <span class="tag tag-green">JSBSim</span>
+    <span class="tag tag-amber">PPO</span>
+    <span class="tag tag-purple">Stable-Baselines3</span>
+    <span class="tag tag-red">27.6%时间缩短</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. TASK ═══════════════ -->
+<section id="task">
+  <h2>2. Task — 解决什么问题？</h2>
+
+  <h3>2.1 问题形式化</h3>
+  <p>用最数学化的语言描述本文要解决的问题：</p>
+  <div class="formula-block">
+    <div class="eq-main">min T_total  s.t. 6-DOF dynamics, h in [10, 190]m, ||p - p_g|| < 30m, t < 40s</div>
+    <div class="eq-note">T_total 为总飞行时间；动力学约束基于 JSBSim 高保真 6-DOF 模型（平动方程 m(v_dot + omega x v) = F + 转动方程 I*omega_dot + omega x I*omega = M）；安全高度 10~190m；到达条件为距离目标 30m 以内；单次飞行限时 40s。目标点随机生成于球坐标: theta ~ U(1.41, 1.73), phi ~ U(-pi, pi), distance ~ U(450, 550)m。</div>
+  </div>
+
+  <h3>2.2 输入 / 输出</h3>
+  <table>
+    <tr><th>类别</th><th>具体内容</th><th>维度/范围</th></tr>
+    <tr><td><strong>系统输入 (VLC)</strong></td><td>极坐标观测: Delta_psi/2pi + tanh(d_h*0.01) + tanh(d_v*0.02) + 空速 + 垂直速度 + 偏航角速率</td><td>6D, 均归一化到 [-1, 1]</td></tr>
+    <tr><td><strong>系统输入 (ALC)</strong></td><td>VLC 6D + 姿态角 (roll, pitch, yaw) + 角速度 (p, q, r)</td><td>11D, 均归一化到 [-1, 1]</td></tr>
+    <tr><td><strong>系统输出 (VLC)</strong></td><td>[yaw_rate, airspeed, climb_rate] — 经反归一化后送入 X8Autopilot PID 自动驾仪</td><td>3D, yaw_rate in [-0.5,0.5] rad/s, airspeed in [14,26] m/s, climb_rate in [-10,10] m/s</td></tr>
+    <tr><td><strong>系统输出 (ALC)</strong></td><td>[aileron, elevator, throttle] — 直接舵面指令，不经 PID</td><td>3D, aileron/elevator in [-1,1], throttle in [0,1]</td></tr>
+    <tr><td><strong>任务目标</strong></td><td>固定翼无人机三维空间最短时间 point-to-point 飞行</td><td>最小化 T_total，同时满足安全约束（高度、角速率）</td></tr>
+  </table>
+
+  <h3>2.3 任务类型</h3>
+  <p>固定翼无人机最短时间 point-to-point 飞行控制。本质是一个受 6-DOF 非线性动力学约束的最优控制问题，通过 RL 转化为无模型策略优化——密集奖励驱动快速接近目标，终止条件保证安全。16 个并行 JSBSim 环境 + PPO 集中训练，推理时单环境独立执行。</p>
+</section>
+
+<!-- ═══════════════ 3. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>3. Challenge — 传统方法遇到什么挑战？</h2>
+
+  <h3>3.1 问题本质 (第一性原理)</h3>
+  <p>从这个问题的物理/数学本质出发，它本质上是一个什么问题？</p>
+  <div class="callout idea">
+    <div class="callout-title">💡 本质判断</div>
+    这是一个"在强非线性耦合 6-DOF 动力学约束下的最短时间最优控制问题"。核心矛盾在于：要缩短飞行时间就需要极限机动（大攻角、大滚转角、急转弯），但极限机动会触发强气动耦合（升力/阻力耦合、荷兰滚模态、失速边界）——传统分层控制架构的级联延迟使其无法在物理极限边缘稳定工作。同时，这是一个 POMDP：RL 策略只能从 6~11 维的不完整观测中做决策，而 JSBSim 内部有 50+ 个物理属性。
+  </div>
+
+  <h3>3.2 传统方法及其局限</h3>
+  <table>
+    <tr><th>传统方法</th><th>基本思路</th><th>核心局限</th></tr>
+    <tr>
+      <td>PID 级联控制</td>
+      <td>上层路径规划 -> 中层速度/姿态追踪 -> 下层执行器控制，每层独立设计 PID 控制器</td>
+      <td>级联误差累积：每层独立优化导致整体非最优；长时间延迟：三层控制信号传递带来相位滞后，无法响应快速机动需求；无法端到端优化飞行时间这一最终目标</td>
+    </tr>
+    <tr>
+      <td>MPC (模型预测控制)</td>
+      <td>在线求解有限时域最优控制问题，基于动力学模型预测未来状态并优化控制序列</td>
+      <td>需要精确动力学模型，对模型误差敏感；固定翼 6-DOF 模型高度非线性，在线求解计算量大；论文实验显示比 ALC 慢 25.9%（25.50s vs 20.24s）</td>
+    </tr>
+    <tr>
+      <td>Dubins 曲线 (几何规划)</td>
+      <td>假设恒定速度，用圆弧-直线-圆弧拼接最短路径</td>
+      <td>忽略速度变化和高度变化，未利用固定翼的机动性；恒定速度假设在最短时间问题中根本不成立——ALC 主动降速换转弯正是其优势所在</td>
+    </tr>
+  </table>
+
+  <h3>3.3 挑战总结</h3>
+  <ul>
+    <li><strong>挑战 1 — 强非线性气动耦合</strong>：固定翼 6-DOF 动力学中，升降舵同时影响俯仰和升力、副翼偏转耦合偏航（adverse yaw）、空速和爬升率深度耦合。在极限机动中这些耦合被剧烈放大，传统解耦控制失效。Eq.(5-6) 中的旋转矩阵 R_bw(alpha, beta) 揭示了升力/阻力会同时投影到体轴系的多个方向——这是固定翼最核心的气动耦合。</li>
+    <li><strong>挑战 2 — 级联架构的固有延迟</strong>：传统"规划 -> 追踪 -> 执行"三层结构中，每层引入的相位滞后在快速机动中不可忽略。论文指出这是限制固定翼释放极限机动性的根本瓶颈——PID 的保守增益和固有的"过冲-纠正-过冲"循环在极限机动中暴露无遗。</li>
+    <li><strong>挑战 3 — 高保真环境中的 RL 训练稳定性</strong>：在 JSBSim 6-DOF 环境中，仅 PPO 在 ALC 中成功收敛——A2C/TD3/SAC 全部失败。高维非线性动力学使值函数估计极不稳定，策略梯度方差巨大。ALC 直接控制舵面意味着轻微动作变化就可能导致不可恢复状态（失速尾旋），对算法稳定性要求极高。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 4. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>4. Insight & Novelty — 洞见与创新</h2>
+
+  <h3>4.1 Inspiration → Insight 映射</h3>
+  <table>
+    <tr><th>Inspiration 来源</th><th>启发了什么 Insight</th><th>Insight 类型</th></tr>
+    <tr>
+      <td>极坐标 vs 笛卡尔坐标表示</td>
+      <td>对飞行控制任务，极坐标（航向偏差 + 距离）比笛卡尔坐标（x, y, z）更有语义信息——直接告诉策略"往哪转、还有多远"，而不是让网络自己从坐标差中推导方向</td>
+      <td>表示级 (Representation-level)</td>
+    </tr>
+    <tr>
+      <td>端到端学习哲学</td>
+      <td>如果最终目标是飞行时间，那就让 RL 直接优化它——不需要中间的 PID 层。每一层中间抽象都会引入信息损失和延迟。"Less is More"：把智慧放在观测设计和奖励设计上，而不是堆砌复杂网络</td>
+      <td>架构级 (Architecture-level)</td>
+    </tr>
+    <tr>
+      <td>奖励函数工程经验</td>
+      <td>奖励各项的"量级平衡"比"直觉正确"更重要——只要每项贡献接近（各约 2 量级），就能稳定训练。三项密集奖励每项贡献约 2 量级，谁也不淹没谁</td>
+      <td>策略级 (Strategy-level)</td>
+    </tr>
+    <tr>
+      <td>安全约束的处理方式</td>
+      <td>硬约束用终止条件（episode termination）而非惩罚项——避免奖励函数复杂化，同时保证安全边界不可逾越。策略永远不会"学"到不安全区域，因为一到边界就终止</td>
+      <td>方法级 (Method-level)</td>
+    </tr>
+    <tr>
+      <td>PPO clipping 机制</td>
+      <td>PPO 的 trust region clipping 恰好匹配 ALC 对更新稳定性的需求——能阻止策略在复杂气动耦合环境中做大幅更新，而 A2C 的高方差梯度和 SAC 的离线值函数估计在这种情况下都会崩溃</td>
+      <td>算法级 (Algorithm-level)</td>
+    </tr>
+  </table>
+
+  <h3>4.2 核心 Insight</h3>
+  <p>用一句话概括本文最核心的洞察：</p>
+  <div class="callout idea">
+    <div class="callout-title">🎯 Core Insight</div>
+    "Less is More"——极简观测（6D极坐标）+ 极简网络（2x64 MLP, 仅5000参数）+ 极简奖励（3项密集奖励，量级平衡）= 鲁棒性能。不需要复杂网络架构，把智慧放在观测设计和奖励设计上，而非网络结构上。极坐标表示对飞行控制更有语义——方向 + 距离 比绝对坐标更直接地告诉策略"往哪飞、还有多远"。
+  </div>
+
+  <h3>4.3 Novelty — 逐条拆解</h3>
+  <p>对每个创新点，按以下格式严格描述：</p>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: ALC — 执行器级控制（RL 直接输出舵面指令，消除 PID 中间层）</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统 PID 级联控制存在级联误差和长时间延迟，无法释放固定翼极限机动能力。三层控制架构（路径规划 -> 速度/姿态追踪 -> 执行器控制）中，每层的相位滞后在快速机动中不可忽略，是最短时间飞行的根本瓶颈。</div>
+    <div class="novelty-step"><strong>【受哪个 Insight 启发】</strong>"端到端学习可直接优化最终目标"——如果目标是飞行时间，就让 RL 直接输出舵面指令，消除所有中间抽象层。每一个中间层都引入信息损失，去掉它们反而让 RL 能学到更好的策略。</div>
+    <div class="novelty-step"><strong>【创新点设计】</strong>ALC (Actuator-Level Control)：RL 策略网络直接输出 [aileron_cmd, elevator_cmd, throttle_cmd] 三个舵面指令。aileron/elevator 直接映射到 [-1, +1]（舵面偏转范围），throttle 映射到 0.5+0.5*a[2]（即 [0,1]）。彻底消除 PID 自动驾仪中间层，端到端优化飞行时间。这是首次在固定翼无人机上实现 RL 执行器级最短时间飞行控制。结果：比传统 PID/MPC 快 27.6%，且标准差最小（1.39s vs 3.94~5.14s）。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 极坐标观测设计（6D 极简观测，5000 参数击败 PID）</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>如何让 RL 在 6-DOF 高保真 JSBSim 环境中高效训练？高维原始状态（50+ 属性）直接输入会导致维度灾难和训练不稳定。需要用最小的观测维度包含最多的任务相关信息。</div>
+    <div class="novelty-step"><strong>【受哪个 Insight 启发】</strong>"极简设计原则"——极坐标表示比笛卡尔坐标对飞行控制更有语义信息。"Less is More"——观测设计比网络设计重要。维度越低、语义越清晰，RL 学得越快。</div>
+    <div class="novelty-step"><strong>【创新点设计】</strong>6D 极坐标观测 (VLC): Delta_psi/2pi（航向偏差，线性归一化）+ tanh(d_h*0.01)（水平距离，tanh 饱和压缩保持近场敏感）+ tanh(d_v*0.02)（垂直距离）+ 空速偏差 + 垂直速度 + 偏航角速率。11D (ALC) 在 6D 基础上增加姿态角和角速度（各除以 2pi/4pi 线性归一化）。两种归一化策略并存：角度用线性除以极值（有界），距离/速度用 tanh 饱和压缩（无界）。网络仅为 2 层 MLP(64)，约 5000 参数——极简但极有效。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 量级平衡的密集奖励设计</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>如何设计奖励函数驱动最短时间飞行？稀疏奖励（仅到达目标给奖励）在 500m 距离尺度上几乎无法学习——RL 需要随机探索 1200 步才能偶然碰到目标，这在连续空间中概率几乎为零。密集但量级失衡的奖励会导致某项淹没其他项。</div>
+    <div class="novelty-step"><strong>【受哪个 Insight 启发】</strong>"量级平衡 > 直觉正确"的工程 insight——奖励各项的贡献量级接近比各项物理意义的精确性更重要。实用流程：先跑随机策略记录每项平均值 -> 调权使量级在正负 20% 内 -> 根据优先级微调。</div>
+    <div class="novelty-step"><strong>【创新点设计】</strong>三项密集奖励：r_t = 0.25 * Delta_d_h + 1.0 * Delta_d_v + 20 * Delta_psi。Delta 定义为 (上一步 - 当前步)，即距离减小 = 正奖励（鼓励接近目标）。权重 0.25/1.0/20 使三项单步贡献均在约 2 量级：水平距离变化约 10m/step * 0.25 = 2.5，垂直距离变化约 2m/step * 1.0 = 2.0，航向偏差变化约 0.1rad/step * 20 = 2.0。谁也不淹没谁——这是 RL 训练稳定的关键。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 4: 硬约束用终止条件而非惩罚</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>安全约束（高度、角速率）如何在不增加奖励函数复杂度的情况下保证？用惩罚项会让奖励函数变得复杂、需要调惩罚系数、策略可能因害怕惩罚而保守、且梯度方向不再纯净。</div>
+    <div class="novelty-step"><strong>【受哪个 Insight 启发】</strong>"硬约束用终止条件而非惩罚"——安全边界不可逾越，用 episode 终止来硬性保证，而非软性的负奖励。让奖励信号保持纯净，梯度方向明确。</div>
+    <div class="novelty-step"><strong>【创新点设计】</strong>四个终止条件：h < 10m 或 h > 190m（高度越界 -> episode 终止，视为不安全）、|omega| > 10 rad/s（角速率超限 -> 视为坠毁 -> 终止）、||p - p_g|| < 30m（到达目标 -> 成功终止）、t > 40s（超时 -> 终止）。奖励函数保持三项纯净，不掺杂任何安全惩罚项——这种设计让"鼓励快速接近"和"保证安全"两个目标完全解耦。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 5. 系统架构 ═══════════════ -->
+<section id="architecture">
+  <h2>5. 系统架构</h2>
+
+  <h3>5.1 System Frame (系统框图)</h3>
+  <div class="diagram-box">
+┌─────────────────────────────────────────────────────────────────────┐
+│                        System Overview (30 Hz)                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────┐    ┌──────────────┐    ┌───────────┐    ┌──────────┐ │
+│  │ JSBSim   │───>│ _get_obs()   │───>│ Policy    │───>│ Action   │ │
+│  │ 6-DOF    │    │ 极坐标归一化  │    │ 2x64 MLP  │    │ Denorm   │ │
+│  │ State    │    │ VLC:6D ALC:11D│   │ ~5000参数  │    │ or Direct│ │
+│  │ (50+属性)│    │ 均 in [-1,1] │    │ Actor+Critic│   │          │ │
+│  └──────────┘    └──────────────┘    └───────────┘    └──────────┘ │
+│       ^                                                    │        │
+│       │              ┌──────────────────────────────────────────┐   │
+│       │              │  V1 (VLC):  RL -> denorm -> PID -> Surfaces│
+│       │              │  V3 (Att):  RL -> denorm -> PID -> Surfaces│
+│       │              │  V2 (ALC):  RL -> Direct Surface ⭐Core  │   │
+│       │              └──────────────────────────────────────────┘   │
+│       │                                    │                        │
+│       └──────── JSBSim.run_fdm() <─────────┘                        │
+│              (RK4 数值积分, dt=1/30s)                                │
+│                                                                     │
+│  三级控制递进: V1(VLC速度级) -> V3(Attitude姿态级) -> V2(ALC⭐)      │
+│  16 并行环境 (SubprocVecEnv) -> 经验汇总 -> PPO 集中更新             │
+└─────────────────────────────────────────────────────────────────────┘</div>
+
+  <h3>5.2 Dataflow (数据流)</h3>
+  <p>从传感器到执行器的完整数据链路（以一步为单位，30Hz）：</p>
+  <div class="diagram-box">
+Step 1: JSBSim FDM 引擎 -> 50+ 物理属性 (位置、姿态、速度、角速度、气动系数、发动机状态)
+Step 2: _get_obs() 提取与归一化 -> 6D (VLC) 或 11D (ALC) 极坐标观测向量, 均 in [-1, +1]
+        角度用除以极值线性归一化 (Delta_psi/2pi, omega/4pi)
+        距离/速度用 tanh 饱和压缩 (tanh(d_h*0.01), tanh(d_v*0.02))
+Step 3: Policy Network (2x64 MLP + Actor/Critic head) -> 3D action in [-1, +1]^3 (tanh)
+        Actor输出均值 mu 和对数标准差 log_sigma, 采样后经 tanh 压缩
+Step 4: _do_action() ->
+        V1(VLC): yaw_rate=0.5*a[0], airspeed=20+6*a[1], climb=10*3.28*a[2] -> X8Autopilot PID -> 舵面
+        V2(ALC): aileron=a[0], elevator=a[1], throttle=0.5+0.5*a[2] -> 直接舵面
+        V3(Att): roll=pi*a[0], pitch=pi/2*a[1] -> PID内环 -> 舵面
+Step 5: JSBSim.run_fdm() RK4数值积分 -> 新状态 s_{t+1} -> _compute_reward()
+Step 6: (s_t, a_t, r_t, s_{t+1}, done) 存入 RolloutBuffer -> PPO update (每 n_steps=2048 步)
+Step 7: 16个并行环境各128步 = 2048 transitions -> GAE优势计算 -> PPO clipped objective -> 10 epoch更新</div>
+
+  <h3>5.3 Workflow (工作流)</h3>
+  <ol>
+    <li><strong>阶段 1 — 训练</strong>：16 个并行 JSBSim 环境 (SubprocVecEnv)，每环境随机生成目标点（球坐标采样: theta~U(1.41,1.73), phi~U(-pi,pi), d~U(450,550)m）。PPO 收集 2048 步经验后更新策略 (n_epochs=10, batch_size=32, lr=2.5e-4)。共训练 2M steps/seed，5 次随机种子取平均。总计 8000 万步环境交互。</li>
+    <li><strong>阶段 2 — 推理</strong>：加载训练好的模型，model.predict(obs, deterministic=True) 输出确定性动作（取均值 mu，不采样）。单目标测试和多目标泛化测试（64 个均匀分布目标点，水平 500m，高度 20~180m）。</li>
+    <li><strong>阶段 3 — 评估</strong>：记录飞行时间、轨迹平滑度、控制量、成功率。6-panel 可视化 (3D trajectory + altitude + airspeed + roll/pitch/yaw + control surfaces + reward)。与 Dubins、MPC、VLC、V3 做全面对比。</li>
+    <li><strong>阶段 4 — 对比</strong>：ALC (20.24s, std=1.39) 全面碾压 Dubins (27.94s, std=4.19)、MPC (25.50s, std=3.94)、VLC (25.94s, std=5.14)。比 Dubins 快 27.6%，比 VLC 快 22.0%，且方差最小。</li>
+  </ol>
+</section>
+
+<!-- ═══════════════ 6. 方法与公式 ═══════════════ -->
+<section id="method">
+  <h2>6. 方法与公式</h2>
+
+  <h3>6.1 核心算法</h3>
+  <p>PPO (Proximal Policy Optimization)，基于 Stable-Baselines3 实现。选择 PPO 的核心理由：在 ALC（执行器级控制）的高维连续动作空间中，仅 PPO 的 trust region clipping 机制能稳定收敛。A2C 高方差梯度导致策略崩溃，TD3 确定性策略陷入局部最优，SAC 离线值函数估计在气动耦合中发散。PPO 的"保守更新"恰好匹配了 ALC 对稳定性的极致需求——轻微的动作变化就可能导致飞机进入不可恢复状态。</p>
+
+  <h3>6.2 关键公式</h3>
+
+  <h4>公式组 A：VLC 观测归一化 (Eq.7-8)</h4>
+  <div class="formula-block">
+    <span class="eq-ref">Eq.(7-8)</span>
+    <div class="eq-main">o_VLC = [Delta_psi/(2*pi), tanh(d_h*0.01), tanh(d_v*0.02), tanh((v_a-20)*0.05), tanh(v_z*0.1), omega_z/(4*pi)]^T</div>
+    <div class="eq-note">6D 极坐标观测。Delta_psi: 航向偏差 (目标方位 - 当前偏航角)；d_h: 水平距离 (m)；d_v: 垂直距离 (m)；v_a: 空速 (m/s)；v_z: NED 垂直速度 (m/s)；omega_z: 偏航角速率 (rad/s)。角度用除以极值线性归一化（有界量），距离/速度用 tanh 饱和压缩（无界量），lambda 参数控制敏感区宽度：0.01 对应约 100m 敏感范围，0.02 对应约 50m。</div>
+  </div>
+
+  <h4>公式组 B：VLC 动作反归一化 (Eq.9-10)</h4>
+  <div class="formula-block">
+    <span class="eq-ref">Eq.(9-10)</span>
+    <div class="eq-main">yaw_rate = 0.5 * a[0]          (in [-0.5, +0.5] rad/s)</div>
+    <div class="eq-main">airspeed = 20 + 6 * a[1]       (in [14, 26] m/s)</div>
+    <div class="eq-main">climb_rate = 10 * 3.28 * a[2]  (in [-10, +10] m/s, 乘以 3.28 转为 ft/s)</div>
+    <div class="eq-note">网络输出 a[i] in [-1, +1] (tanh 激活)，反归一化映射到物理范围。airspeed 以巡航速度 20m/s 为中心，climb_rate 需乘以 3.28 因为 JSBSim 内部使用英制单位 (ft/s)。反归一化后的值送入 X8Autopilot 三个 PID 控制器：yaw_rate_to_heading -> roll -> aileron；airspeed_hold_w_throttle；altitude_hold_with_rate -> pitch -> elevator。</div>
+  </div>
+
+  <h4>公式组 C：ALC 观测 (Eq.11-12)</h4>
+  <div class="formula-block">
+    <span class="eq-ref">Eq.(11-12)</span>
+    <div class="eq-main">o_ALC = [VLC 6D, phi/(2*pi), theta/(2*pi), psi/(2*pi), p/(4*pi), q/(4*pi), r/(4*pi)]^T</div>
+    <div class="eq-note">11D 观测，新增 5 维姿态信息。姿态角 (roll/pitch/yaw) 除以 2*pi 归一化到 [-0.5, 0.5]；角速度 (p/q/r) 除以 4*pi 归一化到 [-0.25, 0.25]。ALC 无需反归一化——RL 直接输出舵面指令 aileron=a[0], elevator=a[1], throttle=0.5+0.5*a[2]（因为 throttle 只能在 [0,1] 范围，所以用 0.5 为中立点、0.5 为幅度的线性映射）。</div>
+  </div>
+
+  <h4>公式组 D：奖励函数 (Eq.13)</h4>
+  <div class="formula-block">
+    <span class="eq-ref">Eq.(13)</span>
+    <div class="eq-main">r_t = 0.25 * Delta_d_h + 1.0 * Delta_d_v + 20 * Delta_psi</div>
+    <div class="eq-note">其中 Delta_X = X(t-1) - X(t)，即"上一步减当前步"——距离减小 = 正奖励（鼓励接近目标），距离增大 = 负奖励。三项贡献量级平衡：水平 ~2.5, 垂直 ~2.0, 航向 ~2.0（典型单步值）。无稀疏奖励、无安全惩罚——安全约束通过终止条件保证。</div>
+  </div>
+
+  <h4>公式组 E：PPO Clipped Objective</h4>
+  <div class="formula-block">
+    <span class="eq-ref">PPO</span>
+    <div class="eq-main">L^CLIP(theta) = E_t[ min(r_t(theta)*A_t, clip(r_t(theta), 0.8, 1.2)*A_t) ]</div>
+    <div class="eq-note">r_t(theta) = pi_theta(a_t|s_t) / pi_old(a_t|s_t) 为概率比（importance sampling ratio）。A_t 为 GAE 优势估计 (lambda=0.95, gamma=0.99)。clip 到 [0.8, 1.2]（epsilon=0.2）限制策略更新幅度：A_t > 0（好动作）时上限 1.2 防止过度乐观；A_t < 0（坏动作）时下限 0.8 防止过度惩罚，保留策略多样性。总损失：L_total = L_CLIP - 0.5*L_VF（价值函数损失 = (V(s_t) - R_t)^2）。这是 ALC 中 PPO 唯一收敛而 A2C/TD3/SAC 全失败的关键——clipping 阻止了单次更新中策略做大幅改动。</div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>值</th><th>含义</th><th>选择依据</th></tr>
+    <tr><td>n_steps</td><td>2048</td><td>每次 PPO 更新前收集的经验步数</td><td>SB3 默认值，平衡更新频率和批次大小。16 envs x 128 steps/env</td></tr>
+    <tr><td>n_epochs</td><td>10</td><td>每批经验重复使用的训练轮数</td><td>标准 PPO 设置，充分利用每批数据做多次梯度更新</td></tr>
+    <tr><td>batch_size</td><td>32</td><td>每次梯度更新的 mini-batch 大小</td><td>小批量 -> 多次梯度更新（2048/32=64次/epoch），稳定训练</td></tr>
+    <tr><td>learning_rate</td><td>2.5e-4</td><td>Adam 优化器学习率</td><td>保守的学习率，防止气动耦合环境中梯度爆炸</td></tr>
+    <tr><td>gamma</td><td>0.99</td><td>折扣因子</td><td>接近 1，让策略关注长期回报（飞行时间）而非即时奖励</td></tr>
+    <tr><td>lambda (GAE)</td><td>0.95</td><td>GAE 偏差-方差权衡参数</td><td>偏向低方差，适合高噪声的飞行动力学环境：lambda=1->MC(高方差), lambda=0->1-step TD(高偏差)</td></tr>
+    <tr><td>clip_range</td><td>0.2</td><td>PPO clip 范围 epsilon</td><td>标准值，限制 r_t 在 [0.8, 1.2]，是 ALC 稳定训练的关键</td></tr>
+    <tr><td>n_envs</td><td>16</td><td>并行 JSBSim 环境数量</td><td>SubprocVecEnv，利用多核 CPU 加速经验收集</td></tr>
+    <tr><td>total_timesteps</td><td>2e6</td><td>总训练步数 / seed</td><td>约 976 次 PPO 更新（2M/2048），经验上足够收敛</td></tr>
+    <tr><td>n_seeds</td><td>5</td><td>随机种子数量（T0~T4）</td><td>5 次独立训练取平均+标准差，保证结果统计显著性。RL 跑一次不可信</td></tr>
+    <tr><td>vf_coef</td><td>0.5</td><td>价值函数损失权重</td><td>SB3 PPO 默认值</td></tr>
+    <tr><td>ent_coef</td><td>0.0</td><td>熵正则化系数</td><td>不鼓励显式探索——任务已有足够随机性（目标随机化）</td></tr>
+    <tr><td>max_grad_norm</td><td>0.5</td><td>梯度裁剪阈值</td><td>防止单次梯度更新过大导致策略崩溃</td></tr>
+  </table>
+
+  <h3>6.4 共识算法 / 一致性协议 (如有)</h3>
+  <p>不适用——本文为单机控制，不涉及多智能体协调。但训练采用 CTDE (Centralized Training, Decentralized Execution) 范式：16 个独立 JSBSim 实例并行收集经验（分散执行），经验汇总到 PPO 集中更新策略（集中训练），推理时各环境独立执行。这是 CTDE 最朴素的实现——不需要 MPI、不需要分布式框架，仅靠 SB3 的 SubprocVecEnv。</p>
+</section>
+
+<!-- ═══════════════ 7. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>7. Potential Flaw — 潜在缺陷与延伸</h2>
+
+  <h3>7.1 当前情境局限</h3>
+  <ul>
+    <li><strong>假设限制</strong>：仅验证 Skywalker X8 一种机型（8kg, 2.1m 翼展, 巡航 20m/s），未测试其他机型的气动特性差异。无风扰实验——所有训练和测试均在零风条件下进行。在真实风场中，策略可能因气动条件分布偏移而性能退化，且 ALC 直接控制舵面没有 PID 的鲁棒缓冲层，对风扰更敏感。</li>
+    <li><strong>场景限制</strong>：静态单目标点对点飞行，无动态目标追踪、无避障、无非合作目标。目标点随机但始终是静态的——无法处理移动目标或目标轨迹预测。无地形约束（地形跟随）、无禁飞区 avoidance。</li>
+    <li><strong>规模限制</strong>：单机控制，未扩展到多机编队或协同任务。2M 训练步数对单机够用（约 976 次策略更新），但多机场景下状态-动作空间指数增长，直接扩展可能不收敛。</li>
+  </ul>
+
+  <h3>7.2 可延伸方向</h3>
+  <p>有没有可能通过延伸架构，解决一些新情境下的问题：</p>
+  <ul>
+    <li><strong>维度扩展</strong>：单机 -> 多机编队最短时间协同飞行（需解决机间避碰 + 编队保持的 trade-off）；静态目标 -> 动态/逃逸目标拦截（需引入目标运动预测，论文的密集奖励框架可直接适用于预测拦截点）；点对点 -> 带避障的 cluttered environment（需引入视觉/激光雷达观测）。</li>
+    <li><strong>条件扩展</strong>：加风扰鲁棒性训练（域随机化 wind speed/direction，在 JSBSim 中可直接配置）；加传感器噪声和通信延迟（模拟真实机载传感器退化）；加执行器故障容错（部分舵面失效时的自适应控制——测试 ALC 的鲁棒性极限）。</li>
+    <li><strong>约束扩展</strong>：能耗约束（不只看时间，还要看 energy efficiency——在奖励中加入 throttle 使用量惩罚）；地形约束（复杂地形跟随飞行，将 DEM 数据加入观测）；空域约束（禁飞区 avoidance，在终止条件中加入空域边界检查）。</li>
+  </ul>
+
+  <h3>7.3 数据敏感性分析</h3>
+  <p>若数据有如下不好的性质，方法可能遇到什么困难：</p>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>动力学模型误差 (Sim-to-Real gap)</td><td>JSBSim 模型参数与实际飞机存在偏差（气动系数误差、质量分布误差、执行器动态未建模），策略从仿真迁移到真实飞机时性能可能大幅退化甚至不安全。ALC 直接控制舵面没有 PID 缓冲，对模型误差更敏感</td><td>⭐⭐⭐⭐⭐ (致命)</td></tr>
+    <tr><td>分布偏移 (风扰/湍流)</td><td>训练时零风，测试时有风——观测分布偏移导致策略输出错误动作。ALC 没有 PID 的鲁棒缓冲层，风扰直接影响舵面效果——这是 ALC 最大的实际部署风险</td><td>⭐⭐⭐⭐ (严重)</td></tr>
+    <tr><td>部分可观测 (传感器故障)</td><td>论文已将其建模为 POMDP。但若 GPS 丢失或空速管故障，6D/11D 观测中的关键维度缺失——Delta_psi（GPS 航向）和 v_a（皮托管空速）是策略最依赖的两个维度，缺失后策略可能完全失效</td><td>⭐⭐⭐ (中等)</td></tr>
+    <tr><td>算法选择高度敏感</td><td>仅 PPO 在 ALC 中收敛——A2C/TD3/SAC 全部失败。这意味着方法对 RL 算法选择极度敏感，换一个算法可能完全不可用。若未来出现更好的算法，需要重新验证</td><td>⭐⭐⭐⭐ (严重)</td></tr>
+  </table>
+
+  <h3>7.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 可写成 Paper 的深挖方向</div>
+    <strong>ALC 的 Sim-to-Real 迁移</strong>——这是 ALC 从仿真走向真实飞行的最大瓶颈。思路：域随机化 (Domain Randomization) + 系统辨识 (System Identification) 两步走。训练阶段在 JSBSim 中随机化气动系数（C_L, C_D 加减 10~20%）、质量分布（加减 5%）、执行器延迟（加 10~50ms 随机延迟）——域随机化让策略学会对模型误差鲁棒。部署阶段先用少量真实飞行数据（如 5~10 次手动飞行）做系统辨识矫正仿真模型参数（缩小 sim-to-real gap）。这恰好是 RL 社区目前最活跃的方向之一，且固定翼 ALC 在这个方向上是空白——有明确的 novelty 和 practical impact。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>8. Motivation — 动机推导（第一性原理）</h2>
+
+  <h3>8.1 Idea 推导链</h3>
+  <p>用问句形式，从问题本质出发，一步步推到本文的 idea：</p>
+  <ol>
+    <li><strong>固定翼最短时间飞行被什么限制？</strong><br>本质是一个最短时间最优控制问题。要快就需要极限机动——大滚转角急转弯、快速俯冲后拉升。但这些动作触发强气动耦合（升力/阻力耦合、科里奥利力、陀螺效应），传统控制架构的级联延迟使其无法在物理极限边缘稳定工作。</li>
+    <li><strong>PID 为什么保守？为什么不够好？</strong><br>PID 级联控制（上层规划 -> 中层追踪 -> 下层执行）每层独立设计，三层之间的信号传递引入级联误差和相位滞后。巡航飞行中这不是问题，但在极限机动中，PID 的保守增益和"过冲-纠正-过冲"循环导致无法充分释放机动潜力。MPC 能做更好（比 Dubins 快 8.7%），但需要精确模型且在线求解 6-DOF 非线性优化计算量大。</li>
+    <li><strong>那能不能让 RL 端到端控制？</strong><br>可以。RL 不需要解析模型——它直接从交互中学习。VLC（速度级）已验证：RL 输出高层速度指令，PID 负责底层稳定——框架跑通了。但 VLC 仍受限于 PID 的延迟和保守性（飞行时间 25.94s vs ALC 的 20.24s）。</li>
+    <li><strong>如果 RL+VLC 还是受限于 PID，那能不能让 RL 直接控制舵面？</strong><br>这就是 ALC 的核心 idea——消除 PID 中间层 = 消除级联延迟和误差。但难度极大：RL 必须同时学会姿态稳定和导航和极限机动，6-DOF 气动耦合使梯度信号复杂，轻微动作变化可能导致失速尾旋。实验发现仅 PPO 能收敛——trust region clipping 恰好提供了 ALC 需要的更新稳定性。</li>
+    <li><strong>最终，最简单的解法是什么？</strong><br>PPO + 极简设计：6D 极坐标观测 + 2x64 MLP（5000 参数）+ 三项密集奖励（量级平衡）+ 安全约束用终止条件。不做花哨架构——"Less is More"——结果比 PID/MPC 快 27.6%，标准差最小（1.39s）。</li>
+  </ol>
+
+  <h3>8.2 一句话 Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 Motivation in One Sentence</div>
+    传统 PID 级联控制因延迟无法释放固定翼极限机动能力，那能不能让 RL 端到端直接控制舵面？
+  </div>
+
+  <h3>8.3 如果让你自己想到这个 idea</h3>
+  <p>从第一性原理出发，最合理、最容易的思考路径是什么？</p>
+  <ul>
+    <li><strong>Step 1 — 观察问题本质</strong>：这是一个受物理约束的轨迹优化问题。固定翼动力学有强耦合（气动、惯性），但物理规律是确定性的（常微分方程）——最优策略是存在的。解题关键在于：如何表示状态、如何定义"好"、如何保证安全。</li>
+    <li><strong>Step 2 — 分解子问题</strong>：(a) 状态表示：笛卡尔坐标 vs 极坐标？对飞行来说，方向+距离比绝对坐标更有语义——直接告诉策略"往哪转、还有多远"。(b) 目标定义：最短时间 = 每一步更快接近目标。分解为水平距离减少、垂直距离减少、航向对齐三个指标。(c) 安全保障：安全边界不可逾越，用硬终止而非软惩罚。</li>
+    <li><strong>Step 3 — 为每个子问题找最合适的工具</strong>：状态表示 -> 手工设计特征（极坐标归一化），不依赖网络自动学习；优化算法 -> PPO（需要 on-policy 稳定性 > 样本效率，因为 ALC 梯度方差大）；环境 -> JSBSim（航空航天级气动仿真，风洞实验数据，比简化质点模型可信）。</li>
+    <li><strong>Step 4 — 拼起来，递进验证</strong>：16 并行环境 + PPO + JSBSim + 极坐标观测。VLC 先验证框架可行 -> V3 验证泛化 -> ALC 冲击核心贡献。递进式实验设计降低了调试难度，每一步验证一个假设——如果直接从 ALC 开始，不收敛时无法判断是框架问题还是算法问题还是环境问题。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 9. 核心收获 ═══════════════ -->
+<section id="takeaway">
+  <h2>9. 核心收获</h2>
+
+  <h3>9.1 这篇 Paper 教会我的</h3>
+  <ul>
+    <li><strong>方法论 — 极简设计哲学</strong>：5000 参数的 MLP 策略击败了精心调参的 PID 和 MPC。"Less is More" 不是口号而是实验结果。观测设计比网络设计重要：6D 极坐标观测的信息密度远高于 50+ 维原始状态——好特征远大于大网络。把智慧放在观测设计和奖励设计上，而不是网络结构上。</li>
+    <li><strong>技术手段 — 三项工程原则</strong>：(1) 奖励量级平衡是第一原则——先调权重使各项贡献在同一量级（各约 2），再根据优先级微调；(2) 硬约束用终止条件而非惩罚——让奖励信号保持纯净，安全边界硬性保证；(3) 递进式实验设计——从 V1 到 V3 到 V2，每一步验证一层假设。</li>
+    <li><strong>写作/实验技巧</strong>：5 次随机种子是最低标准——所有结果都是 5 seeds 取平均 + 标准差，避免单次训练的偶然性。对比实验矩阵清晰：三种控制层级 x 四种 RL 算法 x 两种传统方法，覆盖所有竞争对手。在困难任务（ALC）上比较才有区分度——VLC 上四种算法都能收敛，ALC 上只有 PPO 能。</li>
+  </ul>
+
+  <h3>9.2 可以直接用到我的课题里的</h3>
+  <ul>
+    <li><strong>极坐标观测设计模式</strong>：对任何 navigational RL 任务（无人机、机器人、自动驾驶），用 (航向偏差 + 距离) 替代 (x, y, z) 坐标作为观测——这大幅降低了网络的学习负担，因为方向信息被显式提供而非隐式推导。可以直接迁移到动态目标拦截任务——把目标点 P_g 改为预测拦截点。</li>
+    <li><strong>奖励量级平衡原则</strong>：设计多目标奖励函数时，先估算每项的典型单步值，再调整权重使各项贡献在同一量级（正负 20% 内）。不需要理论推导，只需要数值实验——但这是 RL 训练稳定的关键。</li>
+    <li><strong>硬约束 = 终止条件</strong>：安全约束不要放进 reward 里做惩罚——用 episode termination 硬性保证。避免了 reward shaping 的复杂性，且保证了安全边界不可逾越。</li>
+    <li><strong>递进式实验设计</strong>：从简单到复杂，每一步验证一个假设。如果直接从最难的版本开始，不收敛时根本无法定位问题。</li>
+    <li><strong>PPO 的 clipping 恰好匹配 ALC 的稳定性需求</strong>：当动作空间梯度方差极大时（如直接控制舵面），on-policy + trust region 比 off-policy 更稳定——为选择 RL 算法提供了实用指南。</li>
+    <li><strong>5 次随机种子独立训练</strong>：RL 跑一次的结果不可信——必须报告均值和标准差。这是任何 RL 论文的底线。</li>
+  </ul>
+
+  <h3>9.3 Key References (值得跟读的参考文献)</h3>
+  <table>
+    <tr><th>文献</th><th>为什么重要</th></tr>
+    <tr><td>Schulman et al. (2017) — Proximal Policy Optimization Algorithms</td><td>PPO 原始论文。理解 trust region clipping 为什么在 ALC 中唯一收敛的理论基础。epsilon=0.2 的选择、GAE 的偏差-方差权衡（lambda=0.95）、clip 机制的分情况讨论（A>0 和 A<0）。</td></tr>
+    <tr><td>JSBSim Open Source Flight Dynamics Model</td><td>本文使用的仿真引擎。理解 6-DOF 动力学建模细节：气动系数表（风洞实验数据）、Runge-Kutta 4 阶数值积分（dt=1/30s）、机体/风轴/惯性坐标系之间的变换（Eq.5-6 中的 R_bw）。</td></tr>
+    <tr><td>Koch et al. (2019) — Reinforcement Learning for UAV Attitude Control</td><td>将 RL 用于无人机姿态控制的早期工作，使用简化质点模型。本文的 predecessor——证明了 RL 能控制姿态，但没有做到执行器级。对比之下凸显 ALC 的突破性。</td></tr>
+    <tr><td>Hwangbo et al. (2017) — Control of a Quadrotor with Reinforcement Learning</td><td>将 RL 用于四旋翼控制的先驱工作。对比之下，固定翼的难度远大于四旋翼——固定翼是欠驱动系统（4 个控制量 vs 6 个自由度），必须保持前向速度以提供升力，无法悬停，气动耦合更复杂。</td></tr>
+    <tr><td>Stable-Baselines3 Documentation</td><td>本文使用的 RL 框架。理解 SubprocVecEnv 并行化、PPO 实现细节（总损失 = L_CLIP - 0.5*L_VF + 0.0*S）、自定义网络（CustomFeatureExtractor 继承 BaseFeaturesExtractor）。</td></tr>
+  </table>
+</section>
+
+<footer>📄 论文精读笔记 · 模板 v1.0 · 基于"第一性原理 + 控制专家"双视角</footer>
+
+</div>
+</body>
+</html>

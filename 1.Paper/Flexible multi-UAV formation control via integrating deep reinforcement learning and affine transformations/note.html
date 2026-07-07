@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Flexible Multi-UAV Formation Control via DRL and Affine Transformations (Liu, Yan et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Flexible multi-UAV formation control via integrating deep reinforcement learning and affine transformations（融合深度强化学习与仿射变换的多无人机灵活编队控制）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yunhao Liu</strong>（第一作者）、Guanzheng Wang、<strong>Chao Yan</strong>、Xiangke Wang、Zhiping Huang、<strong>Zhihong Liu</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">国防科技大学</strong>（National University of Defense Technology）智能科学学院；<strong class="bold-affil">南京航空航天大学</strong>（Nanjing University of Aeronautics and Astronautics）自动化学院</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">Aerospace Science and Technology</strong>，<strong>2025年2月</strong>，Vol. 157，109812</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://doi.org/10.1016/j.ast.2024.109812" target="_blank">10.1016/j.ast.2024.109812</a> | Received: 2024-08-20 | Revised: 2024-11-24 | Accepted: 2024-12-01 | Published: 2024-12-05</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出一种<strong>模型-数据混合驱动</strong>的两层编队控制框架：决策层用仿射变换（affine transformations）和应力矩阵（stress matrices）保证编队结构的数学完整性（旋转、缩放、剪切、平移），执行层用 PPO-CNN 深度强化学习端到端输出速度指令实现避障与安全导航。两阶段课程学习加速训练收敛。在 STAGE 模拟器中与纯仿射编队、纯学习方法、ORCA 全面对比——本文方法在无碰撞前提下实现了最优的编队保持能力和运动平滑性，可扩展至 4~10 架 UAV。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-amber">Affine Transformations</span>
+    <span class="tag tag-blue">Deep Reinforcement Learning (DRL)</span>
+    <span class="tag tag-green">Multi-UAV Formation Control</span>
+    <span class="tag tag-purple">Model-Data Hybrid-Driven</span>
+    <span class="tag tag-red">End-to-End Velocity Control</span>
+    <span class="tag tag-cyan">PPO-CNN</span>
+    <span class="tag tag-gray">Leader-Follower Architecture</span>
+    <span class="tag tag-amber">Stress Matrix</span>
+    <span class="tag tag-green">Curriculum Learning</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>为什么纯模型方法（仿射编队）和纯学习方法都不能同时做好编队保持和避障？</strong><br>
+    答：因为编队保持是<strong>结构化数学约束</strong>（共线性、比例关系、应力平衡），而避障是<strong>非结构化环境适应</strong>（障碍物分布任意、动态变化）。前者适合数学模型，后者适合数据驱动学习——单一范式无法同时覆盖两个本质不同的子问题。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>编队控制 = 结构保持（模型驱动）+ 安全导航（数据驱动），两者解耦、各司其职。</strong>决策层用仿射变换保证"形状不会散"（数学保证），执行层用 DRL 保证"飞行不会撞"（学习获得）。把编队保持和避障这对天然矛盾拆成两个子问题，分别用最合适的工具解决——模型保证下限（可解释、可保证），学习提高上限（自适应、灵活）。
+  </div>
+
+  <h3>2.2 Inspiration to Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>Zhao (2018) 仿射编队控制理论——仿射变换保持共线性和比例关系，提供结构完整性的数学保证</td><td>编队结构的形状保持可以用仿射变换数学严格描述——不需要学习、不需要调参、数学上可证明。这是模型驱动部分的数学基础</td><td>数学</td></tr>
+    <tr><td>应力矩阵的 Leader-Follower 分块性质（Omega_ff 可逆时 follower 可由 leader 唯一确定）</td><td>每个 follower 只需本地应力矩阵块 + leaders 位置即可独立计算目标——分布式计算的数学保证。这是"分布式算法"的理想形态：数学优雅 + 工程可行</td><td>架构</td></tr>
+    <tr><td>PPO 在连续控制任务中的成功（Schulman et al. 2017）+ 课程学习在 RL 训练中的有效性（Bengio et al. 2009）</td><td>避障和安全导航是难以建模的非结构化子问题，适合交给 DRL 数据驱动——且两阶段课程学习（无障碍到复杂障碍）可以大幅降低训练难度</td><td>方法</td></tr>
+    <tr><td>Long et al. (2018) 的端到端 LiDAR-to-velocity 碰撞避免策略</td><td>从传感器数据直接映射到速度指令的端到端范式，将感知-规划-控制统一到一个神经网络中联合优化——消除模块间累积误差</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 两层模型-数据混合驱动框架</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>纯模型方法（仿射编队）编队精度极高（位置误差 0.078m）但完全没有避障能力——50/50 次实验全部碰撞。纯学习方法能避障（0 碰撞）但编队结构容易被破坏（相似性误差 0.047~0.078）。单一范式无法同时满足编队保持和安全导航。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>受"结构保持与安全导航可解耦"的 insight 启发——编队形状是结构化约束（适合数学模型），避障是非结构化任务（适合 DRL），可以分开处理</div>
+    <div class="novelty-step"><strong>【创新点设计】</strong>决策层用仿射变换 + 应力矩阵输出每架 UAV 的时变目标位置 p_i*(t)，保证编队结构的数学完整性（共线性、比例关系不变）；执行层用 PPO-CNN 策略网络直接输出速度指令 [v_cmd, omega_cmd] 追踪目标位置并避障。两层解耦协同：决策层输出作为执行层输入，各司其职、优势互补。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 基于 LiDAR 局部感知的 PPO-CNN 端到端策略网络</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>每个 UAV 只能感知局部环境（部分可观测 POMDP），需要从高维 LiDAR 数据中提取有用空间特征，同时融合自身状态和任务目标信息做出安全的速度决策</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>受端到端自主驾驶（Chen et al. 2023）和多机器人碰撞避免（Long et al. 2018）的启发——将感知、规划、控制统一到单个神经网络中</div>
+    <div class="novelty-step"><strong>【创新点设计】</strong>观测空间 o_i = {3帧270度LiDAR扫描(3x512距离值), 当前速度[v_i, omega_i], 相对目标位置(极坐标)}。网络结构：2层 Conv1D（32通道, k=5/s=2 + k=3/s=1, ReLU）提取 LiDAR 空间特征，经 FC(256)+ReLU 进一步压缩，然后与速度、目标位置拼接，经 FC(128)+ReLU 融合，Actor 头输出高斯分布均值与方差（v 用 sigmoid 限制输出范围, omega 用 tanh，4维），Critic 头输出 V(o_i)。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 两阶段课程学习 + 自适应 KL-penalty PPO 训练</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>从零开始在复杂障碍场景直接训练 DRL，奖励稀疏、噪声大——策略在学会基本导航前就"迷失"，收敛极慢甚至不收敛。多 UAV 场景状态空间高维、非平稳（每个 UAV 都是其他 UAV 环境的一部分）</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>课程学习（Curriculum Learning）——从简单任务逐步过渡到困难任务；PPO KL-penalty 变体——在多智能体训练中比 clip 变体更稳定</div>
+    <div class="novelty-step"><strong>【创新点设计】</strong>Stage 1（无障碍环境，~70k 迭代）：多 UAV 学习基本导航 + 互碰避免，奖励稳定在 ~90。Stage 2（复杂障碍环境）：用 Stage 1 checkpoint 初始化，lr 降为 2e-5，迁移到随机静态障碍物 + 动态障碍物混合场景，奖励快速收敛到 ~115。自适应 KL 惩罚系数 beta：KL 太大则 beta x 2，太小则 beta / 2，target KL = 15e-4。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 4: 基于应力矩阵分块的分布式目标计算</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>多机分布式计算需求——每架 follower UAV 需要独立计算自己的目标位置，不能依赖中心节点广播，且全局编队结构仍需保持</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>应力矩阵 Omega 的 Leader-Follower 分块性质（Zhao 2018）——当 Omega_ff 可逆时，follower 位置可由 leader 位置唯一确定</div>
+    <div class="novelty-step"><strong>【创新点设计】</strong>推导出分布式计算公式 p_f*(t) = -Omega_ff^{-1} * Omega_fl * p_l(t)。每个 follower 只需知道：(1) leaders 的当前位置 p_l(t)（广播或 LiDAR 感知），(2) 本地存储的应力矩阵子块 Omega_ff^{-1} * Omega_fl（预计算）。无需全局通信、无需中心节点——数学上保证了分布式可计算性。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame — 两层混合驱动框架总览</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph DL["决策层（模型驱动）— 仿射变换 + 应力矩阵"]
+      direction TB
+      NOM["标称编队构型 x"] --> AFF["仿射变换 (A,b)<br/>x'(t) = (A(t) ⊗ I_d) x + [1_N ⊗ I_d] b(t)<br/>旋转 · 缩放 · 剪切 · 平移"]
+      AFF --> STRESS["应力矩阵 Omega 分块<br/>Omega_ll, Omega_lf, Omega_fl, Omega_ff"]
+      STRESS --> PFSTAR["Follower 目标: p_f*(t) = -Omega_ff^{-1} Omega_fl p_l(t)<br/>纯数学计算 — 无需训练"]
+    end
+
+    subgraph EL["执行层（数据驱动）— 每 UAV 一个 PPO-CNN"]
+      direction TB
+      OBS["观测 o_i<br/>LiDAR 270度 x 3帧 (3x512)<br/>+ [v_i, omega_i] + Delta_p_i (极坐标)"]
+      CNN["Conv1D 特征提取<br/>2层: k5s2 / k3s1 · ReLU · 32ch<br/>+ FC(256) ReLU"]
+      CONCAT["特征拼接<br/>LiDAR 特征 + 速度 + 相对目标"]
+      FC["FC(128) + ReLU"]
+      ACTOR["Actor: 高斯分布<br/>mu_v(sigmoid), sigma_v<br/>mu_omega(tanh), sigma_omega"]
+      CRITIC["Critic: V(o_i)"]
+      OBS --> CNN --> CONCAT --> FC
+      FC --> ACTOR
+      FC --> CRITIC
+    end
+
+    subgraph UAVM["UAV 运动学 + 环境"]
+      ACTION["动作: a_i = [v_cmd, omega_cmd]<br/>v in [0, 1.0] m/s<br/>omega in [-1.0, 1.0] rad/s"]
+      KIN["独轮车运动学<br/>x_dot = v cos(psi)<br/>y_dot = v sin(psi)<br/>psi_dot = omega"]
+      ENV["STAGE 仿真器<br/>静态 + 动态 + 复杂障碍物"]
+      ACTION --> KIN --> ENV
+    end
+
+    PFSTAR -->|"p_i*(t) — 目标位置"| OBS
+    ACTOR --> ACTION
+    ENV -.->|"奖励: r_target + r_collision + r_smooth1 + r_smooth2"| CRITIC
+    ENV -.->|"下一状态 o_i' + done 信号"| OBS
+    CRITIC -.->|"GAE 优势估计 · gamma=0.99 · lambda=0.95"| ACTOR
+
+    classDef decision fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef execute fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef uav fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class NOM,AFF,STRESS,PFSTAR decision
+    class OBS,CNN,CONCAT,FC,ACTOR,CRITIC execute
+    class ACTION,KIN,ENV uav
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 从传感器到执行器的完整数据链路</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUTS["每 UAV 输入（每个时间步）"]
+      direction LR
+      LIDAR["LiDAR 扫描<br/>270度 FOV · 512条射线<br/>3帧历史堆叠"]
+      STATE["自身状态<br/>线速度 v_i<br/>角速度 omega_i"]
+      TARGET["相对目标位置<br/>Delta_p_i（距离、角度）<br/>p_i* 来自决策层"]
+    end
+
+    subgraph NETWORK["策略网络 pi_theta（所有 UAV 共享权重）"]
+      direction LR
+      CNN1["Conv1D Layer 1<br/>32通道 · k=5 · s=2 · ReLU"]
+      CNN2["Conv1D Layer 2<br/>32通道 · k=3 · s=1 · ReLU"]
+      FC256["FC(256) + ReLU<br/>LiDAR 特征提取完成"]
+      MERGE["特征融合<br/>Concat(LiDAR特征, v, omega, Delta_p)"]
+      FC128["FC(128) + ReLU"]
+      HEAD_A["Actor 头<br/>Linear -> mu_v, log_sigma_v<br/>Linear -> mu_omega, log_sigma_omega"]
+      HEAD_C["Critic 头<br/>Linear -> V(o_i)"]
+    end
+
+    subgraph OUTPUTS["输出 + 训练信号"]
+      direction LR
+      CMD["速度指令<br/>v_cmd in [0, 1.0] m/s<br/>omega_cmd in [-1.0, 1.0] rad/s"]
+      REW["每步奖励<br/>r_target (+15) + r_collision (-15)<br/>+ r_smooth1 + r_smooth2"]
+      GAE["GAE 优势估计<br/>gamma=0.99 · lambda=0.95<br/>T_horizon=8000 · K_epoch=20"]
+    end
+
+    INPUTS --> NETWORK
+    NETWORK --> OUTPUTS
+
+    LIDAR --> CNN1 --> CNN2 --> FC256 --> MERGE
+    STATE --> MERGE
+    TARGET --> MERGE
+    MERGE --> FC128
+    FC128 --> HEAD_A --> CMD
+    FC128 --> HEAD_C --> GAE
+    REW --> GAE
+    GAE -.->|"PPO KL-penalty 更新<br/>lr=5e-5 / 2e-5 · KL_target=15e-4"| FC128
+    CMD -.->|"驱动 UAV 运动学<br/>独轮车模型"| STATE
+
+    classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef network fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef output fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class LIDAR,STATE,TARGET input
+    class CNN1,CNN2,FC256,MERGE,FC128,HEAD_A,HEAD_C network
+    class CMD,REW,GAE output
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 离线训练 + 在线推理全流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1: Stage 1 训练 — 无障碍环境"]
+      direction LR
+      S1_INIT["初始化: PPO 策略 pi_theta<br/>KL-penalty 变体 · lr=5e-5"]
+      S1_ROLLOUT["采样: N 架 UAV 导航至目标<br/>仅 UAV 间互碰避免<br/>无外部障碍物"]
+      S1_UPDATE["PPO 更新: GAE + KL-penalty<br/>每 8000 步批数据 20 轮训练"]
+      S1_CHECK{"奖励 ~90<br/>~70k 迭代？"}
+      S1_INIT --> S1_ROLLOUT --> S1_UPDATE --> S1_CHECK
+      S1_CHECK -->|"否"| S1_ROLLOUT
+    end
+
+    subgraph PHASE2["阶段2: Stage 2 训练 — 复杂障碍环境"]
+      direction LR
+      S2_INIT["加载 Stage 1 checkpoint<br/>lr=2e-5（精调学习率）"]
+      S2_ROLLOUT["采样: 静态圆柱 + 动态障碍物<br/>随机初始位置 · 随机目标分配"]
+      S2_UPDATE["PPO 更新: 同 GAE + KL-penalty<br/>KL_target=15e-4 · 自适应 beta<br/>KL 过大则 beta×2 · 过小则 beta÷2"]
+      S2_CHECK{"奖励 ~115<br/>收敛？"}
+      S2_INIT --> S2_ROLLOUT --> S2_UPDATE --> S2_CHECK
+      S2_CHECK -->|"否"| S2_ROLLOUT
+    end
+
+    subgraph PHASE3["阶段3: 在线推理 — 分布式执行"]
+      direction LR
+      I_INIT["加载训练好的策略 pi_theta<br/>设置 deterministic=True（使用均值）"]
+      I_LOOP["每时间步 per UAV_i:"]
+      I_OBS["1. LiDAR 扫描 -> 获取观测 o_i"]
+      I_TGT["2. 决策层: 计算 p_i*(t) via Eq.(8)"]
+      I_INFER["3. 策略推理: a_i = pi_theta(o_i)"]
+      I_STEP["4. 执行: v_cmd, omega_cmd -> 运动学步进"]
+      I_DONE{"5. 所有 UAV 到达<br/>或超最大步数？"}
+      I_INIT --> I_LOOP
+      I_LOOP --> I_OBS --> I_TGT --> I_INFER --> I_STEP --> I_DONE
+      I_DONE -->|"否"| I_LOOP
+    end
+
+    S1_CHECK -->|"是: 保存 checkpoint"| S2_INIT
+    S2_CHECK -->|"是: 保存最终策略"| I_INIT
+    I_DONE -->|"是"| EVAL["评估: 位置误差<br/>相似性误差 · Avg Jerk<br/>飞行时间 · 碰撞次数"]
+    PHASE2 -.->|"反馈: 收敛慢则调整超参"| PHASE1
+    EVAL -.->|"反馈: 消融实验验证课程设计"| S1_INIT
+
+    classDef phase1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef phase2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef phase3 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef eval fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    class S1_INIT,S1_ROLLOUT,S1_UPDATE,S1_CHECK phase1
+    class S2_INIT,S2_ROLLOUT,S2_UPDATE,S2_CHECK phase2
+    class I_INIT,I_LOOP,I_OBS,I_TGT,I_INFER,I_STEP,I_DONE phase3
+    class EVAL eval
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心优化问题</span>
+    $$ \min_{\pi_\theta} \; \mathbb{E}\left[ T_i \mid \pi_\theta \right] \quad \text{s.t.} \quad \|p_i - p_j\| \ge r_{\text{safe}},\; \|p_i - o_k\| \ge r_{\text{safe}},\; p_i^* = \text{编队约束},\; \text{独轮车运动学} $$
+    <div class="eq-note">
+      <strong>T_i</strong> = 第 i 架 UAV 到达目标的时间（最小化）&nbsp;|&nbsp;
+      <strong>r_safe</strong> = 0.5 m 安全碰撞半径 &nbsp;|&nbsp;
+      <strong>p_i*</strong> = 满足仿射变换约束的目标位置 &nbsp;|&nbsp;
+      <strong>核心约束</strong>：在满足 UAV 间避碰、障碍物避碰、编队结构约束和独轮车运动学约束的前提下，最小化编队到达目标区域的期望时间。这是一个带有多目标约束的 Multi-Agent POMDP——每个 UAV 仅能通过 270 度 LiDAR 感知局部环境。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>Category</th><th>Content</th><th>Dimension / Range</th></tr>
+    <tr><td><strong>Input</strong></td><td>LiDAR 扫描（270度 FOV x 3帧连续扫描，每帧 512 距离值）+ 当前速度 [v_i, omega_i] + 相对目标位置（极坐标：距离 + 角度）</td><td>LiDAR: 3x512 距离值；速度: 2维；相对目标: 2维（极坐标）</td></tr>
+    <tr><td><strong>Output</strong></td><td>速度指令 [v_cmd, omega_cmd]：线速度 v 和角速度 omega（UAV 体坐标系）</td><td>v in [0, 1.0] m/s, omega in [-1.0, 1.0] rad/s</td></tr>
+    <tr><td><strong>Objective</strong></td><td>每架 UAV 追踪决策层给出的时变目标位置 p_i*(t)，同时避碰并保持编队结构完整性</td><td>飞行时间最短 + 零碰撞 + 编队误差最小 + 运动平滑</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>多无人机编队在复杂障碍环境（已知静态障碍物 + 未知静态障碍物 + 动态障碍物）中灵活飞行：编队需要整体旋转/缩放/剪切/平移以穿越狭窄通道或躲避动态威胁，同时保持编队结构的数学完整性（共线性、比例关系、应力平衡）。本质上是一个<strong>多智能体部分可观测马尔可夫决策过程（Multi-Agent POMDP）</strong>：CTDE 范式（集中式训练、分布式执行）——训练时共享经验池和全局 PPO 更新，推理时每架 UAV 完全独立决策。平台：STAGE 2D 模拟器，场景：静态/动态/复杂三种障碍物环境。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：编队保持 vs 安全导航的固有 trade-off——要保持编队形状就需要约束 UAV 之间的相对位置，但避障要求 UAV 偏离预定位置。两者本质冲突。<br><br>
+    （1）<strong>编队约束的刚性 vs 避障的灵活性</strong>：纯模型驱动方法（仿射编队）用数学约束保证形状完美——但约束越刚性，避障时越不灵活。实验证明仿射编队在静态场景中 50/50 全部碰撞——因为它没有"障碍物"概念。<br><br>
+    （2）<strong>DRL 的"无知"vs 数学的"有知"</strong>：纯数据驱动方法能学会避障（0 碰撞），但不知道编队的结构约束——DRL 不理解共线性、比例关系等几何不变量，导致编队形状在避障过程中被破坏。<br><br>
+    （3）<strong>多智能体的非平稳性</strong>：在 MARL 中，每个 UAV 的策略更新会改变其他 UAV 的环境——从单个 UAV 视角看，环境是非平稳的（其他 UAV 的行为在不断变化）。这使训练更不稳定、收敛更慢。<br><br>
+    <strong>将这三点放在一起</strong>：需要一种框架，让数学模型处理"它擅长的"（结构约束），让 DRL 处理"它擅长的"（非结构化环境适应），同时保证分布式可行性。本文的两层框架是为解决这三重挑战而设计的。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Affine Formation Control<br>（Zhao 2018, 纯模型驱动）</td>
+      <td>用仿射变换（旋转、缩放、剪切、平移）+ 应力矩阵定义编队的灵活构型约束——编队可以变形但保持共线性和比例关系</td>
+      <td>编队精度最高（位置误差 0.078m，相似性误差 0.00034），但<strong>完全不考虑避障</strong>——在静态障碍物场景中 50/50 次实验全部碰撞。数学模型没有"障碍物"概念——这是纯模型方法在复杂环境中的致命缺陷。</td>
+    </tr>
+    <tr>
+      <td>Learning-based Formation<br>（Bai et al. 2022, 纯数据驱动）</td>
+      <td>用 DRL 端到端学习从观测到速度指令的映射，通过 Leader-Follower 相对位置偏移量定义编队约束</td>
+      <td>能避障（0/50 碰撞），但编队结构容易被破坏：静态场景相似性误差 0.047，复杂场景 0.078——均显著高于本文方法的 0.039 和 0.075。原因是相对位置约束过于刚性，在避障时缺乏灵活性。运动平滑性也较差（Avg Jerk 6.374~6.759 vs 本文 6.219~6.402）。</td>
+    </tr>
+    <tr>
+      <td>ORCA (Optimal Reciprocal Collision Avoidance)<br>（Van den Berg et al. 2011）</td>
+      <td>基于速度障碍（Velocity Obstacle）的互惠避碰算法——每架 UAV 独立计算无碰撞速度</td>
+      <td>仅关心避碰，<strong>不关心编队结构</strong>。位置误差极大（2.9~3.7m），尤其在复杂场景中编队形状完全丢失（相似性误差 0.07~0.24）。ORCA-Fixed 策略完全不考虑编队约束；ORCA-varying 虽然引入了仿射变换调整目标，但与 ORCA 的可行解计算冲突——目标变化导致计算开销增大（~80ms vs ~9ms）。</td>
+    </tr>
+    <tr>
+      <td>Optimization-based Methods<br>（MPC 编队导航, Wen et al. 2024）</td>
+      <td>将编队保持和碰撞避免纳入统一优化框架，通过求解带约束的最优控制问题同时处理编队和避障</td>
+      <td>需要将障碍物信息纳入优化框架——在实际应用中获取全局障碍物先验信息非常困难。且经典优化流程通常将整体任务拆分为多个独立优化的模块，各模块间的建模误差会累积（Chen et al. 2023），最终偏离整体编队控制目标。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 编队保持 vs 安全导航的固有矛盾</strong>：保持形状需要约束相对位置，避障需要偏离预定位置——两者本质冲突。单一范式（纯模型或纯学习）无法同时满足。需要一种框架将两者解耦但协同。</li>
+    <li><strong>挑战 2 — 分布式决策的计算可行性</strong>：多 UAV 系统不能依赖中心节点——每架 UAV 需仅凭局部信息（270度 LiDAR + 自身状态 + 邻居/leaders 位置）独立做决策，且全局编队结构仍要保持。这要求目标计算和策略推理都是分布式的。</li>
+    <li><strong>挑战 3 — 多智能体 DRL 的训练非平稳性</strong>：每个 UAV 的策略更新会改变其他 UAV 的环境；状态空间高维（多 UAV 联合状态 + 障碍物），奖励信号在复杂场景中稀疏。直接从复杂场景训练难以收敛——需要课程学习等技巧加速训练。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & KEY FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心算法是一个<strong>两层混合驱动框架</strong>：决策层（模型驱动：仿射变换 + 应力矩阵）+ 执行层（数据驱动：PPO-CNN 端到端策略）。CTDE 范式：集中式训练（共享经验池 + 全局 PPO 更新），分布式执行（每架 UAV 独立通过 LiDAR 感知 + 策略网络推理）。两阶段课程学习加速训练：Stage 1 无障碍环境学习基本导航（~70k 迭代），Stage 2 复杂障碍环境 fine-tune。PPO 使用 KL-penalty 变体（非 clip 变体），自适应 KL 惩罚系数。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。符号解释用中文。</p>
+
+  <!-- Formula Group A: 仿射变换 -->
+  <h4>Group A: 仿射变换 —— 编队灵活构型的数学基础</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) — 仿射变换定义时变目标编队</span>
+    $$ x'(t) = \big(A(t) \otimes I_d\big) \cdot x + \big[\mathbf{1}_N \otimes I_d\big] \cdot b(t) $$
+    <div class="eq-note">
+      <strong>$A(t) \in \mathbb{R}^{d \times d}$</strong> = 仿射变换矩阵（编码旋转、缩放、剪切——2D 场景 d=2）&nbsp;|&nbsp;
+      <strong>$b(t) \in \mathbb{R}^d$</strong> = 平移向量 &nbsp;|&nbsp;
+      <strong>$x \in \mathbb{R}^{dN}$</strong> = 标称编队构型（nominal configuration，由 N 架 UAV 的 2D 位置堆叠而成）&nbsp;|&nbsp;
+      <strong>$x'(t)$</strong> = 时变目标编队构型 &nbsp;|&nbsp;
+      <strong>$\otimes$</strong> = Kronecker 积——将 d x d 变换广播到每架 UAV &nbsp;|&nbsp;
+      <strong>核心意义</strong>：同一个标称形状 x 可以通过不同的 (A,b) 变成完全不同的空间构型（旋转、缩放、剪切、平移的任意组合），但<strong>保持共线性和比例关系不变</strong>——这是编队灵活变换而结构不散的数学保证。
+    </div>
+  </div>
+
+  <!-- Formula Group B: 应力矩阵与分布式目标计算 -->
+  <h4>Group B: 应力矩阵与分布式目标计算 —— Leader-Follower 架构的核心</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 应力矩阵的平衡条件</span>
+    $$ (\Omega \otimes I_d) \cdot x = 0 $$
+    <div class="eq-note">
+      <strong>$\Omega \in \mathbb{R}^{N \times N}$</strong> = 应力矩阵（stress matrix），编码 UAV 之间的相互作用力关系 &nbsp;|&nbsp;
+      <strong>$\omega_{ij} > 0$</strong> = 吸引力（attractive），<strong>$\omega_{ij} < 0$</strong> = 排斥力（repulsive），<strong>$\omega_{ij} = 0$</strong> = 无交互 &nbsp;|&nbsp;
+      <strong>物理直觉</strong>：应力矩阵模拟了编队成员间的"虚拟弹簧网络"——通过动态调整应力参数，编队的相对位置可以被灵活调节以适应环境和任务需求。平衡应力（equilibrium stress）意味着所有"虚拟力"的合力为零，编队处于稳定构型。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(8) — follower 目标位置的分布式计算公式</span>
+    $$ p_f^*(t) = -\Omega_{ff}^{-1} \cdot \Omega_{fl} \cdot p_l(t) $$
+    <div class="eq-note">
+      <strong>$p_f^*(t)$</strong> = follower 的时变目标位置（待计算）&nbsp;|&nbsp;
+      <strong>$p_l(t)$</strong> = leaders 的当前位置（已知——通过广播或 LiDAR 感知获取）&nbsp;|&nbsp;
+      <strong>$\Omega_{ff}^{-1} \cdot \Omega_{fl}$</strong> = 预计算的本地矩阵块（离线计算，在线只需查表）&nbsp;|&nbsp;
+      <strong>核心意义</strong>：当 $\Omega_{ff}$ 可逆时，follower 位置与 leader 位置存在一一对应关系——每个 follower 只需知道 leaders 位置和本地应力矩阵块即可独立计算自己的目标位置。<strong>无需全局通信、无需中心节点</strong>——数学上保证了分布式可计算性。这是整个分布式架构的数学基石。
+    </div>
+  </div>
+
+  <!-- Formula Group C: PPO 策略优化 -->
+  <h4>Group C: PPO 策略优化 —— 连续动作空间中的稳定训练</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(9) — 随机策略采样</span>
+    $$ a_i \sim \pi_\theta(\cdot \mid o_i) $$
+    <div class="eq-note">
+      <strong>$a_i = [v_{\text{cmd}}, \omega_{\text{cmd}}]^T$</strong> = UAV i 的动作（线速度 + 角速度指令）&nbsp;|&nbsp;
+      <strong>$o_i = \{ \text{3帧LiDAR } 3 \times 512,\; [v_i, \omega_i],\; \Delta p_i^{\text{polar}} \}$</strong> = 观测向量 &nbsp;|&nbsp;
+      <strong>$\pi_\theta$</strong> = 以观测为条件的高斯策略（均值和方差由神经网络输出）&nbsp;|&nbsp;
+      训练时从高斯分布采样以引入探索，测试时使用确定性均值（deterministic=True）
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">PPO KL-penalty — 策略优化目标</span>
+    $$ \mathcal{L}(\theta) = \mathbb{E}\left[ \frac{\pi_\theta(a \mid o)}{\pi_{\theta_{\text{old}}}(a \mid o)} \cdot A(o, a) - \beta \cdot \text{KL}\left(\pi_{\theta_{\text{old}}} \parallel \pi_\theta\right) \right] $$
+    <div class="eq-note">
+      <strong>第一项</strong> = 重要性采样比率 x 优势函数——鼓励提高好动作的概率、降低坏动作的概率 &nbsp;|&nbsp;
+      <strong>第二项</strong> = KL 散度惩罚项——限制新旧策略之间的差异，防止策略更新过大导致训练崩溃 &nbsp;|&nbsp;
+      <strong>$\beta$</strong> = 自适应 KL 惩罚系数：如果 $\text{KL} > 1.5 \times \text{KL}_{\text{target}}$，则 $\beta \gets 2\beta$；如果 $\text{KL} < \text{KL}_{\text{target}} / 1.5$，则 $\beta \gets \beta / 2$ &nbsp;|&nbsp;
+      <strong>GAE 优势估计</strong>：$\gamma = 0.99$（折扣因子），$\lambda = 0.95$（GAE 平衡参数），$T_{\text{horizon}} = 8000$（每次更新前收集的步数），$K_{\text{epoch}} = 20$（同批数据重复训练次数）
+    </div>
+  </div>
+
+  <!-- Formula Group D: 奖励函数 -->
+  <h4>Group D: 奖励函数设计 —— 多目标信号的精细平衡</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(16-20) — 多目标奖励函数</span>
+    $$ r = r_{\text{target}} + r_{\text{collision}} + r_{\text{smooth1}} + r_{\text{smooth2}} $$
+    <div class="eq-note">
+      <strong>$r_{\text{target}}$ (Eq.17)</strong>：到达目标奖励 <strong>+15</strong>（如果 $\|p_i - p_i^*\| < 0.1m$）；过程奖励 <strong>$\lambda_1 \cdot (\|p_{t-1} - p^*\| - \|p_t - p^*\|)$</strong>，鼓励 UAV 向目标移动（$\lambda_1 = 2.5$）&nbsp;|&nbsp;
+      <strong>$r_{\text{collision}}$ (Eq.18)</strong>：碰撞惩罚 <strong>-15</strong>（硬惩罚——与到达奖励对称，形成清晰的二分信号）。碰撞条件：$\|p_i - p_j\| < r_{\text{safe}}$ 或 $\|p_i - o_k\| < r_{\text{safe}}$（$r_{\text{safe}} = 0.5m$）&nbsp;|&nbsp;
+      <strong>$r_{\text{smooth1}}$ (Eq.19)</strong>：角速度平滑惩罚 <strong>$-\lambda_2 \cdot |\omega_i|$</strong> 如果 $|\omega_i| > 0.7$（$\lambda_2 = -0.1$），抑制过大角速度防止 zigzag &nbsp;|&nbsp;
+      <strong>$r_{\text{smooth2}}$ (Eq.20)</strong>：自适应 heading 惩罚——当 $|heading\_error| < 0.3$ 时，$r = 0.1 \cdot (0.3 - |heading\_error|)$；否则 $r = -0.1 \cdot |heading\_error|$。除以距离权重因子 d（$d = \|p_i - p_i^*\|$）消除轨迹长度对惩罚的影响：离目标远时惩罚小（允许绕路），近时惩罚大（强制对准目标）
+    </div>
+  </div>
+
+  <!-- Formula Group E: 编队评估指标 -->
+  <h4>Group E: 编队评估指标 —— Procrustes + Laplacian 双重度量</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(21) — 编队位置误差（Procrustes 对齐后）</span>
+    $$ E_{\text{position}} = \min_{R, t, s} \frac{1}{N} \sum_{i=1}^{N} \| p_i^{\text{des}} - (s R p_i^{\text{cur}} + t) \|^2 $$
+    <div class="eq-note">
+      <strong>$R \in SO(2)$</strong> = 最优旋转矩阵 &nbsp;|&nbsp;
+      <strong>$t \in \mathbb{R}^2$</strong> = 最优平移向量 &nbsp;|&nbsp;
+      <strong>$s \in \mathbb{R}^+$</strong> = 最优缩放因子 &nbsp;|&nbsp;
+      <strong>核心思想</strong>：通过 Procrustes 分析找到将当前编队对齐到期望编队的最优相似变换 (s, R, t)，消除旋转、缩放和平移的影响后，用残差评估编队形状的准确性。这使得不同编队形状（不同缩放/旋转）可以公平比较——度量的是"形状保持能力"而非"轨迹跟踪能力"。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(22) — 编队相似性误差（Laplacian-based, 尺度不变）</span>
+    $$ E_{\text{similarity}} = \| L^{\text{cur}} - L^{\text{des}} \|_F^2 = \text{tr}\left\{ (L^{\text{cur}} - L^{\text{des}})^T (L^{\text{cur}} - L^{\text{des}}) \right\} $$
+    <div class="eq-note">
+      <strong>$L^{\text{cur}}, L^{\text{des}}$</strong> = 当前编队和期望编队的对称归一化 Laplace 矩阵 &nbsp;|&nbsp;
+      <strong>$\|\cdot\|_F$</strong> = Frobenius 范数 &nbsp;|&nbsp;
+      <strong>尺度不变性</strong>：该度量对编队的旋转、平移和缩放具有不变性（见 Quan et al. 2023 的详细证明）——只关心图结构的相似性，不关心绝对位置和尺度。这是评估"编队拓扑结构是否被破坏"的最纯粹指标。值越小 = 编队越接近期望形状。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>Parameter</th><th>Value</th><th>Meaning</th><th>Selection Rationale</th></tr>
+    <tr><td>LiDAR FOV / Frames</td><td><strong>270 deg / 3 frames</strong></td><td>扫描角度范围 / 连续历史帧数</td><td>270度覆盖前方+两侧，保留90度后方盲区（依赖邻居间接感知）；3帧提供时序信息（感知动态障碍物的运动趋势）</td></tr>
+    <tr><td>LiDAR Rays / Max Range</td><td><strong>512 rays/frame / 5 m</strong></td><td>每帧扫描线数 / 最大检测距离</td><td>512点在角度分辨率（~0.53度）和计算量之间平衡；5m覆盖UAV安全制动距离</td></tr>
+    <tr><td>Policy Network</td><td><strong>2xConv1D(32ch, k5s2/k3s1) + FC(256) + FC(128) + Actor/Critic</strong></td><td>CNN分支提取LiDAR空间特征 -> FC(256)压缩 -> 拼接速度/目标 -> FC(128)融合</td><td>参考 Long et al. (2018) 的端到端碰撞避免网络架构，在 UAV 编队场景中调整为 4 隐藏层结构</td></tr>
+    <tr><td>PPO gamma / lambda</td><td><strong>0.99 / 0.95</strong></td><td>折扣因子 / GAE偏差-方差平衡参数</td><td>99%未来奖励计入当前决策——编队任务需要长视距规划；lambda=0.95是标准设置</td></tr>
+    <tr><td>lr (Stage1 / Stage2)</td><td><strong>5e-5 / 2e-5</strong></td><td>两阶段学习率递减</td><td>Stage 2 降低学习率做精细调优，避免灾难性遗忘</td></tr>
+    <tr><td>KL_target</td><td><strong>15e-4</strong></td><td>自适应KL惩罚的目标散度</td><td>防止策略更新过大——多智能体训练比单智能体更不稳定</td></tr>
+    <tr><td>T_horizon / K_epoch</td><td><strong>8000 / 20</strong></td><td>每次更新前的收集步数 / 同批数据重复训练次数</td><td>多UAV场景需足够样本评估策略质量；20 epochs充分利用样本（UAV环境采样成本高）</td></tr>
+    <tr><td>r_safe / r_arrive</td><td><strong>0.5 m / +15</strong></td><td>安全碰撞半径 / 到达目标奖励</td><td>考虑UAV尺寸和LiDAR精度；+15 vs -15形成对称二分信号</td></tr>
+  </table>
+
+  <h3>6.4 模型驱动 vs 数据驱动 —— 为什么二者互补？</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>决策层：仿射变换（模型驱动）</h4>
+      <ul>
+        <li>输入：leaders 当前位置 + 标称编队构型</li>
+        <li>输出：每架 UAV 的时变目标位置 p_i*(t)</li>
+        <li><strong>无需训练</strong>——纯数学计算</li>
+        <li>数学保证：共线性、比例关系不变</li>
+        <li>可解释：每个目标位置有明确的几何意义</li>
+        <li>局限：不知道障碍物在哪里</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>执行层：PPO-CNN（数据驱动）</h4>
+      <ul>
+        <li>输入：LiDAR + 速度 + 相对目标 Delta p_i</li>
+        <li>输出：速度指令 [v_cmd, omega_cmd]</li>
+        <li><strong>需训练约 24h</strong>（双阶段课程学习）</li>
+        <li>学习获得：避障策略、平滑导航</li>
+        <li>端到端：感知-规划-控制统一优化</li>
+        <li>局限：不理解编队的几何结构约束</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个关键基础原理：仿射变换（为什么能灵活变形而不散）、应力矩阵（如何实现分布式Leader-Follower框架）、PPO策略优化（如何在高维连续动作空间中稳定训练多智能体）。</p>
+
+  <h3>7.1 仿射变换原理 — 为什么编队可以旋转/缩放/剪切而不破坏形状？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 仿射变换的几何不变性</span>
+    $$ x'(t) = \big(A(t) \otimes I_d\big) \cdot x + \big[\mathbf{1}_N \otimes I_d\big] \cdot b(t) $$
+    <div class="eq-note">
+      <strong>$A(t)$</strong> = 仿射变换矩阵（可任意组合旋转、缩放、剪切——2D 下有 4 个自由度：旋转角、x缩放、y缩放、剪切因子）&nbsp;|&nbsp;
+      <strong>$b(t)$</strong> = 全局平移向量（2 个自由度）&nbsp;|&nbsp;
+      <strong>关键性质 — 仿射变换保持共线性和比例关系</strong>：如果三架 UAV 在标称构型中共线，经过任意仿射变换后仍然共线；如果两段距离在标称构型中的比例为 2:1，变换后仍然是 2:1。但<strong>绝对距离和绝对角度可以改变</strong>——这正是"灵活编队"的数学本质：形状可以缩放/旋转/剪切以穿越狭窄通道，但结构关系不变。
+    </div>
+  </div>
+
+  <p>仿射变换在编队控制中的核心价值在于它的<strong>"灵活但不散"</strong>特性。以 5 架 UAV 的 V 字形编队为例：标称构型定义了 V 字的角度和臂长比例，仿射变换允许领导者将 V 字（a）顺时针旋转 90 度（b）横向压缩穿越狭窄通道（c）纵向拉伸以加快行进速度（d）施加剪切变形以避开障碍物——<strong>但无论怎么变，V 字的三点共线性和两臂比例关系始终保持不变</strong>。这种"变形金刚"式的编队灵活性是非仿射方法（如固定 Leader-Follower 偏移）无法实现的。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>仿射变换（本文决策层）</h4>
+      <p><strong>变换类型</strong>：旋转（rotation）、各向异性缩放（anisotropic scaling，x/y方向独立缩放）、剪切（shear）、平移（translation）——总计 6 自由度（2D 场景）。</p>
+      <p><strong>不变性保证</strong>：共线性（collinearity）和比例距离（ratio of distances）——这是"形状保持"的严格数学定义。</p>
+      <p><strong>为什么需要各向异性缩放？</strong>：穿越狭窄水平通道时，编队需要在 y 方向压缩而不改变 x 方向的间距——各向同性缩放（uniform scaling）无法做到这一点。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>相似变换（刚性编队常用）</h4>
+      <p><strong>变换类型</strong>：仅旋转 + 各向同性缩放（uniform scaling）+ 平移——总计 4 自由度。</p>
+      <p><strong>不变性保证</strong>：角度（angles）和比例距离——比仿射变换更强的约束，但灵活性更差。</p>
+      <p><strong>为什么不够？</strong>：各向同性缩放在 x 和 y 方向等比例变化——编队无法根据环境各向异性调整形状（如狭窄水平通道只需要 y 方向压缩），导致不必要的绕行。</p>
+    </div>
+  </div>
+
+  <h3>7.2 应力矩阵与Leader-Follower框架 — 分布式计算的数学基础</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 应力矩阵的 Leader-Follower 分块与全局编队唯一可重构性</span>
+    $$ \Omega = \begin{bmatrix} \Omega_{ll} & \Omega_{lf} \\ \Omega_{fl} & \Omega_{ff} \end{bmatrix}, \quad p_f^*(t) = -\Omega_{ff}^{-1} \cdot \Omega_{fl} \cdot p_l(t) $$
+    <div class="eq-note">
+      <strong>$l$</strong> = leader 数量（至少需要 d+1 = 3 个 leaders 才能唯一确定 2D 仿射变换——leader 的位置决定了变换参数 A 和 b）&nbsp;|&nbsp;
+      <strong>$\Omega_{ff}$ 可逆性</strong> = 分布式计算的前提条件——如果 $\Omega_{ff}$ 不可逆（不满秩），则无法由 leader 唯一确定 follower 位置 &nbsp;|&nbsp;
+      <strong>物理直觉</strong>：应力矩阵 $\Omega$ 定义了编队成员间的"虚拟弹簧网络"——当 leaders 移动到新位置时，follower 的平衡位置由应力关系唯一确定。这类似于：固定弹簧网络中的某些节点（leaders），其余节点（followers）的位置自动由力平衡方程确定。
+    </div>
+  </div>
+
+  <p><strong>为什么 Leader-Follower 分块是分布式计算的关键？</strong></p>
+  <ul>
+    <li><strong>(1) 全局编队由少数 leaders 唯一确定</strong>：只需 d+1 = 3 个 leaders 的实时位置，所有 follower 就能通过 Eq.(8) 独立计算出各自的目标位置。不需要知道其他 follower 的位置，不需要中心节点——完全分布式。</li>
+    <li><strong>(2) 预计算 + 在线查表</strong>：$\Omega_{ff}^{-1} \cdot \Omega_{fl}$ 是一个离线预计算的常量矩阵（编队构型确定后不变），每个 follower 只需在本地存储对应行即可。在线计算仅为一次矩阵-向量乘法（$O(N)$ 复杂度）。</li>
+    <li><strong>(3) 天然支持编队规模变化</strong>：增加新的 follower 只需在 $\Omega$ 中增加对应行/列，不影响已有 follower 的计算——因为每个 follower 的 Eq.(8) 是独立的。</li>
+    <li><strong>(4) Leader 单点故障是致命弱点</strong>：若 3 个 leaders 中的任何一个掉线，所有 follower 的 $p_f^*(t)$ 计算失效——因为 2 个 leaders 不足以唯一确定 2D 仿射变换（欠定系统）。这是 Leader-Follower 架构的固有缺陷，需要冗余 leader 机制来缓解。</li>
+  </ul>
+
+  <h3>7.3 PPO与策略优化原理 — 为什么PPO适合高维连续控制的多智能体训练？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — PPO KL-penalty vs PPO clip 的适用场景分析</span>
+    $$ \mathcal{L}_{\text{KL}}(\theta) = \mathbb{E}\left[ \frac{\pi_\theta}{\pi_{\theta_{\text{old}}}} \cdot \hat{A} - \beta \cdot \text{KL}(\pi_{\theta_{\text{old}}} \parallel \pi_\theta) \right] \quad \text{vs} \quad \mathcal{L}_{\text{CLIP}}(\theta) = \mathbb{E}\left[ \min\left( \frac{\pi_\theta}{\pi_{\theta_{\text{old}}}} \cdot \hat{A},\; \text{clip}\left(\frac{\pi_\theta}{\pi_{\theta_{\text{old}}}}, 1-\epsilon, 1+\epsilon\right) \cdot \hat{A} \right) \right] $$
+    <div class="eq-note">
+      <strong>KL-penalty 变体（本文采用）</strong>：在目标函数中显式地加入 KL 散度惩罚项 $\beta \cdot KL$，通过自适应调整 $\beta$ 控制策略更新幅度 &nbsp;|&nbsp;
+      <strong>Clip 变体（更常用）</strong>：通过硬截断重要性采样比率到 $[1-\epsilon, 1+\epsilon]$ 来约束更新幅度（$\epsilon = 0.2$ 为默认值） &nbsp;|&nbsp;
+      <strong>为什么本文选择 KL-penalty？</strong>：多智能体训练中环境非平稳（每个 UAV 的策略更新改变其他 UAV 的环境），策略梯度方差更大。KL-penalty 的自适应机制（$\beta$ 根据实际 KL 自动缩放）比固定 $\epsilon$ 的硬截断更灵活——当环境变化剧烈时 $\beta$ 自动增大以稳定训练，平稳时 $\beta$ 减小以加速收敛。
+    </div>
+  </div>
+
+  <p><strong>Actor-Critic 架构的原理分工</strong>：Actor（策略网络）输出动作分布 $a \sim \pi_\theta(\cdot \mid o)$——负责"做决策"；Critic（价值网络）输出 $V(o)$——负责"评价决策的好坏"。GAE（Generalized Advantage Estimation）用 Critic 的 TD 误差计算优势函数 $\hat{A}(o, a) = Q(o, a) - V(o)$，指导 Actor 的更新方向。这种"分工+合作"的架构使得训练比纯策略梯度方法（REINFORCE）高效得多。</p>
+
+  <p><strong>课程学习为什么至关重要？</strong>：多 UAV 编队在复杂障碍物场景中的奖励信号极其稀疏——在到达目标之前，UAV 可能长时间接收不到有意义的正反馈信号，策略在此阶段容易陷入随机游走。课程学习将训练分为（1）无障碍环境学习基本导航和互碰避免——奖励信号密集（每步都能接近目标），策略快速收敛 ~70k 步；（2）用 Stage 1 的"基本功"初始化，在复杂环境中 fine-tune——"已经会走路了，现在只需要学避障"。Without_CL 实验证明了直接从复杂场景训练虽然也能收敛但最终性能显著更差。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    仿射变换保证了编队可以灵活变形而不散（数学不变性）→ 应力矩阵分块使每个 follower 可以独立计算目标（分布式可行性）→ PPO 为执行层提供了在复杂环境中安全追踪目标的能力（学习适应性）→ <strong>三个原理环环相扣</strong>，共同使得"模型保证结构下限 + 学习提高适应性上限"的混合驱动框架成为可能。任何一个原理的缺失都会让整个框架崩溃——这也是为什么之前的团队要么全用模型（撞墙）要么全用学习（编队散架）。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig3.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">UAV感知模型与编队任务示意图</span>
+      <span class="fig-source">来源：论文 Fig. 1 &amp; Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="UAV perception model and formation mission schematic"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>：(Fig. 1) UAV 的 2D LiDAR 感知模型——每架 UAV 配备 270 度视场角的激光扫描仪，提供 512 个距离值/帧，最大检测范围 5m。世界坐标系 (X_w, Y_w) 与机体坐标系 (X_b, Y_b) 的关系由航向角 psi 定义。(Fig. 2) 多 UAV 编队在复杂障碍环境中的任务示意图——已知障碍物（灰色棱柱，需通过编队缩放穿过的狭窄通道）和未知障碍物（黑色圆柱，随机静态 + 动态移动障碍物）混合存在。编队需要实时感知环境并灵活变换构型以安全通过。</p>
+      <ul>
+        <li><strong>270度 FOV 的设计考量</strong>：前方 + 两侧全覆盖，保留 90 度后方盲区——后方障碍物主要由其他 UAV 间接感知（邻居 UAV 可感知到并从编队行为中反映）。这是在感知覆盖和传感器成本之间的工程折中</li>
+        <li><strong>两类障碍物的区分</strong>："已知"障碍物（可设计参考轨迹主动规避）vs "未知"障碍物（必须依赖 LiDAR 实时感知）——这种区分体现了"能用先验知识的地方用模型，不能用先验知识的地方用学习"的混合驱动哲学</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">两层混合驱动控制系统总览与网络结构</span>
+      <span class="fig-source">来源：论文 Fig. 3 &amp; Fig. 6</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Two-layer hybrid framework overview and network architecture"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>：(Fig. 3) 整个两层混合驱动框架的架构总览。左侧决策层（Decision Layer）——标称编队 -> 仿射变换(A,b) -> 应力矩阵分块 -> 每架 UAV 的目标位置 p_i*(t)；右侧执行层（Execution Layer）——观测 = LiDAR + 速度 + 相对目标 -> 神经网络策略 -> 速度指令 -> 独轮车运动学。两层通过 p_i*(t) 连接：决策层的输出作为执行层的输入。(Fig. 6) 策略网络的详细结构——2 层 Conv1D（32 通道, k5s2/k3s1, ReLU）处理 3 帧 LiDAR 数据 -> FC(256)+ReLU -> 与速度 + 目标位置拼接 -> FC(128)+ReLU -> Actor 头（均值 + log标准差，v 用 sigmoid, omega 用 tanh，4维）和 Critic 头（V(o), 1维）。</p>
+      <ul>
+        <li><strong>关键架构决策——解耦点选在"目标位置"</strong>：决策层输出"去哪里"（p_i*），执行层决定"怎么去"（速度指令）。这是一个非常干净的抽象边界——"目标"是两者的唯一接口，各自独立优化。这种"接口最小化"的设计原则值得借鉴</li>
+        <li><strong>Conv1D 而非 Conv2D</strong>：LiDAR 是 1D 序列（270度角度扫描线），使用 1D 卷积自然匹配数据结构。3 帧 LiDAR 作为 3 通道输入——通道维度编码时序信息而非 RGB 颜色</li>
+        <li><strong>双头输出（Actor + Critic）</strong>：Actor 输出高斯分布参数（均值用于确定性推理 + 方差用于训练时探索），Critic 输出状态价值用于 GAE 优势估计。共享底层（CNN + FC 特征提取），分叉顶层——这是 Actor-Critic 架构的标准设计</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">训练环境、奖励曲线、编队飞行轨迹与可扩展性验证</span>
+      <span class="fig-source">来源：论文 Fig. 7, 8, 10-16</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Training environment, reward curves, flight trajectories and scalability"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>：实验结果的核心发现。(Fig. 7) STAGE 训练环境——多 UAV + 随机生成圆柱障碍物（灰色），每轮随机初始化起止位置。(Fig. 8) 两阶段课程学习奖励曲线——Stage 1（无障碍）~70k 迭代收敛至 ~90，Stage 2（复杂障碍）用 Stage 1 checkpoint 初始化，快速收敛至 ~115；Without_CL 曲线（直接从复杂场景训练）虽然也收敛但最终奖励显著更低。(Fig. 10-13) 不同方法在静态/动态/复杂三种场景中的飞行轨迹——本文方法（Ours）保持编队最紧凑、路径最平滑；纯仿射编队（A-F）直接碰撞障碍物；纯学习方法（L-b）在避障时编队结构被拉散；ORCA 编队形状完全丢失。(Fig. 14-16) 可扩展性验证——5/6/10/15 架 UAV 编队的飞行轨迹，编队位置误差随规模增大而成比例增加（正常：累积误差），但平均位置误差和相似性误差保持稳定——证明方法的可扩展性。</p>
+      <ul>
+        <li><strong>两阶段课程学习的有效性</strong>：Without_CL vs With_CL 的对比直接证明了"从简单到复杂"的训练策略在 UAV 编队场景中能显著提升最终性能——这是一个通用且高效的训练技巧</li>
+        <li><strong>编队相似性误差不随规模恶化</strong>（Fig. 16）：15 架 UAV 的相似性误差与 5 架基本持平——说明应力矩阵框架对编队规模的增大具有天然的鲁棒性（只要 Omega_ff 可逆）</li>
+        <li><strong>仿真结果到实机部署的距离</strong>：STAGE 是 2D 模拟器，独轮车模型忽略了俯仰/滚转/偏航耦合和空气动力学效应。从仿真到实机（sim-to-real）仍有相当大的 gap——但本文的分布式架构（每 UAV 仅需局部观测）天然有利于实机迁移</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 2D 平面环境——所有 UAV 在同一高度飞行，障碍物为垂直圆柱体。实际 UAV 在 3D 空间中飞行，需要处理立体障碍物和高度变化。(2) 独轮车运动学（2D 简化模型）——忽略俯仰、滚转、偏航耦合和空气动力学效应。(3) 完美通信假设——leaders 的位置信息 p_l(t) 实时可靠地传递给所有 followers，不考虑丢包、延迟、带宽限制。(4) 已知障碍物可设计参考轨迹——部分依赖人工先验知识。</li>
+    <li><strong>适用场景</strong>：目前仅在 STAGE 2D 模拟器中验证，尚未在实机（物理 UAV）上部署测试。场景复杂度有限——障碍物为规则圆柱体，未测试更复杂形状（墙壁、迷宫、不规则地形）。动态障碍物仅考虑匀速直线运动，未测试加速/转弯/智能对抗等更复杂行为。</li>
+    <li><strong>可扩展性</strong>：虽然验证了 5~15 架 UAV 的编队规模，但论文也承认——随着编队规模增大，计算资源消耗和邻域通信负载会增加。Leader 单点故障风险：若 leader 掉线/被击落，所有 follower 的 p_f*(t) 计算失效（Eq.(8) 依赖 p_l(t) 输入）——整个编队崩溃。这在大规模或对抗场景中尤为严重。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：2D 编队 -> 3D 空间编队——仿射变换矩阵从 R^(2x2) 扩展到 R^(3x3)，应力矩阵框架需推广到 3D（需要至少 4 个 leaders 唯一确定 3D 仿射变换）。独轮车模型 -> 6-DOF 四旋翼/固定翼动力学——策略网络需要输出更高维动作（推力 + 三轴力矩），训练难度陡增。</li>
+    <li><strong>条件放松 — 通信约束下的鲁棒编队</strong>：当前假设 leader 位置实时可用。加入丢包（follower 偶尔收不到 leader 位置）、延迟（收到的是过时位置）、拓扑切换（leader 角色动态转移）后，Eq.(8) 如何修正？可以引入 Kalman 预测（用历史 p_l 预测当前 p_l）+ 不确定性感知（预测方差大时降低速度/增大安全半径）。这是从仿真走向实机部署的关键问题。</li>
+    <li><strong>Sim-to-Real 迁移</strong>：在 STAGE 仿真器中训练，在真实 UAV 上部署——面临感知噪声（真实 LiDAR 的噪声模型与仿真不同）、动力学模型误差（独轮车 vs 真实 UAV 动力学）、延迟（真实系统的传感器-执行器延迟）。Domain Randomization（在仿真中随机化物理参数和传感器噪声）可以缓解 sim-to-real gap。</li>
+    <li><strong>约束加入</strong>：(1) 能耗约束——最小化编队总能耗的同时完成编队任务（多目标优化）。(2) Leader 冗余和故障恢复——多个候选 leader、leader 角色动态转移机制。(3) 通信约束下的分布式一致性——不依赖 leader 广播的自组织编队。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>Leader UAV 故障 / 丢失（单点故障）</td><td>若 leader 掉线，所有 follower 的 p_f*(t) 计算失效（Eq.(8) 依赖 p_l(t) 输入）——整个编队瞬时崩溃。这是 Leader-Follower 架构的致命弱点，在对抗环境或通信受限场景中尤为严重</td><td>致命</td></tr>
+    <tr><td>LiDAR 噪声大 / 部分遮挡</td><td>CNN 特征提取退化，障碍物漏检或误检——策略可能做出危险决策（看不见的障碍物导致碰撞）。270度 FOV 存在 90 度后方盲区，后方高速来障时完全无法感知</td><td>严重</td></tr>
+    <tr><td>分布偏移（训练 vs 测试环境差异大）</td><td>障碍物形状/密度与训练集不同时，DRL 策略泛化能力不足——需要重新训练或 fine-tune。论文只在规则圆柱体障碍物场景中测试</td><td>严重</td></tr>
+    <tr><td>动态障碍物速度过快 / 行为复杂</td><td>DRL 策略的反应时间受限于传感器频率和推理延迟——高速动态障碍物可能来不及规避。训练中只用了 UAV 间互碰作为动态障碍物信号，未专门设计复杂动态障碍物行为</td><td>中等</td></tr>
+    <tr><td>通信延迟 / 丢包</td><td>当前假设 leader 位置实时可用——若通信链路不稳定，followers 收到的 p_l 是过时的，在高速飞行中可能导致编队偏离预定形状甚至内部碰撞</td><td>中等</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>通信约束下的分布式编队鲁棒性</strong>——这是将本文方法从仿真推向实机部署最关键的一步。核心问题：(1) 当 follower 偶尔收不到 leader 位置（丢包率 > 0）时，Eq.(8) 如何修正？可以引入 Kalman 预测——用历史 p_l(t-1), p_l(t-2), ... 预测当前 p_l(t)，并量化预测不确定性。(2) 预测方差大时（通信中断时间长），follower 应采取保守策略——降低速度、增大安全半径。(3) 如果多个 followers 的预测不一致（各自独立预测），编队结构如何保持一致性？这需要引入分布式共识机制。(4) 如果这个方向做成功了，将填补"仿射编队 + DRL"从理论到工程的关键 gap——有理论深度（分布式预测 + 不确定性量化）和工程价值（实机部署），可产出一篇高质量的 Journal 论文。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>编队控制的本质是什么？</strong><br>让一群 UAV 在保持指定形状的同时完成导航任务——从起点到终点，避开环境中的障碍物。本质上是两个子任务的耦合：<strong>形状保持</strong>（结构化约束）+ <strong>安全导航</strong>（非结构化环境适应）。</li>
+    <li><strong>前人怎么做的？为什么不够好？</strong><br>三条路线：（i）纯模型驱动（仿射编队）——形状完美保持但全部撞墙（50/50 碰撞），因为没有避障机制；（ii）纯数据驱动（Learning-based, ORCA）——会避障（0 碰撞）但编队结构散架，因为没有形状约束；（iii）优化方法（MPC）——需要全局障碍物先验信息，实际中难以获取。总之，<strong>单一范式顾此失彼</strong>。</li>
+    <li><strong>如果"保持形状"是数学问题、"避障"是学习问题呢？</strong><br>这就是混合驱动的核心 idea——既然两个子任务需要的能力本质不同（一个是结构化数学约束——共线性/比例关系，一个是非结构化环境适应——任意形状障碍物），那就用最合适的工具分别解决。数学模型保证结构下限（可解释、可保证），DRL 提高适应性上限（灵活、鲁棒）。</li>
+    <li><strong>数学上如何保证分布式可行性？</strong><br>应力矩阵的 Leader-Follower 分块：当 Omega_ff 可逆时，follower 位置可由 leader 位置唯一确定——p_f*(t) = -Omega_ff^{-1} * Omega_fl * p_l(t)。每个 follower 只需本地矩阵块（预计算）+ leader 位置（广播/LiDAR），<strong>完全分布式、无需中心节点</strong>。这是数学优雅 + 工程可行的典型案例。</li>
+    <li><strong>训练上如何从零开始高效学习？</strong><br>两阶段课程学习：Stage 1 无障碍环境学基本导航（奖励信号密集、容易学）-> 保存 checkpoint -> Stage 2 复杂环境 fine-tune（用 Stage 1 的"基本功"作为起点）。PPO KL-penalty 变体 + 自适应 KL 惩罚系数——在多智能体训练中比 clip 变体更稳定。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    传统编队控制中，避障和编队保持是一对天然矛盾——纯模型方法编队完美但全撞，纯学习方法会避障但编队散架。那可不可以把两者解耦，<strong>用仿射变换和应力矩阵保证编队结构（模型驱动），用 PPO 深度强化学习处理避障导航（数据驱动）</strong>——让两者各司其职、优势互补？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：阅读 Zhao (2018) 的仿射编队论文时发现——编队可以完美保持形状，但在任何有障碍物的场景中都会碰撞。同时，阅读 Long et al. (2018) 的多机器人碰撞避免 DRL 论文时发现——机器人能灵活避障，但多个机器人之间没有任何"编队"概念。这两个工作各自解决了一半问题——能不能把它们拼起来？</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"多 UAV 编队控制"分解为两个可独立优化的子问题——（1）编队结构保持（有明确数学模型——仿射变换 + 应力矩阵），（2）安全避障导航（无数学模型——适合 DRL 学习）。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）仿射变换理论（Zhao 2018）——定义了灵活编队的数学框架（旋转/缩放/剪切/平移，保持共线性）；（2）应力矩阵分块（Omega_ff 可逆时 follower 可由 leader 唯一确定）——分布式计算的数学保证；（3）PPO 连续控制（Schulman et al. 2017）——在连续动作空间中稳定训练的 RL 算法。</li>
+    <li><strong>Step 4 — 组装方案</strong>：决策层（仿射变换）输出目标位置 -> 执行层（PPO-CNN）输出速度指令。两层之间唯一的接口是"目标位置"——接口最小化、各自独立优化。训练时用课程学习从简单到复杂。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个教科书级的<strong>"混合驱动"</strong>案例——不是把所有问题都交给黑箱神经网络，也不是固守纯数学模型，而是先分析问题结构：哪些有明确数学模型？（编队形状的共线性/比例关系）哪些难以建模？（任意障碍物环境中的安全导航）。模型保证下限（可解释、可保证），学习提高上限（自适应、灵活）。这是一种值得推广的"工程系统思维"——对 UAV 领域的研究者而言，<strong>"混合"不是折中，而是将问题分解后用最合适工具分别解决</strong>。</li>
+    <li><strong>技术技巧层面</strong>：(1) 将邻居 UAV 视为动态障碍物——训练时只设静态障碍物，邻居自然充当动态障碍物。巧妙省去专门生成动态障碍物数据的工作量，且训练信号更真实（邻居的行为本身就是策略的一部分）。(2) 自适应 heading 惩罚除以距离权重——奖励权重是状态的函数，让策略在不同阶段有不同的行为偏好（远距离容忍绕路、近距离强制对准）。(3) PPO KL-penalty 变体在多智能体场景中可能比 clip 变体更稳定——算法选择要匹配任务特征。(4) 两个独立的编队评估指标——Procrustes 对齐后的位置误差（消除旋转/缩放/平移后评估形状准确性）+ Laplacian 相似性误差（尺度不变地评估拓扑结构）——不给 reviewer 留质疑空间。</li>
+    <li><strong>实验/写作层面</strong>：(1) 多指标评估体系——位置误差 + 相似性误差 + Avg Jerk + 飞行时间 + 碰撞次数 + 计算开销，覆盖安全性、编队质量、运动质量、效率四个维度。(2) Baseline 方法经过参数调优——让对比方法也充分发挥（所有方法都调到 0 碰撞），赢才更有说服力。(3) 可扩展性验证——测试 5~15 架 UAV 的编队规模，用平均误差消除规模效应——证明方法不因规模增大而崩溃。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 编队控制方向</strong>：本文的两层混合驱动框架可以直接作为编队控制的通用模板——用最优控制/几何方法处理结构化约束（编队形状、运动学约束），用 RL/学习处理不确定性（避障、风扰、模型误差）。只要你的问题有"结构化 + 非结构化"的混合特征，这个模板就适用。</li>
+    <li><strong>对于视觉伺服 / 感知方向</strong>：本文用 LiDAR 作为感知输入——但 CNN 结构天然适配任何 1D/2D 传感器数据。如果将 LiDAR 替换为深度相机/光流/事件相机，只需要调整输入维度。执行层的"端到端感知-决策"范式可以直接迁移到视觉伺服场景——输入 RGB/深度图像，输出速度/姿态指令。</li>
+    <li><strong>对于多智能体强化学习方向</strong>：本文的 CTDE 范式（集中式训练 + 分布式执行）+ 课程学习 + 自适应 KL 惩罚是 MARL 的实用工具箱——如果正在做多 UAV 或多机器人的 DRL 训练，这些训练技巧可以直接套用。</li>
+    <li><strong>对于 Sim-to-Real 方向</strong>：本文方法仅在仿真中验证——这恰好是 Sim-to-Real 研究者的机会。如果能将本文的两层框架成功部署到真实 UAV 上（解决 Domain Randomization、通信延迟、传感器噪声等问题），那将是一个非常有影响力的工作。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Zhao (2018) — Affine Formation Maneuver Control of Multiagent Systems. <em>IEEE Trans. Autom. Control</em> 63, 4140-4155</td><td>仿射编队控制的理论基础——定义了仿射变换在编队中的数学框架（包括应力矩阵、Leader-Follower 分块、仿射可定位性条件）。本文决策层的数学源头。必读。</td></tr>
+    <tr><td>Long et al. (2018) — Towards Optimally Decentralized Multi-Robot Collision Avoidance via Deep Reinforcement Learning. <em>ICRA</em></td><td>端到端 LiDAR-to-velocity 碰撞避免策略的开创性工作——本文的网络结构和观测空间设计直接参考了此文。理解 PPO-CNN 在机器人避障中的设计范式。</td></tr>
+    <tr><td>Schulman et al. (2017) — Proximal Policy Optimization Algorithms</td><td>PPO 原始论文——本文使用的 KL-penalty 变体和 clip 变体均出自此。理解两种变体的区别和适用场景（为什么本文选 KL-penalty 而非 clip）。</td></tr>
+    <tr><td>Bai et al. (2022) — Learning-Based Multi-Robot Formation Control with Obstacle Avoidance. <em>IEEE Trans. Intell. Transp. Syst.</em> 23, 11811-11822</td><td>本文的关键 baseline——纯学习方法的编队控制。理解纯学习方法的局限（刚性相对位置约束导致编队灵活性不足），才能理解混合驱动的优势。</td></tr>
+    <tr><td>Quan et al. (2023) — Robust and Efficient Trajectory Planning for Formation Flight in Dense Environments. <em>IEEE Trans. Robot.</em> 39, 4785-4804</td><td>编队相似性误差（Laplacian-based）的提出者——本文直接采用了该指标作为评估标准。理解该指标的尺度不变性证明（对旋转/平移/缩放不变），以及为什么它是评估"编队拓扑结构"的最纯粹指标。</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Liu, Yan et al. · Aerospace Science and Technology 2025 · Flexible Multi-UAV Formation Control via DRL and Affine Transformations · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

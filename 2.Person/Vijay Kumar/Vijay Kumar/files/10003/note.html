@@ -616,7 +616,78 @@ flowchart TD
   </div>
 </section>
 
-<!-- ═══════════════ 7. EXPERIMENTAL RESULTS ═══════════════ -->
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles -- 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本框架需要掌握三个关键原理：Bi-Level 优化的分离性（为什么高低层分离）、LLM 作为参数调节器而非控制器的角色定位（安全-智能分工）、Human-in-the-Loop 在安全关键场景中的闭环校正。</p>
+
+  <h3>7.1 Bi-Level 优化的解耦原理 -- 为什么分两层</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 -- Bi-Level 优化的数学结构</span>
+    $$ \text{Upper (Task Allocation): } \max_{a_{ij}} \sum_{i,j} U(a_{ij}, x_i, \tau_j) \quad \text{s.t. } \sum_j a_{ij} \le C_i $$
+    $$ \text{Lower (Trajectory Planning): } \min_{u_i(t)} \int_{0}^{T} c(x_i(t), u_i(t)) dt \quad \text{s.t. } \dot{x}_i = f(x_i, u_i) $$
+    <div class="eq-note">
+      <strong>Upper Level</strong> = 任务分配层（离散组合优化）：决定哪个机器人追踪哪个目标，涉及 NP-hard 的组合分配问题。&nbsp;|&nbsp;
+      <strong>Lower Level</strong> = 轨迹规划层（连续最优控制）：给定分配后，为每个机器人规划满足动力学约束的安全轨迹。&nbsp;|&nbsp;
+      <strong>为什么分离</strong>：两个问题的时间尺度和数学性质完全不同——分配问题变化缓慢（秒级），轨迹规划需要高频更新（毫秒级）。Mix 在一起会导致维度灾难且无法实时求解。
+    </div>
+  </div>
+
+  <p><strong>Bi-Level 的核心工程意义</strong>：上层解空间是离散的、LLM 擅长的高层推理（"这个目标危险，换一个机器人"），下层解空间是连续的、优化器擅长的数值计算（"加速度 0.5 m/s^2，转向 15 度"）。将 LLM 放在上层允许它用自然语言推理影响离散决策，同时下层的优化器保证每条轨迹都满足硬安全约束。</p>
+
+  <h3>7.2 LLM 的角色定位 -- Parameter Tuner, NOT Controller</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 -- LLM 影响优化而非替代优化</span>
+    $$ \theta_{\text{new}} = \text{LLM}(\text{observation}, \text{team\_status}, \theta_{\text{old}}) $$
+    $$ a^*, u^* = \text{BiLevelOptimizer}(\theta_{\text{new}}, \text{env\_state}) $$
+    <div class="eq-note">
+      <strong>$\theta$</strong> = 优化参数（包括目标权重、约束松弛量、危险区域惩罚系数）&nbsp;|&nbsp;
+      <strong>LLM 的角色</strong>：观察环境（视觉/语义信息）和机器人队伍状态 → 推理哪些参数需要调整 → 输出新的参数配置 &nbsp;|&nbsp;
+      <strong>Optimizer 的角色</strong>：接收参数 → 求解优化问题 → 输出安全可执行的动作序列。LLM <strong>永远不直接输出控制指令</strong>——这是本框架与直接用 LLM 做 planner 的方法的根本区别。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>LLM as Parameter Tuner (本文)</h4>
+      <ul>
+        <li>LLM 输出：<strong>参数配置</strong>（权重、惩罚系数）</li>
+        <li>安全保证：由优化器（硬约束）<strong>保证</strong></li>
+        <li>LLM 错误的影响：<strong>次优但不危险</strong>——参数偏离最优只会导致效率下降，不会违反安全约束</li>
+        <li>适应能力：LLM 可理解"前方有浓烟"并调整相关区域的代价权重</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>LLM as Planner (对比方案)</h4>
+      <ul>
+        <li>LLM 输出：<strong>动作序列 / 控制指令</strong></li>
+        <li>安全保证：<strong>无</strong>——LLM 可能幻觉出危险动作</li>
+        <li>LLM 错误的影响：<strong>灾难性</strong>——一个错误的动作可能导致碰撞或坠毁</li>
+        <li>适应能力：LLM 直接生成动作，但可靠性随场景复杂度下降</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>7.3 Human-in-the-Loop -- 安全关键场景的最后防线</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 -- Human Feedback 的闭环校正回路</span>
+    $$ \theta_{t+1} = \begin{cases} \text{LLM}(\text{obs}_t, \theta_t) & \text{if no human intervention} \\ \text{HumanFeedback}(\text{obs}_t, \theta_t) & \text{if human overrides} \end{cases} $$
+    <div class="eq-note">
+      <strong>Human Supervisor</strong> 可以：(1) 提供 broad guidance（如"避开东北区域"、“优先追踪目标 3"）；(2) 发现 LLM 推理错误并纠正（如 LLM 误判了危险程度）；(3) 在模型 mismatch 或局部极小值时给出跳出指令。&nbsp;|&nbsp;
+      <strong>实验数据</strong>：加入 Human Feedback 后，累计追踪误差从 116.86 降至 100.98（降低 13.6%），感知攻击次数从 23 降至 19（降低 17.4%），通信攻击次数从 10 降至 7（降低 30%）。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    Bi-Level 解耦保证计算可行性（大问题分解为两个可解的子问题）→ LLM 作为 Parameter Tuner 保证安全性（LLM 错误不会导致危险动作）→ Human-in-the-Loop 提供兜底（处理 LLM 无法理解的极端场景）→ <strong>三层保护环环相扣</strong>，使得 LLM 可以安全地参与实时多机器人协调——这是此前无人实现的关键突破。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. EXPERIMENTAL RESULTS ═══════════════ -->
 <section id="figures">
   <h2>7. Experimental Results -- Key Data &amp; Ablation Analysis</h2>
 

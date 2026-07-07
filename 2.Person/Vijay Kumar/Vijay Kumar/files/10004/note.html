@@ -596,9 +596,82 @@ flowchart TD
   </div>
 </section>
 
-<!-- ═══════════════ 7. EXPERIMENTAL RESULTS ═══════════════ -->
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles -- 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 SPINE-HT 需要掌握三个关键原理：LLM 推理的物理世界 Grounding（为什么非结构化环境中 LLM 易失败）、三阶段分解的必要性（generate → assign → refine）、能力感知任务分配（capability-aware allocation）的数学本质。</p>
+
+  <h3>7.1 LLM 推理的物理 Grounding -- 从语言到物理约束</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 -- Grounding 的本质：将语义概念映射为物理约束</span>
+    $$ \text{Subtask} = (\text{action\_desc}, \text{target\_obj}, \text{required\_capabilities}, \text{physical\_constraints}) $$
+    $$ \text{PhysicalConstraints} = \{\text{traversability}, \text{payload}, \text{perception\_range}, \text{endurance}\} $$
+    <div class="eq-note">
+      <strong>action\_desc</strong> = LLM 生成的子任务自然语言描述（如 "survey the north building facade"）&nbsp;|&nbsp;
+      <strong>target\_obj</strong> = 子任务的目标对象，需要被定位到物理世界坐标中 &nbsp;|&nbsp;
+      <strong>required\_capabilities</strong> = 执行此子任务所需的机器人能力集合（如 aerial mobility + 高分辨率相机）&nbsp;|&nbsp;
+      <strong>physical\_constraints</strong> = 从环境中提取的物理约束（如目标区域是否可穿越、到目标的距离是否在感知范围内）
+    </div>
+  </div>
+
+  <p><strong>为什么非结构化环境中 LLM 直接规划会失败</strong>：LLM 在已知结构化环境（如 AI2THOR 室内仿真）中表现尚可，因为它假设环境是已知的、可导航的。但在非结构化环境（无先验地图、真实物理世界）中，LLM 生成的动作经常引用不存在的路径、忽略物理障碍、或分配任务给能力不匹配的机器人。SPINE-HT 的 Grounding 机制强制将 LLM 的抽象推理锚定在可从感知系统获取的物理信息上——这本质上是 <strong>为 LLM 的符号推理提供物理语义锚点</strong>。</p>
+
+  <h3>7.2 三阶段分解原理 -- Generate, Assign, Refine</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 -- 为什么需要三阶段而非一步到位</span>
+    $$ \text{Mission} \xrightarrow{\text{Stage 1: LLM}} \{\text{subtask}_i\} \xrightarrow{\text{Stage 2: Feasibility}} \{\text{valid\_subtask}_i\} \xrightarrow{\text{Stage 3: Allocation}} \{\text{robot}_j \leftarrow \text{subtask}_i\} $$
+    <div class="eq-note">
+      <strong>Stage 1 (Generate)</strong>：LLM 基于 mission specification（自然语言）+ team capability description → 生成 grounded subtasks。每个 subtask 包含所需能力类型和物理约束。&nbsp;|&nbsp;
+      <strong>Stage 2 (Validate / Assign)</strong>：Feasibility checker 验证每个 subtask 是否可执行（如目标是否在可达范围内 + 是否有机器人具有所需能力），然后基于 robot capability profile 进行分配。&nbsp|&nbsp;
+      <strong>Stage 3 (Refine)</strong>：在线执行反馈闭环——如果某机器人无法到达目标（被障碍物阻挡或感知失败），LLM 重新规划该 subtask 或重新分配。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>SPINE-HT 三阶段（本文）</h4>
+      <ul>
+        <li><strong>Generate</strong>: LLM 专注高层推理（"需要检查建筑东侧"）</li>
+        <li><strong>Validate</strong>: 物理世界验证（东侧是否可达？哪个机器人能去？）</li>
+        <li><strong>Refine</strong>: 在线反馈校正（验证失败 → 重新生成或重新分配）</li>
+        <li>每阶段<strong>职责分离</strong>，LLM 只负责它擅长的高层推理</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>一步到位式 LLM Planning（对比方案）</h4>
+      <ul>
+        <li>LLM 同时负责<strong>推理 + 验证 + 分配</strong></li>
+        <li>无物理验证 → 幻觉出的任务可能不可执行</li>
+        <li>无反馈闭环 → 执行失败后无恢复机制</li>
+        <li>异构团队中<strong>成功率极低</strong>（仿真翻倍失败）</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>7.3 能力感知任务分配 -- Capability-Aware Allocation</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 -- 异构机器人的能力匹配问题</span>
+    $$ \text{Match}(r_j, s_i) = \begin{cases} 1 & \text{if } \forall c \in \text{req}(s_i): c \in \text{cap}(r_j) \text{ and } \text{phys\_check}(r_j, s_i) = \text{pass} \\ 0 & \text{otherwise} \end{cases} $$
+    <div class="eq-note">
+      <strong>$\text{req}(s_i)$</strong> = subtask $s_i$ 所需的能力集合（如 aerial mobility, RGB-D perception, manipulation, payload capacity）&nbsp;|&nbsp;
+      <strong>$\text{cap}(r_j)$</strong> = robot $r_j$ 实际拥有的能力集合 &nbsp|&nbsp;
+      <strong>$\text{phys\_check}$</strong> = 物理可行性验证（traversability analysis——如 UAV 可以飞越障碍但 UGV 不行；perception range——目标是否在传感器探测范围内；endurance——电池是否足够往返）&nbsp;|&nbsp;
+      <strong>关键挑战</strong>：非结构化环境中，物理可行性不是先验已知的——需要在分配时在线评估。例如，Spot 可以爬楼梯但 Jackal 不行；UAV 可以从空中调查但续航有限。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    Grounding 将 LLM 的符号推理锚定到物理世界（解决"说得好听但做不到"的问题）→ 三阶段分解让 LLM 只做高层推理（避免 LLM 在不擅长的物理验证上犯错）→ 能力感知分配确保每个子任务分配给真正能完成的机器人（解决异质性挑战）→ <strong>这三者共同使得异构机器人团队可以在非结构化环境中可靠执行复杂的自然语言指令</strong>——仿真中比先前方法成功率翻倍，真实实验中达到 87%。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. EXPERIMENTAL RESULTS ═══════════════ -->
 <section id="figures">
-  <h2>7. Experimental Results — 关键数据与消融分析</h2>
+  <h2>8. Experimental Results — 关键数据与消融分析</h2>
 
   <h3>7.1 仿真实验结果 — 对比基线方法</h3>
   <table>

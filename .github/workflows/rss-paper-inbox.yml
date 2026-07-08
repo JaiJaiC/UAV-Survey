@@ -1,0 +1,46 @@
+name: RSS Paper Candidate Inbox
+
+on:
+  schedule:
+    # Every Tuesday at 9:17 AM Beijing time (1:17 UTC)
+    - cron: "17 1 * * 2"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days back to search"
+        required: false
+        default: "14"
+
+jobs:
+  rss-inbox:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Collect paper candidates
+        run: |
+          python rss_track.py --days ${{ github.event.inputs.days || 14 }} --output rss_inbox/papers_pending.json
+        timeout-minutes: 20
+
+      - name: Commit candidate inbox
+        run: |
+          git config user.name "UAV-Survey-Bot"
+          git config user.email "bot@uav-survey.local"
+          git add rss_inbox/papers_pending.json
+          if git diff --staged --quiet; then
+            echo "No RSS candidate changes to commit"
+          else
+            git commit -m "Auto-update RSS paper candidate inbox ($(date '+%Y-%m-%d'))"
+            git push
+          fi

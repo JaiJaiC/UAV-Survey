@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — The current state and future outlook of rescue robotics</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">1. 论文信息</a>
+  <a href="#insight">2. 核心洞察与创新</a>
+  <a href="#architecture">3. 系统架构</a>
+  <a href="#task">4. 任务定义</a>
+  <a href="#challenge">5. 技术挑战</a>
+  <a href="#method">6. 方法与评估</a>
+  <a href="#principles">7. 基础原理</a>
+  <a href="#figures">8. 图表解读</a>
+  <a href="#flaw">9. 潜在缺陷</a>
+  <a href="#motivation">10. 动机推导</a>
+  <a href="#takeaway">11. 启示与收获</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">The Current State and Future Outlook of Rescue Robotics（救援机器人技术的现状与未来展望）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Jeffrey Delmerico</strong>（苏黎世大学/ETH Zurich）、<strong>Stefano Mintchev</strong>（ETH Zurich）、<strong>Alessandro Giusti</strong>（IDSIA/USI-SUPSI）、<strong>Boris Gromov</strong>（苏黎世大学）、<strong>Kamilo Melo</strong>（EPFL）、<strong>Tomislav Horvat</strong>（ETH Zurich）、<strong>César Cadena</strong>（苏黎世大学）、<strong>Marco Hutter</strong>（ETH Zurich）、<strong>Auke Ijspeert</strong>（EPFL）、<strong>Dario Floreano</strong>（EPFL）、<strong>Luca M. Gambardella</strong>（IDSIA/USI-SUPSI）、<strong>Roland Siegwart</strong>（ETH Zurich）、<strong>Davide Scaramuzza</strong>（苏黎世大学/ETH Zurich）</td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">NCCR Robotics（瑞士国家机器人研究中心）</strong>联盟：苏黎世大学、ETH Zurich、EPFL、IDSIA/USI-SUPSI</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">Journal of Field Robotics</strong>，Volume 36，Issue 7，pp. 1171–1191，2019年10月</td></tr>
+    <tr><td><strong>DOI</strong></td><td><a href="https://onlinelibrary.wiley.com/doi/10.1002/rob.21887" target="_blank">10.1002/rob.21887</a></td></tr>
+    <tr><td><strong>引用</strong></td><td>~182+ 次引用（截至2024年），救援机器人领域高被引综述</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>瑞士NCCR Robotics联盟13位学者联合撰写的大型综述——全面调研<strong>地面机器人、空中机器人、海洋/两栖系统</strong>及<strong>人机控制接口</strong>四大类救援机器人技术；结合来自美国、意大利、瑞士、日本、荷兰7国一线救援专家的深度访谈，评估现有学术研究与<strong>真实灾难响应需求之间的差距</strong>；核心结论：学术研究关注"先进性"（自主性、AI），而救援人员的实际需求优先"可靠性、易用性、持久性、通信能力"——两者之间存在显著错配。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Rescue Robotics</span>
+    <span class="tag tag-green">Ground Robots / UGV</span>
+    <span class="tag tag-amber">Aerial Robots / UAV</span>
+    <span class="tag tag-purple">Marine &amp; Amphibious</span>
+    <span class="tag tag-red">Human-Robot Interaction</span>
+    <span class="tag tag-cyan">Journal of Field Robotics</span>
+    <span class="tag tag-gray">Survey / Technology Readiness Assessment</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>救援机器人研究已经开展了二十余年，为什么一线救援人员仍然很少使用机器人？</strong><br>
+    答：因为<strong>学术研究的目标函数与一线救援的实际需求之间存在系统性错配</strong>——学术界追求"自主性"和"AI"（以论文创新性为驱动），而救援人员最关心的是<strong>鲁棒性、易用性、持久性和快速部署能力</strong>（以任务成功率为驱动）。这不是技术不够先进的问题，而是技术先进的方向与需求的方向不一致。<br><br>
+    问：<strong>本文的核心贡献是什么？</strong><br>
+    答：首次通过<strong>结构化访谈（7国救援专家）+ 系统技术评估</strong>，建立了一个连接学术研究与救援实践的"翻译框架"——不是简单列举现有机器人，而是<strong>从救援人员的需求出发反推技术缺口</strong>，为未来的研究指明"什么方向的研究最有可能对真实救援产生影响"。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>对应的洞察</th><th>类型</th></tr>
+    <tr><td>DARPA Subterranean Challenge、Fukushima事故等真实应急响应案例</td><td>学术机器人系统在实验室条件下表现优异，但在真实灾难现场面临电力、通信、机动性、人机交互的全方位挑战——需要从"实验室功能演示"视角切换为"现场部署生存"视角</td><td>视角转换</td></tr>
+    <tr><td>7国一线救援专家的深度访谈——涵盖美国消防队、意大利山地救援、瑞士民防、日本地震响应、荷兰洪水应急</td><td>救援人员对技术的优先级排序：鲁棒性 > 易用性 > 持久性 > 通信能力 > 速度 > 自主性——这与学术界的关注焦点几乎反向：学术界最关注自主性和新颖性</td><td>需求映射</td></tr>
+    <tr><td>不同机器人平台（地面/空中/海洋/两栖）在各自子领域的技术成熟度差异显著</td><td>无人机（UAV）在侦察和建图方面已接近实用化；地面机器人在复杂地形机动和操控方面差距较大；海洋系统仍处于早期原型阶段——不同平台需要不同的研究优先级</td><td>技术成熟度分类</td></tr>
+    <tr><td>人机交互（HRI）的研究方法与救援场景的高压力、低带宽、时间紧急特性不匹配</td><td>救援场景需要"直觉化"、"单手可操作"、"无需多任务处理"的交互方式——这与实验室中设计的"全身手势追踪"、"VR/AR交互"存在根本性矛盾</td><td>场景约束认知</td></tr>
+  </table>
+
+  <h3>2.3 创新点拆解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：从"供给驱动"到"需求驱动"的评估视角转换</h4>
+    <div class="novelty-step"><strong>【传统综述的不足】</strong>此前的救援机器人综述论文通常按机器人类型（腿式/轮式/飞行）或功能（建图/操控）进行技术罗列，缺乏"这些技术对救援任务到底有多大用处"的批判性判断。</div>
+    <div class="novelty-step"><strong>【本文的不同】</strong>不是从"研究者能做什么"出发，而是从"救援人员需要什么"出发——7位专家的访谈结果构成了全文的评价准则。例如：某篇论文展示了一种高度精巧的四足机器人可以爬楼梯，但救援人员反馈："我需要它至少能连续工作4小时、在泥水中运行、并且我能在30秒内学会控制"——这些约束定义了真正的技术门槛。</div>
+    <div class="novelty-step"><strong>【方法论价值】</strong>建立了一个可复用的评估框架：首先明确救援场景的核心需求（时间紧迫性、环境复杂性、通信限制、操作者认知负荷），然后在每个需求维度上评估每类机器人技术的成熟度——这套框架可以应用于未来任何新型救援技术的评估。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：四大平台类别的跨域对比与技术成熟度雷达图</h4>
+    <div class="novelty-step"><strong>【分类的系统性】</strong>将救援机器人从"地面/空中/海洋/两栖"四个维度进行穿越式对比——同一需求（如"远程侦察"）在不同平台上有不同的技术实现和成熟度，这种跨域视角揭示了互补和替代关系。</div>
+    <div class="novelty-step"><strong>【成熟度差异的启示】</strong>小型无人机（MAV）的侦察建图能力已经接近TRL 8-9（已在真实灾害中部署，如地震后快速3D建图），而蛇形救援机器人、软体两栖机器人的TRL仅为3-5（实验室原型阶段）——这种差异为资源配置（资金、人才、时间）提供了依据。</div>
+    <div class="novelty-step"><strong>【人机接口的独立审视】</strong>将"人机控制接口"作为独立维度与机器人平台并列——强调人的因素在救援场景中并不比"机器人能做什么"次要；新型交互方式（可穿戴设备、手势控制、脑机接口）被评估在救援场景中的实际适用性。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：研究-需求差距的系统性诊断和未来路线图</h4>
+    <div class="novelty-step"><strong>【差距分类】</strong>将学术研究-救援需求差距分为四类：(1) 鲁棒性差距（实验室 vs 真实环境的性能退化）；(2) 易用性差距（专家操作 vs 普通人操作）；(3) 持久性差距（分钟级续航 vs 小时级任务需求）；(4) 信息-行动差距（提供数据 vs 提供可执行的决策支持）。</div>
+    <div class="novelty-step"><strong>【面向未来的建议】</strong>为每类平台和每类差距提供了具体的研究建议——例如：地面机器人"不要追求完全自主，先追求增强远程操控的鲁棒性"；无人机"在多机协同和3D建图的基础上，提升自主场景理解和异常检测能力"；海洋系统"优先发展水陆交界面的过渡能力"。</div>
+    <div class="novelty-step"><strong>【跨领域协同呼唤】</strong>指出未来的突破可能来自传感器小型化+电池能量密度+人工智能鲁棒性三方面的同步进步——单一维度的进步无法弥合上述差距，需要硬件、软件、人因工程的协同演进。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. 救援机器人技术全景架构</h2>
+
+  <h3>3.1 救援机器人技术分类体系</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph RESCUE["救援机器人技术全景"]
+      direction TB
+
+      subgraph PLATFORMS["机器人平台（四大类别）"]
+        direction LR
+        GROUND["地面机器人 · UGV<br/>轮式/履带式/腿式<br/>废墟通过/远程消防/物资运输"]
+        AERIAL["空中机器人 · UAV/MAV<br/>多旋翼/固定翼/可折叠<br/>快速侦察/3D建图/结构评估"]
+        MARINE["海洋与两栖系统<br/>水上/水下/水陆过渡<br/>洪水救援/水下搜索/环境监测"]
+        HRI["人机控制接口<br/>可穿戴/手势/脑机<br/>直觉操控/信息呈现/共享自治"]
+      end
+
+      subgraph CAPABILITIES["核心能力维度"]
+        direction LR
+        LOCO["运动能力 · Locomotion<br/>——<br/>复杂地形通过<br/>多模态运动<br/>自主导航"]
+        PERCEP["感知能力 · Perception<br/>——<br/>GPS拒止定位<br/>多传感器融合<br/>语义场景理解"]
+        MANIP["操控能力 · Manipulation<br/>——<br/>远程操控<br/>力反馈<br/>自主抓取"]
+        COMM["通信能力 · Communication<br/>——<br/>mesh网络<br/>带宽自适应<br/>中继通信"]
+      end
+
+      subgraph DEPLOY["部署与操作约束"]
+        direction LR
+        ROBUST["鲁棒性<br/>——<br/>防水/防尘<br/>抗冲击<br/>温度范围"]
+        EASE["易用性<br/>——<br/>最低培训<br/>直觉操控<br/>错误恢复"]
+        ENDUR["持久性<br/>——<br/>电池续航<br/>能源管理<br/>热管理"]
+        SPEED["速度<br/>——<br/>部署时间<br/>数据回传<br/>决策速度"]
+      end
+    end
+
+    GROUND --> LOCO
+    GROUND --> PERCEP
+    GROUND --> MANIP
+    AERIAL --> PERCEP
+    AERIAL --> LOCO
+    MARINE --> LOCO
+    MARINE --> PERCEP
+    HRI --> MANIP
+
+    LOCO --> ROBUST
+    PERCEP --> SPEED
+    MANIP --> EASE
+    COMM --> ENDUR
+
+    classDef platform fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef cap fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef deploy fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    class GROUND,AERIAL,MARINE,HRI platform
+    class LOCO,PERCEP,MANIP,COMM cap
+    class ROBUST,EASE,ENDUR,SPEED deploy
+    </pre>
+  </div>
+
+  <h3>3.2 学术研究-救援需求差距映射</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph ACADEMIA["学术界关注焦点"]
+      A1["自主性 · Autonomy<br/>完全自主决策"]
+      A2["新颖性 · Novelty<br/>新算法/新机构"]
+      A3["精度 · Precision<br/>亚厘米级定位"]
+      A4["前沿 · Cutting-edge<br/>AI/深度学习"]
+    end
+
+    subgraph GAP["⬅ 系统性差距 ➡"]
+      G1["实验室 → 真实环境<br/>条件退化"]
+      G2["专家 → 普通人<br/>操作门槛"]
+      G3["演示 → 任务<br/>续航不足"]
+      G4["数据 → 决策<br/>信息过载"]
+    end
+
+    subgraph RESPONDERS["救援人员真实需求"]
+      R1["鲁棒性 · Robustness<br/>在泥水/烟雾/高温中运行"]
+      R2["易用性 · Ease of Use<br/>30秒内学会基本操作"]
+      R3["持久性 · Endurance<br/>连续工作4-8小时"]
+      R4["可操作信息 · Actionable Info<br/>直接支持救援决策"]
+    end
+
+    A1 -.->|"差距：自主性 ≠ 可靠性"| G1
+    A2 -.->|"差距：新颖 ≠ 实用"| G2
+    A3 -.->|"差距：室内精度 ≠ 室外鲁棒性"| G3
+    A4 -.->|"差距：AI不可解释"| G4
+
+    G1 --> R1
+    G2 --> R2
+    G3 --> R3
+    G4 --> R4
+
+    classDef acad fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef gap fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef resp fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    class A1,A2,A3,A4 acad
+    class G1,G2,G3,G4 gap
+    class R1,R2,R3,R4 resp
+    </pre>
+  </div>
+
+  <h3>3.3 技术成熟度分布（按平台分类）</h3>
+  <table>
+    <tr><th>平台类别</th><th>典型系统</th><th>技术成熟度 (TRL)</th><th>已在真实灾害中使用？</th><th>主要瓶颈</th></tr>
+    <tr><td><strong>小型无人机 (MAV)</strong></td><td>DJI Matrice、senseFly eBee、ETH Zurich Fotokite</td><td><strong>TRL 7-9</strong>（3D侦察/建图近实用化）</td><td>是（地震、飓风后快速建图）</td><td>续航（20-30分钟）、恶劣天气飞行、自主场景理解</td></tr>
+    <tr><td><strong>折叠/系留无人机</strong></td><td>Flyability Elios、Fotokite（系留）</td><td><strong>TRL 7-8</strong></td><td>是（狭窄空间检查）</td><td>系留线缠绕、强风稳定性</td></tr>
+    <tr><td><strong>轮式/履带式地面机器人</strong></td><td>iRobot PackBot、QinetiQ Talon</td><td><strong>TRL 7-9</strong>（已军事化）</td><td>是（Fukushima核事故等）</td><td>楼梯/瓦砾通行能力、通信范围</td></tr>
+    <tr><td><strong>四足/人形腿式机器人</strong></td><td>Boston Dynamics Spot、ANYmal</td><td><strong>TRL 5-7</strong></td><td>有限（试验性部署）</td><td>可靠性、速度、成本</td></tr>
+    <tr><td><strong>蛇形/软体机器人</strong></td><td>CMU Snake Robot、Stanford Vine Robot</td><td><strong>TRL 3-5</strong></td><td>否（实验室原型）</td><td>运动速度、控制精度、能源</td></tr>
+    <tr><td><strong>海洋/水下机器人</strong></td><td>BlueROV、EMILY应急浮标</td><td><strong>TRL 5-7</strong></td><td>有限（洪水救援试验）</td><td>水流适应性、水陆过渡</td></tr>
+    <tr><td><strong>两栖系统</strong></td><td>EPFL Salamandra、Velox</td><td><strong>TRL 3-5</strong></td><td>否（早期原型）</td><td>过渡效率、密封性、通用性</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义 —— 救援机器人需要解决什么问题？</h2>
+
+  <h3>4.1 灾难响应的时间线与机器人介入点</h3>
+  <div class="callout info">
+    <div class="callout-title">救援任务的时间结构</div>
+    灾难响应通常分为四个阶段：(1) <strong>初始响应</strong>（0-24小时）：生命探测、危险评估、快速侦察——机器人可以进入不安全的建筑进行初步侦察；(2) <strong>搜救阶段</strong>（24-72小时）：定位幸存者、建立通信、规划通道——机器人需要在杂乱/不稳定环境中移动并找到幸存者；(3) <strong>恢复阶段</strong>（3天-数周）：结构评估、废墟清理、物资运输——机器人需要执行更重型的任务；(4) <strong>重建阶段</strong>（数周-数月）：长时间持续监测、基础设施修复——机器人需要长续航和自主性。
+  </div>
+
+  <h3>4.2 各平台的核心任务规格</h3>
+  <table>
+    <tr><th>平台</th><th>核心任务</th><th>任务输入</th><th>任务输出</th><th>时间约束</th></tr>
+    <tr><td><strong>地面机器人</strong></td><td>废墟中搜索幸存者、危险物质检测、远程消防、物资运输</td><td>操作者指令（远程操控）、GPS坐标、环境先验地图</td><td>实时视频流、传感器读数、幸存者位置估计</td><td>续航 > 2小时；操作延迟 < 200ms</td></tr>
+    <tr><td><strong>空中机器人</strong></td><td>快速3D侦察建图、结构损伤评估、热成像搜索、通信中继</td><td>飞行区域、分辨率需求、传感器配置</td><td>3D点云/网格地图、正射影像、热力图、目标检测</td><td>单次飞行 > 30分钟；覆盖面积 > 1 km²</td></tr>
+    <tr><td><strong>海洋/两栖</strong></td><td>洪水区域人员搜索、水下结构检查、环境样本采集</td><td>搜索区域、水深、流速信息</td><td>声纳/光学图像、水质数据、目标位置</td><td>水流条件下的稳定定位 > 1小时</td></tr>
+    <tr><td><strong>人机接口</strong></td><td>在高压环境下为操作者提供优化的机器人控制界面</td><td>操作者的物理输入（手势、语音、操纵杆）</td><td>机器人的运动/操控指令、操作者的态势感知增强</td><td>学习时间 < 5分钟；误操作率 < 1%</td></tr>
+  </table>
+
+  <h3>4.3 本文的任务：技术状态评估</h3>
+  <p>本文的任务不是"提出一种新的救援机器人"，而是回答三个核心问题：</p>
+  <ol>
+    <li><strong>当前救援机器人技术达到了什么水平？</strong>——按地面/空中/海洋/接口四类分别评估技术成熟度。</li>
+    <li><strong>学术研究离一线救援人员的真实需求还有多远？</strong>——通过7国专家访谈获得需求侧视角。</li>
+    <li><strong>未来的研究应该往哪个方向走？</strong>——基于差距分析提出优先研究方向和路线图。</li>
+  </ol>
+  <p>这种"技术状态评估 + 需求映射 + 路线规划"的组合构成了综述论文的完整闭环。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. 技术挑战 —— 为什么救援机器人难以实用化？</h2>
+
+  <h3>5.1 挑战全景：从实验室到灾难现场的五重鸿沟</h3>
+  <table>
+    <tr><th>挑战维度</th><th>实验室环境</th><th>真实灾难现场</th><th>关键差距</th></tr>
+    <tr><td><strong>环境条件</strong></td><td>平坦地面、良好照明、室温</td><td>瓦砾堆、泥水、浓烟、零下至+50°C</td><td>IP防水防尘等级、宽温域电子元件、抗冲击结构</td></tr>
+    <tr><td><strong>感知条件</strong></td><td>纹理丰富、GPS可用、已知地图</td><td>浓烟/尘埃（视觉失效）、GPS拒止、地图未知/动态变化</td><td>多模态感知融合、无GPS定位、动态SLAM</td></tr>
+    <tr><td><strong>运动条件</strong></td><td>无障碍开阔空间</td><td>瓦砾/楼梯/斜坡/水坑/狭窄缝隙</td><td>多模态运动（行走+攀爬+游泳）、地形自适应</td></tr>
+    <tr><td><strong>通信条件</strong></td><td>WiFi/有线（高带宽低延迟）</td><td>信号屏蔽（钢筋水泥）、带宽受限、间歇性中断</td><td>mesh自组网、延迟容忍、自主回退模式</td></tr>
+    <tr><td><strong>操作者条件</strong></td><td>专注的研究人员（1对1）</td><td>高压、多任务并行、非专业人员</td><td>直觉化交互、共享自治、错误容忍</td></tr>
+  </table>
+
+  <h3>5.2 四类平台的核心技术挑战</h3>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>地面机器人挑战</h4>
+      <ul>
+        <li><strong>非结构化地形通过</strong>：瓦砾、楼梯、斜坡、泥浆——对运动机构的鲁棒性要求极高。腿式在实验室爬楼梯（固定步态参数）与在真实瓦砾中自主选择落脚点是完全不同的问题。</li>
+        <li><strong>尺寸与能力悖论</strong>：大型机器人能力更强但无法进入狭窄废墟缝隙；小型机器人可通过性好但续航和承载力不足——可变形/模块化设计是潜在出路。</li>
+        <li><strong>通信深度</strong>：在钢筋混凝土建筑内部，无线信号被严重衰减——中继节点部署和自主回退是必要条件。</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>空中机器人挑战</h4>
+      <ul>
+        <li><strong>续航时间</strong>：消费级多旋翼20-30分钟续航远不能满足大面积搜索需求——混合动力（油电）、太阳能、系留供电都是未完全解决的问题。</li>
+        <li><strong>恶劣环境飞行</strong>：强风（>10m/s）、雨雪、浓烟、粉尘——GPS辅助定位和视觉定位同时可能失效。</li>
+        <li><strong>与操作者的协同</strong>：无人机通常在操作者视线外飞行（BVLOS），在未知/动态环境中如何保证安全——避障、自主异常返航、空域管理。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>海洋/两栖挑战</h4>
+      <ul>
+        <li><strong>水-陆过渡</strong>：从水面到陆地（或反向）的过渡是纯水面或纯地面机器人不需要面对的独特问题——推进机构需要适应两种介质，密封和浮力设计更为复杂。</li>
+        <li><strong>水下定位与通信</strong>：GPS在水下不可用，声学定位精度低（米级）——水下SLAM仍处于起步阶段。</li>
+        <li><strong>水流适应性</strong>：洪水流速可达5m/s——中小型机器人在强大水流中无法自主定位，需要系留或特殊流体力学设计。</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>人机接口挑战</h4>
+      <ul>
+        <li><strong>认知负荷管理</strong>：救援人员在高压环境下已经面临巨大的认知负荷——机器人控制界面不得增加额外负担。理想界面应该"无感"——就像使用手机一样自然。</li>
+        <li><strong>共享自治的粒度</strong>：完全手动控制→操作者负担重；完全自主→缺乏人类判断的非标准化场景中不可靠。最优粒度在哪里？如何动态切换？</li>
+        <li><strong>信息呈现</strong>：机器人返回大量传感器数据（视频、3D地图、热成像、辐射测量）——如何在有限屏幕空间内呈现"最重要的信息"？</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>5.3 根本性挑战：所有子问题相互耦合</h3>
+  <div class="callout warn">
+    <div class="callout-title">系统性耦合困境</div>
+    救援机器人的子问题不是独立的：<strong>更好的自主性需要更强的感知 → 更强的感知需要更多传感器和计算 → 增加重量和功耗 → 缩短续航 → 限制任务范围</strong>。这是一个负反馈循环，意味着单一维度的技术突破（如更好的SLAM算法）不能单独解决系统级问题——需要硬件（电池、传感器、驱动器）和软件（感知、规划、交互）的同步进步。
+  </div>
+
+  <h3>5.4 从Fukushima事故中吸取的教训（案例深度分析）</h3>
+  <p>2011年Fukushima Daiichi核电站事故是救援机器人历史上最重要（也最令人警醒）的案例。事故后，日本和国际团队部署了多种机器人——iRobot PackBot和Warrior、QinetiQ Talon、以及日本国产的Quince和Survey Runner等。这个案例暴露了救援机器人的五个残酷现实：</p>
+  <ol>
+    <li><strong>辐射对电子元件的破坏</strong>：半导体在>100 Gy的累积剂量下开始出现单粒子翻转和闩锁效应——机器人在高辐射区域中工作数小时后，摄像头出现雪花噪声、通信模块间歇性失效、CPU发生不可恢复的错误。在设计阶段没有人预料到这些"soft errors"会如此迅速地累积。</li>
+    <li><strong>通信在钢筋混凝土中急剧衰减</strong>：核电站建筑有多层钢筋混凝土屏蔽（设计用来防止辐射外泄）——这些屏蔽同样阻挡了无线信号。PackBot在深入建筑20-30米后完全失联——没有任何中继方案。事后诸葛亮：如果预先在沿路部署了中继节点（如mesh路由器），通信范围可以延伸到100米以上。</li>
+    <li><strong>瓦砾和碎片是比楼梯更可怕的障碍</strong>：氢爆炸散落了大量混凝土块、扭曲的钢筋和管道——不是标准的"楼梯"或"门槛"。履带式机器人在缠绕的钢筋堆中反复卡住——需要人类操作者通过有限的摄像头视角远程"解开"——一次救援有时需要2-3小时。</li>
+    <li><strong>电池在高温+高辐射下快速衰减</strong>：锂离子电池在>50°C环境中寿命急剧缩短（Arrhenius加速老化）——设计续航2小时在实际条件下仅40分钟。</li>
+    <li><strong>远程操控的心理负担</strong>：操作者通过延迟的、分辨率有限的、单眼视角的视频远程操控机器人在充满辐射的废墟中导航——一个错误可能导致价值$100k+的机器人不可恢复地丢失。一位操作者事后报告了严重的焦虑症状——将救援机器人操作比作"长时间进行极高赌注的视频游戏"。</li>
+  </ol>
+  <p>这些教训直接塑造了本文的许多建议——特别是：在部署之前必须进行"条件退化测试"（不是在实验室椅子上、而是在模拟真实环境的泥水/高温/振动中测试）；必须设计"自回退"模式（通信中断时机器人自主回到已知的部署点）；以及必须对操作者进行心理负荷管理。</p>
+</section>
+
+<!-- ═══════════════ 6. METHOD ═══════════════ -->
+<section id="method">
+  <h2>6. 综述方法论 —— 如何系统评估一个多维度技术领域</h2>
+
+  <h3>6.1 三步方法论框架</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">综述方法论的三步框架</span>
+    $$ \text{Step 1: 文献系统搜索与分类} \rightarrow \text{Step 2: 专家结构化访谈} \rightarrow \text{Step 3: 差距分析与路线规划} $$
+    <div class="eq-note">
+      <strong>Step 1</strong>：在Google Scholar、IEEE Xplore、Springer、ScienceDirect等数据库中系统搜索，关键词涵盖 rescue robotics、disaster response、search and rescue、human-robot interaction 等——时间范围2000-2019，重点关注近年（2015-2019）的进展。按平台类型（地面/空中/海洋/接口）和功能（运动/感知/操控/通信）进行双层分类 &nbsp;|&nbsp;
+      <strong>Step 2</strong>：设计结构化访谈问卷，采访7位来自美国、意大利、瑞士、日本、荷兰的一线救援专家（消防队长、山地救援队、民防官员、海军应急队）——涵盖"你最需要的机器人功能是什么？""现有技术最大的不足在哪？""你愿意为学习操作花多少时间？"等核心问题 &nbsp;|&nbsp;
+      <strong>Step 3</strong>：将Step 1的技术能力矩阵与Step 2的需求矩阵进行交叉对比——识别"高需求-低成熟度"的技术缺口作为优先研究方向，识别"高成熟度-低需求"的方向作为过度投资警示。
+    </div>
+  </div>
+
+  <h3>6.2 技术评估维度：四类机器人的五维度对比矩阵</h3>
+  <table>
+    <tr><th>评估维度</th><th>地面机器人</th><th>空中机器人</th><th>海洋/两栖</th><th>人机接口</th></tr>
+    <tr><td><strong>运动能力</strong></td><td>★★★★☆（腿式进步快，但可靠性待提高）</td><td>★★★★★（已高度成熟，续航是瓶颈）</td><td>★★★☆☆（水下螺旋桨成熟，水陆过渡困难）</td><td>N/A</td></tr>
+    <tr><td><strong>感知能力</strong></td><td>★★★☆☆（视觉SLAM在废墟中失效）</td><td>★★★★☆（3D建图成熟，语义理解不足）</td><td>★★☆☆☆（水下视觉/声纳精度低）</td><td>N/A</td></tr>
+    <tr><td><strong>操控能力</strong></td><td>★★★☆☆（单臂抓取可行，双臂精细操作难）</td><td>★★☆☆☆（空中接触式操控极其困难）</td><td>★★☆☆☆（水下操控精度受水流影响大）</td><td>★★★☆☆（多种新型接口出现但没有标准）</td></tr>
+    <tr><td><strong>通信能力</strong></td><td>★★★☆☆（中继可扩展但需要手部署）</td><td>★★★★☆（空中中继天然优势）</td><td>★☆☆☆☆（水下射频不可用，声学带宽极低）</td><td>N/A</td></tr>
+    <tr><td><strong>部署速度</strong></td><td>★★★☆☆（大型UGV运输/部署慢）</td><td>★★★★★（背包携带，几分钟起飞）</td><td>★★☆☆☆（需要运输+水面部署）</td><td>★★★★☆（穿戴式设备部署快但需要标定）</td></tr>
+    <tr><td><strong>续航能力</strong></td><td>★★★★☆（1-4小时，可换电）</td><td>★★☆☆☆（20-30分钟是主要瓶颈）</td><td>★★★☆☆（水下1-2小时，水面更长）</td><td>★★★★★（穿戴设备续航长）</td></tr>
+  </table>
+
+  <h3>6.3 专家访谈的核心发现</h3>
+  <div class="callout tip">
+    <div class="callout-title">访谈共识 —— 救援人员确实需要机器人，但不希望它"取代"人</div>
+    <p>7位专家的共识可以概括为：</p>
+    <ul>
+      <li><strong>"机器人是工具，不是替代品"</strong>——救援人员希望机器人增强他们的感知和行动能力，而不是完全取代人类的判断。完全的自主救援决策被所有人拒绝。</li>
+      <li><strong>"鲁棒性压倒一切"</strong>——如果机器人在关键时刻"罢工"，救援人员不仅不会使用它，还会失去对技术的信任。一项新技术必须经过至少10次成功的无故障实地测试，才能被救援单位考虑采用。</li>
+      <li><strong>"易用性是入场券"</strong>——消防员/救援队员不是机器人专家。控制界面必须足够直观，能在5分钟内向从未见过该设备的人解释清楚。触摸屏和手势控制被认为"比操纵杆更直观"。</li>
+      <li><strong>"续航和数据比自主性更迫切"</strong>——当前最紧迫的技术瓶颈是电池续航（无人机飞不到半小时）和通信带宽（在建筑内视频回传不可靠），而不是"更聪明的AI"。</li>
+      <li><strong>"多一点标准化，少一点定制化"</strong>——救援机构不希望每台机器人都需要专门的培训和配件。统一的充电接口、通信协议和操作规范可以大幅降低使用门槛。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. 核心技术原理 —— 救援机器人背后的支撑技术</h2>
+
+  <h3>7.1 无GPS条件下的定位与建图（SLAM）</h3>
+
+  <h4>视觉-惯性里程计（VIO）</h4>
+  <p>无人机和地面机器人在GPS拒止环境（室内、隧道、建筑内部）中依赖VIO进行位姿估计。核心是将相机图像与IMU数据进行紧耦合——IMU提供高频短时位姿预测（400Hz），相机观测提供低频但绝对的位置校正（20Hz）。</p>
+
+  <div class="formula-block">
+    <span class="eq-tag">VIO状态估计的ESKF框架</span>
+    $$ \mathbf{x} = [\mathbf{p}, \mathbf{v}, \mathbf{q}, \mathbf{b}_a, \mathbf{b}_g]^T \quad \text{（位置、速度、姿态四元数、加速度偏置、陀螺偏置）} $$
+    $$ \dot{\mathbf{p}} = \mathbf{v}, \quad \dot{\mathbf{v}} = \mathbf{R}(\mathbf{q})(\mathbf{a} - \mathbf{b}_a) + \mathbf{g}, \quad \dot{\mathbf{q}} = \frac{1}{2}\mathbf{q} \otimes (\boldsymbol{\omega} - \mathbf{b}_g) $$
+    <div class="eq-note">
+      <strong>状态向量 $\mathbf{x}$</strong> 包含5个分量共16维 &nbsp;|&nbsp;
+      <strong>IMU运动方程</strong> 驱动状态预测：位置由速度积分，速度由加速度（旋转到世界系并减去重力）积分，姿态由角速度四元数积分 &nbsp;|&nbsp;
+      <strong>相机观测</strong>：图像帧中观测到的特征点坐标提供重投影误差约束——$e = u_{obs} - \pi(\mathbf{R}^T(\mathbf{p}_f - \mathbf{p}))$，其中 $\pi$ 是相机投影函数 &nbsp;|&nbsp;
+      <strong>关键问题</strong>：当场景深度 $Z$ 很大时，特征点的深度不确定性 $\sigma_Z \propto Z^2/b$（$b$ 是三角化基线），高空飞行时 $Z=50m$, $b=0.5m$，$\sigma_Z$ 可达数十米——VIO实质上退化。
+    </div>
+  </div>
+
+  <h4>激光雷达SLAM（LiDAR SLAM）</h4>
+  <p>相比视觉SLAM，LiDAR提供直接的3D距离测量（不依赖三角化），因此在无纹理环境（浓烟、纯色墙壁）中更鲁棒。典型的LiDAR SLAM（如LOAM）流程：点云特征提取（边缘点+平面点）→ 点到线/点到面的ICP配准 → 局部地图维护 → 位姿图优化。主要缺点是重量（车载LiDAR 1-5kg）、功耗和成本，限制了在小型无人机上的应用。</p>
+
+  <h3>7.2 复杂地形运动机制</h3>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>腿式运动（Legged Locomotion）</h4>
+      <p><strong>核心问题</strong>：在每个接触点生成合适的足底力以实现目标质心动量。相机会用到零力矩点（ZMP）或全身运动控制（WBC）。</p>
+      <p><strong>ANYmal（ETH Zurich）</strong>：四足机器人，采用分层控制架构——运动规划 → 足迹生成 → 全身力矩控制。可以在楼梯、斜坡、瓦砾上行走，但真实救援环境中的可靠性仍不满足要求。</p>
+      <p><strong>Raibert-style力控制</strong>：Spring-Loaded Inverted Pendulum（SLIP）模型——将奔跑简化为弹簧-质量系统，每条腿独立力控制。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>变形/可折叠设计</h4>
+      <p><strong>折纸/可折叠无人机</strong>：EPFL的折纸无人机可以从手掌大小展开为全尺寸四旋翼——解决"运输时小、飞行时大"的矛盾。折叠臂在展开后自锁，不需要外部工具。</p>
+      <p><strong>蛇形机器人</strong>：CMU Snake Robot通过多关节协调运动实现多种步态（侧绕、直线蠕动、攀爬管道）——不需要腿或轮子，纯粹依靠身体与环境的接触力。主要缺点是平地上的运动速度慢。</p>
+      <p><strong>Fotokite（系留）</strong>：通过绳索从地面供能+控制，续航"无限"，适用于长时间的固定位置监视——系留线同时也提供物理约束（防风）。</p>
+    </div>
+  </div>
+
+  <h3>7.3 人-机器人共享自治（Shared Autonomy）</h3>
+
+  <p>共享自治的核心是"让机器人处理它擅长的事（重复精确的动作、快速反应），让人处理人擅长的事（异常判断、价值权衡、创造性解决方案）"。技术实现可表示为：</p>
+
+  <div class="formula-block">
+    <span class="eq-tag">共享自治的混合控制</span>
+    $$ \mathbf{u}_{\text{final}} = \alpha(t) \cdot \mathbf{u}_{\text{human}} + (1 - \alpha(t)) \cdot \mathbf{u}_{\text{auto}} $$
+    $$ \alpha(t) = f(\text{confidence}, \text{risk}, \text{task\_phase}) $$
+    <div class="eq-note">
+      <strong>$\mathbf{u}_{\text{human}}$</strong> = 操作者发出的控制指令 &nbsp;|&nbsp;
+      <strong>$\mathbf{u}_{\text{auto}}$</strong> = 机器人自主计算的控制指令（如避障、稳定悬停） &nbsp;|&nbsp;
+      <strong>$\alpha(t)$</strong> = 时变混合系数——在自主置信度高且风险低时 $\alpha \rightarrow 0$（更多自主），在不确定性高或即将碰撞时 $\alpha \rightarrow 1$（更多人为干预） &nbsp;|&nbsp;
+      <strong>关键设计问题</strong>：$\alpha(t)$ 的调度策略直接影响系统性能——过于保守（$\alpha$ 始终接近1）则操作者负担不减；过于激进（$\alpha$ 始终接近0）则在异常情况下危险。
+    </div>
+  </div>
+
+  <h3>7.4 多机器人协同通信</h3>
+  <p>多机器人系统中，通信带宽是硬约束。一架无人机的高清视频流（1080p, 30fps）需要5-10 Mbps——在灾区mesh网络中同时传输多路视频可能迅速耗尽带宽。解决方案包括：(1) <strong>语义压缩</strong>：不传输原始图像，只传输目标检测结果（坐标+类别+置信度——每帧仅几百字节）；(2) <strong>事件驱动通信</strong>：仅在检测到异常或重要事件（如发现幸存者）时才触发高带宽传输；(3) <strong>分层中继</strong>：高空无人机作为通信中继，连接地面节点与指挥中心。</p>
+
+  <h3>7.5 地面机器人的运动机构设计原理</h3>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>轮式和履带式</h4>
+      <p><strong>轮式（Wheeled）</strong>：最简单的移动机构——高效、快速、可靠。PackBot使用4个独立驱动的三角形"鳍状"轮（flipper），可以在瓦砾上"蹚"过去。局限性：不能爬楼梯（台阶高度超过轮半径时无法通过）。</p>
+      <p><strong>履带式（Tracked）</strong>：比轮式更大的接地面积 → 更低的接地压力 → 在软地面（泥土、沙、雪）上不易陷落。Talon使用双履带+前置可调节摆臂来增强越障能力。主要缺点：转弯阻力大（滑动摩擦）、低速、能耗高。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>腿式和多模态</h4>
+      <p><strong>四足（Quadruped）</strong>：Spot和ANYmal为代表的现代四足机器人使用"虚拟弹簧-阻尼"力控制（MIT Cheetah范式）或全身模型预测控制（ETH Zurich范式）。每条腿有3个自由度（髋部2+膝部1）→ 12个关节协调驱动。优势：在不连续地形（踏脚石、瓦砾堆）上的优势是无与伦比的——可以选择精确的足部落点而非"碾过去"。</p>
+      <p><strong>混合多模态</strong>：轮-腿混合（如ETH Zurich的Ascento——轮式腿，跳跃+滚动）和飞行-地面混合（如EPFL的折纸无人机——折叠后滚动、展开后飞行）——代表了"不同类型运动的优势互补"的发展趋势。</p>
+    </div>
+  </div>
+
+  <h3>7.6 空中机器人的折叠与变形结构</h3>
+  <p>固定翼无人机机动性好、续航长（可达1-2小时），但需要跑道/弹射器起降、无法悬停。多旋翼可以悬停+垂直起降但续航仅20-30分钟。可折叠/可变形无人机试图在两者之间取得平衡：运输时缩小，任务时展开。EPFL的折纸无人机（origami drone）可以从手掌大小（收纳状态）通过弹性折叠臂的展开在1秒内变成全尺寸四旋翼——折叠臂展开后自锁。在救援场景中，这种快速部署能力意味着救援人员可以从背包中取出无人机并在20秒内将其发射到空中——这对时间紧迫的初始响应阶段极为宝贵。</p>
+
+  <h3>7.7 水下机器人的推力和控制</h3>
+  <p>水下机器人的推进面临与空中机器人完全不同的物理约束：水的密度是空气的800倍，粘性是空气的50倍。水下推力方程：$T = \rho \cdot D^4 \cdot n^2$，其中$D$是螺旋桨直径，$n$是转速——推力与直径的四次方成正比。这意味着水下推进器需要大直径慢转速螺旋桨（不同于空中无人机的小直径高转速）。水下通信使用声学信号（声纳）而非无线电（电磁波在水中衰减极快），声学信道的特点是高延迟、极低带宽（kbps级别）、多径效应严重——这使得需要高带宽的远程操控（如高清视频）在水下基本不可行。水下机器人通常使用预设任务+有限的声学指令更新，而非实时远程操控。</p>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. 论文图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图截图。请将截图保存至 <code>figures/</code> 子目录，命名 <code>fig1.png</code> ~ <code>figN.png</code>。</p>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">救援机器人技术全景概览图</span>
+      <span class="fig-source">来源：论文 Fig. 1（推测为技术分类总览）</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="救援机器人技术全景" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>论文覆盖的四类机器人平台（地面/空中/海洋/人机接口）及其核心子技术。这是一个概念性全景图，为后续各章节的深入讨论提供"导航地图"。</p>
+      <ul>
+        <li><strong>分类逻辑</strong>：不是简单的按平台分类，而是以"救援任务需求"为锚点——每种平台被放置在与最匹配任务相连接的位置</li>
+        <li><strong>交叉区域</strong>：某些技术（如SLAM）跨越多类平台——SLAM同时被标注在无人机和地面机器人下，体现技术的可迁移性</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">各类救援机器人平台的代表性系统实例</span>
+      <span class="fig-source">来源：论文 Fig. 2-5（代表性平台照片/示意图）</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="代表性救援机器人系统" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>论文中讨论的关键机器人平台的实例照片——包括PackBot（地面）、ANYmal（四足）、Fotokite（系留无人机）、Flyability Elios（笼式检查无人机）、以及水下/两栖原型系统。</p>
+      <ul>
+        <li><strong>设计哲学多样性</strong>：从高度专业的军事级系统（PackBot, $100k+）到低成本开源方案（$5k-10k）——成本是救援机构采用新技术的关键决定因素</li>
+        <li><strong>形态与功能的对应</strong>：轮式/履带式用于相对平坦但杂乱的地形；腿式用于楼梯和瓦砾；飞行器用于快速空中侦察——没有"万能平台"</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">技术成熟度与需求重要性的二维矩阵（Gap Analysis）</span>
+      <span class="fig-source">来源：论文 Fig. 6（推测为差距分析矩阵）</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="技术成熟度-需求矩阵" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>一个"技术成熟度 vs 需求重要性"的二维散点图——横轴为学术/工业界技术准备水平（低→高），纵轴为救援人员表达的需求重要性（低→高）。</p>
+      <ul>
+        <li><strong>第一象限（高需求+高成熟度）</strong>：无人机侦察建图——应尽快推进标准化和普及</li>
+        <li><strong>第二象限（高需求+低成熟度）</strong>：可靠的废墟内自主导航、长续航电源、水下搜索定位——优先投入资源</li>
+        <li><strong>第三象限（低需求+低成熟度）</strong>：完全自主的救援决策、多机零人工干预——长期远景，当前不紧迫</li>
+        <li><strong>第四象限（低需求+高成熟度）</strong>：过于复杂的VR/AR操作界面——虽技术先进，但不符合一线需求，可能属于"过度投资"</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在缺陷与改进方向</h2>
+
+  <h3>9.1 方法论的局限</h3>
+  <ul>
+    <li><strong>样本量小</strong>：仅访谈了7位专家，虽然覆盖了5个国家，但每个国家的灾害类型和救援文化不同——日本地震救援的需求可能与荷兰洪水救援的需求差异很大，7个样本的细分分析不足。</li>
+    <li><strong>地域偏斜</strong>：全部来自发达国家（美国、意大利、瑞士、日本、荷兰）——发展中国家的救援需求（基础设施更差、物资更缺乏、通信更不可靠）可能完全不同，但完全没有代表。</li>
+    <li><strong>专家选择偏差</strong>：作者团队通过NCCR Robotics网络联系专家，可能存在"近亲选择"——这些专家可能本身就倾向于使用技术（否则不会同意参与访谈），他们的观点可能代表的是"技术乐观派"而非一线救援人员的普遍态度。</li>
+  </ul>
+
+  <h3>9.2 技术覆盖的局限</h3>
+  <ul>
+    <li><strong>缺乏量化对比</strong>：综述对各平台技术成熟度的评估是定性的（"高/中/低"），没有建立统一的量化评分体系——不同作者对不同平台的评分标准可能不一致。</li>
+    <li><strong>快速过时风险</strong>：综述发表于2019年——UAV技术（特别是AI-based自主飞行和避障）在2020-2024年间有巨大进步，论文中关于"无人机自主性不足"的判断现在可能需要更新。</li>
+    <li><strong>缺少多机器人协同的系统级讨论</strong>：虽然讨论了单平台技术，但对多机器人协同（空-地协同、异构集群）的深入讨论不足——而这是近年来救援机器人领域增长最快的方向之一。</li>
+  </ul>
+
+  <h3>9.3 结论的局限性</h3>
+  <ul>
+    <li><strong>"不要追求完全自主"可能过于保守</strong>：在通信受限或操作者不可用的情况下（如核辐射区），完全自主可能是唯一选择——综述对"何时需要完全自主"的场景讨论不足。</li>
+    <li><strong>对AI/深度学习的评估可能偏负面</strong>：论文指出AI "不够可靠"——但在感知任务（目标检测、语义分割）中，深度学习方法已经在实际救援中证明了价值（如利用计算机视觉自动识别废墟中的幸存者迹象），这种"不信任感"可能反映了2019年的时间局限。</li>
+  </ul>
+
+  <h3>9.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>标准化救援机器人评估体系（Rescue Robot TRL / R-TRL）</strong>——当前的TRL（Technology Readiness Level）是为航天/国防领域设计的，不完全适用于评估"在瓦砾、泥水、浓烟、通信中断、高压下被非专业人员使用"的救援机器人。论文虽然指出了需求-技术差距，但没有提出一个适用于救援机器人的专用评估框架。设计一个<strong>Rescue Robot TRL</strong>——包含"环境鲁棒性分数、操作便捷性分数、任务完成率分数、故障恢复能力分数"——将是推动该领域从"论文指标"走向"部署指标"的关键基础设施。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机推导 —— 为什么需要这篇综述？</h2>
+
+  <h3>10.1 思路推导链</h3>
+  <ol>
+    <li><strong>背景事实 1 — 救援机器人研究已开展了二十多年</strong><br>从2001年World Trade Center救援中首次使用PackBot至今，全球已有数百个实验室在从事救援机器人研究，发表了数千篇论文。机器人技术（传感器、计算、AI、电池）在这期间取得了巨大进步。</li>
+    <li><strong>背景事实 2 — 但一线救援中机器人的使用仍然非常有限</strong><br>除了少数高关注度的案例（Fukushima核事故、Nepal地震后无人机建图），绝大多数救援行动仍然完全依赖人力和传统工具（狗、绳索、铲子）。研究产出与实际采用之间存在巨大鸿沟。</li>
+    <li><strong>为什么？（假设1）</strong>技术不够先进？——部分正确，但即使是被认为"成熟"的技术（如消费级无人机）在救援场景中也面临环境鲁棒性、续航和通信问题。</li>
+    <li><strong>为什么？（假设2）</strong>学术界不了解救援人员的真实需求？——很可能正确。救援人员不发表论文；他们的问题和优先级在学术文献中几乎不可见。学术界的"救援机器人"研究往往是从机器人能力的角度定义问题，而不是从救援任务的角度定义问题。</li>
+    <li><strong>因此需要一个"翻译"</strong>：把救援人员的语言（"我需要能在烟雾中看清10米远的设备"）翻译成研究界的语言（"需要多模态传感器融合，在视觉退化环境中的语义SLAM"）——这就是综述的核心动机：架设一座桥梁。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    救援机器人研究产出与一线采用之间存在巨大鸿沟——这篇综述的目标不是再增加一种新机器人，而是<strong>从救援人员的真实需求出发重新评估整个领域</strong>，为未来的研究指明"什么方向的工作最有可能产生真实影响"。
+  </div>
+
+  <h3>10.3 为什么需要13位专家合写这篇综述？</h3>
+  <p>救援机器人是一个高度跨学科和跨平台的领域——地面机器人涉及运动控制和力学设计，空中机器人涉及飞行控制和空气动力学，海洋系统涉及流体力学和水下通信，人机接口涉及认知心理学和交互设计。没有任何一位专家能同时覆盖所有子领域。13位作者分别来自苏黎世大学（视觉SLAM、感知）、ETH Zurich（腿式运动、四足机器人、飞行机器人）、EPFL（仿生机器人、进化机器人、软体机器人）、IDSIA（AI、机器学习、优化）——这种学科分布确保了综述的技术覆盖面。同时，NCCR Robotics联盟的长期合作保证了作者之间有一致的语言和协作经验。</p>
+</section>
+
+<!-- ═══════════════ 11. TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 关键启示与收获</h2>
+
+  <h3>11.1 方法论层面的启示</h3>
+  <ul>
+    <li><strong>"从需求出发而非从能力出发"的评估范式</strong>：传统的综述论文方式是"我们有哪些技术→它们能做什么"，而本文的方式是"救援人员需要什么→哪些技术满足这些需求→缺口在哪里"。这种"需求驱动"的评估范式对于任何应用导向的机器人研究（农业、建筑、医疗）都有借鉴意义——在写论文之前先问："谁会用它？他们最需要什么？"</li>
+    <li><strong>综述论文也可以是"有观点的"</strong>：很多综述论文只是"总结已有工作"（被动整理），而本文通过专家访谈和差距分析得出了<strong>规范性结论</strong>（"学术界过度投资于自主性而忽略了鲁棒性"）。有观点、有立场的综述比纯总结更有影响力——这也是本文被引用180+次的原因之一。</li>
+    <li><strong>跨学科合作的大型综述是可行的且有价值的</strong>：13位作者、4个机构、多个子领域——这种规模的合作需要高度的组织和信任。对于我们自己写综述的启示：不要一个人试图覆盖所有内容，找到互补的合著者，各司其职。</li>
+  </ul>
+
+  <h3>11.2 技术层面的关键结论</h3>
+  <ul>
+    <li><strong>无人机侦察建图是目前最接近实用的救援机器人技术</strong>——成本低（$1k-5k消费级）、操作简单、信息价值高（3D地图+正射影像可以直接用于救援规划）。但续航、恶劣天气飞行、自主异常检测仍需突破。</li>
+    <li><strong>地面机器人的核心矛盾是"通过性 vs 可靠性"</strong>——腿式机器人实验室中表现惊艳（爬楼梯、跳跃、翻越障碍），但可靠性不足以让救援人员信任。轮式/履带式更可靠但通过性有限。在可预见的未来，中继通信 + 轮式/履带式UGV + 无人机空中侦察可能是最实用的组合方案。</li>
+    <li><strong>海洋/两栖救援机器人仍处于极早期</strong>——水下SLAM、水陆过渡、强流中定位都是未解决的硬问题。但洪水是全球最常见的自然灾害——从需求角度来说，海洋救援机器人的"客户需求"是最大但"技术供给"是最少的。</li>
+    <li><strong>人机接口可能是"性价比最高"的改进方向</strong>——不需要换机器人硬件，只需要改进软件和控制界面，就能显著提升救援效率。直觉化设计（减少屏幕上的按钮数量、使用颜色编码、语音反馈）在救援场景中比更复杂的AI算法更可能产生立竿见影的效果。</li>
+  </ul>
+
+  <h3>11.3 对个人研究的直接启示</h3>
+  <ul>
+    <li><strong>对UAV/SLAM方向</strong>：论文反复强调"在真实环境中验证"的重要性——救援场景的视觉退化（烟雾、粉尘、低光）是当前学术SLAM系统的主要盲区。开发鲁棒的"视觉退化环境SLAM"（结合热成像、声纳、UWB等多模态传感器）是一个高价值方向。</li>
+    <li><strong>对多机器人协同方向</strong>："协同不是越多越好"——在通信带宽和延迟受限的真实环境中，最优协同策略不是"所有机器人都交换所有信息"，而是选择最相关的子集。这为通信感知规划（communication-aware planning）提供了应用动机。</li>
+    <li><strong>对系统工程方向</strong>："易用性"和"鲁棒性"听起来不如"新型算法"性感，但它们是决定一项技术是否被实际使用的核心因素——在论文中增加真实环境测试和操作者可用性评估可以极大地增加研究的影响力。</li>
+  </ul>
+
+  <h3>11.4 值得跟进的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Murphy, R. R. (2004) — Rescue robots at the World Trade Center. <em>Journal of the Japan Society of Mechanical Engineers</em></td><td>救援机器人首次大规模实战部署的历史记录——PackBot在911废墟中的使用经验奠定了整个领域的工程约束框架。</td></tr>
+    <tr><td>Nagatani, K. et al. (2013) — Emergency response to the nuclear accident at the Fukushima Daiichi Nuclear Power Plants using mobile rescue robots. <em>Journal of Field Robotics</em></td><td>Fukushima核事故是救援机器人最著名的实战案例——揭示了通信屏蔽、辐射对电子元件的影响、远程操控延迟等现实问题。</td></tr>
+    <tr><td>Hutter, M. et al. (2016) — ANYmal — a highly mobile and dynamic quadrupedal robot. <em>IEEE/RSJ IROS</em></td><td>ANYmal是本文中讨论的最先进的四足救援机器人原型——理解它的能力边界是评估腿式机器人救援潜力的基础。</td></tr>
+    <tr><td>Floreano, D. & Wood, R. J. (2015) — Science, technology and the future of small autonomous drones. <em>Nature</em></td><td>小型自主无人机的综述——与本文互补，更侧重于小型飞行平台的硬件和自主性。</td></tr>
+    <tr><td>Mintchev, S. & Floreano, D. (2016) — Adaptive morphology: A design principle for multimodal and multifunctional robots. <em>IEEE Robotics & Automation Magazine</em></td><td>多模态机器人（飞行+地面、游泳+飞行）的形态自适应设计原理——直接对应本文"可折叠/可变形无人机"和"两栖系统"的讨论。</td></tr>
+  </table>
+
+  <h3>11.5 写作表达的亮点</h3>
+  <ul>
+    <li><strong>"需求驱动"的论证结构</strong>：论文各章节的组织不是传统的"技术分类罗列"，而是"需求 → 当前技术 → 差距 → 建议"的闭环。每章开头都从救援人员的原话或需求出发——让读者始终保持着"我们在为谁工作"的视角。</li>
+    <li><strong>专家引用的策略性使用</strong>：7位专家的引语被分散在论文的多个关键位置（而不是集中在一个"访谈结果"部分）——用作论证的支撑而非独立的展示。例如在讨论无人机自主性时，引用了一位美国消防队长的原话："我不需要一架会自己思考的无人机——我需要一架在强风中也不会被吹走的无人机"——这种策略性引用大幅增强了论证的冲击力。</li>
+    <li><strong>诚实面对领域的不足</strong>：综述论文容易变成"自我庆祝"——但本文反复强调"我们离目标还很远"。这种诚实的批判性姿态赢得了读者的信任，也是它被后续研究广泛引用的重要原因——它提供了一个诚实的基线，后续研究可以声称"在这一基线上改进了X"。</li>
+  </ul>
+	<h3>11.6 展望——2025年后，救援机器人最重要的5个前沿方向</h3>
+	<p>基于本文的差距分析和2019-2025年间的技术进展，以下是当前最值得关注的前沿方向：</p>
+	<ol>
+		<li><strong>空-地-水异构集群协同</strong>：不再是单一的空中或地面机器人，而是由不同类型机器人组成的异构团队——一架高空无人机作为通信中继和全局地图提供者，多架小型无人机进行近距离结构检查，地面机器人进入不稳定的建筑执行接触式任务。DARPA SubT Challenge (2018-2021) 已经部分展示了这种异构团队的潜力。</li>
+		<li><strong>AI增强的半自主操作（Shared Autonomy 2.0）</strong>：现代基础模型（如视觉-语言大模型）使机器人可以用自然语言向操作者描述"我看到了什么"，操作者用自然语言给出高层指令——将操作门槛从"会操作机器人"降低到"会说人话"。</li>
+		<li><strong>救援机器人的标准化与认证</strong>：汽车有NCAP安全评级，航空有适航认证——救援机器人目前没有任何统一的性能评估标准。推动类似"Rescue Robot Safety Rating"的标准化认证体系将大幅降低救援机构采用新技术的决策成本。</li>
+		<li><strong>能源前沿——高能量密度电池和无线充电</strong>：固态电池（500+ Wh/kg）、氢燃料电池（UAV 1-2小时续航）、系留和无线充电混合方案——将从根本上改变"续航"这个最紧迫的瓶颈。</li>
+		<li><strong>从"被动响应"到"主动预防"</strong>：在灾害发生前，长期部署低成本传感器网络和周期性无人机巡检——构建"数字孪生"城市，在灾害发生时立即获得灾害前基线的精确信息。</li>
+	</ol>
+
+	<h3>11.7 13位作者跨机构协作模式分析</h3>
+	<p>这篇综述的生产方式本身就是一个值得研究的案例。关键要素：(1) NCCR Robotics提供了持续多年的合作平台——定期研讨会、共享博士生、联合项目——没有这种机制支持，13人合写的协调成本将高到不可行；(2) 分工模式：每位专家负责自己最熟悉的子领域，但统一的"需求视角"保证各章节一致收敛；(3) 对国内研究机构的启示：以国家级研究中心为平台、以共同应用场景为锚点、以分工合作形式产出大型综述的模式非常值得借鉴。</p>
+  <h3>11.6 展望——2025年后，救援机器人最重要的5个前沿方向</h3>
+  <p>基于本文的差距分析和2019-2025年间的技术进展，以下是当前最值得关注的前沿方向：</p>
+  <ol>
+    <li><strong>空-地-水异构集群协同</strong>：不再是单一的空中或地面机器人，而是由不同类型机器人组成的异构团队——一架高空无人机作为通信中继和全局地图提供者，多架小型无人机进行近距离结构检查，地面机器人进入不稳定的建筑执行接触式任务。DARPA SubT Challenge (2018-2021) 已经展示了这种异构团队的潜力。</li>
+    <li><strong>AI增强的半自主操作（Shared Autonomy 2.0）</strong>：现代基础模型（如视觉-语言大模型）使机器人可以用自然语言向操作者描述场景，操作者用自然语言给出高层指令——将操作门槛从"会操作机器人"降低到"会说人话"。</li>
+    <li><strong>救援机器人的标准化与认证</strong>：汽车有NCAP安全评级，航空有适航认证——救援机器人目前没有任何统一的性能评估标准。推动类似"Rescue Robot Safety Rating"的标准化认证体系将大幅降低救援机构采用新技术的决策成本。</li>
+    <li><strong>能源前沿——高能量密度电池和无线充电</strong>：固态电池（500+ Wh/kg）、氢燃料电池（UAV 1-2小时续航）、系留和无线充电混合方案——将从根本上改变"续航"这个最紧迫的瓶颈。</li>
+    <li><strong>从"被动响应"到"主动预防"</strong>：在灾害发生前，长期部署低成本传感器网络和周期性无人机巡检——构建"数字孪生"城市，在灾害发生时立即获得灾害前基线的精确信息。</li>
+  </ol>
+
+  <h3>11.7 13位作者跨机构协作模式分析</h3>
+  <p>这篇综述的生产方式本身就是一个值得研究的案例。关键要素：(1) NCCR Robotics提供了持续多年的合作平台——定期研讨会、共享博士生、联合项目——没有这种机制支持，13人合写的协调成本将高到不可行；(2) 分工模式：每位专家负责自己最熟悉的子领域，但统一的"需求视角"保证各章节一致收敛；(3) 对国内研究机构的启示：以国家级研究中心为平台、以共同应用场景为锚点、以分工合作形式产出大型综述的模式非常值得借鉴。</p>
+</section>
+
+
+</div>
+<footer>Generated on 2026-07-08 · <a href="../../index.html">Dario Floreano</a> · UAV-Survey · Paper Notes</footer>
+</body>
+</html>

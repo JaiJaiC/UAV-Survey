@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — OmniH2O: Universal and dexterous human-to-humanoid whole-body teleoperation and learning</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+  .mermaid-wrapper { text-align: center; margin: 16px 0; overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Flaws</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">OmniH2O: Universal and dexterous human-to-humanoid whole-body teleoperation and learning</td></tr>
+    <tr><td><strong>Authors</strong></td><td>Tairan He<sup>1,2,*</sup>、Zhengyi Luo<sup>1,*</sup>、Xialin He<sup>2,*</sup>、Wenli Xiao<sup>1</sup>、Chong Zhang<sup>2</sup>、Weinan Zhang<sup>2</sup>、Kris Kitani<sup>1</sup>、Changliu Liu<sup>1</sup>、Guanya Shi<sup>1</sup>（* 表示共同一作）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><sup>1</sup> Carnegie Mellon University (CMU) —— Robotics Institute；<sup>2</sup> Shanghai Jiao Tong University (SJTU)</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong>CoRL 2024</strong> (Conference on Robot Learning)；arXiv提交日期 <strong>2024-06-13</strong></td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td>
+      <a href="http://arxiv.org/abs/2406.08858" target="_blank">arXiv:2406.08858</a> &nbsp;|&nbsp;
+      <a href="https://github.com/LeCAR-Lab/human2humanoid" target="_blank">GitHub (human2humanoid)</a> &nbsp;|&nbsp;
+      <a href="https://omni.human2humanoid.com/" target="_blank">Project Page</a> &nbsp;|&nbsp;
+      <a href="https://openreview.net/forum?id=oL1WEZQal8" target="_blank">OpenReview</a>
+    </td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 OmniH2O，一个基于学习的全身人形机器人遥操作与自主控制系统。以运动学姿态（kinematic pose）作为通用控制接口，支持 VR 头显实时遥操作、RGB 相机、语音指令以及 GPT-4o 等多种控制模式。核心贡献包括：(1) 基于 Teacher-Student 蒸馏的 RL sim-to-real 流水线；(2) 大规模 AMASS 人体运动重定向与数据增强；(3) "每步最大脚高"奖励设计与课程学习；(4) 仅用3个稀疏关键点+25步历史替代全局速度估计；(5) 首个全身人形机器人操控数据集 OmniH2O-6。在 Unitree H1 真实机器人上实现了零样本 sim-to-real 迁移，成功率 94.10%，显著超越 H2O 等基线。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Computer Science - Robotics</span>
+    <span class="tag tag-blue">Electrical Engineering and Systems Science - Systems and Control</span>
+    <span class="tag tag-green">Computer Science - Machine Learning</span>
+    <span class="tag tag-purple">Computer Science - Computer Vision and Pattern Recognition</span>
+    <span class="tag tag-amber">Humanoid Robotics</span>
+    <span class="tag tag-cyan">Sim-to-Real Transfer</span>
+    <span class="tag tag-red">Reinforcement Learning</span>
+  </div>
+</section>
+
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 核心洞察（Inspiration-to-Insight）</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 核心洞察：运动学姿态是连接人和人形机器人的"通用语言"</div>
+    <p>OmniH2O 最根本的洞察是：<strong>运动学姿态（kinematic pose）——即 3D 关节位置和旋转——可以作为一种"通用控制接口"</strong>，将各种异质的人类输入模态（VR 头显、RGB 相机、语言指令、甚至 ChatGPT 的推理输出）统一映射到同一种人形机器人控制信号上。这个洞察的威力在于：<em>一旦你训练出一个能够跟踪运动学姿态的策略，你就获得了对机器人进行多模态控制的"万能钥匙"</em>——无论是谁、用什么方式生成运动指令，都能驱动同一套底层策略。</p>
+    <p>这实质上是一种<strong>抽象分层设计（layered abstraction）</strong>：将"人类意图表达"（上层）与"全身物理控制"（下层）解耦，两者之间通过运动学姿态这个中间表示桥接。这种设计使得 OmniH2O 可以从容应对从 VR 遥操作（人直接生成姿态）到 GPT-4o 自主决策（AI 生成动作指令再转为姿态）的广泛控制范式。</p>
+  </div>
+
+  <h3>2.2 灵感-洞察映射表</h3>
+  <table>
+    <tr><th style="width:25%;">来源/灵感</th><th style="width:45%;">具体洞察</th><th style="width:30%;">对应设计/实现</th></tr>
+    <tr>
+      <td>H2O (前作)：单视角 RGB 遥操作</td>
+      <td>RGB 遥操作依赖全局速度估计（需MoCap），制约野外部署；<strong>可以用历史信息替代全局速度</strong></td>
+      <td>Student 策略观测中<strong>移除全局线速度</strong>，改用 25 步历史关节状态隐式编码速度信息</td>
+    </tr>
+    <tr>
+      <td>Teacher-Student 框架（RL领域）</td>
+      <td>仿真中能获取的信息远多于现实；<strong>让一个"全知"的教师策略先学会最优解，再蒸馏给仅用稀疏感知的学生策略</strong></td>
+      <td>PPO 训练特权教师（990维观测）→ DAgger 蒸馏为学生（稀疏3点+历史）</td>
+    </tr>
+    <tr>
+      <td>腿部运动奖励设计：feet air time</td>
+      <td>现有正则化奖励导致机器人"跺脚"（stomping）；<strong>应奖励每步中脚能达到的最大高度，而非简单的离地时间</strong></td>
+      <td>"每步最大脚高"奖励 + 课程调度（先学站立再学行走）</td>
+    </tr>
+    <tr>
+      <td>运动模仿中的数据分布偏差</td>
+      <td>AMASS 数据大都是动态行走，缺少稳定站立/蹲姿样本；<strong>人为偏置训练分布可有效抑制小碎步问题</strong></td>
+      <td>稳定增强（stable augmentation）：对每个运动序列复制一个下半身固定为站立/蹲姿的版本</td>
+    </tr>
+    <tr>
+      <td>AMASS 大规模人体运动数据库</td>
+      <td>数十万条人体运动数据是巨大宝藏；<strong>通过形态匹配+运动重定向可转化为机器人训练数据</strong></td>
+      <td>3阶段重定向流水线：SMPL形状拟合→运动拟合→稳定增强</td>
+    </tr>
+    <tr>
+      <td>多模态大模型（GPT-4o）</td>
+      <td>语言/视觉模型可以生成高级任务规划；<strong>将其输出转为运动学姿态即可无缝驱动机器人策略</strong></td>
+      <td>GPT-4o → MDM/Motion Diffusion → kinematic pose → OmniH2O 策略 → 机器人执行</td>
+    </tr>
+  </table>
+
+  <h3>2.3 创新点拆解</h3>
+
+  <h4>创新点 1：多模态通用控制接口（Universal Kinematic Pose Interface）</h4>
+  <p>这是 OmniH2O 最鲜明的贡献。以往的人形机器人控制系统各自为政——VR 遥操作需要一个系统，自主导航需要另一个系统，语言指令又需要完全不同的架构。OmniH2O 第一次证明了：<strong>运动学姿态可以作为所有控制模式的统一"指令集"（instruction set）</strong>。</p>
+  <ul>
+    <li><strong>VR 遥操作</strong>：Vision Pro 直接输出头部+双手 3 个关键点的姿态 → 策略推得全身动作</li>
+    <li><strong>RGB 相机</strong>：4D-Humans / HybrIK 等姿态估计算法从单目 RGB 提取人体姿态 → 重定向为机器人目标姿态 → 策略执行</li>
+    <li><strong>语言指令</strong>：自然语言 → MDM (Motion Diffusion Model) 生成人体运动序列 → 转为运动学姿态 → 策略执行</li>
+    <li><strong>GPT-4o 自主推理</strong>：GPT-4o 接收视觉观察 → 生成文本动作决策 → MDM 生成运动 → OmniH2O 执行</li>
+    <li><strong>Diffusion Policy 学习</strong>：从遥操作收集的数据训练 Diffusion Policy → 输出运动学姿态 → 同一底层策略执行</li>
+  </ul>
+  <p>对比前作 H2O，OmniH2O 的通用接口在抽象层次上提升了一个台阶——H2O 的接口是"RGB图像→策略→动作"，而 OmniH2O 的接口是"任意模态→运动学姿态→策略→动作"。这种分层设计使得系统的可扩展性大幅增强。</p>
+
+  <h4>创新点 2：Teacher-Student 蒸馏 + 历史窗口替代全局速度</h4>
+  <p>这是 sim-to-real 成功的技术核心。此前 H2O 需要在现实世界中通过 RGB 相机估计操作者的全局线速度（global linear velocity），这需要 MoCap 系统或者精密的视觉测速，严重制约了系统的野外部署能力。</p>
+  <p>OmniH2O 的解决方案极为巧妙：<strong>既然全局线速度可以从历史位移中推算（$v_t \approx (p_t - p_{t-k})/(k \cdot \Delta t)$），为什么不直接让网络自己学？</strong></p>
+  <p>具体做法：学生策略的观测空间包含 25 步历史的关节位置、关节速度、根角速度、重力方向和过去动作，但<strong>刻意不包含全局线速度</strong>。配合 DAgger 蒸馏（教师有全局速度，学生没有），学生策略被迫从历史信息中隐式学习速度估计。</p>
+  <p>这个设计的消融实验非常精彩：</p>
+  <ul>
+    <li>History-0（无历史，90维）：MPJPE = 83.26，加速度误差 = 4.86</li>
+    <li>History-5（5步历史，405维）：MPJPE = 62.18，加速度误差 = 2.66</li>
+    <li><strong>History-25</strong>（默认，1665维）：MPJPE = 47.94，加速度误差 = 1.84</li>
+    <li>History-50（50步历史，3240维）：MPJPE = 50.24，加速度误差 = 2.37</li>
+  </ul>
+  <p>25 步恰好是最优甜点，更长反而性能略降（可能由于过拟合或训练更困难）。</p>
+
+  <h4>创新点 3："每步最大脚高"奖励 + 课程学习</h4>
+  <p>这是一个精巧的 reward engineering 案例。人形机器人运动控制中，"什么时候该走，什么时候该站"是本质性难题。前作 H2O 使用了 feet air time 和 feet height 等正则化奖励来鼓励抬脚，结果却导致机器人频繁"跺脚"——即做微小、频繁的抬脚动作来骗取奖励，而不是真正的稳定站立。</p>
+  <p>OmniH2O 的解法：在每一步的腾空阶段，跟踪脚部达到的<strong>最大高度</strong>，而不是简单的离地时间。结合课程学习（curriculum），先降低正则化奖励权重让策略学会基本追踪，再逐步增强，迫使策略学会"何时该大步走、何时该安静站"。</p>
+  <p>这展示了 reward shaping 中一个重要的教训：<strong>奖励函数设计必须考虑策略可能找到的"意外最优解"（reward hacking），需要用课程学习等方式逐步引导</strong>。</p>
+
+  <h4>创新点 4：数据增强——稳定姿态偏置（Stable Pose Bias）</h4>
+  <p>AMASS 数据集包含大量行走、跑步、跳舞的动态数据，但缺少长时间稳定站立的样本。这导致策略在没有运动输入时，倾向于"随机游走"——做出小的调整步来保持平衡。OmniH2O 的解决方案直截了当：<strong>对每条 AMASS 运动序列，生成一个副本——将下半身固定在站立或蹲姿，只保留上半身运动</strong>。将这种"稳定版本"混入训练集后，策略学会了在不需要移动时保持静止。</p>
+  <p>这是一种简单但高效的数据分布操控技术——当数据不满足需求时，不是找更多数据，而是对现有数据进行结构化增强。</p>
+
+  <h4>创新点 5：首个全身人形机器人操控数据集 OmniH2O-6</h4>
+  <p>OmniH2O 发布了 OmniH2O-6，包含 6 个日常全身任务（球拍挥动、拳击、毛笔写字、蹲下捡取、篮子递送、浇花）约 40 分钟数据。每个任务配有第一人称 RGBD 相机视图、控制输入和电机动作，使得后续的 imitation learning 算法可以在此基础上训练。</p>
+
+  <h3>2.4 与相关工作的关系</h3>
+  <table>
+    <tr><th>相关工作</th><th>与 OmniH2O 的关系</th><th>改进之处</th></tr>
+    <tr>
+      <td><strong>H2O</strong> (He et al., IROS 2024)</td>
+      <td>直接前作，OmniH2O 是 H2O 的全面升级版</td>
+      <td>(1) 新增 Teacher-Student 蒸馏；(2) 新增历史窗口替代全局速度；(3) 新增多模态控制接口；(4) 新增稳定增强；(5) 新增"每步最大脚高"奖励；(6) 新增自主模式（GPT-4o/Diffusion Policy）；(7) 新增数据集 OmniH2O-6</td>
+    </tr>
+    <tr>
+      <td><strong>PHC</strong> (Luo et al., 2023)</td>
+      <td>OmniH2O 的教师策略训练借鉴了 PHC 的运动模仿框架</td>
+      <td>PHC 仅用于仿真虚拟角色，OmniH2O 将其扩展到真实机器人 sim-to-real</td>
+    </tr>
+    <tr>
+      <td><strong>Exbody</strong> (Cheng et al., 2024)</td>
+      <td>同期工作，同样做全身人形机器人控制</td>
+      <td>OmniH2O 在成功率（94.08% vs 92.46%）和末端执行器误差（0.0506 vs 0.0741）上均更优</td>
+    </tr>
+    <tr>
+      <td><strong>ASAP</strong> (He et al., 2024)</td>
+      <td>同组后续工作，聚焦 alignment of sim and real physics</td>
+      <td>ASAP 进一步解决 sim-to-real gap，使用 real-to-sim 残差建模</td>
+    </tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <p>OmniH2O 的系统架构可以划分为三层：<strong>数据准备层</strong>（AMASS 重定向 + 数据增强）、<strong>策略训练层</strong>（Teacher-Student 蒸馏）、和<strong>部署应用层</strong>（多模态控制接口）。下图展示了完整的数据流和控制流：</p>
+
+  <div class="mermaid-wrapper">
+    <pre class="mermaid">
+flowchart TB
+    subgraph DATA["📦 数据准备层 (Data Preparation)"]
+        AMASS["AMASS 人体运动数据集\n(SMPL, 数万条运动序列)"]
+        FIT1["① 形态重定向\nSMPL→H1 骨骼匹配\n优化形状参数 + 缩放因子\n选取12个关键关节"]
+        FIT2["② 运动重定向\n逐帧优化关节角度\n单轴旋转约束\n~4天(32核)完整重定向"]
+        STABLE["③ 稳定增强\n下半身固定站立/蹲姿\n上半身保留原运动\n均衡动态/静态数据分布"]
+        AMASS --> FIT1 --> FIT2 --> STABLE
+        STABLE --> DATASET["重定向后数据集\nH1 关节角度序列"]
+    end
+
+    subgraph TRAIN["🎓 策略训练层 (Teacher-Student Distillation)"]
+        PRIV["特权教师策略 π_privileged\nPPO 训练 | Isaac Gym\n观测: 990维(全部刚体状态+全局速度)\n奖励: 模仿奖励+正则化奖励+课程\n域随机化: 摩擦/质量/阻尼/噪声"]
+        STUDENT["学生/部署策略 π_OmniH2O\nDAgger 蒸馏自教师\n观测: 3个关键点+25步历史=1665维\n不含全局线速度!\n架构: MLP(512,256,128) | tanh | 50Hz"]
+        DATASET --> PRIV
+        PRIV -- "DAgger蒸馏: L=‖a_teacher−a_student‖²" --> STUDENT
+    end
+
+    subgraph DEPLOY["🚀 部署应用层 (Multi-Modal Deployment)"]
+        VR["🎮 VR 遥操作\nApple Vision Pro\n头部+双手 3个关键点\nWiFi传输 → ~20ms延迟"]
+        RGB["📷 RGB 相机遥操作\n4D-Humans/HybrIK\n单目人体姿态估计"]
+        LANG["🗣️ 语言指令\nGPT-4o + MDM\n文字→运动扩散模型"]
+        AUTO["🤖 自主模式\nDiffusion Policy\n从遥操作数据训练\n或 GPT-4o 视觉推理"]
+        H1["🦾 Unitree H1 真实机器人\n双 Orin NX(方案一)/笔记本+4090(方案二)\nZED 相机 60Hz | 策略推理 50Hz\nInspire Hands 灵巧手\nROS 通信框架\n室内+室外自主运行"]
+    end
+
+    STUDENT --> VR
+    STUDENT --> RGB
+    STUDENT --> LANG
+    STUDENT --> AUTO
+    VR --> H1
+    RGB --> H1
+    LANG --> H1
+    AUTO --> H1
+
+    style DATA fill:#e8f0fe,stroke:#3b82f6
+    style TRAIN fill:#e6f7ee,stroke:#10b981
+    style DEPLOY fill:#fef7ed,stroke:#f59e0b
+    style PRIV fill:#dbeafe,stroke:#1d4ed8
+    style STUDENT fill:#d1fae5,stroke:#047857
+    style H1 fill:#fef3c7,stroke:#92400e
+    </pre>
+  </div>
+
+  <h3>3.1 关键架构决策</h3>
+  <ol>
+    <li><strong>为什么用运动学姿态而不是关节力矩作为接口？</strong>运动学姿态是几何量，对输入源无假设（VR/相机/语言都能产生），且比力矩更直观、可解释。代价是机器人端需要 PD 控制器将姿态指令转为力矩，但这在现代机器人中已经是标准能力。</li>
+    <li><strong>为什么用 Teacher-Student 而不是直接在真实数据上 RL？</strong>真实机器人 RL 训练需要大量物理交互，在人形机器人上极其昂贵且危险。在仿真中训练教师（可并行数千环境），再用 DAgger 蒸馏给能在真实硬件上运行的轻量学生策略，是将 RL 的优化能力与真实部署可行性结合的最优路径。</li>
+    <li><strong>为什么用 MLP 而不是 LSTM/GRU？</strong>消融实验表明，使用 25 步历史拼接为固定维度的 MLP 在真实世界中表现优于 LSTM/GRU（MPJPE: 47.94 vs 87.00 vs 46.06）。原因是 MLP 的参数量更大且训练更稳定，而 LSTM/GRU 在长序列上的隐状态可能漂移。</li>
+    <li><strong>为什么用 3 个关键点（头+双手）而不是全身 22 点？</strong>3 个关键点是 VR 头显能自然提供的最小集合（头显+两个手柄）。实验表明 3 点跟踪几乎能达到 22 点跟踪的精度（全球 MPJPE: 141.11 vs 148.13），这意味着策略学会了从稀疏的末端关键点推断全身运动——这是人体运动学约束在起作用：头部和双手的位置很大程度上"绑定"了全身的姿态。</li>
+  </ol>
+
+  <h3>3.2 真实部署方案对比</h3>
+  <table>
+    <tr><th>组件</th><th>方案一：双 Orin NX</th><th>方案二：笔记本</th></tr>
+    <tr><td>计算设备</td><td>2x 16GB NVIDIA Jetson Orin NX（背部安装）</td><td>i9-13900HX + RTX 4090（远程/外置）</td></tr>
+    <tr><td>视觉传感器</td><td>ZED 相机 @ 60Hz</td><td>ZED 相机 @ 60Hz</td></tr>
+    <tr><td>遥操作输入</td><td>Apple Vision Pro（WiFi）</td><td>Apple Vision Pro（WiFi）</td></tr>
+    <tr><td>策略推理频率</td><td>50 Hz</td><td>50 Hz</td></tr>
+    <tr><td>通信架构</td><td>Orin NX 间以太网 + ROS</td><td>统一 ROS 系统</td></tr>
+    <tr><td>端到端延迟</td><td>~20 ms</td><td>~20 ms</td></tr>
+    <tr><td>灵巧手控制</td><td>VR手部姿态 → IK解算 → Inspire Hands 关节角度</td><td>同上</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — 解决什么问题？</h2>
+
+  <h3>4.1 任务形式化</h3>
+  <p>OmniH2O 解决的核心任务可以形式化为一个<strong>目标条件的马尔可夫决策过程（Goal-Conditioned MDP）</strong>：</p>
+  <div class="formula-block">
+    <span class="eq-tag">MDP 定义</span>
+    <p>$$ \mathcal{M} = \langle \mathcal{S}, \mathcal{A}, \mathcal{T}, r, \gamma, \mathcal{G} \rangle $$</p>
+    <div class="eq-note">
+      <strong>符号说明：</strong><br>
+      $\mathcal{S}$：状态空间（本体感受 + 目标姿态）<br>
+      $\mathcal{A}$：动作空间（目标关节角度），动作频率 50Hz<br>
+      $\mathcal{T}$：转移概率（由物理仿真/真实环境决定）<br>
+      $r(s_t, a_t)$：奖励函数<br>
+      $\gamma$：折扣因子<br>
+      $\mathcal{G}$：目标空间（运动学姿态 $q_t \triangleq (\theta_t, p_t)$）
+    </div>
+  </div>
+
+  <h3>4.2 输入/输出规格</h3>
+  <table>
+    <tr><th>组件</th><th>符号</th><th>维度</th><th>描述</th></tr>
+    <tr><td colspan="4"><strong>教师策略 π_privileged（仿真训练阶段）</strong></td></tr>
+    <tr><td>本体感受</td><td>$s_t^p$</td><td>~990 维</td><td>所有刚体的位置、姿态、线速度、角速度 + 上一帧动作</td></tr>
+    <tr><td>目标状态</td><td>$s_t^g$</td><td>~753 维</td><td>参考姿态+位置，所有刚体的一帧偏差 + 下一帧参考</td></tr>
+    <tr><td>动作</td><td>$a_t$</td><td>27 维 (H1)</td><td>目标关节角度，由 PD 控制器转为关节力矩</td></tr>
+    <tr><td colspan="4"><strong>学生策略 π_OmniH2O（真实部署阶段）</strong></td></tr>
+    <tr><td>本体感受</td><td>$s_t^{\text{p-real}}$</td><td>1665 维</td><td>25步历史的关节位置、关节速度、根角速度、重力方向、历史动作</td></tr>
+    <tr><td>目标状态</td><td>$s_t^{\text{g-real}}$</td><td>~9 维</td><td>仅 3 个关键点（头部+双手）的位置误差、速度误差、当前位置</td></tr>
+    <tr><td>动作</td><td>$a_t$</td><td>27 维 (H1)</td><td>目标关节角度（同上）</td></tr>
+  </table>
+
+  <h3>4.3 任务目标</h3>
+  <p>给定来自遥操作者或自主智能体的运动学姿态参考序列 $\hat{q}_{1:T} = (\hat{\theta}_{1:T}, \hat{p}_{1:T})$，策略 $\pi_{\text{OmniH2O}}$ 被训练来生成动作序列 $a_{1:T}$，使得机器人的实际姿态 $q_{1:T}$ 尽可能跟踪参考 $\hat{q}_{1:T}$，同时保证物理稳定性（不摔倒）、运动自然性（无抖动）和 sim-to-real 可迁移性。</p>
+
+  <div class="formula-block">
+    <span class="eq-tag">核心优化目标</span>
+    $$ \pi_{\text{OmniH2O}}^* = \arg\max_{\pi} \mathbb{E}_{\tau \sim \pi}\left[ \sum_{t=0}^{T} \gamma^t r(s_t, a_t) \right] $$
+    <div class="eq-note">
+      其中 $\tau = (s_0, a_0, s_1, a_1, \dots)$ 是策略与环境交互的轨迹。奖励 $r$ 包含模仿奖励（姿态/速度/位置跟踪）和正则化奖励（每步最大脚高、足部接触力等）。
+    </div>
+  </div>
+
+  <h3>4.4 任务类型分类</h3>
+  <p>OmniH2O 同时覆盖以下三类任务：</p>
+  <ol>
+    <li><strong>遥操作（Teleoperation）</strong>：人类实时提供运动目标，策略在有限观测下跟踪执行——本质上是一个<strong>实时运动模仿（online motion imitation）</strong>任务。</li>
+    <li><strong>自主执行（Autonomy）</strong>：从遥操作数据学习任务策略（Diffusion Policy）或由 GPT-4o 生成任务规划——这是<strong>模仿学习（imitation learning）和任务规划（task planning）</strong>的交叉。</li>
+    <li><strong>Sim-to-Real 迁移（Sim-to-Real Transfer）</strong>：将仿真中训练的 RL 策略部署到真实机器人上，涉及<strong>域适应（domain adaptation）</strong>问题。</li>
+  </ol>
+</section>
+
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — 为什么困难？</h2>
+
+  <h3>5.1 人形机器人全身控制的"第一性原理"困难</h3>
+  <p>人形机器人的全身控制（whole-body control）是机器人学中最困难的问题之一，其根本原因可以从控制论、物理约束和系统工程三个维度理解：</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🔴 高维欠驱动</h4>
+      <p>Unitree H1 有 27 个自由度（DoF），但只有脚底与地面的 6 自由度接触提供了约束。在任意时刻，系统的状态空间维度远高于控制输入维度，且接触模式（单脚支撑、双脚支撑、飞行）频繁切换，构成一个<strong>混合动力学（hybrid dynamics）</strong>系统。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>🔴 灵巧操作耦合</h4>
+      <p>全身控制意味着上肢操作和下肢运动<strong>共享同一个躯干</strong>——手臂挥动球拍产生的反作用力会影响腿部平衡，蹲下捡东西时需要精确协调屈膝和伸手两个子任务。这是一个<strong>全身耦合（whole-body coupling）</strong>问题。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>🔴 Sim-to-Real Gap</h4>
+      <p>仿真中的物理模型永远不完美——Joint friction、电机延迟、传感器噪声、地面不平整、接触建模误差等构成巨大的<strong>现实差距（reality gap）</strong>。在仿真中稳定行走的策略放到真实机器人上可能立刻摔倒。</p>
+    </div>
+  </div>
+
+  <div class="cmp-row" style="margin-top:0;">
+    <div class="cmp-col">
+      <h4>🔴 稀疏感知约束</h4>
+      <p>真实部署中可用的传感器信息远比仿真中少——VR 头显只提供 3 个关键点位置，<strong>全局线速度</strong>（机器人在世界坐标系中的移动速度）这个关键信息在绝大多数部署场景中无法直接获取。而缺乏速度信息意味着策略无法预测自身动量。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>🔴 运动-静止模糊</h4>
+      <p>对 RL 而言，最难学的往往不是"如何走"，而是"<strong>何时不该走</strong>"。在没有明确运动指令时，机器人应该稳定站立——但 RL 策略倾向于做微小的调整动作（"跺脚"）以获取接触力相关的奖励。本质上是<strong>exploration vs. exploitation</strong>的困境。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>🔴 数据稀缺</h4>
+      <p>真实人形机器人的遥操作数据收集极其昂贵——需要操作者戴 VR 头盔操作机器人执行任务，一小时的数据可能需要数小时的设备调试。而仿真数据虽然便宜，却面临 sim-to-real gap。</p>
+    </div>
+  </div>
+
+  <h3>5.2 H2O（前作）的未解决问题</h3>
+  <table>
+    <tr><th>未解决问题</th><th>表现</th><th>OmniH2O 的解决</th></tr>
+    <tr>
+      <td>依赖 MoCap 测速</td>
+      <td>H2O 需要 RGB 相机 + 姿态估计测算操作者全局线速度，无法在野外部署</td>
+      <td>历史窗口替代全局速度，不再依赖外部速度估计</td>
+    </tr>
+    <tr>
+      <td>"跺脚"问题</td>
+      <td>机器人在无运动输入时频繁做小碎步调整</td>
+      <td>每步最大脚高奖励 + 课程调度 + 稳定增强数据</td>
+    </tr>
+    <tr>
+      <td>单一控制模式</td>
+      <td>仅支持 RGB 相机遥操作</td>
+      <td>运动学姿态通用接口，支持 VR/相机/语言/GPT-4o/Diffusion Policy</td>
+    </tr>
+    <tr>
+      <td>无自主能力</td>
+      <td>必须由人类实时控制</td>
+      <td>GPT-4o 视觉推理 + Diffusion Policy 学习实现自主执行</td>
+    </tr>
+    <tr>
+      <td>策略质量受限</td>
+      <td>直接 RL 训练，受限于稀疏观测空间</td>
+      <td>Teacher-Student 蒸馏：教师用全信息学习，学生从教师处学</td>
+    </tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ 6. METHOD ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 整体方法概览</h3>
+  <p>OmniH2O 的方法可以概括为五个阶段：</p>
+  <ol>
+    <li><strong>数据准备</strong>：AMASS 人体运动数据 → 形态+运动重定向 → 稳定增强 → H1 参考运动数据库</li>
+    <li><strong>教师训练</strong>：在 Isaac Gym 中用 PPO 训练特权教师策略（990维观测，全信息）</li>
+    <li><strong>学生蒸馏</strong>：用 DAgger 将教师蒸馏为学生策略（3个关键点+25步历史，1665维）</li>
+    <li><strong>域随机化</strong>：训练过程中的物理参数随机化确保 sim-to-real 鲁棒性</li>
+    <li><strong>真实部署</strong>：零样本迁移到 Unitree H1，支持多种控制模式</li>
+  </ol>
+
+  <h3>6.2 人体运动重定向（Human Motion Retargeting）</h3>
+  <p>重定向是从 AMASS 的 SMPL 人体模型参数到 H1 机器人关节角度的映射过程，分为三步：</p>
+
+  <h4>Step 1: 形态匹配（Shape Optimization）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">形态重定向优化</span>
+    $$ \beta^*, s^* = \arg\min_{\beta, s} \sum_{i \in \mathcal{K}} \| \mathbf{j}_i^{\text{SMPL}}(\beta, s) - \mathbf{j}_i^{\text{H1}} \|^2 $$
+    <div class="eq-note">
+      <strong>符号：</strong>$\beta$ 是 SMPL 形状参数，$s$ 是全局缩放因子，$\mathcal{K}$ 是 12 个关键关节集合（骨盆、髋、膝、肩、肘等），$\mathbf{j}_i^{\text{SMPL}}$ 和 $\mathbf{j}_i^{\text{H1}}$ 分别是 SMPL 模型和 H1 机器人在 T-pose 下对应关节的 3D 位置。这个优化使 SMPL 模型的"体型"尽可能接近 H1 的机械结构。
+    </div>
+  </div>
+
+  <h4>Step 2: 运动拟合（Motion Optimization）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">运动重定向优化</span>
+    $$ \mathbf{q}_{1:T}^{\text{H1}} = \arg\min_{\mathbf{q}_{1:T}} \sum_{t=1}^{T} \sum_{i \in \mathcal{K}} \| \mathbf{j}_i^{\text{H1}}(q_t) - \mathbf{j}_i^{\text{SMPL}}(\hat{q}_t, \beta^*) \|^2 + \lambda \sum_{t=1}^{T-1} \| q_{t+1} - q_t \|^2 $$
+    <div class="eq-note">
+      <strong>符号：</strong>$q_t$ 是时刻 $t$ 的 H1 关节角度，$\hat{q}_t$ 是 AMASS 参考姿态，$\beta^*$ 是 Step 1 得到的最优形状参数。第一项是位置跟踪误差，第二项（正则项，权重 $\lambda$）鼓励相邻帧之间的平滑过渡。每个关节的旋转受 H1 的单轴旋转约束（$H1\_ROTATION\_AXIS$ 定义）。
+    </div>
+  </div>
+
+  <h4>Step 3: 稳定增强（Stable Augmentation）</h4>
+  <p>对每个重定向后的运动序列 $q_{1:T}$，生成稳定版本 $\hat{q}_{1:T}^{\text{stable}}$：将根位置和下半身关节固定为<strong>站立</strong>或<strong>蹲姿</strong>，仅保留上半身运动。两条轨迹均加入训练集，使数据分布偏向稳定姿态。</p>
+
+  <h3>6.3 Teacher-Student 策略学习</h3>
+
+  <h4>教师策略（Privileged Teacher Policy）</h4>
+  <p>教师策略 $\pi_{\text{privileged}}$ 使用 PPO 在 Isaac Gym 的 4096 个并行环境中训练：</p>
+  <div class="formula-block">
+    <span class="eq-tag">教师观测空间</span>
+    $$ s_t^{\text{priviled}} = (p_t^{\text{all}}, \theta_t^{\text{all}}, \dot{q}_t^{\text{all}}, \omega_t^{\text{all}}, a_{t-1}) \oplus (\hat{\theta}_t, \hat{p}_t, \hat{q}_{t+1} - q_t, \hat{\dot{q}}_{t+1} - \dot{q}_t) $$
+    <div class="eq-note">
+      <strong>维度：</strong>~990 (本体感受) + ~753 (目标状态) = <strong>~1743 维</strong>。教师能看到所有刚体的全局线速度、角速度、位置和姿态，以及参考运动的下一帧信息。这些特权信息使 RL 优化更加容易，能学出更优的策略。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">PPO 剪裁目标</span>
+    $$ \mathcal{L}^{\text{PPO}} = \mathbb{E}_t \left[ \min\left( \frac{\pi_\theta(a_t|s_t)}{\pi_{\text{old}}(a_t|s_t)} \hat{A}_t, \text{clip}\left(\frac{\pi_\theta(a_t|s_t)}{\pi_{\text{old}}(a_t|s_t)}, 1-\epsilon, 1+\epsilon\right) \hat{A}_t \right) \right] $$
+    <div class="eq-note">
+      使用标准 PPO 算法，$\hat{A}_t$ 是广义优势估计（GAE），$\epsilon=0.2$ 为剪裁参数。4096 个并行环境 + Isaac Gym 的 GPU 加速使训练高效完成。
+    </div>
+  </div>
+
+  <h4>学生策略（Deployable Student Policy）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">学生观测空间（核心设计）</span>
+    $$ s_t^{\text{p-real}} = (d_{t-25:t}, \dot{d}_{t-25:t}, \omega_{t-25:t}^{\text{root}}, g_{t-25:t}, a_{t-26:t-1}) \quad \text{(1665维)} $$
+    $$ s_t^{\text{g-real}} = (\tilde{p}_t^{\text{real}} - p_t^{\text{real}}, \tilde{v}_t^{\text{real}} - v_t^{\text{real}}, \tilde{p}_t^{\text{real}}) \quad \text{(仅3个关键点，~9维)} $$
+    <div class="eq-note">
+      <strong>关键设计决策：</strong>$s_t^{\text{p-real}}$ 中不包含全局线速度 $v_t$（因为现实中难以直接获取）。取而代之的是 25 步历史关节状态（$d_{t-25:t}$ 为关节位置序列），使网络能从位置变化中隐式估计速度。<br>
+      <strong>目标状态 $s_t^{\text{g-real}}$：</strong>仅使用 VR 头显提供的 3 个关键点（头部+双手）的位置差、速度差和当前位置，完全不依赖 MoCap 系统。<br>
+      <strong>网络架构：</strong>3 层 MLP (512 → 256 → 128)，tanh 激活，输入 1665 维拼接的观测，输出 27 维目标关节角度。
+    </div>
+  </div>
+
+  <h4>策略蒸馏（DAgger Distillation）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">DAgger 损失函数</span>
+    $$ \mathcal{L}^{\text{DAgger}} = \| a_t^{\text{privileged}} - a_t^{\text{student}} \|^2 $$
+    <div class="eq-note">
+      学生策略在仿真中 rollout，在每个状态 $s_t$ 上查询教师策略得到参考动作 $a_t^{\text{privileged}}$，然后用 MSE 损失训练学生匹配教师的输出。DAgger 框架通过迭代添加学生分布下的状态来缓解分布漂移问题。<br>
+      <strong>消融验证：</strong>DAgger 蒸馏（OmniH2O）比直接 RL 训练（OmniH2O-w/o-DAgger）在所有指标上均显著更优，证明了教师指导对稀疏感知策略训练的重要性。
+    </div>
+  </div>
+
+  <h3>6.4 奖励函数设计</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">总奖励结构</span>
+    $$ r_t = r_t^{\text{imitation}} + \alpha(t) \cdot r_t^{\text{regularization}} $$
+    <div class="eq-note">
+      $\alpha(t)$ 是课程权重，在训练初期较小，随训练进行逐步增大。这确保策略先学会基本跟踪，再逐步优化运动质量。
+    </div>
+  </div>
+
+  <h4>模仿奖励（Imitation Rewards）</h4>
+  <p>模仿奖励衡量机器人实际姿态与参考姿态的匹配度：</p>
+  <ul>
+    <li><strong>关节位置奖励</strong>：$r_t^{\text{pos}} = \exp\left( -\sigma_p \sum_i \| p_i - \hat{p}_i \|^2 \right)$ — 鼓励所有关节的 3D 位置匹配参考</li>
+    <li><strong>关节旋转奖励</strong>：$r_t^{\text{rot}} = \exp\left( -\sigma_r \sum_i \| \theta_i - \hat{\theta}_i \|^2 \right)$ — 鼓励关节角度匹配</li>
+    <li><strong>关节速度奖励</strong>：$r_t^{\text{vel}} = \exp\left( -\sigma_v \sum_i \| \dot{q}_i - \hat{\dot{q}}_i \|^2 \right)$ — 鼓励运动速度和节奏匹配</li>
+    <li><strong>末端执行器奖励</strong>：$r_t^{\text{ee}} = \exp\left( -\sigma_e \sum_{j \in \text{EE}} \| p_j - \hat{p}_j \|^2 \right)$ — 特别关注手部和脚部位置精度（EE = {左右手，左右脚}）</li>
+    <li><strong>根位置/旋转奖励</strong>：奖励躯干根节点的全局位置和朝向匹配</li>
+  </ul>
+
+  <h4>正则化奖励——"每步最大脚高"（关键创新）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">每步最大脚高奖励</span>
+    $$ r_t^{\text{foot}} = \begin{cases} \exp\left( -\sigma_f | h_{\text{max}}^{\text{desired}} - h_{\text{max}}^{\text{actual}} | \right) & \text{if foot contacts ground at } t \\ 0 & \text{otherwise} \end{cases} $$
+    <div class="eq-note">
+      <strong>工作原理：</strong>在一只脚离开地面时，跟踪其达到的最大高度 $h_{\text{max}}^{\text{actual}}$。奖励在脚重新接触地面时计算，比较实际最大高度与期望最大高度的差异。这比简单的"离地时间"奖励更有效，因为它鼓励机器人<strong>真正地迈大步</strong>，而非频繁的小碎步。<br>
+      <strong>课程调度：</strong>该奖励的权重 $\alpha(t)$ 从 0 开始，在线性/阶梯课程中逐步增大，避免策略过早陷入"频繁迈步骗奖励"的局部最优。
+    </div>
+  </div>
+
+  <h4>其他正则化奖励</h4>
+  <ul>
+    <li><strong>接触力正则化</strong>：减小脚与地面的碰撞力，使运动更柔和</li>
+    <li><strong>关节力矩正则化</strong>：$r_t^{\text{torque}} = -\lambda_\tau \sum_i | \tau_i |^2$ — 惩罚过大力矩，节能并保护电机</li>
+    <li><strong>关节加速度正则化</strong>：$r_t^{\text{acc}} = -\lambda_a \sum_i | \ddot{q}_i |^2$ — 惩罚高频抖动，使运动更平滑</li>
+    <li><strong>脚部滑移惩罚</strong>：鼓励脚接触地面时不滑动</li>
+  </ul>
+
+  <h3>6.5 域随机化（Domain Randomization）</h3>
+  <p>域随机化是 sim-to-real 成功的关键保障。训练中每 episode 随机采样以下物理参数：</p>
+  <table>
+    <tr><th>参数</th><th>随机化范围</th><th>目的</th></tr>
+    <tr><td>地面摩擦系数</td><td>$[0.3, 1.5]$</td><td>适应室内地板、室外草地、砾石等多种地面</td></tr>
+    <tr><td>机器人质量/惯性</td><td>$\pm 10\%$</td><td>适应电池重量变化、传感器附加重量</td></tr>
+    <tr><td>关节阻尼/刚度</td><td>$\pm 20\%$</td><td>适应电机个体差异和老化</td></tr>
+    <tr><td>动作噪声</td><td>$\mathcal{N}(0, 0.01)$ 高斯噪声</td><td>适应动作执行延迟和误差</td></tr>
+    <tr><td>观测噪声</td><td>$\mathcal{N}(0, 0.005)$ 高斯噪声</td><td>适应传感器噪声</td></tr>
+    <tr><td>外力扰动</td><td>间歇性随机推力</td><td>增强策略对外部干扰的鲁棒性（如被推动、被击打）</td></tr>
+    <tr><td>地形变化</td><td>斜坡、台阶、凹凸不平</td><td>适应室外非平整地形</td></tr>
+  </table>
+
+  <h3>6.6 消融实验关键数据</h3>
+  <table>
+    <tr><th>变体</th><th>状态维度</th><th>Eg-mpipe↓</th><th>Empipe↓</th><th>Eacc↓</th><th>Evel↓</th><th>说明</th></tr>
+    <tr><td><strong>OmniH2O (默认)</strong></td><td>1665</td><td><strong>47.94</strong></td><td>41.87</td><td><strong>1.84</strong></td><td><strong>2.20</strong></td><td>DAgger + MLP + 25步历史 ✅</td></tr>
+    <tr><td>OmniH2O-w/o-DAgger-History0</td><td>90</td><td>83.26</td><td>46.00</td><td>4.86</td><td>4.45</td><td>直接RL，无历史，最差</td></tr>
+    <tr><td>OmniH2O-History0</td><td>90</td><td>83.26</td><td>46.00</td><td>4.86</td><td>4.45</td><td>DAgger但无历史</td></tr>
+    <tr><td>OmniH2O-History5</td><td>405</td><td>62.18</td><td>46.50</td><td>2.66</td><td>2.90</td><td>5步历史，过渡方案</td></tr>
+    <tr><td><strong>OmniH2O-History50</strong></td><td>3240</td><td>50.24</td><td><strong>40.11</strong></td><td>2.37</td><td>2.71</td><td>50步历史，Mpipe最优但其他指标不及25步</td></tr>
+    <tr><td>OmniH2O-LSTM</td><td>90 (每步)</td><td>87.00</td><td>46.06</td><td>3.89</td><td>3.88</td><td>LSTM架构，不如MLP+历史</td></tr>
+  </table>
+  <p>注：Eg-mpipe = 全局平均每关节位置误差 (mm)；Empipe = 局部平均每关节位置误差 (mm)；Eacc = 加速度误差；Evel = 速度误差。</p>
+</section>
+
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles</h2>
+
+  <h3>7.1 强化学习的 Sim-to-Real 范式</h3>
+  <p>OmniH2O 遵循当前人形机器人领域最主流的<strong>"仿真训练 + 域随机化 + 零样本迁移"</strong>范式：</p>
+  <ol>
+    <li><strong>GPU 加速并行仿真</strong>：Isaac Gym 允许同时在数千个环境中运行物理仿真，每个环境拥有独立的域随机化参数。这使得 RL 策略能够在训练过程中隐式地见过各种物理条件，从而在未见过的真实环境中也保持鲁棒。</li>
+    <li><strong>域随机化作为数据增强</strong>：通过随机化物理参数（摩擦、质量、阻尼、噪声），仿真训练覆盖了一个比单一真实环境更广的分布，真实环境只是这个分布中的一个样本点。</li>
+    <li><strong>零样本迁移</strong>：经过充分域随机化训练的策略，可以直接部署到真实机器人上，无需额外的真实环境微调。</li>
+  </ol>
+
+  <h3>7.2 Teacher-Student 知识蒸馏</h3>
+  <p>Teacher-Student 框架是处理<strong>信息不对称（information asymmetry）</strong>的经典策略：</p>
+  <ul>
+    <li><strong>不对称问题</strong>：仿真中可访问的信息（所有刚体的全局速度、精确位置、下一帧参考）远多于现实中可获取的信息（稀疏关节角度、IMU、VR 头显的 3 个关键点）。直接在稀疏观测上训练 RL 非常困难。</li>
+    <li><strong>解决方案</strong>：让教师（有全信息）先达到最优性能，再将教师的知识"压缩"到学生（仅有稀疏信息）中。这是一个<strong>特权信息蒸馏（privileged information distillation）</strong>过程。</li>
+    <li><strong>理论基础</strong>：DAgger 算法保证了学生策略在自身状态分布下的误差界限。通过迭代地在学生分布下收集教师的标签，可以缓解 covariate shift 问题。</li>
+  </ul>
+
+  <h3>7.3 历史信息替代显式状态估计</h3>
+  <p>这是一个被许多机器人学习系统采纳的通用技巧：</p>
+  <ul>
+    <li><strong>核心思想</strong>：某些难以直接获取的状态量（如全局线速度）实际上可以从历史状态序列中推断。$N$ 个历史帧的关节位置序列蕴含了速度信息：$v_t \approx (p_t - p_{t-N}) / (N \cdot \Delta t)$。</li>
+    <li><strong>MLP vs RNN 的抉择</strong>：直觉上 RNN/LSTM 更适合处理时间序列，但 OmniH2O 的消融表明 MLP + 拼接历史的表现更好。原因可能包括：(1) MLP 的参数量更大（512×256×128 + 1665×512 第一层），表达能力更强；(2) RNN 的隐状态更新可能引入梯度不稳定；(3) 有限历史窗口对足式机器人控制已经足够（物理系统的相关时间尺度有限）。</li>
+  </ul>
+
+  <h3>7.4 课程学习（Curriculum Learning）</h3>
+  <p>OmniH2O 的奖励函数使用了课程调度 $\alpha(t)$——在训练初期降低正则化奖励权重，后期逐渐增大。这遵循了课程学习的基本原则：</p>
+  <ul>
+    <li><strong>从简单到复杂</strong>：先学核心任务（跟踪参考运动），再逐步添加辅助约束（运动质量、节能、稳定性）</li>
+    <li><strong>避免过早收敛</strong>：如果一开始就施加很强的正则化惩罚，策略可能收敛到"不动"这种安全但无效的解</li>
+    <li><strong>引导而非约束</strong>：课程学习将正则化从"硬约束"变为"软引导"，让策略在具备基本能力后才去优化辅助目标</li>
+  </ul>
+
+  <h3>7.5 运动学约束隐式利用</h3>
+  <p>OmniH2O 仅用 3 个关键点（头部+双手）就能控制全身 27 个自由度，这背后隐式利用了<strong>人体运动链的刚性约束</strong>：在给定躯干姿态和末端（头、手）位置的情况下，通过 IK（逆运动学）和人体运动先验，全身姿态在很大程度上被确定。学生策略在蒸馏过程中学会了这种映射——从稀疏的关键点"解出"全身姿态。</p>
+
+  <h3>7.6 多模态控制的模块化设计</h3>
+  <p>OmniH2O 展示了<strong>模块化系统设计</strong>的优势：通过将"意图理解"（VR/相机/语言/大模型）和"物理执行"（RL 控制策略）解耦，每个模块可以独立迭代升级。GPT-4o 变得更聪明，不需要修改控制策略；控制策略优化后，也不影响上层接口。这种设计是复杂机器人系统走向实用的关键原则。</p>
+</section>
+
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures</h2>
+
+  <h3>推测的论文图表结构（基于论文结构和技术报告）</h3>
+  <p>以下根据论文的典型结构（CoRL 格式）和公开的技术报告、项目页面，推测论文中关键图表的内容和功能：</p>
+
+  <table>
+    <tr><th>图表</th><th>推测标题/内容</th><th>功能与解读</th></tr>
+    <tr>
+      <td><strong>Figure 1</strong></td>
+      <td>Teaser Figure —— OmniH2O 系统概览</td>
+      <td>展示多模态控制接口（VR 头显、RGB 相机、语言指令、GPT-4o）汇聚到运动学姿态接口，再驱动 Unitree H1 机器人。下方展示 6 个 OmniH2O-6 任务的示意图或照片。</td>
+    </tr>
+    <tr>
+      <td><strong>Figure 2</strong></td>
+      <td>系统架构图 —— OmniH2O Pipeline</td>
+      <td>完整展示 5 个阶段：(1) AMASS 数据重定向；(2) 教师 PPO 训练；(3) DAgger 蒸馏；(4) 域随机化；(5) 多模态部署。箭头标注数据流和策略流方向。</td>
+    </tr>
+    <tr>
+      <td><strong>Figure 3</strong></td>
+      <td>运动重定向过程可视化</td>
+      <td>左侧：SMPL 人体模型；中间：形态匹配后的 SMPL；右侧：H1 机器人。展示 12 个关键关节的对应关系和匹配效果。</td>
+    </tr>
+    <tr>
+      <td><strong>Figure 4</strong></td>
+      <td>Teacher-Student 框架对比</td>
+      <td>对比特权教师（990维全信息观测）和学生策略（3个关键点+25步历史）的观测空间和网络结构。展示两种架构的示意图。</td>
+    </tr>
+    <tr>
+      <td><strong>Figure 5</strong></td>
+      <td>"每步最大脚高"奖励示意图</td>
+      <td>展示脚步周期的五个阶段（离地→上升→最高点→下落→着地），标注最大高度 $h_{\text{max}}$ 的计算方式，对比旧方法（feet air time）的问题。</td>
+    </tr>
+    <tr>
+      <td><strong>Figure 6</strong></td>
+      <td>真实实验任务展示 —— OmniH2O-6</td>
+      <td>6 个任务的真实照片序列：(a) 球拍挥动；(b) 拳击；(c) 毛笔写字；(d) 蹲下捡取；(e) 篮子递送；(f) 浇花。展示机器人从起始姿态到完成任务的连续帧。</td>
+    </tr>
+    <tr>
+      <td><strong>Figure 7</strong></td>
+      <td>消融实验 —— 历史步数对比</td>
+      <td>柱状图/折线图对比 History-0/5/25/50 和 LSTM 变体在 MPJPE、加速度误差、速度误差上的表现，验证 25 步是最优甜点。</td>
+    </tr>
+    <tr>
+      <td><strong>Figure 8</strong></td>
+      <td>鲁棒性测试 —— 外部扰动</td>
+      <td>展示机器人被推动、拳击、在草地/斜坡/砾石上行走的照片序列，证明策略的鲁棒性和泛化能力。</td>
+    </tr>
+    <tr>
+      <td><strong>Figure 9</strong></td>
+      <td>GPT-4o 自主模式示意</td>
+      <td>展示 GPT-4o 接收视觉观察 → 生成文本推理（如"看到人伸出手，应该握手"）→ MDM 生成运动 → OmniH2O 执行的完整流水线。</td>
+    </tr>
+    <tr>
+      <td><strong>Table 1</strong></td>
+      <td>与基线方法的定量对比</td>
+      <td>对比 H2O、Exbody、Mobile-Television 等方法在成功率、MPJPE、加速度误差、末端执行器误差、重力投影误差上的表现。</td>
+    </tr>
+    <tr>
+      <td><strong>Table 2</strong></td>
+      <td>消融实验详细数据</td>
+      <td>所有变体（DAgger/no-DAgger、历史步数、网络架构、观测版本）的完整定量结果，验证各组件的贡献。</td>
+    </tr>
+  </table>
+
+  <div style="text-align:center; padding:40px; color:var(--text-muted); border:2px dashed #e2e8f0; border-radius:8px; margin-top:16px;">
+    📷 请将论文 PDF 中的关键图表截图保存至 <code>figures/</code> 子目录，命名为 <code>fig1.png</code> ~ <code>figN.png</code>，并更新此部分为实际截图。
+  </div>
+</section>
+
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Limitations</h2>
+
+  <div class="callout warn">
+    <div class="callout-title">⚠️ 批判性分析</div>
+    以下是对 OmniH2O 潜在局限性和不足之处的深度分析，基于论文方法的技审视角。
+  </div>
+
+  <h3>9.1 方法论层面</h3>
+  <ol>
+    <li>
+      <p><strong>3 个关键点的信息瓶颈</strong>：虽然消融证明 3 点跟踪与 22 点跟踪性能接近，但这很大程度上依赖于 AMASS 数据集中"正常人体运动"的先验——即在日常运动中，头部和双手的位置确实和全身姿态有强相关性。但在极端姿态（如瑜伽、搏击、舞蹈中的快速旋转）下，3 个点可能无法唯一确定全身姿态。论文未系统测试这些极端场景的边界性能。</p>
+    </li>
+    <li>
+      <p><strong>历史窗口 vs. 显式状态估计</strong>：用 25 步历史隐式估计速度是一种工程"hack"，虽然有效但缺乏理论保证。如果突然切换运动模式（如从静止突然开始跑），历史窗口中包含大量"过时的"静止信息，可能导致速度估计滞后。论文未分析这种瞬态响应的延迟和准确性。</p>
+    </li>
+    <li>
+      <p><strong>DAgger 的在线部署问题</strong>：DAgger 蒸馏在仿真中进行，但学生策略部署到真实机器人后，真实环境的物理分布可能与仿真蒸馏环境不同，导致 <strong>sim-to-real distribution shift 在蒸馏阶段未被覆盖</strong>。更理想的方案可能是结合真实数据做在线 DAgger。</p>
+    </li>
+    <li>
+      <p><strong>IROS→CoRL 的技术增量</strong>：OmniH2O 是 H2O (IROS 2024) 的扩展版本。从技术角度看，新增的贡献（Teacher-Student 蒸馏、多模态接口、数据集）确实是显著的增量，但<strong>核心方法框架（运动学姿态跟踪 + RL sim-to-real）在 H2O 中已经确立</strong>。在同一会议年提交两篇密切相关的论文，可能会引发关于"最小可发表单元"（minimum publishable unit）的讨论。</p>
+    </li>
+  </ol>
+
+  <h3>9.2 实验评估层面</h3>
+  <ol>
+    <li>
+      <p><strong>OmniH2O-6 数据规模有限</strong>：6 个任务约 40 分钟的数据，对于训练通用的 Diffusion Policy 来说可能不够。论文未全面分析数据集规模对下游性能的影响——如果只有这么少的数据，同域任务可能过拟合。</p>
+    </li>
+    <li>
+      <p><strong>缺少长期自主运行评估</strong>：所有演示都是短时段的（数十秒到数分钟）。没有报告策略在长时间（10 分钟以上）连续运行中的漂移、累积误差、或稳定性退化情况。这是实际应用中的关键指标。</p>
+    </li>
+    <li>
+      <p><strong>成功率评估细节不足</strong>："94.10% 成功率"的定义和评测方式需要澄清——是什么任务的成功率？成功的标准是什么？评测了多少 trial？是单次 rollout 还是多次平均？这些细节对理解结果的可靠性至关重要。</p>
+    </li>
+    <li>
+      <p><strong>缺少人机对比的主观测评</strong>：遥操作的"自然度"（naturalness）是一个主观指标。论文没有进行用户研究来评估操作者的主观体验——如延迟感知、体力负担、学习曲线等。</p>
+    </li>
+    <li>
+      <p><strong>缺少消融关于"稳定增强"的独立贡献</strong>：虽然稳定增强是关键创新之一，但搜索结果中未见独立的"with/without stable augmentation"消融数据。无法确定它单独贡献了多少。</p>
+    </li>
+  </ol>
+
+  <h3>9.3 泛化性层面</h3>
+  <ol>
+    <li>
+      <p><strong>机器人平台泛化</strong>：OmniH2O 专门针对 Unitree H1 设计。虽然理论上方法可以迁移到其他平台（如 Tesla Bot、Figure 01），但论文未验证这一点。每个机器人需要单独做形态重定向和策略训练，这不是即插即用的。</p>
+    </li>
+    <li>
+      <p><strong>灵巧手泛化</strong>：论文提到对 Inspire Hands 灵巧手通过 IK 解算控制，但这部分是独立于全身 RL 策略的。手部操作和全身运动的<strong>联合学习</strong>（joint learning）仍然是一个开放问题——当前方案是模块化拆分的，可能在需要精确手-身协调的任务中存在瓶颈。</p>
+    </li>
+    <li>
+      <p><strong>AMASS 许可证限制</strong>：由于 AMASS 数据集的许可证，重定向后的数据不能直接分发。这增加了复现的门槛——用户需要自己下载 AMASS 并运行约 4 天的重定向计算。</p>
+    </li>
+  </ol>
+
+  <h3>9.4 安全性考量</h3>
+  <p>论文未深入讨论人形机器人在人类环境中运行的安全性问题——例如，如果 GPT-4o 发出了不安全的指令（如挥拳击打），系统是否有保护机制？从设计上看，OmniH2O 的策略是一个"盲从执行器"——它会尽力执行任何给定的运动学姿态指令，无论指令是否安全。</p>
+</section>
+
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — 为什么做这个？</h2>
+
+  <h3>10.1 问题背景</h3>
+  <p>人形机器人因其与人类环境的天然适配性（门把手、楼梯、工具都是按人体工学设计的），被认为是最有潜力进入人类日常生活的机器人形态。然而，<strong>控制人形机器人完成灵巧的全身任务仍然是一个极其困难的问题</strong>。传统的基于模型的控制方法（如全身运动控制 WBC、模型预测控制 MPC）需要精确的动力学模型和大量的人工调参，难以泛化到多种任务。</p>
+
+  <div class="callout info">
+    <div class="callout-title">💡 核心动机一：让非专业用户也能操控人形机器人</div>
+    <p>人形机器人的终极价值在于替代或辅助人类从事体力劳动。但如果只有机器人学家才能操控它，它的社会价值就有限。OmniH2O 的目标是<strong>降低遥操作的门槛</strong>——戴上 Apple Vision Pro，像照镜子一样自然地控制机器人。这是人形机器人走向通用应用的关键一步。</p>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">💡 核心动机二：让机器人从遥操作中学习自主能力</div>
+    <p>如果说遥操作让机器人"有手有脚"，那么从遥操作数据中学习让机器人"有自己的大脑"。OmniH2O 的自主模式（Diffusion Policy 学习 + GPT-4o 推理）证明了<strong>teleoperation data 可以成为 autonomous policy 的训练数据</strong>。这是机器人学习领域所谓的"teleoperation → learning"范式的具体实例。</p>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">💡 核心动机三：消除 MoCap 依赖，实现"野外"部署</div>
+    <p>许多先进的人形机器人系统依赖动作捕捉（MoCap）系统来估计全局位姿和速度——这在实验室可行，但在工厂、家庭、户外完全不可行。OmniH2O 通过历史窗口替代全局速度 + 3 点稀疏接口替代全身姿态估计，<strong>系统性地消除了对外部感知基础设施的依赖</strong>。</p>
+  </div>
+
+  <h3>10.2 技术趋势定位</h3>
+  <p>OmniH2O 处于两个重要技术趋势的交汇点：</p>
+  <ol>
+    <li><strong>基于学习的人形机器人控制</strong>：从 2023 年的 PHC（仿真）到 2024 年的 H2O/HOVER/OmniH2O/Exbody/ASAP（真实机器人），基于 RL 的 sim-to-real 人形控制迅速发展。OmniH2O 是这个浪潮中的标杆性工作。</li>
+    <li><strong>多模态大模型 + 机器人</strong>：GPT-4o、Gemini 等大模型开始被用作机器人的"大脑"。OmniH2O 展示了如何将大模型的推理能力通过运动学姿态接口"注入"到物理机器人中。</li>
+  </ol>
+</section>
+
+
+<!-- ═══════════════ 11. TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Takeaways — 学到了什么？</h2>
+
+  <div class="callout tip">
+    <div class="callout-title">📝 关键收获</div>
+  </div>
+
+  <h3>11.1 方法论启示</h3>
+  <ol>
+    <li>
+      <p><strong>分层抽象是复杂系统的核心设计原则</strong>：OmniH2O 将"意图表达"和"物理执行"分为两层，中间用运动学姿态桥接。这种设计使得上层（VR/GPT-4o）和下层（RL 策略）可以独立进化。在构建其他 AI-机器人系统时，<strong>花时间设计好的中间表示（intermediate representation）可能是性价比最高的投入</strong>。</p>
+    </li>
+    <li>
+      <p><strong>Teacher-Student 是处理信息不对称的通用范式</strong>：无论何时面临"训练时能访问的信息多于部署时"的问题，Teacher-Student 蒸馏都可以考虑。关键在于：教师学最优解，学生学教师的输出而非直接学任务，从而绕过信息瓶颈。</p>
+    </li>
+    <li>
+      <p><strong>Reward engineering 是一门科学</strong>：「每步最大脚高」vs「离地时间」的对比生动说明了：奖励函数设计需要考虑策略可能找到的 shortcut。好的奖励函数<strong>激励期望行为、惩罚非期望行为、不给捷径可钻</strong>。</p>
+    </li>
+    <li>
+      <p><strong>"数据不足"可以通过结构化增强缓解</strong>：稳定增强（下半身固定）是数据增强在人形机器人训练中的巧妙应用。当数据分布不理想时，<strong>不是找更多数据，而是对现有数据进行结构化变换</strong>。</p>
+    </li>
+    <li>
+      <p><strong>MLP + 历史拼接可以击败 LSTM/GRU</strong>：这颠覆了"时序数据必须用 RNN"的直觉。对于有限时间窗口的物理控制任务，大的固定窗口 MLP 可能比 RNN 更稳定、更易于训练。</p>
+    </li>
+  </ol>
+
+  <h3>11.2 工程实践</h3>
+  <ol>
+    <li>
+      <p><strong>Sim-to-Real 的黄金法则：充分的域随机化</strong>：OmniH2O 的成功再次证明了这一点。摩擦、质量、阻尼、噪声、外力、地形——将这些参数随机化到足够广的范围，是零样本迁移成功的最关键工程因素。</p>
+    </li>
+    <li>
+      <p><strong>稀疏接口实则利用隐式约束</strong>：仅用 3 个关键点控制 27 个自由度听起来不可思议，但人体运动链的刚性约束使得全身姿态在很大程度上由末端位置确定。这个<strong>从高维到低维的压缩是可行的，因为有结构先验</strong>。在类似的系统中，应该寻找和利用这种自然的低维结构。</p>
+    </li>
+    <li>
+      <p><strong>课程学习不是锦上添花而是必要手段</strong>：在复杂的多目标 RL 中，同时优化所有目标几乎必然导致次优解。通过课程调度逐步引入正则化奖励，是让策略从"会做"进化到"做得好"的关键。</p>
+    </li>
+    <li>
+      <p><strong>系统工程的完备性决定系统上限</strong>：OmniH2O 不仅做了算法创新，还提供了完整的数据流水线（重定向+增强）、两种部署方案（双Orin/笔记本）、数据集（OmniH2O-6）和开源代码。这种<strong>系统工程思维</strong>是让一篇论文产生实际影响力的关键。</p>
+    </li>
+  </ol>
+
+  <h3>11.3 写作表达</h3>
+  <ol>
+    <li>
+      <p><strong>给复杂的系统一个难忘的名字</strong>："OmniH2O"（Omni Human-to-Humanoid）这个名称简洁有力——Omni 传达了"全能/通用"的野心，H2O 是前作的延续（像水一样流动自然），同时和化学式 H2O 同名令人印象深刻。</p>
+    </li>
+    <li>
+      <p><strong>一个图说清整个系统</strong>：好的 Teaser Figure（如 Figure 1 的系统概览）应该在 10 秒内让读者理解"这个系统做什么、怎么做的"。OmniH2O 的多模态输入汇聚到运动学姿态接口的图示，正是这种"一图胜千言"的设计。</p>
+    </li>
+    <li>
+      <p><strong>消融实验是论文的说服力基石</strong>：OmniH2O 的系统消融（DAgger vs no-DAgger、历史步数、MLP vs LSTM）为每个设计选择提供了坚实的实证支持。这种<strong>"claim → ablations → evidence"</strong>的写作结构值得学习。</p>
+    </li>
+  </ol>
+
+  <h3>11.4 未来工作方向</h3>
+  <ol>
+    <li>
+      <p><strong>多平台泛化</strong>：将 OmniH2O 的方法扩展到 Unitree G1、Tesla Bot 等其他平台，验证"一次训练，多平台部署"的可行性。</p>
+    </li>
+    <li>
+      <p><strong>联合全身-灵巧手学习</strong>：将灵巧手控制从独立的 IK 模块整合到统一的 RL 策略中，实现真正端到端的全身+手指联合控制。</p>
+    </li>
+    <li>
+      <p><strong>在线适应与终身学习</strong>：当前策略是固定的离线训练产物。在真实世界中持续在线学习、适应新任务和新环境，是下一代系统的方向。</p>
+    </li>
+    <li>
+      <p><strong>安全约束的集成</strong>：将安全性形式化为约束（constrained RL），使策略在学习跟踪能力的同时，保证不会执行危险的指令。</p>
+    </li>
+    <li>
+      <p><strong>更丰富的触觉反馈</strong>：当前系统的操作者缺乏力反馈——操作者不知道机器人手部是否接触到了物体。集成触觉传感器并提供力反馈，将大幅提升遥操作的沉浸感和精度。</p>
+    </li>
+  </ol>
+
+  <div class="callout tip" style="margin-top:16px;">
+    <div class="callout-title">🏆 总结性评价</div>
+    <p>OmniH2O 是 2024 年人形机器人全身控制领域的 <strong>landmark paper</strong>。它不是在某个单一维度上的技术突破（如更好的 RL 算法或更好的动力学模型），而是在<strong>系统级工程</strong>上的全面升级——从数据准备、策略训练、蒸馏、域随机化到多模态部署，每个环节都做了细致的设计和验证。它的最大贡献是<strong>展示了人形机器人从实验室走向现实应用的技术路线图</strong>：仿真训练 + 特权蒸馏 + 域随机化 + 通用接口 + 大模型集成。对于希望进入人形机器人领域的研究者和工程师，OmniH2O 提供了一个优秀的起点和参考架构。</p>
+  </div>
+</section>
+
+
+</div>
+<footer>Generated on 2026-07-08 · <a href="../../index.html">Tairan He</a> · UAV-Survey</footer>
+</body>
+</html>

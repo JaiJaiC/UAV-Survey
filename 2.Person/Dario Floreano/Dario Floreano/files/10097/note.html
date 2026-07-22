@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Revealing strengths and weaknesses of methods for gene network inference</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">Paper Notes</span>
+  <a href="#info">1. 论文信息</a>
+  <a href="#insight">2. 核心洞察与创新</a>
+  <a href="#architecture">3. 系统架构</a>
+  <a href="#task">4. 任务定义</a>
+  <a href="#challenge">5. 技术挑战</a>
+  <a href="#method">6. 方法与公式</a>
+  <a href="#principles">7. 基础原理</a>
+  <a href="#figures">8. 图表解读</a>
+  <a href="#flaw">9. 潜在缺陷</a>
+  <a href="#motivation">10. 动机推导</a>
+  <a href="#takeaway">11. 启示与收获</a>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Revealing Strengths and Weaknesses of Methods for Gene Network Inference（揭示基因网络推断方法的优势与劣势）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Daniel Marbach</strong>（EPFL）<sup>1,2</sup>、<strong>Robert J. Prill</strong>（IBM）<sup>3</sup>、<strong>Thomas Schaffter</strong>（EPFL）<sup>1</sup>、<strong>Claudio Mattiussi</strong>（EPFL）<sup>1</sup>、<strong>Dario Floreano</strong>（EPFL，通讯作者之一）<sup>1</sup>、<strong>Gustavo Stolovitzky</strong>（IBM，通讯作者之一）<sup>3</sup></td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">1. EPFL</strong>（瑞士洛桑联邦理工学院）智能系统实验室；<strong class="bold-affil">2. MIT</strong>（麻省理工学院）CSAIL；<strong class="bold-affil">3. IBM T.J. Watson 研究中心</strong>（纽约）计算生物学中心</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">PNAS</strong>（Proceedings of the National Academy of Sciences），Volume 107，No. 14，pp. 6286–6291，2010年4月6日（在线发表2010年3月22日）</td></tr>
+    <tr><td><strong>DOI</strong></td><td><a href="https://pnas.org/doi/full/10.1073/pnas.0913357107" target="_blank">10.1073/pnas.0913357107</a></td></tr>
+    <tr><td><strong>项目</strong></td><td>DREAM3（Dialogue on Reverse Engineering Assessment and Methods）in silico 网络推断挑战赛；由GeneNetWeaver（GNW）生成基准网络</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>在DREAM3社区盲评挑战赛中，对<strong>29种基因调控网络推断方法</strong>进行了系统性的性能评估——使用<strong>五个in silico黄金标准网络</strong>（10/50/100基因规模），利用ROC和PR曲线进行"绝对性能评估"（是否比随机猜测好？）和"对比性能评估"（哪种方法最好？）。核心发现：(a) <strong>11/29种方法不显著优于随机猜测</strong>——这对整个领域是严厉的警告；(b) 通过网络模体分析揭示了<strong>三类系统性预测错误</strong>：fan-in错误（组合调控推断失败——除最优方法外所有方法都在高入度基因上严重退化）、fan-out错误（错误推断共调控基因之间的边）、cascade错误（将间接调控错误推断为直接调控）；(c) <strong>社区集成预测（所有29个团队的排序边列表的平均）通常优于任何单一方法</strong>——证明了集体智慧的力量。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Gene Network Inference</span>
+    <span class="tag tag-green">DREAM3 Challenge</span>
+    <span class="tag tag-amber">Benchmark / Performance Assessment</span>
+    <span class="tag tag-purple">Network Motif Analysis</span>
+    <span class="tag tag-red">Combinatorial Regulation</span>
+    <span class="tag tag-cyan">GeneNetWeaver</span>
+    <span class="tag tag-gray">Community Prediction (Ensemble)</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>基因网络推断方法已经有数十种，为什么我们不知道哪种方法更好？</strong><br>
+    答：因为<strong>缺少一个"黄金标准"——真实生物中大多数基因调控关系都是未知的</strong>。如果不知道真实的网络是什么样的，就无法评估推断方法的准确性。之前的评估要么使用极小的合成网络（不够真实），要么使用部分已知的子网络（可能不代表全局特征）。<br><br>
+    问：<strong>本文如何解决这个问题？</strong><br>
+    答：<strong>使用GeneNetWeaver（GNW）生成in silico网络——从真实E. coli和Yeast调控网络中提取拓扑结构，使用热力学模型模拟基因表达动力学，添加真实的实验噪声模型</strong>。这创建了"仿真生物学"——网络结构和动力学都足够逼真，但<strong>真实的边集是完全已知的</strong>（因为网络是计算机生成的）。将这个过程作为一个盲评挑战提供给全球社区——提交者不知道真实网络，组织者不知道哪种方法更好（双盲）。<br><br>
+    问：<strong>本文最深刻的方法论洞察是什么？</strong><br>
+    答：<strong>只看一个总体分数（如AUROC）会掩盖截然不同的优势-劣势模式</strong>——两种方法可能有相同的总体AUROC分数，但一种擅长推断单输入调控，另一种擅长推断多输入调控。识别这些"方法签名"（method signatures）比简单地"排名"更有价值——因为它告诉研究者<strong>应该在什么条件下使用什么方法</strong>，以及<strong>当前方法的根本弱点在何处</strong>。本文的三类模体分析是第一个系统性揭示这些"方法签名"的工作。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>对应的洞察</th><th>类型</th></tr>
+    <tr><td>DREAM项目自2006年发起的"盲评挑战"范式：组织者拥有黄金标准，参与者提交盲预测</td><td>社区盲评是最公正的评估方式——避免了"自评偏差"（方法的提出者往往高估自己方法的性能）。DIALOGUE（对话式逆向工程评估）——不是"比赛"而是"对话"</td><td>方法论</td></tr>
+    <tr><td>系统生物学中网络模体（network motifs）的概念——局部连接模式（fan-in, fan-out, cascade, FFL）</td><td>不同推断方法对<strong>不同的局部网络模体有不同的预测置信度</strong>——通过分析每种方法在每种模体上的性能，可以绘制"方法签名"并识别系统性偏差</td><td>分析框架</td></tr>
+    <tr><td>信息检索中的PR曲线（Precision-Recall）——对于极不平衡数据（真实边仅占所有可能边的~1%）比ROC更敏感</td><td>AUROC可能对"容易推断的边"过度敏感——AUPR更能反映"在推断困难边"上的性能。双指标（AUROC + AUPR）同时使用比单指标更有区分力</td><td>评估指标</td></tr>
+    <tr><td>Ensemble learning（集成学习）——多个弱分类器的平均通常优于单个强分类器</td><td>将所有29个团队的预测结果简单取平均得到的"社区预测"（community prediction）在许多情况下优于任何单个团队——这对未来的评估挑战赛设计有深远影响</td><td>群体智慧</td></tr>
+  </table>
+
+  <h3>2.3 创新点拆解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：系统性的模体级别性能剖析（Motif-level Performance Profiling）</h4>
+    <div class="novelty-step"><strong>【传统评估的不足】</strong>以往的方法对比只给出一个总体指标（AUROC/AUPR）——"方法A的AUROC是0.75，方法B是0.72，A比B好"——这个结论忽视了方法A可能在某些类型的边上表现很差（但总体确实被表现好的边"拉高"了）。就像考试总分80分说明不了你是数学100分语文60分还是反过来。</div>
+    <div class="novelty-step"><strong>【本文的做法】</strong>将每个潜在边按它所属的模体类型（fan-in入度=1,2,3,...；fan-out出度；cascade距离；feed-forward loop）分组——在<strong>每个模体子集中</strong>分别计算每种方法的AUROC/AUPR。绘制每种方法的"模体性能剖面"（motif performance profile）——像雷达图一样展示了方法在不同模体上的性能差异。</div>
+    <div class="novelty-step"><strong>【方法论价值】</strong>这为任何有黄金标准的机器学习评估任务提供了一个通用模板——不要只看总体分数，要在<strong>数据的不同子结构</strong>上分别评估，以揭示模型的系统性偏差。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：识别三类系统性预测错误</h4>
+    <div class="novelty-step"><strong>【Fan-in（入度）错误】</strong>基因具有多个调控输入（组合调控）是生物学中的普遍现象——本文发现：<strong>所有方法（除了最优的Yip et al.）在推断高入度基因的调控边时性能急剧退化</strong>。例如，排名第4的方法在单个调控输入时预测置信度中位数97%，在入度=9时退化到46%（接近随机！）。原因：当基因有多个调控器时，单独扰动其中一个调控器对目标基因表达的影响可能被其他调控器"缓冲"——表达数据中信号被稀释。</div>
+    <div class="novelty-step"><strong>【Fan-out（出度）错误】</strong>共调控基因（由同一调控器激活的多个靶基因）具有高度相关的表达谱——推断方法往往错误地将这种相关性解释为"这些靶基因之间存在直接调控关系"。这是典型的"相关不等于因果"错误——也是基因网络推断领域最常见的错误类型。</div>
+    <div class="novelty-step"><strong>【Cascade（级联）错误】</strong>调控级联 A→B→C 中，A和C的表达也会表现出关联性（因为A变化→B变化→C变化）——推断方法容易将这种间接关联推断为A→C的直接边（"捷径"错误）。有趣的是，最优方法在cascade错误上反而比某些其他方法更严重——这说明<strong>不同错误类型之间存在权衡（trade-off）</strong>。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：社区集成预测的威力</h4>
+    <div class="novelty-step"><strong>【反直觉发现】</strong>将29个团队的预测结果取平均（对每条边，取29个团队给出的排名的中位数或均值）——这个简单的集成策略<strong>通常优于单一最优方法</strong>。更令人惊讶的是，即使包含排名非常靠后的团队（甚至包含不比随机猜测好多少的方法），集成预测的总体性能依然保持竞争力——这与集成学习理论高度一致："弱学习器的集成可以强于单个强学习器，只要它们的错误是不相关的"。</div>
+    <div class="novelty-step"><strong>【对实践的启示】</strong>如果你有一个基因网络推断问题——不要只运行一种方法并相信其结果。运行多种方法（最好来自不同的算法家族——回归、贝叶斯、信息论、相关性），取它们边排名的共识——这种方法可能比你单独调整任何一种方法得到更好的推断。</div>
+    <div class="novelty-step"><strong>【对评估设计的影响】</strong>未来的评估挑战赛应该从一开始就将"社区预测"作为评估基线——任何新提出的方法应该不仅仅比某种现有方法好，还应该比已有的社区集成更好（这更难）。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构 —— DREAM3挑战赛的评估管线</h2>
+
+  <h3>3.1 整体评估管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph GENERATION["阶段 1: 基准网络生成（GeneNetWeaver）"]
+      TOPOLOGY["从真实 E. coli / Yeast 调控网络中提取拓扑模式"]
+      THERMO["热力学基因表达模型（Ackers et al.）<br/>mRNA + 蛋白质动力学"]
+      NOISE["添加分子噪声 + 实验微阵列噪声"]
+      EXPR_DATA["输出: 基因表达数据矩阵<br/>N个基因 × M个实验条件<br/>（敲除/敲低/时间序列）"]
+      GOLD_NET["输出: 黄金标准调控网络<br/>（已知所有真实边）"]
+    end
+
+    subgraph SUBMISSION["阶段 2: 盲评提交（29个参与团队）"]
+      BLIND_DATA["仅向团队提供: 基因表达数据<br/>（不提供黄金标准网络）"]
+      METHOD_1["方法 1: Yip et al. 噪声模型"]
+      METHOD_2["方法 2-N: 回归/贝叶斯/信息论/相关性..."]
+      PREDICTION["每队提交: 排序边列表<br/>（每条候选边有一个置信度分数）"]
+    end
+
+    subgraph EVAL["阶段 3: 评估与分析"]
+      AUROC["AUROC · 整体区分能力"]
+      AUPR["AUPR · 不平衡数据下的精度-召回"]
+      P_VAL["P值 · 是否显著优于随机？<br/>100,000次随机边列表置换"]
+      MOTIF["模体分析 · 在每种网络模体上的性能"]
+      METHOD_SIG["方法签名<br/>（motif performance profile）"]
+    end
+
+    subgraph OUTPUT["阶段 4: 发现与结论"]
+      ERRORS["三类系统性错误<br/>Fan-in / Fan-out / Cascade"]
+      COMMUNITY["社区集成预测<br/>优于任何单一方法"]
+      GAPS["组合调控仍是未解难题<br/>可靠网络推断道阻且长"]
+    end
+
+    TOPOLOGY --> THERMO --> NOISE --> EXPR_DATA
+    THERMO --> GOLD_NET
+    EXPR_DATA --> BLIND_DATA
+    BLIND_DATA --> METHOD_1 --> PREDICTION
+    BLIND_DATA --> METHOD_2 --> PREDICTION
+    PREDICTION --> AUROC
+    PREDICTION --> AUPR
+    AUROC --> P_VAL
+    AUPR --> P_VAL
+    PREDICTION --> MOTIF
+    P_VAL --> METHOD_SIG
+    GOLD_NET --> MOTIF
+    GOLD_NET --> P_VAL
+    METHOD_SIG --> ERRORS
+    METHOD_SIG --> COMMUNITY
+    ERRORS --> GAPS
+    COMMUNITY --> GAPS
+
+    classDef gen fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef sub fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef eval fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef out fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class TOPOLOGY,THERMO,NOISE,EXPR_DATA,GOLD_NET gen
+    class BLIND_DATA,METHOD_1,METHOD_2,PREDICTION sub
+    class AUROC,AUPR,P_VAL,MOTIF,METHOD_SIG eval
+    class ERRORS,COMMUNITY,GAPS out
+    </pre>
+  </div>
+
+  <h3>3.2 三类系统性错误——为何发生</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph FAN_IN["Fan-in 错误 · 组合调控推断失败"]
+      FI_CAUSE["基因C有多个调控输入<br/>（A→C, B→C, D→C...）<br/>单独扰动A: C的表达变化被B和D缓冲"]
+      FI_EFFECT["推断方法低估入度高的<br/>基因的调控边<br/>→ 预测置信度随入度上升而急剧下降"]
+    end
+
+    subgraph FAN_OUT["Fan-out 错误 · 共调控基因间的虚假边"]
+      FO_CAUSE["调控器A共同调控靶基因B和C<br/>B和C的表达高度相关<br/>（受同一调控器驱动）"]
+      FO_EFFECT["方法错误地将B和C之间的<br/>相关性推断为B→C或C→B<br/>→ 产生大量虚假边"]
+    end
+
+    subgraph CASCADE["Cascade 错误 · 间接调控的捷径推断"]
+      CS_CAUSE["调控级联: A→B→C<br/>A的表达变化 → B变化 → C变化<br/>A和C之间表现出间接相关性"]
+      CS_EFFECT["方法可能直接推断A→C<br/>而忽略了中间节点B<br/>→ 过量的2-hop边"]
+    end
+
+    FI_CAUSE --> FI_EFFECT
+    FO_CAUSE --> FO_EFFECT
+    CS_CAUSE --> CS_EFFECT
+
+    classDef err fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class FI_CAUSE,FI_EFFECT,FO_CAUSE,FO_EFFECT,CS_CAUSE,CS_EFFECT err
+    </pre>
+  </div>
+
+  <h3>3.3 基准网络规格</h3>
+  <table>
+    <tr><th>子挑战</th><th>基因数</th><th>网络数</th><th>来源拓扑</th><th>数据类型</th><th>最优方法</th></tr>
+    <tr><td><strong>Size 10 (InSilico_Size10)</strong></td><td>10</td><td>5 (Ecoli1, Ecoli2, Yeast1, Yeast2, Yeast3)</td><td>E. coli + Yeast</td><td>敲除稳态 + 时间序列</td><td>Yip et al. (噪声模型)</td></tr>
+    <tr><td><strong>Size 50 (InSilico_Size50)</strong></td><td>50</td><td>5 (同上)</td><td>E. coli + Yeast</td><td>敲除稳态 + 时间序列</td><td>Yip et al. (噪声模型)</td></tr>
+    <tr><td><strong>Size 100 (InSilico_Size100)</strong></td><td>100</td><td>5 (同上)</td><td>E. coli + Yeast</td><td>敲除稳态 + 时间序列</td><td>Yip et al. (噪声模型)</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义 —— 基因网络推断问题</h2>
+
+  <h3>4.1 基因调控网络推断的形式化定义</h3>
+  <div class="callout info">
+    <div class="callout-title">任务形式化</div>
+    <p><strong>给定</strong>：一个基因表达数据矩阵 $X \in \mathbb{R}^{N \times M}$，其中 $N$ 是基因数，$M$ 是实验条件数（含敲除、敲低、时间序列实验）。每个条目 $x_{i,j}$ 是基因 $i$ 在条件 $j$ 下的表达水平（mRNA浓度）。</p>
+    <p><strong>目标</strong>：推断一个<strong>有向图</strong> $G = (V, E)$，其中 $V = \{1, 2, ..., N\}$ 是基因节点集，$E \subseteq V \times V$ 是有向边集——边 $(i \rightarrow j)$ 表示基因 $i$ 的产物（转录因子蛋白）调控基因 $j$ 的转录。</p>
+    <p><strong>输出</strong>：对所有 $N \times (N-1)$ 个候选有向边进行排序——为每条边分配一个"置信度分数"（置信度越高，越可能是真实调控关系）。二值决策（是/否有边）可以通过对排序后的列表设置阈值来获得。</p>
+    <p><strong>评估</strong>：将推断的排序边列表与黄金标准网络（已知所有真实边）对比，计算ROC曲线和PR曲线。</p>
+  </div>
+
+  <h3>4.2 任务挑战性：稀疏性与表达数据的信息瓶颈</h3>
+  <table>
+    <tr><th>属性</th><th>值</th><th>对推断的影响</th></tr>
+    <tr><td><strong>网络稀疏度</strong></td><td>真实边仅占所有可能边的 ~1-5%</td><td>极度不平衡——如果将所有边标记为"不存在"，准确率可达95-99%，但精确率=0。评估必须使用PR曲线而非单纯准确率。</td></tr>
+    <tr><td><strong>信息瓶颈</strong></td><td>仅从稳态表达数据推断有向因果网络——相关性不等于因果性</td><td>表达数据的相关性可能来自：(a) 真实的直接调控；(b) 间接调控；(c) 共调控（共享同一调控器）；(d) 纯粹的噪声——分离这些因素极其困难。</td></tr>
+    <tr><td><strong>组合爆发式增长</strong></td><td>100个基因的候选边数 = 100×99 = 9,900</td><td>随基因数平方增长——100基因网络已经接近纯手动推断的极限，而真实生物网络有数千个基因。</td></tr>
+    <tr><td><strong>数据维度</strong></td><td>实验条件数 $M$ 通常远小于基因数 $N$</td><td>$M \ll N$（"小n大p"问题）——统计推断的基础不充分。对于N=100基因网络，数百个实验条件是实际可行的，但数千个基因时这个要求在实验上极其昂贵。</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. 技术挑战 —— 为什么从表达数据推断基因网络如此困难？</h2>
+
+  <h3>5.1 五重根本性挑战</h3>
+
+  <h4>挑战 1：相关不等于因果（Correlation != Causation）</h4>
+  <p>基因表达数据的核心是<strong>相关系数矩阵</strong>。如果基因A和基因B的表达水平高度相关，可能的原因有：(a) A调控B；(b) B调控A；(c) C同时调控A和B；(d) A和B都是同一个生物学通路的下游效应；(e) 纯属巧合（多重假设检验问题）。仅从相关性推断有向边是"先天的信息不足"——表达数据本身不能区分类似 (a) 和 (b)（有向性），也不能区分 (a) 和 (c)（直接 vs 间接）。扰动实验（敲除特定基因后观察全局表达变化）可以提供部分因果信息，但实验成本限制了可执行扰动的数量。</p>
+
+  <h4>挑战 2：组合调控（Combinatorial Regulation）——信号稀释</h4>
+  <p>在真核生物中，大多数基因受到多个转录因子（TF）的组合调控。当基因G有5个TF调控它时，单独敲除其中一个TF对G表达的影响可能被其余4个TF"补偿"——在表达数据中看不到显著变化。这就是fan-in错误的物理根源——不是推断方法"笨"，而是<strong>数据本身就没有充分的信息</strong>。要解决这个问题，需要系统性的双敲除/三敲除实验——实验数量随基因数组合爆炸。</p>
+
+  <h4>挑战 3：反馈环路与动力学复杂性</h4>
+  <p>真实的基因网络不是有向无环图（DAG）——大量存在正反馈和负反馈环路。反馈意味着"过去的状态影响未来的状态"——稳态数据抹去了动力学信息，而时间序列数据（虽然包含更多信息）需要更复杂的动态模型（常微分方程/随机微分方程）来推断——这些模型的参数估计在数据有限的条件下极其困难。</p>
+
+  <h4>挑战 4：数据中的噪声和批次效应</h4>
+  <p>微阵列和RNA-seq数据包含多种噪声源：(a) 生物噪声——个体的基因表达水平本身就是随机的（内禀噪声）；(b) 技术噪声——测量误差、批次效应、平台偏差；(c) 实验设计噪声——不同实验室/不同时间点/不同操作者的系统差异。如果数据中的噪声主导了信号，任何推断方法都将无能为力。</p>
+
+  <h4>挑战 5："黄金标准"的悖论</h4>
+  <div class="callout warn">
+    <div class="callout-title">根本困境</div>
+    要评估推断方法的性能，需要知道真实网络。但真实生物网络的<strong>整个</strong>调控结构是未知的——这就是为什么我们要做网络推断。因此只能用"部分已知的"或"计算机生成的"网络作为黄金标准——前者可能不代表完整的网络特征，后者可能不够"生物真实"。这是基因网络推断领域的一个<strong>元级困境</strong>——评估方法的有效性本身就依赖于一个不完美的"真相"。
+  </div>
+
+  <h3>5.2 从信息论看基因网络推断的理论极限</h3>
+  <p>基因网络推断本质上是一个<strong>"欠定逆问题"（underdetermined inverse problem）</strong>——从N个基因在M个实验条件下的表达数据中推断N(N-1)个可能的调控关系。信息论的角度：</p>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 — 网络推断的信息瓶颈</span>
+    $$ I(\text{network}; \text{expression data}) < I(\text{network}; \text{perturbations}) $$
+    <p>信息论上，表达数据能提供的关于调控网络的信息量 <strong>不能超过</strong> 扰动实验设计所允许的上限。</p>
+    <div class="eq-note">
+      <strong>核心不等式</strong>：<strong>数据中的信息量受限于实验设计</strong>——如果你只做了单基因敲除实验，你就只能获得关于"每个基因对系统其他部分的单独影响"的信息。要获得关于组合调控（"A和B共同调控C"）的信息，你必须做<strong>联合扰动</strong>（同时敲除A和B或系统性扰动A和B的不同组合）——而联合扰动的实验数量随N组合爆炸 &nbsp;|&nbsp;
+      <strong>为什么最优方法（Yip et al.）在组合调控上优于其他方法？</strong>——根据本文的数据分析，Yip方法的噪声模型巧妙地利用了单基因敲除实验中"基因表达方差的结构"来间接推断基因之间的多重调控关系——不是直接测量组合效应，而是从表达噪声的协方差结构中<strong>外推</strong>组合效应——这是一种"从部分信息中挖掘更多信号"的聪明策略，但它仍然受限于实验设计的根本信息上限。
+    </div>
+  </div>
+
+  <p>这个信息论视角给出了一个重要启示：<strong>如果实验设计不能提供足够的因果信息（如没有系统性多基因扰动实验），任何算法都只能有限地改善推断——因为信息不在数据中。当AUROC达到某个上限后，剩下的进步空间不是来自更好的算法，而是来自更丰富的实验设计。</strong>本文中11/29的方法不比随机猜测好，其余方法在组合调控上接近随机——这可能不仅仅是算法的失败，也是实验设计信息量的失败。</p>
+
+  <h3>5.3 从2010年到2025年：什么变了，什么没变</h3>
+  <p>本文发表于2010年，随着时间的推移，评估已发生了一些关键变化：</p>
+  <ul>
+    <li><strong>单细胞RNA-seq的革命</strong>：本文时期的标准数据是bulk微阵列（数百万细胞的平均表达）——信号被平均化，细胞间异质性信息完全丢失。单细胞RNA-seq（scRNA-seq）——2010年代中期兴起——提供了"每个细胞的表达水平"，捕捉到了细胞群体中的异质性。这为基因调控推断提供了全新的信息来源——例如，两个基因在单细胞水平上的"共变异"可能揭示它们在相同细胞中的共调控关系，而bulk数据将这种信息平均掉了。</li>
+    <li><strong>深度学习方法（图神经网络GNN）</strong>：深度学习在2010年还远未普及。到2020年代，GNN已经被应用于基因网络推断——将基因网络视为图结构，使用消息传递（message passing）在图上传播信息。GNN的优势在于可以"端到端"地从数据中学习网络的全局结构特征——而不是像传统方法那样逐边独立预测。然而，组合调控的根本挑战仍然存在——GNN并没有从本质上解决"数据中缺少因果信息"的问题。</li>
+    <li><strong>Causal inference（因果推断）方法</strong>：Pearl的因果推断框架在2010年代逐渐被引入计算生物学——区分"干预（intervention）"和"观察（observation）"的差异，使用do-calculus（do演算）从扰动实验中排除混淆因素。这对区分"直接调控"和"间接关联"特别有效——因为它可以利用"如果我主动改变A，B是否变化？"的因果逻辑，而不依赖"A和B是否相关"的相关性逻辑。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD ═══════════════ -->
+<section id="method">
+  <h2>6. 方法 —— 评估框架与评分指标</h2>
+
+  <h3>6.1 AUROC与AUPR：两种互补的评估指标</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 1 — ROC曲线与AUROC</span>
+    $$ \text{TPR} = \frac{\text{TP}}{\text{TP} + \text{FN}}, \quad \text{FPR} = \frac{\text{FP}}{\text{FP} + \text{TN}} $$
+    $$ \text{AUROC} = \int_{0}^{1} \text{TPR}( \text{FPR}^{-1}(t) ) \, dt $$
+    <div class="eq-note">
+      <strong>TPR (True Positive Rate)</strong> = 召回率 = 真实边中被正确推断的比例 &nbsp;|&nbsp;
+      <strong>FPR (False Positive Rate)</strong> = 非真实边中被错误推断为有边的比例 &nbsp;|&nbsp;
+      <strong>AUROC</strong> = 曲线下面积——1.0为完美推断，0.5为随机猜测 &nbsp;|&nbsp;
+      <strong>对基因网络的不适用之处</strong>：负样本（非边）的基数比正样本（真实边）大100倍——FPR的分母巨大，导致ROC曲线"看起来"很乐观（即使FPR=0.01，FP的数量可能已经超过TP——因为分母大）。换句话说，AUROC对高FPR区域的错误不够敏感。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 2 — PR曲线与AUPR</span>
+    $$ \text{Precision} = \frac{\text{TP}}{\text{TP} + \text{FP}}, \quad \text{Recall} = \frac{\text{TP}}{\text{TP} + \text{FN}} $$
+    $$ \text{AUPR} = \int_{0}^{1} \text{Precision}( \text{Recall}^{-1}(t) ) \, dt $$
+    <div class="eq-note">
+      <strong>Precision（精确率）</strong> = 推断为有边的条目中，真实边的比例——"当我声称这是一条调控边时，我有多大概率是对的？" &nbsp;|&nbsp;
+      <strong>AUPR</strong> 对FP更敏感（因为FP在精确率的分母中），在极度不平衡数据上比AUROC更有区分力 &nbsp;|&nbsp;
+      <strong>本文的用法</strong>：同时使用AUROC和AUPR——两个指标的相关性约为0.7-0.8（不是完全一致，说明它们捕捉了性能的不同方面）。
+    </div>
+  </div>
+
+  <h3>6.2 统计显著性检验（P值）</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 3 — P值的计算</span>
+    $$ \text{P\_AUROC} = \frac{\text{随机边列表 AUROC} \geq \text{提交方法 AUROC的次数}}{100,000} $$
+    $$ \text{P\_Overall} = \left( \prod_{i=1}^{5} \text{P\_AUROC}_i \right)^{1/5} \quad \text{（5个网络的几何平均）} $$
+    $$ \text{Score} = -0.5 \cdot \log_{10}( \text{P\_AUROC} \cdot \text{P\_AUPR} ) $$
+    <div class="eq-note">
+      <strong>零假设</strong>：推断方法不比随机猜测好（AUROC = 0.5, AUPR = 随机基线） &nbsp;|&nbsp;
+      <strong>P值</strong>：观测到的AUROC（或AUPR）在随机假设下出现的概率——通过100,000次随机边列表置换计算经验分布 &nbsp;|&nbsp;
+      <strong>最终分数</strong>：$-0.5 \log_{10}(P_{\text{AUROC}} \cdot P_{\text{AUPR}})$——P值越小（越显著），分数越高。例如P=0.01 → Score=1.0；P=0.0001 → Score=2.0 &nbsp;|&nbsp;
+      <strong>11/29种方法的P值 > 0.05</strong>——在统计上不显著优于随机猜测——这是本文最令人警醒的发现。
+    </div>
+  </div>
+
+  <h3>6.3 网络模体分析（Motif-level Performance）</h3>
+  <div class="formula-block">
+    <span class="eq-tag">公式 4 — 模体级别的AUROC</span>
+    $$ \text{AUROC}_{\text{motif}} = \text{AUROC}( \mathcal{E}_{\text{motif}} ) $$
+    <p>其中 $\mathcal{E}_{\text{motif}}$ 是所有属于该模体类型的边（包括真实边和非边）的集合。</p>
+    <div class="eq-note">
+      <strong>Fan-in模体</strong>：按目标基因的入度（indegree）分组——indegree=1（单输入调控）、indegree=2,3,...（多输入组合调控） &nbsp;|&nbsp;
+      <strong>Fan-out模体</strong>：按源基因的出度（outdegree）分组 &nbsp;|&nbsp;
+      <strong>Cascade模体</strong>：按两基因在调控链上的最短距离分组——距离1=直接调控（真实边），距离2=间接调控（存在中间节点，不是真实边） &nbsp;|&nbsp;
+      <strong>FFL模体</strong>：前馈环路——A → B → C 且 A → C——两个路径（直接+间接）同时存在的情况。
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. 基础原理 —— 基因网络推断、模拟生成的底层机制</h2>
+
+  <h3>7.1 GeneNetWeaver（GNW）：in silico网络的生成</h3>
+
+  <p>GNW是本文作者团队（Schaffter, Marbach, Floreano）开发的开放源码工具，可以从真实生物网络中提取拓扑特征并生成"仿真生物"网络。它的工作流程：</p>
+
+  <h4>Step 1：拓扑提取</h4>
+  <p>从RegulonDB（E. coli）和SGD（Yeast）数据库中提取已知的转录调控网络作为"源网络"。这些源网络包含数百个基因和数千条调控边——具有真实的入度/出度分布、模体丰度、网络直径等拓扑特征。</p>
+
+  <h4>Step 2：动力学建模</h4>
+  <div class="formula-block">
+    <span class="eq-tag">原理 — 热力学基因表达模型（Ackers et al., 1982）</span>
+    $$ \frac{d[mRNA_i]}{dt} = \alpha_i \cdot f_i(\mathbf{TF}) - \delta_i \cdot [mRNA_i] $$
+    $$ \frac{d[Protein_i]}{dt} = \beta_i \cdot [mRNA_i] - \gamma_i \cdot [Protein_i] $$
+    <div class="eq-note">
+      <strong>$[mRNA_i]$</strong> = 基因$i$的mRNA浓度 &nbsp;|&nbsp;
+      <strong>$[Protein_i]$</strong> = 基因$i$的蛋白质浓度 &nbsp;|&nbsp;
+      <strong>$\alpha_i, \beta_i$</strong> = 转录/翻译速率常数 &nbsp;|&nbsp;
+      <strong>$\delta_i, \gamma_i$</strong> = mRNA/蛋白质降解速率常数 &nbsp;|&nbsp;
+      <strong>$f_i(\mathbf{TF})$</strong> = 调控函数——取决于结合到基因$i$启动子上的转录因子（TF）的种类和浓度。热力学模型基于平衡结合概率：$f_i = \sum_j w_{ij} \cdot \frac{[TF_j]^{n}}{K_d^n + [TF_j]^{n}}$（Hill-type协同结合） &nbsp;|&nbsp;
+      <strong>参数分布</strong>：$K_d \sim U[0.01, 1]$, Hill系数 $n \sim N(2,4)$（上下截断到[1,10]）, mRNA半衰期 $\sim N(27.5, 56.25)$分钟（上下截断到[5,50]）——这些参数范围基于实验测量数据。
+    </div>
+  </div>
+
+  <h4>Step 3：噪声建模</h4>
+  <p>两种噪声：(1) <strong>分子噪声</strong>——由于mRNA和蛋白质分子的随机产生和降解（内禀随机性），建模为Langevin型随机噪声项，系数=0.05；(2) <strong>实验微阵列噪声</strong>——模拟微阵列技术中的测量误差（背景荧光、探针杂交效率变化、扫描噪声），基于Stolovitzky et al. (2005) 的微阵列噪声模型。</p>
+
+  <h4>Step 4：实验条件仿真</h4>
+  <p>生成敲除实验（每个基因被逐个敲除→表达水平设为0→记录所有其他基因的稳态响应）、敲低实验（每个基因被减少到不同水平→50%, 25%等）、以及时间序列实验（敲除后随时间采样→获取动态过渡信息）。</p>
+
+  <h3>7.2 为什么GNW网络比纯随机网络更适合作为基准</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>纯随机网络（Erdos-Renyi）</h4>
+      <ul>
+        <li>入度/出度服从泊松分布——没有"枢纽"转录因子</li>
+        <li>模体丰度（fan-in, fan-out, cascade, FFL）与真实网络完全不同</li>
+        <li>动力学行为极不现实——大多数基因的表达模式是完全独立的</li>
+        <li>评估结果容易乐观——因为问题被"简化"了</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>GNW生成的网络</h4>
+      <ul>
+        <li>入度/出度服从power-law-ish分布——少数"枢纽"TF调控大量基因</li>
+        <li>模体丰度（特别是FFL和fan-in/fan-out模式）在统计上与源网络一致</li>
+        <li>热力学驱动的非线性动力学——表达模式接近真实微阵列数据</li>
+        <li>评估结果更"诚实"——因为网络特征是生物真实的</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>7.3 网络模体（Network Motifs）的生物学意义</h3>
+  <p>网络模体是在真实基因调控网络中<strong>显著过度出现的</strong>局部连接模式——它们的过度出现暗示它们具有被进化选择的功能优势：</p>
+
+  <table>
+    <tr><th>模体</th><th>结构</th><th>生物学功能</th><th>推断难度</th></tr>
+    <tr><td><strong>Fan-in（入度 > 1）</strong></td><td>多个TF → 同一靶基因</td><td>组合调控——整合多个信号决定一个输出。如：只有在"营养充足 AND 无应激"的条件下才表达某生长基因</td><td>极高——是本文确认的最主要未解决问题</td></tr>
+    <tr><td><strong>Fan-out（出度 > 1）</strong></td><td>一个TF → 多个靶基因</td><td>调控子（regulon）——一个TF协调一组功能相关的基因。如：热休克因子激活多个分子伴侣基因</td><td>中等——方法容易生成虚假的靶基因间边</td></tr>
+    <tr><td><strong>Cascade（级联）</strong></td><td>A → B → C</td><td>信号放大和时序调控——每个步骤可以引入延迟和信号放大。如：发育过程中的时序基因激活</td><td>高——方法容易产生A→C的"捷径"推断</td></tr>
+    <tr><td><strong>Feed-Forward Loop (FFL)</strong></td><td>A → B → C 且 A → C</td><td>噪声过滤、脉冲响应、决策延迟——是生物网络中最常见的模体。如：大肠杆菌ara操纵子</td><td>最高——需要同时推断两条路径</td></tr>
+  </table>
+
+  <h3>7.4 边排序 vs 二值决策：评估输出粒度的关键选择</h3>
+  <p>DREAM3挑战赛要求参与者提交<strong>排序边列表</strong>（每条候选边有一个置信度分数）而不是<strong>二值网络</strong>（边存在/不存在）——这是一个关键的评估设计选择，因为：</p>
+  <ul>
+    <li><strong>排序列表保留了更多信息</strong>：如果要求提交二值网络，每种方法必须在其内部设定一个置信度阈值来决定"哪些边被包含"——这个阈值的选择是主观的且强烈依赖于方法。排序列表则完全绕过了阈值选择问题——AUROC/AUPR直接在排序上计算，使方法之间的比较更加公平。</li>
+    <li><strong>实际应用中阈值是可以后期调整的</strong>：生物学家可以决定"我只关注前K个预测"（最高置信度的K条边），然后对它们进行实验验证——排序列表直接支持这个工作流。</li>
+    <li><strong>但排序列表也掩盖了校准（calibration）问题</strong>：置信度分数的绝对值是否有意义？如果某种方法将某条边的置信度标记为0.95——这真的意味着它有95%的概率是真实边吗？AUROC/AUPR不评估校准——这是本文未涉及的一个评估维度。</li>
+  </ul>
+
+  <h3>7.5 不同推断方法家族的信息理论视角</h3>
+  <p>29种方法可以按它们所利用的信息类型分为几个家族——每个家族对不同类型的网络特征有不同的敏感性：</p>
+  <ol>
+    <li><strong>回归方法（Regression-based）</strong>：将每个基因的表达建模为所有其他基因表达的线性/非线性函数——$x_i = f_i(x_1, x_2, ..., x_{i-1}, x_{i+1}, ..., x_N)$。稀疏回归（Lasso/LARS）只保留最重要的预测因子 → 对应推断的调控边。风险：高维回归在N >> M时严重欠定；函数形式的选择（线性 vs 非线性）对结果影响巨大。</li>
+    <li><strong>互信息/相关性方法（Mutual Information / Correlation）</strong>：计算所有基因对之间的互信息（或Pearson/Spearman相关性），高MI的对被推断为有边。优势：不假设特定函数形式；无模型（model-free）。劣势：不能区分方向（→ 只能推断无向网络的一部分）；不能区分直接和间接关联（→ fan-out和cascade错误高发）。</li>
+    <li><strong>贝叶斯网络方法（Bayesian Networks）</strong>：将基因网络建模为DAG（有向无环图），使用贝叶斯评分搜索最优网络结构。优势：概率解释清晰；可以整合先验知识。劣势：DAG假设排除了反馈环路（真实基因网络中普遍存在）；结构搜索空间随N超指数增长 → 必须使用启发式。</li>
+    <li><strong>常微分方程方法（ODE-based）</strong>：直接对基因表达动力学的ODE模型进行参数估计——$\dot{\mathbf{x}} = \mathbf{f}(\mathbf{x}; \mathbf{W})$，其中$\mathbf{W}$是调控强度矩阵。优势：最接近真实生物物理过程；可以使用时间序列数据的信息。劣势：非线性ODE的参数空间巨大——通常需要极多的时间点数据来可靠地估计参数。</li>
+  </ol>
+  <p><strong>最优方法（Yip et al.）的独特性</strong>：Yip et al.的方法不属于以上任何一个标准家族——它基于"噪声模型"，利用的是"基因在不同实验条件下表达变化的方差结构"中所隐含的调控信息。这个非传统的视角是它在组合调控（fan-in）问题上远远超越其他方法的关键——说明在这个问题上，"换一个完全不同的信息视角"比"在同一个视角下优化模型"更有效。</p>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. 论文图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图截图。请将截图保存至 <code>figures/</code> 子目录，命名 <code>fig1.png</code> ~ <code>figN.png</code>。</p>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">29种方法的总体性能排名（AUROC/AUPR及其P值）</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="29种方法性能排名" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>29种方法在三个子挑战（Size10、Size50、Size100）中的排名——以条形图的形式展示每种方法的P值（-log10尺度）和总体分数。</p>
+      <ul>
+        <li><strong>Yip et al.的精简性</strong>：最优方法只使用了敲除稳态数据（未使用时间序列），而且其模型相对简单（噪声模型）——"简单 + 聪明"胜过"复杂 + 暴力"</li>
+        <li><strong>随机猜测基线</strong>：11种方法落在该基线以下（P > 0.05）——提交这些方法的团队可能真诚地相信他们的方法有效——这说明了盲评的重要性</li>
+        <li><strong>随网络规模增大难度增加</strong>：Size100网络上的AUPR显著低于Size10——更多的基因=更多的候选边=更稀疏的正样本=更难</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">Fan-in错误分析 —— 预测置信度随目标基因入度的变化</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Fan-in错误分析" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>不同方法在目标基因入度从1到9+时的预测置信度曲线——每条线代表一种方法。</p>
+      <ul>
+        <li><strong>最优方法的稳健性</strong>：Yip et al.的曲线随入度增大几乎保持恒定（轻微下降）——它对组合调控的处理明显优于其他方法</li>
+        <li><strong>其他方法的"悬崖式"退化</strong>：排名2-4的方法在入度=1时置信度很高（>90%），但入度>3时急剧下降，入度=9时几乎变为随机（~50%）</li>
+        <li><strong>生物学后果</strong>：如果网络推断方法不能处理组合调控，那么它推断出的网络将严重缺失"枢纽"调控因子（调控最多基因的TF）的调控关系——恰好是最重要的调控关系</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">Fan-out + Cascade 错误分析</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Fan-out和Cascade错误" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>(a) 共调控基因（fan-out模体）之间错误推断的边——"间接边"的置信度分布；(b) 级联中2-hop间接边（A→C via B）的推断置信度。</p>
+      <ul>
+        <li><strong>Fan-out模式</strong>：大多数方法对共调控基因之间不存在真实边的判断不够"自信"——错误地将高置信度分配给这些虚假边</li>
+        <li><strong>Cascade中的"捷径"</strong>：最优方法在区分直接边(1-hop)和间接边(2-hop)上的表现反而不如某些其他方法——说明在减少fan-in错误和减少cascade错误之间存在权衡</li>
+        <li><strong>方法选择需要"问题感知"</strong>：如果你在网络推断中最关心的是准确识别直接调控关系（避免间接"短路"边），你应该选择一种方法；如果你最关心的是不遗漏组合调控关系，你应该选择另一种方法——不存在"万能方法"</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">社区集成预测 vs 单一最优方法的性能对比</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="社区集成 vs 单一方法" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>社区预测（29个团队边排名的平均值）与最优单一方法（Yip et al.）的对比——横轴是"参与集成的团队数量"（从只包含最优团队的1开始，逐步添加更多团队），纵轴是AUROC/AUPR。</p>
+      <ul>
+        <li><strong>集成优于个体</strong>：当包含10个以上团队时，社区预测的AUPR超越了最优单一方法——即使被加入的团队本身排名靠后</li>
+        <li><strong>饱和效应</strong>：超过15-20个团队后，性能增长趋缓——"好的集成不需要无限多的成员"</li>
+        <li><strong>错误多样性的价值</strong>：这个结果说明不同方法犯了<strong>不同类型的错误</strong>——在集成中相互抵消——如果所有方法都犯相同的错误，集成就不会有增益。这是集成学习理论（bias-variance decomposition）的完美体现</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在缺陷与改进方向</h2>
+
+  <h3>9.1 方法论的局限</h3>
+  <ul>
+    <li><strong>in silico基准的"生物真实度"问题始终存在</strong>：GNW网络的拓扑结构和动力学模型虽然比随机网络更真实，但仍然是<strong>对真实生物网络的高度简化</strong>——真实网络包含：(a) 翻译后修饰（磷酸化等不通过转录调控的调控方式）；(b) 代谢物反馈（小分子代谢产物直接抑制或激活酶）；(c) 表观遗传调控（染色质状态、DNA甲基化——这些在GNW模型中完全没有体现）。在这些额外复杂因素的背景下，本文的结论（"组合调控是主要困难"）可能低估了真实生物网络推断的难度。</li>
+    <li><strong>仅评估了表达数据的使用</strong>：现代网络推断可以整合多种数据类型——ChIP-seq（TF-DNA结合位点）、ATAC-seq（开放染色质）、Hi-C（3D基因组结构）、蛋白质组学数据等。整合多模态数据可以显著改善推断（特别是区分直接和间接调控）——但本文仅评估了纯表达数据方法。</li>
+    <li><strong>29种方法的代表性</strong>：虽然这代表了2010年提交到DREAM3的方法，但样本是<strong>自选的</strong>——自愿参与挑战的团队可能代表的是该领域"最有信心"的方法。那些作者都不提交的方法（可能知道自己的方法不够好）没有被评估——29种方法的性能分布可能<strong>向上偏</strong>于乐观。</li>
+  </ul>
+
+  <h3>9.2 评估指标的局限</h3>
+  <ul>
+    <li><strong>边级别评估的核心限制</strong>：AUROC/AUPR只评估单条边推断的准确性——忽略了<strong>推断网络的全局结构</strong>。两个推断网络可能具有完全相同的AUROC分数，但一个是"正确的"scale-free网络（有枢纽TF），另一个是随机的Poisson分布——后者在生物学上完全不make sense。边级别指标不能覆盖结构级别的正确性（如网络直径、度分布、模块化等）。</li>
+    <li><strong>P值的计算方式</strong>：100,000次随机边列表置换估计经验P值——但随机边列表的分布假设边之间是<strong>独立的</strong>，而真实网络中的边是高度相关的（同一个TF调控的多个靶基因，这些边的存在不是独立的）。这种独立性假设可能导致P值偏小（过度显著）。</li>
+  </ul>
+
+  <h3>9.3 改进方向</h3>
+  <ul>
+    <li><strong>多模态数据集成评估</strong>：设计新的基准——要求参与者推断网络时可以使用多种类型的数据（表达+ChIP-seq+蛋白质互作等）——评估"数据融合"对推断性能的增益。</li>
+    <li><strong>结构级别的评估指标</strong>：除了AUROC/AUPR，引入网络级别的指标——如度分布的KS距离、模体丰度的似然比、网络模块化指数等——这些指标能更好地捕捉推断网络在"生物合理性"上的优劣。</li>
+    <li><strong>因果推断vs相关性推断</strong>：区分"只能推断无向关联"的方法和"可以推断有向因果"的方法——前者在AUROC/AUPR上可能与后者不分伯仲（如果将"存在关联"等同于"有边"），但它们在生物学上的价值完全不同。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机推导 —— 为什么需要这场"社区盲评"？</h2>
+
+  <h3>10.1 思路推导链</h3>
+  <ol>
+    <li><strong>背景事实 — 基因网络推断是系统生物学的核心问题</strong><br>如果不知道哪些基因"控制"哪些基因，就无法理解细胞如何做出决策（分化、凋亡、代谢切换），也无法理性地设计药物靶点（"敲除基因A会如何影响整个网络？"）。基因网络推断被认为是"基因组学时代的圣杯"之一。</li>
+    <li><strong>但评估推断方法极其困难——"黄金标准悖论"</strong><br>要评估"推断是否正确"，需要知道"真实答案"。但真实生物中的基因调控网络大部分是未知的——我们做网络推断的目的就是为了知道它。因此评估一直依赖于小规模的部分已知子网络（可能存在选择偏差——"我们已知的"可能不等于"典型的"）。</li>
+    <li><strong>计算机生成网络提供了一个"跳出困境"的方案</strong><br>GeneNetWeaver从真实生物网络中提取拓扑结构（度分布、模体、直径等），使用热力学模型生成逼真的基因表达数据——但真实网络是完全已知的（因为是你自己生成的）。这相当于创建了一个"已知答案的考试"——第一次可以绝对客观地给推断方法打分。</li>
+    <li><strong>但这里有一个陷阱：评估方如果来自方法开发方，就有"利益冲突"</strong><br>方法的提出者在评估自己的方法时——即使努力客观——也难免高估自己的方法（confirmation bias）。"盲评"——组织者有答案但不知道方法（DREAM3挑战赛中团队提交是匿名的），参与者不知道答案——确保客观性。</li>
+    <li><strong>本文的独特贡献：不是宣布"谁赢了"，而是分析"为什么赢/为什么输"</strong><br>传统的比赛只宣布排名——"第一名Yip，第二名XXX"。本文超越排名进行了"赛后分析"：为什么最优方法表现好？——它更好地处理了组合调控（fan-in）。其他人为什么表现差？——系统性地犯了特定类型的模体错误。这些分析将"比赛"提升为"科学研究"。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    数十种基因网络推断方法被提出，却没有人知道它们谁好谁坏以及<strong>为什么</strong>——因为缺少一个真正客观的基准。这篇论文通过社区盲评+in silico黄金标准+模体级别深度分析，首次系统性地回答了"哪种方法在什么条件下表现好、每种方法的根本弱点是什么"——并且以11/29种方法不比随机好这个残酷结果，警告了整个领域：基因网络推断距离"可靠"还有很长的路要走。
+  </div>
+
+  <h3>10.3 "社区盲评"范式的深远影响</h3>
+  <p>本文的DREAM3挑战赛形式影响深远——在此之后，社区盲评挑战赛成为计算生物学和机器学习领域的标准评估方式。DREAM项目扩展到DREAM4、DREAM5（扩展到>1000个参与团队），影响扩散到CAFA（蛋白质功能预测）、CASP（蛋白质结构预测——实现了AlphaFold的突破性验证）等大型评估项目。本文可以视为"科学研究从'论文发表'转向'标准化评估'"范式转换的早期推动者之一——"当无法信任自评时，标准化盲评就是最好的替代品"。</p>
+</section>
+
+<!-- ═══════════════ 11. TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 关键启示与收获</h2>
+
+  <h3>11.1 方法论层面的启示</h3>
+  <ul>
+    <li><strong>"不要只看总分，要看分项"的评估哲学</strong>：在科学和工程中，排名经常被过度简化——"方法A比方法B好"就是一个单维度的结论。本文展示了<strong>在数据的不同子结构上分别评估性能</strong>的价值——两种方法的总体AUROC可能相同，但一种擅长单输入调控、另一种擅长组合调控——这些"方法签名"对于实际应用至关重要。这个"分项评估"思想适用于任何机器学习基准评估。</li>
+    <li><strong>"盲评挑战赛"的威力与必要性</strong>：在人工智能/数据科学领域，经常出现"新方法声称SOTA（state-of-the-art）"但基线被选择性地低估的现象（benchmark gaming）。DREAM3的盲评设计——参与者在不知道黄金标准的情况下提交预测——消除了所有"选择性报告"和"有利比较"的空间。对于竞争激烈的AI领域，盲评挑战赛是非常值得推广的公平评估机制。</li>
+    <li><strong>简单方法的意外胜利</strong>：最优方法（Yip et al.的噪声模型）<strong>相对简单</strong>——没有复杂的深度学习、没有贝叶斯推断的多层采样——但它精确地瞄准了问题的信息瓶颈（组合调控）。"了解问题的本质信息瓶颈在哪里"比"用更复杂的方法"更重要。</li>
+  </ul>
+
+  <h3>11.2 对计算生物学的影响</h3>
+  <ul>
+    <li><strong>11/29的方法不比随机好——这是研究领域的自我净化</strong>：这个残酷的结果让整个基因网络推断领域"直面真相"——许多被发表的方法可能在真实数据上表现并不好。自2010年以后，该领域的"发表标准"显著提高——新方法必须在DREAM标准基准上通过显著性检验，而不能只在小规模/选择性数据集上展示好结果。</li>
+    <li><strong>组合调控是根本瓶颈</strong>：本文明确指出——"推断单输入调控"已经做得不错（AUROC > 0.8），但"推断组合调控"仍然接近随机——这为后续研究指明了唯一的焦点：如何从表达数据中提取组合调控信号？可能的路径：(a) 系统性双敲除实验；(b) 单细胞表达数据（捕捉细胞异质性中隐含的调控信息）；(c) 蛋白质-DNA结合数据（ChIP-seq）的整合。</li>
+    <li><strong>集成方法的常规化</strong>：社区预测优于任何单一方法的发现，使得"取多种方法推断结果的共识"成为网络推断的标准实践——GENIE3（随机森林集成）和GRNBoost（梯度提升集成）在此后兴起——部分受到了本文"集成有效"结论的启发。</li>
+  </ul>
+
+  <h3>11.3 对个人研究的直接启示</h3>
+  <ul>
+    <li><strong>对评估/基准方向</strong>：任何需要评估机器学习方法性能的领域，都可以借鉴本文的模板：(1) 创建逼真的合成基准（保留真实数据的统计特征）；(2) 设计盲评机制；(3) 在数据子结构上进行分项性能分析；(4) 识别方法签名和系统性错误模式——这比简单排名更有价值。</li>
+    <li><strong>对集成学习方向</strong>：本文的社区预测结果是对集成学习力量的一个优雅验证——"弱学习器+多样性 = 强学习器"。对于任何机器学习任务，如果可以获得多种异构方法的预测结果，先不要纠结"哪种方法最好"——将它们取平均，很可能比任何单一方法都好。</li>
+    <li><strong>对计算生物学方向</strong>：基因网络推断的"圣杯"仍在远方——2010年的结论（"可靠推断仍然是一个未解决的问题"）在2025年仍然基本成立。这既是挫折（十年过去了进展有限），也是机会（真正的突破——如果出现——将有巨大的影响力）。单细胞数据、空间转录组学、深度学习（GNN）为这个方向提供了新的工具——如果有人能解决"从单细胞表达数据推断组合调控"这个硬骨头，可能就是这个领域的下一个"AlphaFold时刻"。</li>
+  </ul>
+
+  <h3>11.4 值得跟进的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Schaffter, T., Marbach, D., & Floreano, D. (2011) — GeneNetWeaver: in silico benchmark generation and performance profiling of network inference methods. <em>Bioinformatics</em></td><td>GeneNetWeaver工具的正式描述论文——详细说明了网络生成、表达仿真、噪声模型的实现细节。如果要在GNW上建立自己的基准，必须读这篇。</td></tr>
+    <tr><td>Yip, K. Y. et al. (2010) — Improved reconstruction of in silico gene regulatory networks by integrating knockout and perturbation data. <em>PLoS ONE</em></td><td>DREAM3最优方法的论文——理解它为什么在组合调控上优于其他方法（也许有可迁移到其他问题的技术洞察）。</td></tr>
+    <tr><td>Prill, R. J. et al. (2010) — Towards a rigorous assessment of systems biology models: The DREAM3 challenges. <em>PLoS ONE</em></td><td>DREAM3挑战赛全部三个子挑战（网络推断+参数估计+网络分类）的完整描述——与本文互补，提供了更宏观的DREAM3全貌。</td></tr>
+    <tr><td>Marbach, D. et al. (2012) — Wisdom of crowds for robust gene network inference. <em>Nature Methods</em></td><td>本文作者后续在DREAM5中大规模应用集成思想的论文——将"社区集成优于任何单一方法"的发现扩展到包含>100种方法和>1000个参与者的更大规模挑战赛。</td></tr>
+    <tr><td>Stolovitzky, G., Monroe, D., & Califano, A. (2007) — Dialogue on reverse-engineering assessment and methods: The DREAM of high-throughput pathway inference. <em>Annals of the New York Academy of Sciences</em></td><td>DREAM项目的初始宣言——阐述了"社区盲评"范式背后的哲学：通过系统性的、客观的评估来推动算法发展。</td></tr>
+  </table>
+
+  <h3>11.5 写作表达的亮点</h3>
+  <ul>
+    <li><strong>"盲评揭晓"的戏剧性结构</strong>：论文的写作体现了一种巧妙的"悬念→揭晓"节奏——先描述DREAM3挑战赛的机制（封闭式评估、组织者也不知道结果），然后逐一揭晓各个网络大小上的最优方法，最后通过模体分析解释"为什么"。这种叙事结构使一篇评估论文具有了侦探小说的吸引力——读者会好奇"到底有没有方法比随机好？""是什么样的方法？""为什么它好而别的不好？"</li>
+    <li><strong>主图的信息密度</strong>：论文的几个主图（特别是方法排名和模体性能剖面）在有限的空间中编码了大量信息——方法排名+统计显著性+不同子挑战的差异——一个图可以支撑多段深入讨论。这是PNAS短报告（6页正文+补充材料）写作风格的典范——每个图必须承载足够的分析深度。</li>
+    <li><strong>负面结果的正面呈现</strong>：11/29的方法不比随机好——如果论文的基调是"批评这些不好的方法"，它将引起巨大争议。本文的基调是"这是一个令人警醒的发现，揭示了整个领域面临的共同挑战"——将负面结果框定为"整个领域的集体学习机会"而非"某些方法的个别失败"。这种"不点名批评、只分析模式"的基调使得即使是那些在评估中表现不佳的团队也能从论文中获益并引用它。</li>
+  </ul>
+
+  <h3>11.6 DREAM范式的长期影响——从"发表论文"到"解决基准"</h3>
+  <div class="callout tip">
+    <div class="callout-title">科学研究中"标准化基准"的崛起</div>
+    <p>DREAM3和本文可以视为计算生物学从"基于论文的进展"转向"基于基准的进展"的转折点之一。在这个范式下，进展不是由"谁在顶级期刊上发表了新方法"来定义，而是由"谁在标准基准上取得了最高的分数"来定义。这个范式转换的影响是双重的：</p>
+    <p><strong>积极方面</strong>：(1) 公平——所有方法在完全相同的数据、完全相同的指标下进行比较；(2) 可复现——基准数据和评估代码是公开的，任何人都可以验证；(3) 聚焦——将领域资源集中在明确的问题上。DREAM挑战赛、ImageNet、GLUE（NLP基准）都是这个范式的成功案例。</p>
+    <p><strong>需要警惕的方面</strong>：(1) "过度优化基准"（overfitting to the benchmark）——方法可能在基准上表现极好但在真实数据上泛化差，因为方法的开发者可能有意或无意地利用了基准的特定特性；(2) "基准锁定"——一旦某个基准成为"标准"，就很难引入新的评估维度（如本文的模体分析超越了当时的"标准"AUROC评估）；(3) "指标的专制"——当"在基准X上取得最高分"成为论文发表的必要条件时，研究者会追逐指标而非洞察。</p>
+    <p>本文提供了一个在"标准化基准评估"和"深度理解评估"之间取得平衡的优秀模板——AUROC/AUPR提供了标准化的、可比较的分数；模体分析提供了超越分数的深度理解。未来的基准设计者应该从这个模板中学习：<strong>不仅提供"分数"，还要提供"在什么条件下这些方法表现好/差"的诊断</strong>。</p>
+  </div>
+  <h3>11.7 展望——从DREAM3到AlphaFold：社区盲评范式的演化轨迹</h3>
+  <p>本文发表于2010年的DREAM3——十多年后回看，这个"社区盲评"范式已经完全改变了计算生物学。CASP（蛋白质结构预测）的社区盲评在2020年见证了AlphaFold 2的突破——它不是在实验室自评中宣称"SOTA"，而是在完全盲评的CASP14中展示了与实验方法相当的结构预测精度——这一结果的公信力完全来自于盲评机制。这正是本文的DREAM3范式所倡导的。</p>
+  <p>然而，盲评范式也面临着"成功带来的新问题"：当所有人都追逐同一个基准时，如何避免过度优化？解决方案的方向：(1) <strong>定期更新基准</strong>——每年或每两年发布新的评估数据集（避免"过拟合到旧基准"）；(2) <strong>多维评估</strong>——不要只有一个"总分"，而是像本文那样提供多个互补的评估指标和子集分析；(3) <strong>对抗性评估</strong>——故意设计一些"反直觉"的测试用例来检测方法是否真正理解了底层问题（而非仅仅模式匹配到基准的特征）。DREAM社区在DREAM4/5中采用了这些原则——为未来的机器学习评估基准提供了重要的设计经验。</p>
+
+  <h3>11.8 对AI/机器学习评估的跨领域启示</h3>
+  <p>虽然本文讨论的是基因网络推断，但其评估方法论对更广泛的AI/ML领域有深远启示。当前的ML评估文化面临的问题与2010年的基因网络推断领域惊人地相似：</p>
+  <ol>
+    <li><strong>"SOTA treadmill"（领先榜单的跑步机效应）</strong>：新方法声称在ImageNet/CIFAR/GLUE上"超越SOTA"——但如果SOTA基准本身有缺陷（训练集污染、评估指标不敏感、测试集太小）怎么办？本文的AUROC和AUPR双指标设计——提供互补的视角——是解决"单指标驱动"风险的一种方式。</li>
+    <li><strong>"Cherry-picking baselines"（选择性基线比较）</strong>：新方法的提出者可能选择性地与较弱的基线比较（而忽略了同期的强基线）。DREAM3的盲评设计完全消除了这种可能性——评估方不知道哪种方法来自哪个团队，所有方法在完全相同的条件下比较。</li>
+    <li><strong>"Evaluation hacking"（评估作弊）</strong>：ML社区中出现了"在测试集上训练"或"选择性报告结果"等不端行为。盲评（测试集不公开）是防止这些行为的最有效手段——类似于Kaggle竞赛的"public leaderboard + private test set"设计。</li>
+    <li><strong>本文的核心教训</strong>：<strong>在评估中寻找"为什么"</strong>——不要只报告"方法A的F1是0.82"，而要问"方法A在哪些类型的实例上表现好？哪些类型的实例上是它的弱点？"——就像本文通过模体分析揭示"Fan-in错误是所有方法（除了一种）的弱点"——这类发现远比分数本身更有价值。</li>
+  </ol>
+
+  <h3>11.9 基因网络推断的哲学反思——我们到底在推断什么？</h3>
+  <div class="callout idea">
+    <div class="callout-title">基因网络是"真的存在"还是"我们用来理解数据的模型"？</div>
+    <p>一个深层的认识论问题：当我们说"推断基因调控网络"时，我们假设存在一个固定的、有向的、静态的网络结构（基因A→调控→基因B）。但真实的细胞状态是：(1) <strong>动态的</strong>——调控关系随着细胞周期、代谢状态、环境变化而改变；(2) <strong>条件依赖的</strong>——A调控B在营养充足时可能，在饥饿时可能不(因为B的表达被其他机制关闭)；(3) <strong>连续的而非二值的</strong>——调控不是一个"开/关"开关，而是一个连续的变化（B的表达水平从100变为150，而不是从OFF变为ON）；(4) <strong>随机而非确定的</strong>——在单细胞水平上，基因表达是随机的（内禀噪声），"A调控B"可能意味着A的浓度变化改变了B表达的概率分布——而不是确定性函数。</p>
+    <p>在这个更复杂的视角下，本文讨论的"fan-in错误"可能部分地不是"网络的推断错误"，而是"静态有向图假设本身的局限"。如果一个基因的真实调控模式是"条件依赖的组合调控"，那么强制用一个静态有向图来表示它——必然会遗漏关键信息。这提示着：基因网络推断的终极目标可能不是"更准确地推断一个有向图"，而是<strong>推断一个包含动力学参数、条件依赖、和概率分布的更丰富的过程模型</strong>——这比本文的DREAM3评估要难得多，但也是未来必须面对的挑战。</p>
+  </div>
+</section>
+
+
+</div>
+<footer>Generated on 2026-07-08 · <a href="../../index.html">Dario Floreano</a> · UAV-Survey · Paper Notes</footer>
+</body>
+</html>

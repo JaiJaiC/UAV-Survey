@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - Morpheus: A Neural-Driven Animatronic Face with Hybrid Actuation</title>
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif; line-height: 1.72; }
+  nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  nav a { text-decoration: none; font-size: 12px; font-weight: 500; color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s; }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code { background: #f1f5f9; color: #1e293b; font-family: "JetBrains Mono","Fira Code",Consolas,monospace; font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
+  strong.hl { color: #0f172a; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 4px; margin-right: 5px; margin-bottom: 4px; }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout { border-left: 4px solid; border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 12px 0; font-size: 13.5px; }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 22px; margin: 12px 0; overflow-x: auto; }
+  .formula-block .eq-tag { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong); background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 12.5px; color: #64748b; line-height: 1.65; }
+  .mermaid-box { background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center; }
+  .arch-panel { background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px; padding: 16px; margin: 14px 0 18px; overflow-x: auto; }
+  .arch-grid { min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr; gap: 12px; align-items: stretch; }
+  .arch-stage { border: 1px solid #d8e0ea; border-radius: 8px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .arch-stage h4 { margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .arch-stage h4 span { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; }
+  .arch-card { border-radius: 7px; padding: 9px 10px; border: 1px solid; min-height: 58px; display: flex; flex-direction: column; justify-content: center; }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow { min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr); color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px; }
+  .arch-arrow span { text-align: center; }
+  .arch-summary { min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .arch-metric { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: 8px 10px; }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure { background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0; margin: 16px 0; overflow: hidden; }
+  .paper-figure .fig-header { background: #f1f5f9; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .paper-figure .fig-header .fig-number { font-weight: 700; font-size: 12.5px; color: var(--blue-strong); background: #dbeafe; padding: 3px 10px; border-radius: 4px; }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img { max-width: 100%; height: auto; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .paper-figure .fig-interpretation { padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8; }
+  .paper-figure .fig-interpretation .fig-label { font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px; }
+  .paper-figure .fig-interpretation p, .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .novelty-card { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin: 12px 0; background: #fafbfc; }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step { font-size: 13px; margin-bottom: 8px; padding-left: 12px; border-left: 3px solid var(--purple-stroke); }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="wrap">
+
+<section id="info">
+<h2>1. Paper Info</h2>
+<h1>Morpheus: A Neural-Driven Animatronic Face with Hybrid Actuation and Diverse Emotion Control</h1>
+<table>
+<tr><td>Authors</td><td>Zhang et al. (Huazhe Xu)</td></tr>
+<tr><td>Year</td><td>2025</td></tr>
+<tr><td>Type</td><td>仿生机器人 / 混合驱动 / 语音情感表达</td></tr>
+<tr><td>Source</td><td><a href="Zhang et al. - 2025 - Morpheus A neural-driven animatronic face with hybrid actuation and diverse emotion control.pdf">Zhang et al. - 2025 - Morpheus A neural-driven animatronic face with hybrid actuation and diverse emotion control.pdf</a></td></tr>
+</table>
+
+<div class="callout info">
+<div class="callout-title">TL;DR 一句话速览</div>
+<p>Morpheus是清华大学许华哲课题组提出的神经驱动仿生面部机器人系统，采用<strong>33个执行器（29个刚性舵机+4根腱绳）</strong>的混合驱动方案，在类人尺寸头部中精细复现FACS主要动作单元。系统的核心创新在于：用<strong>Self-Modeling Network（自建模网络）</strong>将不可解析的腱绳-硅胶机械系统转化为可微的"电机命令→面部landmark"函数映射，从而通过梯度下降反向求解任意目标表情对应的电机信号。在此基础上，构建了<strong>wav2vec语音特征→Transformer时序→blendshape系数→线性合成→自模型逆优化→实时电机控制</strong>的端到端管道，实现了从任意语音到6种以上基础情绪的实时（30-50Hz）物理面部表情生成，landmark预测误差控制在2mm以内。Morpheus代表了从"数字avatar"走向"物理表情机器人"的关键一步——其方法论价值在于将"不可建模的机械系统"转化为"可学习可微的代理函数"这一通用范式，对软体机器人、仿生驱动等领域具有广泛借鉴意义。</p>
+</div>
+
+<div class="tags"><span class="tag-blue">仿生机器人</span><span class="tag-green">混合驱动</span><span class="tag-purple">自建模网络</span><span class="tag-amber">语音情感</span><span class="tag-red">电子动画</span><span class="tag-cyan">2025</span><span class="tag-gray">Huazhe Xu</span></div>
+</section>
+
+<section id="insight">
+<h2>2. Insight &amp; Novelty</h2>
+
+<h3>2.1 Q&amp;A 核心洞察</h3>
+<div class="callout idea">
+  <div class="callout-title">Q: 为什么仿生脸无法同时做到"精确定位"和"大范围微表情"</div>
+  <p>刚性机构精度高但体积大，在面颊/鼻子等狭小区域无法密集布置；腱绳灵活布线但精度差、有滞后。单一驱动类型必然在某个区域做妥协。</p>
+</div>
+<div class="callout tip">
+  <div class="callout-title">A: 混合驱动 + 可微自建模网络</div>
+  <p>按区域分配驱动：眼睛/嘴巴用舵机+连杆(高精度)，鼻子/面颊用腱绳(灵活布线)。然后训练Self-Modeling Network学习motor command → landmark的可微映射，反向优化即可将任意目标表情转化为电机信号。</p>
+</div>
+
+<h3>2.2 灵感→洞察映射</h3>
+<table>
+<tr><th>灵感来源</th><th>对应核心洞察</th></tr>
+<tr><td>人脸肌肉双重机制(咬肌+表情肌)</td><td>混合驱动模仿生物分工——刚性=力量+精度，腱绳=灵活+分布</td></tr>
+<tr><td>可微渲染——用NN拟合不可解析的光照过程</td><td>Self-Modeling Network = 可微机械渲染器</td></tr>
+<tr><td>语音驱动3D avatar(VOCA, FaceFormer)</td><td>将blendshape通过自模型桥接到物理电机</td></tr>
+<tr><td>FACS动作编码系统</td><td>blendshape参数化映射到物理AU锚点——将Ekman的44个AU抽象为连续blendshape基向量的线性组合，每个基向量对应一个物理驱动锚点的位移增量，从而将抽象的表情编码标准转化为可量化的电机控制空间</td></tr>
+</table>
+
+<h3>2.3 三大新意卡片</h3>
+
+<div class="novelty-card">
+  <h4>新意1: 混合驱动设计方法论</h4>
+  <div class="novelty-step"><strong>【问题】</strong>纯刚性机构在面部狭小空间无法布置足够多驱动点；纯拉索精度差。</div>
+  <div class="novelty-step"><strong>【灵感】</strong>人脸肌肉分工——咬肌提供力量，表情肌提供精细度。</div>
+  <div class="novelty-step"><strong>【设计】</strong>精度优先区(眼睑、口轮)用舵机+连杆(亚毫米精度)；空间受限区(鼻翼、面颊、眉毛)用腱绳+滑轮组。额外三轴颈部+可横移下颌。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>新意2: Self-Modeling Network</h4>
+  <div class="novelty-step"><strong>【问题】</strong>腱绳+硅胶系统的前向行为无法解析建模。</div>
+  <div class="novelty-step"><strong>【灵感】</strong>learned forward dynamics——用NN替代解析物理模型。</div>
+  <div class="novelty-step"><strong>【设计】</strong>采集(motor cmd, landmark)数据对，训练MLP学习f(m) → l的可微映射。给定目标l*，梯度下降min ||l* - f(m)||²得m*。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>新意3: 语音到物理表情的端到端管道</h4>
+  <div class="novelty-step"><strong>【问题】</strong>从任意语句实时生成时序连贯且情绪一致的面部物理表情。</div>
+  <div class="novelty-step"><strong>【灵感】</strong>语音驱动avatar+情绪识别+FACS动作编码。</div>
+  <div class="novelty-step"><strong>【设计】</strong>wav2vec→Transformer→blendshape系数+情绪标签→linear blendshape→landmark→Self-Model逆优化→电机命令。虚拟Blender面与实体面共享blendshape参数空间。</div>
+</div>
+
+<h3>2.4 原创性深度分析</h3>
+<p>Morpheus的原创性并非来自单个算法突破，而是来自<strong>硬件-数据-算法三层的协同创新</strong>。在硬件层，33执行器混合驱动方案解决了有限面部体积内的执行器密度问题——这与以往仿生面机器人（如Affetto的纯气动、KASPAR的纯电机）的单驱动范式形成根本差异。在数据层，随机电机扫描+MediaPipe landmark检测构建了(m,l)训练数据集，绕过了传统有限元仿真所需的材料参数标定。在算法层，Self-Modeling Network的设计哲学——"不试图理解物理，只学习可微映射"——与NeRF的"不模拟光传输，只学习视角→颜色映射"共享相同的认识论基础。这种三层协同使得Morpheus成为<strong>首个同时实现高DOF（20+独立电机）、高精度（<2mm landmark误差）、实时性（30-50Hz）和语音驱动的物理表情系统</strong>。</p>
+</section>
+
+<section id="architecture">
+<h2>3. Architecture</h2>
+
+<h3>3.1 架构面板</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <div class="arch-stage">
+      <h4>阶段1: 机械设计 <span>硬件</span></h4>
+      <div class="arch-card arch-solar"><strong>刚性区域(舵机+连杆)</strong><small>眼睑/口轮/下颌 | 高精度点控制</small></div>
+      <div class="arch-card arch-power"><strong>腱绳区域(缆线+滑轮)</strong><small>鼻翼/面颊/眉毛 | 灵活狭小空间布线</small></div>
+      <div class="arch-card arch-motor"><strong>颈部+下颌</strong><small>三轴(pan/tilt/roll)+可横移 | 大范围姿态</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>阶段2: 自建模 <span>标定</span></h4>
+      <div class="arch-card arch-solar"><strong>数据采集</strong><small>随机电机扫描 → 相机 → MediaPipe 3D landmark(68/478点)</small></div>
+      <div class="arch-card arch-power"><strong>Self-Model MLP</strong><small>f_theta: m → l; 监督学习m-l非线性映射</small></div>
+      <div class="arch-card arch-motor"><strong>逆优化</strong><small>给定l*; min_m ||l* - f(m)||² via GD; 3-5步收敛</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>阶段3: 语音驱动 <span>感知</span></h4>
+      <div class="arch-card arch-solar"><strong>wav2vec特征</strong><small>自监督语音特征提取</small></div>
+      <div class="arch-card arch-power"><strong>Transformer时序</strong><small>预测blendshape b_t + 情绪 e_t</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>阶段4: 实时控制 <span>执行</span></h4>
+      <div class="arch-card arch-thrust"><strong>Blendshape→Landmark</strong><small>l* = baseline + sum(b_i * delta_i)</small></div>
+      <div class="arch-card arch-thrust"><strong>Landmark→Motor</strong><small>经Self-Model逆优化得m*</small></div>
+    </div>
+  </div>
+  <div class="arch-arrow"><span>CAD/装配</span><span>标定</span><span>推理</span><span>驱动</span></div>
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>自由度</strong><small>20+独立电机</small></div>
+    <div class="arch-metric"><strong>自模型精度</strong><small>landmark误差&lt;2mm</small></div>
+    <div class="arch-metric"><strong>控制频率</strong><small>30-50Hz</small></div>
+    <div class="arch-metric"><strong>情绪种类</strong><small>6+基本情绪+中性</small></div>
+  </div>
+</div>
+
+<h3>3.2 硬件子系统详细分解</h3>
+<p>Morpheus的33个执行器按面部区域和驱动类型分为五个子系统，每个子系统的设计都体现了"精度需求决定驱动选型"的原则：</p>
+<table>
+<tr><th>子系统</th><th>执行器数</th><th>驱动类型</th><th>控制精度</th><th>设计理由</th></tr>
+<tr><td>眉毛模块(Eyebrow)</td><td>4</td><td>刚性舵机</td><td>高</td><td>眉毛抬降、皱眉等动作对位置精度敏感，且眉毛区域有足够空间容纳舵机</td></tr>
+<tr><td>眼部模块(Eye)</td><td>6</td><td>刚性舵机</td><td>高</td><td>眼球同步转动+眼睑开合——视线方向直接影响社交感知，需要精确定位；含微型摄像头用于人脸检测</td></tr>
+<tr><td>嘴部模块(Mouth/Lip)</td><td>16</td><td>刚性舵机(8控制点)</td><td>高</td><td>8个控制点：2个嘴角（五连杆机构实现二维运动）+6个唇部开闭点。口型是最丰富的表情通道，需要最多DOF</td></tr>
+<tr><td>鼻/颊模块(Nose/Cheek)</td><td>4</td><td>腱绳驱动</td><td>中</td><td>鼻翼扩张、面颊提升等微表情——空间狭小无法容纳舵机，腱绳通过滑轮组柔性布线实现</td></tr>
+<tr><td>颈部模块(Neck)</td><td>3</td><td>刚性舵机</td><td>高</td><td>三轴(pan偏航/tilt俯仰/roll横滚)提供头部姿态大范围运动——点头、摇头、歪头等社交动作</td></tr>
+</table>
+
+<h3>3.3 数据闭环与标定流程</h3>
+<p>自建模网络的训练数据采集是一个关键工程环节。系统通过<strong>随机电机扫描</strong>生成覆盖电机空间的数据集：对每个执行器在允许范围内随机采样PWM值，组合成完整的33维电机命令向量m，驱动Morpheus面部执行该命令，同时用固定位置的RGB相机拍摄面部照片，通过MediaPipe提取68或478个3D面部landmark坐标l。这一过程的巧妙之处在于：<strong>不需要任何物理参数标定</strong>——腱绳的摩擦系数、硅胶的杨氏模量/泊松比、关节间隙等传统有限元建模所必需的所有参数，都被隐式地编码在(f_theta)的权重中。采集规模通常为数千到数万对(m,l)样本，覆盖正常表情范围。训练完成后，自模型即可在<strong>训练域内</strong>实现可靠的前向预测和梯度反传——这是整个系统从"硬件堆叠"升级为"可优化系统"的关键跳板。</p>
+
+<h3>3.4 流程图1: 语音到电机</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart LR
+  A["语音输入"] --> B["wav2vec/AudioLM"]
+  B --> C["Transformer时序"]
+  C --> D["blendshape b_t + 情绪 e_t"]
+  D --> E["线性合成 target l*"]
+  E --> F["Self-Model逆优化"]
+  F --> G["电机命令 m"]
+  G --> H["Morpheus实体脸"]
+</div>
+</div>
+
+<h3>3.5 流程图2: 自建模训练与部署</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+  SA["离线标定"] --> SB["随机电机扫描"]
+  SB --> SC["MediaPipe landmark检测"]
+  SC --> SD["(m,l)数据集"]
+  SD --> SE["训练Self-Model MLP"]
+  SE --> SF{"精度&lt;2mm?"}
+  SF -->|否| SB
+  SF -->|是| SG["在线部署"]
+  SG --> SH["给定target l*"]
+  SH --> SI["GD优化(3-5步)"]
+  SI --> SJ["执行m*"]
+  SJ --> SK["视觉闭环(可选)"]
+  SK --> SH
+</div>
+</div>
+</section>
+
+<section id="task">
+<h2>4. Task Definition</h2>
+<h3>4.1 解决的问题</h3>
+<p>从任意语句实时生成与语音内容和情绪一致的物理面部表情。包含三个子问题：</p>
+<ul>
+<li><strong>机械子问题：</strong>类人面部狭小空间中布置足够多驱动点覆盖FACS主要AU</li>
+<li><strong>建模子问题：</strong>无解析模型时，如何获得motor→face的可信映射</li>
+<li><strong>感知-控制子问题：</strong>从语音实时预测时序连贯且情绪合适的表情参数并驱动物理面部</li>
+</ul>
+
+<h3>4.2 系统I/O规格</h3>
+<table>
+<tr><th>项目</th><th>规格</th><th>说明</th></tr>
+<tr><td><strong>输入</strong></td><td>语音音频（16kHz单声道wav） + 可选情绪标签</td><td>wav2vec要求16kHz采样率；情绪标签可来自外部指定或由Transformer自动推断</td></tr>
+<tr><td><strong>输出</strong></td><td>33维电机命令向量（PWM占空比值）</td><td>29个刚性舵机PWM值 + 4个腱绳电机PWM值；PWM范围对应机械行程限制</td></tr>
+<tr><td><strong>处理管线</strong></td><td>wav2vec特征提取 → Transformer解码 → 33维blendshape系数 → 线性合成landmark → 自模型逆优化 → 电机PWM</td><td>五个阶段的级联处理，其中自模型逆优化是计算瓶颈</td></tr>
+<tr><td><strong>端到端延迟</strong></td><td>&lt;100ms（含音频缓冲+特征提取+推理+逆优化+电机响应）</td><td>低于人类对音画不同步的感知阈值（~150ms），保证社交交互的自然感</td></tr>
+<tr><td><strong>实时帧率</strong></td><td>30-50Hz</td><td>即每20-33ms输出一组新的电机命令；利用上一帧m作为当前帧逆优化的热启动，大幅加速收敛</td></tr>
+<tr><td><strong>表情空间</strong></td><td>6+基本情绪（高兴、悲伤、愤怒、惊讶、恐惧、厌恶）+ 中性</td><td>覆盖Ekman六基本情绪；通过blendshape系数的连续插值可实现情绪混合与渐变过渡</td></tr>
+<tr><td><strong>控制精度</strong></td><td>landmark预测误差 &lt;2mm（面部尺度~150mm）</td><td>相对误差约1.3%，满足精细表情的定位需求；眼周/口周关键点精度更高</td></tr>
+<tr><td><strong>物理尺寸</strong></td><td>类人成人头部尺寸</td><td>3D打印骨架+硅胶蒙皮；总重量和体积接近真实人头，适配标准机器人躯干</td></tr>
+</table>
+
+<h3>4.3 问题难度评估</h3>
+<p>该任务的本质困难在于<strong>跨模态（语音→视觉表情）和跨域（数字参数→物理执行）的双重映射</strong>。语音到表情不是一一映射——同一句话可以用不同情绪说出，且表情必须与语音的韵律、重音、节奏在多时间尺度上同步。而数字blendshape到物理电机的映射面临的是非线性的、时变的、存在滞后的材料系统。这两个映射的合成使端到端误差极易累积放大，因此Self-Modeling Network作为"可微桥梁"的角色至关重要。</p>
+</section>
+
+<section id="challenge">
+<h2>5. Key Challenge</h2>
+
+<h3>5.1 第一性原理</h3>
+<div class="callout danger">
+<p><strong>本质困难来自三重不可解析性：</strong>(1)机械不可解析——腱绳摩擦/弹性/滑轮组非线性；(2)材料不可解析——硅胶粘弹性+迟滞；(3)耦合不可解析——面区间通过硅胶皮肤的弹性传递机械耦合。</p>
+</div>
+
+<h3>5.2 三重不可解析性的深层剖析</h3>
+<p>这三重不可解析性并非彼此独立，而是以乘积方式放大了建模难度：</p>
+<ul>
+<li><strong>机械不可解析（腱绳系统）：</strong>腱绳与滑轮之间的库仑摩擦系数随温度/湿度变化；腱绳本身有微小的塑性蠕变，长时间使用后有效长度变化；滑轮组的传动比受绕线方式和预紧力影响。这些因素使得即使精确知道电机转角和力矩，也无法准确预测锚点的实际位移。</li>
+<li><strong>材料不可解析（硅胶蒙皮）：</strong>硅胶是典型的粘弹性材料——应变不仅取决于当前应力，还取决于加载历史（Mullins效应、应力软化）。电机驱动速度不同时，硅胶的变形响应也不同（速率依赖性）。这意味着<strong>同一电机命令在不同历史状态下产生不同的landmark</strong>。</li>
+<li><strong>耦合不可解析（皮肤传播）：</strong>面部硅胶蒙皮是连续弹性体——拉动嘴角不仅改变嘴角位置，还会通过皮肤拉伸影响面颊、鼻翼、甚至对侧嘴角。这种空间耦合的传播方向和幅度是蒙皮形状、厚度、锚点位置的复杂函数，纯解析建模需要求解非线性弹性力学边值问题。</li>
+</ul>
+<p>这三重不可解析性的叠加使得传统基于物理的建模方法（有限元、多体动力学）在实践中几乎不可行——需要标定数十个材料参数和摩擦参数，且每个个体实例的参数都不同（制造公差、装配差异）。Morpheus的Self-Modeling方案从根本上绕过了这些困难：<strong>不建模内部机理，只学习端到端的可微映射</strong>。</p>
+
+<h3>5.3 方法对比</h3>
+<table>
+<tr><th>方法类</th><th>代表</th><th>精度</th><th>丰富度</th><th>vs Morpheus</th></tr>
+<tr><td>纯刚性电子动画</td><td>Disney Audio-Animatronics</td><td>高</td><td>低</td><td>Morph用腱绳补微表情</td></tr>
+<tr><td>纯拉索/气动</td><td>Affetto, KASPAR</td><td>低</td><td>中</td><td>Morph用刚性保精度</td></tr>
+<tr><td>3D Avatar(纯软件)</td><td>VOCA, FaceFormer</td><td>N/A</td><td>高</td><td>Morph桥接数字到物理</td></tr>
+<tr class="highlight"><td><strong>Morpheus</strong></td><td>本文</td><td><strong>高(刚性)+中(腱绳)</strong></td><td><strong>高(20+电机)</strong></td><td><strong>混合驱动+可微自模型</strong></td></tr>
+</table>
+
+<h3>5.4 感知-控制同步挑战</h3>
+<p>除了物理层面的不可解析性，语音到表情的跨模态映射本身也面临多重挑战：(1)<strong>一对多映射：</strong>同一段语音"你好"可以用高兴、悲伤、愤怒等多种情绪表达，表情结果完全不同；(2)<strong>多尺度时序对齐：</strong>语音的音素（~50-100ms）、音节（~100-300ms）、韵律短语（~500-2000ms）分别对应口型变化、表情过渡和情绪表达，需要在不同时间尺度上同步；(3)<strong>情绪一致性约束：</strong>语音过程中的表情不仅要在每个瞬间正确，还需要在整个语句跨度上保持一致的情绪基调——不能前一秒还在笑、后一秒突然冷漠。这些挑战要求语音处理模块同时具备细粒度的音素级别对齐和粗粒度的情绪全局建模能力。</p>
+</section>
+
+<section id="method">
+<h2>6. Method</h2>
+
+<h3>6.1 核心公式</h3>
+
+<div class="formula-block">
+  <div class="eq-tag">公式1: Self-Modeling前向映射</div>
+  <p>电机命令m∈R^K到landmark l∈R^{3N}的MLP映射:</p>
+  $$ l = f_\theta(m) = W_L \cdot \sigma(W_{L-1} \cdot \dots \cdot \sigma(W_1 \cdot m + b_1) \dots) + b_L $$
+  <p>训练损失:</p>
+  $$ \mathcal{L} = \frac{1}{|D|} \sum_{(m_i, l_i) \in D} \|l_i - f_\theta(m_i)\|^2_2 $$
+  <div class="eq-note"><strong>洞察:</strong> 该网络隐式学习腱绳摩擦、硅胶粘弹性和机构间隙——不可解析的物理变成可微的数学函数。</div>
+</div>
+
+<div class="formula-block">
+  <div class="eq-tag">公式2: 逆优化—从landmark到motor</div>
+  <p>给定目标landmark l*:</p>
+  $$ m^* = \arg\min_m \mathcal{L}_{\text{inv}}(m) = \|l^* - f_\theta(m)\|^2_2 + \lambda \mathcal{R}(m) $$
+  <p>梯度下降:</p>
+  $$ m^{(k+1)} \leftarrow m^{(k)} - \eta \nabla_m \mathcal{L}_{\text{inv}} $$
+  <p>其中R(m)为正则化(时序平滑+节能)。3-5步收敛因相邻帧变化小。</p>
+  <div class="eq-note"><strong>实用技巧:</strong> 上一帧的m是当前帧很好的初始猜测——保证30-50Hz实时性。</div>
+</div>
+
+<div class="formula-block">
+  <div class="eq-tag">公式3: Blendshape合成</div>
+  <p>语音→blendshape:</p>
+  $$ b_t, e_t = \text{Transformer}(\text{wav2vec}(\text{audio}_{t-w:t+w})) $$
+  <p>线性合成landmark:</p>
+  $$ l^*_t = \bar{l} + \sum_{i=1}^{B} b_{t,i} \cdot \Delta l_i $$
+  <div class="eq-note"><strong>与FACS的关系:</strong> Blendshape参数空间对齐到FACS AU——b_{t,i}编码各AU激活强度。</div>
+</div>
+
+<div class="formula-block">
+  <div class="eq-tag">公式4: 语音→blendshape训练损失</div>
+  $$ \mathcal{L}_{\text{speech}} = \|b_t - \hat{b}_t\|^2 + \text{CE}(e_t, \hat{e}_t) + \gamma \sum_t \|b_t - b_{t-1}\|^2 $$
+  <div class="eq-note"><strong>三合一:</strong> 回归保口型匹配；分类保情绪正确；平滑防机械抖动。</div>
+</div>
+
+<h3>6.2 关键参数</h3>
+<table>
+<tr><th>参数</th><th>含义</th><th>典型值</th><th>敏感性</th></tr>
+<tr><td>K(电机数)</td><td>独立驱动总数（29刚性+4腱绳）</td><td>33</td><td>高: 决定表情维度上界；每增加1个电机增加1维表情空间但硬件复杂度也随之上升</td></tr>
+<tr><td>N(landmark数)</td><td>3D face landmark点</td><td>68/478</td><td>中: 太少则表情分辨率不足；太多则MLP输出维度爆炸且逆优化计算量增加</td></tr>
+<tr><td>B(blendshape数)</td><td>参数空间维度</td><td>40-60</td><td>中: 对应FACS主要AU的覆盖率；过多导致过拟合和冗余，过少无法表达精细表情</td></tr>
+<tr><td>lambda(正则化)</td><td>逆优化平滑权重</td><td>0.1-0.5</td><td>低: 控制相邻帧电机变化幅度，防机械抖动；过大导致表情过渡迟钝</td></tr>
+<tr><td>eta(步长)</td><td>GD学习率</td><td>0.01-0.05</td><td>高: 收敛速度与稳定性的直接权衡；太小则迭代步数不足无法收敛，太大则震荡</td></tr>
+<tr><td>优化步数</td><td>每帧GD迭代数</td><td>3-5</td><td>高: 精度vs延迟的核心trade-off；3步通常达到实用精度，5步获得更精确匹配</td></tr>
+<tr><td>wav2vec特征维度</td><td>语音特征向量长度</td><td>768/1024</td><td>中: 影响Transformer输入表示能力，需平衡信息量和计算开销</td></tr>
+<tr><td>Transformer层数</td><td>时序解码器层数</td><td>4-8</td><td>中: 层数过少则时序建模能力不足，过多则推理延迟增大</td></tr>
+<tr><td>音频窗口宽度w</td><td>双侧上下文帧数</td><td>20-40帧</td><td>中: 决定前后文信息量；太小无法捕捉韵律，太大延迟增加</td></tr>
+<tr><td>时序平滑gamma</td><td>连续帧blendshape平滑系数</td><td>0.01-0.1</td><td>中: 过大导致滞后（动作迟缓），过小导致机械抖动（高频振动）</td></tr>
+<tr><td>电机PWM范围</td><td>单电机脉冲宽度调制范围</td><td>500-2500μs</td><td>低: 对应0-180°舵机角度范围，由硬件规格固定</td></tr>
+<tr><td>自模型MLP隐层</td><td>网络深度与宽度</td><td>3-5层, 256-512宽</td><td>中: 太浅则容量不足以建模复杂非线性；太深则梯度反传开销影响实时性</td></tr>
+</table>
+
+<h3>6.3 语音处理管道详细展开</h3>
+<p>语音到blendshape的转换是整个管道中算法密度最高的环节，包含三个关键子模块：</p>
+<ul>
+<li><strong>特征提取（wav2vec）：</strong>使用自监督预训练的wav2vec 2.0模型，将16kHz原始波形转换为768维帧级特征向量序列（帧率~50Hz）。wav2vec通过对比学习在海量无标注语音上预训练，其隐层表示已被证明能有效编码音素身份、说话人特征和一定程度的情感信息——这使下游的Transformer无需从原始波形重新学习语音表示。</li>
+<li><strong>情绪解耦编码器：</strong>在Transformer中引入专用的情绪解耦模块——将wav2vec特征同时送入两个分支：内容编码器（提取与"说了什么"相关的特征）和情绪编码器（提取与"怎么说"相关的特征）。通过对抗训练或互信息最小化约束，迫使两个分支编码解耦的信息。解耦后的情绪特征通过情绪引导注意力机制（Emotion-guided Attention）动态调制内容特征的权重，使表情生成同时响应语音内容和情感色彩。</li>
+<li><strong>动态时间规整（DTW）对齐：</strong>不同语速的语音产生不同长度的特征序列，但表情需要以固定帧率（30-50Hz）输出。DTW在训练时将变长语音特征与固定帧率的blendshape真值进行非线性时间对齐，确保"慢速语音不被压缩，快速语音不被拉伸"。推理时，Transformer通过自注意力机制隐式学习输入帧与输出帧的对齐关系。</li>
+</ul>
+
+<h3>6.4 Blendshape到物理锚点的映射机制</h3>
+<p>线性blendshape合成公式 $l^*_t = \bar{l} + \sum_{i=1}^{B} b_{t,i} \cdot \Delta l_i$ 是整个管道中连接"数字表情空间"与"物理landmark空间"的核心桥梁：</p>
+<ul>
+<li>$\bar{l}$ 是中性表情（无表情）时的面部landmark基准位置</li>
+<li>$\Delta l_i$ 是第i个blendshape基向量——单独激活该blendshape时所有landmark点相对于中性位置的偏移量</li>
+<li>$b_{t,i}$ 是t时刻第i个blendshape的激活系数（0=不激活，1=完全激活）</li>
+<li>该线性模型的表达能力取决于blendshape基的数量B和每个基$\Delta l_i$的设计——Morpheus使用40-60个blendshape基，覆盖FACS主要AU对应的面部变形模式</li>
+</ul>
+<p>这个线性模型的关键工程优点在于：它将33维电机空间的非线性问题分离出来，交给Self-Modeling Network通过逆优化解决；而语音→blendshape的映射只需要在低维（40-60维）连续空间中操作，大幅简化了Transformer的学习任务。</p>
+</section>
+
+<section id="principles">
+<h2>7. Principles</h2>
+
+<h3>7.1 深层机理</h3>
+<div class="callout tip">
+<p><strong>混合驱动 = 受限优化问题：</strong>在有限体积V_max内分配执行器，最大化面部landmark可达空间。刚性(精度高/体积大)，腱绳(精度低/体积小)。</p>
+<p>优化目标: max sum_i a_i * DOF_i, s.t. sum v_i ≤ V_max, sigma_i ≤ sigma_max (关键区域)。Morpheus手工定义了关键vs补充区域。</p>
+</div>
+<div class="callout tip">
+<p><strong>Self-Modeling = 将不可建模系统变为可优化系统：</strong>不试图理解物理方程——只预测输入→输出并使该映射可微。类比NeRF——不模拟光传输，只学视角→颜色的可微映射。</p>
+</div>
+
+<h3>7.2 Self-Modeling与NeRF的范式类比</h3>
+<p>Self-Modeling Network与NeRF（Neural Radiance Fields）共享一个深刻的范式洞察：<strong>当物理过程过于复杂而无法解析建模时，直接学习"输入→输出"的可微函数代理，然后在可微函数上进行优化</strong>。具体类比：</p>
+<table>
+<tr><th>维度</th><th>NeRF</th><th>Self-Modeling (Morpheus)</th></tr>
+<tr><td>物理过程</td><td>光在3D场景中的传输（反射/散射/吸收）</td><td>腱绳力传递、硅胶变形、机构摩擦</td></tr>
+<tr><td>输入</td><td>3D位置+视角方向 (x,y,z,θ,φ)</td><td>33维电机命令m</td></tr>
+<tr><td>输出</td><td>颜色+密度 (R,G,B,σ)</td><td>3D landmark坐标l∈R^{3N}</td></tr>
+<tr><td>可微代理</td><td>MLP f(x,d) → (c,σ)</td><td>MLP f(m) → l</td></tr>
+<tr><td>下游优化</td><td>体渲染 + 光度损失 → 场景重建</td><td>梯度下降 min||l*-f(m)||² → 电机控制</td></tr>
+<tr><td>泛化边界</td><td>训练视角附近可靠，极端视角失准</td><td>训练域内可靠，极端表情外推不可信</td></tr>
+</table>
+<p>这个范式类比揭示了一个更普遍的机器人学方法论：<strong>只要能够以足够密度采集(input, output)数据对，任何物理系统的前向行为都可以用神经网络近似，进而使该系统变得可微可优化</strong>。这对软体机器人、气动驱动器、变刚度机构等传统上"难以精确建模"的系统具有广泛的借鉴价值。</p>
+
+<h3>7.3 混合驱动设计的形式化框架</h3>
+<p>Morpheus的混合驱动设计可以形式化为一个<strong>异构执行器分配问题</strong>。定义面部区域集合$\mathcal{R} = \{r_1, r_2, ..., r_n\}$（如眉毛区、眼区、口区、鼻区、颊区、颈区），每个区域$r_j$有一个精度需求$\alpha_j$（该区域表情变化对定位误差的敏感度）和一个可用体积预算$v_j$（该区域颅骨内可供安装执行器的空间）。有两类执行器可选：刚性执行器（精度高$p_R$，体积大$v_R$）和腱绳执行器（精度低$p_T$，体积小$v_T$，但需要滑轮空间$v_{pulley}$）。分配策略为：</p>
+<ul>
+<li>若$\alpha_j > \alpha_{threshold}$（高精度需求区：眼周、口周），且$v_j > v_R$（空间充足），分配刚性执行器</li>
+<li>若$v_j < v_R$（空间狭小区：鼻翼、面颊），分配腱绳执行器，滑轮组安装在颅骨空闲空间</li>
+<li>若$\alpha_j < \alpha_{threshold}$ 且 $v_j > v_R$（眉毛、颈部），优先刚性但可用腱绳补充微调</li>
+</ul>
+<p>这个形式化框架的核心启示是：<strong>混合驱动不是"折中"而是"适配"——根据每个面部区域的精度需求和空间约束，独立匹配最优驱动类型</strong>。这一方法论可推广到其他空间受限的仿生机器人设计（如灵巧手、微型手术器械）。</p>
+
+<h3>7.4 对比</h3>
+<div class="cmp-row">
+  <div class="cmp-col"><h4>解析建模</h4><p>可解释性高/外推好，但对Morpheus几乎不可行——需标定每条腱绳摩擦+每块硅胶粘弹性</p></div>
+  <div class="cmp-col"><h4>数据驱动自建模(Morpheus)</h4><p>无需物理参数/自动隐式学习非线性/易重新标定。训练域外泛化有限/需周期重标定补偿老化</p></div>
+</div>
+
+<h3>7.5 FACS与Blendshape的理论对齐</h3>
+<p>Ekman和Friesen的面部动作编码系统（FACS）定义了44个动作单元（Action Units, AU），每个AU对应一块或一组面部肌肉的收缩。Morpheus的blendshape参数空间需要与FACS AU对齐，以保证生成的表情符合人类对面部表情的感知预期。这个对齐过程包含两个层次：</p>
+<ul>
+<li><strong>语义对齐：</strong>每个blendshape基$\Delta l_i$在语义上对应FACS中的一个或少数几个AU。例如，AU4（降眉）对应眉毛区域的某个blendshape，AU12（嘴角上扬）对应口角区域的某组blendshape。这种语义对齐使得表情设计师可以在FACS框架下理解和操纵blendshape系数。</li>
+<li><strong>强度对齐：</strong>blendshape系数$b_{t,i}$的数值范围[0,1]对应AU的激活强度从"无"到"最大"。但AU标定中常使用A-E五级强度标度——A级为微弱，E级为最大。Morpheus需要将离散的FACS强度标度映射为连续的blendshape系数，这通过从真人演员的MoCap数据或手工标注的表情图像中学习映射函数实现。</li>
+</ul>
+<p>这种FACS-blendshape对齐的设计使Morpheus不仅是一个表情生成系统，还具备了<strong>表情的可解释性和可控性</strong>——用户可以指定"嘴角上扬0.7 + 眉头下压0.3"这样精确的AU级指令来合成任意复合表情。</p>
+</section>
+
+<section id="figures">
+<h2>8. Figures &amp; Evidence</h2>
+<div class="paper-figure">
+  <div class="fig-header"><span class="fig-number">Fig.1</span><span class="fig-caption">系统总览: 机械结构锚点+表情序列</span></div>
+  <div class="fig-image"><img src="figures/overview.png" alt="Morpheus overview" /></div>
+  <div class="fig-interpretation">
+    <div class="fig-label">INTERPRETATION</div>
+    <ul><li>锚点分布于眉毛/眼睑/鼻翼/嘴角/下颌等FACS关键AU位置</li><li>刚性驱动(红色)集中于眼周、口周——定位误差影响最大</li><li>腱绳驱动(蓝色)分布于鼻翼/面颊——补充微表情维度</li><li>虚拟Blender与物理照片并排展示自模型映射精度</li></ul>
+  </div>
+</div>
+
+<div class="paper-figure">
+  <div class="fig-header"><span class="fig-number">Fig.2</span><span class="fig-caption">系统管道总览：语音输入 → Blendshape预测 → 面部逆优化 → 物理执行</span></div>
+  <div class="fig-image"><img src="figures/pipeline.png" alt="Morpheus pipeline overview" /></div>
+  <div class="fig-interpretation">
+    <div class="fig-label">INTERPRETATION</div>
+    <p>该图展示了Morpheus系统的<strong>完整信息流</strong>，从左侧的语音波形输入到右侧的物理面部表情输出，分为四个关键阶段：</p>
+    <ul>
+      <li><strong>阶段A — 语音感知（Speech Perception）：</strong>原始16kHz语音波形首先进入wav2vec 2.0自监督编码器，提取768维帧级声学特征。该编码器在大规模无标注语音上预训练，其隐层表示已被证明能有效编码音素身份、说话人特征和情感韵律信息——相当于将原始声波压缩为"语音语义向量"。同时，一个并行的情绪编码分支从wav2vec特征中解耦出情绪相关维度，通过情绪引导注意力机制（Emotion-guided Attention）注入下游Transformer，确保表情的情感一致性。</li>
+      <li><strong>阶段B — 表情参数化（Expression Parameterization）：</strong>时序Transformer接收wav2vec特征序列，通过自注意力建模语音片段之间的长程依赖关系（跨音素、跨音节、跨短语），输出33维blendshape系数$b_t$（每帧一组）和可选的情绪标签$e_t$。Transformer的设计关键在于：多头注意力可以同时关注细粒度音素（~50ms窗口，对口型变化）和粗粒度韵律（~500ms窗口，对情绪变化），实现多尺度时序对齐。训练时使用DTW将变长语音特征与固定帧率blendshape真值对齐。</li>
+      <li><strong>阶段C — 面部逆求解（Face Inverse Solver）：</strong>blendshape系数通过线性合成公式转化为目标landmark $l^*_t$，然后进入Self-Modeling Network的逆优化回路。这是一个<strong>数字→物理的翻译环节</strong>——梯度下降在Self-Model MLP的梯度场上迭代3-5步，将目标landmark"翻译"为33维电机命令$m^*$。上一帧的电机命令作为热启动初始值，大幅减少迭代步数，保证实时性。</li>
+      <li><strong>阶段D — 物理执行（Physical Actuation）：</strong>最终33维PWM信号通过控制板发送到29个舵机和4个腱绳电机。刚性舵机以高精度驱动眼周/口周的连杆机构，腱绳通过滑轮组拉动鼻翼/面颊的硅胶锚点。硅胶蒙皮将锚点的离散运动转换为连续、自然的面部变形。可选的外部摄像头拍摄实体面部，通过MediaPipe提取landmark实现视觉闭环——将实测位置与目标位置的偏差反馈回逆优化进行在线补偿。</li>
+    </ul>
+    <p><strong>关键设计哲学：</strong>整个管道的模块化分离——语音感知、表情参数化、机械控制分别由独立的神经网络和优化模块负责——使得每个模块可以独立迭代升级（例如替换更好的语音编码器或更强大的自模型架构），而无需重新设计整个系统。同时，blendshape空间作为"数字-物理接口层"，将高度非线性的电机控制问题封装在Self-Modeling模块内，使上游的Transformer只需要在规整的低维连续空间中工作。</p>
+  </div>
+</div>
+
+<p><strong>关键证据:</strong> 自模型预测误差1-2mm(@150mm面部)；表情识别率接近真人演员；语音-表情同步<100ms(感知阈值~150ms)。</p>
+</section>
+
+<section id="flaw">
+<h2>9. Potential Flaw</h2>
+<div class="callout warn">
+<ul><li><strong>硅胶老化漂移:</strong> 硅胶硬化/弹性损失导致自模型渐失准</li><li><strong>泛化边界:</strong> MLP仅在训练域内可靠——极端表情外推不可信</li><li><strong>文化依赖:</strong> 情绪表达存在文化差异，训练数据覆盖不明确</li><li><strong>电机噪声累积:</strong> 舵机死区+腱绳蠕变在开环中累积</li><li><strong>表情自然度上限:</strong> 20+电机 << 42块表情肌</li></ul>
+</div>
+<h3>9.1 扩展方向</h3>
+<ul><li>视觉闭环控制补偿材料老化漂移</li><li>有限元仿真优化硅胶厚度/腱绳锚点</li><li>LLM集成——根据对话语义动态调整表情</li><li>微型化适配小机器人头部</li></ul>
+<h3>9.2 敏感性分析</h3>
+<table>
+<tr><th>组件</th><th>影响</th><th>等级</th><th>说明</th></tr>
+<tr><td>自模型精度</td><td>★★★★★</td><td>极高</td><td>整个控制链路数学基础</td></tr>
+<tr><td>腱绳张力</td><td>★★★★☆</td><td>高</td><td>张力下降→运动范围减小+滞后</td></tr>
+<tr><td>硅胶材料</td><td>★★★★☆</td><td>高</td><td>硬度/弹性影响变形自然感</td></tr>
+<tr><td>电机数K</td><td>★★★☆☆</td><td>中</td><td>30+后边际收益递减</td></tr>
+<tr><td>优化步数(3vs5)</td><td>★★☆☆☆</td><td>低</td><td>3步已足够</td></tr>
+<tr><td>时序平滑gamma</td><td>★★★☆☆</td><td>中</td><td>过大滞后/过小抖动</td></tr>
+</table>
+</section>
+
+<section id="motivation">
+<h2>10. Motivation</h2>
+
+<h3>10.1 五步动机链</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+  M1["服务/教育/陪伴机器人需要情感交互——仅有语音不够"] --> M2["人类沟通55%信息来自面部表情(Mehrabian)"]
+  M2 --> M3["现有方案: 屏幕avatar(无实体感) 或 低DOF机械脸(不自然)"]
+  M3 --> M4["需要高自由度+精确可控+语音驱动的实体面孔"]
+  M4 --> M5["Morpheus = 混合驱动 + 可微自模型 = 可工程实现方案"]
+</div>
+</div>
+
+<h3>10.2 一句话动机</h3>
+<div class="callout info"><p><strong>如果机器人有能由语音实时驱动、表达丰富情绪的实体面孔，人机交互就从"工具性对话"升级为"社交性互动"——机器人从工具走向伴侣的关键一步。</strong></p></div>
+</section>
+
+<section id="takeaway">
+<h2>11. Reading Takeaway</h2>
+
+<h3>11.1 一句话小结</h3>
+<div class="callout tip"><p><strong>Morpheus证明: 混合驱动(刚性=精度+腱绳=灵活) + 可微自建模网络(将不可解析机械系统→可优化可微函数)，可在类人尺寸构建高DOF语音驱动实体表情系统——方法论价值在于将"不可建模"→"可学习可微代理"的通用范式。</strong></p></div>
+
+<h3>11.2 关键教训</h3>
+<ol>
+<li><strong>机械设计=资源分配:</strong> 有限体积内，不同区域的精度和空间需求不同——混合驱动不是折中而是精确匹配</li>
+<li><strong>不可解析≠不可优化:</strong> 物理模型无法建立时，用数据驱动可微代理替代——现代机器人控制的重要范式转变</li>
+<li><strong>物理↔数字双向桥:</strong> Blendshape空间连接语音(数字→blendshape)和电机(blendshape→landmark→motor)，完整端到端管道</li>
+<li><strong>材料也是设计变量:</strong> 硅胶选择/厚度/迭代直接影响表情自然度——硬件论文中材料工程被低估但至关重要</li>
+</ol>
+
+<h3>11.3 UAV应用展望</h3>
+<div class="callout idea">
+<div class="callout-title">UAV借鉴</div>
+<ul>
+<li><strong>意图表达装置:</strong> LED矩阵/微型机械"表情"装置表达飞行状态——用自建模范式映射飞行状态→非语言意图</li>
+<li><strong>混合驱动云台:</strong> 舵机主指向+SMA微调补偿</li>
+<li><strong>声学-运动协同:</strong> 旋翼噪声节奏/音调与LED同步——UAV特有"语音+表情"通道</li>
+</ul>
+</div>
+
+<h3>11.4 推荐阅读(4-6)</h3>
+<table>
+<tr><th>#</th><th>论文</th><th>关联</th></tr>
+<tr><td>1</td><td>VOCA (Cudeiro et al., 2019) — Voice Operated Character Animation</td><td>语音驱动blendshape先驱</td></tr>
+<tr><td>2</td><td>FaceFormer (Fan et al., 2022) — Transformer Speech-Driven Facial Animation</td><td>Transformer语音→blendshape架构</td></tr>
+<tr><td>3</td><td>EMOCA (Danecek et al., 2022) — Emotion Driven Face Capture</td><td>情绪驱动的面部参数化</td></tr>
+<tr><td>4</td><td>Affetto (Ishihara et al., 2015) — Pneumatic Android Face</td><td>气动仿生面，Morpheus对比参照</td></tr>
+<tr><td>5</td><td>Eva (Hanson Robotics) — Frubber Skin Robot</td><td>弹性体表情机器人</td></tr>
+<tr><td>6</td><td>FACS Manual (Ekman &amp; Friesen, 1978)</td><td>表情编码黄金标准，blendshape理论基础</td></tr>
+</table>
+
+<p class="source">From local PDF pages 1-5. See the <a href="Zhang et al. - 2025 - Morpheus A neural-driven animatronic face with hybrid actuation and diverse emotion control.pdf">original PDF</a>.</p>
+</section>
+
+</main>
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>&#x1F4C4; Paper Notes &middot; Huazhe Xu &middot; ID 10389 &middot; MathJax + Mermaid</footer>
+</body></html>

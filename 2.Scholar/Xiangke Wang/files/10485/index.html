@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — 事件触发一致性：联合连通切换拓扑下的同构与异构多智能体系统 (Cheng et al., 2018)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Xiangke Wang · 18-note reading path</div>
+    <div class="series-links">
+<a href="../../index.html">Index</a>
+<a href="../10453/index.html">10453</a>
+<a href="../10464/index.html">10464</a>
+<a href="../10472/index.html">10472</a>
+<a href="../10473/index.html">10473</a>
+<a href="../10474/index.html">10474</a>
+<a href="../10484/index.html">10484</a>
+<a class="active" href="../10485/index.html">10485</a>
+<a href="../10486/index.html">10486</a>
+<a href="../10487/index.html">10487</a>
+<a href="../10488/index.html">10488</a>
+<a href="../10489/index.html">10489</a>
+<a href="../10490/index.html">10490</a>
+<a href="../10491/index.html">10491</a>
+<a href="../10493/index.html">10493</a>
+<a href="../10494/index.html">10494</a>
+<a href="../10495/index.html">10495</a>
+<a href="../10496/index.html">10496</a>
+<a href="../10497/index.html">10497</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Event-Triggered Consensus of Homogeneous and Heterogeneous Multiagent Systems with Jointly Connected Switching Topologies（联合连通切换拓扑下同构与异构多智能体系统的事件触发一致性）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Bin Cheng</strong>, <strong>Xiangke Wang</strong> (Senior Member, IEEE), <strong>Zhongkui Li</strong> (Member, IEEE)</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">国防科技大学</strong>（National University of Defense Technology, NUDT），<strong>北京大学</strong>（Peking University）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Transactions on Cybernetics</strong>（2018年发表），arXiv:2003.11216v2, 2020</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td>arXiv: <code>2003.11216v2</code> — 完整理论分析（定理1-4）+ 数值仿真验证（Section IV）</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>在<strong>联合连通切换拓扑</strong>条件下，针对线性同构和异构多智能体系统，设计了<strong>完全分布式的事件触发一致性协议</strong>。核心突破在于：利用<strong>开环状态预测（open-loop prediction）</strong>构造触发函数，使得控制器更新和触发条件监测<strong>均不需要连续通信</strong>——这是以往工作未能同时实现的关键优势。协议设计<strong>无需求解任何矩阵等式或不等式</strong>，可直接显式构造；并严格排除了 Zeno 行为（连续时间内无限次触发）。同构情形下证明状态一致性，异构情形下通过分布式观测器实现输出一致性。理论保证不依赖于具体的切换规则——仅要求并图在每段有界时间间隔上包含生成树。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Event-Triggered Control</span>
+    <span class="tag tag-green">Switching Topology</span>
+    <span class="tag tag-amber">Jointly Connected</span>
+    <span class="tag tag-purple">Distributed Consensus</span>
+    <span class="tag tag-red">Zeno-Free</span>
+    <span class="tag tag-cyan">No Matrix Inequalities</span>
+    <span class="tag tag-gray">Multi-Agent Systems</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么在切换拓扑下做事件触发一致性如此困难？</strong><br>
+    答：事件触发和切换拓扑之间存在<strong>根本性的耦合矛盾</strong>。事件触发要求每个智能体仅在满足"触发条件"的时刻才采样并广播自身状态——这意味着通信是离散的、异步的、不可预测的。而切换拓扑意味着通信图本身随时间变化——邻居集合可能随时改变。当两者叠加：(1) 邻居消失时，该邻居上次广播的状态已经"过时"——智能体不知道它是"没说话"还是"已不是邻居"；(2) 传统方法用 Lyapunov 函数要求通信图在每时每刻足够连通——但联合连通只保证一段时间上的并图连通，单点时刻可能完全不连通。这使得"连续监测邻居状态判断何时触发"的策略失效——你需要<strong>在不连续通信的情况下判断何时需要通信</strong>——这本身是一个悖论。<br><br>
+    问：<strong>Cheng et al. 如何破解这个悖论？</strong><br>
+    答：<strong>开环状态预测（open-loop prediction）</strong>。每个智能体利用自身动力学模型 <code>e^{A(t-t_k^i)}</code> 在其触发时刻之间"预测"邻居当前的状态——而不需要邻居连续发送信息。这意味着：(a) 控制器更新不依赖连续通信（用预测值替代连续实测值），(b) 触发函数监测也不依赖连续通信（用预测值构造的误差信号 $e_i$ 驱动触发决策）。触发条件变为组合条件——既监测自身估计误差，也监测邻居拓扑变化（当图变化时强制触发）——从而在"联合连通"这种极端宽松的拓扑假设下，保证了系统收敛且无 Zeno 行为。<br><br>
+    问：<strong>相比前人工作的根本进步是什么？</strong><br>
+    答：<strong>"双不连续"的首次实现</strong>——控制器更新不连续（事件触发）+ 通信不连续（事件触发 + 联合连通切换）。前人工作中：[41] 需要连续信息来监测触发函数；[42] 假设图在每个时刻都连通（比联合连通强得多）；[43][44] 需要求解耦合矩阵不等式且用到全局拓扑信息。Cheng et al. 的协议不需要连续通信、不需要每时刻连通、不需要求解任何矩阵等式/不等式、不需要全局拓扑知识——四个"不需要"叠加，使协议真正具备了<strong>分布式可实现性</strong>。
+  </div>
+
+  <h3>2.2 Inspiration to Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>联合连通（Jointly Connected）条件的图论本质</td><td>联合连通只要求<strong>一段时间上的并图含生成树</strong>，不要求每时每刻连通——这意味着允许通信图在某些时刻完全不连通，只要在每段有界时间间隔 $[t_k, t_{k+1})$ 内并起来是连通的就行。这启发了一个<strong>分段分析框架</strong>：将 Lyapunov 分析放在每一段并图连通的时间窗口上做，而不是在每个时刻做，从而绕过了"单点时刻图不连通导致 Lyapunov 导数不定号"的困境。</td><td>Graph Theory</td></tr>
+    <tr><td>Barbalat's Lemma 的 Cauchy 收敛准则形式</td><td>传统 Lyapunov 方法要求 $\dot{V} \leq 0$ 来证明渐近稳定——但切换拓扑下 Lyapunov 函数可能在每次切换时跳跃。Barbalat's Lemma 提供了一个更精细的工具——如果 $V(t)$ 有界且 $\dot{V}(t)$ 一致连续，则 $\dot{V} \to 0$。文中巧妙地将此转化为：利用<strong>指数衰减项 $\mu e^{-\nu t}$</strong> 在触发函数中引入"时间紧迫性"，再通过 Cauchy 准则证明状态差异的平方积分收敛，从而推出最终的一致性。</td><td>Stability Theory</td></tr>
+    <tr><td>实 Jordan 标准型分解——中性稳定矩阵的结构分离</td><td>对于中性稳定（neutrally stable）系统矩阵 $A$（所有特征值在虚轴上），将其通过实 Jordan 标准型分解为<strong>反对称部分 $X$（对应纯虚特征值）和 Hurwitz 稳定部分 $Y$</strong>。$X$ 代表系统的"振荡动力核"——不衰减也不发散；$Y$ 代表"稳定动力核"。控制增益 $G = -B^TE^TE$ 的设计利用了 $(X, EB)$ 的可控性——这是协议可显式构造（不需要解 Lyapunov 方程）的代数基础。</td><td>Linear Algebra / Control</td></tr>
+    <tr><td>开环状态预测的采样控制系统设计思想</td><td>在连续时间域使用离散采样构造控制律的传统思路是：采样后零阶保持（ZOH）直到下一次采样。但该文做了<strong>更激进的推广</strong>：用 <code>e^{A(t-t_k^i)}x_i(t_k^i)</code> 对邻居状态做<strong>开环连续预测</strong>——相当于在采样间隔内"猜想"邻居的运动轨迹。这个猜想是精确的（如果邻居不受控制输入影响），或者是近似但可控的（有界误差驱动触发）。这使得触发函数的计算可以<strong>仅依赖本地信息和自己猜测的邻居状态</strong>，不再需要邻居连续"发声"。</td><td>Sampled-Data / Event-Based Control</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: "双不连续"分布式事件触发协议——控制器更新和触发监测均无需连续通信</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>前人事件触发一致性工作存在一个隐蔽的"伪分布式"问题：虽然控制器在事件时刻才更新（不连续控制），但<strong>触发函数的计算需要连续获取邻居的当前状态</strong>——这意味着在实际系统中，每个智能体的通信模块仍在连续监听邻居的广播，只是控制器"选择性地使用"部分数据。这不是真正的通信节省。更严重的是，在切换拓扑下，如果邻居突然断开，连续监听的策略将完全失效。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>采样控制理论中的模型预测思想——如果你知道邻居的动态模型 $A$，你不需要它一直告诉你"我在哪"，你可以<strong>猜</strong>。猜的误差用触发条件来"续约"：当猜测误差超过阈值时，邻居必须再次通信来"校正"你的猜测。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) 控制器使用 <strong>开环预测状态</strong> $\tilde{x}_j = e^{A(t-t_{k_j}^j)}x_j(t_{k_j}^j)$ 替代邻居真实状态 $x_j$——控制器 $u_i = cG\sum a_{ij}(\tilde{x}_i - \tilde{x}_j)$ 完全基于预测值计算，无需连续通信；(2) 触发函数 $f_i(t) = 4d_i(t)\|G\|^2\|e_i\|^2 - \kappa\sum a_{ij}\|G(\tilde{x}_i-\tilde{x}_j)\|^2 - \mu e^{-\nu t}$ 中的每一项——$d_i$（邻居数）在拓扑切换时更新、$e_i$（自身预测误差）本地可得、$\tilde{x}_i-\tilde{x}_j$（预测值差异）由上次事件信息计算——<strong>全部不依赖连续通信</strong>；(3) 触发条件 $t_{k+1}^i = \inf\{t > t_k^i \mid f_i(t) \ge 0 \text{ 或 } a_{ij}(t) \neq a_{ij}(t_k^i)\}$ 的第二项确保拓扑变化时强制触发——这是应对切换拓扑的关键机制。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 联合连通假设下的严格分析——用分段 Lyapunov + Barbalat 替代逐点 Lyapunov</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>切换拓扑下一致性分析的标准工具是"逐点连通 + 共同 Lyapunov 函数"——要求通信图在每个时刻都有足够的代数连通度来保证 Lyapunov 函数下降。但在无人机编队、移动传感器网络等实际场景中，通信图因遮挡/距离/干扰而间歇性中断——图可能在很长一段时间内根本不连通（例如两群飞机飞过山的两侧），但一段时间后并起来是连通的（从山上空经过时短暂恢复通信）。逐点连通假设排除了这种最常见的情况。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>切换系统理论中的"驻留时间"（dwell-time）和"平均驻留时间"概念——如果系统在每种模态停留足够长时间，即使每次切换带来扰动，整体仍然稳定。联合连通可以看作一种极端的"慢切换"：拓扑在某个有限集内切换，且并图在每个时间窗口内都是连通的。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) 将时间轴划分为区间 $[t_0, t_1), [t_1, t_2), \dots$，在每个区间上并图连通；(2) 在每个区间上构造 Lyapunov 函数 $V_3 = \frac{1}{1-\kappa}V_1 + V_2$——其中 $V_1$ 刻画状态差异（通过实 Jordan 分解），$V_2$ 刻画预测误差的累积效应；(3) 在区间内 $V_3$ 单调下降，在区间边界处（切换时刻）$V_3$ 连续不跳变；(4) 利用 Barbalat's Lemma + Cauchy 准则，证明状态差异 $\xi$ 收敛到零；(5) 通过触发函数中的 <strong>$\mu e^{-\nu t}$ 衰减强迫项</strong>，保证即使图不连通时，误差也不会无限累积——因为该指数衰减项为 Lyapunov 分析提供了"全局尺度"的时间标定。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 无矩阵等式/不等式的显式协议构造——从"给定系统求解控制器"到"给定系统直接写出控制器"</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>绝大多数基于 Riccati 方程或 LMI（线性矩阵不等式）的一致性协议设计，需要用户 <strong>求解一个耦合的代数方程或不等式系统</strong>——这些方程本身可能无解析解（需要数值工具箱如 YALMIP/SeDuMi），且解的可行性依赖于全局拓扑信息（如图的 Laplacian 特征值）。当拓扑切换时，这些不等式可能在某些拓扑下不解——导致协议无效。更严重的是，这本质上<strong>不是一个分布式设计</strong>——因为它要求设计者知道全局通信图的代数特性。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>线性系统理论中的可控性 Gramian 构造和 pole placement 的显式公式——当 $(A,B)$ 可控时，存在一个显式的反馈增益将极点配置到任意位置。类似地，如果能够利用中性稳定矩阵 $A$ 的结构（实 Jordan 形式中的 $X$ 部分），是否可以构造一个显式的、不依赖拓扑的控制增益？</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) 利用实 Jordan 标准型将 $A$ 变换为 $\text{diag}(X, Y)$——$X$ 是反对称矩阵（对应中性稳定模态），$Y$ 是 Hurwitz 矩阵；(2) 控制增益 $G = -B^TE^TE$，其中 $E$ 来自 $(X, EB)$ 的可控性构造——$G$ 仅依赖于每个智能体的<strong>自身动力学矩阵 $(A,B)$</strong>，与通信拓扑完全无关；(3) 耦合增益 $c$ 仅需满足一个充分条件（$c$ 大于某个可计算的阈值）——该阈值仅依赖于拓扑的<strong>联合连通性</strong>（一个性质而非具体数值），不需拓扑特征值。这意味着协议参数可以直接"写出来"——不需要运行任何优化求解器。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture — 协议设计的四阶段框架</h2>
+
+  <h3>3.0 Protocol Design Pipeline</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Stage 1: System Decomposition <span>Linear Algebra</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>Real Jordan Canonical Form</strong>
+          <small>Decompose A: $A = T\,\text{diag}(X,Y)\,T^{-1}$ where X is skew-symmetric (neutrally stable) and Y is Hurwitz.</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>Identify Controllable Pair (X, EB)</strong>
+          <small>Construct matrix E such that (X, EB) is controllable — algebraic key to explicit gain design.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Stage 2: Control Gain Design <span>Explicit Formula</span></h4>
+        <div class="arch-card arch-power">
+          <strong>Gain: $G = -B^TE^TE$</strong>
+          <small>No Riccati equation, no LMI — directly computed from agent's own dynamics. Independent of topology.</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>Coupling Gain c Selection</strong>
+          <small>$c$ sufficiently large to overcome the most adverse jointly connected condition. No eigenvalue needed.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Stage 3: Event-Triggered Protocol <span>Distributed</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>Controller: $u_i = cG\sum a_{ij}(\tilde{x}_i - \tilde{x}_j)$</strong>
+          <small>Uses open-loop predictions $\tilde{x}_i = e^{A(t-t_k^i)}x_i(t_k^i)$ — no continuous neighbor state access.</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>Trigger: $f_i \ge 0$ or topology change</strong>
+          <small>$f_i = 4d_i\|G\|^2\|e_i\|^2 - \kappa\sum a_{ij}\|G(\tilde{x}_i-\tilde{x}_j)\|^2 - \mu e^{-\nu t}$ — fully locally computable.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Stage 4: Stability Verification <span>Lyapunov + Barbalat</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>Piecewise Lyapunov Analysis</strong>
+          <small>$V_3 = \frac{1}{1-\kappa}V_1 + V_2$ — descends on each jointly-connected interval.</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>Zeno Exclusion + Consensus</strong>
+          <small>Strictly positive inter-event intervals. Cauchy convergence ensures asymptotic consensus.</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>decomposed matrices (X,Y,E)</span>
+      <span>control gain G, coupling c</span>
+      <span>control input $u_i(t)$</span>
+      <span>$\xi \to 0$, no Zeno</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key enabler</strong><small>Open-loop prediction $e^{A(t-t_k^i)}$ decouples trigger monitoring from continuous communication.</small></div>
+      <div class="arch-metric"><strong>Main contribution</strong><small>First protocol with both controller and trigger free of continuous communication under jointly connected switching.</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>Real Jordan form splits neutrally stable (X) from stable (Y); $G=-B^TE^TE$ exploits controllability of (X,EB).</small></div>
+      <div class="arch-metric"><strong>Generality</strong><small>Covers homogeneous (state) and heterogeneous (output via distributed observers) consensus.</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 Theory Architecture — 从假设到结论的完整逻辑链</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph ASSUMPTIONS["Assumptions"]
+      A1["Assump.1: (A,B) stabilizable\nA neutrally stable"]
+      A2["Assump.2: Jointly connected\nUnion graph over each interval\ndirected spanning tree"]
+      A3["Assump.3: Switching signal\npiecewise constant, finite modes"]
+    end
+
+    subgraph DECOMP["Algebraic Decomposition"]
+      D1["Real Jordan Form:\nA = T diag(X,Y) T^{-1}\nX: skew-symmetric, Y: Hurwitz"]
+      D2["Construct E s.t. (X,EB) controllable\nGain: G = -B^TE^TE"]
+    end
+
+    subgraph PROTOCOL["Event-Triggered Protocol"]
+      P1["Controller:\nu_i = cG Sum a_{ij}(t)(x_i - x_j)\nx_i = e^{A(t-t_k^i)}x_i(t_k^i)"]
+      P2["Triggering Function:\nf_i(t) = 4d_iG^2e_i^2 - k Sum a_{ij}G(x_i-x_j)^2 - mu e^{-nu t}"]
+      P3["Triggering Rule:\nt_{k+1}^i = inf{t > t_k^i | f_i >= 0 or a_{ij} changes}"]
+    end
+
+    subgraph ANALYSIS["Stability Analysis"]
+      V1["Lyapunov: V3 = 1/(1-k)*V1 + V2\nV1: consensus error, V2: prediction error"]
+      V2["Barbalat Lemma:\nV double dot bounded => V dot -> 0 => xi -> 0"]
+      V3["Cauchy Convergence:\nIntegral of xi^T xi converges\n=> xi -> 0 asymptotically"]
+    end
+
+    subgraph RESULTS["Main Results"]
+      R1["Theorem 1-2 (Homogeneous):\nState consensus achieved\nZeno behavior excluded"]
+      R2["Theorem 3-4 (Heterogeneous):\nOutput consensus via\ndistributed observers"]
+    end
+
+    A1 --> D1
+    A1 --> D2
+    D1 --> P1
+    D2 --> P1
+    A2 --> P2
+    A3 --> P3
+    P1 --> V1
+    P2 --> V2
+    P3 --> V3
+    V1 --> R1
+    V2 --> R1
+    V3 --> R2
+
+    classDef asm fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef dec fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef pro fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef ana fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef res fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class A1,A2,A3 asm
+    class D1,D2 dec
+    class P1,P2,P3 pro
+    class V1,V2,V3 ana
+    class R1,R2 res
+    </pre>
+  </div>
+
+  <h3>3.2 Execution Flow — Agent Runtime Behavior</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph RUNTIME["Agent i Runtime Loop"]
+      direction TB
+      S1["Initialize: x_i(0), t_0^i=0\nBroadcast x_i(0) to neighbors"]
+      S2["Wait for event:\n(1) Own timer: f_i(t) approaches 0\n(2) Receive neighbor broadcast\n(3) Detect topology change"]
+      S3["Update local prediction:\nx_j = e^{A(t-t_{k_j}^j)}x_j(t_{k_j}^j)\nfor all neighbors j"]
+      S4["Compute control:\nu_i = cG Sum a_{ij}(t)(x_i - x_j)"]
+      S5["Apply control to plant:\ndx_i = Ax_i + Bu_i"]
+      S6["Evaluate trigger function:\nf_i(t) = 4d_iG^2e_i^2 - k Sum a_{ij}G(x_i-x_j)^2 - mu*exp(-nu t)"]
+      S7{"f_i >= 0\nor topology changed?"}
+      S8["Trigger! Set t_{k+1}^i = t\nReset e_i = 0\nBroadcast x_i(t) to neighbors"]
+      S9["Continue without triggering\nKeep same control and predictions"]
+
+      S1 --> S2
+      S2 --> S3
+      S3 --> S4
+      S4 --> S5
+      S5 --> S6
+      S6 --> S7
+      S7 -->|"Yes"| S8
+      S7 -->|"No"| S9
+      S8 --> S2
+      S9 --> S3
+    end
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef comp fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef ctrl fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef trig fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#047857
+    class S1 init
+    class S2,S3,S9 comp
+    class S4,S5 ctrl
+    class S6,S7,S8 trig
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — 解决什么问题？</h2>
+
+  <h3>4.1 Problem Formulation (同构多智能体系统)</h3>
+  <div class="formula-block">
+    <span class="eq-tag">问题定义 — 同构多智能体系统</span>
+    $$ \dot{x}_i = A x_i + B u_i, \quad i = 1,\ldots,N $$
+    $$ \text{通信图 } \mathcal{G}_{\theta(t)} = (\mathcal{V}, \mathcal{E}_{\theta(t)}) \text{ — 切换拓扑，分段常数 } \theta(t) \in \{1,\ldots,M\} $$
+    $$ \text{目标: 设计事件触发协议 } \Gamma \text{ 使得 } \lim_{t\to\infty} \|x_i(t) - x_j(t)\| = 0, \quad \forall i,j $$
+    $$ \text{约束: (1) 每两个触发间隔严格正 (无 Zeno);  (2) 控制器和触发监测均不依赖连续通信} $$
+    <div class="eq-note">
+      <strong>$x_i \in \mathbb{R}^n$</strong> = 智能体 $i$ 的状态 &nbsp;|&nbsp;
+      <strong>$u_i \in \mathbb{R}^p$</strong> = 控制输入 &nbsp;|&nbsp;
+      <strong>$A \in \mathbb{R}^{n\times n}$</strong> = 中性稳定系统矩阵（所有特征值在虚轴上）&nbsp;|&nbsp;
+      <strong>$B \in \mathbb{R}^{n\times p}$</strong> = 输入矩阵，$(A,B)$ 可镇定 &nbsp;|&nbsp;
+      <strong>$\theta(t)$</strong> = 切换信号，取值于有限集 $\{1,\dots,M\}$，分段常数 &nbsp;|&nbsp;
+      <strong>$\mathcal{G}_{\theta}$</strong> = 无向通信图（同构情形），边权 $a_{ij}(t) > 0$ 当 $(i,j) \in \mathcal{E}_{\theta(t)}$ &nbsp;|&nbsp;
+      <strong>联合连通假设</strong>：存在无限时间序列 $t_0, t_1, t_2, \dots$ 使得在每个区间 $[t_k, t_{k+1})$ 上，并图 $\bigcup_{t\in[t_k,t_{k+1})} \mathcal{G}_{\theta(t)}$ 包含生成树
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output / Goal</h3>
+  <table>
+    <tr><th>Category</th><th>Content</th><th>Dimensions</th></tr>
+    <tr><td><strong>Input</strong></td><td>每个智能体的初始状态 $x_i(0)$；自身动力学模型 $(A,B)$；邻居在事件时刻广播的状态值 $x_j(t_{k_j}^j)$；本地检测到的邻居拓扑变化（边 $a_{ij}$ 的增删）</td><td>$N$ 个智能体，每个 $n$ 维状态。拓扑图在 $M$ 种模态间切换。可配置参数：耦合增益 $c$、触发参数 $\kappa, \mu, \nu$</td></tr>
+    <tr><td><strong>Output</strong></td><td>控制输入序列 $u_i(t)$（分段连续，仅在事件时刻更新）；触发时刻序列 $\{t_k^i\}_{k=0}^{\infty}$；闭环状态轨迹 $x_i(t)$ 收敛至一致性流形</td><td>触发次数（通信代价）、收敛速度（一致性时间）、控制能量消耗</td></tr>
+    <tr><td><strong>Goal</strong></td><td>在联合连通切换拓扑下，仅依赖<strong>事件触发的离散通信</strong>，使所有同构智能体的状态渐近一致；对异构智能体，使输出渐近一致（通过分布式观测器 + 本地输出调节器）</td><td>理论保证：渐近收敛 + Zeno-free；仿真验证：四个模态切换拓扑（Fig.1）+ 四种场景</td></tr>
+  </table>
+
+  <h3>4.3 两个核心子问题</h3>
+  <table>
+    <tr><th>问题</th><th>系统类型</th><th>目标</th><th>协议设计要点</th><th>对应定理</th></tr>
+    <tr><td><strong>Problem 1</strong></td><td>同构线性多智能体系统<br>$\dot{x}_i = Ax_i + Bu_i$<br>所有智能体拥有相同的 $(A,B)$</td><td><strong>状态一致性</strong>：$\|x_i - x_j\| \to 0$<br>所有状态分量最终相同</td><td>事件触发控制器 $u_i = cG\sum a_{ij}(\tilde{x}_i - \tilde{x}_j)$ + 开环预测 $\tilde{x}_i = e^{A(t-t_k^i)}x_i(t_k^i)$</td><td>Theorem 1<br>Theorem 2</td></tr>
+    <tr><td><strong>Problem 2</strong></td><td>异构线性多智能体系统<br>$\dot{x}_i = A_ix_i + B_iu_i$, $y_i = C_ix_i$<br>不同智能体拥有不同的 $(A_i, B_i, C_i)$</td><td><strong>输出一致性</strong>：$\|y_i - y_j\| \to 0$<br>仅要求输出（低维）一致</td><td>(1) 分布式观测器：估计外生信号 $\dot{v} = Sv$<br>(2) 本地输出调节器：$u_i = K_{1i}x_i + K_{2i}\hat{v}_i$</td><td>Theorem 3<br>Theorem 4</td></tr>
+  </table>
+
+  <h3>4.4 与已有事件触发一致性文献的系统对比</h3>
+  <table>
+    <tr><th>文献</th><th>拓扑假设</th><th>触发监测需要连续通信？</th><th>控制器更新需要连续通信？</th><th>需要求解矩阵方程？</th><th>需要全局拓扑知识？</th></tr>
+    <tr><td>[41] Garcia et al.</td><td>固定连通</td><td><strong>是</strong></td><td><strong>否</strong></td><td>否</td><td>否</td></tr>
+    <tr><td>[42] 某事件触发工作</td><td><strong>每时每刻连通</strong></td><td>取决于实现</td><td><strong>否</strong></td><td>否</td><td>否</td></tr>
+    <tr><td>[43][44] Riccati/LMI</td><td>固定或慢切换</td><td>取决于实现</td><td><strong>否</strong></td><td><strong>是</strong></td><td><strong>是</strong></td></tr>
+    <tr class="highlight">
+      <td><strong>本文</strong></td><td><strong>联合连通（最宽松）</strong></td><td><strong>否</strong>（开环预测 + 本地误差）</td><td><strong>否</strong>（事件触发）</td><td><strong>否</strong>（显式 $G=-B^TE^TE$）</td><td><strong>否</strong>（完全分布式）</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — 为什么困难？</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 First-Principles Diagnosis</div>
+    <strong>核心矛盾：三类"不连续性"的叠加使传统分析工具全线失效</strong><br><br>
+    (1) <strong>控制的不连续性</strong>（事件触发）：控制器 $u_i(t)$ 仅在离散的触发时刻更新——在两个触发时刻之间保持恒定。这使得闭环系统本质上是<strong>脉冲采样-保持系统</strong>，传统连续 Lyapunov 分析的 $\dot{V}$ 不再有简单的闭式表达——必须在触发间隔和触发时刻分别分析。<br><br>
+    (2) <strong>通信拓扑的不连续性</strong>（切换图）：通信图 $\mathcal{G}_{\theta(t)}$ 分段常数变化——这意味着 Lyapunov 函数的"下降驱动项"（与 Laplacian 矩阵相关）在拓扑切换时可能发生跳变。更致命的是：在联合连通条件下，图可能在长时间间隔内<strong>完全不连通</strong>——此时基于 Laplacian 矩阵的 Lyapunov 方法完全失效（因为零特征值不再孤立）。<br><br>
+    (3) <strong>信息的不连续性</strong>（离散通信）：每个智能体仅在事件时刻接收邻居的状态——意味着在任意时刻 $t$，智能体 $i$ 对邻居 $j$ 状态的认知是<strong>过时的</strong>。这个"信息滞后"引入了不可避免的预测误差 $e_j(t) = \tilde{x}_j(t) - x_j(t)$——既出现在控制输入中，又出现在触发函数中。<br><br>
+    <strong>将三者放在一起</strong>：你需要证明——在一个控制器不连续更新、通信图不连续切换、状态信息不连续到达的系统中——所有智能体的状态最终收敛到一致。Cheng et al. 的解法是将时间轴划分成"分析友好的区间"（每个区间内并图连通），在每个区间内用预测误差将事件触发系统桥接为连续系统，再在不同区间之间用 Barbalat + Cauchy 准则缝合。
+  </div>
+
+  <h3>5.2 Key Challenges</h3>
+  <ul>
+    <li><strong>Challenge 1 — 如何在邻居不连续通信时获取触发决策必需的"相对状态"信息？</strong><br>触发函数 $f_i(t)$ 中的关键项 $\sum a_{ij}\|G(\tilde{x}_i-\tilde{x}_j)\|^2$ 依赖于对邻居当前预测值 $\tilde{x}_j(t)$ 的认知——但 $\tilde{x}_j(t) = e^{A(t-t_k^j)}x_j(t_k^j)$ 中的 $t_k^j$（邻居 j 的最近触发时刻）是"私有的"——智能体 i 只能在上次收到 j 的广播时获知。如果 j 很久没有触发，i 对 j 的预测是"基于过期信息的过期预测"。解决方案：通过触发条件中的拓扑变化强制触发项 $a_{ij}(t) \neq a_{ij}(t_k^i)$——每当图结构发生变化时所有相关智能体强制触发——在拓扑变化的"自然同步点"完成信息校正。</li>
+    <li><strong>Challenge 2 — 联合连通下，图长时间不连通时协议如何不"发散"？</strong><br>在联合连通的"不连通子区间"内，$a_{ij}(t) = 0$ 对于大多数 $(i,j)$ 对——控制器的驱动项接近零。此时如果没有任何机制约束，状态差异可能被系统动力学 $A$ 放大（尤其当 $A$ 有纯虚特征值时，振荡可能幅值增大）。文中通过两个机制解决：(a) 触发函数中的指数衰减项 $\mu e^{-\nu t}$ 提供了"绝对时间标度"——即使邻居项为零，误差 $e_i$ 仍然受到压制；(b) 当图恢复连通时，Lyapunov 函数在并图连通区间严格下降——下降量足够抵消不连通期间的累积。</li>
+    <li><strong>Challenge 3 — Zeno 行为排除是否在切换拓扑下仍然成立？</strong><br>在固定拓扑下，触发间隔的下界通过分析 $e_i$ 的导数和触发条件推导。但在切换拓扑下：(a) 触发条件在拓扑变化时<strong>强制触发</strong>，这可能产生"不自愿"的触发；(b) 图频繁切换时，强制触发可能导致触发次数激增——但不会造成 Zeno，因为切换信号本身是分段常数且驻留时间有下界；(c) 文中通过分析三种情况（自身触发、邻居触发、拓扑触发）分别给出触发间隔下界，确保即使在最坏情况下，触发间隔仍严格正。</li>
+  </ul>
+
+  <h3>5.3 Prior Methods and Why They Fail Under Jointly Connected Switching</h3>
+  <table>
+    <tr><th>Prior Approach</th><th>Core Mechanism</th><th>Why Fails Under Jointly Connected Switching</th></tr>
+    <tr><td><strong>共同 Lyapunov 函数</strong></td><td>构造对所有切换模态都递减的单个 $V(x)$</td><td>仅当<strong>每个模态单独连通</strong>时才可能存在共同 Lyapunov 函数。联合连通允许某些模态本身不连通——此时该模态对应的 Lyapunov 导数无下界。共同 Lyapunov 方法系统性失效。</td></tr>
+    <tr><td><strong>Laplacian 特征值法</strong> ($\lambda_2(\mathcal{L})$)</td><td>用 $\lambda_2$ 量化连通强度，构造与此相关的控制增益</td><td>当图不连通时 $\lambda_2 = 0$——导致控制增益趋于无穷（奇异）。即使只在某些区间不连通，基于全局 $\lambda_2$ 上界设计的增益在这些区间内将闭环系统推向不稳定。</td></tr>
+    <tr><td><strong>驻留时间 (dwell-time)</strong></td><td>要求每次切换后系统在模态驻留足够长时间使 Lyapunov 充分下降</td><td>联合连通不需要每个模态连通——即使驻留无限长时间，不连通模态本身也无法产生共识。Dwell-time 分析要求每个模态都有稳定性——与联合连通的本质假设矛盾。</td></tr>
+    <tr><td><strong>离散时间采样分析</strong></td><td>离散化系统，在采样点之间用离散 Lyapunov 方法</td><td>触发时刻是<strong>异步的、非周期的</strong>（每个智能体有自己的触发序列）——不存在全局采样周期。且切换拓扑在连续时间变化——离散化会丢失切换的精确时刻信息。</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method — 核心机制与关键公式</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>该方法的理论主干由四个递进组件构成：(1) 通过实 Jordan 标准型将系统矩阵 $A$ 分解为中性稳定部分 $X$ 和 Hurwitz 部分 $Y$；(2) 利用 $(X, EB)$ 的可控性显式构造控制增益 $G = -B^TE^TE$；(3) 基于开环状态预测设计不依赖连续通信的触发函数；(4) 用分段 Lyapunov + Barbalat + Cauchy 准则联合证明收敛性和 Zeno-free 性质。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. Display formulas use <code>$$...$$</code>, inline formulas use <code>$...$</code>.</p>
+
+  <!-- Formula Group A -->
+  <h4>Group A: 系统建模与代数分解——同构情形</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 同构智能体动力学 + 实 Jordan 分解</span>
+    $$ \dot{x}_i = A x_i + B u_i, \quad i = 1,\dots,N $$
+    $$ A = T \begin{bmatrix} X & 0 \\ 0 & Y \end{bmatrix} T^{-1}, \quad X = -X^T \text{ (skew-symmetric)}, \quad Y \text{ is Hurwitz} $$
+    <div class="eq-note">
+      <strong>$A$</strong> = 中性稳定矩阵——所有特征值位于虚轴 &nbsp;|&nbsp;
+      <strong>$X \in \mathbb{R}^{n_1 \times n_1}$</strong> = 反对称矩阵（特征值纯虚数共轭对：$\pm j\omega$），代表持续振荡模态——不衰减也不发散 &nbsp;|&nbsp;
+      <strong>$Y \in \mathbb{R}^{n_2 \times n_2}$</strong> = Hurwitz 矩阵（所有特征值实部为负），代表自稳定的动力模态——即使不施加控制也会自衰减 &nbsp;|&nbsp;
+      <strong>关键洞察</strong>：中性稳定性意味着 $A$ 既不是渐近稳定的（需要控制来达成共识），也不是不稳定的（共识可实现——系统不会自发散）。实 Jordan 分解将"需要控制干预"的 $X$ 与"自行稳定"的 $Y$ 分离——控制设计只需针对 $X$。
+    </div>
+  </div>
+
+  <!-- Formula Group B -->
+  <h4>Group B: 控制增益的显式构造——无需求解 Riccati/LMI</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 控制增益显式公式</span>
+    $$ G = -B^T E^T E $$
+    $$ \text{where } E \text{ is constructed such that } (X, EB) \text{ is controllable} $$
+    $$ \text{Equivalently: } \text{rank}\begin{bmatrix} EB & X(EB) & \dots & X^{n_1-1}(EB) \end{bmatrix} = n_1 $$
+    <div class="eq-note">
+      <strong>$G \in \mathbb{R}^{p \times n}$</strong> = 控制增益矩阵——每个智能体本地控制器的"方向矩阵" &nbsp;|&nbsp;
+      <strong>$E$</strong> = 由 $(X, B)$ 的可镇定性和 $(X, EB)$ 的可控性共同确定的构造矩阵 &nbsp;|&nbsp;
+      <strong>$n_1$</strong> = $X$ 的维数（中性稳定模态的数目）&nbsp;|&nbsp;
+      <strong>不依赖拓扑</strong>：$G$ 的构造仅用到 $(A,B)$——每个智能体自身的动力学——与通信图、切换信号、邻居数量完全无关 &nbsp;|&nbsp;
+      <strong>与 Riccati 方法的对比</strong>：传统 $G = -R^{-1}B^TP$ 需要解 $A^TP + PA - PBR^{-1}B^TP + Q = 0$——数值求解且 $Q,R$ 选择影响拓扑兼容性。$G = -B^TE^TE$ 是<strong>代数封闭形式</strong>——可以直接"写出来"。
+    </div>
+  </div>
+
+  <!-- Formula Group C -->
+  <h4>Group C: 事件触发协议——控制器 + 触发函数 + 触发规则</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 基于开环预测的事件触发控制器</span>
+    $$ u_i(t) = c G \sum_{j=1}^{N} a_{ij}(t) (\tilde{x}_i(t) - \tilde{x}_j(t)) $$
+    $$ \tilde{x}_i(t) = e^{A(t - t_k^i)} x_i(t_k^i), \quad t \in [t_k^i, t_{k+1}^i) $$
+    <div class="eq-note">
+      <strong>$c > 0$</strong> = 耦合增益（标量）——充分大以克服最不利的联合连通条件 &nbsp;|&nbsp;
+      <strong>$a_{ij}(t)$</strong> = 时变邻接矩阵元素——$a_{ij} > 0$ 当 $i$ 能收到 $j$ 的信息（在时刻 $t$），否则 $a_{ij}=0$ &nbsp;|&nbsp;
+      <strong>$\tilde{x}_i(t)$</strong> = 智能体 $i$ <strong>对自身状态的预测</strong>（开环预测：如果没有任何控制输入，状态沿 $e^{At}$ 演化）&nbsp;|&nbsp;
+      <strong>$t_k^i$</strong> = 智能体 $i$ 的第 $k$ 次触发时刻，$x_i(t_k^i)$ = 触发时刻的精确状态 &nbsp;|&nbsp;
+      <strong>关键设计</strong>：预测值 $\tilde{x}_i$ 仅依赖于<strong>自身</strong>上次触发的状态和自身动力学——不需要邻居的任何实时信息。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 触发函数与触发规则</span>
+    $$ f_i(t) = 4 d_i(t) \|G\|^2 \|e_i(t)\|^2 - \kappa \sum_{j=1}^{N} a_{ij}(t) \|G(\tilde{x}_i(t) - \tilde{x}_j(t))\|^2 - \mu e^{-\nu t} $$
+    $$ t_{k+1}^i = \inf \left\{ t > t_k^i \;\middle|\; f_i(t) \ge 0 \;\text{or}\; a_{ij}(t) \neq a_{ij}(t_k^i) \;\text{for some}\; j \right\} $$
+    $$ e_i(t) = \tilde{x}_i(t) - x_i(t): \text{ prediction error (测量误差)} $$
+    <div class="eq-note">
+      <strong>$f_i(t)$</strong> = 触发函数——$f_i \ge 0$ 时触发 &nbsp;|&nbsp;
+      <strong>$d_i(t) = \sum_j a_{ij}(t)$</strong> = 智能体 $i$ 在时刻 $t$ 的邻居数量（度）&nbsp;|&nbsp;
+      <strong>$\|G\|^2\|e_i(t)\|^2$</strong> = 自身预测误差的加权范数——衡量"我的预测偏离真实状态多少" &nbsp;|&nbsp;
+      <strong>$\sum a_{ij}\|G(\tilde{x}_i - \tilde{x}_j)\|^2$</strong> = 相对预测差异——衡量"我和邻居的预测值差异" &nbsp;|&nbsp;
+      <strong>$\kappa \in (0,1)$</strong> = 触发阈值系数——控制触发的"松紧度"。$\kappa$ 小意味更容易触发（更多通信），$\kappa$ 大意味更难触发（更省通信但可能影响性能）&nbsp;|&nbsp;
+      <strong>$\mu e^{-\nu t}$</strong> = 指数衰减强迫项（$\mu, \nu > 0$）——确保即使一致性误差很小时，仍有动力触发来推动最终收敛。这是 Barbalat's Lemma 分析中的关键"定时器" &nbsp;|&nbsp;
+      <strong>$a_{ij}(t) \neq a_{ij}(t_k^i)$</strong> = 拓扑变化强制触发——确保每次图结构变化时智能体立即更新其邻居集合和控制律。
+    </div>
+  </div>
+
+  <!-- Formula Group D -->
+  <h4>Group D: 一致性误差动力学——从个体状态到共识误差</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) — 一致性误差变量</span>
+    $$ \xi_i = x_i - \frac{1}{N}\sum_{j=1}^{N} x_j, \quad \tilde{\xi}_i = \tilde{x}_i - \frac{1}{N}\sum_{j=1}^{N} \tilde{x}_j $$
+    $$ \dot{\xi}_i = A\xi_i + cBG \sum_{j=1}^{N} a_{ij}(t)(\tilde{\xi}_i - \tilde{\xi}_j) $$
+    $$ \xi = [\xi_1^T, \dots, \xi_N^T]^T: \text{ consensus error vector} $$
+    <div class="eq-note">
+      <strong>$\xi_i$</strong> = 智能体 $i$ 的状态偏离平均值的量——$\xi = 0$ 当且仅当所有智能体状态完全一致 &nbsp;|&nbsp;
+      <strong>$N^{-1}\sum_j x_j$</strong> = 平均状态（质心）——在无向图中，平均状态的动力学是自治的 &nbsp;|&nbsp;
+      <strong>$\tilde{\xi}_i$</strong> = 预测值的一致性误差——因为在控制器中使用预测值 $\tilde{x}$ 而非真实值 $x$，共识误差的动力学中出现的也是 $\tilde{\xi}$ &nbsp;|&nbsp;
+      <strong>目标</strong>：证明 $\xi(t) \to 0$ 当 $t \to \infty$——这需要处理 $\tilde{\xi}$（预测值）与 $\xi$（真实值）之间的偏差——偏差由预测误差 $e_i$ 传递而来。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>Parameter</th><th>Typical Value / Range</th><th>Meaning</th><th>How to Choose</th></tr>
+    <tr><td>耦合增益 $c$</td><td>$c > c_{\min}$（$c_{\min}$ 取决于联合连通条件）</td><td>放缩控制输入相对于状态差异的权重</td><td>$c$ 必须足够大使得 Lyapunov 函数在并图连通区间严格下降。增大 $c$ 加速收敛但增加控制能量和触发频率</td></tr>
+    <tr><td>触发阈值 $\kappa$</td><td>$0 < \kappa < 1$（通常 $0.01 \sim 0.5$）</td><td>控制预测误差容忍度。$\kappa$ 越小，触发越频繁</td><td>$\kappa \to 0$ 趋近于连续控制，$\kappa \to 1$ 触发间隔最大化但收敛可能变慢。建议 $[0.05, 0.3]$</td></tr>
+    <tr><td>指数衰减 $\mu, \nu$</td><td>$\mu > 0$, $\nu > 0$（$\mu \in [0.1, 10]$, $\nu \in [0.01, 1]$）</td><td>随时间递减的触发紧迫性</td><td>$\nu$ 决定衰减速率——应在 $A$ 的中性稳定模态频率之下。$\mu$ 决定初始紧迫性</td></tr>
+    <tr><td>控制增益矩阵 $G$</td><td>$G = -B^TE^TE \in \mathbb{R}^{p \times n}$</td><td>本地反馈方向矩阵</td><td>由 $(A,B)$ 唯一确定（通过实 Jordan 分解）。不依赖拓扑——所有智能体使用相同的 $G$（同构情形）</td></tr>
+    <tr><td>切换驻留时间</td><td>$t_{k+1} - t_k \ge \tau_D > 0$</td><td>两次切换之间的最小时间间隔</td><td>理论上只需 $\tau_D > 0$（非 Zeno 切换）。无上界要求——切换可以任意慢</td></tr>
+    <tr><td>联合连通窗口长度</td><td>$t_{k+1} - t_k$（由切换信号定义）</td><td>在每个窗口内并图包含生成树</td><td>不要求该窗口长度有上界——可以任意长（只要有限）。但窗口越长，收敛越慢</td></tr>
+  </table>
+
+  <h3>6.4 同构 vs 异构：协议框架的扩展路线</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>同构情形（Homogeneous）— Theorem 1 &amp; 2</h4>
+      <ul>
+        <li><strong>动力学</strong>：所有智能体共享相同的 $(A,B)$</li>
+        <li><strong>目标</strong>：全状态一致性 $\|x_i - x_j\| \to 0$</li>
+        <li><strong>控制器</strong>：$u_i = cG\sum a_{ij}(\tilde{x}_i - \tilde{x}_j)$</li>
+        <li><strong>状态预测</strong>：$\tilde{x}_i = e^{A(t-t_k^i)}x_i(t_k^i)$</li>
+        <li><strong>Lyapunov</strong>：$V_3 = \frac{1}{1-\kappa}V_1 + V_2$</li>
+        <li><strong>收敛工具</strong>：Barbalat's Lemma + Cauchy 准则</li>
+        <li><strong>Zeno 排除</strong>：三种情况分别分析</li>
+        <li><strong>核心创新</strong>：完全分布式的"双不连续"协议</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>异构情形（Heterogeneous）— Theorem 3 &amp; 4</h4>
+      <ul>
+        <li><strong>动力学</strong>：每个智能体有不同的 $(A_i, B_i, C_i)$</li>
+        <li><strong>目标</strong>：输出一致性 $\|y_i - y_j\| \to 0$</li>
+        <li><strong>两层架构</strong>：分布式事件触发观测器 + 本地输出调节器</li>
+        <li><strong>外生信号</strong>：$\dot{v} = Sv$，$S$ 中性稳定</li>
+        <li><strong>观测器</strong>：$\dot{\hat{v}}_i = S\hat{v}_i + c_v G_v\sum a_{ij}(\tilde{\hat{v}}_i - \tilde{\hat{v}}_j)$</li>
+        <li><strong>本地控制器</strong>：$u_i = K_{1i}x_i + K_{2i}\hat{v}_i$（输出调节方程确定 $K_{1i}, K_{2i}$）</li>
+        <li><strong>核心创新</strong>：将事件触发 + 联合连通框架从<strong>状态一致</strong>推广到<strong>输出一致</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解该方法需要掌握三个深层原理：(1) 实 Jordan 分解如何为"无矩阵不等式"协议设计提供代数基础；(2) 开环预测误差如何被 Lyapunov 分析"驯服"；(3) Barbalat's Lemma 为何是切换拓扑下替代 LaSalle 的正确工具。</p>
+
+  <h3>7.1 实 Jordan 分解——中性稳定性的结构分离与控制增益的代数可构造性</h3>
+  <div class="formula-block">
+    <span class="eq-tag">Principle 1 — Real Jordan Form and Gain Construction</span>
+    $$ A = T\begin{bmatrix} X & 0 \\ 0 & Y \end{bmatrix}T^{-1}, \quad X = -X^T $$
+    $$ \text{If } (X, EB) \text{ is controllable, then } G = -B^TE^TE \text{ stabilizes } X $$
+    $$ \text{Proof key: } X^T(EBG) + (EBG)^TX = -2(EBG)^T(EBG) \preceq 0 $$
+    <div class="eq-note">
+      <strong>为什么 $G = -B^TE^TE$ 能稳定 $X$？</strong> 因为 $X$ 是反对称矩阵：$X + X^T = 0$。考虑 Lyapunov 方程 $X^TP + PX = -Q$——如果取 $P = E^TE$ 和 $G = -B^TP = -B^TE^TE$，可以通过 $(X, EB)$ 的可控性证明 $X + (EB)G = X - (EB)B^TE^TE$ 是 Hurwitz 的。本质上，这等价于对 $(X, EB)$ 系统施加状态反馈 $u = Gx$——由于 $(X, EB)$ 可控，存在反馈增益使极点可任意配置。$G = -B^TE^TE$ 是该可控系统的<strong>特定显式稳定反馈增益</strong>——不需要求解 Lyapunov 方程或 LMI。&nbsp;|&nbsp;
+      <strong>$Y$ 不需要控制</strong>：$Y$ 已经是 Hurwitz 矩阵——对应模态自衰减。控制增益 $G$ 只需"照顾" $X$ 对应的模态。闭环系统矩阵 $A + c\lambda_i BG$ 对于所有非零 Laplacian 特征值 $\lambda_i$ 都是 Hurwitz 的。
+    </div>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">📌 为什么中性稳定性假设是合理且必要的？</div>
+    中性稳定性（所有特征值在虚轴上）是线性系统理论中的"临界"假设——比 Lyapunov 稳定更宽，比不稳定更强。在实际多智能体系统中：<strong>积分器链</strong> $\dot{x} = u$（$A=0$）、<strong>双积分器</strong>（位置-速度模型，$A$ 有零特征值）、<strong>简谐振子</strong>（$A$ 有纯虚特征值 $\pm j\omega$）——都属于中性稳定。无人机的位置环（双积分器）、姿态环中的简谐运动、振荡器网络——都满足中性稳定假设。如果不满足（有指数发散模态），则在没有连续控制时系统会自发散——事件触发策略可能来不及在发散前采样——因此中性稳定性在事件触发控制中是一个<strong>自然的可行性边界</strong>。
+  </div>
+
+  <h3>7.2 开环预测 + 预测误差驱动的触发——"离散信息连续使用"的核心机制</h3>
+  <div class="formula-block">
+    <span class="eq-tag">Principle 2 — Prediction Error Dynamics and Its Bounding</span>
+    $$ \dot{e}_i = A e_i - c \sum_{j=1}^{N} a_{ij}(t) BG(\tilde{x}_i - \tilde{x}_j) $$
+    $$ \|e_i(t)\| \le \int_{t_k^i}^{t} \|e^{A(t-\tau)}\| \cdot \|c\sum a_{ij}(\tau)BG(\tilde{x}_i(\tau) - \tilde{x}_j(\tau))\| \, d\tau $$
+    <div class="eq-note">
+      <strong>$e_i(t) = \tilde{x}_i(t) - x_i(t)$</strong> = 自身预测误差——触发函数中的核心量 &nbsp;|&nbsp;
+      <strong>误差动力学第一项 $Ae_i$</strong>：由于预测模型 $e^{A(t-t_k^i)}$ 是精确的（在同构情形），预测值与真实值的偏差仅源自<strong>控制输入 $u_i$ 改变了真实状态演化轨迹</strong>——使得 $x_i$ 不再精确遵循 $\dot{x}_i = Ax_i$（因为有 $Bu_i$ 项）&nbsp;|&nbsp;
+      <strong>触发函数的设计逻辑</strong>：当预测误差 $\|e_i\|$ 变得过大（相对于相对预测差异 $\sum a_{ij}\|G(\tilde{x}_i-\tilde{x}_j)\|^2$），触发被激活——智能体重新广播其精确状态，将误差 $e_i$ 重置为零。这形成了一个"误差-触发-重置"的<strong>自校正循环</strong> &nbsp;|&nbsp;
+      <strong>为什么触发函数的第二项是 $\tilde{x}$ 而非 $x$？</strong> 因为 $x_j$ 是未知的（邻居不连续通信）——只有 $\tilde{x}_j$ 是已知的。这使得触发监测<strong>不需要连续收听邻居</strong>。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 开环预测的"精确性"与"误差补偿"</div>
+    如果控制输入 $u_i = 0$ 且没有外部扰动，开环预测 $\tilde{x}_i(t) = e^{A(t-t_k^i)}x_i(t_k^i)$ 是<strong>精确的</strong>——$e_i(t) \equiv 0$。正是 $u_i \neq 0$（为了达成共识而施加的控制）导致了预测误差 $e_i$ 非零。这构成了一个根本性的权衡：(a) 施加更强的控制（更大的 $u_i$）以加速共识——但会增快预测误差累积，导致更频繁的触发；(b) 施加更弱的控制——减少触发频率，但减慢共识速度。触发函数通过参数 $\kappa$ 在两者之间做显式权衡——$\kappa$ 接近 1 时容忍更大的误差（更少的触发），$\kappa$ 接近 0 时严格限制误差（更频繁的触发，趋近连续控制）。
+  </div>
+
+  <h3>7.3 Barbalat's Lemma —— 切换拓扑下替代 LaSalle 不变性原理的正确工具</h3>
+  <div class="formula-block">
+    <span class="eq-tag">Principle 3 — Barbalat's Lemma and Cauchy Criterion in Consensus Proof</span>
+    $$ \text{Barbalat's Lemma: If } \lim_{t\to\infty} f(t) = \alpha < \infty \text{ and } \ddot{f}(t) \text{ is bounded, then } \lim_{t\to\infty} \dot{f}(t) = 0 $$
+    $$ \text{Cauchy Criterion: } \int_{0}^{\infty} \xi^T(t)\xi(t)\,dt < \infty \text{ and } \dot{\xi}(t) \text{ is bounded } \Rightarrow \lim_{t\to\infty} \xi(t) = 0 $$
+    <div class="eq-note">
+      <strong>LaSalle 不变性原理的局限</strong>：LaSalle 定理要求系统是<strong>自治的</strong>（$\dot{x} = f(x)$ 不显含 $t$）。但在切换拓扑系统中，通信图随时间变化——系统本质上是<strong>非自治的</strong>（$\dot{x} = f(x, \theta(t))$）。因此 LaSalle 定理不能直接应用。此外，LaSalle 要求 $\dot{V} \le 0$ 对于所有 $t$——这在联合连通条件下不成立（在不连通子区间 $V$ 可能上升）。&nbsp;|&nbsp;
+      <strong>Barbalat's Lemma 的优势</strong>：(1) 不需要 $\dot{V} \le 0$ 对于所有 $t$——只需要 $\dot{V}$ 的极限行为；(2) 条件仅是 $V(t)$ 有界 + $\ddot{V}$ 有界 $\Rightarrow \dot{V} \to 0$；(3) 结合 Cauchy 准则：如果 $\int_0^\infty \xi^T\xi \, dt$ 收敛（Lyapunov 分析保证）且 $\dot{\xi}$ 有界（从动力学推导），则 $\xi \to 0$——达成一致性结论 &nbsp;|&nbsp;
+      <strong>触发函数中 $\mu e^{-\nu t}$ 的关键作用</strong>：这个指数衰减项确保触发函数即使在其他项为零时也有"时间驱动"的组件——在 Lyapunov 分析中，它保证 $\int_0^\infty \xi^T\xi \, dt$ 的收敛性可以通过对 $\mu e^{-\nu t}$ 的积分来控制——为 Cauchy 准则的应用提供了最关键的"可积性"保证。
+    </div>
+  </div>
+
+  <div class="callout danger">
+    <div class="callout-title">⚠ 使用 Barbalat 的隐藏陷阱</div>
+    Barbalat's Lemma 的核心条件是 $\ddot{f}$ 有界——这是一个<strong>二阶导数条件</strong>，需要 $f$ 有两次连续可微性。在事件触发系统中，状态轨线 $x_i(t)$ 是连续可微的，但 $\tilde{x}_i(t)$ 在触发时刻 $t_k^i$ 经历了状态跳变（因为 $e_i$ 被重置为零）。因此 Lyapunov 函数 $V$ 在触发时刻是<strong>不可导的</strong>——但 $V$ 被证明在触发时<strong>不增加</strong>（$V(t_k^+) \le V(t_k^-)$），这保证了在两次触发之间 $V$ 的下降性质足够强来弥补触发时刻的不可导性。文中对这一微妙之处的处理是其证明严谨性的体现。
+  </div>
+
+  <h3>7.4 Three Principles Working Together</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>Principle 1: Real Jordan</h4>
+      <p>提供<strong>代数基础</strong>——将 $A$ 分离为需控制的 $X$ 与自稳定的 $Y$，使得控制增益 $G = -B^TE^TE$ 可<strong>显式构造</strong>（无需数值求解）</p>
+    </div>
+    <div class="cmp-col">
+      <h4>Principle 2: Prediction + Trigger</h4>
+      <p>提供<strong>信息机制</strong>——开环预测 $\tilde{x}_j = e^{A(t-t_k^j)}x_j(t_k^j)$ 使得触发监测<strong>不依赖连续通信</strong>，$\mu e^{-\nu t}$ 提供全局时间标度</p>
+    </div>
+    <div class="cmp-col">
+      <h4>Principle 3: Barbalat + Cauchy</h4>
+      <p>提供<strong>收敛证明</strong>——在不要求 $\dot{V} \le 0$ 每时每刻成立的非自治切换系统中，利用积分收敛 + 导数有界推出渐近一致性</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">四种可能的交互拓扑（切换模态）：$\mathcal{G}_1, \mathcal{G}_2, \mathcal{G}_3, \mathcal{G}_4$</span>
+      <span class="fig-source">来源：论文 Fig. 1 (p.9)</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-1-context.png" alt="Four possible switching topologies"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-1-context.png</code><br>原图：四个无向图 G1-G4，节点1-5的不同连接方式</div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：论文仿真中使用的四种切换拓扑（5个智能体）。关键观察：</p>
+      <ul>
+        <li><strong>联合连通条件成立</strong>：单独看 $\mathcal{G}_1$ 到 $\mathcal{G}_4$，<strong>没有任何一个图包含完整的生成树</strong>（某些节点是孤立的或仅局部连通）。但在任意连续四个模态的并图中，存在连接所有5个节点的路径——这就是联合连通的含义。</li>
+        <li><strong>切换的极端性</strong>：某些模态中节点几乎完全孤立——这意味着在切换过程中，某些智能体可能在<strong>相当长时间内</strong>收不到任何邻居的信息。这比传统"固定连通"严苛得多。</li>
+        <li><strong>验证强度</strong>：在该拓扑集下验证协议，意味着算法必须能够在"有时完全不连通"的通信条件下工作——这是对协议鲁棒性的严格测试。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 - State Consensus -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">同构多智能体系统的状态一致性仿真——状态轨迹与触发时刻</span>
+      <span class="fig-source">来源：Section IV (pp.9-10)</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-2-states.png" alt="State consensus trajectories and triggering instants"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-2-states.png</code><br>原图：五个智能体的状态分量随时间收敛曲线 + 触发时刻标记</div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本案例展示了</strong>：5个同构智能体在四种切换拓扑下的状态一致性过程。关键证据：</p>
+      <ul>
+        <li><strong>状态分量渐近一致</strong>：所有智能体的状态分量随时间逐渐收敛到同一值——证明 Theorem 1。收敛不是单调的——在拓扑切换时段内短暂偏离——是联合连通条件下预期的行为。</li>
+        <li><strong>触发频率递减</strong>：随一致性误差减小，触发次数逐渐减少——初期密集（状态差异大），后期稀疏（已接近一致）。与触发函数中 $\mu e^{-\nu t}$ 和相对预测差异项的共同作用一致。</li>
+        <li><strong>无 Zeno 行为</strong>：在整个仿真过程中，任意两次连续触发之间的时间间隔始终<strong>严格大于零</strong>——数值印证 Theorem 2。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">异构多智能体系统的输出一致性仿真结果</span>
+      <span class="fig-source">来源：Section IV (pp.10-11)</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-3-heterogeneous.png" alt="Output consensus of heterogeneous agents"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-3-heterogeneous.png</code><br>原图：异构智能体的输出分量收敛曲线 + 分布式观测器状态轨迹</div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本案例展示了</strong>：异构多智能体系统的输出一致性。5个智能体拥有<strong>不同的系统矩阵</strong> $(A_i, B_i, C_i)$——通过分布式观测器 + 本地输出调节器实现输出一致性。关键证据：</p>
+      <ul>
+        <li><strong>输出 $y_i$ 收敛到共同轨迹</strong>：尽管每个智能体内部状态 $x_i$ 可能完全不同，但输出 $y_i = C_ix_i$ 最终收敛到相同值——证明 Theorem 3-4。</li>
+        <li><strong>分布式观测器的协同估计</strong>：每个智能体的本地观测器 $\hat{v}_i$ 通过事件触发通信交换信息，最终所有 $\hat{v}_i$ 收敛到真实外生信号 $v(t)$——输出调节器正确工作的前提。</li>
+        <li><strong>两层解耦的有效性</strong>：观测器层（通信层）仅负责估计外生信号；调节器层（本地层）使用估计值来调节输出——两层间解耦使得异构情形可在不修改通信协议的情况下扩展。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">触发间隔统计——Zeno-free 数值验证</span>
+      <span class="fig-source">来源：Section IV 数据</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-4-zeno.png" alt="Inter-event interval statistics"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-4-zeno.png</code><br>原图：各智能体的触发间隔直方图/时序图</div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：各智能体的触发间隔分布——验证 Zeno 行为被排除。关键证据：</p>
+      <ul>
+        <li><strong>最小触发间隔严格正</strong>：所有智能体的触发间隔均大于可观测定下界——与理论分析的正下界一致。没有触发间隔逼近零的趋势。</li>
+        <li><strong>触发间隔初期短、后期长</strong>：与状态轨迹收敛一致——体现了事件触发相对时间触发的优势——通信负载自适应于系统需求。</li>
+        <li><strong>不同智能体触发频率不同</strong>：处于"关键桥接位置"的智能体触发更频繁——因为它们的预测误差对全局共识影响更大。这是完全分布式协议的"自然涌现"行为。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提约束</strong>：(1) 系统矩阵 $A$ 必须<strong>中性稳定</strong>（所有特征值在虚轴上）——排除了严格不稳定系统。对于有右半平面特征值的系统，开环预测误差会指数放大。(2) $(A,B)$ 必须<strong>可镇定</strong>——这限制了某些欠驱动系统的适用性。(3) 同构情形要求所有智能体具有<strong>完全相同的动力学</strong>——在异构硬件组成的多智能体系统中不成立。(4) 通信图必须为<strong>无向图</strong>（$a_{ij} = a_{ji}$）——对于有向图/广播通信，当前 Lyapunov 构造失效。</li>
+    <li><strong>适用场景边界</strong>：最适用于：(a) 间歇性通信的中小型无人机编队（$N \le 10$），(b) 移动传感器网络中周期性恢复通信的场景，(c) 水声/空间多智能体系统。不太适用于：(a) 大规模网络（$N \gg 10$）——触发函数复杂度与邻居数 $d_i$ 成正比；(b) 严格实时性要求的系统——事件触发的异步性使延迟难以预先保证；(c) 持续外部扰动的系统——高扰动下触发频率可能接近连续通信。</li>
+    <li><strong>仿真验证有限</strong>：仅用一个5智能体、4种拓扑的数值仿真验证——无物理实验、无大规模仿真、无与其他协议的定量比较（触发次数、收敛时间）。通信延迟和测量噪声下的行为不明确。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>理论维度</strong>：(1) <strong>有向图推广</strong>——将无向图放松到有向图；(2) <strong>固定时间/预设时间一致性</strong>——引入时变增益实现有限时间收敛；(3) <strong>通信延迟与丢包</strong>——在触发函数中引入确认机制或时间窗口鲁棒触发；(4) <strong>非线性动力学</strong>——利用 Lipschitz 常数约束开环预测误差的增长上界。</li>
+    <li><strong>方法维度</strong>：(1) <strong>动态触发阈值</strong>——$\kappa$ 自适应调节：误差大时降低 $\kappa$，接近一致时提高；(2) <strong>自触发（self-triggered）</strong>——在触发时刻同时计算下次触发时间——省去连续监测；(3) <strong>结合 MPC</strong>——在触发间隔内优化控制序列以最小化触发频率。</li>
+    <li><strong>应用维度</strong>：(1) <strong>UAV 编队</strong>——用四旋翼双积分器模型验证通信中断对编队保持的影响；(2) <strong>水声通信网络</strong>——通信带宽极低、延迟大的理想应用场景；(3) <strong>移动机器人路径规划</strong>——路径导致通信图频繁切换时的共识维持。</li>
+  </ul>
+
+  <h3>9.3 Sensitivity Analysis</h3>
+  <table>
+    <tr><th>Factor</th><th>Potential Difficulty</th><th>Severity</th></tr>
+    <tr><td>中性稳定性假设被违反<br>（$A$ 有右半平面特征值）</td><td>开环预测误差将<strong>指数增长</strong>。触发频率可能指数增长以补偿——最坏情况下触发间隔逼近零（Zeno 可能无法排除）。该协议在发散系统上<strong>本质上不适用</strong>。</td><td>★★★★★</td></tr>
+    <tr><td>联合连通窗口长度过长<br>（长时间无通信）</td><td>在不连通区间，控制器接近零——状态沿 $e^{At}$ 开环演化。中性稳定下不收敛也不发散。$\mu e^{-\nu t}$ 持续衰减——可能在通信恢复前就触发（"过早触发"）。极端长窗口可能使收敛速度<strong>极慢</strong>。</td><td>★★★★</td></tr>
+    <tr><td>耦合增益 $c$ 太小或太大</td><td>$c$ 太小：Lyapunov 在并图连通区间<strong>不保证下降</strong>——可能不收敛。$c$ 太大：控制输入过大——加速收敛但加剧预测误差累积→触发频率增加。最优 $c$ 的理论指导缺失。</td><td>★★★★</td></tr>
+    <tr><td>触发阈值 $\kappa$ 接近 1</td><td>$\kappa \to 1$ 时<strong>极端节省通信</strong>但可能导致一致性性能严重退化。$\kappa > 0.8$ 通常不推荐——可能出现在切换信号变化前所有智能体都不触发的情况→通信完全停滞。</td><td>★★★</td></tr>
+    <tr><td>测量噪声</td><td>触发时刻的状态 $x_i(t_k^i)$ 包含噪声→$e_i$ 初始值非零→噪声驱动的误触发。文中未分析噪声鲁棒性——可通过在触发函数中加入<strong>滞后阈值（hysteresis）</strong>缓解。</td><td>★★★</td></tr>
+    <tr><td>异步触发导致的相对预测误差</td><td>邻居 $j$ 的预测 $t_{k_j}^j$ 可能是很久以前的值——"逐对异步"效应使不同邻居的信息陈旧度不同。当前触发函数将其统一处理——没有区分不同邻居的信息新近度。</td><td>★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>事件触发通信协议在真实 UAV 编队中的实验验证与系统性 benchmark</strong>——当前事件触发多智能体一致性文献缺乏标准化的<strong>硬实验验证基准</strong>。几乎所有理论工作仅用3-5个智能体的数值仿真（MATLAB/Simulink）作为验证——与实际 UAV 编队飞行中的通信延迟（10-100ms MAVLink 数传）、测量噪声（IMU 偏置、GPS 漂移）、执行器饱和、风扰动等条件相差甚远。可以设计一套实验——在3-5架搭载 Pixhawk + WiFi/数传模块的无人机上实现本文协议，测试：(1) 人工制造的通信中断下编队是否仍能保持；(2) 触发次数 v.s. 时间触发的通信节省百分比；(3) 不同参数组合下的收敛速度-通信量 Pareto 前沿；(4) 风扰动下的触发频率变化。这将首次回答：<strong>事件触发一致性理论在真实物理系统中的通信节省效果是否达到理论预期？</strong>
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — 从第一性原理推演研究动机</h2>
+
+  <h3>10.1 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    一群无人机在峡谷中穿行，通信信号时断时续——每次通信窗口仅几秒钟——但它们必须在飞过峡谷后仍保持精确编队。传统的"别停地聊"策略会在无信号区间让系统失去控制；传统的"定时聊"策略在信号恢复时已积累了不可挽回的误差——唯一的出路是<strong>让每架飞机在不通信时"猜测"队友的轨迹，并在误差太大或通信恢复时"及时校正"</strong>——这就是联合连通切换拓扑下事件触发一致性的全部动机。
+  </div>
+
+  <h3>10.2 Idea Derivation Chain (五步推演)</h3>
+  <ol>
+    <li><strong>第一步：多智能体系统面临的根本约束是什么？</strong><br>多个自主智能体（无人机、机器人、卫星簇）需要协同完成编队、覆盖、跟踪等任务——要求它们对某些量达成共识。达成共识需要通信——但<strong>通信资源是有限的</strong>：无线带宽有限、电池供电节点需省电、水声通信速率极低、深空任务通信窗口极短。核心问题：<strong>如何用最少的通信达成共识？</strong></li>
+    <li><strong>第二步：现有方法在"最少通信"上的妥协是什么？</strong><br>前人提出事件触发方法——"只在必要时通信"。但具体实现中，几乎所有工作都存在隐蔽妥协：<strong>虽然控制器不连续更新，但触发条件本身需要连续获取邻居状态来评估"何时该通信"</strong>——通信模块并未真正休眠。这个妥协使得事件触发的"通信节省"大打折扣。</li>
+    <li><strong>第三步：如果再加上拓扑切换——问题为何难上加难？</strong><br>在静态拓扑下，"监听但不发送"尚且可行。但如果通信图在变化——邻居可能突然消失——你基于它的连续信息构造的触发函数瞬间失效。在联合连通条件下，图可能长时间<strong>完全不连通</strong>——连续监听回报极低。<strong>触发决策必须能在没有邻居实时信息的情况下完成。</strong></li>
+    <li><strong>第四步：如何在没有连续邻居信息的条件下做触发决策？</strong><br>利用系统动力学 $A$——每个智能体知道自己和邻居的动力学模型——可以<strong>预测</strong>邻居在两次通信之间的状态：$\tilde{x}_j = e^{A(t-t_k^j)}x_j(t_k^j)$。这个预测只需邻居上次通信时发送的值和当前时间——两者本地可知。触发函数的每一项也仅依赖本地信息或预测值——完全绕过连续通信需求。</li>
+    <li><strong>第五步：如何保证预测误差不会导致系统发散？</strong><br>通过将预测误差 $e_i$ 的动力学显式建模并纳入 Lyapunov 分析：(a) 预测误差增长率与当前控制强度（即一致性误差）成正比——接近一致时控制趋于零，预测误差也趋于零——自洽的；(b) 触发函数确保误差在达到"危险水平"前被重置；(c) 联合连通条件确保每过一段有界时间，并图中的生成树路径足以将 Lyapunov 函数下拉。(a)+(b)+(c) 通过 Barbalat + Cauchy 准则证明渐近一致性。</li>
+  </ol>
+
+  <h3>10.3 How You Would Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察痛点</strong>：设计无人机编队时，实时可靠通信是最大奢侈——战场/灾后/峡谷环境中，通信中断是常态。现有共识协议几乎默认通信图在"每个时刻"连通——物理现实中根本做不到。</li>
+    <li><strong>Step 2 — 定位问题的数学本质</strong>：联合连通是图论条件——不关心单点时刻连通性，只关心区间上的并图。数学上意味用<strong>积分而非微分</strong>刻画一致性。传统 Lyapunov 微分不等式 $\dot{V} \le 0$ 须每时每刻成立——但积分条件 $\int_{t_k}^{t_{k+1}} \dot{V} dt \le 0$ 只需区间累积下降。暗示 Barbalat + Cauchy 作为替代工具。</li>
+    <li><strong>Step 3 — 寻找"信息代理"替代连续通信</strong>：知道邻居的动力学模型→可以"跑一个副本"在本地计算机上。开环预测 $\tilde{x}_j = e^{A(t-t_k^j)}x_j(t_k^j)$ 就是触发决策所需的全部信息。代价是预测误差——通过巧妙触发设计控制在安全范围。</li>
+    <li><strong>Step 4 — 设计"自校正"的触发函数</strong>：比较两样东西——(a) 自身预测偏离真实状态多少，(b) 和邻居的预测差异多大。如果 (a) 相对于 (b) 太大→说明基于过时信息做决策→触发。加上随时间递减的"紧迫因子" $\mu e^{-\nu t}$——防止系统陷入"误差小但共识未达成"的停滞状态。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：本文提供了一个<strong>"用系统动力学知识替代通信"</strong>的教科书级范例。每条链路的本质是传递信息——但如果接收方能<strong>基于已知动力学模型预测</strong>发送方的状态，通信只需在"预测误差太大"时发生——通信变为"纠错"而非"持续汇报"。这一思想远超多智能体一致性——对于任意包含已知模型的分布式系统（多机器人协同 SLAM、分布式目标跟踪、编队控制），<strong>用模型预测替代通信</strong>都是通用的降通信策略。关键是证明"预测-误差-触发-重置"闭环的稳定性——Barbalat's Lemma 在此提供了处理非自治切换系统的新范式。</li>
+    <li><strong>技术技巧层面</strong>：(1) <strong>实 Jordan 分解</strong>作为控制设计预处理——将系统矩阵分为"需控制的振荡部分（反对称 X）"和"自行稳定的部分（Hurwitz Y）"——使控制增益成为代数显式公式。(2) <strong>触发函数的三项结构</strong>：第一项（自身预测误差）保证本地精度；第二项（相对预测差异）保证共识驱动；第三项（指数衰减强迫）保证全局时间紧迫性——三项各自承担不同角色。(3) <strong>拓扑变化强制触发</strong>是处理切换图的最简洁机制——拓扑变化瞬间作为自然"同步点"。</li>
+    <li><strong>实验/写作层面</strong>：(1) 假设的"分级列出"——Assumption 1（动力学中性稳定+可镇定）、Assumption 2（联合连通）、Assumption 3（分段常数切换）——每个假设有明确物理含义。(2) 定理结构清晰——Theorem 1（一致性）、Theorem 2（Zeno-free）——"是否收敛"和"是否可实现"分为独立定理。(3) 仿真虽简单（5个智能体），但四种图模态精心体现联合连通的极端性。</li>
+    <li><strong>前沿意识层面</strong>：本文建立了<strong>可扩展的理论框架</strong>——后续工作可在此基础上替换任意组件（增益设计、触发函数结构、收敛证明工具）而不需重建整个分析体系。这种"框架化"的贡献方式——提供一套方法论而非孤立协议——对领域发展的推动力远超单个算法改进。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My UAV Research</h3>
+  <ul>
+    <li><strong>UAV 编队控制方向</strong>：无人机编队在实际飞行中的<strong>间歇性通信中断</strong>（遮挡、干扰、距离）恰好对应文中的联合连通切换拓扑。可直接将触发协议应用于 UAV 编队的<strong>位置一致性</strong>（双积分器动力学 $\dot{p}_i = v_i, \dot{v}_i = u_i$——符合中性稳定假设）。每架无人机在 Pixhawk 上运行本地触发函数——触发时通过 MAVLink 向邻居广播当前 GPS/视觉位置和速度——其余时间基于双积分器模型做开环预测。</li>
+    <li><strong>多 UAV 协同搜索/覆盖方向</strong>：可将框架推广——每个无人机不仅广播位置，还广播"地图更新"——触发条件基于"地图版本差异"而非单纯状态差异。无人机进入无通信区独立搜索后重新汇合时，联合连通假设成立——协议保证地图同步不需每一架广播完整搜索历史。</li>
+    <li><strong>UAV 集群分布式决策方向</strong>：分布式任务分配（多无人机协同攻击多目标）——每架需在目标价值、能力约束等方面达成一致——形式化为"异构系统的输出一致性"。本文异构框架——分布式观测器+本地调节器——可直接映射。</li>
+    <li><strong>ROS/Gazebo 仿真验证方向</strong>：可在 XTDrone 平台上实现该协议——在 Gazebo 中创建含遮挡物的三维场景，配置多架无人机 WiFi 通信模型（基于距离和视线丢包率），运行事件触发编队控制——验证：(a) 通信节省百分比 vs 编队精度，(b) Zeno-free 是否在物理仿真中成立，(c) 不同联合连通窗口长度下的收敛速度。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>References</th><th>Why Important</th></tr>
+    <tr><td><strong>[12]–[17] 事件触发一致性综述</strong> — Dimarogonas et al. (2012), Seyboth et al. (2013), Meng and Chen (2014)</td><td>事件触发多智能体一致性的经典基础——建立"事件触发+固定/连通拓扑"理论框架。阅读可理解为什么联合连通是质的飞跃——以及前人"隐式连续通信"局限从何而来。</td></tr>
+    <tr><td><strong>[27]–[29] 线性网络事件驱动一致性</strong> — Zhu et al. (2014), Zhang et al. (2015), Cheng and Li (2019)</td><td>将事件触发从积分器/双积分器推广到一般线性系统 $(A,B)$——引入连续通信下的触发条件设计。本文显式增益 $G=-B^TE^TE$ 在此基础上进一步消除了对矩阵不等式求解的依赖。</td></tr>
+    <tr><td><strong>[37]–[40] 切换拓扑一致性</strong> — Jadbabaie et al. (2003), Ren and Beard (2005), Olfati-Saber (2006)</td><td>切换拓扑下非事件触发一致性的经典理论——Jadbabaie et al. (2003) 首次引入联合连通条件。为本文提供了理论起点。</td></tr>
+    <tr><td><strong>[41] 事件触发+通信约束</strong> — Garcia et al. (2013)</td><td>本文明确引用以指出其局限——需连续信息监测触发函数。阅读此文可完整理解"从连续监听到无监听的跨越"意味着什么。</td></tr>
+    <tr><td><strong>[46] Barbalat's Lemma</strong> — Slotine and Li (1991), Applied Nonlinear Control</td><td>本文证明核心工具。Slotine 和 Li 教材提供完整数学表述和应用条件——特别是 $\ddot{f}$ 有界条件在事件触发系统中如何验证。</td></tr>
+    <tr><td><strong>输出调节理论</strong> — Huang (2004), Nonlinear Output Regulation: Theory and Applications</td><td>异构情形的理论基础——分布式观测器+本地调节器架构源自输出调节理论。理解输出调节方程解的存在条件对判断异构一致性可实现性至关重要。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Cheng et al. · 2018 · Event-Triggered Consensus of Homogeneous and Heterogeneous Multiagent Systems with Jointly Connected Switching Topologies · arXiv:2003.11216 · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

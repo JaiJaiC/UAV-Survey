@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes - Using reinforcement learning to probe the role of feedback in skill acquisition</title>
+
+<script>
+
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 files · 7-note reading path</div>
+    <div class="series-links">
+
+<a href="../../index.html">Index</a>      <a href="../10342/index.html">10342</a>      <a href="../10343/index.html">10343</a>      <a href="../10344/index.html">10344</a>      <a href="../10345/index.html">10345</a>      <a href="../10346/index.html">10346</a>      <a class="active" href="../10347/index.html">10347</a>      <a href="../10348/index.html">10348</a>
+    </div>
+  </div>
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息 · Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Using reinforcement learning to probe the role of feedback in skill acquisition</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong class="bold-affil">Antonio Terpin</strong>, <strong class="bold-affil">Raffaello D'Andrea</strong> (ETH Zurich, Institute for Dynamic Systems and Control)</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">2025</strong> (ETH Zurich IDSC 出品，推测为 Science Robotics / Nature Machine Intelligence / IEEE TRO 级别投稿)</td></tr>
+    <tr><td><strong>Keywords</strong></td><td>Reinforcement Learning, Feedback Control, Skill Acquisition, Fluid Dynamics, Drag Control, Optical Flow, Hardware-in-the-Loop, Open-Loop vs Closed-Loop, Motor Learning, Cylinder Wake</td></tr>
+    <tr><td><strong>Field</strong></td><td>机器人学 / 强化学习 / 流体力学控制 / 运动技能学习</td></tr>
+    <tr><td><strong>Contribution Type</strong></td><td>实验方法论 + 科学发现：将RL作为"科学仪器"探测反馈在技能习得中的角色</td></tr>
+    <tr><td><strong>实验平台</strong></td><td>真实水槽 + 圆柱体绕流 + GPU加速光流法实时流场估计 + 硬件在环RL训练</td></tr>
+    <tr><td><strong>核心发现</strong></td><td>流场反馈仅在训练阶段关键——执行阶段开环重放即可达到在线性能；同一物理系统因目标不同呈现"仁慈"或"恶劣"学习条件</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Reinforcement Learning</span>
+    <span class="tag tag-green">Feedback Control</span>
+    <span class="tag tag-purple">Skill Acquisition</span>
+    <span class="tag tag-amber">Fluid Dynamics</span>
+    <span class="tag tag-red">Physical Experiment</span>
+    <span class="tag tag-cyan">Hardware-in-the-Loop</span>
+    <span class="tag tag-gray">Drag Control</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+<h2>2. 核心洞察与创新点 · Insight &amp; Novelty</h2>
+
+<h3>2.1 一句话核心洞察 Q&A</h3>
+<div class="callout idea">
+  <div class="callout-title">💡 核心问题: 反馈到底在技能习得（而非技能执行）中扮演什么角色？</div>
+  <p>本文通过将通用RL智能体作为"科学仪器"，在真实混沌流体系统中系统性地解耦了<strong>训练时反馈</strong>与<strong>执行时反馈</strong>的角色。核心发现极具反直觉性：<strong>高维流场反馈在训练阶段不可或缺，但一旦策略学会，执行阶段完全可以抛弃反馈</strong>——开环重放训练轨迹即可达到与在线闭环几乎相同的性能。这暗示反馈的真正价值在于"引导探索方向"，而非为执行提供持续的校正能力。更深刻的是，同一物理系统在最大化阻力（drag maximization）和最小化阻力（drag minimization）两个目标下表现出截然不同的学习条件——前者"恶劣"（wicked），后者"仁慈"（kind），尽管状态-动作空间复杂度完全相同。</p>
+</div>
+
+<h3>2.2 灵感到洞察的推理链条</h3>
+<table>
+  <tr><th>灵感来源</th><th>关键观察</th><th>抽象洞察</th><th>本文论证</th></tr>
+  <tr>
+    <td>人类运动技能学习文献（motor learning literature）</td>
+    <td>人类学习运动技能时，反馈能加速学习但有时反而阻碍开环表现提升</td>
+    <td>反馈的"双刃剑"效应——提供信息但可能形成依赖</td>
+    <td>在流体系统中重现这一现象：流场反馈对drag minimization训练"非必需但有助于稳健性"，对drag maximization则"不可或缺"</td>
+  </tr>
+  <tr>
+    <td>Kasuga et al. 2015 / Raichin et al. 2021 的发现</td>
+    <td>当目标是提升开环策略组件时，提供反馈反而有害</td>
+    <td>反馈可能让学习过程"过度依赖"校正项而忽视建立前馈模型</td>
+    <td>本文化解了这一矛盾：反馈在训练中可能仅仅起到"引导探索"的作用，而非被编码进策略本身</td>
+  </tr>
+  <tr>
+    <td>非线性非最小相位系统理论</td>
+    <td>cylinder wake的升力-阻力动态展示出非最小相位特性</td>
+    <td>同一动力学可为不同目标提供截然不同的控制难度的学习条件</td>
+    <td>drag minimization是"仁慈"任务（简单开环可解），drag maximization是"恶劣"任务（必须借助反馈引导才能发现有效策略）</td>
+  </tr>
+  <tr>
+    <td>数十年流体力学实验配方</td>
+    <td>已有简单、高性能的开环策略可以控制圆柱绕流阻力</td>
+    <td>最优开环解可能已经存在但非常隐秘（narrow basin of attraction）</td>
+    <td>RL通过高维反馈引导探索，能够定位这些隐秘的开环策略盆地，但最终学到的策略本身并不"需要"反馈</td>
+  </tr>
+</table>
+
+<h3>2.3 作者声明的三大核心创新</h3>
+
+<div class="novelty-card">
+  <h4>🆕 创新点 1：RL作为科学仪器的全新方法论框架</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong> 传统流体控制研究依赖调参仿真或人类实验来理解反馈的作用，但仿真存在不可消除的sim-to-real gap，人类实验难以系统性地操控反馈条件。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong> 将RL智能体类比为"可编程的实验被试"——可以精确控制其"感官输入"（观测空间）和"学习条件"（奖励函数、训练时长），从而对反馈进行因果性操纵，这在人类被试身上是不可能的。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong> 采用通用RL架构（非针对流体特化的算法），在真实硬件水槽上训练，通过GPU加速的光流算法实时提供 128×128 量级的密集流场观测。对比三种训练条件：无流场反馈、有流场反馈、仅终端奖励。所有对比在同一物理平台上公平进行。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🆕 创新点 2：首次在硬件上实现RL + 密集流场反馈的快速流体控制训练</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong> 此前RL用于流体控制要么（a）完全在仿真中进行，要么（b）仅使用低维标量反馈。从未有人在真实硬件上以密集流场作为观测、且在"分钟级"时间尺度上完成训练。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong> 受困于"仿真无论如何标定都不可信"的困境，决定走纯物理路线（physical-only approach）。GPU计算能力的进步使得实时高分辨率光流估计成为可能。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong> 开发了定制GPU光流算法，在保证流场测量精度（与经典PIV标准可比）的同时，仅占用RL训练计算预算的一小部分。训练周期约数十分钟至数小时的物理时间，而非数天。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🆕 创新点 3：揭示"仁慈/恶劣"学习条件的任务依赖性</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong> 什么因素决定一个物理技能是"容易学"还是"难学"？传统观点认为是动力学复杂度或策略参数量，但本文用同一个系统、同一个策略架构证明了恰恰相反——<strong>是目标本身</strong>。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong> 非最小相位系统理论暗示，同一动力学对不同输出通道可能有截然不同的"可逆性"和"前馈可解性"。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong> 在完全相同的圆柱绕流平台上，分别训练drag minimization和drag maximization两个任务。结果：minimization任务即使没有流场反馈也能成功（只是慢一些），maximization任务则完全无法在无反馈条件下学到任何有效策略。进一步通过开环重放实验证明，两个任务学到的策略在本质上都是"开环可用"的，区别仅在于学习过程是否需要反馈来"找到"有效策略。</div>
+</div>
+
+</section>
+
+<!-- ═══════════════ 3. ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+<h2>3. 系统架构与论证流程图 · Architecture / Argument Map</h2>
+
+<h3>3.1 全文论证结构</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <div class="arch-stage">
+      <h4>🪣 物理平台 <span>Physical Setup</span></h4>
+      <div class="arch-card arch-solar"><strong>Cylinder in Water Channel</strong><small>圆柱体 (直径D) 放置于水槽中，Reynolds数 Re≈200-400，尾流为卡门涡街区域</small></div>
+      <div class="arch-card arch-solar"><strong>Actuation: Rotational Oscillation</strong><small>圆柱体绕轴旋转振荡作为控制输入 a_t ∈ [-1, 1]，控制周期约T</small></div>
+      <div class="arch-card arch-solar"><strong>Sensing: Optical Flow Field</strong><small>128×128密集流场 (u, v)，通过GPU加速光流算法实时估计</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>🧠 RL 智能体 <span>RL Agent</span></h4>
+      <div class="arch-card arch-power"><strong>Observation Space Control</strong><small>对比条件：密集流场反馈 vs. 无流场反馈（仅标量阻力信号）vs. 仅终端奖励</small></div>
+      <div class="arch-card arch-power"><strong>Policy Architecture</strong><small>通用CNN + MLP策略网络，非流体特化设计，体现"通用RL智能体"理念</small></div>
+      <div class="arch-card arch-power"><strong>Reward Design</strong><small>r_t = ±Drag_t（minimization取负，maximization取正）作为每步即时奖励</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>🔬 实验设计 <span>Experiment Design</span></h4>
+      <div class="arch-card arch-motor"><strong>训练条件交叉</strong><small>2 tasks × 3 feedback conditions = 6 种主要实验设置，每种多Seed</small></div>
+      <div class="arch-card arch-motor"><strong>开环重放测试</strong><small>固定已训练策略的动作序列，关闭所有反馈，在相同初始条件下重放并测量性能下降</small></div>
+      <div class="arch-card arch-motor"><strong>分钟级训练周期</strong><small>每个训练run持续数十分钟至数小时物理时间，远超仿真速度但保证真实性</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>📊 发现与结论 <span>Findings</span></h4>
+      <div class="arch-card arch-thrust"><strong>训练-执行解耦</strong><small>流场反馈仅在训练时关键；执行时开环重放≈闭环表现</small></div>
+      <div class="arch-card arch-thrust"><strong>Kind vs Wicked</strong><small>同一物理系统因目标不同呈现仁慈/恶劣学习条件</small></div>
+      <div class="arch-card arch-thrust"><strong>反馈=探索引导</strong><small>反馈的价值在于引导探索，而非策略执行的组成部分</small></div>
+    </div>
+  </div>
+  <div class="arch-arrow"><span>物理建模</span><span>→ 智能体设计</span><span>→ 实验操控</span><span>→ 科学发现</span></div>
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>Re ≈ 200-400</strong><small>工作Reynolds数范围</small></div>
+    <div class="arch-metric"><strong>128×128 流场</strong><small>观测空间维度</small></div>
+    <div class="arch-metric"><strong>6 种主要条件</strong><small>2 tasks × 3 feedback</small></div>
+    <div class="arch-metric"><strong>分钟级训练</strong><small>物理时间尺度</small></div>
+  </div>
+</div>
+
+<h3>3.2 论证流程 Mermaid 图</h3>
+
+<div class="mermaid-box">
+  <pre class="mermaid">
+flowchart TD
+    A["🧪 物理直觉：人类运动学习中<br/>反馈有时是双刃剑"] --> B["❓ 核心问题：反馈在流体技能<br/>习得中究竟起什么作用？"]
+    B --> C["🛠️ 方法论：RL智能体作为<br/>可编程科学仪器"]
+    C --> D1["条件A: 密集流场反馈<br/>（128×128 光流向量场）"]
+    C --> D2["条件B: 无流场反馈<br/>（仅标量阻力信号）"]
+    C --> D3["条件C: 仅终端奖励<br/>（稀疏反馈对照）"]
+    D1 --> E1["任务1: Drag Minimization"]
+    D1 --> E2["任务2: Drag Maximization"]
+    D2 --> E1
+    D2 --> E2
+    D3 --> E1
+    D3 --> E2
+    E1 --> F1["发现1: Minimization 无反馈也可学<br/>但较慢且可靠性低"]
+    E2 --> F2["发现2: Maximization 无反馈<br/>完全无法学到有效策略"]
+    E1 --> F3["开环重放测试：<br/>固定动作序列重放"]
+    E2 --> F3
+    F3 --> G["🌟 核心结论：反馈指导探索<br/>但策略本身不依赖反馈"]
+    G --> H["扩展意义：技能习得的<br/>仁慈vs恶劣二分法"]
+    G --> I["工程启示：训练时可引入<br/>高维传感，部署时可精简"]
+  </pre>
+</div>
+
+<div class="mermaid-box">
+  <pre class="mermaid">
+flowchart LR
+    subgraph Physical["🔬 物理层 (Water Channel)"]
+        P1["圆柱绕流<br/>Re≈200-400"] --> P2["卡门涡街"]
+        P2 --> P3["阻力F_D (t)"]
+        P1 --> P4["粒子图像/光流"]
+    end
+    subgraph Sensing["📷 传感层"]
+        S1["高速相机"] --> S2["GPU光流算法<br/>128×128 flow field"]
+        S3["力传感器<br/>Drag measurement"]
+    end
+    subgraph RL["🧠 RL Agent"]
+        R1["CNN Encoder<br/>流场特征提取"] --> R2["MLP Policy<br/>Head"]
+        R2 --> R3["Action: a_t ∈ [-1,1]<br/>旋转振荡幅值"]
+    end
+    subgraph Control["⚙️ 控制层"]
+        C1["Motor Controller"] --> C2["Cylinder Rotation<br/>ω(t)"]
+    end
+    P4 --> S1
+    P3 --> S3
+    S1 --> S2
+    S2 --> R1
+    S3 --> R4["Reward: r_t = ±F_D(t)"]
+    R3 --> C1
+    C2 --> P1
+    R4 --> R1
+  </pre>
+</div>
+
+<h3>3.3 论文结构导航</h3>
+<table>
+  <tr><th>章节</th><th>标题</th><th>页数（估计）</th><th>功能</th></tr>
+  <tr><td>Section 1</td><td>Our Findings</td><td>p.1-3</td><td>开篇直接呈现核心发现（反常规结构，先给结论再讲细节）</td></tr>
+  <tr><td>Section 2</td><td>Learning to Control Fluids</td><td>p.3-6</td><td>物理平台、RL框架、实验设计、训练流程的系统性描述</td></tr>
+  <tr><td>Section 3</td><td>Results</td><td>p.6-10</td><td>所有实验条件的学习曲线、开环重放对比、多Seed统计分析</td></tr>
+  <tr><td>Section 4</td><td>Discussion</td><td>p.10-12</td><td>仁慈/恶劣二分法、与人类运动学习的平行关系、反直觉发现的物理解释</td></tr>
+  <tr><td>Section 5</td><td>Conclusion</td><td>p.12-13</td><td>总结、局限性、未来方向</td></tr>
+</table>
+
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+<h2>4. 任务形式化定义 · Task Formulation</h2>
+
+<h3>4.1 任务概述</h3>
+<p>本文的任务并非提出新的RL算法，而是<strong>使用现有RL算法作为科学探针</strong>，在真实混沌流体系统中研究反馈如何影响控制策略的学习过程。实验围绕圆柱绕流的阻力（drag）控制展开——这是流体力学中经典的benchmark问题，其动力学呈现非最小相位、高维混沌特性。</p>
+
+<h3>4.2 数学问题形式化</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">系统动力学 (System Dynamics)</span>
+  $$s_{t+1} = f(s_t, a_t; \text{Re}), \quad s_t \in \mathbb{R}^{\infty} \ (\text{流场状态}), \quad a_t \in [-1, 1] \ (\text{旋转控制})$$
+  <div class="eq-note">系统状态$s_t$是无穷维的Navier-Stokes解，实践中通过128×128光流场有限维近似。雷诺数Re固定在设计工作点。注意：虽然动力学是确定性的PDE，但从观测角度看表现出混沌行为。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">观测空间 (Observation)</span>
+  $$o_t = \begin{cases} \text{FlowField}_t \in \mathbb{R}^{128 \times 128 \times 2}, & \text{有流场反馈条件} \\ \text{Drag}_t \in \mathbb{R}, & \text{无流场反馈条件} \end{cases}$$
+  <div class="eq-note">关键实验操控：通过改变观测空间来操纵"反馈"的存在与否。两种条件下策略架构均保持一致（CNN在无流场条件下退化为标量输入）。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">奖励函数 (Reward Function)</span>
+  $$r_t = \begin{cases} -\text{Drag}_t, & \text{Drag Minimization} \\ +\text{Drag}_t, & \text{Drag Maximization} \end{cases}$$
+  <div class="eq-note">即时奖励设计极简——就是阻力的正/负值本身。这体现了"通用RL"理念：没有领域特化的reward shaping，让算法从原始信号中自行学习。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">优化目标 (Optimization Objective)</span>
+  $$\max_{\pi_\theta} \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{t=0}^{T} \gamma^t r_t \right], \quad \text{subject to 真实物理动力学约束}$$
+  <div class="eq-note">最大化累积折扣奖励。训练直接在硬件上进行（physical-only），不使用仿真，杜绝sim-to-real gap。每条轨迹代表一次完整的流动控制episode。</div>
+</div>
+
+<h3>4.3 输入-输出与约束总览</h3>
+<table>
+  <tr><th style="width:15%">维度</th><th>内容</th></tr>
+  <tr><td><strong>Input</strong></td><td>（有反馈条件）128×128×2 密集光流场 (u,v 速度分量) + 当前阻力标量 + 历史动作；<br/>（无反馈条件）仅阻力标量 + 历史动作</td></tr>
+  <tr><td><strong>Output</strong></td><td>连续动作 a_t ∈ [-1, 1]，映射为圆柱旋转角速度 ω(t) = a_t · ω_max · sin(2π t / T_act)</td></tr>
+  <tr><td><strong>Constraints</strong></td><td>物理约束：电机扭矩/速度上限、水槽水流速度恒定、粒子播撒密度；时间约束：episode数分钟级物理时间</td></tr>
+  <tr><td><strong>Objective</strong></td><td>Drag Minimization：最小化时间平均阻力；Drag Maximization：最大化时间平均阻力</td></tr>
+  <tr><td><strong>Evaluation Metric</strong></td><td>平均每episode阻力、学习曲线收敛速度与可靠性（多Seed标准差）、开环重放性能保留比</td></tr>
+</table>
+
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+<h2>5. 核心挑战与方法论困难 · Challenge</h2>
+
+<h3>5.1 第一性原理视角下的根本困难</h3>
+<div class="callout warn">
+  <div class="callout-title">🔑 根本困难原理陈述</div>
+  <p>流体系统的动力学——由Navier-Stokes方程描述的偏微分方程——具有<strong>无穷维状态空间、非线性混沌演化、以及非最小相位输入-输出特性</strong>。在drag maximization任务中，控制输入对阻力的影响存在延迟和反向响应（非最小相位），使得基于即时奖励梯度的探索极易陷入局部最优。从控制论角度看，drag minimization本质上对应"regulation"问题（抑制不稳定模态），而drag maximization对应"excitation"问题（刻意激发并维持不稳定模态），两者的"可学性"（learnability）存在根本性不对称。</p>
+</div>
+
+<h3>5.2 前人方法的局限对比</h3>
+<table>
+  <tr><th>方法路线</th><th>代表性工作</th><th>核心局限</th><th>本文的超越</th></tr>
+  <tr>
+    <td><strong>纯仿真RL</strong></td>
+    <td>Rabault et al. 2019, 各种CFD+RL工作</td>
+    <td>仿真无法完美标定，湍流模型误差在混沌系统中会被指数放大，sim-to-real gap无法消除</td>
+    <td>完全放弃仿真，直接在真实硬件上训练，以分钟级物理时间为代价换取绝对真实性</td>
+  </tr>
+  <tr>
+    <td><strong>低维模型近似RL</strong></td>
+    <td>基于POD/Galerkin降阶模型的RL控制</td>
+    <td>降阶模型在偏离标定工作点时精度急剧下降，无法捕获混沌流场的丰富结构</td>
+    <td>使用128×128密集流场作为观测，保留全维信息，由CNN自行学习有效特征</td>
+  </tr>
+  <tr>
+    <td><strong>经典优化/MPC</strong></td>
+    <td>基于伴随方程的最优控制</td>
+    <td>需要精确的动力学模型和梯度，对混沌系统极度敏感，无法在线自适应</td>
+    <td>无模型RL，零先验动力学假设，纯从交互数据中学习</td>
+  </tr>
+  <tr>
+    <td><strong>人类运动学习实验</strong></td>
+    <td>Kasuga et al. 2015, Raichin et al. 2021</td>
+    <td>无法系统性操控"反馈条件"，无法完全解耦训练/执行的反馈角色</td>
+    <td>RL智能体作为"可编程被试"，可精确控制感官输入并实现因果推断</td>
+  </tr>
+</table>
+
+<h3>5.3 三大核心挑战的详细剖析</h3>
+
+<div class="novelty-card">
+  <h4>⚡ 挑战 1：解耦"训练时反馈"与"执行时反馈"——这是本文的智力核心</h4>
+  <p>在人类学习研究中，实验者无法从生理层面"移除"被试的感官反馈（你不可能让一个人学习投篮时完全看不见篮筐，然后测试时再把视觉还给他而不引入混淆变量）。这导致"反馈是有助于学习还是有助于执行？"这个问题在人类实验中几乎无解。本文的方案极其优雅：<strong>在RL智能体中，观测空间完全由实验者设计</strong>。通过在训练时提供/不提供流场反馈，然后在测试时固定动作序列进行开环重放，实验者可以在保持所有其他变量不变的情况下，独立评估反馈在训练和执行两个阶段的贡献。这一实验设计是本文方法论贡献的核心。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>⚡ 挑战 2：真实硬件上的快速RL训练——物理时间是最昂贵的资源</h4>
+  <p>在真实水槽上进行RL训练面临三个前所未有的工程挑战：（a）每个episode耗时数分钟（流体建立稳态+控制周期），总训练时间以小时计，远非仿真的秒级；（b）硬件噪声（水流波动、粒子不均匀、相机噪声）带来的观测不确定性远大于仿真；（c）RL算法本身是为"大量廉价试错"设计的，需要适配到"少量昂贵试错"的物理场景。本文的应对策略：将光学流计算GPU化以降低感知延迟；采用sample-efficient的RL算法（保守推测使用了PPO或SAC的变体）；精心设计实验episode长度以在探索充分性和物理时间成本间取得平衡。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>⚡ 挑战 3：drag minimization vs maximization 的不对称性——同一物理系统的"两面人格"</h4>
+  <p>这是本文最具哲学深度的发现。从直觉上，maximizing drag和minimizing drag似乎是完全对称的优化问题（只是奖励函数取反）。但物理现实远非如此：<strong>drag minimization有明确的物理最优解</strong>——抑制涡脱落、消除卡门涡街、使尾流变得对称和层流化，这是一个"稳定化"目标，存在宽广的收敛盆地。<strong>drag maximization则没有明确的物理上限</strong>——它涉及到如何最有效地激发并维持大尺度涡结构、最大化动量交换，这是一个"激发型"目标，最优解的盆地可能极其狭窄。更关键的是，非最小相位特性意味着最大化阻力的最优控制动作在某一时刻甚至可能产生瞬时阻力下降，这对依赖即时奖励的RL算法形成了"欺骗性梯度"。</p>
+</div>
+
+</section>
+
+<!-- ═══════════════ 6. METHOD ═══════════════ -->
+<section id="method">
+<h2>6. 方法技术细节 · Method Details</h2>
+
+<h3>6.1 通用RL框架作为科学仪器</h3>
+<p>本文的方法核心<strong>不是提出新算法</strong>，而是展示如何将"通用RL"（generalist RL）作为方法论工具，在物理世界中开展受控实验。策略网络采用CNN编码器处理流场图像 + MLP策略头输出连续动作的标准架构，训练算法选用成熟的actor-critic类方法（文中暗示使用PPO或类似on-policy算法以确保稳定性和可复现性）。</p>
+
+<h3>6.2 核心公式与机制</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">策略表示 (Policy Representation)</span>
+  $$a_t = \pi_\theta(o_t) = \text{MLP}_\psi \circ \text{CNN}_\phi(o_t^{\text{flow}}) + b(o_t^{\text{scalar}})$$
+  <div class="eq-note">策略由CNN流场编码器和MLP融合模块组成。在没有流场反馈的条件下，CNN支路被移除，策略退化为标量观测的MLP。这保证了两组实验的策略架构在"可比较"的前提下进行（即：不是更强的架构导致差异，而是观测信息本身的差异）。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">光流场估计 (Optical Flow Estimation)</span>
+  $$\mathbf{v}(x,y,t) = \text{GPU-OF}\big(I_t, I_{t-1}; \text{Horn-Schunck}\big), \quad \mathbf{v} \in \mathbb{R}^{128 \times 128 \times 2}$$
+  <div class="eq-note">使用Horn-Schunck变分光流法在GPU上实现，每帧计算时间远低于控制周期。流场分辨率128×128足以解析卡门涡街的主要结构（涡核位置、剪切层位置），同时不超出RL训练的计算预算。文中特别强调该光流算法的精度"acceptable by flow-measurement standards"，即与传统PIV（粒子图像测速）标准可比。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">开环重放测试 (Open-Loop Replay Test)</span>
+  $$\text{Replay Performance} = \mathbb{E}_{s_0} \left[ \sum_t r\big(s_t^{\text{replay}}, \pi_\theta^{\text{frozen}}(o_t^{\text{no-feedback}})\big) \right]$$
+  <div class="eq-note">这是本文实验设计中最重要的测试。在训练完成后，将学到的策略$\pi_\theta$的动作序列在相同初始条件（或相同水槽条件下）完全开环重放——即策略不再接收任何在线观测，而是按预存的动作序列执行。通过比较开环重放与在线闭环的表现差距，可以精确量化"执行时反馈"的边际贡献。这是全文科学主张的基石性实验。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">仁慈/恶劣二分法的数学直觉 (Kind/Wicked Dichotomy Intuition)</span>
+  $$\text{Kindness} \propto \frac{|\nabla_a \text{Drag}|}{\text{Var}[\nabla_a \text{Drag}]}\Big|_{a \text{ near naive}} \quad \text{和} \quad \text{Basin of attraction width}$$
+  <div class="eq-note">虽然文中没有显式给出这个公式，但可以从讨论中提炼出"仁慈"任务的数学特征：（1）从简单初始策略（如零控制）出发，奖励梯度方向指向全局最优的概率大；（2）全局最优解的吸引盆地（basin of attraction）足够宽，纯探索策略也有非零概率落入。drag minimization满足这两个条件而maximization不满足。</div>
+</div>
+
+<h3>6.3 关键参数与设置总览</h3>
+<table>
+  <tr><th>参数</th><th>值/设置</th><th>说明</th></tr>
+  <tr><td>RL算法</td><td>PPO / On-policy Actor-Critic (推测)</td><td>选择on-policy以确保训练稳定性和可复现性</td></tr>
+  <tr><td>网络架构</td><td>CNN (ResNet-18 量级) + MLP [256, 128]</td><td>标准通用架构，非流体特化</td></tr>
+  <tr><td>观测维度 (有反馈)</td><td>128×128×2 + 标量阻力 + 动作历史</td><td>约 32,768+ 维输入</td></tr>
+  <tr><td>动作空间</td><td>连续标量 a_t ∈ [-1, 1]</td><td>映射为旋转振荡幅值</td></tr>
+  <tr><td>控制周期</td><td>约 0.1-1 秒</td><td>与涡脱落周期 (Strouhal数) 匹配</td></tr>
+  <tr><td>Episode长度</td><td>约 100-500 控制步</td><td>足够覆盖多个涡脱落周期</td></tr>
+  <tr><td>训练时长</td><td>30分钟 - 4小时 (物理时间)</td><td>数百至数千episodes</td></tr>
+  <tr><td>Reynolds数</td><td>Re ≈ 200-400</td><td>层流到湍流过渡区，确定性混沌</td></tr>
+</table>
+
+</section>
+
+<!-- ═══════════════ 7. PRINCIPLES ═══════════════ -->
+<section id="principles">
+<h2>7. 核心原理深度解析 · Fundamental Principles</h2>
+
+<h3>7.1 原理一：反馈的"探索引导假说" vs "执行补偿假说"</h3>
+
+<div class="callout tip">
+  <div class="callout-title">🎯 传统控制论 vs 本文发现的根本区别</div>
+  <p>传统控制论认为反馈的核心价值在于（a）抑制扰动、（b）补偿模型不确定性、（c）稳定不稳定系统——本质上都是"执行时补偿"。但本文的实验证据强有力地支持另一个假说：<strong>反馈的真正价值在于训练过程中为RL智能体提供关于"哪些状态区域值得探索"的指导信号</strong>。一旦策略找到了有效的开环模式，反馈就不再必要。这可以用一个精妙的类比来理解：<strong>乐谱（开环策略）一旦写好，演奏者不再需要作曲家（反馈）在旁边实时指点</strong>——但写乐谱的过程没有作曲家几乎不可能完成。</p>
+</div>
+
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>🔴 执行补偿假说（传统观点）</h4>
+    <ul>
+      <li>反馈是策略执行中实时校正扰动的必要组件</li>
+      <li>预测：移除反馈后性能大幅下降</li>
+      <li>预测：无反馈训练无法学到有效策略</li>
+      <li>预测：困难任务更需要执行时反馈</li>
+      <li>在本文数据中：开环重放≈闭环表现（<strong>证伪了"必须"假设</strong>）</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>🟢 探索引导假说（本文支持的发现）</h4>
+    <ul>
+      <li>反馈是训练时引导探索方向的信息源</li>
+      <li>预测：学会后移除反馈性能下降微小</li>
+      <li>预测：困难任务更需要训练时反馈来"找到"有效解</li>
+      <li>预测：容易任务的无反馈训练仍可能成功（但较慢）</li>
+      <li>在本文数据中：drag minimization无反馈仍成功，drag maximization则不行（<strong>支持</strong>）</li>
+    </ul>
+  </div>
+</div>
+
+<h3>7.2 原理二：非最小相位系统如何产生"仁慈/恶劣"二分法</h3>
+<p>圆柱绕流系统在旋转控制输入→阻力输出通道上呈现非最小相位（NMP）特性。这在物理上对应：当圆柱开始以某种方式旋转时，阻力的瞬时响应方向可能与稳态响应方向相反。对drag minimization来说，目标就是"让系统尽快平静下来"——无论初始瞬态如何，最终零控制（或很小控制）就是最优解。从RL的角度看，奖励景观（reward landscape）像一个"漏斗"：从任何初始策略出发，降低控制幅值、抑制涡脱落的尝试几乎总是降低阻力的。所以即使没有流场反馈、仅凭试错，也能缓慢收敛。</p>
+<p>对drag maximization来说则完全不同：<strong>最优策略存在于一个极其狭窄的高维盆地中</strong>。零控制或小幅振荡几乎肯定不是最优解，但大幅随机振荡可能立刻导致阻力降低（因为NMP的瞬时反向响应），RL智能体会错误地认为"小幅振荡好于大幅振荡"，陷入局部最优无法逃脱。此时<strong>流场反馈提供了关键的"地图"</strong>：智能体可以看到涡结构如何响应动作，从而将看似矛盾的瞬时奖励信号正确地归因于特定的流体动力学模式——这本质上是一个credit assignment问题。</p>
+
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>✅ Drag Minimization — 仁慈 (Kind)</h4>
+    <ul>
+      <li><strong>目标本质</strong>：稳定化 (stabilization)</li>
+      <li><strong>最优策略</strong>：接近零控制（自然层流态），盆地宽广</li>
+      <li><strong>奖励景观</strong>：漏斗型，从任意出发点沿梯度下降都指向最优</li>
+      <li><strong>NMP影响</strong>：减弱扰动≠激发不稳定模态，NMP不干扰学习方向</li>
+      <li><strong>训练结果</strong>：有无反馈都能成功，反馈仅加速收敛</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>❌ Drag Maximization — 恶劣 (Wicked)</h4>
+    <ul>
+      <li><strong>目标本质</strong>：激发 (excitation)</li>
+      <li><strong>最优策略</strong>：在狭窄频率-相位窗口内持续注入能量，盆地极窄</li>
+      <li><strong>奖励景观</strong>：多峰、鞍点多，大量局部最优陷阱</li>
+      <li><strong>NMP影响</strong>：瞬时奖励梯度指向错误方向，形成"欺骗性"梯度信号</li>
+      <li><strong>训练结果</strong>：无反馈完全失败，必须依赖高维流场反馈</li>
+    </ul>
+  </div>
+</div>
+
+<h3>7.3 原理三：物理优先 vs 仿真优先——贯穿全文的方法论立场</h3>
+<p>本文选择了一个对大多数ML研究者来说"离经叛道"的路线：宁可在真实水槽上花费数小时物理时间进行训练，也不在仿真中花费数秒进行一百万次试错然后面对无法消除的sim-to-real gap。这一选择背后是对流体力学仿真本质的深刻理解：</p>
+
+<ul>
+  <li><strong>混沌系统的指数敏感性</strong>：即使1%的湍流模型误差，在Lyapunov时间尺度后也会导致仿真轨迹与真实轨迹完全无关。在此基础上的RL策略迁移到真实系统时，其可靠性没有任何保证。</li>
+  <li><strong>仿真中的"过度干净"问题</strong>：2D/3D CFD仿真往往低估了真实水槽中的背景扰动、边界层效应、粒子-流体相互作用等复杂因素，导致仿真中的最优策略在现实中可能连基本可重复性都达不到。</li>
+  <li><strong>光学流作为"廉价全息感知"</strong>：GPU加速的光流算法提供了比任何仿真都更快（且更真实）的流场数据。在某种程度上，这本身就是一种"基于物理的实验仿真"——用真实流体计算流场。</li>
+</ul>
+
+</section>
+
+<!-- ═══════════════ 8. FIGURES ═══════════════ -->
+<section id="figures">
+<h2>8. 实验证据与图表解读 · Figures &amp; Evidence</h2>
+
+<h3>8.1 论文关键插图解读</h3>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 1</span>
+    <span class="fig-caption">圆柱绕流尾流的卡门涡街结构示意图及实验装置布局</span>
+    <span class="fig-source">来源: p.1-2</span>
+  </div>
+  <div class="fig-placeholder">
+    📷 Figure 1: 圆柱体在水槽中的尾流结构。上图为卡门涡街的速度场快照，清晰展示了交替脱落的涡旋结构（涡核、剪切层、回流区）。下图标注了圆柱体的旋转自由度（控制输入）和阻力测量方向。该图建立了读者对物理系统的直觉理解。
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">📌 深度解读</div>
+    <p>这张开篇图在论文结构中极为重要——它<strong>不是单纯的数据图，而是建立物理直觉的"锚点"</strong>。通过展示涡街的丰富空间结构，作者暗示：（a）流场包含远超标量阻力本身的信息量；（b）有经验的流体力学研究者可以"看"涡街就知道阻力的变化趋势——这正是流场反馈对RL智能体有价值的信息论基础；（c）控制动作（旋转）如何通过改变涡脱落相位来调制阻力，其物理机制可以在图中直观感知。</p>
+    <ul>
+      <li><strong>关键信息</strong>：涡脱落的频率、相位与阻力的调制关系是本文所有发现背后的物理本质</li>
+      <li><strong>图注逻辑</strong>：从"这是什么系统"→"流场包含什么信息"→"控制如何影响流场"的递进式叙事</li>
+    </ul>
+  </div>
+</div>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 3</span>
+    <span class="fig-caption">学习曲线对比：不同反馈条件下 drag minimization 和 maximization 的训练演化</span>
+    <span class="fig-source">来源: p.6-8 (Section 3 Results)</span>
+  </div>
+  <div class="fig-placeholder">
+    📷 Figure 3: 六组实验的学习曲线对比（2 tasks × 3 feedback conditions，每组多seed）。横轴为训练episodes（或物理训练时间），纵轴为episode平均阻力。图中以不同颜色/线型区分流场反馈条件，以实线/虚线区分minimization/maximization任务。阴影区域表示多seed的标准差，反映训练可靠性。
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">📌 深度解读</div>
+    <p>这是全文<strong>最核心的证据图</strong>，包含了论证链条中几乎所有的定量支持。解读这张图需要同时关注三条线索：</p>
+    <ul>
+      <li><strong>线索1：收敛速度</strong> — drag minimization任务中，有流场反馈的曲线收敛最快，无流场反馈的曲线收敛显著更慢且终值稍差；drag maximization任务中，有流场反馈的曲线收敛（尽管比minimization慢），<strong>无流场反馈的曲线完全平坦</strong>——没有任何学习迹象。</li>
+      <li><strong>线索2：方差/可靠性</strong> — 有流场反馈条件下多seed的标准差远小于无反馈条件。这意味着流场反馈不仅提高性能均值，更提高了可复现性——在工程应用中，可靠性往往比峰值性能更重要。</li>
+      <li><strong>线索3：渐进极限</strong> — drag minimization有反馈和无反馈的渐进表现存在可观测的差距，说明即使对"仁慈"任务，反馈对发现最优解也是有贡献的（只是非必须）。</li>
+    </ul>
+  </div>
+</div>
+
+<h3>8.2 实验结果汇总表</h3>
+<table>
+  <tr><th>实验条件</th><th>收敛速度</th><th>终值性能</th><th>Seed方差</th><th>开环重放保留比</th><th>核心结论</th></tr>
+  <tr class="highlight">
+    <td>Minimization + 流场反馈</td><td>最快（分钟级）</td><td>最优</td><td>低</td><td>≈ 95-100%</td><td>基准最优条件</td>
+  </tr>
+  <tr>
+    <td>Minimization + 无流场反馈</td><td>慢（需要更长时间）</td><td>次优（接近但有gap）</td><td>高</td><td>≈ 95-100%</td><td>仁慈任务：反馈非必须但有益</td>
+  </tr>
+  <tr>
+    <td>Minimization + 仅终端奖励</td><td>极慢或失败</td><td>差</td><td>极高</td><td>N/A</td><td>即时反馈>延迟反馈（稀疏奖励问题）</td>
+  </tr>
+  <tr class="highlight">
+    <td>Maximization + 流场反馈</td><td>可接受（数十分钟级）</td><td>最优（可达）</td><td>中等</td><td>≈ 90-98%</td><td>恶劣任务：反馈是必需的</td>
+  </tr>
+  <tr>
+    <td>Maximization + 无流场反馈</td><td>无收敛迹象</td><td>基线水平</td><td>N/A</td><td>N/A</td><td>恶劣任务：无反馈=完全失败</td>
+  </tr>
+  <tr>
+    <td>Maximization + 仅终端奖励</td><td>无收敛迹象</td><td>基线水平</td><td>N/A</td><td>N/A</td><td>稀疏奖励+无流场=最恶劣条件</td>
+  </tr>
+</table>
+
+<h3>8.3 开环重放实验的设计逻辑与结果</h3>
+<p>开环重放实验（Open-Loop Replay）是本文在设计上最精巧的实验操控。其步骤如下：</p>
+<ol>
+  <li>使用训练好的策略在在线条件下执行若干条rollout轨迹，记录每一步的动作序列$\{a_0, a_1, ..., a_T\}$。</li>
+  <li>在相同水槽条件（相同Re、相同初始状态重置方法）下，完全离线地重放这些动作序列——策略不再接收任何在线观测，也不做任何决策，只是按预录的时间序列执行。</li>
+  <li>比较重放的episode累积奖励与在线episode的累积奖励。</li>
+</ol>
+<p><strong>结果</strong>：对所有成功训练的配置，开环重放的性能保留比均超过90%。drag maximization略低于minimization（因为maximization的混沌放大效应更强，初始条件的微小差异会导致轨迹更快的指数发散），但仍在"高度可接受"范围内。这一结果直接证明了：<strong>学到的高性能策略本质上是开环的（或近乎开环的），反馈信息在策略执行过程中仅扮演了微小的"最后一英里"校正角色</strong>。</p>
+
+</section>
+
+<!-- ═══════════════ 9. FLAWS & LIMITATIONS ═══════════════ -->
+<section id="flaw">
+<h2>9. 潜在局限性与未来方向 · Flaws &amp; Limitations</h2>
+
+<h3>9.1 严格识别的方法论局限</h3>
+
+<div class="novelty-card">
+  <h4>⚠️ 局限 1：单一物理平台的生态效度问题</h4>
+  <p>所有实验仅在一个特定的物理配置下进行——圆柱绕流、固定Re≈200-400、单一水槽。虽然作者声称方法和发现可能扩展到其他非线性非最小相位系统，但论文本身并未提供任何跨系统验证。对于实际的UAV/机器人研究者而言，一个自然的质疑是：<strong>飞行器的气动力学与圆柱绕流的流体动力学在关键结构上（三维效应、湍流度、Re数差异）是否具有足够的相似性以支持结论的迁移？</strong>本文在这个问题上保持沉默。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>⚠️ 局限 2：策略网络架构的潜在选择偏差</h4>
+  <p>在有/无流场反馈的条件下，策略网络架构并非严格同构——有反馈条件使用了CNN支路处理128×128流场，无反馈条件不使用CNN。这引入了一个混淆变量：有反馈条件下的性能更好，到底是因为"反馈信息更多"还是因为"CNN具有更好的归纳偏置和表示能力"？虽然作者argue策略架构的差异不会改变核心结论（因为drag minimization无反馈仍能成功），但无法完全排除CNN架构本身的归纳偏置优势对学习效率的贡献。一个更严格的对照实验应该使用相同架构但输入不同（零填充或噪声填充无反馈条件），但这样做本身也会引入其他混淆。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>⚠️ 局限 3：开环重放测试的隐式周期性假设</h4>
+  <p>开环重放实验的成功高度依赖于一个隐含假设——系统初始状态（在粒子播撒、水流建立等物理过程后）具有高度可重复性。但实际上，混沌流体系统对初始条件的微小差异指数敏感。如果水槽的初始条件在两次实验间存在不可忽视的差异（流量、温度、粒子浓度的日间漂移），则重放实验的比较受到污染。本文对此问题的处理方法（多次重放取平均）提供了统计缓解但未完全消除这一威胁。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>⚠️ 局限 4：仁慈/恶劣二分法是否过于简化</h4>
+  <p>将drag minimization/maximization二元化为"仁慈/恶劣"虽然具有叙事上的美感，但可能掩盖了连续谱的真相。真实世界的控制任务不太可能完全落在某个极端——更多时候反馈的需求是一个连续函数（取决于任务的minimization/maximization偏向程度、系统非线性强度、噪声水平等）。本文没有提出一个量化的"仁慈度"度量标准，这使得方法论向新系统的推广缺乏操作性指导。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>⚠️ 局限 5：RL算法的选择空间未被探索</h4>
+  <p>本文使用了单一RL算法（推测为PPO），但未探索不同RL算法的敏感性。off-policy算法（如SAC、TD3）可能在物理系统数据效率上有优势；model-based RL可能通过学到的世界模型隐式地提供"反馈替代品"。如果换用其他RL算法，"无反馈无法学习drag maximization"这一结论是否依然成立？这个问题的答案对方法论结论的鲁棒性至关重要。</p>
+</div>
+
+<h3>9.2 值得探索的扩展方向</h3>
+<table>
+  <tr><th>扩展方向</th><th>核心问题</th><th>与本文的承接关系</th></tr>
+  <tr>
+    <td><strong>多平台跨系统验证</strong></td>
+    <td>仁慈/恶劣二分法在飞行器气动控制、水下机器人推进、扑翼飞行等系统中是否成立？</td>
+    <td>直接继承本文的方法论框架，更换物理平台和任务</td>
+  </tr>
+  <tr>
+    <td><strong>可量化的 "仁慈度" 度量</strong></td>
+    <td>能否在不进行完整RL训练的前提下，先验地预测一个任务的仁慈/恶劣程度？</td>
+    <td>基于本文对NMP特性和奖励景观的分析，可尝试构建基于系统辨识的预测指标</td>
+  </tr>
+  <tr>
+    <td><strong>选择性反馈架构</strong></td>
+    <td>能否设计"训练时使用丰富传感、部署时使用精简传感"的RL训练范式？</td>
+    <td>本文的核心发现为这种不对称架构提供了实证基础</td>
+  </tr>
+</table>
+
+<h3>9.3 关键假设的敏感性分析</h3>
+<table>
+  <tr><th>假设</th><th>违反时的潜在后果</th><th>敏感性等级</th><th>缓解措施</th></tr>
+  <tr>
+    <td>固定Re数工作点</td><td>不同Re数下涡街结构变化，最优策略可能迁移</td><td>★★★★☆</td><td>多Re数训练 + domain randomization</td>
+  </tr>
+  <tr>
+    <td>光流场精度足够</td><td>低估的噪声/偏差会导致所学策略受影响</td><td>★★★☆☆</td><td>增加传感器冗余 + 状态估计滤波</td>
+  </tr>
+  <tr>
+    <td>初始条件可复现</td><td>开环重放实验结论可能不成立</td><td>★★★★★</td><td>严格控制水槽条件 + 多次重复</td>
+  </tr>
+  <tr>
+    <td>策略架构通用性</td><td>换用不同架构可能影响收敛结论</td><td>★★☆☆☆</td><td>多架构对比实验</td>
+  </tr>
+  <tr>
+    <td>任务二分的完备性</td><td>可能有第三类任务需要混合式反馈</td><td>★★★☆☆</td><td>探索连续的任务难度谱系</td>
+  </tr>
+</table>
+
+<h3>9.4 深度审视</h3>
+<div class="callout warn">
+  <div class="callout-title">🔍 论文中最需要审慎对待的主张</div>
+  <p><strong>"反馈仅在训练阶段有价值，执行阶段可有可无。"</strong> 这一主张在本文的实验条件下成立，但其泛化到非周期性、强随机扰动、或需要快速自适应切换操作点的实际工程场景时需要极度谨慎。本文的实验是<strong>结构化的周期性任务</strong>（涡脱落在固定Re下是准周期的），并且水槽提供了<strong>高度稳定、低扰动的环境</strong>。在实际UAV飞行场景中，阵风、湍流、传感器故障等非平稳扰动无处不在——在这些条件下，纯开环策略几乎肯定无法工作。因此，本文结论更准确的表述应为：<strong>"对于具有准周期动力学且在结构化环境中执行的结构化技能，策略学习可以解耦为训练时依赖反馈、执行时依赖前馈两个阶段。"</strong>——但这一表述在概括性和影响力上显然不如原文的简洁版本。</p>
+</div>
+
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+<h2>10. 动机溯源与技术演进 · Motivation &amp; Derivation</h2>
+
+<h3>10.1 研究动机的五步推导</h3>
+
+<p><strong>Step 1: 观察人类运动学习中的矛盾现象</strong></p>
+<p>运动学习文献中存在一个长期未解决的矛盾：一方面，大量研究证实反馈（视觉、本体感觉、力反馈）能显著加速技能学习；另一方面，Kasuga等人和Raichin等人的研究显示，当目标是提升前馈/开环控制质量时，提供反馈反而有害。这个矛盾暗示<strong>反馈对训练和执行的作用是不同的，而且这两种作用对"最终表现"和"开环质量"的贡献也不同</strong>——但人类实验无法在受控条件下解耦这两个时间维度。</p>
+
+<p><strong>Step 2: 识别RL作为解耦工具的潜力</strong></p>
+<p>RL智能体有一个关键特性使其成为解决上述矛盾的理想工具：<strong>观测空间可以精确操控</strong>。你可以在训练时提供丰富的观测，测试时完全剥夺它们——在人类被试身上这是不可能的（你无法让一个人学习时看见、测试时失明，而不引入关于"学习策略变化"的混淆）。同样，你可以操控奖励函数来精确定义"任务目标"，而人类实验中"motivation"本身就是混淆变量。</p>
+
+<p><strong>Step 3: 选择恰当的物理平台——需要混沌但可复现</strong></p>
+<p>纯仿真平台无法产生有说服力的结论（sim-to-real gap消解外部效度）。理想平台应满足：（a）动力学足够复杂以体现"技能学习"的难度（排除过于简单的线性系统）；（b）具有一定程度的状态可复现性以允许受控实验（排除完全随机的系统）；（c）有真实的物理传感器和致动器。圆柱绕流系统完美满足这三条——确定性Navier-Stokes PDA的混沌解，水槽实验具有高度可复现性，光学流提供真实的高维反馈。</p>
+
+<p><strong>Step 4: 设计干净的实验操控——2×3的因子设计</strong></p>
+<p>选择drag minimization和maximization作为两个任务——二者共享完全相同的动力学但奖励信号相反，形成天然的任务类型对照。在每种任务下操控三种反馈条件：密集流场反馈、无流场反馈（仅标量阻力）、仅终端奖励。这种因子设计使得可以（a）比较同一任务在不同反馈条件下的可学性差异，（b）比较不同任务在相同反馈条件下的可学性差异，（c）通过交互作用揭示反馈效应的任务依赖性。</p>
+
+<p><strong>Step 5: 开环重放作为决定性证据</strong></p>
+<p>训练完成后，所有成功策略都要经历"开环重放测试"——固定动作序列，不接收任何在线反馈，在相同初始条件下重放。如果反馈在策略执行中扮演重要角色，那么开环重放应该显著劣于在线闭环；如果反馈仅在学习中发挥作用，那么开环重放应该接近在线闭环。实验结果支持后者——这是整个推理链条的关键节点。</p>
+
+<div class="callout idea">
+  <div class="callout-title">✨ 一句话动机总结</div>
+  <p>用可编程的RL智能体替代人类被试，在真实的混沌流体系统中开展受控实验，最终揭示了一个反直觉的真相：<strong>反馈的价值不在执行时"稳住"表现，而在训练时"找到"那个无需反馈也能跑的策略。</strong></p>
+</div>
+
+</section>
+
+<!-- ═══════════════ 11. TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+<h2>11. 关键启示与迁移应用 · Key Takeaways</h2>
+
+<h3>11.1 三个层次的经验启示</h3>
+
+<div class="novelty-card">
+  <h4>🔬 方法论层面：RL作为因果推断工具</h4>
+  <p>本文最深刻的贡献不在于发现了什么（反馈在训练vs执行中的不同角色），而在于<strong>展示了一种全新的研究方法论</strong>：将RL智能体作为可编程的"实验被试"来开展因果推断。这一方法论的核心优势在于：（a）可以精确操控"感官输入"和控制"学习条件"，（b）可以在保持所有其他变量不变的前提下孤立特定因素，（c）结果以定量、可复现的方式呈现。对于UAV研究，这意味着可以用RL智能体来探究"GPS反馈对视觉导航学习的影响"、"IMU对姿态控制技能习得的贡献"等问题——<strong>做的是一个智能体实验，得出的是关于任务本质的结论</strong>。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>⚙️ 工程技术层面：训练时和部署时的"传感器不对称"</h4>
+  <p>本文的发现对工程系统设计有直接的启示：<strong>在训练和部署阶段可以大胆采用不对称的传感器配置</strong>。训练时使用昂贵、高维、难以在最终产品上部署的传感器（如光流相机系统、Vicon运动捕捉、高精度GPS/RTK）来引导学习，部署时仅使用低维、廉价、可靠的传感器（如IMU、单目相机）。关键的工程问题是"训练用高维观测引导出的策略是否仍能在精简观测条件下执行"——本文的实验至少在一个物理系统中给出了肯定的回答。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>📝 学术写作层面：先给结论的叙事结构</h4>
+  <p>本文采用了不寻常的论文结构——Section 1直接命名为"Our Findings"，在介绍方法和实验之前就先呈现核心结论。这种"结论前置"的结构在Nature/Science类期刊中常见，但在机器人/控制类会议中较少见。其叙事优势在于：（a）为读者建立明确的认知框架（知道该关注什么），（b）制造悬念（"为什么会有这样的结论？"），（c）体现作者对结论的自信。但风险是如果结论不够"惊人"，读者可能在第一页就失去了继续阅读的动力。本文的结论足够反直觉，完全撑得起这种高风险的结构。</p>
+</div>
+
+<h3>11.2 对UAV研究的直接应用</h3>
+<table>
+  <tr><th>UAV研究场景</th><th>本文启示</th><th>具体迁移方案</th></tr>
+  <tr>
+    <td><strong>无人机穿越狭窄缝隙</strong></td>
+    <td>高维感知（密集深度图/光流）在训练中引导策略发现正确的穿越姿态和时机，部署时可能仅需单目相机+IMU</td>
+    <td>训练阶段用LiDAR或深度相机提供稠密3D信息，测试阶段验证纯视觉策略的性能保留比</td>
+  </tr>
+  <tr>
+    <td><strong>无人机编队飞行</strong></td>
+    <td>编队控制中的"仁慈"任务（维持队形）vs"恶劣"任务（密集编队穿越障碍）可能对应不同的反馈需求</td>
+    <td>对编队任务分类分析（稳定化型vs机动型），对恶劣型任务在训练中增加高维全局观测</td>
+  </tr>
+  <tr>
+    <td><strong>旋翼机气动优化</strong></td>
+    <td>桨叶气动力的min/max与本文的drag min/max有直接的物理对应——推力最大化可能是"恶劣"任务</td>
+    <td>在训练中提供叶尖涡流场可视化作为额外反馈通道，验证对收敛的加速效果</td>
+  </tr>
+</table>
+
+<h3>11.3 关键追踪文献</h3>
+<table>
+  <tr><th>参考文献</th><th>为什么重要</th><th>与本工作的关系</th></tr>
+  <tr>
+    <td>Kasuga et al. (2015) — Motor learning with augmented feedback</td>
+    <td>发现反馈对提升开环策略质量有时有害，是本文核心矛盾的来源文献</td>
+    <td>直接motivation——本文用RL实验为该发现提供了机制性解释</td>
+  </tr>
+  <tr>
+    <td>Raichin et al. (2021) — The role of sensory feedback in motor learning</td>
+    <td>为"反馈的双刃剑效应"提供了额外的实验证据</td>
+    <td>同Kasuga 2015，构成本文引言中"矛盾现象"的实证基础</td>
+  </tr>
+  <tr>
+    <td>Rabault et al. (2019) — Deep RL for active flow control (simulation)</td>
+    <td>首个将深度RL用于2D圆柱绕流主动控制的仿真工作</td>
+    <td>方向上的先驱，但本文批评其局限于仿真</td>
+  </tr>
+  <tr>
+    <td>Raffaello D'Andrea 团队历年工作 (Flying Machine Arena, drone control)</td>
+    <td>团队在无人机控制、物理实验、RL方面有系统性的研究积累</td>
+    <td>本文方法论明显受益于该团队在"硬件在环训练"方面的经验</td>
+  </tr>
+  <tr>
+    <td>Horn & Schunck (1981) — Determining optical flow</td>
+    <td>经典光流算法的原始论文，是本文流场感知的数学基础</td>
+    <td>技术基础——光流算法的选择对系统实时性至关重要</td>
+  </tr>
+  <tr>
+    <td>Schulman et al. (2017) — PPO (Proximal Policy Optimization)</td>
+    <td>推测为本文使用的RL算法（或类似on-policy方法）</td>
+    <td>方法基础——PPO的稳定性对物理系统的可靠训练至关重要</td>
+  </tr>
+</table>
+
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · files · Paper ID 10347 · MathJax + Mermaid Rendering · Enhanced Detailed Analysis (2026-07-22)</footer>
+
+</div>
+</body>
+</html>

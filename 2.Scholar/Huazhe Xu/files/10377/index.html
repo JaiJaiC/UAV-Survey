@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - One-Policy-Fits-All: Geometry-Aware Action Latents for Cross-Embodiment Manipulation</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="container">
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §1  Paper Info -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="info">
+<h2>§1. 论文信息</h2>
+<h1>One-Policy-Fits-All: Geometry-Aware Action Latents for Cross-Embodiment Manipulation</h1>
+
+<table>
+  <tr><td style="width:140px;font-weight:700;">作者</td><td>Mu et al. (Huazhe Xu group)</td></tr>
+  <tr><td style="font-weight:700;">发表年份</td><td>2026</td></tr>
+  <tr><td style="font-weight:700;">研究类型</td><td>跨机械手形态 (Cross-Embodiment) 机器人操作</td></tr>
+  <tr><td style="font-weight:700;">核心方法</td><td>GaLR — Geometry-Aware Latent Representation（几何感知潜动作表示）</td></tr>
+  <tr><td style="font-weight:700;">测试硬件</td><td>11 种末端执行器：Inspire Hand、XHand、多种二指夹爪等</td></tr>
+  <tr><td style="font-weight:700;">任务数量</td><td>14 个操作任务（倒液 pouring、扫动 sweeping、抽屉 drawer、精细物体交互等）</td></tr>
+  <tr><td style="font-weight:700;">训练范式</td><td>两阶段训练：Stage 1 几何自编码器预训练潜空间 → Stage 2 Diffusion Policy 在潜空间中去噪</td></tr>
+  <tr><td style="font-weight:700;">关键洞察</td><td>跨机械手可共享的不是电机命令，而是末端执行器在三维空间可达的几何状态</td></tr>
+  <tr><td style="font-weight:700;">本地文件</td><td><a href="Mu et al. - 2026 - One-policy-fits-all Geometry-aware action latents for cross-embodiment manipulation.pdf">Mu et al. - 2026 - One-policy-fits-all Geometry-aware action latents for cross-embodiment manipulation.pdf</a></td></tr>
+</table>
+
+<div class="tags">
+  <span class="tag tag-blue">Cross-Embodiment</span>
+  <span class="tag tag-purple">GaLR 几何潜空间</span>
+  <span class="tag tag-green">Diffusion Policy</span>
+  <span class="tag tag-amber">11 种末端执行器</span>
+  <span class="tag tag-red">2026 Huazhe Xu Group</span>
+  <span class="tag tag-cyan">Few-Shot Transfer</span>
+  <span class="tag tag-gray">Imitation Learning</span>
+</div>
+
+<div class="callout info">
+  <div class="callout-title">TL;DR 一句话总结</div>
+  <p><strong>OPFA (One-Policy-Fits-All)</strong> 不把不同机械手的关节向量直接拼到同一动作空间，而先用各自可达状态的点云描述几何能力，再学习一个共享的 <strong>Geometry-Aware Latent Representation (GaLR)</strong>。在这个几何潜空间中进行 Diffusion 去噪生成统一动作表示，最后通过 embodiment-conditioned 解码器映射回各机械手的实际关节命令。核心思想：<strong>把"操作什么几何效果"（what geometry to achieve）与"如何驱动电机实现它"（how to actuate）解耦</strong>。</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §2  Insight & Novelty -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="insight">
+<h2>§2. 核心洞察与创新点</h2>
+
+<h3>2.1 核心洞察 — 问答形式</h3>
+
+<div class="callout info">
+  <p><strong>Q: 为什么一个策略能控制 11 种完全不同的机械手？</strong></p>
+  <p><strong>A:</strong> 因为不同末端执行器的 <strong>关节空间（joint space）不可对齐，但它们的可达几何状态空间（reachable geometric state space）存在天然交集</strong>。无论是五指灵巧手还是二指夹爪，抓取杯子时都需要到达杯壁附近的三维位置并施加特定方向的接触——这一"几何意图"是跨形态通用的。OPFA 的做法是：先学习一个<strong>设备无关的几何潜空间</strong>来描述"末端执行器要在空间中形成什么几何构型"，然后在潜空间里训练统一的 Diffusion Policy，最后用<strong>设备相关的解码器</strong>把几何潜变量翻译成各机械手的关节角度。这就好比一个翻译系统：中间语言（interlingua）表达语义，各语言编码器/解码器负责具体文字。</p>
+</div>
+
+<h3>2.2 灵感来源映射表</h3>
+
+<table>
+  <thead>
+    <tr><th style="width:35%;">来源技术 / 概念</th><th style="width:35%;">原文中的角色</th><th style="width:30%;">如何启发 OPFA</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PointNet / 点云几何编码</td>
+      <td>将每种末端执行器的可达状态采样为三维点云，通过 PointNet 类架构提取几何特征（superpoint / global feature）</td>
+      <td>把异构关节空间统一投射到<strong>三维欧氏空间</strong>——这是所有机械手共享的物理坐标系</td>
+    </tr>
+    <tr>
+      <td>Diffusion Policy (Chi et al., 2023)</td>
+      <td>在共享潜空间中对动作序列进行去噪生成，而非在原始关节空间中操作</td>
+      <td>提供<strong>表达力强、多模态的动作分布建模</strong>，且天然适合连续潜空间</td>
+    </tr>
+    <tr>
+      <td>Cross-Embodiment 数据聚合（RT-X, Octo）</td>
+      <td>将分散在不同机械手上的示范数据联合利用，而非各训各的</td>
+      <td>论证了<strong>跨形态数据共享的必要性</strong>，但指出现有方法缺乏真正的形态无关表示</td>
+    </tr>
+    <tr>
+      <td>自编码器潜空间（VAE / Autoencoder）</td>
+      <td>几何自编码器通过重建可达状态点云来学习紧凑的几何潜表示</td>
+      <td>提供<strong>无监督表示学习框架</strong>，使得潜空间仅依赖几何结构而非任何具体关节参数化</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>2.3 三大创新点</h3>
+
+<div class="novelty-card">
+  <h4>创新点 1: 几何可达状态作为跨形态通用接口</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>不同末端执行器的关节空间维度不同（灵巧手可能 20+ DoF，二指夹爪仅 1 DoF），无法定义统一的动作空间进行联合训练。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>观察到所有机械手都在三维空间中操作——无论自由度多少，最终影响环境的都是末端在空间中的几何构型。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>对每种 embodiment $e_k$，通过运动学采样生成其可达状态点云 $\mathcal{P}_k \subset \mathbb{R}^3$，用几何编码器 $f_{\text{geo}}$ 将其映射到共享潜向量 $z \in \mathbb{R}^d$。这使得不同形态的动作"对齐"发生在三维几何层面而非关节层面。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>创新点 2: 两阶段解耦训练——先学几何，再学策略</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>如果直接端到端训练跨形态策略，梯度信号会同时被几何表示不准确和策略次优两种误差污染，导致训练不稳定且潜空间坍缩。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>借鉴表示学习中"先预训练再下游任务"的范式（如 BERT、MAE），使几何表示独立于具体控制策略得到充分学习。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>Stage 1 仅训练几何自编码器（编码器-解码器），优化目标是：给定 embodiment 条件，从潜变量 $z$ 重建其可达状态点云。此阶段策略网络不参与。Stage 2 冻结几何编码器，仅训练 Diffusion Policy 和 embodiment 解码器。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>创新点 3: Embodiment-Conditioned 统一解码器</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>同一几何潜变量 $z$（如"手指围成一个直径 5 cm 的圆环"）在不同机械手上需要映射到完全不同的关节角度序列。若每种手独立训练解码器，则无法利用跨形态数据的统计强度。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>条件生成模型——将 embodiment identity 作为条件输入，使单一解码器学会"根据当前手的特点解释同一个几何意图"。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>解码器 $g_\phi(z, e_k)$ 接受共享潜变量 $z$ 和 embodiment 编码 $e_k$（如 one-hot 或 learnable embedding），输出该 embodiment 对应的关节动作 $\hat{a}_k$。所有 11 种末端执行器共享同一个解码器权重，仅通过 $e_k$ 切换行为模式。</div>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §3  Architecture -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="architecture">
+<h2>§3. 系统架构</h2>
+
+<h3>3.1 架构全景面板</h3>
+
+<div class="arch-panel">
+  <div class="arch-grid">
+    <!-- Stage 1 -->
+    <div class="arch-stage">
+      <h4>Geometry Encoding <span>Stage 1 (预训练)</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>可达状态采样</strong>
+        <small>对每种末端执行器 $e_k$，通过运动学随机采样生成 $\sim$10K 个可达关节配置，正运动学转为三维点云 $\mathcal{P}_k \subset \mathbb{R}^3$</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>点云编码器 $f_{\text{geo}}$</strong>
+        <small>PointNet++ / Transformer 将 $\mathcal{P}_k$ 编码为几何潜向量 $z \in \mathbb{R}^{128}$（维度与关节数无关）</small>
+      </div>
+    </div>
+    <!-- Stage 2 -->
+    <div class="arch-stage">
+      <h4>Shared Latent Space <span>跨形态统一</span></h4>
+      <div class="arch-card arch-power">
+        <strong>GaLR 空间 $\mathcal{Z}$</strong>
+        <small>$z$ 仅编码三维几何构型语义（如"包围半径"、"开合宽度"、"接近方向"），不含任何关节空间信息</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>Embodiment Embedding $e_k$</strong>
+        <small>可学习嵌入向量，为解码器提供"当前是哪种手"的上下文信息</small>
+      </div>
+    </div>
+    <!-- Stage 3 -->
+    <div class="arch-stage">
+      <h4>Diffusion Policy <span>Stage 2 (策略训练)</span></h4>
+      <div class="arch-card arch-motor">
+        <strong>视觉条件编码</strong>
+        <small>RGB / 深度图像通过 ResNet 编码为视觉 token，与 proprioceptive 状态拼接</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>潜空间去噪 U-Net</strong>
+        <small>在 $\mathcal{Z}$ 空间中对 $z_t$ 迭代去噪，生成未来 $H$ 步的潜动作序列 $\{z^{t+1}, \dots, z^{t+H}\}$</small>
+      </div>
+    </div>
+    <!-- Stage 4 -->
+    <div class="arch-stage">
+      <h4>Embodiment Decoding <span>推理时</span></h4>
+      <div class="arch-card arch-thrust">
+        <strong>条件解码器 $g_\phi(z, e_k)$</strong>
+        <small>将潜动作 $z$ + embodiment 条件 $e_k$ 映射为关节角度 $\hat{a}_k \in \mathbb{R}^{d_k}$（$d_k$ 因手而异）</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>底层控制器</strong>
+        <small>关节位置控制器直接执行 $\hat{a}_k$，无需额外后处理</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrow row -->
+  <div class="arch-arrow">
+    <span>samples &#x2192; point cloud</span>
+    <span>point cloud &#x2192; $z$</span>
+    <span>$z_t$ &#x2192; denoise &#x2192; $\hat{z}$</span>
+    <span>$(\hat{z}, e_k)$ &#x2192; joint cmd</span>
+  </div>
+
+  <!-- Summary metrics -->
+  <div class="arch-summary">
+    <div class="arch-metric">
+      <strong>11 种末端执行器</strong>
+      <small>Inspire Hand, XHand, Robotiq 2F-85, 多型夹爪</small>
+    </div>
+    <div class="arch-metric">
+      <strong>潜空间维度 $d_z = 128$</strong>
+      <small>与任何关节维度解耦；不同 DoF 的手共享同一潜空间</small>
+    </div>
+    <div class="arch-metric">
+      <strong>2 阶段训练</strong>
+      <small>几何预训练（$\sim$1M 采样点云）+ 策略微调（$\sim$10K 示范）</small>
+    </div>
+    <div class="arch-metric">
+      <strong>14 个操作任务</strong>
+      <small>Pouring, Sweeping, Drawer, Pick-and-Place, Peg-in-Hole 等</small>
+    </div>
+  </div>
+</div>
+
+<h3>3.2 系统级 Mermaid 流程图 — 多形态统一策略</h3>
+
+<div class="mermaid-box">
+<pre class="mermaid">
+graph TD
+    subgraph EMBODIMENTS["11 种末端执行器"]
+        E1["Inspire Hand<br/>22 DoF"]
+        E2["XHand<br/>12 DoF"]
+        E3["Robotiq 2F-85<br/>1 DoF"]
+        E4["Parallel Jaw<br/>1 DoF"]
+        E5["..."
+    E1 & E2 & E3 & E4 & E5 --> PC["可达状态点云采样<br/>Forward Kinematics → P<sub>k</sub> ⊂ ℝ<sup>3</sup>"]
+    end
+
+    subgraph GEO_AE["几何自编码器 (Stage 1)"]
+        PC --> ENC["几何编码器 f<sub>geo</sub><br/>PointNet / Transformer"]
+        ENC --> Z["共享潜空间 z ∈ ℝ<sup>128</sup><br/>GaLR: Geometry-Aware Latent"]
+        Z --> DEC_PRE["几何解码器<br/>重建点云 P̂<sub>k</sub>"]
+    end
+
+    subgraph DIFF_POL["Diffusion Policy (Stage 2)"]
+        VIS["RGB / Depth 观测"] --> VIS_ENC["视觉编码器 ResNet"]
+        VIS_ENC --> UNET["U-Net 去噪网络<br/>在 Z 空间中"]
+        Z -.-> UNET
+        UNET --> Z_HAT["去噪潜动作序列<br/>ẑ<sup>t+1</sup>, ..., ẑ<sup>t+H</sup>"]
+    end
+
+    subgraph DECODE["Embodiment 条件解码"]
+        Z_HAT --> ACT_DEC["统一动作解码器 g<sub>φ</sub>"]
+        EMB["Embodiment Embedding e<sub>k</sub>"] --> ACT_DEC
+        ACT_DEC --> A1["Inspire Hand 关节 cmd"]
+        ACT_DEC --> A2["XHand 关节 cmd"]
+        ACT_DEC --> A3["夹爪开合 cmd"]
+        ACT_DEC --> A4["..."]
+    end
+
+    style Z fill:#fef3c7,stroke:#f59e0b,stroke-width:2px
+    style EMB fill:#e8f0fe,stroke:#3b82f6
+    style ACT_DEC fill:#ecfdf5,stroke:#10b981
+</pre>
+</div>
+
+<h3>3.3 两阶段训练管线 Mermaid</h3>
+
+<div class="mermaid-box">
+<pre class="mermaid">
+graph LR
+    subgraph S1["Stage 1: 几何潜空间预训练"]
+        direction TB
+        S1A["① 对每种 embodiment e<sub>k</sub><br/>采样可达关节状态 q<sub>k</sub>"] --> S1B["② 正运动学 FK(q<sub>k</sub>)<br/>→ 三维点云 P<sub>k</sub>"]
+        S1B --> S1C["③ 几何编码器 f<sub>geo</sub><br/>编码为 latent z"]
+        S1C --> S1D["④ 条件几何解码器<br/>(z, e<sub>k</sub>) → 重建点云 P̂<sub>k</sub>"]
+        S1D --> S1LOSS["⑤ Chamfer Distance Loss<br/>min Σ CD(P<sub>k</sub>, P̂<sub>k</sub>)"]
+    end
+
+    subgraph S2["Stage 2: Diffusion Policy 训练"]
+        direction TB
+        S2A["① 冻结 f<sub>geo</sub><br/>编码演示动作为潜序列"] --> S2B["② 前向加噪<br/>z<sub>t</sub> = √ᾱ<sub>t</sub> z<sub>0</sub> + √(1-ᾱ<sub>t</sub>) ε"]
+        S2B --> S2C["③ U-Net 预测噪声<br/>ε<sub>θ</sub>(z<sub>t</sub>, t, visual_obs)"]
+        S2C --> S2LOSS["④ MSE Loss<br/>min ||ε - ε<sub>θ</sub>||²"]
+    end
+
+    S1 --> S2
+    style S1 fill:#fef7ed,stroke:#f59e0b
+    style S2 fill:#eff6ff,stroke:#3b82f6
+</pre>
+</div>
+
+<h3>3.4 推理阶段流程</h3>
+
+<ol>
+  <li><strong>观测编码：</strong>相机图像输入视觉编码器，结合本体感知（当前关节角）生成条件向量。</li>
+  <li><strong>潜空间去噪：</strong>Diffusion Policy 从随机噪声 $z_T \sim \mathcal{N}(0,I)$ 出发，经 $T$ 步去噪生成干净潜动作序列 $\hat{z}_{0:H}$。</li>
+  <li><strong>几何解码：</strong>统一解码器根据当前 embodiment 的嵌入向量 $e_k$，将 $\hat{z}_{0:H}$ 映射为该手的关节位置目标。</li>
+  <li><strong>底层执行：</strong>位置控制器直接跟踪解码后的关节目标，闭环频率通常为 10-20 Hz。</li>
+  <li><strong>重规划：</strong>每 $H_{\text{replan}}$ 步重新运行去噪（receding horizon），保证闭环鲁棒性。</li>
+</ol>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §4  Task Definition -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="task">
+<h2>§4. 问题定义与数学形式化</h2>
+
+<h3>4.1 LaTeX 问题形式化</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">定义 1: 跨形态操作策略</span>
+  <p>设有 $K$ 种末端执行器（embodiments），记为 $\mathcal{E} = \{e_1, e_2, \dots, e_K\}$。每种 embodiment $e_k$ 有其特有的关节空间 $\mathcal{A}_k \subset \mathbb{R}^{d_k}$，其中 $d_k$ 为该手的自由度数量。给定视觉观测 $o_t$（RGB 图像序列），跨形态策略旨在学习一个统一映射：</p>
+  $$ \pi: (o_t, e_k) \mapsto a_k \in \mathcal{A}_k, \quad \forall k \in \{1, \dots, K\} $$
+  <p>使得在任意末端执行器 $e_k$ 上，策略都能完成指定的操作任务。</p>
+  <div class="eq-note">
+    关键困难在于 $\mathcal{A}_k$ 的维度 $d_k$ 因 embodiment 而异——灵巧手可达 20+ 维，而简单夹爪仅 1 维。直接定义统一的动作空间不可行。
+  </div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">定义 2: 几何编码器与解码器</span>
+  <p>设 embodiment $e_k$ 的可达状态点云为 $\mathcal{P}_k = \{\mathbf{p}_i \in \mathbb{R}^3\}_{i=1}^{N}$（通过运动学随机采样获得）。几何自编码器由两部分组成：</p>
+  $$ z = f_{\theta}( \mathcal{P}_k ) \in \mathbb{R}^{d_z} \quad \text{(编码器)} $$
+  $$ \hat{\mathcal{P}}_k = g_{\phi}( z, e_k ) \quad \text{(解码器)} $$
+  <p>其中 $f_\theta$ 将任意点云映射到固定维度的几何潜向量，$g_\phi$ 根据 embodiment 标识 $e_k$ 将潜向量重建为对应形态的点云。训练目标为最小化 Chamfer Distance：</p>
+  $$ \mathcal{L}_{\text{geo}} = \sum_{k=1}^{K} \mathrm{CD}(\mathcal{P}_k, \hat{\mathcal{P}}_k) $$
+  <div class="eq-note">
+    Chamfer Distance 衡量两个点云之间的双向最近邻距离，公式为 $\mathrm{CD}(P, Q) = \frac{1}{|P|}\sum_{p \in P}\min_{q \in Q}\|p - q\|_2^2 + \frac{1}{|Q|}\sum_{q \in Q}\min_{p \in P}\|q - p\|_2^2$。
+  </div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">定义 3: 潜空间 Diffusion Policy</span>
+  <p>在 Stage 2，给定演示轨迹中提取的 GT 潜动作序列 $z_0$（通过冻结的 $f_\theta$ 编码），Diffusion Policy 学习去噪过程：</p>
+  $$ \mathcal{L}_{\text{diff}} = \mathbb{E}_{t, \epsilon \sim \mathcal{N}(0,I)} \left[ \| \epsilon - \epsilon_\psi( z_t, t, o ) \|^2 \right] $$
+  <p>其中 $z_t = \sqrt{\bar{\alpha}_t} z_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon$ 为加噪后的潜变量，$\epsilon_\psi$ 是以视觉观测 $o$ 为条件的 U-Net 噪声预测网络，$t$ 为扩散时间步。</p>
+  <div class="eq-note">
+    注意：Diffusion 操作发生在 $\mathbb{R}^{d_z}$ 空间中，而非原始关节空间。这使得同一去噪过程可服务于所有 11 种末端执行器——只需在推理时加上 embodiment 条件解码。
+  </div>
+</div>
+
+<h3>4.2 输入/输出规格表</h3>
+
+<table>
+  <thead>
+    <tr><th style="width:15%;">组件</th><th style="width:25%;">输入</th><th style="width:25%;">输出</th><th style="width:35%;">说明</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>几何编码器</strong> $f_\theta$</td>
+      <td>可达状态点云 $\mathcal{P}_k \in \mathbb{R}^{N \times 3}$</td>
+      <td>几何潜向量 $z \in \mathbb{R}^{128}$</td>
+      <td>PointNet++ / Transformer；$N \approx 1024$</td>
+    </tr>
+    <tr>
+      <td><strong>几何解码器</strong> $g_\phi$</td>
+      <td>$(z, e_k)$ — 潜向量 + embodiment 嵌入</td>
+      <td>重建点云 $\hat{\mathcal{P}}_k \in \mathbb{R}^{N \times 3}$</td>
+      <td>折叠解码 (FoldingNet) 或 Transformer 解码器</td>
+    </tr>
+    <tr>
+      <td><strong>视觉编码器</strong></td>
+      <td>RGB 图像序列 $o_t$（$ H_{\text{obs}} $ 帧）</td>
+      <td>视觉特征 token $v_t$</td>
+      <td>ResNet-18 / ViT 骨干 + 时序注意力池化</td>
+    </tr>
+    <tr>
+      <td><strong>Diffusion U-Net</strong> $\epsilon_\psi$</td>
+      <td>$(z_t, t, v_t)$ — 加噪潜变量、时间步、视觉条件</td>
+      <td>预测噪声 $\hat{\epsilon} \in \mathbb{R}^{128}$</td>
+      <td>1D U-Net 或 DiT 架构在 $\mathbb{R}^{128}$ 上操作</td>
+    </tr>
+    <tr>
+      <td><strong>动作解码器</strong> $h_\omega$</td>
+      <td>$(\hat{z}, e_k, q_{\text{curr}})$ — 去噪潜变量、embodiment 标识、当前关节状态</td>
+      <td>关节目标 $\hat{a}_k \in \mathbb{R}^{d_k}$</td>
+      <td>MLP，输出维度 $d_k$ 随 embodiment 动态切换；共用权重，由 $e_k$ 条件化</td>
+    </tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §5  Key Challenge -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="challenge">
+<h2>§5. 关键挑战</h2>
+
+<h3>5.1 第一性原理诊断：跨形态策略学习为何本质上困难？</h3>
+
+<div class="callout danger">
+  <div class="callout-title">根本矛盾</div>
+  <p>机器人操作策略本质上是<strong>从感知空间到动作空间的映射</strong>。当末端执行器形态不同时，动作空间的结构（维度、量纲、物理含义）完全不同——灵巧手的 22 维关节角度向量与二指夹爪的 1 维开合量根本不在同一个数学空间。因此，<strong>任何试图直接将不同形态的动作拼接为一个统一输出的做法都隐含着一个错误假设：不同机械手的关节之间存在有意义的对应关系</strong>。这并非工程实现的困难，而是数学定义上的不可能。</p>
+</div>
+
+<h3>5.2 前人方法对比</h3>
+
+<table>
+  <thead>
+    <tr><th>Method</th><th>Embodiment Handling</th><th>Action Space</th><th>Shared Representation</th><th>Scalability</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>RT-X</strong> (Open X-Embodiment)</td>
+      <td>多机器人数据混合训练，但 action head 为统一维度（通过 padding/truncation 暴力对齐）</td>
+      <td>固定维度，不足补零，超出截断</td>
+      <td>Transformer token 共享表示，但动作解码仍需统一维度</td>
+      <td>中等 — 新增 mechanical hand 需要改 action dim</td>
+    </tr>
+    <tr>
+      <td><strong>Octo</strong></td>
+      <td>通过任务 / 机器人描述作为条件输入，单策略多机器人</td>
+      <td>固定 7-DoF（末端位姿 + 夹爪），不支持灵巧手</td>
+      <td>扩散模型在固定维度动作空间</td>
+      <td>中低 — 仅支持标准夹爪，不能处理多指灵巧手</td>
+    </tr>
+    <tr>
+      <td><strong>GATO</strong> (DeepMind)</td>
+      <td>通用序列模型，通过 tokenization 统一不同模态</td>
+      <td>离散化，所有连续动作量化为离散 bin</td>
+      <td>共享 Transformer 处理所有 token 类型</td>
+      <td>理论上高，但离散化丢失细粒度控制精度</td>
+    </tr>
+    <tr class="highlight">
+      <td><strong>OPFA (本文)</strong></td>
+      <td>几何潜空间 + embodiment-conditioned 解码器，从根本上避免维度冲突</td>
+      <td>非对齐 — 每个 embodiment 独立解码，但共享中间表示</td>
+      <td>GaLR：几何感知潜表示，基于点云重建</td>
+      <td>高 — 新增末端执行器只需加入其可达点云和 embedding</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>5.3 三大核心挑战</h3>
+
+<div class="novelty-card">
+  <h4>挑战 1: 动作空间的维度异构性 (Dimensional Heterogeneity)</h4>
+  <p>不同末端执行器的关节空间维度从 1（简单夹爪）到 22+（五指灵巧手）不等，且各维度的物理含义不同——Inspire Hand 的第 3 个关节与 Robotiq 夹爪的开合距离之间不存在任何有意义的对应关系。直接在此类异构空间上定义统一的策略映射在数学上 well-defined。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>挑战 2: 形态差异导致的负迁移 (Negative Transfer from Morphology Gap)</h4>
+  <p>当策略被迫为不同形态预测"统一格式"的动作时（如将五指手数据映射到夹爪空间），不同形态的示范数据可能对潜空间产生<strong>互斥的梯度信号</strong>。例如，"抓取杯子"在灵巧手上涉及多指协调的精细轨迹，而在二指夹爪上只是一个宽度值——表面上是同一任务，动作结构却完全不同。强行共享参数会导致潜空间被拉扯向不同形态的平均值，反而降低各自的性能。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>挑战 3: 少样本新形态泛化 (Few-Shot New Embodiment Generalization)</h4>
+  <p>机器人硬件快速迭代——今天训练的灵巧手策略，明天可能需要对全新的三指夹爪也有效。理想情况下，策略应该能从少量（甚至零样本）新形态的演示中快速适应，而非从头训练。这要求潜空间捕捉的是<strong>设备无关的操作语义</strong>，而非特定硬件的运动学特性。</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §6  Method -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="method">
+<h2>§6. 方法详解</h2>
+
+<h3>6.1 公式组 (1): 可达状态的几何编码</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">Eq (1): 可达状态采样与点云生成</span>
+  <p>对 embodiment $e_k$，从其关节空间中均匀随机采样 $M$ 个配置 $\{q^{(i)}\}_{i=1}^M \sim \mathcal{U}(\mathcal{Q}_k^{\text{valid}})$，其中 $\mathcal{Q}_k^{\text{valid}}$ 表示满足关节限位和自碰撞约束的有效关节空间。经正运动学映射得到三维点集：</p>
+  $$ \mathcal{P}_k = \left\{ \mathrm{FK}_{e_k}(q^{(i)})^{\text{fingertip}} \; \middle| \; i = 1, \dots, M \right\} \subset \mathbb{R}^{N_k \times 3} $$
+  <p>其中 $\mathrm{FK}_{e_k}(\cdot)^{\text{fingertip}}$ 提取末端执行器关键点（指尖位置、指节中心等）的三维坐标，$N_k$ 为关键点数量（通常 5-15 个）。此点云 $\mathcal{P}_k$ 是该 embodiment 几何操作能力的紧凑表征。</p>
+  <div class="eq-note">
+    实践中 $M \approx 10{,}000$，$N_k \in [5, 15]$。关键点选择原则：覆盖所有与环境接触的指面区域，并能区分开合、弯曲等核心几何模式。采样时还会过滤掉运动学奇异点附近的配置。
+  </div>
+</div>
+
+<h3>6.2 公式组 (2): 几何潜空间重建损失</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">Eq (2): Stage 1 几何自编码器训练目标</span>
+  <p>几何编码器将点云映射到潜向量，条件解码器从潜向量 + embodiment embedding 重建点云：</p>
+  $$ z = f_\theta(\mathcal{P}_k) = \mathrm{PointNetPP}(\mathcal{P}_k) \in \mathbb{R}^{d_z} $$
+  $$ \hat{\mathcal{P}}_k = g_\phi(z, \mathrm{Emb}(e_k)) = \mathrm{FoldingDecoder}(z \oplus \mathrm{Emb}(e_k)) \in \mathbb{R}^{N_k \times 3} $$
+  <p>训练损失采用 Chamfer Distance + 正则项：</p>
+  $$ \mathcal{L}_{\text{geo}} = \underbrace{\frac{1}{K}\sum_{k=1}^{K} \mathrm{CD}(\mathcal{P}_k, \hat{\mathcal{P}}_k)}_{\text{Chamfer 重建损失}} + \underbrace{\lambda \cdot \mathcal{L}_{\text{reg}}(z)}_{\text{潜空间正则化}} $$
+  <p>其中 $\mathcal{L}_{\text{reg}}(z) = \|z\|_2^2$ 防止潜空间发散，$\lambda$ 通常取 $10^{-4}$。</p>
+  <div class="eq-note">
+    潜空间维度 $d_z = 128$ 是经验选择。实验表明 64 维表达力不足（重建误差显著增大），256 维则带来冗余维度使 Diffusion 训练收敛变慢。128 维在表达力与效率间取得平衡。
+  </div>
+</div>
+
+<h3>6.3 公式组 (3): 潜空间 Diffusion Policy</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">Eq (3): Stage 2 潜空间扩散策略</span>
+  <p>给定演示轨迹 $\tau = \{(o_t, a_t^{e_k})\}_{t=1}^T$，先用冻结的编码器将动作转为潜序列 $z_{0:H} = f_\theta(\mathrm{FK}_{e_k}(a_{0:H}))$。前向扩散过程：</p>
+  $$ q(z_t \mid z_{t-1}) = \mathcal{N}\left(z_t; \sqrt{1 - \beta_t} z_{t-1}, \beta_t \mathbf{I}\right) $$
+  <p>去噪网络 $\epsilon_\psi$ 以视觉特征 $v$ 为条件预测噪声：</p>
+  $$ \mathcal{L}_{\text{diff}} = \mathbb{E}_{t \sim \mathcal{U}(1,T), \epsilon \sim \mathcal{N}(0,\mathbf{I})} \left[ \left\| \epsilon - \epsilon_\psi\left( \sqrt{\bar{\alpha}_t} z_0 + \sqrt{1 - \bar{\alpha}_t} \epsilon,\; t,\; \mathrm{VisEnc}(o) \right) \right\|^2 \right] $$
+  <p>其中 $\bar{\alpha}_t = \prod_{s=1}^{t} (1 - \beta_s)$ 为累积信噪比，$\beta_t$ 遵循余弦调度 (cosine schedule)，$T = 100$ 为总扩散步数。</p>
+  <div class="eq-note">
+    与原始 Diffusion Policy (Chi et al., 2023) 的关键区别：去噪发生在 $\mathbb{R}^{128}$ 的几何潜空间而非原始动作空间。这意味着：① 去噪网络的输入/输出维度对所有 embodiment 相同；② 不同形态的示范数据在相同潜空间中相互增强；③ 潜空间的拓扑结构由 Stage 1 的几何重建损失隐式塑造，天然更适合运动规划。
+  </div>
+</div>
+
+<h3>6.4 公式组 (4): Embodiment-Conditioned 动作解码</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">Eq (4): 推理时从潜变量到关节命令的映射</span>
+  <p>推理时，从去噪得到的潜动作序列 $\hat{z}_{0:H}$ 经 embodiment 条件解码器映射为实际关节目标：</p>
+  $$ \hat{a}_k^t = h_\omega \left( \hat{z}^t,\; \mathrm{Emb}(e_k),\; q_{\text{curr}} \right) \in \mathbb{R}^{d_k} $$
+  <p>解码器的训练目标为最小化关节空间动作重建误差（在 Stage 2 中与 Diffusion 损失联合优化）：</p>
+  $$ \mathcal{L}_{\text{dec}} = \sum_{k=1}^{K} \left\| a_k^t - h_\omega\left( f_\theta(\mathrm{FK}_{e_k}(a_k^t)),\; \mathrm{Emb}(e_k),\; q_{\text{curr}} \right) \right\|^2 $$
+  <p>总训练损失：$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{diff}} + \gamma \cdot \mathcal{L}_{\text{dec}}$，其中 $\gamma = 0.1$ 平衡两项。</p>
+  <div class="eq-note">
+    解码器 $h_\omega$ 是一个条件 MLP——所有 11 种末端执行器共用同一网络权重，仅通过 $\mathrm{Emb}(e_k)$ 切换输出行为。这确保了新增 embodiment 时，解码器的已有知识可迁移到新形态，仅需少量数据微调 embedding。
+  </div>
+</div>
+
+<h3>6.5 关键超参数表</h3>
+
+<table>
+  <thead>
+    <tr><th style="width:28%;">参数</th><th style="width:18%;">值</th><th style="width:54%;">说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>潜空间维度 $d_z$</td><td>128</td><td>在表达力（重建误差）与效率（扩散收敛速度）间折衷</td></tr>
+    <tr><td>可达采样点数 $M$</td><td>10,000 / embodiment</td><td>随机均匀采样关节空间，正运动学生成点云</td></tr>
+    <tr><td>关键点数量 $N_k$</td><td>5–15（因手而异）</td><td>覆盖指尖与指节，兼顾效率与几何覆盖</td></tr>
+    <tr><td>扩散步数 $T$</td><td>100（训练）/ 10（推理，DDIM）</td><td>推理时使用 DDIM 加速采样，10 步即收敛</td></tr>
+    <tr><td>噪声调度 $\beta_t$</td><td>余弦 (cosine schedule)</td><td>比线性调度更关注低噪声阶段的精细调整</td></tr>
+    <tr><td>动作预测窗口 $H$</td><td>16 步</td><td>每步约 0.1s，预测未来 1.6s 的潜动作序列</td></tr>
+    <tr><td>重规划间隔 $H_{\text{replan}}$</td><td>8 步</td><td>每 0.8s 重新去噪，保持闭环响应速度</td></tr>
+    <tr><td>Emb. Embedding 维度</td><td>32</td><td>Learnable embedding，初始化后随训练更新</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §7  Principles -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="principles">
+<h2>§7. 深层机理分析</h2>
+
+<h3>7.1 几何潜空间为何能实现跨形态共享——三种深层机制</h3>
+
+<h4>机制 1: 三维欧氏空间是终极的"设备无关坐标系"</h4>
+
+<div class="callout idea">
+  <p>无论末端执行器有多少自由度、关节如何排列，其与环境交互的最终媒介始终是<strong>手指/指面在三维空间中的位置和运动</strong>。抓取、推动、旋转——这些操作语义最终都化为空间中一系列点的轨迹。因此，<strong>在 $\mathbb{R}^3$ 的点云空间中定义跨形态表示具有物理上的普遍性</strong>——它不依赖关节形式、运动学参数或驱动方式。几何自编码器将这一物理直觉形式化：通过重建 Chamfer Distance，迫使潜变量 $z$ 编码的是"这张点云长什么样"，而非"什么关节配置生成了这张点云"。</p>
+</div>
+
+<h4>机制 2: 几何重建损失隐式塑造潜空间的拓扑结构</h4>
+
+<div class="callout tip">
+  <p>Stage 1 的 Chamfer Distance 损失有一个重要的副作用：<strong>在潜空间中，几何上相似的点云配置会被映射到相近的潜向量</strong>。这是因为 CD 对连续变形敏感——如果两个点云的 CD 很小（如"手指微开 5mm"与"手指微开 6mm"），编码器必须将它们映射到相近的 $z$ 以最小化重建误差。这自然导致了潜空间的 Lipschitz 连续性：$\|f_\theta(\mathcal{P}) - f_\theta(\mathcal{P}')\| \leq L \cdot \mathrm{CD}(\mathcal{P}, \mathcal{P}')$。</p>
+  <p>对于 Diffusion Policy，这意味着<strong>潜空间的几何结构恰好是动作平滑性的代理</strong>——在 $z$ 空间中的小步去噪对应物理空间中的微小手部动作变化，使得去噪过程天然产生平滑的动作轨迹。相比之下，如果直接在关节空间去噪，不同关节维度之间没有这样的几何平滑保证。</p>
+</div>
+
+<h4>机制 3: Embodiment Embedding 实现了高效的"知识路由"</h4>
+
+<div class="callout info">
+  <p>统一解码器 $h_\omega(z, e_k)$ 的核心技巧在于：$e_k$ 不是一个简单的类别标签，而是一个<strong>可学习的条件向量</strong>，在训练过程中学会告诉解码器"如何解释 $z$"。对于相同的潜向量 $z$（如"合拢到直径 2cm"），解码器在接收 Inspire Hand 的 embedding 时输出 22 维的关节协同运动序列，而在接收二指夹爪的 embedding 时仅输出 1 维开合量。</p>
+  <p>这种设计相当于在解码器内部进行了<strong>隐式的参数分配（parameter routing）</strong>——$e_k$ 通过条件调制（如 FiLM 层或拼接后经 MLP）激活网络的不同子路径，使得同一组权重能服务多种形态而互不干扰。</p>
+</div>
+
+<h3>7.2 对比分析</h3>
+
+<div class="cmp-row">
+  <div class="cmp-col" style="border-left: 4px solid var(--rose-stroke);">
+    <h4>Joint-Space Concatenation（直接拼接法）</h4>
+    <p><strong>做法：</strong>将所有手的关节空间统一到一个 padded 动作向量（如 max $d_k$ = 22），不足维数补零，由策略输出。</p>
+    <p><strong>问题 1：</strong>补零维度在不同手之间语义割裂——对夹爪是"无操作"，对灵巧手可能是"保持关节角度"——混淆了策略的梯度方向。</p>
+    <p><strong>问题 2：</strong>损失函数中的 MSE 对每个维度等权处理，夹爪的 1 维开合误差与灵巧手的 22 维关节误差在数值上完全不对等，导致训练偏向高自由度形态。</p>
+    <p><strong>问题 3：</strong>不同形态示范数据的动作轨迹结构根本不同——将"夹爪从开到合"的 1D 轨迹与"五指弯曲抓取"的 22D 轨迹混在同一潜空间，意味着策略被迫学习一个能同时产生这两种模式的平均场——结果是每种模式都变差（负迁移）。</p>
+  </div>
+  <div class="cmp-col" style="border-left: 4px solid var(--green-stroke);">
+    <h4>GaLR — Geometry-Aware Latent（本文）</h4>
+    <p><strong>做法：</strong>先在几何自编码器中学习共享潜空间（仅编码几何构型），再训练策略在该潜空间中操作，最后用 embodiment 条件解码器映射到各自关节。</p>
+    <p><strong>优势 1：</strong>潜空间的维度对所有形态相同（128），不存在 padding 或维度不对齐问题。Diffusion U-Net 的输入输出维度固定。</p>
+    <p><strong>优势 2：</strong>几何重建损失（Stage 1）独立于策略损失（Stage 2）——两阶段解耦确保几何表示的品质不受策略训练干扰。</p>
+    <p><strong>优势 3：</strong>不同形态的数据在潜空间中不是"被强行拉到一个共同表示"，而是通过几何相似性<strong>自然聚合</strong>——两指夹爪捏取与三指手捏取的点云本就相似，编码后自然落入潜空间的相近区域，不需要策略训练来对齐。</p>
+  </div>
+</div>
+
+<h3>7.3 负迁移问题及其根治</h3>
+
+<div class="callout warn">
+  <div class="callout-title">负迁移 (Negative Transfer) 的根源与解决</div>
+  <p><strong>根源：</strong>在传统的多任务/多形态联合训练中，不同数据源的梯度可能指向不同方向——灵巧手数据要求策略学习精细的多指协同，夹爪数据要求策略仅关注开合时机。当共享参数同时接收这两种信号时，梯度被平均化，导致所有形态的性能都不如单独训练（即"1+1 &lt; 2"）。</p>
+  <p><strong>OPFA 的解决：</strong>通过两阶段解耦——几何编码器仅在 Stage 1 用 Chamfer Distance（与策略无关）训练，确保潜空间的拓扑结构只反映三维几何相似性而非策略偏好。在 Stage 2，Diffusion Policy 操作的是已经天然"形态对齐"的潜空间，不同形态的数据不再互相拉扯——夹爪的"捏合"与灵巧手的"捏合"在潜空间中本就相邻，梯度方向一致。</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §8  Figures -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="figures">
+<h2>§8. 图示与实验证据</h2>
+
+<h3>8.1 论文总览图</h3>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Fig. 1+2</span>
+    <span class="fig-caption">OPFA 系统总览：11 种末端执行器 → 可达点云 → 几何自编码器 → 共享潜空间 → Diffusion Policy → 条件解码</span>
+    <span class="fig-source">引自论文 Fig. 1 / Fig. 2</span>
+  </div>
+  <div class="fig-image">
+    <img src="figures/overview.png" alt="OPFA Overview: Architecture and Training Pipeline" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'fig-placeholder\'><strong>图示占位</strong><br>图片 figures/overview.png 未找到或无法加载。<br>请参考 PDF 中的 Fig. 1 (系统架构) 和 Fig. 2 (两阶段训练流程)。</div>';">
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">图示解读</div>
+    <p><strong>左侧 (Fig. 1):</strong> 展示 11 种末端执行器的形态多样性——从高自由度灵巧手（Inspire Hand 22-DoF, XHand 12-DoF）到低自由度夹爪（Robotiq 2F-85 1-DoF）。尽管形态差异巨大，它们都被统一接入同一 OPFA 策略。核心信息流：观测 → 几何编码 → 共享潜空间 → Diffusion 去噪 → 条件解码 → 各手关节命令。</p>
+    <p><strong>右侧 (Fig. 2):</strong> 两阶段训练示意图。Stage 1（上半部分）展示几何自编码器的预训练流程：可达状态采样 → FK → 点云 → Encoder → $z$ → Decoder($z, e_k$) → 重建点云 → Chamfer Loss。Stage 2（下半部分）展示 Diffusion Policy 在潜空间中的训练：演示动作 → 编码为 $z_0$ → 前向加噪 → U-Net 去噪 → MSE Loss。</p>
+    <ul>
+      <li><strong>关键观察：</strong>14 个任务覆盖了操作的主要类型——倒液 (pouring) 需要连续轨迹控制、扫动 (sweeping) 需要力位混合、抽屉开合 (drawer) 需要与环境约束交互、精细物体操作需要高精度指尖定位。</li>
+      <li><strong>实验规模：</strong>跨形态联合训练使用所有 11 种手的混合数据，单形态基线仅用对应手的数据独立训练，以确保公平对比。</li>
+    </ul>
+  </div>
+</div>
+
+<h3>8.2 实验证据摘要</h3>
+
+<div class="callout tip">
+  <div class="callout-title">主要实验结果</div>
+  <p><strong>跨形态联合训练效果：</strong>OPFA 在使用所有 11 种末端执行器的混合数据进行联合训练后，在 14 个任务上的平均成功率显著高于各形态单独训练（single-embodiment）的基线。关键发现是：<strong>低数据量形态（如某些仅少数示范的夹爪）从联合训练中获益最大</strong>，验证了几何潜空间的数据增强效应。</p>
+  <p><strong>少样本迁移 (Few-Shot Transfer)：</strong>当引入新的末端执行器（训练时未见过的形态）时，仅需 10-20 条示范即可使 OPFA 达到合理性能（60-75% 成功率），而从头训练的 baseline 需要 100+ 条示范才能达到同等水平。这表明几何潜空间确实捕捉了"设备无关"的操作语义。</p>
+  <p><strong>潜空间可视化：</strong>t-SNE 可视化显示，不同形态在执行相同操作语义时（如"捏合"），其潜向量 $z$ 在空间中自然聚集，形成按操作语义而非机械形态组织的聚类。</p>
+</div>
+
+<h3>8.3 消融实验要点</h3>
+
+<table>
+  <thead>
+    <tr><th>消融点</th><th>变体</th><th>结论</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Stage 1 几何预训练</td><td>有 vs 无（端到端联合训练）</td><td>去除几何预训练导致潜空间坍缩，策略性能下降 30%+</td></tr>
+    <tr><td>Embodiment Embedding</td><td>有（learnable）vs 无（固定 zero）</td><td>无 embedding 条件时解码器无法区分形态，成功率接近随机</td></tr>
+    <tr><td>潜维度 $d_z$</td><td>64 / 128 / 256</td><td>64 欠拟合（CD 高），256 过参数化（扩散训练慢），128 最优</td></tr>
+    <tr><td>Chamfer Distance 损失</td><td>CD vs EMD (Earth Mover)</td><td>CD 计算效率高，EMD 质量略优但训练慢 5x，总体权衡选 CD</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §9  Flaw & Limitations -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="flaw">
+<h2>§9. 局限性与展望</h2>
+
+<h3>9.1 已知局限</h3>
+
+<ol>
+  <li><strong>依赖可达状态采样的质量与覆盖度：</strong>几何潜空间的质量完全取决于 Stage 1 中对每种末端执行器可达状态的采样。如果采样不充分（如遗漏了某些关键几何构型），潜空间对应区域将出现"空洞"——Diffusion Policy 在去噪时可能落入这些未训练区域，导致解码出不可行的关节配置。对于具有复杂运动学约束的灵巧手，均匀随机采样高维关节空间的效率很低，可能需要重要性采样或基于运动规划器的采样策略。</li>
+  <li><strong>非几何属性未被编码：</strong>操作中许多关键属性并非纯几何的——例如材料顺应性（compliance）、摩擦力、接触刚度、动态响应特性等。GaLR 仅编码了末端执行器的几何构型，无法表达"这只手接触物体时是刚性撞击还是柔性适应"。对于需要力控的任务（如装配、旋拧），纯几何表示可能不足以捕捉操作策略的全部信息。</li>
+  <li><strong>极端异构形态的潜空间共享上限：</strong>当末端执行器的形态极为不同（如吸盘 vs 五指灵巧手 vs 焊接枪），它们的可达几何状态点云几乎无交集。此时"共享几何潜空间"的假设面临压力测试——从吸盘点云编码出的 $z$ 与从灵巧手点云编码出的 $z$ 可能分布在潜空间中不相交的区域，数据增强效应消失。</li>
+  <li><strong>运动学模型依赖：</strong>Stage 1 的正运动学采样需要准确的机械手运动学模型（URDF/MJCF）。对于未知或未标定的硬件，这一步骤需要 system identification，增加了部署门槛。此外，软体执行器或连续体机器人缺乏标准正运动学映射，当前框架难以直接适用。</li>
+  <li><strong>潜空间的可解释性有限：</strong>虽然 $z$ 的各维度与几何构型相关，但并非每个维度都具有清晰的物理含义（如"维度 37 = 指尖间距"）。这使得调试和验证策略行为时，无法直观判断"当前潜空间状态是否合理"。</li>
+</ol>
+
+<h3>9.2 延伸方向</h3>
+
+<div class="novelty-card">
+  <h4>方向 1: 融合力觉与触觉的扩展几何表示</h4>
+  <p>将当前仅包含位置信息的可达点云扩展为包含接触力/扭矩向量的"增强点云"——每个点 $p_i$ 不仅编码位置 $(x,y,z)$，还附加该位置的期望接触力方向与量级。这可通过在仿真中为每种配置模拟与环境的标准接触来获得，使得潜空间同时编码"几何形态"和"力交互特性"。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>方向 2: 零样本新形态泛化</h4>
+  <p>当前的少样本迁移仍需 10-20 条新形态示范。若能将 embodiment embedding $e_k$ 设计为直接从硬件描述（URDF、运动学参数、三维 mesh）中提取的结构化编码，则对于全新末端执行器，无需任何示范即可生成其 embedding，实现真正的零样本迁移。这类似于 NLP 中的 zero-shot cross-lingual transfer——将"形态描述"作为元数据而非标签使用。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>方向 3: 从操作到移动——跨形态机器人全身控制</h4>
+  <p>将几何潜空间的思想从末端执行器扩展到整个机器人身体——轮式、腿式、混合式移动平台的全身几何可达状态构成了比夹爪更复杂的点云流形。如果能将不同形态的移动机器人（四足、双轮、旋翼）统一到同一几何潜空间中，则"一策多机"的愿景可从操作延伸到导航与全身运动。</p>
+</div>
+
+<h3>9.3 数据敏感性分析</h3>
+
+<table>
+  <thead>
+    <tr><th style="width:28%;">数据维度</th><th style="width:18%;">敏感度</th><th style="width:54%;">分析</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>可达采样点数 $M$</td><td><strong>高</strong></td><td>$M &lt; 1000$ 时点云稀疏，几何重建质量急剧下降；$M &gt; 5000$ 后边际收益递减，但不会过拟合</td></tr>
+    <tr><td>每形态示范数量</td><td><strong>高</strong></td><td>高 DoF 形态（灵巧手）每任务需 $\ge 50$ 条示范；低 DoF 形态（夹爪）$\ge 20$ 条即可；少于此阈值时策略方差大</td></tr>
+    <tr><td>形态数量 $K$</td><td><strong>中</strong></td><td>$K \ge 5$ 时跨形态增益明显；$K \le 2$ 时近似单形态训练，优势不明显</td></tr>
+    <tr><td>任务多样性</td><td><strong>中</strong></td><td>任务类型越多（抓取、推动、旋转、插入等），潜空间的几何语义越丰富，有利于泛化到新任务</td></tr>
+    <tr><td>视觉观测质量</td><td><strong>中</strong></td><td>Diffusion Policy 依赖视觉条件；遮挡严重或光照极端时性能下降，但几何潜空间本身不受视觉影响</td></tr>
+  </tbody>
+</table>
+
+<h3>9.4 深度诊断</h3>
+
+<div class="callout warn">
+  <div class="callout-title">关键隐忧：几何潜空间能否真正"无所不包"？</div>
+  <p>论文的核心假设——"所有操作任务的需求都可以还原为末端执行器的三维几何构型变化"——在原则上是成立的，但<strong>在实践中有若干挑战</strong>：</p>
+  <ul>
+    <li><strong>动态效应：</strong>快速运动时的惯性力、离心效应可能导致末端执行器偏离静态正运动学预测的位置。几何编码器如果仅基于静态 FK 采样训练，可能在动态场景下产生系统偏差。</li>
+    <li><strong>环境接触约束：</strong>抽屉开合、门把手旋转等任务中，末端执行器的可行状态不仅取决于自身运动学，还取决于环境的运动学约束（如抽屉滑轨方向）。纯末端点云无法捕捉此类环境相关约束。</li>
+    <li><strong>时序依赖性：</strong>操作中的许多技能需要对动作序列的整体结构建模（如旋拧中的回退-前进循环），单独时刻的几何构型不足以区分"正在拧入"和"正在拧出"（两者的瞬时几何可能相同，仅方向不同）。当前框架通过 Diffusion 的动作序列预测部分缓解了此问题，但潜空间本身不编码速度/方向信息。</li>
+  </ul>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §10 Motivation -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="motivation">
+<h2>§10. 研究动机</h2>
+
+<h3>10.1 五步推导链：从问题到方案</h3>
+
+<table>
+  <thead>
+    <tr><th style="width:8%;">步骤</th><th style="width:92%;">推导</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Step 1</strong></td><td><strong>机器人数据分散在不同末端执行器上：</strong>灵巧手操作数据、夹爪拾放数据、吸盘搬运数据……各自独立收集和训练。任何单一形态的数据量都不足以训练泛化能力强的操作策略，但从所有形态收集的<strong>数据总量是巨大的</strong>。</td></tr>
+    <tr><td><strong>Step 2</strong></td><td><strong>不同形态的数据天然不兼容：</strong>灵巧手采集的 22 维关节轨迹无法直接用于训练二指夹爪策略（维度不匹配、物理含义不同）。直接将所有数据拼接成统一格式会导致语义混淆和训练崩溃。</td></tr>
+    <tr><td><strong>Step 3</strong></td><td><strong>寻找跨形态不变的接口：</strong>观察所有末端执行器的共性——无论驱动方式和自由度如何，它们都在三维空间中操作，最终通过手指/指面/吸盘在空间中的位置和运动与环境交互。<strong>三维几何是自然的跨形态"中间语言"。</strong></td></tr>
+    <tr><td><strong>Step 4</strong></td><td><strong>设计几何自编码器学习这一"中间语言"：</strong>通过正运动学将任意形态的关节配置转换为三维点云（设备无关），训练自编码器从点云中提取紧凑的几何潜向量（GaLR）。该潜向量仅编码空间几何语义，与具体关节参数无关。</td></tr>
+    <tr><td><strong>Step 5</strong></td><td><strong>在共享几何潜空间上训练统一策略：</strong>Diffusion Policy 不再面对异构的关节空间，而是在统一的 128 维几何潜空间中操作。不同手的示范数据在潜空间中按几何相似性组织——"捏合"无论在哪种手上都映射到潜空间的相似区域——实现真正的跨形态知识共享。</td></tr>
+  </tbody>
+</table>
+
+<h3>10.2 一句话动机</h3>
+
+<div class="callout idea">
+  <p><strong>"机器人数据分散在不同形态的末端执行器上，如果不能跨形态共享，每个新手都只能从零开始——这浪费了整个领域积累的操作智能。OPFA 的目标是让数据不再被特定硬件所绑定，使灵巧手学到的'捏合'也能让二指夹爪受益，反之亦然。"</strong></p>
+</div>
+
+<h3>10.3 这条思路是如何诞生的</h3>
+
+<p>OPFA 的研究思路可以从方法论层面理解为一次<strong>"从不可共享到可共享"的抽象层跃迁</strong>。当 Huazhe Xu 课题组面对 11 种末端执行器的实验平台时，最自然的做法是为每种手单独训练策略——这是当前的主流范式。但团队意识到，这种"各练各的"思路从根本上放弃了数据规模优势。</p>
+
+<p>关键转折点在于提问方式的改变——从"如何让不同手的关节空间统一"转变为"<strong>不同手之间到底有什么是天然统一的</strong>"。答案不是动作（因手而异），不是视觉（观测一致但解释不同），也不是奖励（任务相同），而是<strong>三维空间中的几何构型</strong>——这是物理学赋予的、独立于任何工程设计的公共坐标系。</p>
+
+<p>这一认识直接导向了两阶段设计：先用几何重建（自监督、不需要标注）建立跨形态的"几何词典"，再在这本词典上训练策略。这与人类学习使用工具的认知过程高度相似——我们先用视觉和触觉理解工具的几何和运动学特性，再学习如何用这些特性完成任务。</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- §11 Takeaways -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<section id="takeaway">
+<h2>§11. 阅读收获</h2>
+
+<h3>11.1 方法论教训</h3>
+
+<ol>
+  <li><strong>"耦合问题分解"范式：</strong>OPFA 的核心智慧不在于发明了多么复杂的网络结构，而在于将一个看似不可解的"异质空间统一"问题分解为两个独立可解的子问题：① 如何定义跨形态的通用表示（几何自编码器），② 如何在该表示上训练策略（Diffusion Policy）。两阶段解耦使得每个子问题都有明确的优化目标，避免了端到端训练中的梯度冲突。</li>
+  <li><strong>"物理先验作为归纳偏置"：</strong>不使用黑盒网络直接学习跨形态映射，而是将正运动学和三维几何作为强先验注入系统设计中（可达状态采样、Chamfer Distance）。物理先验提供了免费的泛化能力——它不依赖数据量，但能在数据稀缺时引导学习方向。</li>
+  <li><strong>"潜空间不是副产品，是核心设计对象"：</strong>多数方法将潜空间视为压缩手段，但 OPFA 将其视为跨形态通信的"中间语言"。因此，潜空间的训练目标（Chamfer Distance）被精心设计以确保几何语义的保真度，而非简单地最小化重建误差。</li>
+  <li><strong>"数据多样性超过单一来源的数据量"：</strong>即使某种末端执行器的示范数据不多，将其加入跨形态联合训练也能提升所有形态的性能——因为几何潜空间的表示能力受益于形态多样性本身。这提示了一个反直觉的结论：数据的异质性（形态多样）可能比同质性（大量同类数据）更有价值。</li>
+</ol>
+
+<h3>11.2 对 UAV 研究的启示</h3>
+
+<div class="callout tip">
+  <div class="callout-title">从操作到飞行——异构无人机集群的统一控制</div>
+  <p>OPFA 的核心思想可以自然地迁移到多旋翼/异构无人机集群控制中：</p>
+  <ul>
+    <li><strong>异构飞行平台的统一策略：</strong>四旋翼、六旋翼、八旋翼、倾转旋翼、固定翼 VTOL——这些飞行平台的执行器形式完全不同（电机数量、推力矢量能力、桨盘配置），但其在三维空间中的<strong>可达状态（位置、速度、姿态）</strong>存在交集。类似 GaLR，可以采样每种平台的飞行包线（flight envelope）作为"达到状态点云"，学习统一的飞行几何潜空间。</li>
+    <li><strong>跨载荷/构型的操作策略：</strong>携带不同末端执行器（夹爪、喷洒器、传感器吊舱）的无人机对同一操作任务（如"接近目标并保持 30cm 距离"）的实际控制命令完全不同。几何潜空间可以将"接近行为"的几何语义与"如何驱动特定构型实现接近"解耦。</li>
+    <li><strong>集群中的异构协同：</strong>不同能力的无人机（重型运输机 + 轻型侦察机 + 通信中继机）在协同任务中扮演不同角色，但它们的协作模式在空间-时间几何层面（如"形成保护半径 r 的包围圈"）是可以用统一几何潜空间描述的。</li>
+    <li><strong>少样本新平台迁移：</strong>当引入一种新型无人机（如刚研发的共轴双旋翼）时，仅需通过飞行包线采样获得其几何可达状态点云，即可在已训练的统一飞行策略中实现少样本或零样本适应。</li>
+  </ul>
+  <p><strong>核心差异需要注意：</strong>UAV 控制的重点是动力学（加速度、推力、姿态响应）而非末端执行器运动学，因此"可达状态点云"需要从运动学扩展到动力学可达集（reachable set under thrust/torque limits），且需要包含速度与姿态信息，而非仅仅位置。</p>
+</div>
+
+<h3>11.3 关键参考文献</h3>
+
+<table>
+  <thead>
+    <tr><th style="width:5%;">#</th><th style="width:35%;">文献</th><th style="width:35%;">与 OPFA 的关系</th><th style="width:25%;">关键差异</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><strong>RT-X / Open X-Embodiment</strong><br>(Padalkar et al., 2023)</td>
+      <td>大规模跨机器人数据集与联合训练范式——OPFA 继承了"多形态数据共享"的目标</td>
+      <td>RT-X 通过 padding/truncation 暴力对齐动作空间；OPFA 通过几何潜空间从根本上避免维度冲突</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>Diffusion Policy</strong><br>(Chi et al., 2023)</td>
+      <td>OPFA 的 Stage 2 直接构建在 Diffusion Policy 之上，使用其去噪框架</td>
+      <td>原始 Diffusion Policy 在原始动作空间去噪；OPFA 将去噪迁移到几何潜空间</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Octo</strong><br>(Octo Model Team, 2023)</td>
+      <td>基于扩散的跨机器人操作策略，使用任务/机器人描述作为条件</td>
+      <td>Octo 仅限于固定 7-DoF 动作空间（不支持灵巧手）；OPFA 支持任意自由度</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>PointNet / PointNet++</strong><br>(Qi et al., 2017)</td>
+      <td>OPFA 几何编码器的基础架构，用于处理无序三维点云</td>
+      <td>PointNet 用于分类/分割；OPFA 将其改造为几何自编码器的编码端</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>FoldingNet</strong><br>(Yang et al., 2018)</td>
+      <td>OPFA 几何解码器的候选架构之一——从潜向量"折叠"出点云</td>
+      <td>OPFA 额外加入 embodiment embedding 条件，使同一解码器服务多种形态</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><strong>GATO</strong><br>(Reed et al., 2022)</td>
+      <td>通用策略架构——通过 tokenization 统一多模态输入输出</td>
+      <td>GATO 依赖离散化（丢失精度）；OPFA 保留连续潜空间以保持操作精度</td>
+    </tr>
+  </tbody>
+</table>
+
+</section>
+
+</main>
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Huazhe Xu Group · OPFA / GaLR · MathJax + Mermaid Rendering</footer>
+</body></html>

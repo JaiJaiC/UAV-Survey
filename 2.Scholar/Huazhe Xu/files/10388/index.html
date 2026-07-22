@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — HERMES (Yuan et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 论文笔记</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察与创新点</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">关键挑战</a>
+  <a href="#method">方法与公式</a>
+  <a href="#principles">深层原理</a>
+  <a href="#figures">图表证据</a>
+  <a href="#flaw">局限与延伸</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Huazhe Xu · 26-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10384/index.html">RL-100</a>
+<a href="../10382/index.html">RL</a>
+<a href="../10381/index.html">X-distill Cross-architect</a>
+<a href="../10380/index.html">DexImit Learning bimanual</a>
+<a href="../10379/index.html">ViTaS Visual tactile</a>
+<a href="../10378/index.html">Beyond action residuals</a>
+<a href="../10377/index.html">One-policy-fits-all Geome</a>
+<a href="../10376/index.html">VLA</a>
+<a href="../10392/index.html">Fine-tuning hard-to-simul</a>
+<a href="../10391/index.html">DemoSpeedup Accelerating </a>
+<a href="../10390/index.html">forget-and-grow strategy </a>
+<a href="../10389/index.html">Morpheus neural-driven an</a>
+<a class="active" href="../10388/index.html">HERMES</a>
+<a href="../10387/index.html">VLA</a>
+<a href="../10386/index.html">Entropy regularizing acti</a>
+<a href="../10385/index.html">Dtactive vision-based tac</a>
+<a href="../10383/index.html">MoE-DP MoE-enhanced diffu</a>
+<a href="../10438/index.html">opportunities risks found</a>
+<a href="../10442/index.html">Visual genome Connecting</a>
+<a href="../10437/index.html">Perceptual losses real-ti</a>
+<a href="../10441/index.html">Deep visual-semantic alig</a>
+<a href="../10439/index.html">ImageNet large scale</a>
+<a href="../10440/index.html">Large-scale video classif</a>
+<a href="../10443/index.html">3D</a>
+<a href="../10436/index.html">Imagenet large-scale hier</a>
+<a href="../10444/index.html">bayesian hierarchical mod</a>
+    </div>
+  </div>
+
+
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">HERMES: Human-to-Robot Embodied Learning from Multi-Source Motion Data for Mobile Dexterous Manipulation</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Zhecheng Yuan</strong>, <strong>Tianming Wei</strong>, Langzhe Gu, Pu Hua, Tianhai Liang, Yuanpei Chen, <strong>Huazhe Xu</strong> (corresponding)</td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">Tsinghua University</strong>, <strong>Shanghai Qi Zhi Institute</strong>, <strong>Peking University</strong></td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">arXiv</strong> (arXiv:2508.20085), <strong>2025年8月27日</strong></td></tr>
+      <div class="journal-meta"><span class="jif-name">arXiv</span> <span class="jif-badge if-preprint">📄 Preprint</span></div>
+    <tr><td><strong>项目链接</strong></td><td><a href="https://gemcollector.github.io/HERMES/" target="_blank">Project Page</a> | <a href="https://arxiv.org/abs/2508.20085" target="_blank">arXiv:2508.20085</a></td></tr>
+    <tr><td><strong>一句话总结</strong></td><td>HERMES 是一个统一的框架，将<strong>异构人类手部运动数据</strong>（仿真遥操作、MoCap动作捕捉、无约束野生视频）转化为物理可行的<strong>移动双臂灵巧操作</strong>技能。核心创新包括：(1) <strong>统一 RL</strong>，采用接触门控的物体中心奖励机制，接受任意来源的人类运动数据，且<strong>每任务只需一次演示</strong>；(2) <strong>基于深度图像的 sim2real 迁移</strong>，通过 DAgger 蒸馏结合针对性深度增强实现；(3) <strong>闭环 PnP 定位</strong>，桥接 ViNT 导航与精确操作之间的精度鸿沟。在 6 个双臂任务上达到 <strong>67.8% 成功率</strong>（较基线方法<strong>提升 54%</strong>）。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Imitation Learning</span>
+    <span class="tag tag-green">Reinforcement Learning</span>
+    <span class="tag tag-amber">Sim-to-Real Transfer</span>
+    <span class="tag tag-purple">Bimanual Dexterous Manipulation</span>
+    <span class="tag tag-red">Mobile Manipulation</span>
+    <span class="tag tag-cyan">Human-to-Robot Embodiment</span>
+    <span class="tag tag-gray">Multi-Source Motion Data</span>
+  </div>
+</section>
+
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察（Core Insight）</div>
+    问题一：<strong>为什么将人类手部运动转化为机器人灵巧操作如此困难？</strong><br>
+    回答：人类运动数据来自异构来源（遥操作、MoCap、野生视频），具有不同的坐标系、噪声水平和运动学结构。直接回放重定向后的人类轨迹会失败，原因在于<strong>具身鸿沟（embodiment gap）</strong>——人手与机器人手在运动学、动力学和接触物理上存在根本性差异。此前的方法要么需要数百个机器人专用演示，要么在接触密集任务上失败。<br><br>
+    问题二：<strong>HERMES 的核心洞察是什么？</strong><br>
+    回答：<strong>人类运动表达的是行为意图（behavioral intent），而非可执行的控制指令。</strong>通过将灵巧操作建模为<strong>目标条件的 RL 问题</strong>，并设计<strong>统一的、任务无关的奖励函数</strong>（物体中心距离链 + 轨迹跟踪 + 功率惩罚，辅以接触门控），策略学习到的是物理可行的机器人动作，能够实现与人类演示<strong>相同的物体级结果</strong>。物体运动轨迹作为<strong>跨具身的共同参考（cross-embodiment common reference）</strong>，桥接人类与机器人的形态差异——无论运动数据来源于何处。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>启发了什么洞察</th><th>类型</th></tr>
+    <tr><td>多源人类数据（Apple Vision Pro 遥操作、OakInk2 MoCap、野生视频）</td><td>不同模态共享同一个核心结构：<strong>物体运动意图（object motion intent）</strong>。提取物体轨迹和手-物接触状态作为共享表征——三种数据源统一输入同一管线。</td><td>表征</td></tr>
+    <tr><td>残差策略学习（Residual policy learning, Johannsmeier et al., 2019）</td><td>手臂动作 = <strong>粗粒度</strong>（人类轨迹）+ <strong>精细残差</strong>（网络预测）。人类先验引导探索；残差部分处理具身修正。</td><td>方法</td></tr>
+    <tr><td>DAgger（Ross et al., 2011）+ 深度模态</td><td>将状态专家策略蒸馏为<strong>基于深度图像的</strong>学生策略，通过 DAgger 实现。深度（而非 RGB）提高了 sim2real 鲁棒性——不受光照和纹理变化影响。</td><td>架构</td></tr>
+    <tr><td>ViNT 导航 + 经典 PnP 几何</td><td>基础模型提供长时域导航能力但缺乏<strong>末端精度</strong>。闭环 PnP（LoFTR + RANSAC + PID）桥接这一鸿沟，达到 1.3-3.2 cm 精度。</td><td>整合</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：基于多源人类运动数据的统一 RL —— 每任务一次演示</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>现有方法要么需要每个任务数百次遥操作演示（如 ACT、Diffusion Policy），要么只能接受单一运动来源（如 ObjDex 仅支持视频）。高昂的数据成本和有限的来源多样性制约了可扩展性。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>所有人类操作数据——遥操作、MoCap、视频——编码了相同的<strong>物体操作意图</strong>。提取物体轨迹作为共同参考，任何来源都可以使用。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>三条采集管线：(1) Apple Vision Pro 遥操作，75Hz，在 MuJoCo 中直接获取手臂和手部位姿；(2) OakInk2 MoCap，通过 DexPilot 重定向 + RL 补偿具身鸿沟；(3) 野生视频，通过 WiLoR（手部关键点）+ FoundationPose（物体位姿）+ PnP 对齐。三者输出统一格式：<strong>物体轨迹 + 手部关键点</strong>。轨迹增强通过随机化物体位姿实现从单次演示的空间泛化。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：接触门控的物体中心距离链奖励</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>灵巧操作的奖励工程极其困难——每个任务都需要手工设计不同奖励项（抓取、抬起、放置）。系统因此变得脆弱且不可泛化。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>大多数操作共享一个基本结构：接近物体、建立接触、沿轨迹移动。这可以通过<strong>从指尖/手掌到物体中心的时序向量</strong>来刻画。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>物体中心距离链计算物体中心到各指尖和手掌的时变距离。<strong>接触门控</strong>：仅当网格接触点数超过阈值（3 个）时激活奖励。结合轨迹跟踪（位置 + 四元数）和功率惩罚（力矩 x 速度）。单一奖励函数在<strong>全部 6 个双臂任务上通用，无需调参</strong>。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：闭环 PnP 桥接 —— 从导航到精确操作</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>ViNT 虽能实现零样本导航，但其末端精度（约 10 cm / 约 5 deg）不足以支撑灵巧操作。此前没有方法能够桥接自主导航与精细操作之间的鸿沟。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>经典 PnP 算法能从稠密对应关系中精确估计相对位姿。结合现代特征匹配（Efficient LoFTR）和导航模型，构建<strong>由粗到精的定位管线</strong>。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>ViNT 导航至大致位置。Efficient LoFTR 提取稠密对应关系。RANSAC PnP 估计相对 6-DoF 位姿。三个 PID 控制器依次调节 x、y、yaw。达到 <strong>1.3-3.2 cm / 0.57-2.06 deg</strong> 精度，相较于仅用 ViNT，操作成功率提升 <strong>+54%</strong>。</div>
+  </div>
+</section>
+
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.0 架构总览 —— 四阶段管线</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>阶段一：人类运动采集</h4>
+        <div class="arch-card arch-solar">
+          <strong>遥操作（仿真）</strong>
+          <small>Apple Vision Pro 75 Hz；MuJoCo 中直接获取手臂与手部位姿。</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>MoCap（OakInk2）</strong>
+          <small>通过 DexPilot 重定向；RL 补偿具身鸿沟。</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>野生视频（Wild）</strong>
+          <small>WiLoR 手部关键点 + FoundationPose 物体位姿 + PnP 对齐。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>阶段二：统一 RL 训练</h4>
+        <div class="arch-card arch-power">
+          <strong>目标条件 MDP</strong>
+          <small>状态 = 本体感知 + 参考轨迹目标；24-DoF 动作空间。</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>DrM + PPO on MJX</strong>
+          <small>DrM：off-policy，样本高效（休眠比率机制）；PPO：on-policy，GPU 加速。</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>残差动作学习</strong>
+          <small>手臂：粗粒度（人类）+ 精细（学习）；手部：完全学习。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>阶段三：Sim2Real 迁移</h4>
+        <div class="arch-card arch-motor">
+          <strong>DAgger 蒸馏</strong>
+          <small>状态专家到基于深度图像的 ResNet-18 学生，带 rollout 调度。</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>深度数据增强</strong>
+          <small>裁剪、高斯噪声/模糊、像素 dropout、NYU Depth 混合。</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>混合 Sim2Real 控制</strong>
+          <small>真实观测到动作；动作在仿真中执行以获取关节值。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>阶段四：移动部署</h4>
+        <div class="arch-card arch-thrust">
+          <strong>ViNT 导航</strong>
+          <small>图像目标基础模型；长时域零样本导航。</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>闭环 PnP</strong>
+          <small>LoFTR + RANSAC PnP + PID：1.3 cm / 0.57 deg 末端精度。</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>6 个双臂任务</strong>
+          <small>67.8% 成功率；+54% 超越基线；零样本泛化至新物体。</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>人类意图捕获</span>
+      <span>策略学习</span>
+      <span>域适应</span>
+      <span>真实世界执行</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>核心瓶颈</strong><small>人类与机器人运动学/动力学之间的具身鸿沟。</small></div>
+      <div class="arch-metric"><strong>主要创新</strong><small>统一 RL 接受任意运动来源，配合接触门控奖励。</small></div>
+      <div class="arch-metric"><strong>成功关键</strong><small>物体轨迹作为跨具身参考；残差学习处理鸿沟。</small></div>
+      <div class="arch-metric"><strong>当前局限</strong><small>仅支持准静态任务；碰撞调参仍需手工完成。</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 系统框架 —— 端到端数据流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph DATA["多源人类运动数据"]
+      TELEOP["遥操作（仿真）Apple VisionPro 75Hz"]
+      MOCAP["MoCap 数据集 OakInk2 via DexPilot"]
+      VIDEO["野生视频 WiLoR + FoundationPose + PnP"]
+    end
+
+    subgraph RETARGET["运动重定向与增强"]
+      RET["DexPilot 运动学重定向"]
+      AUG["轨迹增强 单次演示周围随机化物体位姿"]
+      UNIFY["统一格式 物体轨迹 + 手部关键点"]
+    end
+
+    subgraph RL["统一 RL 训练（MuJoCo / MJX）"]
+      MDP["目标条件 MDP s=(本体感知, 目标) a=关节指令"]
+      REWARD["统一奖励：物体中心距离链 + 轨迹跟踪 + 功率惩罚"]
+      DRM["DrM Off-Policy（样本高效，休眠比率）"]
+      PPO["PPO On-Policy MJX（GPU 并行，快速墙钟）"]
+      RESIDUAL["残差动作：手臂=(粗+精) 手部=学习"]
+    end
+
+    subgraph DISTILL["DAgger 蒸馏至视觉策略"]
+      TEACHER["基于状态的专家策略"]
+      STUDENT["基于深度图像的学生 ResNet-18 + GroupNorm"]
+      DAUG["深度增强 裁剪、噪声、模糊、NYU 混合"]
+    end
+
+    subgraph DEPLOY["真实世界部署"]
+      NAV["ViNT 图像目标导航"]
+      PNP["闭环 PnP LoFTR + RANSAC + PID"]
+      HYBRID["混合 Sim2Real 控制 观测→动作→仿真前向→关节"]
+      ROBOT["物理机器人 X1 + 2x Galaxea A1 + 2x OYMotion 手"]
+    end
+
+    TELEOP --> RET
+    MOCAP --> RET
+    VIDEO --> RET
+    RET --> AUG --> UNIFY --> MDP
+    MDP --> REWARD --> DRM & PPO
+    DRM & PPO --> RESIDUAL --> TEACHER
+    TEACHER --> STUDENT
+    DAUG --> STUDENT
+    STUDENT --> NAV --> PNP --> HYBRID --> ROBOT
+
+    classDef data fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef retarget fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef rl fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef distill fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef deploy fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class TELEOP,MOCAP,VIDEO data
+    class RET,AUG,UNIFY retarget
+    class MDP,REWARD,DRM,PPO,RESIDUAL rl
+    class TEACHER,STUDENT,DAUG distill
+    class NAV,PNP,HYBRID,ROBOT deploy
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 —— 从人类运动到机器人执行</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph HUMAN["人类数据（每任务一次演示）"]
+      H1["遥操作：Apple VisionPro 手臂+手部位姿"]
+      H2["MoCap：OakInk2 MANO 手部参数"]
+      H3["视频：WiLoR 2D/3D 关键点 + FoundationPose 物体位姿"]
+    end
+
+    subgraph EXTRACT["共享表征"]
+      E1["手部关键点：指尖位置、手掌坐标"]
+      E2["物体位姿：位置 + 朝向（四元数）"]
+      E3["接触状态：手-物网格接触点对"]
+    end
+
+    subgraph LEARN["RL 训练 + Sim2Real 迁移"]
+      S1["状态：本体感知 + 参考轨迹目标"]
+      S2["24-DoF 动作：残差（手臂粗+精，手部学习）"]
+      S3["奖励：r_chain（接触门控）+ r_track + r_power"]
+      S4["DAgger：蒸馏状态专家至深度视觉学生"]
+    end
+
+    subgraph EXECUTE["真实世界部署"]
+      R1["RGB-D：RealSense L515 堆叠深度帧"]
+      R2["策略：深度图像→关节指令 via ResNet-18+GroupNorm"]
+      R3["混合控制：真实观测→动作→仿真前向→真实关节"]
+    end
+
+    HUMAN -->|"重定向 + 增强"| EXTRACT
+    EXTRACT -->|"参考轨迹"| LEARN
+    LEARN -->|"视觉策略"| EXECUTE
+
+    classDef human fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef extract fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef learn fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef execute fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class H1,H2,H3 human
+    class E1,E2,E3 extract
+    class S1,S2,S3,S4 learn
+    class R1,R2,R3 execute
+    </pre>
+  </div>
+
+  <h3>3.3 工作流 —— 完整工程管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段一：数据采集与预处理"]
+      P1A["每任务采集 1 次人类演示，任意来源"]
+      P1B["DexPilot 重定向：人类关节映射到机器人关节"]
+      P1C["提取物体轨迹 via FoundationPose 或真值"]
+      P1D["轨迹增强：在演示周围随机化物体位姿"]
+    end
+
+    subgraph PHASE2["阶段二：仿真中 RL 训练"]
+      P2A["初始化 MuJoCo 环境：机器人 URDF、物体网格、碰撞基元"]
+      P2B["DrM：off-policy，休眠比率机制，高样本效率"]
+      P2C["PPO on MJX：GPU 加速并行环境，快速墙钟"]
+      P2D["提前终止 + 碰撞禁用退火策略促进探索"]
+    end
+
+    subgraph PHASE3["阶段三：Sim2Real 迁移"]
+      P3A["DAgger：混合专家/学生 rollout，退火调度"]
+      P3B["深度增强：裁剪、噪声、模糊、NYU 混合"]
+      P3C["训练学生：ResNet-18+GroupNorm，L1/L2 动作损失"]
+      P3D["混合控制：真实观测→动作→仿真前向→真实关节"]
+    end
+
+    subgraph PHASE4["阶段四：移动部署"]
+      P4A["ViNT：导航至目标图像位置（零样本）"]
+      P4B["Efficient LoFTR：当前视图与目标视图稠密特征匹配"]
+      P4C["PnP + PID：RANSAC 位姿估计 + PID x/y/yaw 调节"]
+      P4D["操作策略：零样本双臂任务执行"]
+    end
+
+    PHASE1 --> PHASE2 --> PHASE3 --> PHASE4
+
+    P4D -.->|"反馈：透明物体需 5 条真实轨迹微调"| P3C
+    P4C -.->|"反馈：达到 1.3-3.2cm / 0.57-2.06deg"| P4B
+    P2D -.->|"反馈：碰撞参数需手工调参"| P2A
+
+    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class P1A,P1B,P1C,P1D p1
+    class P2A,P2B,P2C,P2D p2
+    class P3A,P3B,P3C,P3D p3
+    class P4A,P4B,P4C,P4D p4
+    </pre>
+  </div>
+</section>
+
+<section id="task">
+  <h2>4. 任务定义</h2>
+
+  <h3>4.1 问题建模</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \max_{\pi} \; \mathbb{E}_{\tau \sim \mathcal{D}_{\text{multi}}} \left[ \sum_{t} \gamma^t r(s_t, a_t; g_t) \right] \quad \text{s.t.} \quad s_{t+1} = f_{\text{sim}}(s_t, a_t), \quad a_t^{\text{real}} = \mathcal{T}_{\text{s2r}}(\pi(o_t^{\text{real}})) $$
+    <div class="eq-note">
+      <strong>$\pi$</strong> = 学习的操作策略 &nbsp;|&nbsp;
+      <strong>$\mathcal{D}_{\text{multi}}$</strong> = 多源人类运动数据（遥操作、MoCap、视频）&nbsp;|&nbsp;
+      <strong>$\tau$</strong> = 单次人类演示的参考轨迹 &nbsp;|&nbsp;
+      <strong>$r$</strong> = 统一奖励（物体中心距离链 + 轨迹跟踪 + 功率惩罚）&nbsp;|&nbsp;
+      <strong>$\mathcal{T}_{\text{s2r}}$</strong> = sim2real 迁移模块（DAgger 蒸馏 + 混合控制）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：策略必须在真实世界中工作，仅依赖深度观测，能处理新物体，并协调移动导航与双臂操作——以上全部仅需一次人类演示。
+    </div>
+  </div>
+
+  <h3>4.2 输入 / 输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入（训练）</strong></td><td>单次人类演示：手部关键点 + 物体轨迹 + 仿真中机器人本体感知</td><td>手部：6-DoF x 2；物体：6-DoF 轨迹</td></tr>
+    <tr><td><strong>输入（推理）</strong></td><td>RealSense L515 堆叠深度图像（3 帧）+ 机器人本体感知</td><td>深度：HxW；本体感知：手臂 + 手部关节位置</td></tr>
+    <tr><td><strong>输出</strong></td><td>双 6-DoF 手臂（Galaxea A1）+ 双 6-DoF 手部（OYMotion）的关节级位置指令</td><td>手臂：6 DoF x 2；手部：6 DoF x 2（共 24 DoF）</td></tr>
+    <tr><td><strong>任务</strong></td><td>6 个双臂任务：交接（Handover）、倒茶（Pour Teapot）、擦桌（Clean Table）、扫描瓶子（Scan Bottle）、取下瓶子（Put-off Bottle）、清洗盘子（Clean Plate）</td><td>全部需要协调双手灵巧性 + 移动底座接近</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>全栈机器人学习系统</strong>，涵盖模仿学习、RL、sim2real 迁移和移动操作。不是单纯的算法论文，而是一个完整的管线：从原始多源人类数据到真实世界双臂灵巧执行，运行在物理移动机器人上。平台配置：X1 底座 + 双 Galaxea A1 手臂 + 双 OYMotion 手部 + RealSense L515 + NVIDIA RTX 4090。核心主张：<strong>每任务仅需一次人类演示</strong>，得益于轨迹增强和基于 RL 的策略自适应。</p>
+</section>
+
+<section id="challenge">
+  <h2>5. 关键挑战</h2>
+
+  <h3>5.1 本质（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断（First-Principles Diagnosis）</div>
+    <strong>核心矛盾</strong>：人机技能迁移面临<strong>数据多样性</strong>、<strong>具身保真度</strong>和<strong>任务通用性</strong>之间的三重张力。<br><br>
+    (1) <strong>具身鸿沟（Embodiment Gap）</strong>：人手（21+ DoF）与机器人手（OYMotion 6-DoF）有根本不同的运动学。直接关节映射产生物理不可行的动作——自碰撞、接触丢失、力度不足。这不是缩放因子，而是<strong>拓扑不匹配</strong>。<br><br>
+    (2) <strong>多源异构性</strong>：(i) 仿真遥操作：高保真 75 Hz，需要 VR 设备；(ii) MoCap：带噪声的骨架，存在遮挡和坐标歧义；(iii) 野生视频：2D 像素需要 3D 估计，误差较大。三者在坐标系、噪声水平、分辨率和完整性上各不相同。<br><br>
+    (3) <strong>24-DoF 双臂动作空间</strong>：双 6-DoF 手臂 + 双 6-DoF 手部 = 24 维连续空间。缺乏强先验时，随机探索几乎不可能成功。ObjDex 正是因为此问题在双臂多物体任务上表现不佳。<br><br>
+    (4) <strong>接触密集任务的 Sim2Real 迁移</strong>：多点接触在仿真（MuJoCo 等式约束）和现实之间存在差异。深度图像的域偏移（仿真：完美；真实：噪声、空洞、偏差）尽管优于 RGB，仍然严重。<br><br>
+    (5) <strong>导航到操作的鸿沟</strong>：ViNT 提供约 10 cm / 约 5 deg 精度——不足以支撑需要厘米级精度的灵巧操作。此前没有方法能在不使用昂贵 SLAM 的情况下桥接这一鸿沟。
+  </div>
+
+  <h3>5.2 先前方法及其局限</h3>
+  <table>
+    <tr><th>先前方法</th><th>核心思路</th><th>失败原因</th></tr>
+    <tr><td>运动学重定向 + 回放（DexPilot）</td><td>优化映射人手到机器人关节，开环回放</td><td><strong>无动力学</strong>：轨迹不可行，自碰撞。物体位姿变化时完全失败。无法泛化。</td></tr>
+    <tr><td>任务特定模仿（ACT, Diffusion Policy）</td><td>每任务采集 50-200 次遥操作演示，行为克隆</td><td><strong>数据饥渴</strong>：每任务数百次演示。无跨任务或跨来源泛化。无 sim2real。</td></tr>
+    <tr><td>ObjDex（Gu et al., 2024）</td><td>从人类视频出发的物体中心 RL 奖励</td><td><strong>仅支持单物体</strong>：单手、单物体。双臂多物体任务失败。奖励需逐任务调参。</td></tr>
+    <tr><td>ViNT + 开环操作</td><td>导航至目标，执行预录轨迹</td><td><strong>末端误差过大</strong>：约 10 cm 偏移导致操作失败。无闭环修正。</td></tr>
+    <tr><td>RGB-D SLAM + 导航（RTAB-MAP）</td><td>通过 SLAM 建图、定位、规划路径</td><td><strong>无纹理场景失效</strong>：无特征时退化。需要预先建图。</td></tr>
+  </table>
+
+  <h3>5.3 关键挑战列表</h3>
+  <ul>
+    <li><strong>挑战 1——统一多源数据接入</strong>：将遥操作（75 Hz 关节角）、MoCap（带噪声 MANO 参数）和视频（2D 像素 + WiLoR 误差）转化为统一格式，且不丢失行为意图。</li>
+    <li><strong>挑战 2——无需任务工程化的接触门控奖励</strong>：成功依赖物理接触，但仅从视觉模拟和检测接触极其困难。奖励必须鼓励接触而不依赖逐任务标注。</li>
+    <li><strong>挑战 3——24-DoF 空间中的高效探索</strong>：随机探索在 24-DoF 双臂空间中成功概率为零。残差分解（人类先验 + 学习修正）是关键所在。</li>
+    <li><strong>挑战 4——深度域鸿沟</strong>：仿真深度完美；RealSense L515 存在空洞、噪声和偏差。标准域随机化（纹理）对深度不适用——需要专门的增强策略。</li>
+    <li><strong>挑战 5——导航-操作闭环</strong>：ViNT 和操作具有不同的精度需求。在不依赖 SLAM 的情况下桥接二者，是实现自主移动灵巧操作的关键。</li>
+  </ul>
+</section>
+
+<section id="method">
+  <h2>6. 方法与公式</h2>
+
+  <h3>6.1 核心算法</h3>
+  <p>HERMES 是一个四阶段管线：(1) 多源人类运动重定向和轨迹提取；(2) 统一 RL，采用目标条件 MDP 和残差动作学习；(3) DAgger 蒸馏，从状态专家到深度视觉学生；(4) 移动部署，通过 ViNT 导航 + 闭环 PnP + 混合控制实现。</p>
+
+  <h3>6.2 核心公式</h3>
+
+  <h4>A 组：残差动作学习</h4>
+  <div class="formula-block">
+    <span class="eq-tag">公式 (1) —— 残差动作分解</span>
+    $$ a_{\text{arm}} = a_{\text{coarse}}(\tau) + \pi_{\text{fine}}(s) \qquad a_{\text{hand}} = \pi(s) $$
+    <div class="eq-note">
+      <strong>$a_{\text{arm}}$</strong> = 最终手臂关节指令（12 DoF）&nbsp;|&nbsp;
+      <strong>$a_{\text{coarse}}(\tau)$</strong> = 来自人类轨迹的粗粒度动作（覆盖约 80-90% 运动）&nbsp;|&nbsp;
+      <strong>$\pi_{\text{fine}}(s)$</strong> = 学习的残差，用于具身修正和物体位姿自适应 &nbsp;|&nbsp;
+      <strong>$a_{\text{hand}}$</strong> = 手部关节指令（12 DoF），<strong>完全由学习获得</strong>，因为重定向误差使得粗粒度先验比随机更差 &nbsp;|&nbsp;
+      <strong>核心洞察</strong>：将探索空间从完整的 24-DoF 体积缩小到残差子空间——策略只需学习修正量。
+    </div>
+  </div>
+
+  <h4>B 组：接触门控统一奖励</h4>
+  <div class="formula-block">
+    <span class="eq-tag">公式 (2) —— 统一奖励（任务无关）</span>
+    $$ r(s_t, g_t) = \lambda_{\text{chain}} r_{\text{chain}} \cdot \mathbb{1}[n_{\text{contact}} > \delta] + \lambda_{\text{track}} r_{\text{track}} + \lambda_{\text{power}} r_{\text{power}} $$
+    $$ r_{\text{track}} = -\lambda_p \|p_t - \hat{p}_t\| - \lambda_o \, d_{\text{quat}}(o_t, \hat{o}_t), \quad r_{\text{power}} = -\lambda \sum_{j \in \mathcal{J}} \|\tau_j \cdot \dot{q}_j\| $$
+    <div class="eq-note">
+      <strong>$r_{\text{chain}}$</strong> = 物体中心距离链：从物体中心到各指尖和手掌的时序向量 &nbsp;|&nbsp;
+      <strong>$\mathbb{1}[n_{\text{contact}} > \delta]$</strong> = <strong>接触门控</strong>：仅当网格接触点对超过阈值（3 个）时激活。防止无物理接触的视觉模仿 &nbsp;|&nbsp;
+      <strong>$r_{\text{track}}$</strong> = 位置 + 四元数距离，跟踪参考物体轨迹 &nbsp;|&nbsp;
+      <strong>$r_{\text{power}}$</strong> = 力矩 x 速度惩罚，鼓励平滑、节能的动作 &nbsp;|&nbsp;
+      <strong>关键特性</strong>：跨全部 6 个任务通用，无需调参——仅参考轨迹 $\tau$ 随任务变化。
+    </div>
+  </div>
+
+  <h4>C 组：DAgger 蒸馏</h4>
+  <div class="formula-block">
+    <span class="eq-tag">公式 (3) —— 带 Rollout 调度器的 DAgger</span>
+    $$ \mathcal{L}_{\text{DAgger}} = \mathbb{E}_{(o,p) \sim \mathcal{D}_{\text{mix}}} \big[ \|\pi_{\text{student}}(o,p) - a_{\text{expert}}(s)\|_1 + \|\pi_{\text{student}}(o,p) - a_{\text{expert}}(s)\|_2^2 \big] $$
+    $$ \beta_k = \max(\beta_{\min}, \beta_0 \cdot \gamma_{\text{DAgger}}^k) $$
+    <div class="eq-note">
+      <strong>$o$</strong> = RealSense L515 的 3 帧堆叠深度图像 &nbsp;|&nbsp;
+      <strong>$p$</strong> = 注入高斯噪声的机器人本体感知 &nbsp;|&nbsp;
+      <strong>$\beta_k$</strong> = 专家/学生混合比例，从 $\beta_0=1.0$ 退火至 $\beta_{\min}=0.1$ &nbsp;|&nbsp;
+      <strong>深度增强</strong>：$\tilde{o} = \text{Augment}(o)$ = 裁剪 + 高斯噪声/模糊 + 像素 dropout + <strong>NYU Depth v2 混合</strong>以实现分布对齐。
+    </div>
+  </div>
+
+  <h4>D 组：闭环 PnP 定位</h4>
+  <div class="formula-block">
+    <span class="eq-tag">公式 (4) —— PnP 位姿精化 + PID 控制</span>
+    $$ \mathbf{T}_{\text{rel}} = \arg\min_{R,t} \sum_i \rho\big( \|\mathbf{x}_i^{\text{curr}} - \pi(K [R \mid t] \mathbf{X}_i^{\text{goal}})\|^2 \big) $$
+    $$ \mathbf{u}_{\text{PID}} = K_p \mathbf{e} + K_i \int \mathbf{e} dt + K_d \frac{d\mathbf{e}}{dt}, \quad \mathbf{e} = [\Delta x, \Delta y, \Delta \theta_{\text{yaw}}]^{\top} $$
+    <div class="eq-note">
+      <strong>$\mathbf{x}_i^{\text{curr}}, \mathbf{X}_i^{\text{goal}}$</strong> = Efficient LoFTR 稠密匹配产生的 2D-3D 对应 &nbsp;|&nbsp;
+      <strong>$\rho$</strong> = RANSAC 阶段的 Huber 损失，随后 Levenberg-Marquardt 精化 &nbsp;|&nbsp;
+      <strong>PID</strong>：依次调节 x、y、yaw &nbsp;|&nbsp;
+      <strong>精度</strong>：1.3-3.2 cm 平移，0.57-2.06 deg 旋转。
+    </div>
+  </div>
+
+  <h3>6.3 关键训练参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th></tr>
+    <tr><td>动作空间</td><td><strong>24-DoF</strong></td><td>双 6-DoF 手臂（12）+ 双 6-DoF 手部（12）</td></tr>
+    <tr><td>RL 算法</td><td><strong>DrM + PPO (MJX)</strong></td><td>DrM：off-policy，含休眠比率；PPO：on-policy，GPU 并行</td></tr>
+    <tr><td>视觉编码器</td><td><strong>ResNet-18 + GroupNorm</strong></td><td>3 帧堆叠深度图像；GroupNorm 适配小批量 DAgger</td></tr>
+    <tr><td>深度增强</td><td><strong>裁剪 + 噪声 + NYU 混合</strong></td><td>裁剪 [0.3m, 3.0m]；高斯 sigma=0.005；混合 alpha=0.2</td></tr>
+    <tr><td>接触门控阈值</td><td><strong>$\delta = 3$ 个点</strong></td><td>激活奖励所需的最小网格接触点对数</td></tr>
+    <tr><td>DAgger 退火</td><td><strong>$\beta_0=1.0 \to \beta_{\min}=0.1$</strong></td><td>专家比例从 100% 衰减至 10%</td></tr>
+    <tr><td>轨迹增强</td><td><strong>5 cm / 15 deg</strong></td><td>在单次演示周围随机化物体位姿</td></tr>
+  </table>
+
+  <h3>6.4 运动学重定向 vs RL 策略</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>运动学重定向 + 直接回放</h4>
+      <ul>
+        <li>通过优化将人手关节映射到机器人关节</li>
+        <li><strong>开环</strong>：无反馈，无动力学</li>
+        <li>物体位姿随机化时<strong>失败</strong></li>
+        <li>双臂协调任务<strong>失败</strong></li>
+        <li>sim2real（运动学不匹配）<strong>失败</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>HERMES RL 策略</h4>
+      <ul>
+        <li>人类轨迹作为<strong>行为意图</strong></li>
+        <li><strong>闭环</strong>：观测状态，在线调整</li>
+        <li>新物体位姿<strong>零样本</strong>泛化</li>
+        <li>通过距离链<strong>处理双臂</strong>协调</li>
+        <li>通过深度 DAgger + 混合控制实现<strong>鲁棒 sim2real</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="principles">
+  <h2>7. 深层原理</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">三个相互关联的原理：(1) 用于接触密集操作的接触门控物体中心奖励；(2) 用于可处理的高自由度探索的残差动作分解；(3) 用于鲁棒感知迁移的基于深度图像的 sim2real 方法。</p>
+
+  <h3>7.1 物体中心距离链 —— 为什么接触门控至关重要</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 —— 接触门控奖励机制</span>
+    $$ r_{\text{chain}} = -\sum_{k \in \mathcal{K}} \sum_{f \in \mathcal{F}} \big\| \mathbf{d}_{k,f}(t) - \hat{\mathbf{d}}_{k,f}(t) \big\| \cdot \mathbb{1}\!\big[ \sum_{c \in \mathcal{C}} \mathbb{1}[d_{\text{contact}}(c) < \epsilon] > \delta \big] $$
+    <div class="eq-note">
+      <strong>$\mathcal{K}$</strong> = 关键点（指尖 + 手掌）&nbsp;|&nbsp;
+      <strong>$\mathbf{d}_{k,f}(t)$</strong> = 在帧 $f$ 时刻，从物体中心到关键点 $k$ 的向量 &nbsp;|&nbsp;
+      <strong>$\mathcal{C}$</strong> = 网格接触点对 &nbsp;|&nbsp;
+      <strong>无接触门控时</strong>：策略会将手放在物体附近而不接触，最小化奖励（视觉模仿）。<strong>有门控时</strong>：奖励仅在物理交互期间有效——必须抓握和操作才能成功。<strong>相同的</strong>物体相对手部运动，在不同具身上映射为<strong>不同的</strong>关节配置——这正是跨具身泛化的关键所在。
+    </div>
+  </div>
+
+  <h3>7.2 残差动作学习 —— 驯服 24-DoF 探索空间</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 —— 探索复杂度缩减</span>
+    $$ V_{\text{full}} = \prod_{i=1}^{24} (a_i^{\max} - a_i^{\min}) \;\gg\; V_{\text{residual}} = \prod_{i=1}^{12} (\Delta a_i^{\max} - \Delta a_i^{\min}) $$
+    <div class="eq-note">
+      <strong>$V_{\text{full}}$</strong> = 完整的 24-DoF 动作空间——天文数字般巨大；随机探索的成功概率为零 &nbsp;|&nbsp;
+      <strong>$V_{\text{residual}}$</strong> = 12-DoF 残差子空间（仅手臂修正；手部完全学习但由物体奖励引导）——大幅缩小 &nbsp;|&nbsp;
+      <strong>类比</strong>：全动作学习 = "这是钢琴，请弹贝多芬。" 残差学习 = "这是乐谱，请调整你的手指力度和时机让演奏更好听。"
+    </div>
+  </div>
+
+  <h3>7.3 基于深度图像的 Sim2Real —— 为什么深度优于 RGB</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 —— 深度 vs RGB 域鸿沟</span>
+    $$ \text{MMD}(\mathcal{D}_{\text{sim}}^{\text{RGB}}, \mathcal{D}_{\text{real}}^{\text{RGB}}) \gg \text{MMD}(\mathcal{D}_{\text{sim}}^{\text{depth}}, \mathcal{D}_{\text{real}}^{\text{depth}}) $$
+    <div class="eq-note">
+      <strong>RGB 鸿沟</strong>：仿真渲染完美的纹理和光照；真实世界随光照、曝光、材质、阴影变化。极难用域随机化覆盖所有因素 &nbsp;|&nbsp;
+      <strong>深度鸿沟</strong>：单通道几何距离。主要鸿沟：噪声、空洞、偏差——可通过针对性增强（噪声、dropout、NYU 混合）处理 &nbsp;|&nbsp;
+      <strong>关键发现</strong>：直接深度增强<strong>优于</strong> Depth-Anything 对齐——尽管语义对齐更差，但定量分布匹配更好。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的协同作用</div>
+    <strong>物体中心奖励</strong>提供跨具身信号。<strong>残差分解</strong>使探索可行。<strong>基于深度的 sim2real</strong>弥合感知鸿沟。三者相互增强：残差动作为奖励评估提供有意义的候选方案；深度策略确保学习到的行为能迁移到现实世界。
+  </div>
+</section>
+
+<section id="figures">
+  <h2>8. 图表证据</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">将截图保存到 <code>figures/</code> 目录。当前 <code>figures/overview.png</code> 可用。</p>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">图 总览</span>
+      <span class="fig-caption">HERMES：从多源人类运动到双臂灵巧操作</span>
+      <span class="fig-source">来源：论文 Fig. 1 / Overview</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/overview.png" alt="HERMES System Overview"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>将截图保存为 <code>figures/overview.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图解分析</div>
+      <p><strong>HERMES 完整管线</strong>：三种人类数据源（仿真遥操作、MoCap、野生视频）输入统一 RL 训练，随后通过 DAgger 蒸馏 + ViNT + PnP 部署到移动双臂机器人上。</p>
+      <ul>
+        <li><strong>左</strong>：(1) Apple Vision Pro 遥操作，75 Hz；(2) OakInk2 MoCap，通过 DexPilot 重定向；(3) 野生视频，通过 WiLoR + FoundationPose + PnP。</li>
+        <li><strong>中</strong>：目标条件 MDP，含接触门控物体中心奖励；残差动作学习；DrM/PPO 训练。</li>
+        <li><strong>右</strong>：DAgger 蒸馏至深度策略；ViNT 导航；闭环 PnP；在 X1 + Galaxea A1 + OYMotion 平台上的混合 sim2real 控制。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">图 结果</span>
+      <span class="fig-caption">6 个真实世界双臂任务及定量结果</span>
+      <span class="fig-source">来源：论文实验部分</span>
+    </div>
+    <div class="fig-image">
+      <div class="fig-placeholder">将截图保存为 <code>figures/results.png</code></div>
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图解分析</div>
+      <p><strong>六个任务</strong>：双臂交接（Bimanual Handover）、倒茶（Pour Teapot）、擦桌（Clean Table）、扫描瓶子（Scan Bottle）、取下瓶子（Put-off Bottle）、清洗盘子（Clean Plate）。</p>
+      <ul>
+        <li>6 个任务<strong>平均零样本成功率 67.8%</strong>，较原始深度基线<strong>提升 54.5%</strong>。</li>
+        <li>透明物体：仅需<strong>额外 5 条真实轨迹</strong>进行微调。</li>
+        <li>在单物体和多物体场景的样本效率上均<strong>优于 ObjDex</strong>。</li>
+        <li>通过几何形状随机化实现对新物体形状的<strong>零样本泛化</strong>。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">图 定位</span>
+      <span class="fig-caption">闭环 PnP：从 ViNT 导航到精确操作</span>
+      <span class="fig-source">来源：论文导航章节</span>
+    </div>
+    <div class="fig-image">
+      <div class="fig-placeholder">保存为 <code>figures/localization.png</code></div>
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图解分析</div>
+      <ul>
+        <li>精度达到 <strong>1.3-3.2 cm / 0.57-2.06 deg</strong>——远超仅使用 ViNT（约 10 cm / 约 5 deg）。</li>
+        <li>ViNT + Efficient LoFTR + RANSAC PnP + PID 依次调节 x/y/yaw。</li>
+        <li>相比仅用 ViNT，操作成功率提升 <strong>+54%</strong>。不同于 SLAM（RTAB-MAP），对无纹理场景鲁棒。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="flaw">
+  <h2>9. 局限与延伸</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>准静态假设</strong>：在快速、动态任务（投掷、接球、快速装配）上失败。惯性和动量被忽略。</li>
+    <li><strong>手工仿真工程</strong>：碰撞基元和关节约束需要逐物体手工调参，限制可扩展性。</li>
+    <li><strong>仍需要每任务一次演示</strong>：轨迹增强实现了空间泛化，但无法从零发明全新的任务类型。</li>
+    <li><strong>透明/反光物体</strong>：RealSense L515 深度失效；需 5 条额外真实轨迹进行微调。</li>
+    <li><strong>与硬件耦合</strong>：紧密绑定 X1 + Galaxea A1 + OYMotion + L515 平台。跨具身声明适用于人类数据来源，而非机器人平台。</li>
+  </ul>
+
+  <h3>9.2 延伸方向</h3>
+  <ul>
+    <li><strong>动态操作</strong>：引入动量感知奖励，更高的控制频率以支持投掷/接球等任务。</li>
+    <li><strong>自动仿真搭建</strong>：碰撞基元的凸分解，关节约束自动配置。</li>
+    <li><strong>多模态感知</strong>：引入触觉传感器（GelSight）处理透明物体和接触验证。</li>
+    <li><strong>跨机器人迁移</strong>：策略以运动学参数为条件，实现机器人无关的控制。</li>
+    <li><strong>语言条件化</strong>：VLM 从文本生成参考轨迹；RL 精化。零人类演示。</li>
+  </ul>
+
+  <h3>9.3 失败模式</h3>
+  <table>
+    <tr><th>失败模式</th><th>根因</th><th>严重程度</th></tr>
+    <tr><td>透明表面深度失效</td><td>结构光无法在散射/透射表面测量</td><td>高</td></tr>
+    <tr><td>视觉模糊场景下 ViNT 失效</td><td>感知混淆（走廊中相同外观的门）</td><td>高</td></tr>
+    <tr><td>双臂接触不稳定</td><td>一只手的力量误差破坏另一只手的抓握；无显式协调奖励</td><td>中</td></tr>
+    <tr><td>大视角变化下 PnP 失效</td><td>LoFTR 在超过约 45 度时退化；ViNT 必须在容差范围内</td><td>中</td></tr>
+    <tr><td>DAgger 分布偏移</td><td>学生漂移至专家未覆盖的状态；退火策略缓解但未消除</td><td>低-中</td></tr>
+  </table>
+
+  <h3>9.4 深度探索方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深入探索的方向</div>
+    <strong>VLM 到轨迹：零样本灵巧操作</strong>：用 VLM 生成的参考轨迹替代人类演示。VLM 通过 RGB-D 观察场景，理解任务（"将茶倒入杯中"），输出物体轨迹 + 手部关键点。RL 策略将其精化为可执行动作。将 HERMES 从"单样本模仿"转化为<strong>完全自主、开放词汇的操作系统</strong>——任何自然语言任务，零人类演示。关键问题：(1) RL 收敛所需的最小 VLM 轨迹精度？(2) RL 能否将轨迹误差作为增强来处理？(3) 基于 VLM 的任务完成验证？
+  </div>
+</section>
+
+<section id="motivation">
+  <h2>10. 动机推导</h2>
+
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong>机器人灵巧操作面临三重困难：(a) 机器人演示代价高昂（每任务数小时）；(b) 人类数据丰富但不兼容（异构格式）；(c) 具身鸿沟意味着直接回放必然失败。核心问题：<strong>能否利用任意来源的易获取人类数据来训练机器人？</strong></li>
+    <li><strong>此前的方法为何不够？</strong>(i) 机器人专用演示（ACT）：准确但昂贵，不可扩展。(ii) 运动学重定向（DexPilot）：廉价但在接触和位姿变化时失败。(iii) 单源 RL（ObjDex）：仅视频、单手、单物体，需逐任务调参。</li>
+    <li><strong>将"做什么"与"怎么做"分离？</strong><strong>做什么</strong> = 物体轨迹 + 接触模式（跨具身，可从任意人类来源提取）。<strong>怎么做</strong> = 关节级控制（具身特定，必须通过 RL 学习）。两全其美。</li>
+    <li><strong>从任意来源提取"做什么"？</strong>遥操作：直接关节映射。MoCap：DexPilot + RL 补偿。视频：WiLoR + FoundationPose + PnP。所有输出：手部关键点 + 物体轨迹。通过增强实现空间泛化。</li>
+    <li><strong>高效学习"怎么做"？</strong>目标条件 MDP + 统一任务无关奖励（接触门控距离链 + 跟踪 + 功率惩罚）。残差动作分解缩小探索空间。DrM/PPO 训练。DAgger 蒸馏至深度策略以实现真实部署。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    人类每天产生海量操作数据（视频、MoCap、VR）——但机器人无法直接使用，原因在于具身鸿沟和格式异构——因此 HERMES 从<strong>任意</strong>人类来源中提取<strong>物体级操作意图</strong>，并通过 RL 将其转化为物理可行的机器人行为，每任务仅需<strong>一次演示</strong>。
+  </div>
+
+  <h3>10.3 如何得出这个想法</h3>
+  <ul>
+    <li><strong>步骤一——观察不对称性</strong>：YouTube 上数百万小时的人类操作视频 vs. 数小时才能采集 50 条遥操作演示。为什么机器人不能从人类数据中学习？</li>
+    <li><strong>步骤二——诊断瓶颈</strong>：人类数据编码的是<strong>意图</strong>（物体发生了什么）而非<strong>控制</strong>（关节力矩）。此前方法将其视为控制（重定向——失败）或纯粹的行为克隆演示（需要数百条——昂贵）。</li>
+    <li><strong>步骤三——识别不变量</strong>：跨所有来源的不变量是<strong>手-物交互结构</strong>：哪只手何时接近什么、何时发生接触、物体如何移动。与机器人具身无关。</li>
+    <li><strong>步骤四——设计框架</strong>：(i) 利用现成工具从任意来源提取不变量。(ii) 作为 RL 的参考而非控制指令。(iii) 接触门控奖励跟踪参考轨迹同时处理具身差异。(iv) 残差动作使探索可行。(v) 基于深度的迁移。(vi) PnP 定位桥接导航与操作。</li>
+  </ul>
+</section>
+
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+
+  <h3>11.1 经验总结</h3>
+  <ul>
+    <li><strong>方法论</strong>：<strong>分解以复用</strong>——将"做什么"（物体意图，跨具身）与"怎么做"（机器人控制，具身特定）分离。对无人机研究的启示：将"飞去哪里"（任务意图）与"如何飞行"（学习控制）分离。</li>
+    <li><strong>工程实践</strong>：(1) <strong>接触门控</strong>看似简单但至关重要——没有它，视觉模仿将主导物理交互。(2) <strong>残差学习</strong>使高自由度探索变得可行。(3) <strong>深度 > RGB for sim2real</strong>，当几何信息至关重要时。(4) <strong>经典 CV + 学习模型 > 二者单独使用</strong>（ViNT + PnP）。</li>
+    <li><strong>论文呈现</strong>：以管线为导向的叙述方式使价值主张清晰有力："给我们任意人类视频，还你一个能做到的机器人。"</li>
+  </ul>
+
+  <h3>11.2 对本研究的启示</h3>
+  <ul>
+    <li><strong>空中操作</strong>：HERMES 管线可适配无人机搭载的灵巧操作，将无人机底座运动作为粗粒度动作的一部分。</li>
+    <li><strong>无人机 Sim2real</strong>：基于深度的 DAgger + 混合控制是可迁移到无人机感知-控制管线的通用方案。</li>
+    <li><strong>多模态无人机数据</strong>：从人类驾驶日志、仿真轨迹、机载传感器和生物飞行视频中提取共同的"飞行意图"。</li>
+    <li><strong>精准着陆</strong>：ViNT + PnP 模式可直接映射到无人机精准着陆/栖息——基础导航 + 经典 CV 定位。</li>
+  </ul>
+
+  <h3>11.3 关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>重要性说明</th></tr>
+    <tr><td>Gu et al. (2024) -- ObjDex. <em>arXiv</em></td><td>最接近的前驱工作。基于视频的物体中心奖励。单手、单物体。HERMES 扩展至双臂、多物体、移动平台。</td></tr>
+    <tr><td>Ross et al. (2011) -- DAgger. <em>AISTATS</em></td><td>DAgger 原论文。HERMES 将其应用于状态到视觉的蒸馏，配合特定域的深度增强。</td></tr>
+    <tr><td>Sferrazza et al. (2024) -- ViNT. <em>CoRL</em></td><td>导航骨干。理解其末端精度限制是 PnP 桥接设计的关键。</td></tr>
+    <tr><td>Arunachalam et al. (2022) -- DexPilot. <em>CoRL</em></td><td>运动学重定向作为初始化。RL 处理 DexPilot 无法解决的残差鸿沟。</td></tr>
+    <tr><td>Zhao et al. (2023) -- DrM. <em>NeurIPS</em></td><td>采用休眠比率机制的 RL 算法，在高维空间中增强探索。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes -- Yuan, Wei, Gu, Hua, Liang, Chen, Xu -- arXiv 2025 -- HERMES: Human-to-Robot Embodied Learning from Multi-Source Motion Data for Mobile Dexterous Manipulation -- MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

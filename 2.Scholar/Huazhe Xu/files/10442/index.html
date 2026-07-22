@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - Visual Genome: Connecting Language and Vision Using Crowdsourced Dense Image Annotations</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="wrap">
+<section id="info"><h2>1. Paper Info</h2><h1>Visual Genome: Connecting Language and Vision Using Crowdsourced Dense Image Annotations</h1><table><tr><td>Authors</td><td>Ranjay Krishna, Yuke Zhu, Oliver Groth, Justin Johnson, Kenji Hata, Joshua Kravitz, Stephanie Chen, Yannis Kalantidis, Li-Jia Li, David A. Shamma, Michael S. Bernstein, Li Fei-Fei</td></tr><tr><td>Year</td><td>2017</td></tr><tr><td>Venue</td><td>International Journal of Computer Vision (IJCV), Vol. 123, Issue 1, pp. 32-73</td></tr><tr><td>Affiliation</td><td>Stanford University; Snapchat; Yahoo Research</td></tr><tr><td>Research type</td><td>大规模视觉语言知识库 / 稠密标注数据集</td></tr><tr><td>Local source</td><td><a href="Krishna et al. - 2017 - Visual genome Connecting language and vision using crowdsourced dense image annotations.pdf">Krishna et al. - 2017 - Visual genome Connecting language and vision using crowdsourced dense image annotations.pdf</a></td></tr></table><div><span class="tag tag-blue">视觉语言数据集</span><span class="tag tag-green">Scene Graph</span><span class="tag tag-purple">众包标注</span><span class="tag tag-amber">2017</span><span class="tag tag-cyan">IJCV</span><span class="tag tag-red">Stanford</span><span class="tag tag-gray">Huazhe Xu</span></div></section>
+
+<section id="insight"><h2>2. Insight &amp; Novelty</h2>
+<h3>2.1 核心洞察</h3>
+<div class="callout info">
+  <div class="callout-title">场景图作为视觉理解的结构化中间表示</div>
+  <p>传统的图像理解数据集（如 ImageNet、MS-COCO）将以<strong>单一标签或简短描述</strong>压缩整张图像的全部信息。Visual Genome 的核心理念是：<strong>视觉世界由实体（对象）、实体的属性以及实体间的关系构成</strong>。因此，一张图像不应被压缩为一个分类标签或一句描述，而应被形式化为一张<strong>场景图（Scene Graph）</strong>——节点表示对象及其属性，有向边表示成对关系。这种结构化表示同时连接了视觉像素与自然语言，使得机器不仅能"识别有什么"，还能"理解谁对谁做了什么"。</p>
+</div>
+
+<h3>2.2 关键创新点</h3>
+<div class="novelty-card">
+  <h4>六大创新贡献</h4>
+  <div class="novelty-step"><strong>1. 史上最大规模的稠密视觉标注：</strong>对 108,077 张图像进行了平均每图 35 个对象、26 个属性和 21 个成对关系的极致稠密标注，总计超过 540 万条区域描述、380 万个对象实例、280 万个属性和 230 万对关系。</div>
+  <div class="novelty-step"><strong>2. 场景图的形式化定义：</strong>首次将图像内容形式化为图结构 $\mathcal{G} = (\mathcal{O}, \mathcal{E})$，其中节点 $\mathcal{O}$ 包含对象及其属性，边 $\mathcal{E}$ 表示对象间的有向关系，为视觉推理提供了可计算的表示框架。</div>
+  <div class="novelty-step"><strong>3. 跨模态规范化管道（Canonicalization Pipeline）：</strong>设计了一套将自由文本中的名词短语、形容词和动词分别映射到 WordNet synset 的自动+人工验证管道，确保标注词汇的一致性。对象映射精度 88%、属性 85.7%、关系 92.9%。</div>
+  <div class="novelty-step"><strong>4. 多层标注的统一融合：</strong>将区域描述（Region Descriptions）、对象边界框、属性、关系和问答对（QA Pairs）五种标注类型有机整合到同一数据集中，每种标注互相补充、互相验证。</div>
+  <div class="novelty-step"><strong>5. 区域图到全图场景图的合并：</strong>先将每个区域独立标注为区域图（Region Graph），再通过对象对齐将多个区域图合并为覆盖全图的统一场景图，实现了从局部到全局的标注组织。</div>
+  <div class="novelty-step"><strong>6. 六类 W-问题的问答语料：</strong>包含 <code>what</code>、<code>where</code>、<code>when</code>、<code>who</code>、<code>why</code> 和 <code>how</code> 六种问题类型，共计约 170 万对自由形式问答，支持从感知到推理的多层次视觉问答研究。</div>
+</div>
+
+<h3>2.3 与现有数据集的本质差异</h3>
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>ImageNet / MS-COCO 范式</h4>
+    <ul>
+      <li>整图 → 一个标签或一句描述</li>
+      <li>对象边界框独立标注，无关系</li>
+      <li>语言与视觉的映射是一对一的</li>
+      <li>无法回答"穿红衬衫的男人在做什么"</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>Visual Genome 范式</h4>
+    <ul>
+      <li>整图 → 场景图（对象+属性+关系）</li>
+      <li>对象、属性和关系联合标注</li>
+      <li>语言与视觉的映射是多对多的</li>
+      <li>可回答"男人穿着什么？他和狗是什么关系？"</li>
+    </ul>
+  </div>
+</div>
+
+<h3>2.4 形式化定义：场景图</h3>
+<div class="formula-block">
+  <div class="eq-tag">场景图的数学定义</div>
+  <p>场景图 $\mathcal{G}$ 是一个有向图，形式化定义为：</p>
+  $$ \mathcal{G} = (\mathcal{O}, \mathcal{E}), \quad \mathcal{O} = \{o_1, o_2, \ldots, o_n\}, \quad \mathcal{E} \subseteq \mathcal{O} \times \mathcal{R} \times \mathcal{O} $$
+  <p>其中每个对象节点包含：</p>
+  $$ o_i = (b_i, c_i, A_i), \quad b_i \in \mathbb{R}^4 \text{（边界框）}, \quad c_i \in \mathcal{C} \text{（类别/synset）}, \quad A_i = \{a_{i1}, a_{i2}, \ldots\} $$
+  <p>每条关系边：</p>
+  $$ e_{ij} = (o_i, r, o_j), \quad r \in \mathcal{R} \text{（关系谓词/synset）} $$
+  <div class="eq-note"><strong>关键性质：</strong>场景图将图像从非结构化像素映射为结构化符号表示。每个节点和边的标签都被规范化到 WordNet synset，确保跨图像的概念一致性和可计算性。这种表示天然支持图查询、关系推理和视觉问答。</div>
+</div>
+
+<h3>2.5 区域描述与场景图的关系</h3>
+<div class="formula-block">
+  <div class="eq-tag">从区域描述到场景图</div>
+  <p>对于图像 $I$ 的一组区域 $\mathcal{R} = \{R_1, R_2, \ldots, R_k\}$，每个区域有一条或多条自然语言描述 $D(R_i)$：</p>
+  $$ D(R_i) = \{d_{i1}, d_{i2}, \ldots\} $$
+  <p>从中自动抽取对象、属性和关系三元组：</p>
+  $$ \text{Extract}(D(R_i)) \mapsto (\{o_1, o_2, \ldots\}, \{a_1, a_2, \ldots\}, \{(o_s, r, o_t), \ldots\}) $$
+  <p>最终全图场景图由所有区域图合并得到：</p>
+  $$ \mathcal{G}_{\text{image}} = \bigoplus_{R_i \in \mathcal{R}} \mathcal{G}(R_i) $$
+  <div class="eq-note"><strong>合并逻辑：</strong>当两个区域图中的对象具有空间重叠（IoU 足够高）且被映射到相同 synset 时，将其合并为同一节点。关系边和属性被汇聚到合并后的节点上。这使得场景图随着标注区域的增多而不断丰富。</div>
+</div>
+</section>
+
+<section id="architecture"><h2>3. Architecture &amp; Pipeline</h2>
+<h3>3.1 数据集构建全流程</h3>
+<div class="mermaid-box">
+<pre class="mermaid">
+flowchart TB
+    subgraph A["1. 图像来源"]
+        A1["YFCC100M + MS-COCO 交集<br/>108,077 张图像"]
+    end
+    subgraph B["2. 区域描述收集<br/>Crowdsourced Region Descriptions"]
+        B1["Worker 自由绘制矩形区域"]
+        B2["Worker 用自然语言描述该区域<br/>（1-16 词，不限定格式）"]
+        B3["每张图像约 50 条区域描述<br/>总计超 540 万条"]
+    end
+    subgraph C["3. 对象标注<br/>Object Annotation"]
+        C1["从区域描述中自动抽取名词短语<br/>（Stanford NLP Parser）"]
+        C2["Worker 为每个对象绘制边界框"]
+        C3["规范化到 WordNet synset<br/>（30 条人工修正规则）"]
+        C4["平均每图 35 个对象"]
+    end
+    subgraph D["4. 属性标注<br/>Attribute Annotation"]
+        D1["从描述中提取形容词和属性词"]
+        D2["Worker 确认属性与对象关联"]
+        D3["词干化 + WordNet 映射<br/>（15 条人工修正规则）"]
+        D4["平均每图 26 个属性"]
+    end
+    subgraph E["5. 关系标注<br/>Relationship Annotation"]
+        E1["从描述中抽取动词/介词关系"]
+        E2["Worker 确认三元组：<br/>(主体, 关系, 客体)"]
+        E3["句子框架匹配 + 上位词泛化<br/>+ WordNet 映射（20 条规则）"]
+        E4["平均每图 21 对关系"]
+    end
+    subgraph F["6. 场景图合并<br/>Scene Graph Merging"]
+        F1["区域图 → 全图场景图"]
+        F2["IoU 匹配合并重复节点"]
+        F3["多区域标注互相验证"]
+    end
+    subgraph G["7. 问答对生成<br/>QA Pair Generation"]
+        G1["Worker 基于图像自由提问"]
+        G2["六类问题：what/where/when<br/>/who/why/how"]
+        G3["另一 Worker 作答"]
+        G4["约 170 万对 QA"]
+    end
+    A --> B --> C --> D --> E --> F
+    B --> G
+    F --> G
+</pre>
+</div>
+
+<h3>3.2 数据处理架构的四个阶段</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <div class="arch-stage">
+      <h4>阶段一：众包收集<span>AMT Workers</span></h4>
+      <div class="arch-card arch-solar"><strong>自由形式区域描述</strong><small>Worker 画框 + 自然语言描述，无模板限制，鼓励多样化表达</small></div>
+      <div class="arch-card arch-solar"><strong>自由形式问答</strong><small>六类 W-问题，自由提问 + 自由回答，覆盖感知和推理</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>阶段二：自动抽取<span>NLP Pipeline</span></h4>
+      <div class="arch-card arch-power"><strong>Stanford CoreNLP</strong><small>分词、词性标注、依存句法分析、命名实体识别</small></div>
+      <div class="arch-card arch-power"><strong>名词短语 → 对象候选</strong><small>99% 召回率（200 条描述人工验证）</small></div>
+      <div class="arch-card arch-power"><strong>关系三元组抽取</strong><small>从依存树中提取 (主, 谓, 宾) 结构</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>阶段三：规范化<span>Canonicalization</span></h4>
+      <div class="arch-card arch-motor"><strong>→ WordNet Synset</strong><small>对象：词频最大 synset<br/>精度 88%，召回 98.5%</small></div>
+      <div class="arch-card arch-motor"><strong>属性规范化</strong><small>词干化后映射<br/>精度 85.7%，召回 95.9%</small></div>
+      <div class="arch-card arch-motor"><strong>关系规范化</strong><small>句子框架 + 上位词<br/>精度 92.9%，召回 88.5%</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>阶段四：人工验证<span>AMT Verification</span></h4>
+      <div class="arch-card arch-thrust"><strong>Synset 选择验证</strong><small>提供 1 候选 + 4 干扰项<br/>Worker 选择最佳匹配</small></div>
+      <div class="arch-card arch-thrust"><strong>质量过滤</strong><small>Gold-standard 问题筛除<br/>低质量 Worker</small></div>
+      <div class="arch-card arch-thrust"><strong>区域图合并</strong><small>IoU 匹配 + synset 对齐<br/>构建全图场景图</small></div>
+    </div>
+  </div>
+  <div class="arch-arrow"><span>⤷ 原始语言</span><span>⤷ 结构化候选</span><span>⤷ 规范符号</span><span>⤷ 最终数据集</span></div>
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>108,077 图像</strong><small>YFCC100M ∩ MS-COCO</small></div>
+    <div class="arch-metric"><strong>5.4M 区域描述</strong><small>平均 50 条/图</small></div>
+    <div class="arch-metric"><strong>3.8M 对象实例</strong><small>平均 35 个/图</small></div>
+    <div class="arch-metric"><strong>1.7M QA 对</strong><small>平均 17 对/图</small></div>
+  </div>
+</div>
+
+<h3>3.3 规范化管道的核心挑战与解决方案</h3>
+<table>
+  <tr><th>组件</th><th>核心挑战</th><th>解决方案</th><th>精度</th><th>召回</th></tr>
+  <tr>
+    <td><strong>对象 (Objects)</strong></td>
+    <td>WordNet 词频偏好抽象义项（如 <code>table.n.01</code> 表格 vs <code>table.n.02</code> 桌子）</td>
+    <td>Stanford NLP 抽取 + 词频最大 synset + 30 条人工修正规则</td>
+    <td>88.0%</td>
+    <td>98.5%</td>
+  </tr>
+  <tr>
+    <td><strong>属性 (Attributes)</strong></td>
+    <td>属性词性多样（形容词、过去分词、名词），词性标注器在孤立短语上失效</td>
+    <td>形态学词干化 + 词频最大 synset + 15 条人工修正规则</td>
+    <td>85.7%</td>
+    <td>95.9%</td>
+  </tr>
+  <tr>
+    <td><strong>关系 (Relationships)</strong></td>
+    <td>动词语义严重依赖句法框架（主动/被动/介词短语）；WordNet 动词义项过细</td>
+    <td>句子框架匹配 + 根上位词泛化 + 20 条人工修正规则</td>
+    <td>92.9%</td>
+    <td>88.5%</td>
+  </tr>
+</table>
+
+<h3>3.4 关系上位词泛化的数学描述</h3>
+<div class="formula-block">
+  <div class="eq-tag">关系 synset 的上位词泛化</div>
+  <p>对于关系谓词 $r$，其映射到的 WordNet 动词 synset 为 $s(r)$，定义上位词链：</p>
+  $$ \text{hypernym}^k(s) = \underbrace{\text{hypernym}(\text{hypernym}(\cdots\text{hypernym}(s)\cdots))}_{k \text{ 次}} $$
+  <p>取根上位词（root hypernym）作为最终映射：</p>
+  $$ s^*(r) = \text{hypernym}^K(s(r)), \quad \text{其中 } \text{hypernym}^{K+1}(s(r)) = \text{ROOT} $$
+  <p>WordNet 动词层级约包含 100+ 个根上位词，如 <code>move.v.02</code>、<code>get.v.01</code>、<code>make.v.01</code> 等。通过泛化到根节点，有效降低了 WordNet 细粒度义项区分带来的噪声。</p>
+  <div class="eq-note"><strong>实例：</strong><code>draw.v.01</code>（拉动）的上位词链为 draw → pull → move → displace，根节点为 <code>move.v.02</code>；而 <code>draw.v.02</code>（获得）的上位词链为 draw → derive → get → acquire，根节点为 <code>get.v.01</code>。通过泛化，视觉上相似的"拉"动作被归入同一上位概念。</div>
+</div>
+</section>
+
+<section id="task"><h2>4. Task Definition</h2>
+<h3>4.1 数据集支持的核心视觉任务</h3>
+<p>Visual Genome 的稠密多层标注使其天然支持一系列从感知到推理的递进式视觉任务。这些任务共同构成了"理解一张图像"的完整能力谱系。</p>
+
+<table>
+  <tr><th>任务</th><th>输入</th><th>输出</th><th>形式化定义</th><th>所属层次</th></tr>
+  <tr>
+    <td><strong>1. 对象检测</strong><br/>Object Detection</td>
+    <td>图像 $I$</td>
+    <td>边界框 + 类别 $\{(b_i, c_i)\}$</td>
+    <td>$\mathcal{F}_{\text{det}}: I \mapsto \{(b_i, c_i) \mid c_i \in \mathcal{C}\}$</td>
+    <td>感知层</td>
+  </tr>
+  <tr>
+    <td><strong>2. 属性分类</strong><br/>Attribute Classification</td>
+    <td>图像 $I$ + 对象框 $b_i$</td>
+    <td>属性集 $A_i = \{a_{i1}, a_{i2}, \ldots\}$</td>
+    <td>$\mathcal{F}_{\text{attr}}: (I, b_i) \mapsto A_i$</td>
+    <td>感知层</td>
+  </tr>
+  <tr>
+    <td><strong>3. 关系预测</strong><br/>Relationship Prediction</td>
+    <td>图像 $I$ + 两个对象框 $(b_s, b_o)$</td>
+    <td>关系谓词 $r$</td>
+    <td>$\mathcal{F}_{\text{rel}}: (I, b_s, b_o) \mapsto r \in \mathcal{R}$</td>
+    <td>关联层</td>
+  </tr>
+  <tr>
+    <td><strong>4. 场景图生成</strong><br/>Scene Graph Generation</td>
+    <td>图像 $I$</td>
+    <td>场景图 $\mathcal{G} = (\mathcal{O}, \mathcal{E})$</td>
+    <td>$\mathcal{F}_{\text{sgg}}: I \mapsto \mathcal{G}$</td>
+    <td>结构化理解层</td>
+  </tr>
+  <tr>
+    <td><strong>5. 区域描述生成</strong><br/>Region Captioning</td>
+    <td>图像 $I$ + 区域框 $b$</td>
+    <td>自然语言描述 $d$</td>
+    <td>$\mathcal{F}_{\text{cap}}: (I, b) \mapsto d \in \Sigma^*$</td>
+    <td>语言生成层</td>
+  </tr>
+  <tr>
+    <td><strong>6. 视觉问答</strong><br/>Visual Question Answering</td>
+    <td>图像 $I$ + 自然语言问题 $q$</td>
+    <td>自然语言答案 $a$</td>
+    <td>$\mathcal{F}_{\text{vqa}}: (I, q) \mapsto a \in \Sigma^*$</td>
+    <td>推理层</td>
+  </tr>
+  <tr>
+    <td><strong>7. 图像检索</strong><br/>Image Retrieval</td>
+    <td>场景图查询 $\mathcal{G}_q$ / 文本查询</td>
+    <td>相关图像列表</td>
+    <td>$\mathcal{F}_{\text{ret}}: \mathcal{G}_q \mapsto \{I_1, I_2, \ldots\}$</td>
+    <td>检索层</td>
+  </tr>
+</table>
+
+<h3>4.2 问题类型分布与语义覆盖</h3>
+<p>Visual Genome 的 QA 对中，问题类型按英语 W-疑问词分为六类，覆盖了从事实提取到因果推理的完整语义空间：</p>
+<table>
+  <tr><th>问题类型</th><th>语义功能</th><th>示例</th><th>占比</th></tr>
+  <tr><td><code>what</code></td><td>实体识别、属性描述、动作识别</td><td>"What color is the car?"</td><td>~50%</td></tr>
+  <tr><td><code>where</code></td><td>空间关系、位置推理</td><td>"Where is the cat sitting?"</td><td>~15%</td></tr>
+  <tr><td><code>how</code></td><td>方式、数量、程度</td><td>"How many people are in the room?"</td><td>~15%</td></tr>
+  <tr><td><code>who</code></td><td>人物识别、社会关系</td><td>"Who is wearing a hat?"</td><td>~8%</td></tr>
+  <tr><td><code>why</code></td><td>因果推理、意图理解</td><td>"Why is the man running?"</td><td>~7%</td></tr>
+  <tr><td><code>when</code></td><td>时间推理、场景推断</td><td>"When was this photo taken?"</td><td>~5%</td></tr>
+</table>
+
+<h3>4.3 场景图生成（SGG）的详细定义</h3>
+<div class="formula-block">
+  <div class="eq-tag">场景图生成的形式化</div>
+  <p>场景图生成是最具代表性的 Visual Genome 任务，可分解为三个子任务：</p>
+  <p><strong>子任务 1 —— 谓词分类 (PredCls)：</strong>给定真实边界框和对象类别，预测关系。</p>
+  $$ \mathcal{F}_{\text{pred}}: (I, \{(b_i, c_i)\}) \mapsto \{(o_s, r, o_o)\} $$
+  <p><strong>子任务 2 —— 场景图分类 (SGCls)：</strong>给定真实边界框（无类别标签），预测对象类别和关系。</p>
+  $$ \mathcal{F}_{\text{sgcls}}: (I, \{b_i\}) \mapsto (\{(b_i, c_i)\}, \{(o_s, r, o_o)\}) $$
+  <p><strong>子任务 3 —— 场景图检测 (SGDet)：</strong>仅给定图像，检测对象、分类并预测关系。</p>
+  $$ \mathcal{F}_{\text{sgdet}}: I \mapsto (\{(b_i, c_i)\}, \{(o_s, r, o_o)\}) $$
+  <p>评价指标常用 Recall@K（R@K），即在 top-K 预测中召回的真实关系三元组比例：</p>
+  $$ \text{Recall@}K = \frac{|\text{TopK}(\mathcal{E}_{\text{pred}}) \cap \mathcal{E}_{\text{gt}}|}{|\mathcal{E}_{\text{gt}}|} $$
+  <div class="eq-note"><strong>典型设置：</strong>$K \in \{20, 50, 100\}$。场景图生成是一个极其困难的任务——图像中可能的关系组合数随对象数呈 $\mathcal{O}(n^2 \cdot |\mathcal{R}|)$ 增长，且存在严重的长尾分布（少数关系如 <code>on</code>、<code>has</code>、<code>wearing</code> 占据大部分样本）。</div>
+</div>
+
+<h3>4.4 Visual Genome 的任务生态位</h3>
+<div class="callout tip">
+  <div class="callout-title">Visual Genome 在数据集谱系中的位置</div>
+  <p>如果以"理解深度"和"结构化程度"为轴：<strong>ImageNet</strong>（浅层分类，非结构化标签）→ <strong>MS-COCO</strong>（对象检测+一句话描述，半结构化）→ <strong>Visual Genome</strong>（对象+属性+关系+QA，全结构化场景图）→ <strong>Visual Commonsense Reasoning</strong>（VCR，需要常识推理的选择题）。Visual Genome 恰好填补了"感知"与"推理"之间的关键空白——它要求的不仅是对像素的分类，更是对<strong>实体间关系的显式建模</strong>。</p>
+</div>
+</section>
+
+<section id="challenge"><h2>5. Key Challenge</h2>
+<h3>5.1 自由文本到结构化标注的鸿沟</h3>
+<div class="callout danger">
+  <div class="callout-title">核心矛盾：自然语言的模糊性与结构化数据库的精确性</div>
+  <p>众包工人用<strong>自由形式的自然语言</strong>描述图像区域，而数据集需要<strong>结构化、可查询、可计算</strong>的场景图表示。这两者之间存在根本性张力：同一概念可以有数十种表达方式（"man in red shirt" = "person wearing crimson top" = "guy with reddish tee"），但场景图中必须用同一个 synset 表示。</p>
+</div>
+
+<h3>5.2 五大技术挑战</h3>
+<table>
+  <tr><th>#</th><th>挑战</th><th>具体表现</th><th>影响</th></tr>
+  <tr>
+    <td><strong>1</strong></td>
+    <td><strong>词汇同义性与多义性</strong></td>
+    <td>同一对象有多种称呼（synonymy）；同一单词在不同语境下含义不同（polysemy）。如 "bat" 可以是球棒或蝙蝠。</td>
+    <td>对象和关系映射错误；不同图像的同一概念无法对齐</td>
+  </tr>
+  <tr>
+    <td><strong>2</strong></td>
+    <td><strong>关系方向性歧义</strong></td>
+    <td>"The man is behind the tree" 与 "The tree is in front of the man" 描述同一空间关系但方向相反；被动语态和介词短语使抽取更加困难</td>
+    <td>三元组主体-客体对调；下游推理出现方向性错误</td>
+  </tr>
+  <tr>
+    <td><strong>3</strong></td>
+    <td><strong>标注密度与质量控制</strong></td>
+    <td>每图需要约 50 条区域描述 + 35 个对象框 + 26 个属性 + 21 个关系。总计标注量巨大，质量控制困难</td>
+    <td>标注疲劳导致遗漏和错误；Worker 间一致性低</td>
+  </tr>
+  <tr>
+    <td><strong>4</strong></td>
+    <td><strong>WordNet 视觉-语言偏差</strong></td>
+    <td>WordNet 的词频统计基于文本语料，偏好抽象义项（如 <code>short.a.01</code> 时间短 vs <code>short.a.02</code> 长度短），而视觉世界更关注具体物理属性</td>
+    <td>自动映射系统性地选择错误 synset；需要大量人工修正</td>
+  </tr>
+  <tr>
+    <td><strong>5</strong></td>
+    <td><strong>区域图合并的一致性</strong></td>
+    <td>多个 Worker 标注不同区域时，同一物理对象可能出现在多个区域图中，需要通过空间对齐（IoU）和语义对齐（synset）进行合并</td>
+    <td>合并不当导致对象重复或错误融合；场景图结构失真</td>
+  </tr>
+</table>
+
+<h3>5.3 WordNet 在视觉领域的适用性问题</h3>
+<div class="formula-block">
+  <div class="eq-tag">WordNet 词频偏差的量化</div>
+  <p>对于对象 $o$，令 $\mathcal{S}(o) = \{s_1, s_2, \ldots, s_k\}$ 为 $o$ 的全部候选 WordNet synset，按语料词频 $f(s)$ 降序排列：</p>
+  $$ f(s_1) \geq f(s_2) \geq \cdots \geq f(s_k) $$
+  <p>词频优先策略选择 $s^* = s_1$。但在视觉域中，正确义项往往是低频的 $s_j$（$j > 1$）。Visual Genome 发现在最常见的 30 个失败案例中，词频优先策略系统地选择了<strong>抽象/隐喻义项</strong>而忽略了<strong>具体/物理义项</strong>。</p>
+  <p><strong>案例：</strong></p>
+  $$ \begin{aligned}
+  \text{"table"}: &\quad s_1 = \text{table.n.01（数据表，$f$ 高）}, \quad s_2 = \text{table.n.02（家具桌，$f$ 低）} \quad \checkmark \\
+  \text{"short"}: &\quad s_1 = \text{short.a.01（时间短，$f$ 高）}, \quad s_2 = \text{short.a.02（长度短，$f$ 低）} \quad \checkmark \\
+  \text{"long"}:  &\quad s_1 = \text{long.a.01（时间长，$f$ 高）}, \quad s_2 = \text{long.a.02（空间长，$f$ 低）} \quad \checkmark
+  \end{aligned} $$
+  <div class="eq-note"><strong>解决方案：</strong>针对高频失败案例（对象 30 条、属性 15 条、关系 20 条）手动编写映射规则，覆盖了绝大多数错误。剩余少量错误通过 Amazon Mechanical Turk 的人工验证（worker 从 5 个候选中选择最佳 synset）进一步修正。</div>
+</div>
+
+<h3>5.4 关系抽取的句法挑战</h3>
+<div class="callout warn">
+  <div class="callout-title">为什么关系抽取比对象抽取更难？</div>
+  <p>对象的语法角色相对固定（通常为名词短语），而关系的表达形式极其多样：可以是主动语态动词（"man <em>wears</em> hat"）、被动语态（"hat <em>is worn by</em> man"）、介词短语（"cat <em>on</em> mat"）、比较级（"man <em>taller than</em> child"）甚至隐含在命名实体中。Stanford CoreNLP 在完整句子上表现良好，但在场景图的孤立关系短语上准确率下降。此外，WordNet 对动词的划分极其细粒度（如 <code>play</code> 有 35 个义项），需要上位词泛化来降低噪声。</p>
+</div>
+</section>
+
+<section id="method"><h2>6. Method</h2>
+<h3>6.1 标注流程全览</h3>
+<p>Visual Genome 的标注流程分为三大阶段、七个步骤。每个步骤都经过精心设计以平衡标注效率、覆盖完整性和数据质量。</p>
+
+<div class="mermaid-box">
+<pre class="mermaid">
+flowchart LR
+    subgraph Phase1["第一阶段：语言收集"]
+        S1["Step 1<br/>📝 区域描述<br/>Region Descriptions"] --> S2["Step 2<br/>❓ QA 对生成<br/>QA Pairs"]
+    end
+    subgraph Phase2["第二阶段：结构化抽取"]
+        S3["Step 3<br/>🔍 对象抽取与框标注<br/>Object Extraction"]
+        S4["Step 4<br/>🏷️ 属性标注<br/>Attribute Annotation"]
+        S5["Step 5<br/>🔗 关系标注<br/>Relationship Annotation"]
+    end
+    subgraph Phase3["第三阶段：规范化与合并"]
+        S6["Step 6<br/>📐 WordNet 规范化<br/>Canonicalization"]
+        S7["Step 7<br/>🧩 场景图合并<br/>Graph Merging"]
+    end
+    Phase1 --> Phase2 --> Phase3
+</pre>
+</div>
+
+<h3>6.2 Step 1: 区域描述的众包收集</h3>
+<div class="formula-block">
+  <div class="eq-tag">区域描述收集协议</div>
+  <p>每张图像被分配给多个 Amazon Mechanical Turk (AMT) Worker。对于每个图片-工人对：</p>
+  <ol>
+    <li><strong>绘制区域：</strong>Worker 自由绘制一个矩形区域 $R$（框出他们认为值得描述的内容）。</li>
+    <li><strong>自然语言描述：</strong>Worker 用 1-16 个单词的自由形式英语描述该区域中的内容。要求描述具体、可验证，不限定格式或模板。</li>
+    <li><strong>重复：</strong>Worker 可重复上述过程多次，直至认为图像中值得描述的区域都已覆盖。</li>
+  </ol>
+  <p>最终，每张图像收集约 50 条区域描述，每条描述对应一个或多个区域框。描述涵盖了对象的<strong>外观、动作、空间关系、场景上下文和主观判断</strong>。</p>
+</div>
+
+<h3>6.3 Step 2: 问答对生成</h3>
+<p>QA 标注分为两轮：</p>
+<ul>
+  <li><strong>提问轮：</strong>Worker 观察图像，自由提出 1-3 个问题，鼓励覆盖六种 W-问题类型。</li>
+  <li><strong>回答轮：</strong>另一个 Worker 观察同一图像和问题，提供自由形式的自然语言答案。</li>
+  <li>问题不绑定特定区域——Worker 可以针对全图任意内容提问，包括需要常识推理的问题（如"为什么这个男人在跑？"）。</li>
+</ul>
+
+<h3>6.4 Step 3-5: 从区域描述中结构化抽取</h3>
+<div class="novelty-card">
+  <h4>Step 3: 对象抽取与边界框标注</h4>
+  <div class="novelty-step"><strong>3a. 名词短语抽取：</strong>使用 Stanford CoreNLP 对所有区域描述进行依存句法分析，提取所有名词短语（NP）。在手动标注的 200 条描述子集上验证，召回率达到 <strong>99%</strong>。</div>
+  <div class="novelty-step"><strong>3b. 边界框标注：</strong>将抽取出的名词短语列表展示给另一组 AMT Worker，Worker 在图像上为每个对象绘制紧密的边界框。每个对象由一个 Worker 标注，确保一致性。</div>
+  <div class="novelty-step"><strong>3c. 对象规范化：</strong>将每个对象名词短语映射到 WordNet synset。策略：选择词频最高的 synset（$s^* = \arg\max_{s \in \mathcal{S}(o)} f(s)$）+ 30 条人工规则修正（针对最常见的 30 个失败案例）。映射精度 88%，召回 98.5%。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>Step 4: 属性标注</h4>
+  <div class="novelty-step"><strong>4a. 属性候选提取：</strong>从区域描述中提取修饰名词的形容词和过去分词（如 "red"、"wooden"、"standing"）。同时从 QA 对中补充属性信息。</div>
+  <div class="novelty-step"><strong>4b. 词干化规范化：</strong>由于属性词性多样（形容词、过去分词、名词修饰语）且词性标注器在孤立短语上表现不佳，采用<strong>纯形态学词干化</strong>（Porter Stemmer）进行规范化，而不依赖词性标注。</div>
+  <div class="novelty-step"><strong>4c. WordNet 映射：</strong>将词干化后的属性映射到词频最高的 WordNet synset + 15 条人工规则修正。映射精度 85.7%，召回 95.9%。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>Step 5: 关系标注</h4>
+  <div class="novelty-step"><strong>5a. 关系候选提取：</strong>从区域描述中提取连接两个名词短语的动词和介词短语。排除无法在 WordNet 中找到的纯介词（如 "of"）。</div>
+  <div class="novelty-step"><strong>5b. 三元组确认：</strong>Worker 被展示一对对象和一个候选关系谓词，确认该三元组 (主体, 关系, 客体) 是否准确描述了图像中的真实关系。</div>
+  <div class="novelty-step"><strong>5c. 关系规范化：</strong>这是最具挑战性的步骤。采用<strong>句子框架匹配 + 上位词泛化</strong>的双重策略：(1) 将每个关系映射到最匹配的 WordNet 动词句子框架；(2) 将该动词 synset 泛化到其根上位词以减少义项噪声。+ 20 条人工规则。映射精度 92.9%，召回 88.5%。</div>
+</div>
+
+<h3>6.5 Step 6: WordNet 规范化的完整技术方案</h3>
+<p>规范化（Canonicalization）是 Visual Genome 方法论中最核心的技术贡献之一。以下是三种标注成分的规范化技术对比：</p>
+<table>
+  <tr><th>维度</th><th>对象 (Objects)</th><th>属性 (Attributes)</th><th>关系 (Relationships)</th></tr>
+  <tr><td>输入形式</td><td>名词短语（NP）</td><td>形容词/过去分词/属性短语</td><td>动词/介词短语（动词为主）</td></tr>
+  <tr><td>预处理</td><td>Stanford CoreNLP 句法分析</td><td>Porter Stemmer 词干化（无词性标注）</td><td>排除纯介词（不在 WordNet 中）</td></tr>
+  <tr><td>映射策略</td><td>词频最大 synset</td><td>词频最大 synset</td><td>句子框架匹配 → 词频最大 synset</td></tr>
+  <tr><td>去噪策略</td><td>—</td><td>—</td><td>根上位词泛化</td></tr>
+  <tr><td>人工规则数</td><td>30 条</td><td>15 条</td><td>20 条</td></tr>
+  <tr><td>人工验证</td><td>AMT 5 选 1</td><td>AMT 5 选 1</td><td>AMT 5 选 1</td></tr>
+  <tr><td>最终精度</td><td>88.0%</td><td>85.7%</td><td>92.9%</td></tr>
+  <tr><td>最终召回</td><td>98.5%</td><td>95.9%</td><td>88.5%</td></tr>
+</table>
+
+<h3>6.6 Step 7: 区域图合并为全图场景图</h3>
+<div class="formula-block">
+  <div class="eq-tag">区域图合并算法</div>
+  <p>设图像 $I$ 有 $k$ 个区域图 $\mathcal{G}_1, \mathcal{G}_2, \ldots, \mathcal{G}_k$，其中 $\mathcal{G}_i = (\mathcal{O}_i, \mathcal{E}_i)$。合并过程如下：</p>
+  <p><strong>初始化：</strong>$\mathcal{G}_{\text{merged}} = \mathcal{G}_1$</p>
+  <p><strong>迭代合并：</strong>对 $i = 2, 3, \ldots, k$：</p>
+  <ol>
+    <li>对 $\mathcal{G}_i$ 中的每个对象节点 $o_a$，计算其与 $\mathcal{G}_{\text{merged}}$ 中每个对象节点 $o_b$ 的匹配分数：</li>
+    $$ \text{match}(o_a, o_b) = \text{IoU}(b_a, b_b) \cdot \mathbb{1}[c_a = c_b] $$
+    <li>若 $\text{match}(o_a, o_b) \geq \tau_{\text{IoU}}$（IoU 阈值，通常 0.5），将 $o_a$ 和 $o_b$ 合并为同一节点：</li>
+    $$ b_{\text{merged}} = \text{union\_box}(b_a, b_b), \quad A_{\text{merged}} = A_a \cup A_b $$
+    <li>将 $\mathcal{G}_i$ 中未匹配的节点和所有关系边添加到 $\mathcal{G}_{\text{merged}}$ 中。</li>
+  </ol>
+  $$ \mathcal{G}_{\text{image}} \leftarrow \mathcal{G}_{\text{merged}} $$
+  <div class="eq-note"><strong>合并后的场景图随着区域数量的增加而逐渐丰富。</strong>每个新区域可能引入新的对象、属性或关系，也可能为已存在的对象补充更多属性。这确保了场景图对图像的覆盖是渐进式完善的。</div>
+</div>
+
+<h3>6.7 数据集统计概览</h3>
+<table>
+  <tr><th>统计项</th><th>数值</th></tr>
+  <tr class="highlight"><td>图像总数</td><td>108,077</td></tr>
+  <tr><td>区域描述总数</td><td>约 540 万（平均 50 条/图）</td></tr>
+  <tr><td>对象实例总数</td><td>约 380 万（平均 35 个/图）</td></tr>
+  <tr><td>属性总数</td><td>约 280 万（平均 26 个/图）</td></tr>
+  <tr><td>关系总数</td><td>约 230 万（平均 21 对/图）</td></tr>
+  <tr><td>QA 对总数</td><td>约 170 万（平均 17 对/图）</td></tr>
+  <tr><td>唯一对象类别（synset）</td><td>约 33,000+</td></tr>
+  <tr><td>唯一关系谓词（synset）</td><td>约 40,000+</td></tr>
+  <tr><td>唯一属性类型（synset）</td><td>约 40,000+</td></tr>
+  <tr><td>对象类别长尾度</td><td>Top-1000 类覆盖约 95% 实例</td></tr>
+  <tr><td>关系长尾度</td><td>Top-100 谓词覆盖约 90% 实例</td></tr>
+</table>
+</section>
+
+<section id="principles"><h2>7. Principles &amp; Design Philosophy</h2>
+<h3>7.1 设计哲学：从分类到理解</h3>
+<div class="callout idea">
+  <div class="callout-title">数据集设计的三个核心原则</div>
+  <p>Visual Genome 的设计不是对现有数据集的增量改进，而是一次<strong>范式转变</strong>——从"图像→标签"的分类逻辑转向"图像→结构化知识库"的理解逻辑。整个数据集围绕三个原则构建：</p>
+  <ol>
+    <li><strong>稠密性（Density）：</strong>不满足于每图几个标注，而是追求对图像中<em>所有</em>显著对象的全面覆盖。平均每图 35 个对象远超过 MS-COCO 的约 7 个。</li>
+    <li><strong>结构性（Structure）：</strong>标注不是扁平的标签列表，而是有节点、有边、有层级关系的图结构。这种结构使得标注可以被形式化地查询、推理和组合。</li>
+    <li><strong>多模态连接（Multi-modal Grounding）：</strong>每一条结构化标注（对象、属性、关系）都通过边界框与像素空间连接，同时又通过 WordNet synset 与语言/知识空间连接。这是连接视觉与语言的桥梁。</li>
+  </ol>
+</div>
+
+<h3>7.2 场景图作为中间表示的理论优势</h3>
+<p>场景图之所以是连接语言与视觉的有效中间表示，可以从以下角度理解：</p>
+<table>
+  <tr><th>原理</th><th>解释</th><th>对下游任务的意义</th></tr>
+  <tr>
+    <td><strong>1. 组块化（Compositionality）</strong></td>
+    <td>复杂场景可分解为独立对象、属性和关系的组合。场景图提供了这种分解的形式化框架</td>
+    <td>模型可以学习组合泛化——在训练中未见过的对象-关系组合可以在测试时推断</td>
+  </tr>
+  <tr>
+    <td><strong>2. 符号接地（Symbol Grounding）</strong></td>
+    <td>每个符号节点（synset）通过边界框锚定到像素空间的实际区域</td>
+    <td>使模型能够从视觉信号直接学习符号的含义，而非仅从文本分布中推断</td>
+  </tr>
+  <tr>
+    <td><strong>3. 关系显式化（Relational Explicitness）</strong></td>
+    <td>传统数据集将关系隐式编码在描述文本中。场景图将其显式化为可索引、可查询的有向边</td>
+    <td>支持关系推理——如"所有穿红色衣服的人在做什么"</td>
+  </tr>
+  <tr>
+    <td><strong>4. 知识可累积性（Cumulative Knowledge）</strong></td>
+    <td>场景图可以通过合并操作渐进式扩充，新标注与旧标注融合</td>
+    <td>允许增量扩展数据集，降低一次性全量标注的成本</td>
+  </tr>
+  <tr>
+    <td><strong>5. 跨模态可计算性（Cross-modal Computability）</strong></td>
+    <td>场景图的图结构可被图算法处理，同时 synset 标签可被 NLP 工具处理</td>
+    <td>CV + NLP 联合模型的自然接口</td>
+  </tr>
+</table>
+
+<h3>7.3 稠密标注 vs. 稀疏标注</h3>
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>稀疏标注（如 MS-COCO）</h4>
+    <ul>
+      <li>每图 5-7 个显著对象</li>
+      <li>标注策略：标注"最重要的"对象</li>
+      <li>问题：模型学会忽略小对象、背景对象和部分遮挡对象</li>
+      <li>标注者偏差：不同人认为的"重要"不同</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>稠密标注（Visual Genome）</h4>
+    <ul>
+      <li>每图 35 个对象（覆盖几乎所有可命名实体）</li>
+      <li>标注策略：标注"所有可识别的"对象</li>
+      <li>优势：模型学会关注全图每个区域，泛化能力更强</li>
+      <li>更接近人类的视觉理解——人能描述图像中的几乎所有事物</li>
+    </ul>
+  </div>
+</div>
+
+<h3>7.4 为什么区域描述是关键的起点？</h3>
+<div class="callout tip">
+  <div class="callout-title">语言作为视觉标注的先验</div>
+  <p>Visual Genome 的设计选择了一个重要且非显然的顺序：<strong>先收集自由语言描述，再从中抽取结构化信息</strong>，而非直接要求 Worker 列出对象和关系。这基于以下认知：</p>
+  <ul>
+    <li><strong>自然性：</strong>人类天然习惯用句子描述所见（"一个穿蓝色衬衫的男人坐在长椅上"），而非枚举结构化元素（"对象1: 男人, 对象2: 衬衫, 对象3: 长椅..."）。</li>
+    <li><strong>丰富性：</strong>自由语言描述天然包含关系（"坐在"）、属性（"蓝色的"）和上下文，这些在直接的对象枚举中容易被遗漏。</li>
+    <li><strong>可验证性：</strong>描述可以与原始图像对照验证真伪；而抽象的三元组列表不易验证是否遗漏了重要关系。</li>
+    <li><strong>覆盖面：</strong>通过多 Worker 多区域的策略，语言的丰富性保证了标注的多样性。</li>
+  </ul>
+</div>
+
+<h3>7.5 从区域图到场景图：为何分层构建？</h3>
+<div class="formula-block">
+  <div class="eq-tag">分层标注的优势</div>
+  <p>Visual Genome 采用"区域图→全图场景图"的分层构建策略而非直接标注全图。这类似于软件工程中的<strong>分治策略</strong>：</p>
+  <ol>
+    <li><strong>降低认知负荷：</strong>Worker 只需关注一个局部区域，该区域内的对象和关系更容易被准确标注。</li>
+    <li><strong>增加标注密度：</strong>不同 Worker 关注不同区域，多人的标注可以覆盖图像中更多角落。</li>
+    <li><strong>提供冗余验证：</strong>当两个 Worker 的标注区域重叠时，他们对同一对象的描述可以互相验证（或揭示歧义）。</li>
+    <li><strong>并行化：</strong>不同区域的标注可以完全并行进行，加快数据收集速度。</li>
+  </ol>
+  <p>形式上，令 $\mathcal{R} = \{R_1, \ldots, R_k\}$ 为 $k$ 个区域，每个区域 $R_i$ 有图 $\mathcal{G}(R_i)$。全图场景图为：</p>
+  $$ \mathcal{G}_{\text{full}}(I) = \text{Merge}\left(\{\mathcal{G}(R_1), \mathcal{G}(R_2), \ldots, \mathcal{G}(R_k)\}\right) = \left(\bigcup_i \mathcal{O}_i / \sim, \bigcup_i \mathcal{E}_i\right) $$
+  <p>其中等价关系 $\sim$ 表示 IoU 重叠且 synset 相同的节点被合并。通过该策略，最终场景图的节点数和边数显著多于任何单个区域图。</p>
+</div>
+</section>
+
+<section id="figures"><h2>8. Figures &amp; Evidence</h2>
+<h3>8.1 数据集关键统计</h3>
+
+<div class="mermaid-box">
+<pre class="mermaid">
+graph LR
+    subgraph VG["Visual Genome Dataset"]
+        Images["108,077 图像<br/>来源: YFCC100M ∩ MS-COCO"]
+        RD["540 万 区域描述<br/>~50 条/图 × 1-16 词"]
+        OBJ["380 万 对象实例<br/>~35 个/图 × 33K+ 唯一类"]
+        ATTR["280 万 属性<br/>~26 个/图 × 40K+ 唯一类"]
+        REL["230 万 关系<br/>~21 对/图 × 40K+ 唯一类"]
+        QA["170 万 QA 对<br/>~17 对/图 × 6 种问句类型"]
+    end
+    Images --> RD
+    Images --> QA
+    RD --> OBJ
+    RD --> ATTR
+    RD --> REL
+    OBJ --> SG["场景图 Scene Graph"]
+    ATTR --> SG
+    REL --> SG
+    style SG fill:#dbeafe,stroke:#3b82f6,stroke-width:2px
+</pre>
+</div>
+
+<h3>8.2 场景图示意</h3>
+<div class="mermaid-box">
+<pre class="mermaid">
+graph TD
+    subgraph "示例场景图：一张街景照片"
+        man["👤 man<br/>wn: person.n.01"] -->|"wearing<br/>wn: wear.v.01"| shirt["👕 shirt<br/>wn: shirt.n.01"]
+        man -->|"sitting on<br/>wn: sit.v.01"| bench["🪑 bench<br/>wn: bench.n.01"]
+        man -->|"holding<br/>wn: hold.v.02"| phone["📱 phone<br/>wn: telephone.n.01"]
+        shirt -->|"has"| color["🔵 blue<br/>wn: blue.a.01"]
+        bench -->|"has"| material["🪵 wooden<br/>wn: wooden.a.01"]
+        bench -->|"near"| tree["🌳 tree<br/>wn: tree.n.01"]
+        dog["🐕 dog<br/>wn: dog.n.01"] -->|"lying on"| ground["🏞️ ground<br/>wn: ground.n.01"]
+        dog -->|"near"| bench
+        dog -->|"has"| color2["⬛ black<br/>wn: black.a.01"]
+    end
+    style man fill:#dbeafe,stroke:#3b82f6
+    style bench fill:#d1fae5,stroke:#10b981
+    style dog fill:#fef3c7,stroke:#f59e0b
+</pre>
+</div>
+
+<h3>8.3 规范化管道效果：对象映射案例</h3>
+<table>
+  <tr><th>自由文本中的名词短语</th><th>Stanford NLP 解析</th><th>WordNet 词频优先映射</th><th>人工修正后映射</th><th>修正原因</th></tr>
+  <tr>
+    <td>"a wooden table in the corner"</td>
+    <td>NP: "wooden table"</td>
+    <td><code>table.n.01</code>（数据表）</td>
+    <td><code>table.n.02</code>（家具桌）✓</td>
+    <td>视觉场景中"table"几乎总指家具</td>
+  </tr>
+  <tr>
+    <td>"a man wearing a short sleeve"</td>
+    <td>NP: "short sleeve"</td>
+    <td><code>short.a.01</code>（短暂的）</td>
+    <td><code>short.a.02</code>（短的——长度）✓</td>
+    <td>视觉属性关注物理尺寸而非时间</td>
+  </tr>
+  <tr>
+    <td>"a long road ahead"</td>
+    <td>NP: "long road"</td>
+    <td><code>long.a.01</code>（长久的）</td>
+    <td><code>long.a.02</code>（长的——空间）✓</td>
+    <td>空间"长"而非时间"长"</td>
+  </tr>
+  <tr>
+    <td>"a boy holding a bat"</td>
+    <td>NP: "bat"</td>
+    <td><code>bat.n.01</code>（球棒）</td>
+    <td>上下文决定：<br/>若图像是运动场景 → 球棒<br/>若图像是洞穴场景 → 蝙蝠</td>
+    <td>多义性需要图像上下文消歧</td>
+  </tr>
+</table>
+
+<h3>8.4 与其他主流数据集的系统对比</h3>
+<table>
+  <tr><th>数据集</th><th>图像数</th><th>对象标注</th><th>属性</th><th>关系</th><th>区域描述</th><th>QA</th><th>场景图</th></tr>
+  <tr>
+    <td><strong>ImageNet</strong></td><td>14M+</td><td>1 标签/图</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td>
+  </tr>
+  <tr>
+    <td><strong>PASCAL VOC</strong></td><td>~20K</td><td>~3 个/图</td><td>部分</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td>
+  </tr>
+  <tr>
+    <td><strong>MS-COCO</strong></td><td>~330K</td><td>~7 个/图</td><td>✗</td><td>✗</td><td>5 描述/图</td><td>✗</td><td>✗</td>
+  </tr>
+  <tr>
+    <td><strong>Flickr30K</strong></td><td>~30K</td><td>✗</td><td>✗</td><td>✗</td><td>5 描述/图</td><td>✗</td><td>✗</td>
+  </tr>
+  <tr>
+    <td><strong>Visual7W</strong></td><td>~47K</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓（7 类）</td><td>✗</td>
+  </tr>
+  <tr class="highlight">
+    <td><strong>Visual Genome</strong></td><td>108K</td><td><strong>35 个/图</strong></td><td><strong>✓ 26/图</strong></td><td><strong>✓ 21/图</strong></td><td><strong>✓ 50/图</strong></td><td><strong>✓ 17/图</strong></td><td><strong>✓</strong></td>
+  </tr>
+  <tr>
+    <td><strong>Visual Relation</strong></td><td>~5K</td><td>✓</td><td>✗</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td>
+  </tr>
+</table>
+
+<h3>8.5 关系分布的长尾特性（Paper 关键发现）</h3>
+<div class="formula-block">
+  <div class="eq-tag">关系标注的长尾分布</div>
+  <p>Visual Genome 的关系标注呈现极端的<strong>长尾分布</strong>。令 $f(r)$ 为关系谓词 $r$ 在数据集中出现的频次，排序后得到：</p>
+  $$ f(r_{(1)}) \geq f(r_{(2)}) \geq \cdots \geq f(r_{(|\mathcal{R}|)}) $$
+  <p>分布呈 Zipfian 特性：前 100 个最频繁的关系（如 <code>on</code>、<code>has</code>、<code>wearing</code>、<code>near</code>、<code>holding</code>）覆盖了约 90% 的关系实例，而超过 40,000 个关系谓词的出现次数少于 10 次。</p>
+  <p><strong>Top-10 关系谓词及其频率：</strong></p>
+  <table>
+    <tr><th>排名</th><th>关系谓词</th><th>语义</th><th>约占比例</th></tr>
+    <tr><td>1</td><td><code>on</code></td><td>在...之上</td><td>~12%</td></tr>
+    <tr><td>2</td><td><code>has</code></td><td>拥有/具有</td><td>~9%</td></tr>
+    <tr><td>3</td><td><code>wearing</code></td><td>穿着</td><td>~7%</td></tr>
+    <tr><td>4</td><td><code>near</code></td><td>在...附近</td><td>~6%</td></tr>
+    <tr><td>5</td><td><code>holding</code></td><td>手持/握住</td><td>~5%</td></tr>
+    <tr><td>6</td><td><code>behind</code></td><td>在...后面</td><td>~4%</td></tr>
+    <tr><td>7</td><td><code>sitting on</code></td><td>坐在...上</td><td>~3%</td></tr>
+    <tr><td>8</td><td><code>standing on</code></td><td>站在...上</td><td>~3%</td></tr>
+    <tr><td>9</td><td><code>in</code></td><td>在...里面</td><td>~3%</td></tr>
+    <tr><td>10</td><td><code>riding</code></td><td>骑/乘</td><td>~2%</td></tr>
+  </table>
+  <div class="eq-note"><strong>启示：</strong>场景图生成模型必须应对极端的数据不平衡。如果仅用交叉熵损失训练，模型会严重偏向高频关系（如几乎将所有关系都预测为 <code>on</code> 或 <code>has</code>）。这也是后续场景图生成研究（如 motif-based、因果干预、重加权损失等）的关键动机。</div>
+</div>
+
+<h3>8.6 图像来源分布</h3>
+<div class="mermaid-box">
+<pre class="mermaid">
+pie title 图像来源分布
+    "YFCC100M (Flickr)" : 80
+    "MS-COCO" : 20
+</pre>
+</div>
+<p style="text-align:center; font-size:12px; color:#64748b;">108,077 张图像来自 YFCC100M（约 80%）和 MS-COCO（约 20%）的交集，两个数据集都从 Flickr 收集，确保了场景的多样性和自然性。</p>
+</section>
+
+<section id="flaw"><h2>9. Potential Flaw &amp; Limitations</h2>
+<h3>9.1 数据集偏差与局限性</h3>
+
+<div class="callout danger">
+  <div class="callout-title">局限一：众包标注的系统性偏差</div>
+  <p>Amazon Mechanical Turk Worker 的标注具有可预见的系统性偏差：</p>
+  <ul>
+    <li><strong>显著性偏差（Saliency Bias）：</strong>Worker 天然倾向于标注图像中最显著、最大的对象，而忽略背景中的小对象。尽管 Visual Genome 的稠密度远高于 COCO，仍有大量小对象被遗漏。</li>
+    <li><strong>可命名性偏差（Nameability Bias）：</strong>Worker 倾向于描述"容易命名"的内容（如"人"、"车"、"树"），而忽略难以简洁命名的细节（如"远处的模糊建筑轮廓"）。</li>
+    <li><strong>文化偏差：</strong>标注者主要为英语母语者，其语言习惯和文化参照系可能不适用于所有文化和场景。</li>
+    <li><strong>关系冗余：</strong>一些关系（如空间关系 <code>near</code>、<code>on</code>）被过度标注，而语义关系（如社会关系、因果关系）标注不足。</li>
+  </ul>
+</div>
+
+<div class="callout warn">
+  <div class="callout-title">局限二：场景图不等于完整的世界模型</div>
+  <p>场景图虽然结构化，但不是对图像内容的完整编码：</p>
+  <ul>
+    <li><strong>缺失时间维度：</strong>场景图只能表示静态空间关系，无法表示动作序列、运动轨迹或事件的时间演化。</li>
+    <li><strong>缺失语义层级：</strong>场景图是扁平图——没有"人群包含多个人"这样的部分-整体层级关系。</li>
+    <li><strong>缺失不确定性：</strong>Worker 对模糊区域的不同解读被扁平化为唯一映射，丢失了标注的不确定性信息。</li>
+    <li><strong>缺失函数关系：</strong>场景图可以编码"人拿着手机"，但无法编码"人正在用手机拍照"这一意图/功能理解。</li>
+  </ul>
+</div>
+
+<div class="callout warn">
+  <div class="callout-title">局限三：WordNet 规范化的信息损失</div>
+  <p>将自由语言映射到 WordNet synset 虽然实现了跨图像的一致性和可计算性，但也产生了不可逆的信息损失：</p>
+  <ul>
+    <li><strong>细粒度语义丢失：</strong>"crimson"、"scarlet" 和 "ruby" 都被映射到 <code>red.a.01</code>，颜色的细微差异消失。</li>
+    <li><strong>上下文信息丢失：</strong>WordNet synset 是脱离语境的抽象概念，而原始描述中的措辞选择本身携带了语境信息。</li>
+    <li><strong>新词/罕见词问题：</strong>不在 WordNet 中的词汇（如品牌名、俚语、新兴词汇）无法被规范化，只能丢弃。</li>
+    <li><strong>语言多样性被削平：</strong>不同文化、不同风格的语言表达被迫映射到同一套英语 WordNet 概念中。</li>
+  </ul>
+</div>
+
+<div class="callout danger">
+  <div class="callout-title">局限四：数据集规模仍然有限</div>
+  <p>尽管 108K 图像在当时是最大规模，但与真实世界的视觉多样性相比仍显不足：</p>
+  <ul>
+    <li>图像来源集中于 Flickr 用户上传，偏向旅游照、生活照，缺少工业、医学、遥感等专业领域图像。</li>
+    <li>33,000+ 个唯一对象 synset 看似很多，但其中绝大多数仅出现 1-2 次，真正有足够训练样本的只有前 1,000 个类别。</li>
+    <li>关系长尾极其严重——超过 40,000 个关系谓词出现少于 10 次，使得学习稀有关系几乎不可能。</li>
+  </ul>
+</div>
+
+<h3>9.2 方法论局限</h3>
+<table>
+  <tr><th>局限</th><th>详细表现</th><th>对下游研究的影响</th></tr>
+  <tr>
+    <td><strong>区域描述依赖文本质量</strong></td>
+    <td>如果 Worker 的区域描述有语法错误或表述不清，后续的 NLP 抽取会产生级联错误</td>
+    <td>噪声在管道中传递和放大；场景图质量上限受限于描述质量</td>
+  </tr>
+  <tr>
+    <td><strong>NLP 抽取的不完整性</strong></td>
+    <td>Stanford CoreNLP 对简单句效果良好，但对复杂句、省略句、不完整句的抽取效果较差</td>
+    <td>复杂的语义关系可能被遗漏；Worker 意图未被完整捕获</td>
+  </tr>
+  <tr>
+    <td><strong>规范化管道的不可逆性</strong></td>
+    <td>一旦映射到 WordNet synset，原始的词汇选择信息永久丢失</td>
+    <td>无法回溯到原始标注；无法重新审视规范化决策</td>
+  </tr>
+  <tr>
+    <td><strong>人工规则的可扩展性</strong></td>
+    <td>65 条人工规则（30+15+20）仅在当前数据集上验证有效</td>
+    <td>扩展到新领域或新语言时需要重新编写规则</td>
+  </tr>
+  <tr>
+    <td><strong>单语言中心主义</strong></td>
+    <td>所有标注和规范化基于英语和英语 WordNet</td>
+    <td>多语言视觉理解研究需要额外的对齐工作</td>
+  </tr>
+</table>
+
+<h3>9.3 已知的社会与伦理偏差</h3>
+<div class="callout danger">
+  <div class="callout-title">社会偏差（Social Bias）问题</div>
+  <p>Visual Genome 论文本身并未深入探讨标注中的社会偏差，但后续研究揭示了以下问题：</p>
+  <ul>
+    <li><strong>性别偏差：</strong>某些职业或活动被不成比例地与特定性别关联（如"cooking" 更多与 "woman" 关联，"driving" 更多与 "man" 关联）。这些偏差反映的是社会刻板印象而非视觉事实。</li>
+    <li><strong>种族偏差：</strong>数据集中特定种族的面孔和场景可能有不同的标注密度或语言描述方式。</li>
+    <li><strong>地理偏差：</strong>Flickr 用户偏向发达国家和城市地区，数据集中对这些场景的表示远多于发展中国家或农村地区。</li>
+    <li><strong>规范性偏差：</strong>标注中隐含着什么是"正常的"场景的假设（如"人应该站着"），可能边缘化非常规场景。</li>
+  </ul>
+</div>
+</section>
+
+<section id="motivation"><h2>10. Motivation &amp; Historical Context</h2>
+<h3>10.1 视觉理解的瓶颈：从"有什么"到"发生了什么"</h3>
+<div class="callout info">
+  <div class="callout-title">2015-2016 年计算机视觉的关键瓶颈</div>
+  <p>到 2015 年，基于 ImageNet 的图像分类已在某些任务上超越人类水平（如 ResNet）。然而，<strong>分类性能的提升并没有转化为真正的视觉理解</strong>。一个能准确预测"这张图是棒球比赛"的模型，完全不知道图中有哪些球员、他们在做什么、球在哪里、比分如何。这种"标签级理解"与"人类级理解"之间的鸿沟，本质上是<strong>标注粒度和结构的鸿沟</strong>。</p>
+  <p>同时期，MS-COCO 引入了对象检测和图像描述任务，但每图 5 句描述的方式依然将丰富的视觉信息压缩成了极少数几句话。模型学会了生成近似描述，但仍然无法回答关于图像的具体、组合性问题。</p>
+</div>
+
+<h3>10.2 语言与视觉两个领域的交汇需求</h3>
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>计算机视觉的困境</h4>
+    <ul>
+      <li>ImageNet 分类：图像→一个标签（1000 类）</li>
+      <li>检测任务：图像→边界框列表</li>
+      <li>分割任务：图像→像素级掩码</li>
+      <li><strong>问题：</strong>这些输出都是"名词"——告诉你场景中"有什么"，但不说"它们之间是什么关系"</li>
+      <li>缺少"动词"和"介词"维度的理解</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>自然语言处理的局限</h4>
+    <ul>
+      <li>文本语料训练的语言模型知道"man wears hat"</li>
+      <li>但模型不知道"man"长什么样、"hat"如何出现、"wearing"在视觉上意味着什么</li>
+      <li><strong>问题：</strong>语言模型的语言知识是<strong>脱离感知</strong>的——它们从未"看见"过所讨论的事物</li>
+      <li>缺少视觉接地（visual grounding）</li>
+    </ul>
+  </div>
+</div>
+<p style="text-align:center; margin-top:10px; font-weight:700; color:#1d4ed8;">Visual Genome 的设计目标正是填补这两个领域的鸿沟：为视觉模型提供"关系"和"属性"维度的监督信号，同时为语言模型提供视觉接地。</p>
+
+<h3>10.3 学术谱系：Visual Genome 的思想来源</h3>
+<table>
+  <tr><th>思想来源</th><th>相关工作</th><th>Visual Genome 的继承与超越</th></tr>
+  <tr>
+    <td><strong>图像描述生成</strong></td>
+    <td>MS-COCO Captions (2015), Flickr30K</td>
+    <td>继承：区域级别的自然语言描述<br/>超越：从描述中抽取结构化场景图，而非仅仅是端到端描述生成</td>
+  </tr>
+  <tr>
+    <td><strong>视觉问答</strong></td>
+    <td>DAQUAR (2014), VQA (2015), Visual7W</td>
+    <td>继承：图像-QA 对的标注形式<br/>超越：QA 与场景图标注同源，使 QA 可被结构化分解</td>
+  </tr>
+  <tr>
+    <td><strong>知识图谱</strong></td>
+    <td>WordNet, Freebase, ConceptNet</td>
+    <td>继承：WordNet 作为概念规范化的本体<br/>超越：将抽象知识图谱锚定到具体图像像素</td>
+  </tr>
+  <tr>
+    <td><strong>视觉关系检测</strong></td>
+    <td>Visual Phrases (2011), VRD (2016)</td>
+    <td>继承：关系三元组的标注形式<br/>超越：更大规模 + 更多样化的关系类型 + 与场景图统一</td>
+  </tr>
+  <tr>
+    <td><strong>语义分割</strong></td>
+    <td>PASCAL VOC, SIFT Flow</td>
+    <td>继承：像素级标注的思想<br/>超越：从类别掩码升级为属性+关系+描述的多维标注</td>
+  </tr>
+</table>
+
+<h3>10.4 Visual Genome 引发的后续研究方向</h3>
+<p>Visual Genome 不仅是一个数据集，更定义了一个全新的研究方向。它直接催生了以下领域的繁荣：</p>
+<ul>
+  <li><strong>场景图生成（Scene Graph Generation）：</strong>Xu et al. (2017, CVPR)、Zellers et al. (2018, ECCV)、Tang et al. (2019, CVPR) 等大量工作直接在 Visual Genome 上训练和评测。</li>
+  <li><strong>视觉关系检测（Visual Relationship Detection）：</strong>场景图生成的核心子任务，发展出了基于语言先验、统计依赖和因果推断的多种方法。</li>
+  <li><strong>图像检索中的结构化查询：</strong>Johnson et al. (2015, CVPR) 展示了使用场景图进行图像检索的可能性。</li>
+  <li><strong>视觉推理与 VQA：</strong>Visual Genome 的 QA 数据被广泛用于训练和评估视觉问答模型，尤其是 GQA (Hudson & Manning, 2019) 直接基于 Visual Genome 场景图构建。</li>
+  <li><strong>多模态预训练：</strong>ViLBERT (Lu et al., 2019)、UNITER (Chen et al., 2020) 等视觉-语言预训练模型使用 Visual Genome 的场景图进行结构化预训练。</li>
+  <li><strong>图像生成的条件控制：</strong>场景图到图像的生成（sg2im, Johnson et al., 2018）成为图像生成领域的重要子方向。</li>
+</ul>
+</section>
+
+<section id="takeaway"><h2>11. Reading Takeaway</h2>
+<h3>11.1 一句话总结</h3>
+<div class="callout tip">
+  <p><strong>Visual Genome 的贡献不在于任何一个具体的算法或模型，而在于定义了"场景图"这一连接视觉像素与自然语言的结构化中间表示，并通过大规模的众包标注工程将这一理念落地为可供整个社区使用的基础设施。它从根本上改变了计算机视觉的任务定义——从"图像中有什么"转向"图像中谁与谁有什么关系"。</strong></p>
+</div>
+
+<h3>11.2 五个关键收获</h3>
+<ol>
+  <li><strong>稠密标注的革命性：</strong>每图 35 个对象 vs. MS-COCO 的 7 个——稠密标注迫使模型关注全图而非仅关注显著对象，这与人类视觉理解的全覆盖特性一致。这是数据标注范式的重要突破。</li>
+  <li><strong>场景图作为通用接口：</strong>场景图是一个优雅的抽象层——它是对象检测（节点）、属性分类（节点标签）、关系预测（边）、描述生成（图序列化）和问答（图查询）的统一表示。一个模型学会了生成场景图，理论上就获得了执行所有这些任务的能力。</li>
+  <li><strong>自由语言先于结构化的设计智慧：</strong>先让 Worker 用自然语言描述，再从中抽取结构化信息——这个简单的设计决策同时解决了"如何让标注自然"和"如何确保覆盖全面"两个难题。语言是人类最自然的视觉表达方式。</li>
+  <li><strong>规范化是连接语言与符号的必经之路：</strong>将多样化的自由文本映射到 WordNet synset 的过程虽然不完美（有信息损失），但它是使标注可计算、可索引、可跨图像对齐的必经之路。这种"自由→规范"的转化模式对任何多模态数据工程都有参考价值。</li>
+  <li><strong>长尾是场景理解的根本挑战：</strong>Visual Genome 的关系和对象分布极端长尾，这既是真实世界的属性（大多数关系和对象确实是罕见的），也是场景图生成模型的主要瓶颈。后续的因果干预、重加权、few-shot learning 等方法都是对这一挑战的回应。</li>
+</ol>
+
+<h3>11.3 对本研究的启示</h3>
+<div class="callout idea">
+  <div class="callout-title">方法论层面的价值</div>
+  <p>Visual Genome 的数据集构建方法论对任何需要<strong>大规模、结构化、多模态标注</strong>的研究都具有参考价值：</p>
+  <ul>
+    <li><strong>先语言后结构：</strong>让标注者用最自然的方式表达，然后用自动化工具抽取结构——这种"human-in-the-loop NLP"范式可以显著降低标注的认知负荷。</li>
+    <li><strong>分而治之的标注策略：</strong>区域图 → 全图场景图的分层构建，既降低了单次标注的复杂度，又通过合并实现了覆盖面的扩展。</li>
+    <li><strong>自动映射 + 人工修正的混合规范化：</strong>纯自动映射速度快但不够准确，纯人工标注准确但不可扩展。Visual Genome 的"自动映射 + 少量人工规则 + AMT 验证"的混合方案在效率和准确率之间找到了好的平衡。</li>
+    <li><strong>从数据到任务的定义权：</strong>一个新的数据集不仅提供训练数据，更定义了新的任务和评价标准。Visual Genome 对场景图生成任务的定义（PredCls/SGCls/SGDet）和 R@K 评价指标至今仍是该领域的标准。</li>
+  </ul>
+</div>
+
+<h3>11.4 延伸阅读建议</h3>
+<ul>
+  <li><strong>场景图生成方法：</strong>Xu et al., "Scene Graph Generation by Iterative Message Passing", CVPR 2017 —— Visual Genome 发布后的第一个系统性 SGG 方法。</li>
+  <li><strong>场景图到图像：</strong>Johnson et al., "Image Generation from Scene Graphs", CVPR 2018 —— 展示场景图足以编码生成图像所需的信息。</li>
+  <li><strong>结构化 VQA：</strong>Hudson & Manning, "GQA: A New Dataset for Real-World Visual Reasoning and Compositional Question Answering", CVPR 2019 —— 基于 Visual Genome 场景图构建的组合性 VQA 数据集。</li>
+  <li><strong>关系检测的去偏：</strong>Tang et al., "Unbiased Scene Graph Generation from Biased Training", CVPR 2020 —— 针对 Visual Genome 关系长尾问题的因果解决方案。</li>
+  <li><strong>预训练中的场景图：</strong>Lu et al., "ViLBERT: Pretraining Task-Agnostic Visiolinguistic Representations for Vision-and-Language Tasks", NeurIPS 2019 —— 利用 Visual Genome 进行多模态预训练。</li>
+</ul>
+
+<h3>11.5 核心公式回顾</h3>
+<div class="formula-block">
+  <div class="eq-tag">Visual Genome 知识体系的核心数学表达</div>
+  <p><strong>场景图定义：</strong></p>
+  $$ \mathcal{G} = (\mathcal{O}, \mathcal{E}), \quad o_i = (b_i, c_i, A_i), \quad e_{ij} = (o_i, r, o_j) $$
+  <p><strong>从区域描述到场景图：</strong></p>
+  $$ \mathcal{G}_{\text{image}} = \bigoplus_{R_i \in \mathcal{R}} \text{Extract}(D(R_i)) $$
+  <p><strong>规范化映射：</strong></p>
+  $$ c^* = \begin{cases} \arg\max_{s \in \mathcal{S}(o)} f(s) & \text{（词频优先）} \\ \text{rule}(o) & \text{（若在人工规则覆盖范围内）} \end{cases} $$
+  <p><strong>场景图生成评价：</strong></p>
+  $$ \text{Recall@}K = \frac{|\text{TopK}(\mathcal{E}_{\text{pred}}) \cap \mathcal{E}_{\text{gt}}|}{|\mathcal{E}_{\text{gt}}|} $$
+  <p><strong>关系根上位词泛化：</strong></p>
+  $$ s^*(r) = \text{RootHypernym}(s(r)) = \lim_{k \to \infty} \text{hypernym}^k(s(r)) $$
+  <div class="eq-note"><strong>这些公式共同定义了视觉场景理解的"结构化中间层"范式：</strong>将图像映射到可计算的符号图，在图空间进行推理和查询，然后将结果投射回语言或视觉空间。这一范式至今仍是视觉-语言理解研究的核心框架之一。</div>
+</div>
+
+<p class="source">This page is grounded in the abstract, methods (canonicalization pipeline, scene graph construction, QA generation), statistics (108,077 images, 35 objects, 26 attributes, 21 relationships per image on average), experiments, and conclusion of the local PDF. Specific quantitative values and technical details come from the paper's published IJCV 2017 version.</p>
+</section>
+</main></div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>&#128214; Paper Notes &#183; Scholar &#183; Paper ID 10442 &#183; MathJax + Mermaid Rendering</footer>
+</body></html>

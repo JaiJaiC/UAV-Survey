@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Hold my beer: Learning gentle humanoid locomotion and end-effector stabilization control</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Tairan He · 13-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a class="active" href="../10059/index.html">Hold my beer</a>
+<a href="../10056/index.html">FALCON</a>
+<a href="../10054/index.html">Humanoid policy ~</a>
+<a href="../10052/index.html">Hover Versatile neural</a>
+<a href="../10048/index.html">ASAP</a>
+<a href="../10053/index.html">WoCoCo Learning whole-bod</a>
+<a href="../10050/index.html">Agile but safe</a>
+<a href="../10049/index.html">Learning human-to-humanoi</a>
+<a href="../10047/index.html">OmniH2O Universal dextero</a>
+<a href="../10058/index.html">Probabilistic safeguard</a>
+<a href="../10057/index.html">Safety index synthesis</a>
+<a href="../10051/index.html">State-wise safe reinforce</a>
+<a href="../10055/index.html">Energy-based imitation le</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Hold My Beer: Learning Gentle Humanoid Locomotion and End-Effector Stabilization Control</td></tr>
+    <tr><td><strong>Authors</strong></td><td>Yitang Li, Yuanhang Zhang, Wenli Xiao, Chaoyi Pan, Haoyang Weng, Guanqi He, <strong>Tairan He</strong>, Guanya Shi</td></tr>
+    <tr><td><strong>Affiliations</strong></td><td>IIIS, Tsinghua University; Carnegie Mellon University (CMU)</td></tr>
+    <tr><td><strong>Venue</strong></td><td class="bold-venue">arXiv preprint (under review), 2025-06-03</td></tr>
+      <div class="journal-meta"><span class="jif-name">arXiv</span> <span class="jif-badge if-preprint">📄 Preprint</span></div>
+    <tr><td><strong>Date</strong></td><td>首次发布 2025-05-30</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="http://arxiv.org/abs/2505.24198" target="_blank">arXiv:2505.24198</a> | <a href="https://lecar-lab.github.io/SoFTA/" target="_blank">Project Page</a> | <a href="https://github.com/LeCAR-Lab/SoFTA" target="_blank">GitHub</a> | <a href="https://openreview.net/forum?id=Bl2VfU9NhF" target="_blank">OpenReview</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 SoFTA（Slow-Fast Two-Agent），一种慢-快双智能体框架，将人形机器人全身控制按时间和目标分解为下肢慢速 Agent（50Hz，关注鲁棒行走）和上肢快速 Agent（100Hz，关注末端稳定）。通过频率分离消除策略干扰，将末端执行器加速度降低 2-5 倍，在 Unitree G1 和 Booster T1 上实现了端水杯行走、稳定摄像、抗扰动等精细任务，性能接近人类水平。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Reinforcement Learning</span>
+    <span class="tag tag-green">Humanoid Robotics</span>
+    <span class="tag tag-purple">End-Effector Control</span>
+    <span class="tag tag-amber">Sim-to-Real</span>
+    <span class="tag tag-cyan">Dual-Agent</span>
+    <span class="tag tag-red">Frequency Separation</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <div class="callout idea">
+    <div class="callout-title">第一性原理洞察：运动与精细操作在时间尺度上的本质不匹配</div>
+    <p>人形机器人"端着满杯啤酒走路"这一看似简单的任务，暴露了机器人控制中一个被长期忽视的根本矛盾：<strong>行走（Locomotion）和末端稳定（End-Effector Stabilization）需要完全不同的时间尺度和控制精度。</strong></p>
+    <p>行走是<strong>慢时间尺度、容错性高</strong>的过程——步态周期约 0.5-1s，足地碰撞存在固有离散性和不可微性，微小的关节误差不会导致灾难性后果。而端水杯需要<strong>快时间尺度、零容错</strong>——任何超过约 0.2g 的末端加速度就会导致液体溢出，响应延迟必须以毫秒计。当这两者耦合在同一控制回路中时，<strong>同一个策略的参数必须在"慢但鲁棒"和"快但精确"之间做出不可能的折衷。</strong></p>
+  </div>
+
+  <h3>核心创新点</h3>
+
+  <table>
+    <tr><th style="width:30px;">#</th><th>创新点</th><th>技术内涵</th></tr>
+    <tr>
+      <td><strong>1</strong></td>
+      <td><strong>慢-快双智能体频率分离（Slow-Fast Frequency Separation）</strong></td>
+      <td>下肢 Agent 以 <strong>50Hz</strong> 运行，专注于鲁棒步态生成——足够快以维持平衡，足够慢以避免对传感器噪声过度敏感（100Hz 会导致"腿抖"）。上肢 Agent 以 <strong>100Hz</strong> 运行，专注于末端加速度的毫秒级抑制。这是首次在 RL-based 人形机器人控制中系统论证频率分离的必要性，并通过消融实验证明了 50/100Hz 是最优配对。</td>
+    </tr>
+    <tr>
+      <td><strong>2</strong></td>
+      <td><strong>加速度最小化奖励（Acceleration-Minimization Reward）</strong></td>
+      <td>上肢 Agent 的奖励完全围绕末端加速度——线加速度惩罚 $-\|\ddot{\boldsymbol{p}}_{EE}\|^2$、角加速度惩罚 $-\|\dot{\boldsymbol{\omega}}_{EE}\|^2$、零加速度指数奖励 $e^{-\lambda\|\ddot{\boldsymbol{p}}_{EE}\|^2}$、以及重力倾斜惩罚。这种纯粹以"不动"为目标的奖励设计，使得 Agent 学会主动预测和抵消来自下肢运动的惯性扰动。</td>
+    </tr>
+    <tr>
+      <td><strong>3</strong></td>
+      <td><strong>双重"解耦"（双智能体分解 + 奖励隔离）</strong></td>
+      <td>与 FALCON 类似，SoFTA 也将控制分解为上下肢两个 Agent。但 SoFTA 的独特之处在于 <strong>频率不对称</strong>——不仅分解了"谁控制什么"，还分解了"以多快控制"。此外，上下肢的奖励函数<strong>完全隔离</strong>（共享的仅是防摔惩罚），避免了信用分配问题。</td>
+    </tr>
+    <tr>
+      <td><strong>4</strong></td>
+      <td><strong>超越单纯稳定的通用性</strong></td>
+      <td>SoFTA 不仅证明了"端稳"，还展示了同一框架在三个不同任务上的有效性：端水杯行走、稳定摄像（人形 Steadicam）、以及推搡恢复（disturbance rejection）。这表明慢-快频率分离是一种通用的结构先验，而非针对特定任务的技巧。</td>
+    </tr>
+  </table>
+
+  <h3>与兄弟工作 FALCON 的关系</h3>
+  <div class="callout info">
+    <div class="callout-title">双智能体分解范式的两条互补路径</div>
+    <p>FALCON 和 SoFTA 均出自 CMU LeCAR Lab，共享"上下半身双智能体分解"的核心范式，但切入点互补：</p>
+    <ul>
+      <li><strong>SoFTA（本文）</strong>回答的问题是：<strong>"如何在运动中保持末端不动？"</strong>——核心切入点是<strong>时间尺度分离</strong>（慢走+快稳），奖励设计围绕<strong>加速度最小化</strong>。</li>
+      <li><strong>FALCON</strong> 回答的问题是：<strong>"如何在外力下保持操作精度？"</strong>——核心切入点是<strong>力维度适应</strong>（对抗大小方向未知的外力），奖励设计围绕<strong>关节跟踪精度</strong>，关键贡献是<strong>力矩感知的力课程</strong>。</li>
+    </ul>
+    <p>两者构成了人形机器人全身控制中"双智能体分解"范式的完整图景——SoFTA 负责"稳"（时间维度的解耦），FALCON 负责"力"（力维度的解耦）。</p>
+    <p>一个有趣的技术细节对比：<strong>SoFTA 使用 50Hz+100Hz 的非对称频率，而 FALCON 使用统一的 50Hz。</strong>这是因为两者面对的"对抗目标"不同——SoFTA 对抗的是运动产生的惯性加速度（需要高频抑制），FALCON 对抗的是外力（频率取决于外力变化率，通常较慢）。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 整体架构（Mermaid 流程图）</h3>
+  <div class="mermaid">
+flowchart TB
+    subgraph ENV["仿真环境 / 真实世界"]
+        S["本体感知 s_t<br/>(5步历史: 关节位置/速度、<br/>根角速度、重力投影、历史动作)"]
+        ROB["机器人<br/>Unitree G1 / Booster T1"]
+    end
+
+    subgraph LB["下肢慢速 Agent · 50Hz"]
+        GL["下肢目标 G_t^l<br/>(根速度 2D、偏航率、<br/>站/走命令、步态频率)"]
+        AL["Actor π_l(s_t, G_t^l) → a_t^l"]
+        CL["Critic V_l (含特权信息)"]
+        RL["下肢奖励 r_t^l<br/>(速度跟踪、步态接触、<br/>高度、能耗、防摔)"]
+    end
+
+    subgraph UB["上肢快速 Agent · 100Hz"]
+        GU["上肢目标 G_t^u<br/>(EE位置 5D/每手, 容差σ)"]
+        AU["Actor π_u(s_t, G_t^u) → a_t^u"]
+        CU["Critic V_u (含特权信息)"]
+        RU["上肢奖励 r_t^u<br/>(加速度惩罚、重力倾斜、<br/>零加速度激励、防摔)"]
+    end
+
+    S --> AL
+    S --> AU
+    GL --> AL
+    GU --> AU
+    AL -->|50Hz| PD_L["PD控制器<br/>下肢13关节"]
+    AU -->|100Hz| PD_U["PD控制器<br/>上肢14关节"]
+    PD_L --> ROB
+    PD_U --> ROB
+    ROB --> S
+
+    RL -.-> LB
+    RU -.-> UB
+  </div>
+
+  <h3>3.2 频率分离机制详解</h3>
+  <div class="mermaid">
+sequenceDiagram
+    participant T as 时间轴 (20ms步长)
+    participant UB as 上肢 Agent (100Hz)
+    participant LB as 下肢 Agent (50Hz)
+    participant R as 机器人
+
+    Note over T,R: 每10ms一个仿真步，每20ms一个控制周期
+
+    T->>T: t = 0ms
+    UB->>R: a_t^u (上肢动作)
+    LB->>R: a_t^l (下肢动作)
+    Note over R: 并行执行
+
+    T->>T: t = 10ms
+    UB->>R: a_t^u (仅上肢更新)
+
+    T->>T: t = 20ms
+    UB->>R: a_t^u (上肢动作)
+    LB->>R: a_t^l (下肢动作更新)
+    Note over R: 下肢50Hz = 每20ms一次
+
+    T->>T: t = 30ms
+    UB->>R: a_t^u (仅上肢更新)
+
+    Note over UB,LB: 在一个下肢周期(20ms)内，<br/>上肢执行了2次更新
+  </div>
+
+  <h3>3.3 观测空间与动作空间</h3>
+  <table>
+    <tr><th>组件</th><th>内容</th><th>说明</th></tr>
+    <tr><td><strong>共享本体感知 $s_t$</strong></td><td>5步历史的关节位置、关节速度、根角速度、投影重力向量、上一时刻动作</td><td>两个 Agent 共享完全相同的历史观测，确保对全身状态有完整感知</td></tr>
+    <tr><td><strong>下肢目标 $G_t^l$</strong></td><td>目标根线速度 (2D)、目标偏航角速度 (1D)、基座朝向命令、站/走模式、步态频率</td><td>控制机器人走向哪里、以什么速度走</td></tr>
+    <tr><td><strong>上肢目标 $G_t^u$</strong></td><td>每只手的末端执行器位置命令 (5D: x,y,z + 容差 σ)、位置跟踪奖励参数</td><td>训练中随机化 EE 目标位置以增强泛化</td></tr>
+    <tr><td><strong>Critic 特权信息</strong></td><td>全局速度真值 + 精确的 EE 位置</td><td>仅 Critic 可用，Actor 不感知——缩小 sim-to-real gap</td></tr>
+    <tr><td><strong>上肢动作 $a_t^u$</strong></td><td>14个手臂关节的目标位置</td><td>100Hz 高频输出</td></tr>
+    <tr><td><strong>下肢动作 $a_t^l$</strong></td><td>13个腿+腰关节的目标位置</td><td>50Hz 低频输出</td></tr>
+    <tr><td><strong>执行</strong></td><td>PD 控制器将目标关节位置转为力矩</td><td>仿真中 10ms 步长，真实机器人上 1-2ms 控制回路</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义 — 解决什么问题？</h2>
+
+  <div class="callout info">
+    <div class="callout-title">核心任务：精细人形机器人运动中的末端执行器稳定控制</div>
+    <p>在机器人以任意速度行走、转向、原地踏步的过程中，<strong>最小化末端执行器（手部）的线加速度和角加速度</strong>，使得夹持的物体（如满杯液体）保持稳定、不洒出。任务的核心挑战在于：行走必然产生被动的末端惯性运动，而抑制这些惯性需要<strong>主动、快速、精确的上肢补偿动作</strong>。</p>
+  </div>
+
+  <h3>4.1 形式化定义</h3>
+  <p>SoFTA 将问题建模为两个耦合的 <strong>Goal-Conditioned MDP</strong>，共享状态但具有独立的目标、动作和奖励：</p>
+
+  <div class="formula-block">
+    <div class="eq-tag">下肢 MDP</div>
+    $$ \mathcal{M}_l = (\mathcal{S}, \mathcal{A}_l, \mathcal{G}_l, P, r_l, \gamma), \quad a_t^l \sim \pi_l(\cdot \mid s_t, G_t^l) $$
+    <div class="eq-note">下肢策略的目标是最大化累积运动奖励：速度跟踪、步态自然度、平衡保持。频率：50Hz。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">上肢 MDP</div>
+    $$ \mathcal{M}_u = (\mathcal{S}, \mathcal{A}_u, \mathcal{G}_u, P, r_u, \gamma), \quad a_t^u \sim \pi_u(\cdot \mid s_t, G_t^u) $$
+    <div class="eq-note">上肢策略的目标是最小化末端加速度（即最大化负加速度惩罚）。频率：100Hz。</div>
+  </div>
+
+  <p><strong>共享状态 $s_t$：</strong>两个 Agent 读取完全相同的本体感知历史。这意味着上肢 Agent 可以"看到"下肢的运动状态，从而学会预测来自行走的惯性扰动并进行前馈补偿。</p>
+
+  <h3>4.2 真实世界验证任务</h3>
+  <table>
+    <tr><th>任务</th><th>关键指标</th><th>难度来源</th><th>SoFTA 的表现</th></tr>
+    <tr>
+      <td><strong>端水杯行走<br/>(Cup Carry)</strong></td>
+      <td>末端加速度 &lt; 2 m/s²<br/>液体表面平稳度</td>
+      <td>行走的周期性加速度峰值（足地碰撞）直接传导至末端</td>
+      <td>液体表面几乎不动；对比默认控制器液体剧烈晃动</td>
+    </tr>
+    <tr>
+      <td><strong>稳定摄像<br/>(Humanoid Cameraman)</strong></td>
+      <td>相机画面稳定性<br/>(类似 Steadicam 效果)</td>
+      <td>行走时手腕的高频抖动导致画面模糊</td>
+      <td>腕载相机产出平滑画面，可比肩专业稳定器</td>
+    </tr>
+    <tr>
+      <td><strong>抗扰动恢复<br/>(Disturbance Rejection)</strong></td>
+      <td>推搡后 EE 稳定恢复时间</td>
+      <td>外力突然施加，上下肢需要协调响应——下肢恢复平衡，上肢同时保持末端稳定</td>
+      <td>50Hz下肢踉跄后恢复站姿，100Hz上肢快速调整手臂姿态使杯子保持水平</td>
+    </tr>
+  </table>
+
+  <h3>4.3 与 FALCON 的任务维度对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>SoFTA（本文）— "稳"</h4>
+      <ul>
+        <li>外力来源：<strong>运动自身产生的惯性力</strong></li>
+        <li>核心指标：<strong>末端加速度</strong> $\|\ddot{\boldsymbol{p}}_{EE}\|$</li>
+        <li>控制策略：<strong>高频主动补偿</strong>（100Hz）</li>
+        <li>典型场景：端水、摄像、抗推</li>
+        <li>奖励基调：<strong>惩罚运动</strong>（minimize acceleration）</li>
+        <li>频率：<strong>非对称 50/100Hz</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>FALCON（兄弟工作）— "力"</h4>
+      <ul>
+        <li>外力来源：<strong>外部施加的负载力</strong></li>
+        <li>核心指标：<strong>关节跟踪精度</strong></li>
+        <li>控制策略：<strong>隐式力自适应</strong>（通过课程学习）</li>
+        <li>典型场景：搬运、拉车、开门</li>
+        <li>奖励基调：<strong>跟踪精度</strong>（accurate joint tracking）</li>
+        <li>频率：<strong>对称 50/50Hz</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. 挑战分析 — 为什么困难？</h2>
+
+  <h3>5.1 动力学时间尺度不匹配（Dynamics Mismatch）</h3>
+  <div class="callout danger">
+    <div class="callout-title">根本挑战：同一个身体需要同时执行两种动力学特性截然不同的任务</div>
+    <table>
+      <tr><th>维度</th><th>运动 (Locomotion)</th><th>末端稳定 (EE Stabilization)</th></tr>
+      <tr><td><strong>时间尺度</strong></td><td>慢（步态周期 ~0.5-1s）</td><td>快（加速度变化 ~10ms）</td></tr>
+      <tr><td><strong>控制精度要求</strong></td><td>中等（厘米级足部位置）</td><td>极高（亚毫米级加速度抑制）</td></tr>
+      <tr><td><strong>动力学特性</strong></td><td>离散、非光滑（足地碰撞）</td><td>连续、光滑（阻抗控制）</td></tr>
+      <tr><td><strong>容错空间</strong></td><td>较大（微小的步态偏差不致命）</td><td>极小（加速度超过阈值即失败）</td></tr>
+      <tr><td><strong>传感器噪声敏感性</strong></td><td>低（低频滤波有效）</td><td>高（噪声直接转化为动作抖动）</td></tr>
+    </table>
+  </div>
+
+  <h3>5.2 统一策略的"不可能三角"</h3>
+  <p>如果用一个统一的策略同时控制上下肢，会陷入以下困境：</p>
+  <div class="formula-block">
+    <div class="eq-tag">统一策略的梯度困境</div>
+    $$ \nabla_\theta J = \mathbb{E}\left[\nabla_\theta \log \pi_\theta(a|s) \cdot \left(A_{\text{loco}} + A_{\text{stab}}\right)\right] $$
+    <div class="eq-note">
+      当 $A_{\text{loco}}$ 和 $A_{\text{stab}}$ 来自不同时间尺度的奖励信号时，它们的方差和相关性结构完全不同：<br/>
+      - $A_{\text{loco}}$ 需要跨多个步态周期（~1s）的 credit assignment<br/>
+      - $A_{\text{stab}}$ 需要毫秒级的即时反馈<br/>
+      这导致梯度估计的噪声极大，策略要么偏向行走（末端抖），要么偏向稳定（走不稳），很难收敛到两者都好的解。
+    </div>
+  </div>
+
+  <h3>5.3 高频控制的传感器噪声问题</h3>
+  <p>直觉上，如果末端稳定需要快速响应，应该把整个控制回路都提速到 100Hz。但实验发现：<strong>将下肢也提到 100Hz 会导致腿部"发抖"（shivering）——高频策略对 IMU 和关节编码器的噪声过度敏感，产生高频振荡的控制信号。</strong>这是 SoFTA 发现的最关键反直觉事实：</p>
+  <div class="callout warn">
+    <div class="callout-title">反直觉发现：越快不一定越好</div>
+    <p>对于下肢运动控制，<strong>50Hz 反而优于 100Hz</strong>。原因：行走动力学本身是慢过程，50Hz 的控制带宽已经足够捕捉步态周期（0.5-1s）的动态。更高频率只是引入了更多噪声，而没有提供有用的控制信息。这解释了为什么需要非对称频率——上肢和下肢各自需要其"最优"的频率，而非"最高"的频率。</p>
+  </div>
+
+  <h3>5.4 前序方法的局限</h3>
+  <ul>
+    <li><strong>Whole-Body RL（统一策略，50Hz 或 100Hz 单一频率）：</strong>无法同时满足行走的鲁棒性和末端的高精度。消融实验显示 50/50 或 100/100 统一频率的末端加速度显著高于 50/100。</li>
+    <li><strong>Lower-RL + Upper-IK（下肢学习+上肢逆运动学）：</strong>IK 是开环的，无法感知或补偿运动产生的惯性扰动。</li>
+    <li><strong>Unitree G1 默认控制器：</strong>原地踏步时末端加速度约 5 m/s²（超过人类水平 10 倍以上），完全无法胜任端水杯等精细任务。</li>
+    <li><strong>基于模型的全身控制（WBC）：</strong>依赖精确的动力学参数，对建模误差和未建模扰动（如液体晃动的非线性）敏感。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD ═══════════════ -->
+<section id="method">
+  <h2>6. 方法详解与关键公式</h2>
+
+  <h3>6.1 SoFTA 慢-快双智能体框架</h3>
+
+  <p>SoFTA 的核心设计包含<strong>三个层次的解耦</strong>：</p>
+  <ol>
+    <li><strong>空间解耦：</strong>下肢 Agent 控制腿和腰部，上肢 Agent 控制手臂。</li>
+    <li><strong>时间解耦：</strong>下肢 50Hz，上肢 100Hz——这是 SoFTA 最独特的贡献。</li>
+    <li><strong>奖励解耦：</strong>上下肢各自有独立的奖励函数，仅在防摔惩罚上共享（促进协调）。</li>
+  </ol>
+
+  <h3>6.2 上肢奖励函数设计（核心贡献）</h3>
+
+  <p>上肢 Agent 的奖励函数以<strong>末端执行器加速度最小化</strong>为核心目标：</p>
+
+  <div class="formula-block">
+    <div class="eq-tag">公式 1：线加速度惩罚</div>
+    $$ r_{\text{acc}} = -\|\ddot{\boldsymbol{p}}_{EE}\|^2 $$
+    <div class="eq-note">$\ddot{\boldsymbol{p}}_{EE} \in \mathbb{R}^3$ 是末端执行器在世界坐标系下的线加速度。这是最主要的惩罚项，直接驱动策略减少末端的任何线性运动。平方惩罚对大的加速度（如足地碰撞传导的尖峰）施加不成比例的惩罚。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">公式 2：角加速度惩罚</div>
+    $$ r_{\text{ang-acc}} = -\|\dot{\boldsymbol{\omega}}_{EE}\|^2 $$
+    <div class="eq-note">$\dot{\boldsymbol{\omega}}_{EE} \in \mathbb{R}^3$ 是末端执行器的角加速度。对于端水杯任务，角加速度直接导致杯子倾斜和液体晃动。这一项确保末端不仅位置稳定，而且姿态也稳定。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">公式 3：零加速度指数奖励</div>
+    $$ r_{\text{zero-acc}} = \exp\left(-\lambda_{\text{acc}} \|\ddot{\boldsymbol{p}}_{EE}\|^2\right), \quad r_{\text{zero-ang}} = \exp\left(-\lambda_{\text{ang}} \|\dot{\boldsymbol{\omega}}_{EE}\|^2\right) $$
+    <div class="eq-note">指数奖励提供了一个"甜区"——当加速度接近零时，奖励趋近于1（最大），而当加速度增大时，奖励急剧衰减。相比线性惩罚，指数形式更强调"绝对稳定"的价值。$\lambda$ 控制衰减的陡峭程度。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">公式 4：重力倾斜惩罚</div>
+    $$ r_{\text{grav-xy}} = -\left\|\text{proj}_{xy}\left(\boldsymbol{R}_{EE}^T \boldsymbol{g}\right)\right\|^2 $$
+    <div class="eq-note">$\boldsymbol{R}_{EE}$ 是末端执行器的旋转矩阵，$\boldsymbol{g}$ 是重力向量。这一项惩罚末端坐标系的 $xy$ 平面（即手掌平面）偏离水平面的程度。物理直觉：如果手掌不水平，液体就会因重力而流出。这是对杯子不洒的显式物理约束。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">公式 5：末端位置跟踪（含容差）</div>
+    $$ r_{\text{pos}} = \begin{cases} 1 & \text{if } \|\boldsymbol{p}_{EE} - \boldsymbol{p}_{EE}^{\text{des}}\| \leq \sigma \\ \exp\left(-\frac{\|\boldsymbol{p}_{EE} - \boldsymbol{p}_{EE}^{\text{des}}\|^2}{\sigma^2}\right) & \text{otherwise} \end{cases} $$
+    <div class="eq-note">在容差 $\sigma$ 范围内给予全额奖励，超出后指数衰减。训练时 EE 目标位置随机化，确保策略学会在任何手臂姿态下保持稳定。</div>
+  </div>
+
+  <h3>6.3 下肢奖励函数设计</h3>
+  <p>下肢 Agent 使用标准的人形机器人运动奖励函数族：</p>
+  <ul>
+    <li><strong>速度跟踪：</strong>$\exp(-\|\boldsymbol{v}_{xy} - \boldsymbol{v}_{xy}^{\text{cmd}}\|^2 / \sigma_v^2)$ —— 线速度命令跟踪</li>
+    <li><strong>偏航率跟踪：</strong>$\exp(-(\omega_z - \omega_z^{\text{cmd}})^2 / \sigma_\omega^2)$ —— 角速度命令跟踪</li>
+    <li><strong>步态接触：</strong>足部在空中/地面的时间符合命令的步态频率和相位</li>
+    <li><strong>基座高度：</strong>惩罚基座偏离目标高度</li>
+    <li><strong>能耗/平滑性：</strong>惩罚关节力矩和动作变化率</li>
+    <li><strong>防摔终止（共享）：</strong>基座姿态超过阈值则终止——此惩罚同时出现在 $r_l$ 和 $r_u$ 中</li>
+  </ul>
+
+  <h3>6.4 频率消融实验（关键发现）</h3>
+  <p>SoFTA 系统性地测试了上下肢频率的所有组合（33.3Hz、50Hz、100Hz）：</p>
+
+  <table>
+    <tr><th>下肢频率</th><th>上肢频率</th><th>末端加速度</th><th>行走稳定性</th><th>分析与解释</th></tr>
+    <tr>
+      <td>50 Hz</td>
+      <td><strong>100 Hz</strong></td>
+      <td><strong>✅ 最低</strong></td>
+      <td><strong>✅ 最优</strong></td>
+      <td>下肢慢速保证行走鲁棒性，上肢快速保证末端稳定——<strong>最优配对</strong></td>
+    </tr>
+    <tr><td>100 Hz</td><td>100 Hz</td><td>⚠️ 中等</td><td>❌ 腿抖 (shivering)</td><td>下肢对噪声过度敏感，产生高频振荡，反而传导致末端</td></tr>
+    <tr><td>33 Hz</td><td>100 Hz</td><td>⚠️ 偏大</td><td>⚠️ 步态迟钝</td><td>下肢频率过低导致平衡恢复慢</td></tr>
+    <tr><td>50 Hz</td><td>50 Hz</td><td>❌ 明显偏大</td><td>✅ 良好</td><td>上肢反应太慢，无法及时补偿运动扰动</td></tr>
+    <tr><td>50 Hz</td><td>33 Hz</td><td>❌❌ 最大</td><td>✅ 良好</td><td>上肢严重滞后于扰动</td></tr>
+  </table>
+
+  <div class="callout idea">
+    <div class="callout-title">论文 Fig.7 热力图的核心信息</div>
+    <p>频率消融结果呈现为二维热力图：蓝色区域（低加速度 + 高稳定性）精确集中在 <strong>下肢=50Hz, 上肢=100Hz</strong> 的交叉点。红色区域（高加速度 + 不稳定）出现在下肢尝试 100Hz（过敏感）或上肢低于 50Hz（过迟钝）的位置。这不仅是经验选优——它揭示了人形机器人控制中<strong>运动频率天然低于稳定频率</strong>的物理本质。</p>
+  </div>
+
+  <h3>6.5 训练细节</h3>
+  <ul>
+    <li><strong>算法：</strong>Proximal Policy Optimization (PPO)，两个 Agent 各自独立的 Actor-Critic 网络，无参数共享</li>
+    <li><strong>仿真平台：</strong>Isaac Gym，4096 并行环境</li>
+    <li><strong>Actor 网络：</strong>MLP，输入 5 步历史观测（propioceptive history），输出目标关节位置</li>
+    <li><strong>Critic 网络：</strong>MLP，输入本体感知 + 特权信息（根速度真值、精确 EE 位置）</li>
+    <li><strong>域随机化：</strong>关节增益、摩擦系数、基座质量/惯量、控制延迟、外部推力扰动</li>
+    <li><strong>PD 控制：</strong>目标关节位置通过 PD 控制器转为力矩，仿真步长 10ms</li>
+    <li><strong>奖励权重：</strong>上肢加速度奖励权重显著高于位置跟踪奖励，体现"稳比准更重要"的设计理念</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. 核心技术原理</h2>
+
+  <h3>7.1 控制回路中的 Nyquist-Shannon 采样定理</h3>
+  <p>从信号处理角度看，控制频率的选择本质上是一个采样问题：</p>
+  <ul>
+    <li><strong>下肢运动：</strong>步态周期的最高有效频率分量约 2-5 Hz（快跑时更高），按照 Nyquist 定理需要至少 10 Hz 的控制频率。50Hz 提供了约 10-25 倍的过采样，是鲁棒性和计算开销之间的良好平衡。</li>
+    <li><strong>末端稳定：</strong>足地碰撞产生的加速度尖峰包含显著的高频分量（可达 50+ Hz）。要有效抑制这些扰动，控制频率需要足够高以捕捉并补偿尖峰。100Hz 约提供了 2 倍的过采样。</li>
+    <li><strong>传感器噪声：</strong>真实 IMU 和编码器噪声在 50-100Hz 频段显著。50Hz 的低通效应（隐式的抗混叠滤波）使得下肢策略免受噪声干扰，而 100Hz 的上肢策略需要依赖奖励函数中的平滑项来抑制噪声引起的抖动。</li>
+  </ul>
+
+  <h3>7.2 多速率控制理论（Multi-Rate Control）</h3>
+  <p>SoFTA 的频率分离设计可以视为<strong>多速率控制系统</strong>的一个特例：</p>
+  <div class="formula-block">
+    <div class="eq-tag">多速率系统的状态更新</div>
+    $$ \begin{aligned} \boldsymbol{x}_{t+\Delta t_u} &= f_u(\boldsymbol{x}_t, \boldsymbol{u}_t^u, \boldsymbol{u}_t^l), \quad \Delta t_u = 10\text{ms (100Hz)} \\ \boldsymbol{x}_{t+\Delta t_l} &= f_l(\boldsymbol{x}_t, \boldsymbol{u}_t^u, \boldsymbol{u}_t^l), \quad \Delta t_l = 20\text{ms (50Hz)} \end{aligned} $$
+    <div class="eq-note">在一个下肢周期（20ms）内，上肢完成两次状态更新和动作输出。这是一种"快内环+慢外环"的级联控制结构，快环补偿高频扰动，慢环维持低频稳定。</div>
+  </div>
+
+  <h3>7.3 人类运动控制的生物学启发</h3>
+  <p>SoFTA 的设计受到了<strong>人类运动神经系统</strong>的启发：</p>
+  <ul>
+    <li><strong>脊髓中枢模式发生器（CPG）：</strong>以低频（~2-5 Hz）生成基本的步态节律，类似于 SoFTA 的 50Hz 下肢 Agent。</li>
+    <li><strong>小脑-皮层快速反馈回路：</strong>以高频（~100+ ms 延迟但持续调整）进行精细的运动修正，类似于 SoFTA 的 100Hz 上肢 Agent。</li>
+    <li><strong>分层+并行的组织方式：</strong>人类不会用一个统一的神经回路同时控制行走和端水——而是将行走交给自动化的脊髓回路，将端水交给需要意识参与的皮层回路。SoFTA 的双 Agent 设计正是这种生物学分层控制的人工实现。</li>
+  </ul>
+
+  <h3>7.4 PPO 与广义优势估计（GAE）</h3>
+  <p>SoFTA 使用 PPO + GAE 进行训练。GAE 通过指数加权平均不同步长的 TD 误差来平衡偏差和方差：</p>
+  <div class="formula-block">
+    $$ \hat{A}_t^{\text{GAE}(\gamma, \lambda)} = \sum_{l=0}^{\infty} (\gamma \lambda)^l \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t) $$
+    <div class="eq-note">$\lambda$ 控制偏差-方差权衡：$\lambda=0$ 为一步 TD（低方差高偏差），$\lambda=1$ 为 Monte Carlo（高方差低偏差）。对于 SoFTA 的高频上肢 Agent，$\lambda$ 的选择尤为关键——需要足够长的有效时间窗口来传播末端稳定所需的长期 credit，但又不能太长以免引入过多噪声。</div>
+  </div>
+
+  <h3>7.5 Sim-to-Real 中的域随机化</h3>
+  <table>
+    <tr><th>随机化参数</th><th>范围</th><th>目的</th></tr>
+    <tr><td>关节 PD 增益</td><td>标称值 ±20%</td><td>模拟电机驱动器的个体差异和老化</td></tr>
+    <tr><td>地面摩擦系数</td><td>0.3 – 1.5</td><td>覆盖瓷砖、地毯、水泥等各种地面</td></tr>
+    <tr><td>基座质量/惯量</td><td>标称值 ±15%</td><td>模拟负载变化和建模误差</td></tr>
+    <tr><td>控制延迟</td><td>0 – 20 ms</td><td>模拟通信和计算延迟</td></tr>
+    <tr><td>外部扰动</td><td>随机方向 0 – 150 N 脉冲</td><td>模拟意外碰撞和推力</td></tr>
+    <tr><td>观测噪声</td><td>加性高斯噪声</td><td>模拟传感器噪声</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 7B. EXPERIMENTS & RESULTS ═══════════════ -->
+<section id="experiments">
+  <h2>7B. 实验与结果分析</h2>
+
+  <h3>仿真实验：末端加速度对比</h3>
+  <p>在 Isaac Gym 仿真环境中，测试了两种运动模式下的末端加速度：</p>
+
+  <h4>Tapping Task（原地踏步 + 端杯）</h4>
+  <table>
+    <tr><th>方法</th><th>加速度均值 (m/s²)</th><th>加速度最大值 (m/s²)</th><th>vs. SoFTA 退化</th></tr>
+    <tr><td>Lower-RL + Upper-IK</td><td>1.83</td><td>4.92</td><td>+69%</td></tr>
+    <tr><td>Whole-Body RL (50Hz)</td><td>1.29</td><td>4.24</td><td>+19%</td></tr>
+    <tr><td><strong>SoFTA (50/100Hz)</strong></td><td><strong>1.08</strong></td><td><strong>3.45</strong></td><td><strong>基准</strong></td></tr>
+  </table>
+  <p>SoFTA 相比 Lower-RL+IK 方案降低了 <strong>41%</strong> 的末端加速度均值，相比 Whole-Body RL 降低了 <strong>16%</strong>。</p>
+
+  <h4>RandCommand Task（随机速度命令，每10s切换）</h4>
+  <table>
+    <tr><th>方法</th><th>加速度均值 (m/s²)</th><th>加速度最大值 (m/s²)</th></tr>
+    <tr><td>Lower-RL + Upper-IK</td><td>3.17</td><td>6.51</td></tr>
+    <tr><td>Whole-Body RL</td><td>2.47</td><td>5.19</td></tr>
+    <tr><td><strong>SoFTA</strong></td><td><strong>&lt; 2.0</strong></td><td><strong>&lt; 4.0</strong></td></tr>
+  </table>
+  <p>在随机变速、变向的动态行走中，SoFTA 的优势更加显著——因为 Whole-Body RL 在动态场景下的梯度干扰更严重。SoFTA 实现了 <strong>2-5x 的末端加速度降低</strong>。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">与人类基线对比</div>
+    <p>论文测量了人类端水杯行走时的末端加速度基线，并报告：</p>
+    <ul>
+      <li>Unitree G1 默认控制器：末端加速度 ~5 m/s²（原地踏步），<strong>超过人类水平 10 倍以上</strong></li>
+      <li>SoFTA：末端加速度 &lt; 2 m/s²，<strong>接近人类水平</strong>（但仍有差距）</li>
+      <li>这一差距来源于人类前庭系统的超快速反馈（~10ms延迟）、软组织阻尼、以及视觉预测能力</li>
+    </ul>
+  </div>
+
+  <h3>频率消融：为什么 50/100Hz 是最优的？</h3>
+  <p>SoFTA 进行了目前最系统的 RL-based 人形机器人控制频率消融实验。所有 3x3=9 种频率组合的结果：</p>
+
+  <table>
+    <tr><th>下肢 \ 上肢</th><th>33.3 Hz</th><th>50 Hz</th><th>100 Hz</th></tr>
+    <tr>
+      <td><strong>33.3 Hz</strong></td>
+      <td>❌ 差：下肢迟钝 + 上肢迟钝</td>
+      <td>⚠️ 一般：下肢迟钝，上肢勉强</td>
+      <td>⚠️ 一般：下肢迟钝导致平衡恢复慢</td>
+    </tr>
+    <tr>
+      <td><strong>50 Hz</strong></td>
+      <td>❌ 差：上肢严重滞后于扰动</td>
+      <td>⚠️ 中等：统一频率，梯度干扰存在</td>
+      <td><strong>✅ 最优：慢走+快稳</strong></td>
+    </tr>
+    <tr>
+      <td><strong>100 Hz</strong></td>
+      <td>❌ 差：下肢快但上肢慢（最差组合）</td>
+      <td>❌ 差：下肢腿抖 + 上肢不够快</td>
+      <td>❌ 差：下肢对噪声过度敏感 → "腿抖"</td>
+    </tr>
+  </table>
+
+  <div class="callout idea">
+    <div class="callout-title">频率选择的三条物理直觉</div>
+    <ol>
+      <li><strong>下肢不宜超过 50Hz：</strong>行走的动力学带宽约 2-5Hz，50Hz 控制频率已提供 10-25x 过采样。更高频率只引入传感器噪声，导致"腿抖"——这是一种高频振荡，由于 IMU 和关节编码器在 50-100Hz 频段的噪声被策略放大。</li>
+      <li><strong>上肢不宜低于 100Hz：</strong>足地碰撞产生的加速度尖峰具有显著的高频分量。50Hz 的上肢控制无法在单个步态碰撞事件内（约 50-100ms）完成检测-响应-补偿的闭环，导致加速度抑制不充分。</li>
+      <li><strong>不对称是必需的：</strong>上下肢的"最优频率"不同 —— 这是身体动力学决定的结构性事实，而非调参偏好。统一频率必然导致一方迁就另一方。</li>
+    </ol>
+  </div>
+
+  <h3>真实世界实验详情</h3>
+
+  <h4>实验一：端水杯行走（Cup Carry）</h4>
+  <ul>
+    <li><strong>设置：</strong>Unitree G1 机器人手持几乎满杯的彩色液体，执行原地踏步、直线行走、转向等动作。</li>
+    <li><strong>结果：</strong>SoFTA 策略下，液体表面保持近乎静止，肉眼几乎观察不到晃动。对比 G1 默认控制器，液体会剧烈晃动并溅出。</li>
+    <li><strong>定量指标：</strong>通过 200Hz mocap 系统测量，SoFTA 末端加速度 &lt; 1.5 m/s²（行走状态）。</li>
+  </ul>
+
+  <h4>实验二：人形摄像师（Humanoid Cameraman）</h4>
+  <ul>
+    <li><strong>设置：</strong>在机器人手腕安装相机，执行行走任务，记录画面稳定性。</li>
+    <li><strong>结果：</strong>SoFTA 产出的画面平滑稳定，效果可比肩专业 Steadicam 稳定器。对比无稳定策略时，画面存在明显的周期性抖动（与步态频率一致）。</li>
+    <li><strong>启示：</strong>这一实验展示了末端稳定的非直观应用 —— 不仅限于端水，任何需要"运动中保持传感器/工具/负载稳定"的场景都可以受益。</li>
+  </ul>
+
+  <h4>实验三：推搡恢复（Disturbance Rejection）</h4>
+  <ul>
+    <li><strong>设置：</strong>在机器人端水杯行走过程中，从侧面施加突然的推力扰动。</li>
+    <li><strong>观察到的协调行为：</strong>下肢（50Hz）出现踉跄但快速恢复平衡（约 2-3 步内）；上肢（100Hz）在推力瞬间快速调整手臂姿态，使杯子保持水平——即使基座发生了倾斜和位移。</li>
+    <li><strong>关键发现：</strong>上下肢的响应是<strong>去同步化</strong>的——上肢在推力发生后约 10ms 就开始响应（100Hz），而下肢在一个步态周期（约 50-100ms）后才完成平衡恢复。这验证了非对称频率的物理必要性：快响应和慢恢复可以并行发生。</li>
+  </ul>
+
+  <h4>跨具身实验：Booster T1</h4>
+  <ul>
+    <li><strong>设置：</strong>使用与 G1 完全相同的训练代码和参数，仅在仿真中替换机器人 URDF 模型，训练后在 Booster T1 实物上部署。</li>
+    <li><strong>关键差异：</strong>T1 与 G1 的肢体比例、关节数量（T1 上肢有更少自由度）、质量分布明显不同。但 SoFTA 框架<strong>零调参</strong>即可工作。</li>
+    <li><strong>结果：</strong>T1 在"端可乐行走"测试中表现优于其默认控制器，尤其在急停和精确 EE 控制方面。这证明 50/100Hz 频率分离是一种 <strong>结构先验</strong>（structural prior），而非针对特定硬件的工程调优。</li>
+    <li><strong>局限：</strong>由于 T1 上肢自由度较少，其绝对加速度抑制能力略逊于 G1。但频率分离的价值仍然体现——T1 的 50/100Hz 配置仍优于 50/50Hz 或 100/100Hz。</li>
+  </ul>
+
+  <h3>奖励权重消融</h3>
+  <p>论文对上肢奖励函数中各分量的权重进行了消融分析：</p>
+  <table>
+    <tr><th>移除的奖励分量</th><th>末端加速度退化</th><th>定性影响</th></tr>
+    <tr><td><strong>线加速度惩罚 $r_{\text{acc}}$</strong></td><td>+52%</td><td>策略失去对末端抖动的主要抑制驱动力——这是最重要的单项奖励</td></tr>
+    <tr><td><strong>零加速度指数奖励 $r_{\text{zero-acc}}$</strong></td><td>+23%</td><td>策略学会"容忍"小幅加速度——"差不多稳定" vs. "绝对稳定"的差异</td></tr>
+    <tr><td><strong>重力倾斜惩罚 $r_{\text{grav-xy}}$</strong></td><td>+18%</td><td>手掌不再刻意保持水平——液体虽不晃但会倾斜溢出</td></tr>
+    <tr><td><strong>角加速度惩罚 $r_{\text{ang-acc}}$</strong></td><td>+14%</td><td>末端姿态出现高频小幅抖动——角稳定性的退化</td></tr>
+    <tr><td><strong>防摔共享惩罚</strong></td><td>+8%</td><td>上下肢协调性略微下降——偶尔出现上肢为稳杯而牺牲平衡的"非理性"行为</td></tr>
+  </table>
+  <p>消融结果表明：<strong>线加速度惩罚是最关键的奖励分量</strong>，贡献了超过一半的稳定效果。但指数奖励、重力倾斜和角加速度各自补充了不同维度的稳定性——它们共同构成了"不洒"的完整物理约束。</p>
+
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. 论文图表解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文关键图表。请将截图保存至 <code>figures/</code> 子目录，命名 <code>fig1.png</code> ~ <code>figN.png</code>。</p>
+
+  <h3>预期关键图表</h3>
+  <table>
+    <tr><th>图表</th><th>预期内容</th><th>分析要点</th></tr>
+    <tr><td><strong>Fig 1: Teaser</strong></td><td>人形机器人端满杯啤酒行走的实物照片——对比默认控制器（酒洒）与 SoFTA（酒不洒）</td><td>直观展示问题的难度和方法的有效性——一张图讲一个故事</td></tr>
+    <tr><td><strong>Fig 2: Dynamics Mismatch Illustration</strong></td><td>示意运动（慢、离散）与末端稳定（快、连续）在时间尺度上的不匹配</td><td>建立问题的理论框架——为什么单一控制器不够</td></tr>
+    <tr><td><strong>Fig 3: SoFTA Architecture</strong></td><td>慢-快双 Agent 框架：Shared Observation → 两个独立策略 → 不同频率输出</td><td>理解"共享感知、分离决策"的核心设计</td></tr>
+    <tr><td><strong>Fig 4: Reward Structure</strong></td><td>上下肢奖励函数的分解图</td><td>重点分析上肢的加速度惩罚族——每个分量的物理含义</td></tr>
+    <tr><td><strong>Fig 5: EE Acceleration Comparison</strong></td><td>SoFTA vs. Whole-Body RL vs. Lower-RL+IK vs. G1 默认控制器的末端加速度对比</td><td>关注 2-5x 降低和 vs. 人类基线的差距</td></tr>
+    <tr><td><strong>Fig 6: Real-World Cup Carry</strong></td><td>实际端水杯行走的连续帧——液体表面特写</td><td>定性评估：液体晃动幅度是终极指标</td></tr>
+    <tr><td><strong>Fig 7: Frequency Ablation Heatmap</strong></td><td>上下肢频率所有组合的末端加速度热力图（33/50/100 Hz）</td><td><strong>核心消融图</strong>——蓝色区域精准落在 50/100 Hz 交叉点</td></tr>
+    <tr><td><strong>Fig 8: Disturbance Rejection</strong></td><td>推搡后上下肢的协调响应时间序列</td><td>观察 50Hz 下肢的"踉跄→恢复"和 100Hz 上肢的"快速调整"</td></tr>
+    <tr><td><strong>Fig 9: Recovery Time Analysis</strong></td><td>不同上肢频率下的扰动恢复时间对比</td><td>验证 100Hz 上肢比 50Hz 恢复更快——解释了"为什么不统一用 50Hz"</td></tr>
+    <tr><td><strong>Fig 10: Cross-Embodiment</strong></td><td>Booster T1 上的端可乐行走结果</td><td>跨具身泛化——同一套框架无需调参</td></tr>
+  </table>
+
+  <div style="text-align:center; padding:40px; color:var(--text-muted); border:2px dashed #e2e8f0; border-radius:8px;">
+    📷 图表截图待补充——请将论文 PDF 中的关键图表截图保存至 <code>figures/</code> 目录
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在不足与局限性</h2>
+
+  <h3>9.1 加速度指标 vs. 真实液体动力学</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 1：末端加速度是液体稳定性的代理指标，而非直接指标</div>
+    <p>SoFTA 的核心优化目标是末端执行器的线加速度和角加速度，假设"加速度越小，液体越稳"。但实际上，液体稳定性还取决于<strong>加速度的频谱特性</strong>（低频大幅晃动 vs. 高频小幅振动对液体的影响不同）、<strong>容器形状</strong>（宽口杯 vs. 高脚杯的晃动力学不同）和<strong>液体黏度</strong>。在某些频率下，即使 RMS 加速度较低，如果频率接近液体的固有晃动频率（sloshing frequency），也可能因共振导致严重溢出。论文未对液体的完整动力学建模和验证。</p>
+  </div>
+
+  <h3>9.2 静态末端假设</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 2：仅优化"保持不动"，未优化"精确移动"</div>
+    <p>SoFTA 的上肢奖励完全围绕"加速度最小化"——目标是让末端尽可能不动。但许多实际任务需要末端<strong>精确移动同时保持稳定</strong>：例如将酒杯递给对方（需要轨迹跟踪 + 中途不洒的高级技能）。当前的框架在处理"运动中的稳定"（stabilization during motion）时有效，但在"稳定中的运动"（motion with stability）上未经测试。</p>
+  </div>
+
+  <h3>9.3 频率选择的物理依赖性</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 3：最优频率对可能依赖于机器人硬件</div>
+    <p>50/100 Hz 的最优频率配对是在 Unitree G1 上验证的。机器人的固有频率（由关节刚度、连杆惯量、传动系统带宽决定）会影响最优控制频率的选择。对于更轻/更重的机器人、更高/更低刚度的关节，最优频率对可能不同。论文虽在 Booster T1 上也验证了跨具身泛化，但两平台的动力学差异可能不足以证明频率选择的普适性。对于具有<strong>显著不同动力学特性</strong>的机器人（如液压驱动的 Atlas），结论可能不直接适用。</p>
+  </div>
+
+  <h3>9.4 与 FALCON 的整合缺失</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 4：未整合力课程和频率分离</div>
+    <p>SoFTA 证明了 100Hz 上肢能够更好地抑制运动产生的惯性扰动，FALCON 证明了力课程能够使上肢适应外部负载。一个自然的问题是：<strong>能否将 100Hz 频率 + 力课程结合</strong>，实现既能在负载下精确操作、又能稳定端水杯的能力？目前两篇论文各自独立验证了一个维度，但未探索它们的组合效果。这是最具潜力的后续方向。</p>
+  </div>
+
+  <h3>9.5 仍不及人类水平</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 5：与人类表现仍有差距</div>
+    <p>论文承认，"achieved stability still falls short of human-level performance"。人类端水杯行走几乎不产生可观察的液体晃动，而 SoFTA 虽然大幅优于所有基线，但在某些步态下（如快速转向、变速）仍会产生轻微晃动。这一差距可能来源于：(1) 人类拥有前庭系统的超快速平衡反馈（~10ms延迟），(2) 人类能通过视觉预测未来的运动扰动，(3) 人类的软组织阻尼吸收了大量高频振动。这些生物学机制尚未在 SoFTA 中得到工程化对应。</p>
+  </div>
+
+  <h3>9.6 双手协调的缺失</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 6：仅演示单手端杯，未涉及双手协调</div>
+    <p>许多精细任务需要双手协调——例如一手端托盘一手开门（同时涉及 SoFTA 的稳定需求和 FALCON 的力交互需求）。当前的框架可以为每只手独立设置 Agent，但双手之间的协调（避免自碰撞、协同施力）需要额外的约束或奖励设计。如何将双 Agent 框架扩展到双手 + 全身的层次化组合是一个开放问题。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. 研究动机</h2>
+
+  <h3>10.1 为什么"端稳一杯啤酒"是个值得认真对待的科学问题？</h3>
+  <p>"Hold my beer" 这个标题既幽默又精准——它捕捉了一个深刻的机器人学困境：</p>
+  <ul>
+    <li><strong>看似简单，实则极难：</strong>人类觉得端水走路毫不费力，因为我们的神经系统自动完成了上下身的协调。但对机器人而言，这正是<strong>全身协调控制</strong>的终极测试——任何微小的控制缺陷都会在液体晃动中被放大和可视化。</li>
+    <li><strong>普适性的"金丝雀"测试：</strong>端水杯的能力是一个优秀的代理指标（proxy metric），反映了更广泛的全身精细控制能力。如果机器人能在行走中保持液体稳定，它很可能也能胜任手术辅助、精密装配、老人护理等需要"轻柔但动态"控制的场景。</li>
+    <li><strong>暴露了 RL 的隐性缺陷：</strong>传统 RL 在奖励稀疏或冲突的任务上表现不佳。端水杯的任务恰好是"奖励极度冲突"的——行走需要大幅度运动，稳定需要零运动。成功解决这一问题的方法论（时间/空间分解）对其他冲突性任务也有指导意义。</li>
+  </ul>
+
+  <h3>10.2 现有方法为什么不够好？</h3>
+  <table>
+    <tr><th>方法</th><th>能走？</th><th>能稳？</th><th>不依赖精确模型？</th><th>跨具身？</th><th>适合动态任务？</th></tr>
+    <tr><td>Unitree G1 默认控制器</td><td>✅（基本）</td><td>❌（5 m/s² 加速度）</td><td>N/A</td><td>N/A（仅G1）</td><td>⚠️</td></tr>
+    <tr><td>Whole-Body RL (50Hz)</td><td>✅</td><td>❌（梯度干扰）</td><td>✅</td><td>⚠️</td><td>⚠️</td></tr>
+    <tr><td>Whole-Body RL (100Hz)</td><td>❌（腿抖）</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>⚠️</td></tr>
+    <tr><td>Lower-RL + Upper-IK</td><td>✅</td><td>❌（IK无感知）</td><td>✅（下肢）</td><td>⚠️</td><td>❌</td></tr>
+    <tr><td>MPC / WBC</td><td>✅</td><td>⚠️（模型敏感）</td><td>❌（需精确模型）</td><td>❌</td><td>⚠️</td></tr>
+    <tr><td><strong>SoFTA</strong></td><td><strong>✅</strong></td><td><strong>✅（2-5x提升）</strong></td><td><strong>✅</strong></td><td><strong>✅</strong></td><td><strong>✅</strong></td></tr>
+  </table>
+
+  <h3>10.3 作者的核心动机链条</h3>
+  <ol>
+    <li><strong>观察：</strong>人形机器人社区的 Demo 越来越炫酷（跳舞、跑酷、后空翻），但一个尴尬的事实是——大多数机器人甚至不能端着一杯水稳定行走。社区过度关注"大动作"而忽视了"小精细"。</li>
+    <li><strong>诊断：</strong>问题不在于算力或算法，而在于一个结构性的设计错误——试图用单一控制回路同时处理两种不同时间尺度的任务。</li>
+    <li><strong>方案：</strong>慢-快双 Agent 框架（SoFTA）提供了一种简单、通用、可扩展的解决方案——不需要新硬件、不需要新算法，只需要<strong>正确的结构先验</strong>。</li>
+    <li><strong>愿景：</strong>让"轻柔控制"（gentle control）成为人形机器人的标配能力，与行走、跑步、跳跃等"大力控制"并列，构建完整的运动技能谱系。</li>
+  </ol>
+
+  <h3>10.4 社区影响</h3>
+  <p>SoFTA 和 FALCON 两篇论文共同传递了一个明确的信息：<strong>分解（decomposition）——无论是按身体部位、按时间尺度、还是按力维度——是解决人形机器人全身控制的关键设计原则。</strong>在"一个统一大模型解决一切"的浪潮中，LeCAR Lab 的这两项工作提醒社区：智能的分解（而非盲目的统一）可能是更有效的路径。</p>
+</section>
+
+<!-- ═══════════════ 11. TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 关键收获</h2>
+
+  <h3>11.1 方法论启示</h3>
+  <div class="callout tip">
+    <div class="callout-title">频率分离是解决多时间尺度控制问题的通用设计原则</div>
+    <p>SoFTA 的最重要贡献不是某一个具体的技巧，而是<strong>系统性地论证了"不同动力学过程需要不同控制频率"这一基本原则在人形机器人领域的适用性。</strong>这一原则在控制理论中并非新概念（多速率控制已有数十年历史），但 SoFTA 通过清晰的消融实验首次在 RL-based 人形机器人控制中验证了其关键性，并展示了如何在实践中设计和验证频率选择。</p>
+    <p>这一方法论可以推广到许多其他领域——任何涉及"慢过程 + 快响应"耦合的控制问题（飞行器姿态控制+导航、自动驾驶横向+纵向控制、机械臂力控+位置控制等）都可以从频率分离中受益。</p>
+  </div>
+
+  <h3>11.2 工程实践技巧</h3>
+  <table>
+    <tr><th>技巧</th><th>出处</th><th>可迁移性</th></tr>
+    <tr><td><strong>加速度最小化作为末端稳定性的代理奖励</strong></td><td>上肢奖励设计</td><td>任何需要"保持不动"的机器人任务——手术机器人、相机稳定器、激光切割</td></tr>
+    <tr><td><strong>指数奖励替代线性惩罚以强调"甜区"</strong></td><td>$e^{-\lambda\|\ddot{p}\|^2}$</td><td>当优化目标对"绝对完美"有极高要求时，指数形式比线性更有效</td></tr>
+    <tr><td><strong>非对称频率消融实验的设计方法</strong></td><td>频率热力图</td><td>系统性地测试所有频率组合以验证选择——而非凭直觉设定</td></tr>
+    <tr><td><strong>重力倾斜约束作为物理 insight 的编码</strong></td><td>$r_{\text{grav-xy}}$</td><td>将任务特定的物理约束直接编码为奖励项，加速策略收敛到物理合理的行为</td></tr>
+    <tr><td><strong>共享观测 + 独立奖励的信用分配方案</strong></td><td>双 Agent 架构</td><td>当多个控制目标共享传感器但各自有独立的成功标准时的通用方案</td></tr>
+    <tr><td><strong>用 mocap 系统精确测量末端加速度</strong></td><td>实物评估方法</td><td>200Hz mocap + 插值 + 异常值剔除 + 双重微分 + 滤波——为机器人末端稳定性的量化评估提供了标准 pipeline</td></tr>
+  </table>
+
+  <h3>11.3 写作与表达亮点</h3>
+  <ul>
+    <li><strong>标题的艺术：</strong>"Hold My Beer" 是最优秀的论文标题之一——既幽默易记，又精准捕捉了任务本质（端酒不洒），还能在社交媒体上病毒式传播。在保持学术严谨性的同时，这种亲和力值得学习。</li>
+    <li><strong>故事驱动结构：</strong>从"你能端着啤酒走路吗？"引出 dynamics mismatch → 频率分离 → 消融验证 → 实物展示，叙事弧线完美。</li>
+    <li><strong>消融实验的说服力：</strong>频率热力图（Fig.7）是教科书级的消融可视化——一张图内同时展示所有组合，蓝色区域自明地指向最优解，无需任何统计检验。</li>
+    <li><strong>实物实验的视觉冲击：</strong>端水杯走路的对比视频/图片比任何数值指标都更有说服力——这是 embodied AI 论文的黄金标准。</li>
+    <li><strong>谦逊的 limitations：</strong>明确承认仍不及人类水平，坦诚讨论液体动力学的代理指标问题，增强了论文的可信度。</li>
+  </ul>
+
+  <h3>11.4 未来工作方向</h3>
+  <ol>
+    <li><strong>SoFTA + FALCON 融合：</strong>将力课程 + 非对称频率结合，实现既能在负载下精确操作又能在运动中轻柔稳定的统一框架。这是最直接、最有前景的后续方向。</li>
+    <li><strong>自适应频率选择：</strong>让 Agent 自己学会动态调整控制频率——行走时下肢自动降频，受到扰动时上肢自动升频。</li>
+    <li><strong>液体动力学感知：</strong>将液体的完整动力学（晃动模态、黏度、容器几何）建模为额外的感知输入和奖励约束，实现真正的"一滴不洒"。</li>
+    <li><strong>动态任务扩展：</strong>从"保持不动"扩展到"动态稳定运动"——例如边走边将杯子从 A 点移动到 B 点、边走边倒水、边走边递给他人。</li>
+    <li><strong>双手协调：</strong>将双 Agent 扩展到层次化的多 Agent——例如两个上肢子 Agent 各控制一只手，共享一个慢速下肢 Agent。</li>
+    <li><strong>多模态感知融合：</strong>引入视觉预测（看到前方要转弯，提前调整手臂）以进一步缩小与人类的差距。</li>
+  </ol>
+
+  <h3>11.5 与其他工作的关联</h3>
+  <table>
+    <tr><th>相关论文</th><th>关联</th><th>SoFTA 的独特贡献</th></tr>
+    <tr><td><strong>FALCON (Zhang et al., 2025)</strong></td><td>同一 Lab，共享双 Agent 分解范式</td><td>SoFTA 贡献了<strong>频率分离</strong>维度；FALCON 贡献了<strong>力课程</strong>维度</td></tr>
+    <tr><td><strong>RMA (Kumar et al., 2021)</strong></td><td>使用特权信息训练、本体感知推理的非对称范式</td><td>SoFTA 将这一范式扩展到<strong>多 Agent + 多频率</strong></td></tr>
+    <tr><td><strong>AMP / ASE (Peng et al., 2021-22)</strong></td><td>从运动数据学习自然运动</td><td>SoFTA 不依赖参考运动——通过奖励设计直接学习稳定行为</td></tr>
+    <tr><td><strong>Humanoid WBC (Sentis et al.)</strong></td><td>全身控制的经典方法</td><td>SoFTA 用免模型 RL 替代了精确建模和 QP 求解</td></tr>
+  </table>
+
+</section>
+
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Generated on 2026-07-08 · <a href="../../index.html">Tairan He</a> · UAV-Survey</footer>
+</body>
+</html>

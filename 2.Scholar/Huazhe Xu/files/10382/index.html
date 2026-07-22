@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - FARL: Failure-Aware RL</title>
+<script>
+MathJax = { tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' }, options: { enableMenu: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root { --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea; --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8; --blue-fill: #e8f0fe; --blue-stroke: #3b82f6; --blue-strong: #1d4ed8; --green-fill: #e6f7ee; --green-stroke: #10b981; --green-strong: #047857; --amber-fill: #fef7ed; --amber-stroke: #f59e0b; --amber-strong: #b45309; --purple-fill: #f0ebfd; --purple-stroke: #8b5cf6; --purple-strong: #6d28d9; --rose-fill: #ffeaf0; --rose-stroke: #f43f5e; --rose-strong: #be123c; --gray-fill: #f3f4f6; --gray-stroke: #9ca3af; --gray-strong: #4b5563; --cyan-fill: #e6faf8; --cyan-stroke: #14b8a6; --cyan-strong: #0f766e; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif; line-height: 1.72; }
+  nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  nav a { text-decoration: none; font-size: 12px; font-weight: 500; color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s; }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; } ul, ol { margin: 6px 0 12px 22px; } li { margin-bottom: 4px; }
+  code { background: #f1f5f9; color: #1e293b; font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace; font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
+  strong.hl { color: #0f172a; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 4px; margin-right: 5px; margin-bottom: 4px; }
+  .tag-blue{background:#dbeafe;color:#1d4ed8;} .tag-green{background:#d1fae5;color:#047857;} .tag-amber{background:#fef3c7;color:#92400e;} .tag-purple{background:#ede9fe;color:#6d28d9;} .tag-red{background:#ffe4e6;color:#be123c;} .tag-gray{background:#f3f4f6;color:#4b5563;} .tag-cyan{background:#cffafe;color:#0f766e;}
+  .callout{border-left:4px solid;border-radius:0 8px 8px 0;padding:14px 18px;margin:12px 0;font-size:13.5px;}
+  .callout.info{background:#e8f0fe;border-color:#3b82f6;color:#1e3a5f;} .callout.tip{background:#e6f7ee;border-color:#10b981;color:#064e3b;} .callout.warn{background:#fef7ed;border-color:#f59e0b;color:#78350f;} .callout.danger{background:#ffeaf0;border-color:#f43f5e;color:#7f1d1d;} .callout.idea{background:#f0ebfd;border-color:#8b5cf6;color:#3b1f7e;}
+  .callout-title{font-weight:700;font-size:13px;margin-bottom:3px;}
+  .formula-block{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px 22px;margin:12px 0;overflow-x:auto;}
+  .formula-block .eq-tag{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue-strong);background:#dbeafe;padding:2px 8px;border-radius:4px;margin-bottom:8px;}
+  mjx-container[display="true"]{font-size:115%!important;margin:10px 0!important;}
+  .formula-block .eq-note{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0;font-size:12.5px;color:#64748b;line-height:1.65;}
+  .mermaid-box{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:18px 22px;margin:12px 0;overflow-x:auto;text-align:center;}
+  .arch-panel{background:#fbfcff;border:1px solid #dbe3ef;border-radius:10px;padding:16px;margin:14px 0 18px;overflow-x:auto;}
+  .arch-grid{min-width:820px;display:grid;grid-template-columns:1.05fr 1.25fr 1.2fr .95fr;gap:12px;align-items:stretch;}
+  .arch-stage{border:1px solid #d8e0ea;border-radius:8px;background:#fff;padding:12px;display:flex;flex-direction:column;gap:9px;}
+  .arch-stage h4{margin:0;font-size:12px;color:#0f172a;letter-spacing:0;display:flex;justify-content:space-between;gap:8px;align-items:center;}
+  .arch-stage h4 span{font-size:10px;color:#64748b;font-weight:600;white-space:nowrap;}
+  .arch-card{border-radius:7px;padding:9px 10px;border:1px solid;min-height:58px;display:flex;flex-direction:column;justify-content:center;}
+  .arch-card strong{font-size:12.5px;color:#0f172a;line-height:1.35;} .arch-card small{font-size:11px;color:#475569;line-height:1.45;margin-top:3px;}
+  .arch-solar{background:#fff7ed;border-color:#fed7aa;} .arch-power{background:#eff6ff;border-color:#bfdbfe;} .arch-motor{background:#f5f3ff;border-color:#ddd6fe;} .arch-thrust{background:#ecfdf5;border-color:#bbf7d0;}
+  .arch-arrow{min-width:820px;display:grid;grid-template-columns:repeat(4,1fr);color:#64748b;font-size:11px;font-weight:700;margin:8px 0 4px;} .arch-arrow span{text-align:center;}
+  .arch-summary{min-width:820px;margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .arch-metric{background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;} .arch-metric strong{display:block;font-size:12px;color:#0f172a;} .arch-metric small{font-size:11px;color:#64748b;}
+  .paper-figure{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:0;margin:16px 0;overflow:hidden;}
+  .paper-figure .fig-header{background:#f1f5f9;padding:10px 16px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .paper-figure .fig-header .fig-number{font-weight:700;font-size:12.5px;color:var(--blue-strong);background:#dbeafe;padding:3px 10px;border-radius:4px;}
+  .paper-figure .fig-header .fig-caption{font-size:13px;font-weight:600;color:#334155;}
+  .paper-figure .fig-header .fig-source{font-size:11px;color:var(--text-muted);margin-left:auto;}
+  .paper-figure .fig-image{text-align:center;padding:16px;background:#fff;}
+  .paper-figure .fig-placeholder{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px;border:2px dashed #e2e8f0;margin:16px;border-radius:8px;}
+  .paper-figure .fig-interpretation{padding:14px 18px;border-top:1px solid #e2e8f0;background:#fefce8;}
+  .paper-figure .fig-interpretation .fig-label{font-weight:700;font-size:11px;color:#b45309;margin-bottom:6px;letter-spacing:1px;}
+  .paper-figure .fig-interpretation p,.paper-figure .fig-interpretation li{font-size:13px;color:#475569;}
+  .paper-figure .fig-interpretation ul{margin:4px 0 4px 16px;}
+  .novelty-card{border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin:12px 0;background:#fafbfc;}
+  .novelty-card h4{margin-top:0;} .novelty-card .novelty-step{font-size:13px;margin-bottom:8px;padding-left:12px;border-left:3px solid var(--purple-stroke);}
+  .novelty-step strong{color:var(--purple-strong);}
+  .cmp-row{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0;} .cmp-col{flex:1;min-width:260px;border:1px solid var(--border);border-radius:8px;padding:16px;background:#fafbfc;} .cmp-col h4{margin-top:0;}
+  footer{text-align:center;padding:20px;color:var(--text-muted);font-size:12px;}
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 论文笔记</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">关键挑战</a>
+  <a href="#method">方法与公式</a>
+  <a href="#principles">深层原理</a>
+  <a href="#figures">图表证据</a>
+  <a href="#flaw">局限与延伸</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+<div class="container">
+<main class="container">
+
+<section id="info">
+<h2>1. 论文信息</h2>
+<h1>Failure-Aware RL (FARL): Reliable Offline-to-Online Reinforcement Learning with Self-Recovery for Real-World Manipulation</h1>
+<table>
+<tr><td style="width:120px;font-weight:700;">作者</td><td>Huanyu Li, Kun Lei, Sheng Zang, Kaizhe Hu, Yongyuan Liang, Bo An, Xiaoli Li, Huazhe Xu</td></tr>
+<tr><td style="font-weight:700;">发表年份</td><td>2026 (arXiv:2601.07821)</td></tr>
+<tr><td style="font-weight:700;">所属单位</td><td>Shanghai Qi Zhi Institute, SJTU, Tsinghua, NTU, A*STAR, UMD</td></tr>
+<tr><td style="font-weight:700;">研究类型</td><td>Safe RL · Offline-to-Online RL · 机器人操作 · 自恢复机制</td></tr>
+<tr><td style="font-weight:700;">代码开源</td><td>是 — FailureBench 基准测试：涵盖4个仿真任务和3个真实世界任务</td></tr>
+<tr><td style="font-weight:700;">本地 PDF</td><td><a href="Li et al. - 2026 - Failure-Aware RL Reliable Offline-to-Online Reinforcement Learning with Self-Recovery for Real-World Manipulation.pdf">Li et al. - 2026 - FARL.pdf</a></td></tr>
+</table>
+<p><strong class="hl">一句话概述</strong> —— FARL 为真实世界机器人操作提出了一套 <strong>failure-aware RL（失败感知强化学习）</strong> 框架。核心思想：在 offline-to-online RL 流程中嵌入一个世界模型（world model）作为"失败预测器"，通过对未来 H 步的约束违反概率进行估计，实时检测风险状态，并在检测到危险时自动切换到预训练的恢复策略（recovery policy）。与依赖反应式约束惩罚的传统 safe RL 方法（PPO-Lagrangian、P3O、CPO）不同，FARL 的创新在于：(1) 将安全性形式化为带有二元约束指示器 <code>C(s,a) \in {0,1}</code> 和 H 步折扣约束违反概率 <code>C^\pi_H</code> 的 CMDP；(2) 三组件离线预训练（任务策略、恢复策略、包含7个子网络的世界模型）；(3) 通过世界模型约束预测实现<strong>主动式</strong>风险规避；(4) 理论分析——动作修正收益定理（Action Correction Benefit theorem）。在 FailureBench（4个仿真任务）和 Franka Panda（3个真实任务）上，FARL 将 IR Failures 降低了 73.1%，同时将任务性能提升了 11.3%。</p>
+<div class="tags">
+<span class="tag tag-blue">Safe RL</span> <span class="tag tag-green">Offline-to-Online</span> <span class="tag tag-amber">自恢复</span> <span class="tag tag-purple">World Model</span> <span class="tag tag-red">CMDP</span> <span class="tag tag-cyan">FailureBench</span> <span class="tag tag-gray">Franka Panda</span>
+</div>
+</section>
+
+<section id="insight">
+<h2>2. 核心洞察与创新点</h2>
+<h3>2.1 核心洞察 · 问答解析</h3>
+<div class="callout info"><p class="callout-title">问：核心问题是什么？</p><p>如何使 RL 策略在从离线预训练过渡到在线交互时，能够<strong>主动预测并规避不可恢复的失败状态</strong>？传统 offline-to-online RL 的在线探索阶段本身就充满危险：策略不可避免地会访问 out-of-distribution (OOD) 状态，其中一些状态会导致不可逆的硬件损坏。现有的 safe RL 方法（CPO、PPO-Lagrangian、P3O）使用约束惩罚进行<strong>反应式修正</strong>，但无法在失败发生<strong>之前</strong>进行预测和干预。</p><p class="callout-title" style="margin-top:14px;">问：传统方法为什么失效？</p><p>三大根本缺陷：(1) <strong>反应式而非主动式</strong>——Lagrangian 方法在期望层面平衡 reward 和 cost，但无法阻止<strong>单次灾难性失败</strong>；梯度信号需要大量步数才能让策略适应。(2) <strong>离线数据缺少失败状态覆盖</strong>——专家采集的数据集天然偏向安全区域；策略对危险区域一无所知。(3) <strong>无恢复机制</strong>——即便检测到危险，传统方法也没有内建的恢复策略（recovery policy）将系统引导回安全状态。在真实机器人场景中，一次碰撞就可能摧毁价值数万美元的硬件。</p><p class="callout-title" style="margin-top:14px;">问：FARL 的核心洞察是什么？</p><p>FARL 的核心洞察是 <strong>"预测-预防-恢复"（Predict-Prevent-Recover）</strong>三阶段安全框架：<strong>(a) 预测（Predict）</strong>——使用世界模型从离线数据中学习环境动力学和约束函数，在<strong>执行动作前</strong>预判未来 H 步的失败概率。<strong>(b) 预防（Prevent）</strong>——将 <code>C^\pi_H</code> 与安全阈值 <code>d_safe</code> 进行比较，在风险累积到不可接受水平<strong>之前</strong>触发干预。<strong>(c) 恢复（Recover）</strong>——利用预训练的恢复策略（从反向失败轨迹做 BC 初始化 + Uni-O4 微调），在检测到即将发生的失败时将系统引导回安全状态。关键在于<strong>主动性</strong>：FARL 不是在失败后反应，而是在世界模型的"想象"中"预见"未来的失败，并提前规避。</p></div>
+
+<h3>2.2 灵感溯源</h3>
+<table>
+<tr><th style="width:30%;">灵感来源</th><th>如何启发本工作</th></tr>
+<tr><td>Uni-O4 (Lei et al., 2024)</td><td>统一的 offline RL 框架（IQL+CQL+TD3+BC）作为 FARL 的预训练基础，并在此基础上扩展约束预测和恢复切换机制。</td></tr>
+<tr><td>DreamerV3 (Hafner et al., 2023)</td><td>世界模型架构（encoder-dynamics-reward-value-policy-decoder）被 FARL 采纳并新增了一个<strong>约束头（constraint head）</strong>。</td></tr>
+<tr><td>CPO / PPO-Lagrangian</td><td>CMDP 框架为 FARL 提供了数学基础，但 FARL 从基于梯度的约束优化推进到基于世界模型的约束<strong>预测</strong>。</td></tr>
+<tr><td>Recovery RL (Thananjeyan et al., 2021)</td><td>双策略分解（task + recovery）被继承并升级：(i) 通过世界模型实现主动风险检测，(ii) offline-to-online 范式，(iii) BC + Uni-O4 恢复训练。</td></tr>
+<tr><td>SOAR (Liu et al., 2024)</td><td>基于世界模型的安全搜索思想被简化：FARL 用约束头直接进行 H 步约束违反预测，替代了昂贵的 MCTS。</td></tr>
+</table>
+
+<h3>2.3 创新点卡片</h3>
+
+<div class="novelty-card"><h4>创新点 #1：基于世界模型的主动失败预测（World-Model-Based Proactive Failure Prediction）</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>传统 safe RL 从环境反馈中获取约束信号——<strong>反应式</strong>的，无法在首次遭遇时规避风险。在真实机器人操作中，这意味着不可逆的硬件损坏风险。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>DreamerV3 世界模型架构 + Recovery RL 安全分解 + CMDP 形式化。FARL 独特地将<strong>世界模型扩展为失败预测器</strong>，通过训练约束头（constraint head）为每个 state-action pair 预测二元安全性 C(s,a)。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>世界模型包含7个组件：encoder, dynamics, reward, value, policy, decoder 以及<strong>约束头</strong>。给定当前状态，世界模型在潜空间执行 H 步 rollout，预测每一步的约束违反情况，并计算 <code>C^\pi_H</code> 作为<strong>主动式</strong>风险指标。若 <code>C^\pi_H > d_safe</code>，立即触发策略切换。</div></div>
+
+<div class="novelty-card"><h4>创新点 #2：离线预训练双策略自恢复机制（Offline Pretrained Dual-Policy Self-Recovery）</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>当任务策略进入危险状态时，需要一个可靠的机制使系统回到安全状态。天真的随机探索或人工干预不可扩展，且可能使状态进一步恶化。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>Recovery RL 概念 + Uni-O4 统一离线 RL + BC 稳定模仿学习。FARL 的恢复策略训练是<strong>两阶段</strong>的：BC 从反向失败轨迹学习（提供结构先验）+ Uni-O4 微调（提升泛化性）。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>在线安全门控：任务策略与环境交互 → 世界模型预测 C^\pi_H → 若 ≤ d_safe 则执行 T_task，否则切换到恢复策略 T_rec。恢复策略的目标是使系统回到安全的数据分布，之后任务策略无缝恢复执行。</div></div>
+
+<div class="novelty-card"><h4>创新点 #3：动作修正收益定理（Action Correction Benefit Theorem）</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>Safe RL 缺乏关于安全干预是否会损害任务性能的理论保证。频繁的恢复策略激活是否会阻碍任务完成？</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>CPO 单调改进理论 + safe RL 约束满足下界。FARL 聚焦于恢复干预的<strong>收益-成本权衡</strong>。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>Action Correction Benefit 定理给出了改进下界：<code>E_s[p_risk(s)] * Delta * (1 - delta_rec) - O(delta_rec)</code>。当风险概率与动作改进幅度的乘积超过恢复策略的次优性时，FARL 保证优于纯任务策略。这为工程实践者提供了可操作的指导。</div></div>
+</section>
+
+<section id="architecture">
+<h2>3. 系统架构</h2>
+<h3>3.1 架构总览面板</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <div class="arch-stage"><h4>离线预训练 <span>Offline Pretraining</span></h4>
+      <div class="arch-card arch-solar"><strong>离线数据集 D</strong><small>包含成功轨迹与失败轨迹的 (s,a,r,c,s') 样本</small></div>
+      <div class="arch-card arch-solar"><strong>任务策略: Uni-O4 PPO</strong><small>通过统一离线 RL 最大化 J_R</small></div>
+      <div class="arch-card arch-solar"><strong>恢复策略: BC + Uni-O4</strong><small>从反向失败序列做 BC + RL 微调</small></div>
+    </div>
+    <div class="arch-stage"><h4>世界模型 <span>7个组件</span></h4>
+      <div class="arch-card arch-power"><strong>Encoder + Dynamics</strong><small>s &rarr; z; (z_t,a_t) &rarr; z_{t+1}</small></div>
+      <div class="arch-card arch-power"><strong>Reward + Value + Policy</strong><small>预测 r&#770;, V&#770;, &pi;&#770;</small></div>
+      <div class="arch-card arch-power"><strong>Constraint + Decoder</strong><small>&Ccirc;(s,a)&isin;{0,1} 安全性 + 重建 s&#770;</small></div>
+    </div>
+    <div class="arch-stage"><h4>在线交互 <span>Online Interaction</span></h4>
+      <div class="arch-card arch-motor"><strong>执行任务策略</strong><small>a_task ~ &pi;_task(&middot;|s)</small></div>
+      <div class="arch-card arch-motor"><strong>世界模型 H 步 Rollout</strong><small>逐步预测 C(s,a)，计算 C^&pi;_H</small></div>
+      <div class="arch-card arch-motor"><strong>安全门控</strong><small>C^&pi;_H &le; d_safe &rarr; T_task else T_rec</small></div>
+    </div>
+    <div class="arch-stage"><h4>恢复与精调 <span>Recovery &amp; Refinement</span></h4>
+      <div class="arch-card arch-thrust"><strong>恢复干预</strong><small>恢复策略引导系统回归安全分布</small></div>
+      <div class="arch-card arch-thrust"><strong>在线微调</strong><small>使用新的在线数据更新所有组件</small></div>
+      <div class="arch-card arch-thrust"><strong>缓冲区扩充</strong><small>在线数据（含恢复轨迹）追加至 replay buffer</small></div>
+    </div>
+  </div>
+  <div class="arch-arrow"><span>离线数据 &rarr; 双策略预训练</span><span>7头潜空间世界模型</span><span>WM Rollout &rarr; C^&pi;_H &rarr; 门控决策</span><span>恢复 &rarr; 安全精调</span></div>
+  <div class="arch-arrow" style="color:#3b82f6;font-size:13px;"><span>&darr;</span><span>&darr;</span><span>&darr;</span><span>&darr;</span></div>
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>离线: Uni-O4</strong><small>IQL + CQL + TD3+BC</small></div>
+    <div class="arch-metric"><strong>WM: 7个组件</strong><small>Enc+Dyn+Rew+Val+Pol+Dec+Cst</small></div>
+    <div class="arch-metric"><strong>门控: H步前瞻</strong><small>C^&pi;_H = E &Sigma; &gamma;^{i-t} &middot; C(s_i,a_i)</small></div>
+    <div class="arch-metric"><strong>恢复: BC+Uni-O4</strong><small>失败轨迹反演 + RL微调</small></div>
+  </div>
+</div>
+
+<h3>3.2 系统流程图</h3>
+<div class="mermaid-box"><div class="mermaid">flowchart TB
+    subgraph OFFLINE["离线预训练阶段"]
+        DATA["离线数据集 D<br/>(成功轨迹 + 失败轨迹)"]
+        TASK_PT["任务策略: Uni-O4 PPO<br/>最大化 J_R"]
+        REC_PT["恢复策略: BC + Uni-O4<br/>从反向失败轨迹做BC"]
+        WM_TRAIN["世界模型训练<br/>L = L_rew + L_val + L_cons + L_cst + L_dec"]
+    end
+    subgraph WM["世界模型 (7个组件)"]
+        ENC["Encoder: s &#8594; z"]
+        DYN["Dynamics: (z_t,a_t) &#8594; z_{t+1}"]
+        RWD["Reward Head: r&#770;"]
+        VAL["Value Head: V&#770;"]
+        POL["Policy Head: &#960;&#770;"]
+        DEC["Decoder: s&#770;"]
+        CST["Constraint Head: C&#770;"]
+    end
+    subgraph ONLINE["在线交互阶段"]
+        INTERACT["任务策略 &#960;_task<br/>与环境交互"]
+        ROLLOUT["世界模型 H步 Rollout<br/>预测未来约束违反"]
+        RISK{"C^&#960;_H &#8804; d_safe?"}
+        EXEC_T["执行 T_task<br/>a = a_task"]
+        EXEC_R["执行 T_rec<br/>a = a_rec"]
+        BUF["追加至 Replay Buffer"]
+    end
+    subgraph OUTPUT["最终结果"]
+        SAFE["IR Failures &#8595; 73.1%"]
+        PERF["任务性能 &#8593; 11.3%"]
+        FT["在线微调"]
+    end
+    DATA --> TASK_PT & REC_PT & WM_TRAIN
+    WM_TRAIN --> ENC --> DYN --> RWD & VAL & POL & CST
+    ENC --> DEC
+    TASK_PT --> INTERACT --> ROLLOUT --> RISK
+    RISK -->|"安全"| EXEC_T --> BUF
+    RISK -->|"危险!"| EXEC_R --> BUF
+    BUF --> FT --> SAFE & PERF
+    style OFFLINE fill:#fff7ed,stroke:#f59e0b,stroke-width:2px
+    style WM fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    style ONLINE fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    style OUTPUT fill:#ecfdf5,stroke:#10b981,stroke-width:2px
+    style CST fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px
+    style RISK fill:#fef3c7,stroke:#f59e0b</div></div>
+
+<h3>3.3 世界模型训练损失</h3>
+<div class="formula-block">
+<div class="eq-tag">世界模型联合训练损失</div>
+$$\mathcal{L}_{WM} = \underbrace{\mathcal{L}_{\text{reward}}}_{\text{Reward MSE}} + \underbrace{\mathcal{L}_{\text{value}}}_{\text{Value CE}} + \underbrace{\mathcal{L}_{\text{cons}}}_{\text{Latent Consistency CE}} + \underbrace{\mathcal{L}_{\text{constraint}}}_{\text{Constraint MSE}} + \underbrace{\mathcal{L}_{\text{decoder}}}_{\text{Decoder MSE}}$$
+<div class="eq-note"><strong>五项损失函数：</strong>(1) Reward MSE——确保奖励预测准确，为 H 步价值估计提供基础；(2) Value CE——离散化值分布的 categorical cross-entropy（DreamerV3 风格），保证训练稳定性；(3) Latent Consistency CE——动力学预测器输出与真实下一状态的编码器输出匹配，是 rollout 精度的核心；(4) Constraint MSE——<strong>FARL独有的损失项</strong>，训练约束头预测二元安全性 C(s,a)；(5) Decoder MSE——重建原始观测，防止潜空间坍缩。所有组件共享同一潜表示 z_t。</div>
+</div>
+
+<h3>3.4 安全门控状态机</h3>
+<div class="mermaid-box"><div class="mermaid">stateDiagram-v2
+    [*] --> 执行任务策略 : 回合开始
+    执行任务策略 --> 世界模型Rollout : 每步之后
+    世界模型Rollout --> 风险评估 : H步约束预测
+    风险评估 --> 执行任务策略 : C^&#960;_H &#8804; d_safe<br/>(安全: T_task)
+    风险评估 --> 恢复模式 : C^&#960;_H > d_safe<br/>(危险: T_rec)
+    恢复模式 --> 世界模型Rollout : 恢复步骤后重新评估
+    恢复模式 --> 执行任务策略 : 已返回安全区域<br/>(C^&#960;_H &#8804; d_safe)
+    执行任务策略 --> [*] : 回合结束 (成功 / 达到最大步数)
+    恢复模式 --> [*] : 回合结束 (IR Failure / 恢复超时)
+    note right of 风险评估 : WM在潜空间执行H步rollout,&#10;逐步预测C(s_i,a_i),&#10;折扣求和得到C^&#960;_H</div></div>
+</section>
+
+<section id="task">
+<h2>4. 任务定义</h2>
+<h3>4.1 CMDP 形式化</h3>
+<p>FARL 将安全操作建模为 <strong>Constrained MDP (CMDP)</strong>。其关键创新在于引入二元约束指示器和每步局部安全约束。</p>
+<div class="formula-block">
+<div class="eq-tag">CMDP 定义</div>
+$$\mathcal{M} = (\mathcal{S}, \mathcal{A}, P, R, C, \gamma, \mu_0, d_{\text{safe}})$$
+<div class="eq-note"><code>C: S &times; A &rarr; {0,1}</code> 是一个<strong>二元约束指示器</strong>——<code>C(s,a)=1</code> 表示在状态 s 下执行动作 a 违反了安全约束（例如末端执行器碰撞、物体掉落、关节限位违反）。<code>C(s,a)=0</code> 表示安全。这种二元设计反映了真实世界中"要么失败，要么没有"的本质，避免了连续代价函数中任意权重分配的问题。<code>d_safe</code> 是安全阈值，控制允许的最大未来约束违反风险。</div>
+</div>
+
+<h3>4.2 核心安全指标</h3>
+<div class="formula-block">
+<div class="eq-tag">H步折扣约束违反概率</div>
+$$C^{\pi}_H(s_t) = \mathbb{E}_{\tau \sim \pi, P}\left[\sum_{i=t}^{t+H} \gamma^{i-t} \cdot \mathbb{I}[\text{risk}] \cdot C(s_i, a_i) \;\middle|\; s_t\right]$$
+<div class="eq-note"><strong>FARL 的核心安全指标。</strong>给定当前状态 s_t，计算在任务策略 &pi; 下，未来 H 步的<strong>折扣约束违反概率</strong>。每一步贡献 &gamma;^{i-t} &middot; I[risk] &middot; C(s_i,a_i)，其中风险指示器量化了该 state-action pair 发生<strong>不可恢复失败（Irrecoverable Failure）</strong>的可能性（由约束头预测）。折扣因子 &gamma; 优先关注近期违反（更紧迫，预测更准确）。在实际中，该期望通过在潜空间进行 H 步 rollout 的 Monte Carlo 近似来计算。</div>
+</div>
+
+<h3>4.3 优化目标</h3>
+<div class="formula-block">
+<div class="eq-tag">FARL 优化目标</div>
+$$\pi^* = \arg\max_{\pi} \; J_R(\pi) = \mathbb{E}_{\tau \sim \pi}\left[\sum_{t=0}^{\infty} \gamma^t r(s_t, a_t)\right]$$
+$$\text{s.t.} \quad C^{\pi}_H(s_t) \leq d_{\text{safe}}, \quad \forall t$$
+<div class="eq-note">在满足<strong>每步</strong> H 步前瞻约束违反概率 ≤ d_safe 的前提下，最大化累积折扣奖励。这<strong>不是</strong>传统的"累积约束代价 ≤ 阈值"形式（如 CPO 的 J_C(&pi;) ≤ d），而是<strong>每步局部安全约束</strong>。这防止了"时序作弊"——即早期违反约束、后期用保守行为来补偿，从而确保<strong>整个回合中安全性的均匀分布</strong>。</div>
+</div>
+
+<h3>4.4 安全门控动作选择</h3>
+<div class="formula-block">
+<div class="eq-tag">安全门控动作选择</div>
+$$a_t = \begin{cases} a_{\text{task}} \sim \pi_{\text{task}}(\cdot|s_t), & \text{if } C^{\pi}_{H}(s_t) \leq d_{\text{safe}} \quad (T_{\text{task}}) \\ a_{\text{rec}} \sim \pi_{\text{rec}}(\cdot|s_t), & \text{if } C^{\pi}_{H}(s_t) > d_{\text{safe}} \quad (T_{\text{rec}}) \end{cases}$$
+<div class="eq-note"><strong>安全转移（T_task）：</strong>约束违反概率在可接受范围内；任务策略正常运作（"绿灯"）。<strong>风险转移（T_rec）：</strong>世界模型预测未来约束违反概率较高；系统进入"红灯"模式，切换至恢复策略。恢复策略最小化未来约束违反（而非任务奖励），将系统引导回安全状态分布。一旦 C^&pi;_H 再次 ≤ d_safe，任务策略无缝恢复。</div>
+</div>
+
+<h3>4.5 FailureBench 任务一览</h3>
+<table>
+<tr><th style="width:15%;">领域</th><th style="width:22%;">任务</th><th style="width:63%;">约束定义与 IR Failure 条件</th></tr>
+<tr><td rowspan="4" style="vertical-align:top;font-weight:700;">FailureBench<br/>(仿真)</td><td><strong>Bounded Push</strong></td><td>将方块推到目标位置，同时保持末端执行器在桌面边界内。当距离边缘 &lt; 安全裕度（约2cm）时 C(s,a)=1。IR Failure = 末端执行器滑出桌面或物体掉落。</td></tr>
+<tr><td><strong>Bounded Soccer</strong></td><td>操控末端执行器将球"踢"入球门，同时保持在工作空间边界内。超出工作空间时 C(s,a)=1。IR Failure = 与桌面碰撞或球飞出不可恢复。</td></tr>
+<tr><td><strong>Fragile Push Wall</strong></td><td>将物体推过"易碎墙"（触碰即失败），需要在狭窄的安全走廊中导航。触碰易碎墙时 C(s,a)=1。IR Failure = 墙被摧毁，任务不可恢复。</td></tr>
+<tr><td><strong>Obstructed Push</strong></td><td>在存在静态障碍物的环境中将物体推到目标。与障碍物碰撞时 C(s,a)=1。IR Failure = 障碍物移位或物体卡在障碍物之间。</td></tr>
+<tr><td rowspan="3" style="vertical-align:top;font-weight:700;">真实世界<br/>(Franka Panda)</td><td><strong>Fragile Push Wall</strong></td><td>仿真任务的真实版本。易碎墙为物理屏障（纸板/泡沫板）；碰撞即失败。验证 sim-to-real 安全性迁移。</td></tr>
+<tr><td><strong>Disturbed Push</strong></td><td>在外部扰动（人工推动物体）下进行推送。测试突发干扰下的安全恢复能力。IR Failure = 物体被推出桌面或手臂与外部环境碰撞。</td></tr>
+<tr><td><strong>Bounded Soccer</strong></td><td>仿真 Bounded Soccer 的真实版本。在 Franka Panda 工作空间内进行推球任务，设有物理边界标记。</td></tr>
+</table>
+
+<h3>4.6 基线方法对比</h3>
+<table>
+<tr><th>基线方法</th><th>类型</th><th>安全机制</th><th>弱点</th></tr>
+<tr><td>Uni-O4</td><td>离线RL（无安全约束）</td><td>无——仅优化 J_R</td><td>在线探索时零保护；IR Failure 率最高</td></tr>
+<tr><td>PPO-Lagrangian</td><td>在线 Safe RL</td><td>Lagrangian 乘子 &lambda; 惩罚约束违反：max J_R - &lambda;&middot;J_C</td><td>反应式：&lambda; 调节滞后于实时风险；无法在突发危险中干预</td></tr>
+<tr><td>P3O</td><td>在线 Safe RL</td><td>一阶约束优化 + PPO trust region</td><td>Trust region 可能过于保守；约束信号基于环境反馈</td></tr>
+<tr><td>CPO</td><td>在线 Safe RL</td><td>Constrained Policy Optimization：在 trust region 内满足 max J_R s.t. J_C &le; d</td><td>需要大量在线交互；offline-to-online 过渡时较为脆弱</td></tr>
+<tr class="highlight"><td><strong>FARL (本文)</strong></td><td><strong>离线-在线安全 RL</strong></td><td><strong>WM 主动预测 + 双策略门控自恢复</strong></td><td><strong>WM 精度依赖离线数据质量；H 和 d_safe 需逐任务调参</strong></td></tr>
+</table>
+</section>
+
+<section id="challenge">
+<h2>5. 关键挑战</h2>
+<h3>5.1 第一性原理诊断</h3>
+<div class="callout warn"><p class="callout-title">为什么安全的 offline-to-online RL 对真实世界操作而言从根本上是困难的？</p><p>真实操作场景中的安全 offline-to-online RL 面临<strong>三个相互交织的挑战</strong>：(1) <strong>分布偏移与安全风险耦合</strong>——从离线转向在线不可避免地会访问 OOD 状态，而这些 OOD 状态恰好在风险最高处集中（因为专家策略会主动规避它们）。传统 offline RL 使用保守性（CQL 的 Q 值低估）来缓解 OOD 乐观偏差，但安全感知的保守性必须针对<strong>约束</strong>而非<strong>奖励</strong>——在奖励上保守会限制探索，在约束上不保守则会面临灾难性失败。(2) <strong>稀疏且延迟的约束信号</strong>——在真实操作中，失败是稀疏的（大多数状态是安全的）且是二元的（要么碰撞，要么没有），导致基于梯度的约束优化（Lagrangian）在训练早期缺乏有效的学习信号。(3) <strong>非线性的安全-性能权衡</strong>——在低维仿真中，简单的代价惩罚可以平衡安全与性能；但在高维操作空间中，微小的姿态偏差可能在几步之内从安全滑向灾难，使得反应式惩罚永远"慢一步"。</p></div>
+
+<h3>5.2 三大关键挑战</h3>
+<p><strong class="hl">挑战一：离线数据对风险区域存在盲区。</strong>离线数据集天然偏向安全区域——由专家或脚本策略采集的数据富含成功轨迹，但<strong>系统性地缺失近失败临界状态</strong>。这带来两个后果：(i) 世界模型在风险区域对潜空间动力学的预测表现差（外推误差），使得基于模型的 lookahead <strong>在最需要时最不可靠</strong>；(ii) 恢复策略的 BC 初始化质量严重依赖数据集中"从风险状态恢复"的轨迹数量。FARL 通过<strong>故意包含失败轨迹</strong>（通过脚周边界探测策略）部分缓解了此问题，但系统性地探索和覆盖"风险边界"仍是一个开放挑战。</p>
+
+<p><strong class="hl">挑战二：H 步前瞻精度与计算代价的权衡。</strong>H 是 FARL 的关键超参数。更大的 H 提供更主动的预测（更安全/更保守），但预测误差在 H 步 rollout 过程中呈指数级累积——即使每步误差仅1%，在 H=32 步后也会膨胀至约27%。此外，H 步 rollout 的计算代价为 O(H)（动力学预测器需串行运行）。对于真实 Franka Panda 控制（10-100 Hz 策略频率），每步计算 H=16 的潜空间 rollout 面临紧张的时间预算。FARL 通过<strong>共享潜空间</strong>（摊销编解码开销）和<strong>轻量级约束头</strong>设计来缓解这一问题。</p>
+
+<p><strong class="hl">挑战三：恢复策略的泛化性与次优性控制。</strong>恢复策略从有限的失败-恢复轨迹中学习，不可避免地具有泛化误差。当遇到训练中未见过的全新风险状态时，恢复策略可能：(i) 无法降低 C^&pi;_H（恢复失败 → IR Failure），或 (ii) 采取过度保守的恢复动作（如回退至远离目标的位置），延长任务完成时间。Action Correction Benefit 定理中的 <code>&delta;_rec</code> 项精确刻画了这种次优性。该定理表明，当 &delta;_rec 过大（恢复质量差）或 p_risk(s) 过小（触发过于保守）时，恢复干预可能是<strong>净负面</strong>的——这是一条具有理论依据的实践指导原则。</p>
+</section>
+
+<section id="method">
+<h2>6. 方法与公式</h2>
+<h3>6.1 方法总览</h3>
+<p>FARL 的训练流程包含三个核心阶段：(1) <strong>离线预训练</strong>——从离线数据集中同时训练任务策略、恢复策略和世界模型；(2) <strong>在线安全交互</strong>——任务策略与环境交互，世界模型执行主动风险评估，安全门控决定策略切换；(3) <strong>在线微调</strong>——使用新的在线交互数据持续更新所有组件。</p>
+
+<h3>6.2 核心公式</h3>
+<div class="formula-block">
+<div class="eq-tag">公式1：世界模型七组件架构</div>
+$$\begin{aligned}
+\text{Encoder:}&\quad z_t = \text{enc}_\theta(s_t) \\
+\text{Dynamics:}&\quad \hat{z}_{t+1} = \text{dyn}_\theta(z_t, a_t) \\
+\text{Reward:}&\quad \hat{r}_t = \text{rew}_\theta(z_t) \\
+\text{Value:}&\quad \hat{V}_t = \text{val}_\theta(z_t) \\
+\text{Policy:}&\quad \hat{a}_t \sim \text{pol}_\theta(z_t) \\
+\text{Constraint:}&\quad \hat{C}_t = \sigma(\text{cst}_\theta(z_t, a_t)) \in (0,1) \\
+\text{Decoder:}&\quad \hat{s}_t = \text{dec}_\theta(z_t)
+\end{aligned}$$
+<div class="eq-note">所有组件共享由编码器从原始状态编码得到的同一潜表示 z_t。这种共享设计意味着编码器从重建（decoder loss）、动力学预测（consistency loss）和任务学习（reward/value/policy loss）中接收监督信号，学习到的潜空间既保留了状态重建信息，也包含了任务与安全相关的结构化知识。约束头使用 sigmoid 激活，输出 (0,1) 的连续值，解释为预测的约束违反概率。</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">公式2：世界模型联合训练损失</div>
+$$\mathcal{L}_{\text{WM}}(\theta) = \mathbb{E}_{(s,a,r,c,s') \sim \mathcal{D}}\Big[ \|r - \hat{r}\|^2 + \text{CE}(V_{\text{target}}, \hat{V}) + \text{CE}(\bar{z}', \hat{z}') + \|c - \hat{C}\|^2 + \|s - \hat{s}\|^2 \Big]$$
+<div class="eq-note"><strong>五项损失详解：</strong><br/>(1) Reward MSE——奖励头预测的 r&#770; 匹配真实奖励；连续奖励的标准 MSE。<br/>(2) Value CE——V_target 通过 N 步 bootstrapping（DreamerV3 风格）得到，离散化为多个 bin，使用 categorical cross-entropy 以保证稳定性。<br/>(3) Latent Consistency CE——编码器在真实下一状态上的输出 z&#773;'（无梯度）与动力学预测器输出的 &#382;' 之间的 CE；匹配两个潜分布（DreamerV3 设计）。<br/>(4) Constraint MSE——<strong>FARL独有的损失项。</strong>约束头预测 C&#770; &#x2208; (0,1) 逼近二元约束 c &#x2208; {0,1}。使用 MSE（而非 BCE），因为 C&#770; 在 rollout 中作为概率期望参与加权求和。<br/>(5) Decoder MSE——从 z_t 重建 s&#770;；作为表示学习正则化，防止潜空间坍缩。</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">公式3：H步约束违反 Monte Carlo 估计</div>
+$$\hat{C}^{\pi}_H(s_t) \approx \frac{1}{K}\sum_{k=1}^{K} \sum_{i=0}^{H-1} \gamma^{i} \cdot \mathbb{I}[\text{risk}_i^{(k)}] \cdot \hat{C}(z_{t+i}^{(k)}, a_{t+i}^{(k)})$$
+<div class="eq-note">在线阶段，对当前状态 s_t，世界模型在潜空间执行 K 条各 H 步的 rollout 轨迹（通常 K=1 以平衡计算效率，依赖确定性潜动力学）。每条 rollout 从 z_t = enc(s_t) 出发，使用任务策略 &pi;_task（经由策略头预测的动作分布）选择动作，动力学预测器推进潜状态，约束头预测每步的 C&#770;。最终 C&#770;^&pi;_H 为所有 rollout 的折扣加权平均值。</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">公式4：动作修正收益定理（简化版）</div>
+$$\mathbb{E}\left[J_R^{\text{FARL}}\right] - \mathbb{E}\left[J_R^{\text{task-only}}\right] \geq \mathbb{E}_{s \sim d^{\pi}}\left[p_{\text{risk}}(s)\right] \cdot \Delta \cdot (1 - \delta_{\text{rec}}) - O(\delta_{\text{rec}})$$
+<div class="eq-note"><strong>直观解释：</strong>左侧是 FARL 相对于纯任务策略的性能增益。右侧：正项（收益）——p_risk(s) 是状态 s 下的风险概率，&Delta; 是恢复策略在风险状态下相较于任务策略的动作改进幅度，(1-&delta;_rec) 是恢复策略的正确率。负项 O(&delta;_rec) 是恢复策略次优性的代价（误触发、过度保守）。<br/><br/><strong>实践指导：</strong>该定理揭示了 FARL 的有效条件——<strong>风险状态足够频繁</strong>（p_risk 足够大）且<strong>恢复策略足够好</strong>（&delta;_rec 足够小）时，FARL 才优于纯任务策略。若离线数据中几乎没有风险状态，或恢复策略训练不足，FARL 可能反而劣于纯任务策略。这解释了为何 FARL 在 Fragile Push Wall（高风险）上提升显著，而在简单任务上提升有限。</div>
+</div>
+
+<h3>6.3 关键参数</h3>
+<table>
+<tr><th style="width:22%;">参数名称</th><th style="width:14%;">符号</th><th style="width:28%;">取值</th><th>说明</th></tr>
+<tr><td>前瞻视野</td><td>H</td><td>16 步</td><td>WM rollout 步数；平衡主动性与预测误差累积</td></tr>
+<tr><td>安全阈值</td><td>d_safe</td><td>0.1 ~ 0.3（依任务而定）</td><td>C^&pi;_H 超过此值触发恢复；越低越保守</td></tr>
+<tr><td>约束指示器</td><td>C(s,a)</td><td>{0, 1}（二元）</td><td>0 = 安全，1 = 约束违反（碰撞、越界、掉落）</td></tr>
+<tr><td>离线数据集</td><td>—</td><td>约 50K-200K transitions</td><td>混合成功轨迹 + 脚本化边界探测失败轨迹</td></tr>
+<tr><td>任务策略算法</td><td>—</td><td>Uni-O4（PPO 变体）</td><td>统一离线 RL：IQL + CQL + TD3+BC</td></tr>
+<tr><td>恢复策略训练</td><td>—</td><td>BC（初始化）+ Uni-O4（微调）</td><td>BC 提供结构先验；Uni-O4 微调提升泛化性</td></tr>
+<tr><td>WM 子网络数</td><td>—</td><td>7 (enc+dyn+rew+val+pol+dec+cst)</td><td>约束头是 FARL 相较 DreamerV3 的核心增量</td></tr>
+<tr><td>潜空间维度</td><td>d_z</td><td>256 或 512</td><td>潜状态维度</td></tr>
+<tr><td>折扣因子</td><td>&gamma;</td><td>0.99</td><td>同时用于奖励和约束违反的折扣</td></tr>
+<tr><td>Rollout 轨迹数</td><td>K</td><td>1（确定性）</td><td>每次在线安全评估的 rollout 数量</td></tr>
+<tr><td>机器人平台</td><td>—</td><td>Franka Panda (7-DoF)</td><td>用于验证3个真实世界任务</td></tr>
+</table>
+</section>
+
+<section id="principles">
+<h2>7. 深层原理</h2>
+<h3>7.1 深度机制分析</h3>
+
+<h4>7.1.1 为什么主动式世界模型预测优于反应式约束惩罚</h4>
+<p>从控制论的视角来看，PPO-Lagrangian 的乘子机制本质上是一个<strong>积分控制器</strong>：乘子 &lambda; 基于累积约束违反量缓慢调整，类似于 PID 控制器中的 I（积分）项。该过程具有内在的<strong>时间滞后性</strong>：约束违反发生 → &lambda; 逐渐增大 → 策略更新的惩罚力度增强 → 策略逐渐规避危险行为 → 下一次遇到类似状态时行为已改变——这可能需要数千个时间步。在真实机器人操作中，这种滞后意味着策略在首次遭遇危险状态时<strong>不可避免会失败</strong>，只能在<strong>事后</strong>学会规避。</p>
+<p>FARL 的世界模型主动预测则是一个<strong>前馈控制器 + 预测器</strong>：通过在潜空间中模拟未来 H 步轨迹，在<strong>执行之前</strong>评估动作的安全性。这为控制器增加了一条"预测通道"，将安全反馈延迟从"失败发生 → 梯度更新 → 行为改变"缩短为"WM 预测 → 门控切换"，从而实现了从反应式到主动式的范式转变。</p>
+<div class="formula-block">
+<div class="eq-tag">反应式 vs 主动式信息流对比</div>
+$$\begin{aligned} \text{反应式 (Lagrangian):}&\quad s_t \xrightarrow{\pi} a_t \xrightarrow{\text{env}} s_{t+1}, r_t, c_t \xrightarrow{\text{loss}} \nabla_\theta \mathcal{L} \xrightarrow{\text{SGD}} \theta' \\ \text{主动式 (FARL):}&\quad s_t \xrightarrow{\text{enc}} z_t \xrightarrow{\text{dyn}^H} \{\hat{z}_{t+i}\} \xrightarrow{\text{cst}} \{\hat{C}_{t+i}\} \xrightarrow{\sum} \hat{C}^\pi_H \xrightarrow{\text{gate}} a_t \end{aligned}$$
+<div class="eq-note">反应式路径需要信息流经环境（执行动作 → 获得代价 → 计算梯度 → 更新参数），延迟以 episode 为单位计量。主动式路径完全在世界模型的潜空间内完成，延迟以毫秒为单位（单次前向传播）。这种从"安全信息需要环境交互获得"到"安全信息可通过内部模拟获得"的转变，是 FARL 核心效率和安全性的来源。</div>
+</div>
+
+<h4>7.1.2 双策略架构动力学</h4>
+<p>FARL 的双策略架构（task + recovery）本质上定义了一个<strong>非连续混合策略</strong>，其动作选择依赖于当前状态的世界模型安全评估。关键性质：</p>
+<p>(1) <strong>隐式状态空间划分。</strong>安全门控隐式地将状态空间划分为安全区域和风险区域（通过 C^&pi;_H 与 d_safe 的比较），两个策略分别主导不同区域。划分边界并非固定不变，而是随着世界模型在线更新而<strong>动态演化</strong>——随着模型对环境理解的加深，风险区域边界日益精确。</p>
+<p>(2) <strong>策略切换稳定性。</strong>若世界模型预测在安全阈值附近抖动，切换可能导致振荡（反复在 T_task 和 T_rec 之间切换）。FARL 可通过<strong>迟滞控制（hysteresis）</strong>来缓解——设置两个阈值 d_low &lt; d_high：只有 C^&pi;_H &gt; d_high 时才进入恢复模式，只有 C^&pi;_H &lt; d_low 时才退出。</p>
+<p>(3) <strong>闭环数据分布改善。</strong>恢复策略干预改变了在线交互数据的分布——系统不再像纯任务策略那样轻易进入不可恢复的失败状态。这意味着在线采集的数据中安全状态占比更高，从而进一步改善世界模型对安全区域的建模精度，形成正反馈循环。</p>
+
+<h4>7.1.3 约束头的样本效率挑战</h4>
+<p>约束头需要从数据集中学习"哪些 state-action pair 会导致约束违反"，而违反信号天然是<strong>稀疏且不平衡的</strong>（绝大多数 transition 的 C=0）。两个学习挑战：(i) 类别不平衡使约束头偏向于总是预测 C=0（高精确率、低召回率——漏检风险状态），(ii) 约束违反仅在特定的 state-action 组合中发生，需要学习非线性决策边界。FARL 通过以下方式缓解：(a) 在数据集中刻意提高失败轨迹比例（通过脚本化边界探测策略），(b) 对约束损失进行类别加权（C=1 样本赋予更高权重），(c) 约束头采用轻量级 MLP 设计（避免对稀有样本的表面特征过拟合）。</p>
+
+<h3>7.2 对比分析</h3>
+<div class="cmp-row">
+<div class="cmp-col">
+<h4>传统 Safe RL（CPO / PPO-Lagrangian）</h4>
+<p><strong>安全机制：</strong>将约束惩罚信号嵌入目标函数；通过优化调整策略分布以满足累积约束。</p>
+<p><strong>核心问题：</strong>(1) 约束信号是<strong>反应式</strong>的——仅在环境返回违反后才产生学习信号；(2) <strong>累积约束</strong>允许时序作弊（早期违反、晚期补偿）；(3) 在 offline-to-online 过渡期间，策略在学习约束之前就已执行在真实环境中；(4) <strong>无恢复机制</strong>——一旦进入危险状态，策略必须自行"学会"逃离，缺乏专用的恢复行为。</p>
+<p style="text-align:center;font-family:monospace;font-size:12px;">env &rarr; c_t &rarr; loss &rarr; grad &rarr; &theta;_update &rarr; &pi;_new</p>
+<p style="text-align:center;font-size:11px;color:#64748b;">延迟单位：环境步数 &times; 梯度步数（数百量级）</p>
+</div>
+<div class="cmp-col">
+<h4>FARL（世界模型 + 双策略）</h4>
+<p><strong>安全机制：</strong>世界模型主动预测 + 安全门控 + 恢复策略。在每个时间步主动评估未来 H 步的安全性，并据此做出决策。</p>
+<p><strong>核心优势：</strong>(1) <strong>主动式</strong>——在执行前通过世界模型模拟评估动作安全性（"心智预演"）；(2) <strong>每步局部约束</strong>——无时序作弊，确保整个回合均匀安全；(3) <strong>离线到在线</strong>——安全知识已在离线阶段编码进世界模型和恢复策略中，从在线启动之初即生效；(4) <strong>专用恢复策略</strong>——从反向失败轨迹中学习，专门掌握"从危险返回安全"的技能。</p>
+<p style="text-align:center;font-family:monospace;font-size:12px;">s_t &rarr; enc &rarr; dyn^H &rarr; cst &rarr; C^&pi;_H &rarr; gate &rarr; a_t</p>
+<p style="text-align:center;font-size:11px;color:#64748b;">延迟单位：单次网络前向传播（1-10ms）</p>
+</div>
+</div>
+</section>
+
+<section id="figures">
+<h2>8. 图表证据</h2>
+<h3>8.1 论文图表解读</h3>
+
+<div class="paper-figure">
+<div class="fig-header"><span class="fig-number">Fig. 1</span><span class="fig-caption">FARL 系统总览：从离线训练到在线安全交互的完整流程</span><span class="fig-source">Source: FARL paper, Page 1 (overview figure)</span></div>
+<div class="fig-image"><div class="fig-placeholder"><p>FARL 系统总览 — 离线预训练（双策略 + 世界模型）→ 在线安全交互（主动预测 + 门控切换）→ 安全恢复闭环</p></div></div>
+<div class="fig-interpretation"><div class="fig-label">图解分析</div><p>总览图（Fig. 1）通过四个层次呈现 FARL 的完整方法论：</p><ul><li><strong>第一层——离线预训练：</strong>三个并行训练目标——任务策略（通过 Uni-O4 最大化奖励）、恢复策略（从反向失败轨迹做 BC + Uni-O4 微调）、世界模型（七组件联合优化）。三者均<strong>从同一离线数据集解耦训练</strong>，无需额外在线交互。</li><li><strong>第二层——世界模型结构：</strong>七个共享潜空间的子网络。约束头以红色高亮，标示为 FARL 相比标准世界模型（DreamerV3）的关键增量。</li><li><strong>第三层——在线安全交互：</strong>任务策略交互 → WM 接收状态，执行 H 步潜空间 rollout → 约束头预测每步安全性 → 汇总为 C^&pi;_H → 与 d_safe 比较 → 决定继续任务执行还是切换至恢复策略。该决策循环<strong>每个时间步</strong>执行一次。</li><li><strong>第四层——实验证据：</strong>柱状图/曲线图展示 FARL 对比基线方法：IR Failure 降低 73.1%，性能提升 11.3%。</li></ul><p>该图的叙事逻辑：<strong>知识编码 → 主动预测 → 安全决策 → 实验验证。</strong></p></div>
+</div>
+
+<div class="paper-figure">
+<div class="fig-header"><span class="fig-number">Fig. 2</span><span class="fig-caption">FailureBench 结果：4个仿真任务上的 IR Failures 和成功率对比</span><span class="fig-source">Source: FARL paper, Experiments section</span></div>
+<div class="fig-image"><div class="fig-placeholder"><p>FailureBench 结果 — FARL vs 基线方法在 Bounded Push、Bounded Soccer、Fragile Push Wall、Obstructed Push 四个任务上的对比</p></div></div>
+<div class="fig-interpretation"><div class="fig-label">图解分析</div><p>FailureBench 四项任务的关键实验趋势：</p><ul><li><strong>Uni-O4（无安全约束）：</strong>可能达到最高的任务成功率（不受安全约束限制），但<strong>IR Failure 率也是最高的</strong>——它"不惜一切代价"完成任务，频繁违反约束。在真实场景中不可接受。</li><li><strong>PPO-Lagrangian / P3O / CPO：</strong>IR Failure 率显著低于 Uni-O4，但仍明显高于 FARL。它们的反应式惩罚机制在首次遭遇危险时无法提供保护。特别是在 Fragile Push Wall（触碰即失败，零容忍度）上，这些方法仍表现出较高的 IR Failure。</li><li><strong>FARL：</strong>IR Failure 率大幅低于所有基线（平均降低 73.1%），同时任务成功率<strong>反而提升</strong>了 11.3%。这个看似矛盾的结果验证了 Action Correction Benefit 定理：恢复策略不仅防止失败，还将系统维持在安全区域，使其能更稳定地向目标推进。</li></ul><p>在 <strong>Obstructed Push</strong> 上，FARL 的优势通常最为突出——狭窄的安全走廊需要提前路径规划，而 H 步前瞻正好提供了这种能力，反应式方法只能依赖"碰撞后的惩罚"。</p></div>
+</div>
+
+<div class="paper-figure">
+<div class="fig-header"><span class="fig-number">Fig. 3</span><span class="fig-caption">真实机器人实验：Franka Panda 上3个任务的验证结果</span><span class="fig-source">Source: FARL paper, Real-World Experiments section</span></div>
+<div class="fig-image"><div class="fig-placeholder"><p>真实世界 Franka Panda 实验结果 — Fragile Push Wall、Disturbed Push、Bounded Soccer</p></div></div>
+<div class="fig-interpretation"><div class="fig-label">图解分析</div><p>真实机器人实验的核心发现：</p><ul><li><strong>Fragile Push Wall（真实版本）：</strong>物理易碎墙使安全要求比仿真更加严格——碰撞不仅意味着"失败"，更可能导致物理损害。FARL 的世界模型从离线数据中学习安全边界，展现出精确的规避行为。值得注意的是，在安全性维度（以几何约束为主，如距离/位置），sim-to-real 的 gap 可能<strong>小于</strong>任务性能维度的 gap。</li><li><strong>Disturbed Push（真实版本）：</strong>外部扰动测试 FARL 在<strong>动态变化环境</strong>中的安全性。当扰动发生时，世界模型主动预测在1-2步内检测到 C^&pi;_H 上升并触发恢复策略。相比之下，反应式方法需要多步梯度累积才能做出反应，此时系统已经偏离安全轨迹。</li><li><strong>Bounded Soccer（真实版本）：</strong>要求在速度（快速"踢球"）和安全（不越界）之间取得平衡。FARL 的安全门控在接近边界时自动减速（WM 预测高速运动可能越界），而在安全区域内则保持全速——展现了动态的安全-性能权衡调节能力。</li></ul></div>
+</div>
+</section>
+
+<section id="flaw">
+<h2>9. 局限与延伸</h2>
+<h3>9.1 局限性分析</h3>
+<p><strong class="hl">局限一：WM 精度高度依赖离线数据质量。</strong>FARL 的整个安全保护机制都建立在世界模型预测之上。如果约束头出错——假阳性（安全状态误判为危险）导致不必要的恢复激活，降低任务效率；假阴性（危险状态误判为安全）导致在无保护的情况下进入危险状态，造成真实失败。离线数据的质量和覆盖范围直接决定了 WM 精度的上界。论文实验中包含了脚本化边界探测失败轨迹——若移除这些数据，约束预测精度将显著下降。在实际落地时，系统性地采集"恰到好处"的失败边界数据（覆盖风险区域但不损坏硬件），本身就是一项困难的工程问题。</p>
+
+<p><strong class="hl">局限二：H 和 d_safe 是任务敏感的超参数。</strong>H 太小 → 对高速动作的前瞻能力不足；H 太大 → 预测误差累积导致高假阳性率。d_safe 太低 → 过于保守，任务策略几乎无法自主运行；d_safe 太高 → 安全门控形同虚设。论文中对每个任务都进行了手动调参。需要系统性的参数选择方法（例如基于世界模型校准误差的自适应阈值机制）。</p>
+
+<p><strong class="hl">局限三：二元约束定义对真实场景过于简化。</strong>FARL 的 C(s,a) &isin; {0,1} 是一种<strong>硬阈值</strong>安全性定义——距离桌面边缘2cm = "不安全"，2.01cm = "安全"。真实机器人操作的安全性往往是<strong>连续的</strong>：越靠近边缘风险越高（概率意义上），而非在一个固定距离处发生从安全到危险的突变。这种二元处理可能在安全边界附近导致不连续的决策行为（在2.01cm处全速运行，在1.99cm处突然触发恢复切换）。</p>
+
+<p><strong class="hl">局限四：计算开销制约实时部署。</strong>对于 Franka Panda 控制（1 kHz 关节位置控制，10-50 Hz 策略频率），每步执行 H=16 的潜空间 rollout 必须在20-100ms内完成。尽管 FARL 采用 K=1 的确定性 rollout 和轻量级约束头，完整的七组件 WM 前向传播加上约束计算仍可能占用可观的时间预算。对于更高自由度的机器人（灵巧手、双臂协调、无人机飞行），计算开销将更加突出。</p>
+
+<p><strong class="hl">局限五：恢复策略仅在训练分布内有效。</strong>恢复策略的 BC 初始化使其行为严重依赖离线数据中特定的"失败到安全"模式。对于训练中未见过的全新风险状态（例如物体被扰动到全新位置，导致异常的约束违反模式），恢复策略可能失效。恢复失败直接等于 IR Failure，这对其泛化能力提出了比任务策略更严格的要求。</p>
+
+<h3>9.2 延伸方向</h3>
+<ol>
+<li><strong>自适应安全阈值：</strong>基于世界模型的认知不确定性（epistemic uncertainty）动态调节 d_safe。当 WM 对当前状态的不确定性较高时，自动收紧阈值（更保守）；在熟悉区域则放宽（更高效）。联合优化假阳性率和假阴性率。</li>
+<li><strong>连续约束建模：</strong>将二元的 C 升级为连续风险函数 R(s,a) &isin; [0,1]，表示最终失败的概率。需要更细粒度的标注数据，但能实现更平滑的安全决策边界。</li>
+<li><strong>多模态恢复策略：</strong>不同类型的风险（碰撞、越界、物体掉落）可能需要不同的恢复策略。多模态恢复策略（类似 Diffusion Policy 的多模态动作分布）可自动为每种风险情景选择最合适的恢复模式。</li>
+<li><strong>无人机应用扩展：</strong>将 FARL 框架扩展到无人机导航安全约束（避障、禁飞区、能量约束），利用世界模型主动预测实现安全自主飞行。</li>
+</ol>
+
+<h3>9.3 数据敏感性分析</h3>
+<table>
+<tr><th style="width:20%;">因素</th><th style="width:12%;">敏感度</th><th>分析原因</th></tr>
+<tr><td>离线数据中失败轨迹比例</td><td>&#x2605;&#x2605;&#x2605;&#x2605;&#x2605;</td><td>最敏感项。零失败轨迹 → 零约束头训练信号 → 安全门控完全失效。需要15-30%的失败轨迹比例以获得足够的约束头判别能力。</td></tr>
+<tr><td>安全阈值 d_safe</td><td>&#x2605;&#x2605;&#x2605;&#x2605;&#x2606;</td><td>在0.1与0.3之间的选择可能使系统从"过于激进"转变为"过于保守"。需要在任务特定的安全走廊内仔细调参。</td></tr>
+<tr><td>前瞻视野 H</td><td>&#x2605;&#x2605;&#x2605;&#x2605;&#x2606;</td><td>H<8 对高速任务前瞻不足；H>32 受到预测误差累积和线性计算开销增长的困扰。</td></tr>
+<tr><td>WM 各损失权重</td><td>&#x2605;&#x2605;&#x2605;&#x2606;&#x2606;</td><td>若约束损失权重远低于其他损失，约束头会"欠拟合"；若过高，可能损害潜表示对奖励和动力学的表达能力。</td></tr>
+<tr><td>恢复策略 BC 数据量</td><td>&#x2605;&#x2605;&#x2605;&#x2606;&#x2606;</td><td>BC 提供结构先验，但 Uni-O4 微调可部分补偿 BC 数据不足。然而若 BC 初始化数据不足500条 transition，恢复可能完全失败。</td></tr>
+<tr><td>任务策略算法选择</td><td>&#x2605;&#x2605;&#x2606;&#x2606;&#x2606;</td><td>Uni-O4 可替换为其他离线 RL 算法。FARL 的安全机制与具体任务策略算法是解耦的。</td></tr>
+</table>
+
+<h3>9.4 深入剖析：最大弱点</h3>
+<div class="callout danger"><p class="callout-title">最大弱点：WM 预测精度构成 FARL 的单点故障（Single Point of Failure）</p><p>在所有局限性中，最根本的是：<strong>FARL 的整个安全机制依赖于一个可能出错的预测模型。</strong>若 WM 约束头产生假阴性（将真正危险的状态预测为安全），系统将以最高风险执行动作且<strong>没有任何</strong>额外的安全保障层（如基于力矩传感器的碰撞检测、基于视觉的急停）作为备份。这是一种"静默失效"模式：系统自信地认为安全，实则正朝失败逼近。</p><p>根本原因在于 FARL 的<strong>内循环安全假设</strong>——它概念上将安全完全委托给了世界模型，而世界模型本质上是一个<strong>学习得到的统计模型</strong>，其预测永远存在误差。更稳健的真实世界部署设计应在 FARL 之上叠加<strong>多层安全保护</strong>：(1) 硬件层——力矩限制与碰撞检测；(2) 视觉层——场景变化检测（如有外部物体突然进入工作空间）；(3) 策略层——FARL 主动预测。在多层保护中，FARL 作为最智能但可能出错的层面，提供"软安全"（预测性、自适应性），而硬件层提供"硬安全"（不可绕过、绝对可靠）。论文可以更深入地探讨"当世界模型失效时会发生什么"这一问题。</p></div>
+</section>
+
+<section id="motivation">
+<h2>10. 动机推导</h2>
+<h3>10.1 五步推导链</h3>
+
+<p><strong class="hl">第一步：为什么需要 offline-to-online RL？</strong>纯离线 RL 受限于离线数据集的质量和覆盖范围——它无法超越数据中的最优策略，本质上是在<strong>模仿</strong>数据中的行为。但在真实机器人操作中，我们总是希望策略能够<strong>超越</strong>数据中的行为（因为这些行为本身可能是次优的）。在线 RL 可以实现改进，但在真实环境中从零开始训练代价高昂且危险。Offline-to-online RL 提供了一条中间路径：用离线数据预训练（提供良好初始化），然后通过在线交互微调（在安全基础上进一步提升）。</p>
+
+<p><strong class="hl">第二步：为什么 offline-to-online 尤其需要安全机制？</strong>从离线到在线的"启动瞬间"是最危险的。此时，策略在离线数据分布内已经学会了合理的行为，但对out-of-distribution状态的能力为零。在线探索不可避免地引入新的状态访问，其中部分是有害的。当传统离线 RL 的保守性（CQL、IQL）在在线阶段被"解锁"时，策略的探索热情可能将其推向危险区域。因此，对 offline-to-online 的安全保护不是可选的"锦上添花"，而是<strong>不可或缺的基础设施</strong>——就像汽车不能在没有制动系统的情况下上路一样。</p>
+
+<p><strong class="hl">第三步：为什么传统 safe RL 不够用？</strong>CPO、PPO-Lagrangian、P3O 是为<strong>纯在线</strong>环境设计的：假设策略在训练中持续接收环境反馈的约束信号，逐步调整以满足约束。但在 offline-to-online 过渡中：(i) 策略在离线阶段从未见过约束信号（离线数据可能缺少约束标签）；(ii) 在线启动时的策略已经是一个有偏策略（被离线训练塑形过），其探索行为与随机初始化策略不同；(iii) 传统方法需要大量在线交互才能在约束满足上收敛——在收敛之前，系统在"裸奔"。这些因素使得传统 safe RL 在 offline-to-online 场景下尤其脆弱。</p>
+
+<p><strong class="hl">第四步：为什么选择世界模型作为安全预测器？</strong>在离线阶段，智能体无法与环境交互来"探测"哪些状态是危险的。但它可以<strong>观察</strong>离线数据中包含的失败轨迹，学习"哪些 state-action 组合倾向于导致失败"。世界模型天然适合此任务：它不仅是一个"约束分类器"（仅判断当前状态的安全性），更是一个<strong>动力学预测器</strong>——能够预测"如果从当前状态执行动作序列 X，未来 H 步会发生什么"。这种时序预测能力正是主动安全检测所需的核心能力。另一个关键优势：世界模型训练仅需要离线 transitions，无需额外的在线交互或人工标注。</p>
+
+<p><strong class="hl">第五步：为什么需要分离的恢复策略，而不是让任务策略也学习安全性？</strong>将任务目标（最大化奖励）和安全目标（最小化约束违反）合并到一个策略中，本质上要求单个网络解决一个多目标优化问题。在离线数据中，这两个目标可能存在冲突——奖励最大化的行为可能与高风险动作重合。双策略架构将这两个目标<strong>解耦</strong>为两个专用策略：任务策略专注于"如何把任务做好"（假设处于安全状态），恢复策略专注于"如何从危险中返回"（忽略任务奖励）。这种分解使每个策略的学习目标更纯粹，在各自领域内表现更优。安全门控机制在运行时协调两者。</p>
+
+<h3>10.2 一句话动机</h3>
+<div class="callout idea"><p class="callout-title">一句话动机</p><p>如果强化学习要在真实物理世界中运行，它必须学会"预见危险并提前刹车"——这正是 FARL 通过世界模型主动预测和双策略自恢复所实现的：让 RL 系统不仅数学上保证约束满足，更物理上保护硬件安全。</p></div>
+
+<h3>10.3 研究者视角：FARL 是如何产生的？</h3>
+<p>从研究者的视角来看，FARL 的产生遵循着一条自然而然的思维链条。设想你是一名 2024-2025 年的机器人学习研究者：你已经看到 Uni-O4 展示了统一离线 RL 的有效性，DreamerV3 展示了基于世界模型的潜空间想象可以支撑复杂的控制任务，Recovery RL 展示了双策略架构是实现 safe RL 的有效方式。你自然会提出一个<strong>组合式</strong>问题：<strong>能否将统一离线 RL + 世界模型预测 + 双策略安全架构组合成一个完整的、适用于真实机器人的安全 offline-to-online RL 系统？</strong></p>
+<p>工程动机是清晰的：真实机器人操作需要一种方法安全地从离线预训练过渡到在线微调。学术动机同样清晰：现有 safe RL 方法存在理论空白（未考虑 offline-to-online 过渡的特殊性）和实践空白（缺乏真实机器人验证）。FARL 的答案是：在世界模型的潜空间中预测约束违反概率，用此概率驱动任务策略与恢复策略之间的安全门控，并为此机制提供理论保证。沿着"离线 RL + 世界模型 + 安全 → 还缺什么？"的路径，FARL 的"预测-预防-恢复"三阶段设计几乎是必然的结论。</p>
+</section>
+
+<section id="takeaway">
+<h2>11. 核心收获</h2>
+<h3>11.1 方法论洞察</h3>
+<ol>
+<li><strong>安全 RL 的关键不是"反应式惩罚"，而是"主动式预测"。</strong>FARL 的成功表明，在安全关键场景中，将安全性嵌入世界模型的预测能力远比将其作为目标函数的惩罚项更有效。这一方法论洞见适用于任何在物理世界中运行的学习系统——从自动驾驶到手术机器人，主动式预测优于事后惩罚。</li>
+<li><strong>双策略分解是处理安全-性能权衡的有效架构范式。</strong>FARL 的 task + recovery 分解优雅地避免了一个策略在"做好任务"和"少犯错误"之间的挣扎。两个专用策略各司其职，由门控机制协调。这种"分而治之"的方法可推广到其他多目标 RL 场景——效率-能耗权衡、速度-舒适度权衡等。</li>
+<li><strong>Offline-to-online 的"启动安全性"问题长期被忽视。</strong>大多数 safe RL 工作假设策略从零开始在线训练，忽略了离线到在线过渡期间独特的安全脆弱性。FARL 揭示了这一过渡阶段的特殊挑战，并提供了系统性解决方案。这提醒我们：在将 RL 推向真实部署时，<strong>过渡阶段</strong>往往比稳态运行阶段更危险。</li>
+<li><strong>理论分析为工程实践提供直接指导。</strong>Action Correction Benefit 定理关于恢复干预何时有益的判定条件，构成了<strong>可操作的工程指导</strong>——告诉实践者需要监控哪些指标（p_risk、&delta;_rec），以及如何判断恢复策略训练是否充分。</li>
+</ol>
+
+<h3>11.2 对无人机研究的启示</h3>
+<ol>
+<li><strong>无人机安全导航中的主动避障。</strong>在复杂环境中，传统无人机避障（如基于深度相机的反应式方法）在高速飞行时可能反应过慢。FARL 的世界模型主动预测可直接应用：预测未来 H 步飞行轨迹并评估碰撞风险，在<strong>实际接近障碍物之前</strong>调整飞行路径。这对于高速狭窄走廊穿越（森林、城市峡谷）尤为关键。</li>
+<li><strong>无人机 offline-to-online 安全迁移。</strong>当前无人机 RL 策略通常在仿真中训练，然后迁移到真实飞行——这个"sim-to-real"过渡正是 FARL 所针对的 offline-to-online 场景。在仿真中预训练飞行策略和世界模型（仿真碰撞作为约束违反），然后在真实飞行中利用世界模型主动预测确保安全性——即使真实环境动力学与仿真存在差异，世界模型也能用少量真实在线数据快速校准。</li>
+<li><strong>无人机恢复策略设计。</strong>无人机面临多样化的安全威胁：电量不足、GPS 丢失、强阵风、传感器故障。FARL 的双策略架构可扩展为<strong>多恢复策略</strong>：针对每种安全威胁类型预训练专用恢复策略（低电量 → 自动返航，GPS丢失 → 视觉里程计悬停，强风 → 降低高度抗风），由安全监控器按需激活。</li>
+<li><strong>多无人机协同安全约束。</strong>在多无人机编队中，约束从单机的"不要撞障碍物"扩展为"不要撞其他无人机 + 保持通信范围 + 避开尾流扰动"。FARL 的世界模型可扩展为<strong>多智能体世界模型</strong>，预测其他智能体的未来轨迹并评估相互碰撞风险——可直接应用于无人机编队飞行和协同搜索。</li>
+</ol>
+
+<h3>11.3 关键参考文献</h3>
+<table>
+<tr><th style="width:32%;">论文</th><th style="width:10%;">年份</th><th style="width:26%;">与本文的关联</th><th>核心贡献</th></tr>
+<tr><td>Uni-O4 (Lei et al.)</td><td>2024</td><td>FARL 的基础离线 RL 框架</td><td>将 IQL/CQL/TD3+BC 统一为一个离线 RL 框架</td></tr>
+<tr><td>DreamerV3 (Hafner et al.)</td><td>2023</td><td>世界模型架构的直接来源</td><td>证明了潜动力学 MBRL 在多样化任务上超越无模型 RL</td></tr>
+<tr><td>Recovery RL (Thananjeyan et al.)</td><td>2021</td><td>双策略安全架构的先驱</td><td>首次将安全 RL 分解为 task + recovery 双策略架构</td></tr>
+<tr><td>CPO (Achiam et al.)</td><td>2017</td><td>约束 RL 的理论基础</td><td>提出 Constrained Policy Optimization，构建 safe RL trust-region 理论</td></tr>
+<tr><td>PPO-Lagrangian (Ray et al.)</td><td>2019</td><td>Safe RL 的工程基线</td><td>将 Lagrangian 乘子法嵌入 PPO，提供简单有效的 safe RL 基线</td></tr>
+<tr><td>SOAR (Liu et al.)</td><td>2024</td><td>基于搜索的安全 RL</td><td>探索了世界模型 MCTS 搜索用于安全动作选择</td></tr>
+<tr><td>TD-MPC2 (Hansen et al.)</td><td>2024</td><td>高效世界模型架构</td><td>证明了轻量级 WM + MPC 可实现高效的实时控制</td></tr>
+<tr><td>CQL (Kumar et al.)</td><td>2020</td><td>保守离线 RL 理论</td><td>提出 Q 值低估以阻止离线 RL 的 OOD 乐观偏差</td></tr>
+</table>
+</section>
+
+</main>
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes &copy; 2026 &middot; Scholar: Huazhe Xu Group &middot; Paper: FARL &mdash; Failure-Aware RL (Li et al., 2026, arXiv:2601.07821) &middot; Rendered with MathJax &amp; Mermaid</footer>
+</body></html>

@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - Dexora: Open-source VLA for High-DoF Bimanual Dexterity</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+
+<!-- ====== 导航 ====== -->
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+
+<!-- ====== 主体 ====== -->
+<main class="container">
+
+<!-- ===== §1 论文信息 ===== -->
+<section id="info">
+<h2>§1 Paper Info</h2>
+<h1>Dexora: Open-source VLA for High-DoF Bimanual Dexterity</h1>
+
+<table>
+<tr><td style="width:120px;font-weight:700;">Authors</td><td>Zhang et al. (Huazhe Xu group)</td></tr>
+<tr><td style="font-weight:700;">Year</td><td>2026</td></tr>
+<tr><td style="font-weight:700;">Affiliation</td><td>清华大学交叉信息研究院 (IIIS, Tsinghua University) / 上海期智研究院</td></tr>
+<tr><td style="font-weight:700;">Research Type</td><td>Vision-Language-Action (VLA) 模型 · 双臂灵巧操作 · 模仿学习</td></tr>
+<tr><td style="font-weight:700;">Open Source</td><td>是 — 首个面向高自由度双臂灵巧操作的开源 VLA 系统</td></tr>
+<tr><td style="font-weight:700;">Local PDF</td><td><a href="Zhang et al. - 2026 - Dexora Open-source VLA for high-DoF bimanual dexterity.pdf">Zhang et al. - 2026 - Dexora Open-source VLA for high-DoF bimanual dexterity.pdf</a></td></tr>
+</table>
+
+<p><strong class="hl">TL;DR</strong> — Dexora 提出并开源了首个面向高自由度（36-DoF）双臂灵巧操作的 VLA 系统。其核心创新在于：(1) 通过混合遥操作方案（外骨骼背包捕获大尺度手臂运动 + Apple Vision Pro 无标记手指追踪），在 MuJoCo 数字孪生环境中采集 100K 仿真轨迹与 10K 真实遥操作示范；(2) 训练一个 Diffusion Transformer 作为统一的动作预测器，并引入质量判别器对示范片段进行 clip-level 加权，从而抑制抖动和低质量数据对策略学习的负面影响；(3) 将双臂、双灵巧手和自然语言条件统一进单个端到端策略，而非并行两个单臂策略的简单拼接。系统在活塞插入、书本取放、开瓶等需要双臂协调与多指精细操作的任务上验证了有效性，并展示了跨 embodiment（单臂夹爪、双臂夹爪、单臂灵巧手、双臂双手）的泛化能力。</p>
+
+<div class="tags">
+<span class="tag tag-blue">VLA 视觉-语言-动作</span>
+<span class="tag tag-green">双臂灵巧操作</span>
+<span class="tag tag-amber">Diffusion Transformer</span>
+<span class="tag tag-purple">质量感知模仿学习</span>
+<span class="tag tag-red">36-DoF 高自由度控制</span>
+<span class="tag tag-cyan">混合遥操作采集</span>
+<span class="tag tag-gray">跨 Embodiment 泛化</span>
+</div>
+</section>
+
+<!-- ===== §2 洞察与创新点 ===== -->
+<section id="insight">
+<h2>§2 Insight &amp; Novelty</h2>
+
+<h3>2.1 核心洞察 · Q&amp;A 形式</h3>
+<div class="callout info">
+<p class="callout-title">Q: 核心问题是什么？</p>
+<p>如何构建一个能从自然语言指令直接生成高自由度（36-DoF）双臂灵巧操作动作的统一模型，并使其具备跨不同 embodiment 的泛化能力？现有的 VLA 模型（如 RT-1/RT-2/Octo）仅支持单臂或双臂夹爪操作（通常 6-7 DoF），在需要多指协同的精细操作任务上完全失效。</p>
+
+<p class="callout-title" style="margin-top:14px;">Q: 传统方法为何失败？</p>
+<p>传统方法存在三重瓶颈：(1) <strong>策略架构层面</strong> — 将两个单臂策略并行部署无法本质性地建模双臂间的力耦合与协调约束，且夹爪策略的动作空间无法泛化到灵巧手的高维连续控制；(2) <strong>数据层面</strong> — 高维双手动作空间的遥操作极其困难，传统外骨骼或视觉方法要么精度不足、要么成本过高、要么标定复杂，导致大规模高质量示范难以采集；(3) <strong>训练层面</strong> — 人工遥操作示范的质量天然不均（新手疲劳、抖动、次优轨迹），标准行为克隆（BC）给予所有示范片段等权重，导致策略被低质量数据"污染"。</p>
+
+<p class="callout-title" style="margin-top:14px;">Q: 本文的核心洞察是什么？</p>
+<p>双臂灵巧操作的本质不是"两个单臂策略的简单拼接"，而是一个<strong>统一的耦合动力学系统</strong>——需要端到端建模双臂间的隐含协调模式。在此基础上，Dexora 的三个关键洞察环环相扣：<strong>(a)</strong> 用数字孪生（MuJoCo 仿真 + 实物匹配的 URDF）桥接仿真与真实数据，使 100K 仿真轨迹能为 10K 真实示范提供有效的预训练基础；<strong>(b)</strong> 混合遥操作（外骨骼捕获粗粒度手臂姿态 + Vision Pro 无标记手指追踪）首次使 36-DoF 双手示范的大规模采集成为工程上可行；<strong>(c)</strong> 质量判别器不是替代 BC，而是在 BC 框架内以 clip-level 权重重新分配学习信号，大梯度留给高质量片段，小梯度留给低质量片段——既保留了数据规模又抑制了噪声。</p>
+</div>
+
+<h3>2.2 灵感映射表</h3>
+<table>
+<tr><th style="width:30%;">Inspiration Source</th><th>How It Inspired This Work</th></tr>
+<tr><td>Diffusion Policy (Chi et al., 2023)</td><td>扩散模型在单臂操作中展现了多模态动作分布建模的优势；Dexora 将其扩展至 36-DoF 双臂双手空间，通过 Diffusion Transformer 骨干处理更高维的动作序列预测。</td></tr>
+<tr><td>RT-2 / Octo (Brohan et al., 2023; Octo Model Team, 2024)</td><td>这些工作证明了 VLA 范式（视觉-语言-动作联合建模）在单臂场景的可行性；Dexora 追问"为什么止于夹爪？"，将 VLA 范式推进到灵巧手领域。</td></tr>
+<tr><td>ALOHA (Zhao et al., 2023) 与 GELLO (Wu et al., 2024)</td><td>低成本双臂遥操作的成功启发了 Dexora 的数据采集思路；但现有方案无法处理灵巧手，因此 Dexora 设计了外骨骼 + Vision Pro 的混合方案。</td></tr>
+<tr><td>Demonstration Augmentation / Noise Filtering (Mandlekar et al., 2023; Belkhale et al., 2024)</td><td>示范质量对模仿学习的显著影响已被社区认知；Dexora 将"过滤"升维为"质量加权"，用可学习的判别器代替人工筛选，在处理大规模数据时更具可扩展性。</td></tr>
+</table>
+
+<h3>2.3 创新点卡片</h3>
+
+<div class="novelty-card">
+<h4>Novelty #1：首个开源的高自由度双臂灵巧 VLA 系统</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>社区缺乏一个同时支持双臂协同与多指灵巧操作的开放 VLA 系统。现有 RT-2、Octo、OpenVLA 等均仅支持夹爪，无法处理需要手指级精细操作的任务。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>RT-2 的 VLA 范式 + Diffusion Policy 的动作生成能力 + ALOHA 的开源精神。将三者结合但推向更高维度的灵巧操作空间。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>构建完整的硬件-数据-训练管道：外骨骼背包 + Vision Pro 的混合遥操作接口 → MuJoCo 数字孪生 → Diffusion Transformer (DiT 骨干) → 质量判别器加权 → 统一 36-DoF 动作输出。全栈开源。</div>
+</div>
+
+<div class="novelty-card">
+<h4>Novelty #2：质量感知扩散模仿学习 (Quality-Weighted Diffusion BC)</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>遥操作采集的示范天然包含质量差异——新手操作员的次优轨迹、疲劳导致的抖动、标定误差引入的噪声。传统 BC 对所有片段一视同仁，导致策略拟合"平均化"甚至学习到错误动作。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>偏好学习 (Preference Learning, RLHF) 中的奖励建模思想 + 噪声标签学习 (Learning with Noisy Labels) 中的样本重加权技术。将"示范质量评估"作为一个可学习的辅助任务。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>训练一个轻量的质量判别器，对每个示范片段 (clip) 输出 0-1 的质量分数，该分数作为扩散损失中该轨迹的权重。判别器以"操作成功率"作为监督信号（高质量片段来自成功轨迹，低质量片段来自失败/次优轨迹），无需人工标注。</div>
+</div>
+
+<div class="novelty-card">
+<h4>Novelty #3：跨 Embodiment 的统一策略架构</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>机器人学习社区的典型做法是每个 embodiment 训练独立策略，数据和模型无法复用。Dexora 追问：能否用一个统一的策略骨架处理从单臂夹爪到双臂灵巧手的四种不同配置？</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>Octo 的 embodiment token 条件化设计 + RT-X 的跨机器人泛化实验。将 embodiment 差异编码为条件输入而非架构差异。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>在 Diffusion Transformer 的输入中添加可学习的 embodiment embedding，针对四种配置（单臂夹爪、双臂夹爪、单臂灵巧手、双臂双手）分别学习专属 token，与视觉和语言 token 共同送入 transformer 骨干。策略输出为固定最大维度（36-DoF）的动作向量，不同 embodiment 仅激活其对应的子空间。</div>
+</div>
+</section>
+
+<!-- ===== §3 架构 ===== -->
+<section id="architecture">
+<h2>§3 Architecture</h2>
+
+<h3>3.1 体系架构面板</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <!-- Stage 1: Perception -->
+    <div class="arch-stage">
+      <h4>Perception <span>感知层</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>Multi-view RGB Cameras</strong>
+        <small>3-4 个固定视角的 RealSense 相机，覆盖操作空间</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>Language Instruction</strong>
+        <small>自然语言任务描述，如"用双手打开瓶盖"</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>Proprioception</strong>
+        <small>双臂关节角度 × 14 + 双手手指关节角度 × 22 = 36-DoF 本体感知</small>
+      </div>
+    </div>
+    <!-- Stage 2: Representation -->
+    <div class="arch-stage">
+      <h4>Representation <span>表示层</span></h4>
+      <div class="arch-card arch-power">
+        <strong>Vision Encoder (SigLIP/DINOv2)</strong>
+        <small>多视角图像 → 视觉 token 序列；可选冻结或微调</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>Language Encoder (T5-XXL)</strong>
+        <small>任务指令 → 语言 embedding；冻结以保留语义泛化能力</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>Embodiment Embedding</strong>
+        <small>可学习的 one-hot token × 4，标识当前机器人配置</small>
+      </div>
+    </div>
+    <!-- Stage 3: Action Generation -->
+    <div class="arch-stage">
+      <h4>Action Generation <span>动作生成层</span></h4>
+      <div class="arch-card arch-motor">
+        <strong>Diffusion Transformer (DiT)</strong>
+        <small>以视觉/语言/embodiment 联合 token 为条件，迭代去噪生成动作序列</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>Denoising: 100 steps (DDIM)</strong>
+        <small>从高斯噪声出发，经 100 步 DDIM 采样生成 36-DoF 动作序列</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>Prediction Horizon: 16 steps</strong>
+        <small>每次推理预测未来 16 个时间步的动作，执行前 8 步后重新推理</small>
+      </div>
+    </div>
+    <!-- Stage 4: Execution -->
+    <div class="arch-stage">
+      <h4>Execution <span>执行层</span></h4>
+      <div class="arch-card arch-thrust">
+        <strong>36-DoF Joint Position Targets</strong>
+        <small>双臂 7-DoF × 2 + 双手 11-DoF × 2 → 关节位置控制器</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>Impedance Controller</strong>
+        <small>柔顺控制策略，避免刚性轨迹导致的硬件损伤</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>Safety Monitor</strong>
+        <small>实时关节限位检测 + 碰撞预警 + 紧急停止</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrow row -->
+  <div class="arch-arrow">
+    <span>Multi-view RGB + Lang + Proprio</span>
+    <span>Vision Tokens + Lang Embedding + Emb Token</span>
+    <span>Denoising Process (DiT backbone)</span>
+    <span>Joint Position Commands (100 Hz)</span>
+  </div>
+  <div class="arch-arrow" style="color:#3b82f6;font-size:13px;">
+    <span>&#8595;</span><span>&#8595;</span><span>&#8595;</span><span>&#8595;</span>
+  </div>
+
+  <!-- Summary metrics -->
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>Input: 3-4 RGB views</strong><small>RealSense D435i @ 30 Hz</small></div>
+    <div class="arch-metric"><strong>Encoder: SigLIP + T5-XXL</strong><small>~680M params (frozen)</small></div>
+    <div class="arch-metric"><strong>DiT: ~300M params</strong><small>12 layers, 1024 hidden dim</small></div>
+    <div class="arch-metric"><strong>Control: 36-DoF @ 100 Hz</strong><small>Position + impedance</small></div>
+  </div>
+</div>
+
+<h3>3.2 系统总览流程图</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TB
+    subgraph INPUT["输入层"]
+        CAM["多视角 RGB 相机<br/>(3-4 views @ 30Hz)"]
+        LANG["自然语言指令<br/>'用双手打开瓶盖'"]
+        PROP["本体感知<br/>(36-DoF 关节状态)"]
+    end
+
+    subgraph ENC["编码层"]
+        VENC["Vision Encoder<br/>(SigLIP/DINOv2, frozen)"]
+        LENC["Language Encoder<br/>(T5-XXL, frozen)"]
+        EEMB["Embodiment Embedding<br/>(learnable, 4 types)"]
+    end
+
+    subgraph CORE["Dexora Core: DiT Denoising"]
+        COND["Condition Embedding<br/>(Vision + Lang + Emb concat)"]
+        NOISE["Gaussian Noise<br/>(action sequence)"]
+        DiT["Diffusion Transformer<br/>(12-layer DiT-B)"]
+        DENOISE["DDIM Sampling<br/>(100 denoising steps)"]
+    end
+
+    subgraph OUTPUT["输出层"]
+        ACT["36-DoF Action Sequence<br/>(16-step prediction horizon)"]
+        EXEC["Joint Position Controller<br/>(100 Hz execution)"]
+        ROBOT["Physical Bimanual Robot<br/>(双臂 + 双灵巧手)"]
+    end
+
+    CAM --> VENC
+    LANG --> LENC
+    VENC --> COND
+    LENC --> COND
+    EEMB --> COND
+    PROP --> COND
+    COND --> DiT
+    NOISE --> DiT
+    DiT --> DENOISE
+    DENOISE --> ACT
+    ACT --> EXEC
+    EXEC --> ROBOT
+
+    style CORE fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    style DiT fill:#dbeafe,stroke:#3b82f6
+    style ROBOT fill:#ecfdf5,stroke:#10b981
+</div>
+</div>
+
+<h3>3.3 训练数据管道流程图</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart LR
+    subgraph TELEOP["混合遥操作采集"]
+        EXO["外骨骼背包<br/>(双臂粗姿态)"]
+        VP["Apple Vision Pro<br/>(无标记手指追踪)"]
+        SYNC["时间同步 + 重映射<br/>(human → robot URDF)"]
+    end
+
+    subgraph SIM["仿真数据生成"]
+        MJ["MuJoCo 数字孪生<br/>(与实物 1:1 建模)"]
+        SCRIPT["脚本化任务策略<br/>(规则 + 轨迹优化)"]
+        AUG["域随机化增强<br/>(纹理/光照/物理参数)"]
+    end
+
+    subgraph DATA["训练数据集"]
+        REAL["真实遥操作示范<br/>(~10K trajectories)"]
+        SIMU["仿真示范<br/>(~100K trajectories)"]
+    end
+
+    subgraph TRAIN["两阶段训练"]
+        PT["Phase 1: 仿真预训练<br/>(BC on 100K sim data)"]
+        FT["Phase 2: 混合精调<br/>(real + sim, quality-weighted)"]
+        QD["质量判别器<br/>(clip-level weight prediction)"]
+    end
+
+    subgraph DEPLOY["部署"]
+        POLICY["Dexora Policy<br/>(unified 36-DoF VLA)"]
+    end
+
+    EXO --> SYNC
+    VP --> SYNC
+    SYNC --> REAL
+    MJ --> SCRIPT --> SIMU
+    MJ --> AUG --> SIMU
+    REAL --> DATA
+    SIMU --> DATA
+    DATA --> PT --> FT
+    QD --> FT
+    FT --> POLICY
+
+    style TELEOP fill:#fff7ed,stroke:#f59e0b
+    style SIM fill:#e8f0fe,stroke:#3b82f6
+    style DATA fill:#f3f4f6,stroke:#9ca3af
+    style TRAIN fill:#f0ebfd,stroke:#8b5cf6
+    style QD fill:#ffe4e6,stroke:#f43f5e
+    style POLICY fill:#ecfdf5,stroke:#10b981,stroke-width:2px
+</div>
+</div>
+</section>
+
+<!-- ===== §4 任务定义 ===== -->
+<section id="task">
+<h2>§4 Task Definition</h2>
+
+<h3>4.1 问题形式化</h3>
+<p>Dexora 将双臂灵巧操作建模为一个<strong>视觉-语言条件的动作生成问题</strong>。给定多视角视觉观测 $\mathbf{o}_t = \{I_t^{(1)}, I_t^{(2)}, \dots, I_t^{(V)}\}$、自然语言指令 $\ell$、以及当前本体感知状态 $\mathbf{s}_t \in \mathbb{R}^{36}$（双臂 14 维 + 双手 22 维），策略 $\pi_\theta$ 需要预测未来 $H$ 步的动作序列 $\mathbf{a}_{t:t+H}$。</p>
+
+<div class="formula-block">
+<div class="eq-tag">VLA Policy Definition</div>
+$$\pi_\theta(\mathbf{a}_{t:t+H} \mid \mathbf{o}_{t-K:t}, \ell, \mathbf{s}_{t-K:t}, \mathbf{e})$$
+
+<div class="eq-note">
+其中 $\mathbf{o}_{t-K:t}$ 是过去 $K$ 帧的多视角视觉历史，$\ell$ 是自然语言指令的 tokenized 形式，$\mathbf{s}_{t-K:t}$ 是本体感知状态历史，$\mathbf{e}$ 是 embodiment token（标识当前机器人配置为单臂夹爪/双臂夹爪/单臂灵巧手/双臂双手之一）。动作空间 $\mathbf{a} \in \mathbb{R}^{36}$ 覆盖双臂各关节（位置或速度控制）与双手各手指关节。策略以 Diffusion Transformer 参数化，通过迭代去噪从高斯先验中采样高质量动作轨迹。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Observation &amp; Action Space</div>
+$$\mathbf{o}_t = \{I_t^{(v)} \in \mathbb{R}^{H \times W \times 3}\}_{v=1}^{V}, \quad \mathbf{s}_t = [\mathbf{q}_{\text{arm},L}; \mathbf{q}_{\text{arm},R}; \mathbf{q}_{\text{hand},L}; \mathbf{q}_{\text{hand},R}] \in \mathbb{R}^{36}$$
+
+$$\mathbf{a}_t = \Delta \mathbf{q}_t = [\Delta \mathbf{q}_{\text{arm},L}; \Delta \mathbf{q}_{\text{arm},R}; \Delta \mathbf{q}_{\text{hand},L}; \Delta \mathbf{q}_{\text{hand},R}] \in \mathbb{R}^{36}$$
+
+<div class="eq-note">
+动作定义为相对于当前关节位置的目标增量 $\Delta \mathbf{q}_t$。双臂各 7 DoF（6 DoF 末端位姿 + 1 冗余），双手各 11 DoF（4 指每指 2 关节 + 拇指 3 关节）。实际操作中使用绝对关节位置目标，增量形式有助于归一化和训练稳定性。预测 horizon $H = 16$ 步，执行前 8 步后异步重新推理（8-step action chunking），推理频率 12.5 Hz（每 80ms 一次），底层关节位置控制器以 100 Hz 运行。
+</div>
+</div>
+
+<h3>4.2 输入/输出规格表</h3>
+<table>
+<tr><th style="width:18%;">Component</th><th style="width:42%;">Description</th><th style="width:40%;">Dimension / Specification</th></tr>
+<tr><td>Multi-view RGB</td><td>固定视角的 RealSense D435i 彩色图像（含深度通道可选）</td><td>3-4 views × 256×256×3 @ 30 Hz</td></tr>
+<tr><td>Language Instruction</td><td>自由形式的自然语言任务描述，如"Pick up the book with both hands and place it on the shelf"</td><td>T5-XXL tokenized, max 64 tokens</td></tr>
+<tr><td>Proprioception</td><td>双臂关节角度（含夹爪开合或灵巧手指关节）+ 末端执行器位姿</td><td>$\mathbb{R}^{36}$: 14 (arms) + 22 (hands)</td></tr>
+<tr><td>Embodiment Token</td><td>标识当前机器人硬件配置，控制动作空间激活子集</td><td>4-dim one-hot vector, learnable embedding</td></tr>
+<tr><td>Action Output</td><td>未来 H 步的关节位置目标序列（绝对位置或增量）</td><td>$\mathbb{R}^{H \times 36}$, $H=16$</td></tr>
+<tr><td>Control Frequency</td><td>推理频率与底层执行频率</td><td>Inference: 12.5 Hz (80ms); Execution: 100 Hz (10ms)</td></tr>
+</table>
+
+<h3>4.3 评估任务定义</h3>
+<p>Dexora 定义了三个需要双臂协调与多指精细操作的代表性任务：</p>
+<ul>
+<li><strong>活塞插入 (Piston Insertion)</strong>：一手扶住气缸壳体，另一手以多指抓取活塞并对准插入孔，需要 1-2mm 级定位精度和双臂力耦合感知。成功率定义为活塞完全插入且无卡滞。</li>
+<li><strong>书本取放 (Book Pick-and-Place)</strong>：双手同时从桌面抓取书本（需要手指展开覆盖书本侧面），抬升平移后放置到目标书架位置。成功率定义为书本稳定放置在目标区域且无滑落。</li>
+<li><strong>开瓶 (Bottle Opening)</strong>：一手握持瓶身（稳定抓取），另一手以两指或三指旋开瓶盖，需要旋转力矩的精细控制以避免滑脱。成功率定义为瓶盖完全旋开并与瓶身分离。</li>
+</ul>
+</section>
+
+<!-- ===== §5 关键挑战 ===== -->
+<section id="challenge">
+<h2>§5 Key Challenge</h2>
+
+<h3>5.1 第一性原理诊断</h3>
+<div class="callout warn">
+<p class="callout-title">Why is bimanual dexterous VLA fundamentally hard?</p>
+<p>双臂灵巧 VLA 的难度不是单臂 VLA 的简单"乘以 2"。从第一性原理出发，存在三个根本性困难：(1) <strong>维度灾难 (Curse of Dimensionality)</strong> — 36-DoF 的动作空间意味着状态-动作联合分布的支持集呈指数膨胀，而可获得的示范数据量远不足以覆盖这个空间；(2) <strong>耦合动力学 (Coupled Dynamics)</strong> — 双臂通过被操作物体形成闭合运动链 (closed kinematic chain)，任何单侧手臂的动作都会通过物体传递到另一侧，这种隐式力耦合无法通过独立建模两个手臂来捕捉；(3) <strong>多尺度控制冲突 (Multi-scale Control Conflict)</strong> — 手臂级的粗粒度运动（厘米级、低频）与手指级的精细操作（毫米级、高频）共享同一个动作空间和推理频率，但两者的动力学时间尺度和精度需求差异显著。</p>
+</div>
+
+<h3>5.2 先前方法对比</h3>
+<table>
+<tr><th>Method</th><th>Core Idea</th><th>Bimanual Support</th><th>Dexterous Hand</th><th>High-DoF</th><th>Data Efficiency</th></tr>
+<tr><td>RT-1 / RT-2 (Brohan et al., 2023)</td><td>VLA 范式：大规模互联网数据 + 机器人数据联合训练的视觉-语言-动作模型</td><td>No (single-arm only)</td><td>No (parallel gripper)</td><td>~7 DoF</td><td>Low (needs massive web data)</td></tr>
+<tr><td>ACT (Zhao et al., 2023)</td><td>Action Chunking Transformer：预测动作序列块 + 时间 ensemble 平滑</td><td>Yes (dual-arm ALOHA)</td><td>No (parallel gripper)</td><td>~14 DoF</td><td>Medium (~50 demos)</td></tr>
+<tr><td>Diffusion Policy (Chi et al., 2023)</td><td>扩散模型生成多模态动作分布，适用于单臂精细操作</td><td>No (single-arm, some dual extensions)</td><td>No (parallel gripper)</td><td>~7 DoF</td><td>Medium-High (~100 demos)</td></tr>
+<tr class="highlight"><td><strong>Dexora (Zhang et al., 2026)</strong></td><td>端到端质量加权 DiT + 混合遥操作 + embodiment 条件化的统一 36-DoF VLA</td><td><strong>Yes (native dual-arm)</strong></td><td><strong>Yes (5-finger × 2)</strong></td><td><strong>36 DoF</strong></td><td><strong>High (100K sim + 10K real)</strong></td></tr>
+<tr><td>GELLO (Wu et al., 2024)</td><td>低成本双臂遥操作：3D 打印的被动臂作为输入设备</td><td>Yes (dual-arm)</td><td>No</td><td>~14 DoF</td><td>N/A (data collection only)</td></tr>
+</table>
+
+<h3>5.3 三大关键挑战详解</h3>
+
+<p><strong class="hl">挑战一：36-DoF 动作空间的数据采集瓶颈。</strong>在 36 维连续空间中，即使是简单的"抓取-移动-放置"也需要协调至少 30 个以上关节的轨迹。传统的单一遥操作设备（如 SpaceMouse、单个力反馈手柄、动捕手套）无法同时覆盖双臂和双手。Dexora 的解决方案是混合遥操作：外骨骼背包提供双臂末端位姿的准确控制（利用其机械耦合确保双臂运动的物理一致性），Apple Vision Pro 以 90 Hz 进行无标记手指关节估计并重映射到机器人手指关节。这种"粗-细"分层采集策略在工程上首次使大规模 36-DoF 示范成为可行。</p>
+
+<p><strong class="hl">挑战二：示范质量的天然不一致性。</strong>即使是同一操作员，其第 1 次和第 100 次示范的质量可能截然不同——前者可能包含探索性抖动，后者可能趋于流畅。传统 BC 对所有示范时间步给予均等权重，导致：(i) 策略尝试"平均化"不一致的动作，输出落在分布间的低密度区域；(ii) 低质量示范中的次优甚至危险动作被同等学习。Dexora 的质量判别器将此问题形式化为一个学习问题：给定一段示范 clip 和其对应的任务结果（成功/失败），学习预测该 clip 对策略学习的"价值"。</p>
+
+<p><strong class="hl">挑战三：跨 Embodiment 的策略统一。</strong>不同 embodiment 的动作空间维度不同（单臂夹爪 7-DoF、双臂夹爪 14-DoF、单臂灵巧手 ~18-DoF、双臂灵巧手 36-DoF），语义上也不对应（夹爪的"张开/闭合"vs 灵巧手的"拇指-食指对捏"）。Dexora 通过以下设计解决：将动作空间统一到最大维度（36-DoF），不同 embodiment 仅激活其对应子空间；用可学习的 embodiment token 作为 DiT 的条件输入，使 transformer 在注意力计算中学会根据当前 embodiment 选择性关注不同的视觉区域和本体感知通道。</p>
+</section>
+
+<!-- ===== §6 方法 ===== -->
+<section id="method">
+<h2>§6 Method</h2>
+
+<h3>6.1 方法总览</h3>
+<p>Dexora 的训练管道包含三个核心组件：(1) 以 Diffusion Transformer 为骨干的动作扩散策略；(2) 质量判别器引导的加权模仿学习；(3) Embodiment 条件化的统一策略架构。</p>
+
+<h3>6.2 公式推导</h3>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.1: Diffusion Policy Training Objective (Standard)</div>
+$$\mathcal{L}_{\text{diff}}(\theta) = \mathbb{E}_{(\mathbf{o},\mathbf{s},\mathbf{\ell},\mathbf{a}^0), \epsilon, t}\left[ \|\epsilon - \epsilon_\theta(\mathbf{a}^t, t, \mathbf{o}, \mathbf{s}, \mathbf{\ell})\|^2 \right]$$
+
+<div class="eq-note">
+这是标准扩散策略的损失函数。$\mathbf{a}^0$ 是真实动作序列，$\mathbf{a}^t = \sqrt{\bar{\alpha}_t}\mathbf{a}^0 + \sqrt{1-\bar{\alpha}_t}\epsilon$ 是第 $t$ 步加噪后的动作，$\epsilon_\theta$ 是 DiT 预测的噪声。条件包括视觉观测 $\mathbf{o}$、本体感知 $\mathbf{s}$ 和语言指令 $\mathbf{\ell}$。标准损失对所有时间步和数据点赋予均等权重。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.2: Quality-Weighted Diffusion Loss (Dexora's core contribution)</div>
+$$\mathcal{L}_{\text{QW}}(\theta) = \mathbb{E}_{(\mathbf{o},\mathbf{s},\mathbf{\ell},\mathbf{a}^0), \epsilon, t}\left[ w_\phi(\tau_{clip}) \cdot \|\epsilon - \epsilon_\theta(\mathbf{a}^t, t, \mathbf{o}, \mathbf{s}, \mathbf{\ell})\|^2 \right]$$
+
+$$w_\phi(\tau_{clip}) = \sigma\big( f_\phi(\mathbf{o}_{clip}, \mathbf{s}_{clip}, \mathbf{a}_{clip}) \big) \in (0, 1)$$
+
+<div class="eq-note">
+<strong>这是 Dexora 的核心技术贡献。</strong>$w_\phi(\tau_{clip})$ 是质量判别器 $f_\phi$ 为每个示范片段 (clip) 预测的质量权重。$f_\phi$ 是一个轻量的 MLP + temporal attention 网络，输入为一段连续 32-64 步的观测-状态-动作三元组，输出经 sigmoid 激活后的标量分数。判别器的训练目标是最小化：$\mathcal{L}_{\text{disc}}(\phi) = \mathbb{E}_{\tau^+ \sim \mathcal{D}_{\text{succ}}}[-\log w_\phi(\tau)] + \mathbb{E}_{\tau^- \sim \mathcal{D}_{\text{fail}}}[-\log(1 - w_\phi(\tau))]$，即区分来自成功轨迹和失败/次优轨迹的片段。关键点：<strong>判别器的梯度不回传到 DiT</strong>（stop-gradient），$w_\phi$ 仅作为一个乘性权重缩放扩散损失——这种设计避免了判别器与策略的对抗训练不稳定性，同时实现了质量感知的学习信号分配。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.3: Action Prediction Formulation (Denoising Process)</div>
+$$\mathbf{a}^{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(\mathbf{a}^t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\epsilon_\theta(\mathbf{a}^t, t, \mathbf{c})\right) + \sigma_t \mathbf{z}, \quad \mathbf{z} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$$
+
+$$\mathbf{c} = \text{concat}\big( \text{ViT}(\mathbf{o}), \text{T5}(\mathbf{\ell}), \text{EmbProj}(\mathbf{e}), \text{MLP}(\mathbf{s}) \big)$$
+
+<div class="eq-note">
+推理时采用 DDIM 采样方案：从纯噪声 $\mathbf{a}^T \sim \mathcal{N}(0, \mathbf{I})$ 开始，经过 $T=100$ 步迭代去噪得到干净的 36-DoF 动作序列 $\mathbf{a}^0 \in \mathbb{R}^{H \times 36}$。条件向量 $\mathbf{c}$ 是视觉 token（SigLIP/DINOv2 编码的多视角图像特征）、语言 embedding（T5-XXL 输出的 last hidden state）、embodiment token 投影和本体感知 MLP 投影的拼接。注意视觉 token 通过 cross-attention 注入 DiT，而非简单拼接——这使得 transformer 能够在空间上关注任务相关的图像区域。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.4: Embodiment Conditioning</div>
+$$\mathbf{e} = \text{EmbLookup}(k), \quad k \in \{\text{gripper\_single}, \text{gripper\_dual}, \text{dexterous\_single}, \text{dexterous\_dual}\}$$
+
+$$\mathbf{a}_{\text{masked}} = \mathbf{a} \odot \mathbf{m}_k, \quad \mathbf{m}_k \in \{0,1\}^{36}$$
+
+<div class="eq-note">
+四种 embodiment 配置各有一个可学习的 embedding token $\mathbf{e}_k \in \mathbb{R}^{d_e}$（$d_e=256$），通过 $\text{EmbLookup}$ 查询后经线性投影 $\text{EmbProj}$ 映射到 DiT 的 hidden dimension。在训练和推理中，仅对当前 embodiment 对应的关节维度计算损失和输出动作——这通过二值掩码 $\mathbf{m}_k$ 实现，确保策略不会为不存在的关节学习"虚动作"。在跨 embodiment 训练中，batch 内混合不同配置的数据，transformer 的自注意力机制学会将 $\mathbf{e}_k$ 作为一种"模态选择器"。
+</div>
+</div>
+
+<h3>6.3 关键参数表</h3>
+<table>
+<tr><th style="width:22%;">Parameter</th><th style="width:14%;">Symbol</th><th style="width:28%;">Value / Range</th><th>Description</th></tr>
+<tr><td>动作空间维度</td><td>$D_a$</td><td>36 (14 臂 + 22 手)</td><td>双臂双手的完整关节空间维度</td></tr>
+<tr><td>预测视野</td><td>$H$</td><td>16 steps</td><td>每次推理预测未来 16 步的动作序列</td></tr>
+<tr><td>执行块长度</td><td>$H_{\text{exec}}$</td><td>8 steps</td><td>每次执行 8 步后重新推理（50% 重叠）</td></tr>
+<tr><td>去噪步数</td><td>$T$</td><td>100 (DDIM)</td><td>推理时的总去噪迭代步数</td></tr>
+<tr><td>噪声调度</td><td>$\beta_t$</td><td>linear, $\beta_1=10^{-4}$, $\beta_T=0.02$</td><td>线性噪声调度，从低噪声到高噪声</td></tr>
+<tr><td>DiT 层数</td><td>$L$</td><td>12</td><td>Diffusion Transformer 的层数 (DiT-B scale)</td></tr>
+<tr><td>隐藏维度</td><td>$d$</td><td>1024</td><td>DiT 的 hidden dimension</td></tr>
+<tr><td>注意力头数</td><td>$n_{\text{head}}$</td><td>16</td><td>Multi-head attention 的头数</td></tr>
+<tr><td>视觉 backbone</td><td>—</td><td>SigLIP ViT-SO400M (frozen)</td><td>图像编码器，冻结以减少计算开销</td></tr>
+<tr><td>语言 backbone</td><td>—</td><td>T5-XXL (frozen)</td><td>文本编码器，冻结以保留预训练语义</td></tr>
+<tr><td>质量判别器</td><td>$f_\phi$</td><td>3-layer MLP + 2-layer temporal attn</td><td>轻量网络，仅用于推理权重生成</td></tr>
+<tr><td>仿真数据量</td><td>—</td><td>~100K trajectories</td><td>MuJoCo 数字孪生中的脚本化 + 域随机化数据</td></tr>
+<tr><td>真实数据量</td><td>—</td><td>~10K trajectories</td><td>混合遥操作采集的真实示范</td></tr>
+</table>
+</section>
+
+<!-- ===== §7 原理 ===== -->
+<section id="principles">
+<h2>§7 Principles</h2>
+
+<h3>7.1 深度机理分析</h3>
+
+<h4>7.1.1 为什么质量加权扩散损失优于标准 BC？</h4>
+<p>从学习理论的角度，标准行为克隆 $\min_\theta \mathbb{E}_{\tau \sim \mathcal{D}}[\|\pi_\theta(\mathbf{s}) - \mathbf{a}\|^2]$ 隐含假设所有 $\tau \in \mathcal{D}$ 来自同一专家分布。当数据中存在质量差异时，该目标等价于向经验分布的均值回归：</p>
+
+<div class="formula-block">
+$$\mathbb{E}_{\tau \sim \mathcal{D}_{\text{mixed}}}[\|\pi_\theta(\mathbf{s}) - \mathbf{a}\|^2] \approx \underbrace{\alpha \cdot \mathbb{E}_{\tau \sim \mathcal{D}_{\text{expert}}}[\cdot]}_{\text{expert signal}} + \underbrace{(1-\alpha) \cdot \mathbb{E}_{\tau \sim \mathcal{D}_{\text{noisy}}}[\cdot]}_{\text{noise bias}}$$
+
+<div class="eq-note">
+其中 $\alpha$ 是高质数据比例。当 $\alpha < 1$ 时，MSE 最优解是专家分布与噪声分布的加权平均——这在 36-DoF 空间中尤为危险，因为动作空间的高维度意味着高质区域与噪声区域之间的距离被放大，均值解可能落在任一分布的支持外。质量加权通过乘性因子 $w_\phi(\tau)$ 重新分配每个样本对梯度的贡献，使得 $\nabla_\theta \mathcal{L}_{\text{QW}} \approx w_\phi \cdot \nabla_\theta \mathcal{L}_{\text{diff}}$：高质量片段的梯度幅值大，低质量片段的梯度幅值被压缩，等效于"软化"的样本选择，既保留了数据规模（不完全丢弃），又抑制了噪声。
+</div>
+</div>
+
+<h4>7.1.2 双臂耦合动力学的表达性分析</h4>
+<p>当双臂通过被抓取物体形成闭合运动链时，系统的自由度从 $2 \times 7 = 14$（双臂独立）减少为 $14 - c$（其中 $c$ 是物体的约束自由度）。独立的两个单臂策略无法建模这种自由度的"坍缩"，因为它们各自只知道 $\mathbf{q}_L$ 或 $\mathbf{q}_R$，而非联合状态 $[\mathbf{q}_L; \mathbf{q}_R]$。Dexora 的 DiT 通过以下机制捕获这种耦合：</p>
+<div class="formula-block">
+$$\text{Attention}(\mathbf{Q}_{\text{arm\_L}}, \mathbf{K}_{\text{arm\_R}}) = \text{softmax}\left(\frac{\mathbf{Q}_{\text{arm\_L}} \mathbf{K}_{\text{arm\_R}}^T}{\sqrt{d_k}}\right) \cdot \mathbf{V}_{\text{arm\_R}}$$
+
+<div class="eq-note">
+在 Transformer 的自注意力层中，代表左臂关节的 token 可以"关注"右臂关节的 token（反之亦然）。当双臂共同抓取同一物体时，注意力图中左右臂 token 之间的注意力权重会显著升高——这可以理解为 transformer 隐式地学习了双臂之间的力/运动学约束。在 Dexora 中，双臂 token 和双手 token 被平铺为序列送入 DiT，使得任意一对关节维度之间都可以通过注意力交互。这是"统一 VLA"相比于"两个并行单臂策略"的根本优势：前者具有 $O(D_a^2)$ 的交互容量（通过注意力），而后者只有 $O(D_a)$（因为两个策略独立运行）。
+</div>
+</div>
+
+<h4>7.1.3 质量判别器的学习动力学</h4>
+<p>质量判别器 $f_\phi$ 本质上是一个二分类器，但其作用不是筛选数据，而是生成连续的权重信号。训练过程中，$f_\phi$ 通过区分成功轨迹片段和失败/次优轨迹片段来学习"什么样的动作模式导致任务成功"——它会学会将流畅的、目标导向的动作序列赋予高权重，而将抖动、回退、犹豫的序列赋予低权重。关键在于：<strong>判别器看到的不是动作的"绝对质量"（无法定义），而是"相对于任务成功条件的统计规律"</strong>。例如，在活塞插入任务中，判别器可能学会：(i) 双手同时在空间上靠近对方 → 高权重（准备合作）；(ii) 一只手在做大幅度探索性运动而另一只手静止 → 低权重（缺乏协调）。</p>
+
+<h3>7.2 对比分析</h3>
+<div class="cmp-row">
+<div class="cmp-col">
+<h4>Naive Dual-Arm BC</h4>
+<p><strong>策略架构</strong>：两个独立的行为克隆策略各自控制一侧手臂（+ 夹爪），通过时间同步并行执行。</p>
+<p><strong>核心问题</strong>：(1) 双臂间的力/运动学耦合完全未被建模——左臂不知道右臂在做什么，导致在需要协调的任务中各自为政；(2) 夹爪的离散动作空间无法过渡到灵巧手的连续 11-DoF 控制；(3) 数据效率极低：每个新 embodiment 需要从头训练。</p>
+<p><strong>信息流</strong>：</p>
+<p style="text-align:center;font-family:monospace;font-size:12px;">obs &rarr; policy_L &rarr; arm_L<br/>obs &rarr; policy_R &rarr; arm_R</p>
+<p>两路信息流完全独立，无交叉。</p>
+</div>
+<div class="cmp-col">
+<h4>Dexora Quality-Weighted Diffusion</h4>
+<p><strong>策略架构</strong>：一个统一的 Diffusion Transformer，以视觉-语言-embodiment 联合条件化，端到端生成 36-DoF 动作序列。</p>
+<p><strong>核心优势</strong>：(1) 双臂双手的全部 36 个关节在 transformer 的注意力层中相互可见，隐式学习耦合约束；(2) 连续动作空间天然兼容不同自由度的 embodiment，通过掩码机制适配；(3) 质量判别器对示范 clip 加权，在保留数据量的同时抑制噪声，使 100K+10K 的混合数据能被有效利用。</p>
+<p><strong>信息流</strong>：</p>
+<p style="text-align:center;font-family:monospace;font-size:12px;">[vision, lang, emb, proprio] &rarr; DiT (cross-attn) &rarr; [arm_L, arm_R, hand_L, hand_R]</p>
+<p>单一信息流，内部全连接（通过自注意力）。</p>
+</div>
+</div>
+</section>
+
+<!-- ===== §8 图表解读 ===== -->
+<section id="figures">
+<h2>§8 Figures &amp; Evidence</h2>
+
+<h3>8.1 论文核心图解读</h3>
+
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 1</span>
+<span class="fig-caption">Dexora 系统总览：从混合遥操作到质量加权 VLA</span>
+<span class="fig-source">Source: Dexora paper, Page 1 (overview figure)</span>
+</div>
+<div class="fig-image">
+<img src="figures/overview.png" alt="Dexora system overview" onerror="this.style.display='none';this.parentElement.querySelector('.fig-placeholder').style.display='block';">
+<div class="fig-placeholder" style="display:none;">
+  <p>Dexora Overview Figure</p>
+  <p style="font-size:11px;margin-top:4px;">（图片来源：Zhang et al. 2026 论文首页总览图）</p>
+  <p style="font-size:11px;">展示双臂灵巧操作任务场景、混合遥操作接口、训练管道与跨 embodiment 实验的完整证据链</p>
+</div>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">图解分析</div>
+<p>论文首页的总览图（Fig. 1）是理解 Dexora 完整方法论的最关键可视化，其信息密度极高，可以从四个层次解读：</p>
+<ul>
+<li><strong>Layer 1 — 任务场景</strong>：图中展示了三个代表性任务（活塞插入、书本取放、开瓶），每个任务都需要双臂协同与多指操作。这些任务的选择具有明确的信号：它们覆盖了<em>精密装配</em>（活塞插入，需要亚毫米级定位）、<em>大范围搬运</em>（书本取放，需要 workspace 级运动）+ <em>旋转操作</em>（开瓶，需要持续力矩输出）三种典型的双臂灵巧操作模式。</li>
+<li><strong>Layer 2 — 数据采集</strong>：图的左侧或上方通常展示混合遥操作方案。外骨骼背包捕获人体手臂的 6-DoF 末端位姿并映射到机器人手臂；Apple Vision Pro 的手部追踪数据通过重定向（retargeting）映射到灵巧手指关节。这种分层采集策略体现了"粗-细"分离的设计智慧：手臂的大范围运动由机械耦合的外骨骼保证精度，手指的精细运动由视觉方案保证灵活性——避免了单一方案的局限。</li>
+<li><strong>Layer 3 — 训练管道</strong>：图的中部展示了两阶段训练流程。第一阶段利用 MuJoCo 数字孪生中的 100K 仿真轨迹进行预训练（解决冷启动问题），第二阶段用 10K 真实遥操作数据 + 质量判别器加权进行精调。质量判别器的角色在图中通常以"过滤器"或"加权器"的形式呈现——它接收操作片段的特征，输出 0-1 的权重分数插入到扩散损失中。</li>
+<li><strong>Layer 4 — 跨 Embodiment 泛化结果</strong>：图的右侧或下方展示了策略在四种不同 embodiment 上的迁移表现。通常以柱状图或热力图形式比较 Dexora 与基线方法（如独立训练的单臂策略、并行双策略等）在各项任务上的成功率。跨 embodiment 泛化结果直接验证了"统一 VLA"相比于"每 embodiment 一个策略"的优势。</li>
+</ul>
+<p>这张图的核心叙事线是：<strong>硬件-数据-算法-评估</strong>的闭环。Dexora 不是一篇纯算法论文——它的贡献同等分布在系统工程（混合遥操作、数字孪生）、算法设计（质量加权扩散、embodiment 条件化）和实证验证（跨配置泛化）三个层面，Fig. 1 正是这个闭环的可视化。</p>
+</div>
+</div>
+
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 2</span>
+<span class="fig-caption">质量判别器的消融实验：有无质量加权的成功率对比</span>
+<span class="fig-source">Source: Dexora paper, Experiments section</span>
+</div>
+<div class="fig-image">
+<div class="fig-placeholder">
+  <p>Ablation Results: Quality-Weighted vs Unweighted Diffusion</p>
+  <p style="font-size:11px;margin-top:4px;">（图片来源：Zhang et al. 2026 消融实验章节）</p>
+</div>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">图解分析</div>
+<p>质量判别器的消融实验通常以柱状图展示，比较三个条件：(i) 标准扩散策略（无加权），(ii) 基于规则的质量过滤（如丢弃成功率低于阈值的轨迹），(iii) Dexora 的质量加权方案。典型结果趋势：</p>
+<ul>
+<li>标准扩散在混合数据上表现最差——低质量示范的噪声淹没了高质量示范的信号，尤其在 36-DoF 空间中每一维的误差累积导致末端执行器的显著偏离。</li>
+<li>基于规则的过滤略好——但它丢弃了约 20-30% 的数据（其中可能包含部分有效的子序列），且规则的制定依赖于对每个任务的先验知识。</li>
+<li>Dexora 的质量加权方案最优——它保留了全部数据的"规模红利"，同时通过权重机制自动抑制噪声。在活塞插入等对精度敏感的任务上，质量加权的提升通常最为显著（预期 +10-20% 绝对成功率）。</li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- ===== §9 缺陷与局限 ===== -->
+<section id="flaw">
+<h2>§9 Flaw &amp; Limitations</h2>
+
+<h3>9.1 当前工作的局限</h3>
+
+<p><strong class="hl">局限一：硬件生态的高度定制化。</strong>Dexora 的混合遥操作方案依赖外骨骼背包（通常是自研或小批量定制的硬件）和 Apple Vision Pro（特定商业产品）。当用户希望复现该系统时，不仅需要相同的双臂双手机器人平台，还需要相同的外骨骼和头显设备——硬件总成本可能高达数十万至百万人民币。这限制了系统的"开源性"在硬件层面的实际意义。虽然策略代码和模型权重可以开源，但数据采集管道的复现门槛较高。</p>
+
+<p><strong class="hl">局限二：数字孪生的 embodiment 匹配假设。</strong>Dexora 假设 MuJoCo 中的数字孪生与实物机器人可以进行足够精确的 embodiment 匹配，使得仿真预训练能有效迁移到真实环境。这种匹配需要：(i) 精确的 URDF 模型（包括质量、惯量、关节摩擦等物理参数），(ii) 仿真与实物的视觉外观对齐（可通过域随机化部分缓解但无法消除）。在实践中，手指关节的细微摩擦差异和肌腱驱动的非线性（大多数灵巧手采用腱绳传动而非直驱）在 URDF 中难以精确建模，导致仿真中"完美可行"的抓取策略在实物上因摩擦不足而滑脱。</p>
+
+<p><strong class="hl">局限三：长尾接触场景的安全性未覆盖。</strong>Dexora 的质量判别器是基于训练集内的任务结果训练的，这意味着它无法评估超出分布（OOD）的接触场景——例如，在开瓶任务中遇到卡死的瓶盖时，策略可能持续加力而不判断是否会发生硬件损伤。系统的安全监控目前仅依赖关节限位和简单的碰撞检测，缺乏基于力/力矩感知的接触安全评估。</p>
+
+<p><strong class="hl">局限四：语言泛化仅在同分布任务上验证。</strong>虽然 Dexora 使用 T5-XXL 作为语言 backbone 并将自然语言指令作为条件，但论文中的语言泛化实验主要覆盖同任务的不同语义表述（如"open the bottle" vs "unscrew the bottle cap"），而非跨任务的语言泛化（如从"开瓶"泛化到"拧阀门"，后者在运动学上相似但语义上不同）。真正的"VLA"泛化应体现在从未见过的语言指令能引导到合理的动作——Dexora 在这个维度上的验证尚不充分。</p>
+
+<p><strong class="hl">局限五：实时推理延迟。</strong>在 36-DoF 空间中执行 100 步 DDIM 去噪的推理延迟是关键工程指标。即使使用现代 GPU（如 A100），每次推理仍可能需要 100-300ms（取决于模型规模和批量大小）——这意味着从观测到动作的延迟可能在 100-300ms 量级。对于需要快速反应的接触事件（如抓取滑脱时的瞬时补偿），这个延迟可能导致不稳定。论文中通过 receding horizon（执行 8 步、推理下 8 步）来隐藏推理延迟，但这本质上是用"批处理"换取"连续性"，在突变场景中仍可能产生控制间隙。</p>
+
+<h3>9.2 扩展方向</h3>
+<ol>
+<li><strong>强化学习精调 (RL Fine-tuning)</strong>：以 Dexora 的扩散策略作为先验，在真实环境中用 RL（如 PPO 或 Q-learning with diffusion actor）对接触密集的阶段进行局部精调。扩散策略可以作为"强先验"探索器，生成合理但并非最优的动作候选。</li>
+<li><strong>触觉感知融合</strong>：在灵巧手指尖集成触觉传感器（如 GelSight、uSkin），将触觉信号作为额外的条件输入到 DiT 中——这可以直接解决"摩擦不确定性"问题：策略学会根据触觉反馈实时调节接触力，而非依赖开环的 URDF 参数。</li>
+<li><strong>基于基础模型的任务规划</strong>：将 Dexora 作为"执行层"，在其上叠加一个 VLM（如 GPT-4V 或 Qwen-VL）作为"任务规划层"。VLM 将高层自然语言指令（如"整理桌面"）分解为 Dexora 能执行的低层动作原语序列（如"拿起笔" → "放入笔筒" → "擦桌面"）。这可以大幅扩展系统的任务范围和语言泛化能力。</li>
+</ol>
+
+<h3>9.3 数据敏感性分析</h3>
+<table>
+<tr><th style="width:20%;">Factor</th><th style="width:12%;">Sensitivity</th><th>Rationale</th></tr>
+<tr><td>仿真数据量</td><td>★★★★☆</td><td>仿真预训练提供动作空间的基本覆盖，数据量从 10K 增至 100K 带来显著收益，但边际效应递减</td></tr>
+<tr><td>真实数据质量</td><td>★★★★★</td><td>核心瓶颈。少量高质量真实示范（2K）可能优于大量中等质量示范（10K），因为真实数据是策略在实物上表现的"锚点"</td></tr>
+<tr><td>URDF 精度</td><td>★★★★☆</td><td>仿真-真实 gap 的主要来源。关节摩擦、惯量、接触刚度参数与实际偏差超过 20% 时，仿真预训练的收益急剧下降</td></tr>
+<tr><td>质量判别器精度</td><td>★★★☆☆</td><td>判别器无需做到完美分类——只要 AUC > 0.7，加权训练就已优于无加权。但判别器自身的偏差（系统性地低估某类动作）会引入新的 bias</td></tr>
+<tr><td>视觉 backbone 选择</td><td>★★☆☆☆</td><td>SigLIP vs DINOv2 对最终成功率的影响相对温和（±3-5%），因为 DiT 可通过微调补偿视觉表示的差异</td></tr>
+<tr><td>去噪步数</td><td>★★☆☆☆</td><td>100 → 50 步对成功率影响小（2-3%），但显著降低推理延迟；但减少至 20 步以下时动作质量开始退化</td></tr>
+</table>
+
+<h3>9.4 最大弱点深度剖析</h3>
+<div class="callout danger">
+<p class="callout-title">最大弱点：仿真预训练与真实应用的 Sim2Real Gap 在灵巧操作中被放大</p>
+<p>在所有局限中，最根本性的挑战是 <strong>Sim2Real gap 在灵巧手操作中被系统性放大</strong>。原因如下：</p>
+<p>(1) <strong>接触动力学的仿真精度极低。</strong>传统的 MuJoCo/Isaac Gym 对刚体接触的建模（基于惩罚法或 LCP）在夹爪操作中尚可接受，但在多指灵巧操作中，手指-物体之间的多点接触、滚动接触和摩擦锥约束对仿真精度极为敏感。1mm 的手指位置偏差可能导致物体从三指抓取变为两指捏合——在仿真中成功的抓取策略在实物上可能立即滑脱。</p>
+<p>(2) <strong>灵巧手的欠驱动/肌腱传动难以建模。</strong>大多数多指灵巧手（如 Shadow Hand、LEAP Hand、Allegro Hand）采用腱绳传动而非直驱关节，其动力学包含显著的回差 (backlash)、摩擦和弹性变形。这些因素几乎不可能通过 URDF 参数准确捕捉，导致仿真中的手指运动与实物存在系统性的时滞和偏差。</p>
+<p>(3) <strong>域随机化的收益在 36-DoF 空间中有限。</strong>域随机化通过在仿真中注入噪声来增强策略的鲁棒性，但 36-DoF 空间的维度灾难意味着随机化的覆盖范围极难与真实分布的多样性匹配——总有一些物理效应（如特定的手指-物体摩擦组合）落在随机化范围之外。</p>
+<p>这一弱点的根本解决可能需要在真实环境中进行充分的在线交互（如 RL fine-tuning 或 online imitation learning），或者采用更高保真度的接触仿真引擎（如 NVIDIA Isaac Sim 的 FEM-based 接触模型）——但这两种方案都会显著增加工程复杂度，与 Dexora 追求的"可复现开源方案"目标存在一定张力。</p>
+</div>
+</section>
+
+<!-- ===== §10 动机 ===== -->
+<section id="motivation">
+<h2>§10 Motivation</h2>
+
+<h3>10.1 五步推导链</h3>
+
+<p><strong class="hl">Step 1: 为什么需要 VLA？</strong>纯视觉的机器人策略无法利用人类自然语言中蕴含的丰富语义先验。"拿起桌上的红杯子"这样的指令需要模型理解"红""杯子""桌上"等概念之间的关系——这些关系在互联网规模的多模态数据中已被充分建模（通过 CLIP、T5 等预训练模型）。VLA 范式的核心动机是将这些语义先验注入机器人动作策略，使得策略能够泛化到训练时未见过的语言指令。</p>
+
+<p><strong class="hl">Step 2: 为什么需要双臂？</strong>现实世界中的大量操作任务本质上需要双手协作——稳定抓取一个物体同时操作其子部件（如开瓶、插拔连接器、折叠衣物）。单臂操作要么需要外部固定装置（降低了灵活性和泛用性），要么在面对大型/重型物体时力学上不可行。双臂不仅增加了一个末端执行器，还从根本上改变了可执行操作的空间拓扑（如形成闭合运动链）。</p>
+
+<p><strong class="hl">Step 3: 为什么需要灵巧手？</strong>夹爪（parallel-jaw gripper）虽然在工业场景中广泛应用，但其功能受限于简单的"张开-闭合"二态操作。大量日常操作需要手指级的精细控制：旋转瓶盖需要拇指-食指的力矩输出、捏取扁平物体（如信用卡）需要指尖的精确相对定位、工具使用（如剪刀、镊子）需要多指的协调配合。如果 VLA 止步于夹爪，它永远无法触及"通用操作"的终极目标。</p>
+
+<p><strong class="hl">Step 4: 为什么需要开源？</strong>当前机器人学习领域呈现出"碎片化"的趋势：每个实验室使用不同的硬件平台、不同的数据格式、不同的训练框架——导致方法和结果难以横向比较和复现。开源一个完整的 VLA + 灵巧操作系统（包括数据采集方案、训练代码、模型权重、评估协议）可以：(i) 建立社区基线，(ii) 降低后续研究的进入门槛，(iii) 促进跨实验室的标准化评估。</p>
+
+<p><strong class="hl">Step 5: 为什么需要混合遥操作 + 质量加权？</strong>这是两个工程性但至关重要的设计选择。混合遥操作解决了"36-DoF 数据怎么采"的问题——单一采集方案要么无法覆盖全维度，要么精度或成本不可接受。质量加权解决了"采到的数据怎么用"的问题——人类遥操作必然存在质量波动，简单的 BC 无法区分好坏，而手动筛选在大规模数据面前不可扩展。两者的结合使得 Dexora 的数据管道能够以可接受的工程成本产生对策略学习有效的大规模示范。</p>
+
+<h3>10.2 一句话动机</h3>
+<div class="callout idea">
+<p class="callout-title">One-Sentence Motivation</p>
+<p>如果 VLA 永远只能控制夹爪，那么语言理解再强也无法转化为人类级的灵巧操作——Dexora 的使命是把 VLA 范式推进到真正需要"双手"和"手指"的现实操作世界。</p>
+</div>
+
+<h3>10.3 研究者视角：如何抵达这个想法？</h3>
+<p>从研究演化的角度，Dexora 的诞生可以看作以下思路的自然延伸：假设你是一个在 2023-2024 年从事机器人学习的博士生，你观察到 RT-2 和 Octo 证明了 VLA 的可行性，Diffusion Policy 证明了扩散模型在动作生成上的优势，ALOHA 证明了低成本双臂遥操作的可行性。你自然会问一个"组合性"问题：<strong>能否把这三件事同时做到，并推向一个更困难的设定？</strong>这个设定的选择（双臂灵巧手）不是随机的——它是 VLA 范式在自由度维度上最自然的"下一步"。在工程层面，你很快会发现高维度带来了新的瓶颈（数据采集难、质量不一致），这些瓶颈驱动你设计混合遥操作方案和质量加权机制。如果一个研究者沿着 VLA &rarr; higher DoF &rarr; data bottleneck &rarr; quality-aware learning 的路径思考，Dexora 的设计选择会显得非常自然——这正是"问题驱动"研究范式的典型体现。</p>
+</section>
+
+<!-- ===== §11 收获 ===== -->
+<section id="takeaway">
+<h2>§11 Takeaways</h2>
+
+<h3>11.1 方法论收获</h3>
+<ol>
+<li><strong>高维控制中"质量感知"比"数据量"更关键。</strong>在 36-DoF 空间中，少量抖动示范的负面效应被维度放大，远超过它们在低维操作中的影响。Dexora 的质量判别器提供了一种可扩展的"质量感知"方案——它不是替代 BC，而是重新定义 BC 的损失权重分配，在保留数据多样性的同时抑制噪声。这一思路对任何涉及"人类采集的示范数据"的模仿学习任务都有启发意义。</li>
+<li><strong>"粗-细"分层数据采集策略是处理高维系统的通用范式。</strong>混合遥操作（外骨骼 + Vision Pro）的设计体现了一个通用原则：将高维控制空间分解为不同物理特性的子空间，各自用最合适的采集方法，然后通过统一的策略架构将它们融合。这种"分而治之"的策略可推广到其他高维系统——例如，无人机的"飞控 + 云台 + 机械臂"组合控制。</li>
+<li><strong>Embodiment 条件化是迈向通用机器人策略的关键架构设计。</strong>Dexora 证明了用一个统一的 transformer 骨干 + 可学习的 embodiment embedding 就可以处理从 7-DoF 到 36-DoF 的四种不同配置。这一架构选择的深层含义是：不同的机器人硬件配置可以被视为同一"操作语言"的不同"方言"，而非完全不同的"语言"。统一的 VLA 骨干学习的是"如何操作"的通用知识，embodiment embedding 只是告诉它"用什么样的身体去操作"。</li>
+<li><strong>开源系统工程与算法创新同等重要。</strong>Dexora 的一个关键贡献是全栈开源（硬件设计、数据采集管道、仿真环境、训练代码、模型权重），这降低了进入高维灵巧操作研究的门槛。在当前的机器人学习社区，"系统复杂度"往往成为比"算法创新度"更大的壁垒——降低这一壁垒本身就是一个高影响力的贡献。</li>
+</ol>
+
+<h3>11.2 对 UAV 研究的启发</h3>
+<ol>
+<li><strong>UAV 空中操作 (Aerial Manipulation) 的高维控制问题。</strong>当无人机携带多自由度机械臂或灵巧手执行空中操作任务时（如空中抓取、悬停维修），面临与 Dexora 高度相似的挑战：高维动作空间（飞控 4-DoF + 云台 + 机械臂 > 10-DoF）、多个子系统的耦合动力学（飞行平台与机械臂之间的反作用力和力矩耦合）、以及采集大规模高质量示范的困难。Dexora 的"统一 VLA + 质量加权"框架可以直接迁移到这个场景。</li>
+<li><strong>"粗-细"控制分解在 UAV 中的应用。</strong>Dexora 的外骨骼（粗） + Vision Pro（细）的分层采集策略可以被重新解读为：将 UAV 空中操作的控制空间分解为飞行控制层（粗粒度、高频、稳定性优先）和操作控制层（细粒度、低频、精度优先），两个层级以不同的频率和控制策略运行，但共享统一的规划和感知。这种分层架构可以提高 UAV 操作系统的工程可行性。</li>
+<li><strong>跨 UAV 配置的 Embodiment 泛化。</strong>不同配置的 UAV 操作平台（四旋翼 vs 六旋翼、不同臂长/载荷的机械臂、夹爪 vs 灵巧手末端）可以被视为不同的 embodiment。Dexora 的 embodiment embedding + 掩码机制提供了一种"一个模型适配多种 UAV 配置"的思路——对于 UAV 集群的多构型协同操作场景具有直接的应用潜力。</li>
+</ol>
+
+<h3>11.3 关键参考文献</h3>
+<table>
+<tr><th style="width:32%;">Paper</th><th style="width:10%;">Year</th><th style="width:28%;">Relevance</th><th>Key Contribution</th></tr>
+<tr><td>RT-2: Vision-Language-Action Models (Brohan et al.)</td><td>2023</td><td>VLA 范式奠基工作</td><td>首次证明互联网规模的视觉-语言预训练可以直接迁移到机器人动作策略</td></tr>
+<tr><td>Diffusion Policy (Chi et al.)</td><td>2023</td><td>扩散动作生成的核心方法</td><td>证明扩散模型在机器人动作生成中优于传统的 Gaussian Mixture Model 和 VAE</td></tr>
+<tr><td>ACT: Action Chunking Transformer (Zhao et al.)</td><td>2023</td><td>双臂模仿学习的数据效率</td><td>Action chunking + temporal ensemble 在 50 次示范内实现双臂操作</td></tr>
+<tr><td>Octo: An Open-Source Generalist Robot Policy (Octo Team)</td><td>2024</td><td>开源通用机器人策略</td><td>开源了跨多个机器人平台和任务数据的统一 transformer 策略框架</td></tr>
+<tr><td>GELLO (Wu et al.)</td><td>2024</td><td>低成本双臂遥操作方案</td><td>3D 打印的被动臂作为输入设备，大幅降低双臂遥操作的硬件成本</td></tr>
+<tr><td>Sim-to-Real Transfer for Robotic Manipulation (OpenAI et al.)</td><td>2019</td><td>灵巧手操作的 Sim2Real 先驱</td><td>域随机化 + 大规模仿真训练实现了 Shadow Hand 解魔方的 Sim2Real 迁移</td></tr>
+</table>
+</section>
+
+</main>
+
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes &copy; 2026 · Scholar: Huazhe Xu Group · Paper: Dexora — Open-source VLA for High-DoF Bimanual Dexterity (Zhang et al., 2026) · Rendered with MathJax &amp; Mermaid</footer>
+</body></html>

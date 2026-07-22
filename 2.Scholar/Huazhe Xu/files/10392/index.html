@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Hard-to-Sim Objectives (Nai, You et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察与创新点</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">关键挑战</a>
+  <a href="#method">方法与公式</a>
+  <a href="#principles">深层原理</a>
+  <a href="#figures">图表证据</a>
+  <a href="#flaw">局限与延伸</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Huazhe Xu · 26-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10384/index.html">RL-100</a>
+<a href="../10382/index.html">RL</a>
+<a href="../10381/index.html">X-distill Cross-architect</a>
+<a href="../10380/index.html">DexImit Learning bimanual</a>
+<a href="../10379/index.html">ViTaS Visual tactile</a>
+<a href="../10378/index.html">Beyond action residuals</a>
+<a href="../10377/index.html">One-policy-fits-all Geome</a>
+<a href="../10376/index.html">VLA</a>
+<a class="active" href="../10392/index.html">Fine-tuning hard-to-simul</a>
+<a href="../10391/index.html">DemoSpeedup Accelerating </a>
+<a href="../10390/index.html">forget-and-grow strategy </a>
+<a href="../10389/index.html">Morpheus neural-driven an</a>
+<a href="../10388/index.html">HERMES</a>
+<a href="../10387/index.html">VLA</a>
+<a href="../10386/index.html">Entropy regularizing acti</a>
+<a href="../10385/index.html">Dtactive vision-based tac</a>
+<a href="../10383/index.html">MoE-DP MoE-enhanced diffu</a>
+<a href="../10438/index.html">opportunities risks found</a>
+<a href="../10442/index.html">Visual genome Connecting</a>
+<a href="../10437/index.html">Perceptual losses real-ti</a>
+<a href="../10441/index.html">Deep visual-semantic alig</a>
+<a href="../10439/index.html">ImageNet large scale</a>
+<a href="../10440/index.html">Large-scale video classif</a>
+<a href="../10443/index.html">3D</a>
+<a href="../10436/index.html">Imagenet large-scale hier</a>
+<a href="../10444/index.html">bayesian hierarchical mod</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. 论文信息 ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Fine-Tuning Hard-to-Simulate Objectives for Quadruped Locomotion: A Case Study on Total Power Saving<br>（针对难仿真目标微调四足运动策略——以总功耗节省为案例研究）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Ruiqian Nai</strong>、<strong>Jiacheng You</strong>、Liu Cao、Hanchen Cui、Shiyuan Zhang、<strong>Huazhe Xu</strong>、<strong>Yang Gao</strong>（corresponding）</td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">清华大学</strong>（Tsinghua University），交叉信息研究院（IIIS）/ 电子工程系；上海人工智能实验室（Shanghai AI Lab）；上海期智研究院（Shanghai Qi Zhi Institute）</td></tr>
+    <tr><td><strong>发表会议</strong></td><td><strong class="bold-venue">IEEE ICRA 2025</strong>（International Conference on Robotics and Automation），<strong>2025年5月19-23日</strong>，美国亚特兰大，pp. 15957–15964</td></tr>
+      <div class="journal-meta"><span class="jif-name">ICRA</span> <span class="jif-badge if-conf-top">🏆 Top Conference</span></div>
+    <tr><td><strong>DOI / 链接</strong></td><td><a href="https://doi.org/10.1109/ICRA61961.2025.11128263" target="_blank">10.1109/ICRA61961.2025.11128263</a> | <a href="https://arxiv.org/abs/2502.10956" target="_blank">arXiv: 2502.10956</a> | Project: <a href="https://hard-to-sim.github.io/" target="_blank">hard-to-sim.github.io</a> | Submitted: 2025-02-16</td></tr>
+    <tr><td><strong>一句话概述</strong></td><td>提出一个<strong>数据驱动的迭代微调框架</strong>，针对物理仿真器中难以精确建模的机器人真实目标（如电池总功耗、步态噪声、电机发热）进行策略优化。核心思路：用真实机器人采集数据训练 LSTM 测量模型预测总电流，将该模型嵌入仿真器作为奖励函数，利用 <strong>KL 散度约束 + 层级策略选择</strong>，经多轮迭代实现四足机器人（Unitree Go1）电池总功耗<strong>净降低 24–28%</strong>（vs 手工解析 proxy 的 5–12%）。框架通用性强——可扩展到任何"现实中有但仿真中没有"的目标。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Sim-to-Real Transfer</span>
+    <span class="tag tag-green">Total Power Saving</span>
+    <span class="tag tag-amber">Data-Driven Measurement Model</span>
+    <span class="tag tag-purple">KL Divergence Constraint</span>
+    <span class="tag tag-red">Hierarchical Policy Selection</span>
+    <span class="tag tag-cyan">ICRA 2025</span>
+    <span class="tag tag-gray">Quadruped Locomotion</span>
+    <span class="tag tag-gray">LSTM Surrogate</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. 核心洞察与创新点 ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么四足机器人的 sim-to-real 策略在仿真中表现良好、但在真实世界中能耗依旧居高不下？</strong><br>
+    答：因为现有的 sim-to-real 方法在仿真中优化的目标（如机械功率 $\sum \tau_i \dot{q}_i$、足端接触力、电机扭矩惩罚项等）只是电池总功耗的<strong>粗略近似</strong>——它们忽略了 FOC 驱动损耗、电池内阻压降、待机功耗、机械传动摩擦等仿真器无法建模的复杂物理/电气过程。手工设计的 proxy 不仅需要领域专家反复调参，而且优化方向可能与真实总功耗<strong>不一致甚至相反</strong>。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>"难仿真不等于不可优化"</strong>——只要目标在真实世界中可以被测量，就可以用数据驱动的方式学习一个局部有效的 surrogate（替代模型），并在仿真中用它来指导策略优化。关键在于：（1）用少量真实数据训练 LSTM 网络预测电池总电流（从可观测的电机状态 $[\tau_t, \dot{q}_t]$ 到真实电流 $i_t$）；（2）在仿真中用 KL 散度约束将策略更新限制在 surrogate 可信的分布范围内，防止策略 exploit surrogate 的预测误差；（3）通过层级选择和多轮迭代，让 measurement model 和 policy 协同进化。
+  </div>
+
+  <h3>2.2 灵感来源→洞察映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>→ 启发产生的洞察</th><th>类型</th></tr>
+    <tr><td>传统 sim-to-real 中 domain randomization 只能处理"仿真不准"——无法处理"仿真根本没有"的量</td><td>→ 对于电池总功耗这种在仿真器中完全缺失的量，domain randomization 完全无能为力——需要一个<strong>从真实数据中学习</strong>的测量模型来"补全"仿真器的盲区</td><td>问题定义</td></tr>
+    <tr><td>Offline RL / model-based RL 中的"学习世界模型"范式</td><td>→ 不是学习整个动力学世界模型（太复杂且不必要），而是只学习<strong>目标相关的测量模型</strong>——将高维状态映射到一个标量（功耗）。这是"最小必要模型"思路：学得越少，需要的数据越少，泛化越可靠</td><td>方法</td></tr>
+    <tr><td>Trust-region policy optimization（TRPO）和 PPO 中的 KL 散度约束</td><td>→ 将 KL 散度从一个"稳定训练"的工具升级为一个<strong>"防止策略利用 surrogate 漏洞"的安全约束</strong>——策略不能偏离 anchor 太远，因为 surrogate 在远离数据采集分布的地方预测不可靠</td><td>数学 / 安全</td></tr>
+    <tr><td>DAgger (Dataset Aggregation) 和 evolutionary strategies 中的精英选择</td><td>→ 每轮迭代都聚合所有历史真实数据来改进模型（DAgger 思路），同时通过<strong>"仿真 Top-K → 真实评估最优"的层级筛选</strong>来降低真实世界测试次数（evolutionary 思路），将两个互补的方法融合在一个框架中</td><td>架构</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1: 数据驱动的难仿真目标测量模型——将"仿真器盲区"变为"可优化目标"</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>电池总功耗（包括电机驱动损耗、待机功耗、电池内阻损耗、机械摩擦等）在通用仿真器（Isaac Gym / MuJoCo）中缺乏精确的物理模型。传统方法靠手工设计解析 proxy（如 $\sum \tau_i \dot{q}_i + \frac{r}{k^2}\tau_i^2$），但无法捕捉完整的系统级功耗特性，且优化方向可能与真实总功耗不一致。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>既然人类无法为每个机器人写出准确的功耗公式，为什么不直接从数据中学？电池总电流是直接可测的物理量——只需要一个从"仿真器可见状态"到"真实电流"的轻量映射。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>训练一个 <strong>LSTM 网络</strong>，输入为电机扭矩 $\tau_t$ 和角速度 $\dot{q}_t$（这些是仿真器可见的），输出为预测的电池总电流 $\hat{i}_t$。LSTM 的选择是因为功耗具有时序依赖性（电机加减速的历史影响当前功耗）。模型对所有特征和输出进行均值-标准差归一化。一旦训练完成，这个模型作为仿真器的"插件"，为策略提供功耗奖励：$r_{\text{power}} = -\hat{i}_t$。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2: KL 散度约束 + 多参数扫描——防止策略利用 surrogate 的预测漏洞</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>将学习的 surrogate 嵌入仿真作为奖励函数后，RL 优化器（PPO）可能会<strong>exploit</strong> surrogate 的不准确性——找到仿真中"预测功耗极低"但真实世界中功耗并不低的轨迹。这是所有 model-based RL 都面临的 "reward hacking" 问题。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Trust-region 方法的核心思想：策略更新步长不能太大，否则进入模型不准确的区域。KL 散度是衡量策略分布变化的自然度量。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>约束策略 $\pi$ 与 anchor 策略 $\pi^{\text{anchor}}$（数据采集时的策略）之间的 KL 散度不超过阈值 $c$：$\mathbb{E}_{\mathbf{s}\sim\pi}[\text{KL}(\pi(\cdot|\mathbf{s}) \parallel \pi^{\text{anchor}}(\cdot|\mathbf{s}))] \leq c$。同时，对奖励权重 $\lambda \in \{0.5, 1, 5\}$ 和 KL 系数 $c \in \{0.2, 0.5, 1\}$ 进行网格扫描，每轮产生多个候选策略（而不是只训练一个），用多样性对抗不确定性。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3: 层级策略选择 + 数据聚合——仿真筛选 + 真实验证 + 模型迭代的三位一体闭环</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>真实机器人测试昂贵且耗时（一次测试需要部署、充电、确保安全），不可能将所有候选策略都在真机上跑。但仅靠仿真（带 surrogate）排名又不可靠——surrogate 的排名和真实排名不一定一致。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Evolutionary strategies 的精英选择 + DAgger 的迭代数据聚合——用仿真做粗筛（Top-6），用真实世界做精筛（选最优），每一轮的真实数据又用来改进下一轮的 surrogate。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>每轮扫描产生多组策略 → 在仿真中用 surrogate 评估 → 取 Top-6 精英策略在真实机器人上部署测试 → 选真实功耗最低的作为下一轮 anchor → 所有真实测试数据加入训练集（从不丢弃历史数据）→ 更新 LSTM 模型 → 进入下一轮。经 3–4 轮迭代，策略和 surrogate 协同进化，共同逼近真实最优。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. 系统架构 ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.0 架构总览 —— 从仿真策略到真实功耗优化的闭环</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>数据采集 <span>真实机器人</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>部署当前策略</strong>
+          <small>Unitree Go1 执行行走运动；记录 ($\tau_t, \dot{q}_t, i_t$) 三元组。</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>累积全部历史数据</strong>
+          <small>DAgger 风格：从不丢弃前轮数据。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>测量模型 <span>LSTM 训练</span></h4>
+        <div class="arch-card arch-power">
+          <strong>LSTM: $\hat{i}_t = f(\tau_t, \dot{q}_t)$</strong>
+          <small>输入：电机扭矩和角速度。输出：预测的电池总电流。</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>归一化与训练</strong>
+          <small>均值-标准差归一化；MSE 损失；在所有累积数据上训练。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>策略微调 <span>仿真 + Surrogate</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>带 KL 约束的 PPO</strong>
+          <small>$r = r_{\text{sim}} + \lambda \cdot (-\hat{i}_t)$; KL ≤ c vs anchor。</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>参数扫描</strong>
+          <small>网格扫描 $\lambda \in \{0.5,1,5\}$, $c \in \{0.2,0.5,1\}$ → 多组候选策略。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>筛选与迭代 <span>真实验证</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>层级筛选：仿真 Top-6</strong>
+          <small>用 surrogate 奖励对候选策略排序，保留前 6 名。</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>真实机器人部署</strong>
+          <small>真实表现最优的 → 下一轮 anchor；全部数据 → 训练集。</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>策略 → 真实数据</span>
+      <span>数据 → 模型</span>
+      <span>模型 → 奖励 → 策略</span>
+      <span>仿真排名 → 真实验证</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>关键瓶颈</strong><small>测量模型在分布外准确度下降；KL 约束不可或缺。</small></div>
+      <div class="arch-metric"><strong>核心创新</strong><small>数据驱动 surrogate 替代手工设计的功耗 proxy。</small></div>
+      <div class="arch-metric"><strong>为什么有效</strong><small>协同进化：更好的策略 → 更多样化的数据 → 更准确的模型。</small></div>
+      <div class="arch-metric"><strong>当前局限</strong><small>需要 3–4 轮迭代；每轮仍需真实机器人测试。</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 系统流程图 —— 完整的迭代微调流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INIT["Phase 0: Initialization"]
+      PRETRAIN["Pre-trained locomotion policy pi0<br>standard sim reward: velocity tracking etc."]
+      DEPLOY0["Deploy pi0 on Unitree Go1<br>record tau, q_dot, i triples"]
+    end
+
+    subgraph LOOP["Iterative Fine-Tuning Loop"]
+      direction TB
+      subgraph MODEL["Step 1: Update Measurement Model"]
+        AGGREGATE["Aggregate all historical data D"]
+        TRAIN_LSTM["Train LSTM: i_hat = f(tau, q_dot)<br>MSE loss with normalization"]
+      end
+
+      subgraph FINE_TUNE["Step 2: Simulation Fine-Tuning"]
+        EMBED["Embed LSTM in simulator<br>reward: r = r_sim + lambda * (-i_hat)"]
+        KL_CONSTRAINT["KL(pi || pi_anchor) <= c<br>sweep lambda in {0.5,1,5}, c in {0.2,0.5,1}"]
+        PPO_TRAIN["PPO trains candidate policies"]
+      end
+
+      subgraph SELECT["Step 3: Hierarchical Selection"]
+        SIM_RANK["Sim ranking with surrogate<br>select Top-6 elites"]
+        REAL_TEST["Real robot test Top-6<br>measure true power P_real"]
+        BEST_PICK["Pick best real performer pi*<br>as next-round anchor"]
+      end
+
+      subgraph UPDATE["Step 4: Data Aggregation"]
+        ADD_DATA["Add new real test data to D"]
+        NEXT_ANCHOR["Set pi_anchor = pi*<br>go to next iteration"]
+      end
+
+      MODEL --> FINE_TUNE --> SELECT --> UPDATE --> MODEL
+    end
+
+    subgraph OUTPUT["Final Output"]
+      FINAL["Optimal policy after 3-4 iterations<br>24-28% net power reduction"]
+    end
+
+    INIT --> LOOP
+    LOOP --> OUTPUT
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef model fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef tune fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef select fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef update fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef final fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    class PRETRAIN,DEPLOY0 init
+    class AGGREGATE,TRAIN_LSTM model
+    class EMBED,KL_CONSTRAINT,PPO_TRAIN tune
+    class SIM_RANK,REAL_TEST,BEST_PICK select
+    class ADD_DATA,NEXT_ANCHOR update
+    class FINAL final
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 —— 数据流与模型-策略协同进化</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph REAL["Real World (Unitree Go1)"]
+      direction TB
+      DEPLOY["Deploy current policy pi_k"]
+      MEASURE["Measure: motor state and battery current i_real"]
+      STORE["Store triples into dataset D"]
+    end
+
+    subgraph MODEL_WORLD["Measurement Model Training"]
+      direction TB
+      NORMALIZE["Data normalization"]
+      LSTM_TRAIN["LSTM training: i_hat = f(tau, q_dot)"]
+      OUTPUT_MODEL["Measurement model M_k"]
+    end
+
+    subgraph SIM_WORLD["Simulation Optimization"]
+      direction TB
+      REWARD["Combined reward: r = r_sim + lambda * (-i_hat)"]
+      KL_PENALTY["KL constraint: Dist(pi, pi_anchor) <= c"]
+      PPO_UPDATE["PPO policy update"]
+    end
+
+    subgraph FILTER["Hierarchical Filter"]
+      direction TB
+      TOP6["Sim Top-6 ranked by surrogate"]
+      REAL_EVAL["Real evaluation of Top-6"]
+      BEST["Select best pi* as next anchor"]
+    end
+
+    REAL -->|"tau, q_dot, i"| MODEL_WORLD
+    MODEL_WORLD -->|"M_k"| SIM_WORLD
+    SIM_WORLD -->|"candidates"| FILTER
+    FILTER -->|"pi*, new data"| REAL
+
+    classDef real fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef model fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef sim fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef filter fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class DEPLOY,MEASURE,STORE real
+    class NORMALIZE,LSTM_TRAIN,OUTPUT_MODEL model
+    class REWARD,KL_PENALTY,PPO_UPDATE sim
+    class TOP6,REAL_EVAL,BEST filter
+    </pre>
+  </div>
+
+  <h3>3.3 工程管线 —— 从预训练到最优策略的完整流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["Phase 1: Pre-training and Baseline"]
+      direction LR
+      P1["Pre-train locomotion policy<br>with standard sim rewards"] --> P2["Deploy on real robot<br>record baseline power"]
+      P2 --> P3["Train initial LSTM model<br>i_hat = f(tau, q_dot)"]
+    end
+
+    subgraph PHASE2["Phase 2: Iterative Fine-Tuning"]
+      direction LR
+      I1["Iter 1: Embed LSTM, sweep<br>lambda and c, PPO training"] --> I2["Iter 1: Sim Top-6, real test<br>pick best pi*_1"]
+      I2 --> I3["Iter 2: Update LSTM, sweep<br>and fine-tune again"]
+      I3 --> I4["Iter 3: Continue until<br>convergence or budget"]
+    end
+
+    subgraph PHASE3["Phase 3: Final Evaluation"]
+      direction LR
+      E1["Multi-speed: 0.5/0.8/1.1 m/s<br>net power vs baseline"]
+      E2["Behavior analysis: torque<br>smoothness, foot placement"]
+      E3["Outdoor long-distance test<br>battery endurance"]
+    end
+
+    PHASE1 -->|"initial LSTM"| PHASE2
+    PHASE2 -->|"optimal policy"| PHASE3
+
+    classDef phase1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef phase2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef phase3 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class P1,P2,P3 phase1
+    class I1,I2,I3,I4 phase2
+    class E1,E2,E3 phase3
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. 任务定义 ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义</h2>
+
+  <h3>4.1 问题建模</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \min_{\pi} \; \mathbb{E}_{\pi}\left[\sum_{t} i_t\right] \quad \text{s.t.} \quad \dot{x}_{\text{cmd}} \approx v_{\text{target}},\quad \text{simulator has no model of } i_t $$
+    <div class="eq-note">
+      <strong>$i_t$</strong> = 电池总电流（真实世界中可测量，但仿真器中完全不存在） &nbsp;|&nbsp;
+      <strong>$\pi$</strong> = 运动控制策略（将机器人状态映射为关节目标位置） &nbsp;|&nbsp;
+      <strong>$v_{\text{target}}$</strong> = 目标前进速度（0.5 / 0.8 / 1.1 m/s） &nbsp;|&nbsp;
+      <strong>$\dot{x}_{\text{cmd}}$</strong> = 指令速度 &nbsp;|&nbsp;
+      <strong>关键约束</strong>：不能牺牲速度跟踪精度来省电——指令速度必须被满足。策略必须在节能与任务执行之间找到 Pareto 最优平衡点。
+    </div>
+  </div>
+
+  <h3>4.2 输入 / 输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入（策略）</strong></td><td>机器人本体感知状态（关节角度/速度、IMU、基座速度）+ 用户速度指令 $v_{\text{cmd}}$</td><td>~60 维观测（Unitree Go1: 12 关节）</td></tr>
+    <tr><td><strong>输出（策略）</strong></td><td>12 个关节目标位置（由 PD 控制器跟踪）→ 行走步态</td><td>12 维动作空间</td></tr>
+    <tr><td><strong>优化目标</strong></td><td>最小化电池总功耗（电流积分），同时保持速度跟踪精度</td><td>在 0.5–1.1 m/s 速度下净功耗降低 24–28%</td></tr>
+    <tr><td><strong>测量模型输入</strong></td><td>电机扭矩 $\tau_t$ 和角速度 $\dot{q}_t$（仿真中已知）</td><td>24 维（12 关节 × 2）</td></tr>
+    <tr><td><strong>测量模型输出</strong></td><td>预测的电池总电流 $\hat{i}_t$（真实电流的 surrogate）</td><td>1 维标量</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个 <strong>sim-to-real 策略优化问题</strong>，但与传统的 domain randomization 不同（后者解决"仿真器不准"），本文解决的是<strong>"仿真器中完全不存在"的目标量</strong>。该任务位于 <strong>model-based RL 与迭代学习</strong>的交汇处：从真实数据中学习一个局部世界模型（只建模目标指标，而非完整动力学），用它来指导仿真中的策略搜索，再用真实世界测试来修正和更新模型。平台：Unitree Go1 四足机器人（12 自由度，约 12 kg），场景：平地行走 + 室外长距离测试，核心指标：<strong>电池总功耗净降低百分比</strong>。</p>
+</section>
+
+<!-- ═══════════════ 5. 关键挑战 ═══════════════ -->
+<section id="challenge">
+  <h2>5. 关键挑战</h2>
+
+  <h3>5.1 本质（第一性原理分析）</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：仿真器是一个物理近似——它知道"质量"、"摩擦"、"关节扭矩"，但完全不知道"电池电流"、"电机驱动芯片发热"、"FOC 开关损耗"。<br><br>
+    （1）<strong>"已知的未知" vs "未知的未知"</strong>：Domain randomization 处理的是"已知的未知"（比如摩擦系数不准确——将其随机化），但电池总功耗属于"未知的未知"——仿真器中根本没有这个变量，因此 randomization 完全无效。<br><br>
+    （2）<strong>手工 proxy 的维数灾难</strong>：为每个机器人和每个目标设计精确的解析 proxy，需要完整的电-机-热耦合模型——在实践中几乎不可能。更糟的是，proxy 的梯度方向可能与真实目标相悖（例如，机械功率 proxy 在 0.5 m/s 下仅节省 11.8% 净功耗，而数据驱动方法节省了 28.4%）。<br><br>
+    （3）<strong>Surrogate 的分布外（OOD）陷阱</strong>：基于真实数据训练的 LSTM 在训练分布内预测准确，但 RL 优化天然会探索新颖步态模式——这些步态的 ($\tau, \dot{q}$) 分布可能远偏离训练数据。如果策略 exploit 了 surrogate 的预测误差，整个优化就会崩溃。<br><br>
+    <strong>综合来看</strong>：你需要（a）从真实数据中学到的 surrogate 来建模仿真器缺失的量；（b）一个约束来防止策略进入 surrogate 不可信的区域；（c）持续的真实世界验证来修正 surrogate。这三个需求构成一个先有鸡还是先有蛋的循环——本文通过迭代闭环框架同时解决了它们。
+  </div>
+
+  <h3>5.2 先前方法及其局限性</h3>
+  <table>
+    <tr><th>先前方法</th><th>核心思想</th><th>为何对难仿真目标失效</th></tr>
+    <tr>
+      <td>手工设计的解析 Proxy</td>
+      <td>使用物理公式，例如 $\sum \max(\tau_i \dot{q}_i + \frac{r}{k^2}\tau_i^2, 0)$（机械功率 + 焦耳热）</td>
+      <td>（1）每个目标都需要领域专家设计；（2）无法捕捉 FOC 驱动损耗、电池内阻、待机功耗；（3）可能给出错误的梯度方向——解析 proxy 仅节省 5–12% 净功耗，而本文方法达 24–28%</td>
+    </tr>
+    <tr>
+      <td>Domain Randomization</td>
+      <td>随机化仿真中的物理参数，使策略对参数变化具有鲁棒性</td>
+      <td><strong>核心问题：只能处理仿真中"存在但不准确"的量，无法处理"根本不存在"的量。</strong>电池电流在 Isaac Gym 中根本不存在——无论怎么随机化也无法生成它。</td>
+    </tr>
+    <tr>
+      <td>系统辨识 + 高保真仿真器</td>
+      <td>通过实验测量机器人参数，构建更精确的仿真模型</td>
+      <td>（1）耗费大量人力——每台机器人都需重新辨识；（2）许多过程（FOC 动力学、电池老化）无法用简单参数化模型捕捉；（3）总会不断出现新的"难仿真"目标</td>
+    </tr>
+    <tr>
+      <td>纯真实世界 RL</td>
+      <td>直接在真实机器人上运行 RL，从真实数据中学习</td>
+      <td>（1）样本效率极低——数千个 episode 不可行；（2）安全隐患——探索可能导致摔倒；（3）无并行性——只能在单台机器人上串行采集数据</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 —— 测量模型的 OOD 泛化问题</strong>：LSTM 在训练分布内预测准确，但仿真中的 RL 优化会探索新颖步态模式——其 ($\tau, \dot{q}$) 分布可能远偏离训练数据。如果没有策略更新的约束，优化器会 exploit surrogate 的预测误差，导致"仿真中改善但真实中恶化"。解决手段：KL 散度约束将更新限制在 trust region 内，确保 surrogate 预测的可靠性。</li>
+    <li><strong>挑战 2 —— 真实世界测试的样本效率</strong>：每轮需要在真实机器人上部署 Top-6 策略——每次测试都需要部署、监控和充电。如何在有限测试预算内找到显著改进（~3-4 轮 × 6 策略 = 18-24 次真实测试）？层级选择是关键，但仿真排名与真实排名的相关性决定了效率上限。</li>
+    <li><strong>挑战 3 —— 跨速度的统一优化</strong>：不同速度下的最优步态可能差异很大。如何确保优化后的策略在所有目标速度上都优于基线，而不是在某个速度上改善却在另一个上恶化？通过统一训练中覆盖多个速度指令，以及最终评估中验证全速度谱来解决。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. 方法与公式 ═══════════════ -->
+<section id="method">
+  <h2>6. 方法与公式</h2>
+
+  <h3>6.1 核心算法</h3>
+  <p>本方法是一个<strong>四步迭代框架</strong>，每一步都有清晰的理论依据和工程考量。以下逐组件进行公式化拆解。</p>
+
+  <h3>6.2 关键公式</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX 渲染由 MathJax 支持。显示公式使用 <code>$$...$$</code>，行内公式使用 <code>$...$</code>。</p>
+
+  <h4>公式组 A: LSTM 测量模型 —— 从电机状态到电池电流</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 数据驱动的测量模型</span>
+    $$ \hat{i}_t = f_{\text{LSTM}}(\tau_t, \dot{q}_t; \theta) \qquad \mathcal{L}_{\text{MSE}} = \frac{1}{T}\sum_{t=1}^{T}(\hat{i}_t - i_t^{\text{real}})^2 $$
+    <div class="eq-note">
+      <strong>$\hat{i}_t$</strong> = LSTM 预测的 $t$ 时刻电池总电流 &nbsp;|&nbsp;
+      <strong>$\tau_t$</strong> = 12 个关节的电机扭矩向量 &nbsp;|&nbsp;
+      <strong>$\dot{q}_t$</strong> = 12 个关节的角速度向量 &nbsp;|&nbsp;
+      <strong>$f_{\text{LSTM}}$</strong> = 带有隐状态的 LSTM 网络，捕捉功耗中的时序依赖性 &nbsp;|&nbsp;
+      <strong>$i_t^{\text{real}}$</strong> = 在真实机器人上测量的 ground-truth 电池电流 &nbsp;|&nbsp;
+      <strong>为什么用电机状态 ($\tau, \dot{q}$) 作为输入？</strong>这些量在仿真中精确已知，且是功耗的主要物理决定因素。LSTM 学习从机械功率到电气总功率的非线性映射（包括电机效率、驱动损耗等）。
+    </div>
+  </div>
+
+  <h4>公式组 B: 组合奖励 —— 任务奖励 + 数据驱动功耗奖励</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 组合奖励函数</span>
+    $$ r(\mathbf{s}_t, \mathbf{a}_t) = r_{\text{sim}}(\mathbf{s}_t, \mathbf{a}_t) + \lambda \cdot r_{\text{power}}(\hat{i}_t) $$
+    $$ r_{\text{power}}(\hat{i}_t) = -\hat{i}_t = -f_{\text{LSTM}}(\tau_t, \dot{q}_t; \theta) $$
+    <div class="eq-note">
+      <strong>$r_{\text{sim}}$</strong> = 标准仿真奖励（速度跟踪误差 + 姿态稳定性 + 动作平滑度 + 存活奖励） &nbsp;|&nbsp;
+      <strong>$r_{\text{power}}$</strong> = 数据驱动的省电奖励：预测电流的负值（电流越低 → 奖励越高） &nbsp;|&nbsp;
+      <strong>$\lambda$</strong> = 功耗奖励权重（扫描值：$\{0.5, 1, 5\}$）——控制"省电 vs 完成任务"之间的权衡 &nbsp;|&nbsp;
+      <strong>关键设计选择</strong>：直接使用预测电流的负值——因为 LSTM 已学到真实总电流的完整映射，封装了仿真器无法建模的所有损耗分量。
+    </div>
+  </div>
+
+  <h4>公式组 C: KL 散度约束 —— 防止策略分布偏移</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — KL 散度约束</span>
+    $$ \mathbb{E}_{\mathbf{s} \sim \pi}\left[ D_{\text{KL}}\left( \pi(\cdot \mid \mathbf{s}) \;\|\; \pi^{\text{anchor}}(\cdot \mid \mathbf{s}) \right) \right] \leq c $$
+    <div class="eq-note">
+      <strong>$\pi$</strong> = 正在优化的策略 &nbsp;|&nbsp;
+      <strong>$\pi^{\text{anchor}}$</strong> = anchor 策略（上一轮最优，用于数据采集） &nbsp;|&nbsp;
+      <strong>$D_{\text{KL}}$</strong> = KL 散度——衡量两个策略动作分布之间的差异 &nbsp;|&nbsp;
+      <strong>$c$</strong> = KL 散度上限（扫描值：$\{0.2, 0.5, 1\}$） &nbsp;|&nbsp;
+      <strong>为什么这个约束是必要的？</strong>LSTM 仅在 $\pi^{\text{anchor}}$ 产生的 ($\tau, \dot{q}$) 分布附近预测可靠。如果新策略偏离太远，LSTM 预测会变成"幻觉"。KL 约束将更新限制在"信任区域"内，防止 exploit surrogate 的弱项。
+    </div>
+  </div>
+
+  <h4>公式组 D: 解析功耗 Proxy（基线对比）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 解析功耗 Proxy（传统方法）</span>
+    $$ r_{\text{analytical}} = -\sum_{i=1}^{12} \max\left( \tau_i \dot{q}_i + \frac{r}{k^2} \tau_i^2,\; 0 \right) $$
+    <div class="eq-note">
+      <strong>$\tau_i \dot{q}_i$</strong> = 第 $i$ 个关节的机械功率（扭矩 × 角速度） &nbsp;|&nbsp;
+      <strong>$\frac{r}{k^2} \tau_i^2$</strong> = 焦耳热损耗（$r$ = 电机绕组电阻，$k$ = 扭矩常数） &nbsp;|&nbsp;
+      <strong>$\max(\cdot, 0)$</strong> = 仅惩罚正功率 &nbsp;|&nbsp;
+      <strong>为什么不够？</strong>（1）忽略了 FOC 驱动开关损耗和待机功耗；（2）忽略了电池内阻；（3）忽略了电机效率变化；（4）$r$ 和 $k$ 随温度和老化变化。仅节省 5–12% 总功耗，而数据驱动方法达 24–28%。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>功耗奖励权重 $\lambda$</td><td><strong>{0.5, 1, 5}</strong></td><td>控制省电 vs 完成任务之间的权衡</td><td>太小 → 不够省电；太大 → 可能牺牲速度跟踪。网格扫描找到最优平衡</td></tr>
+    <tr><td>KL 散度上限 $c$</td><td><strong>{0.2, 0.5, 1}</strong></td><td>策略偏离 anchor 的最大允许程度</td><td>太小 → 没有改进空间；太大 → 可能进入 surrogate 的 OOD 区域</td></tr>
+    <tr><td>精英策略数量</td><td><strong>Top-6</strong></td><td>每轮用于真实测试的候选策略数</td><td>太少 → 可能漏掉好策略；太多 → 测试成本高。6 是一个平衡选择</td></tr>
+    <tr><td>迭代轮数</td><td><strong>3–4</strong></td><td>框架的总轮数</td><td>3 轮后观察到了饱和——策略和测量模型均接近收敛</td></tr>
+    <tr><td>LSTM 输入维度</td><td><strong>24</strong></td><td>12 关节 × 2（扭矩 + 速度）</td><td>信息量最大且仿真可靠性最高的最小特征集</td></tr>
+    <tr><td>RL 算法</td><td><strong>PPO</strong></td><td>Proximal Policy Optimization</td><td>PPO 通过 clipping 原生支持 trust-region，与 KL 约束天然兼容</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 7. 深层原理 ═══════════════ -->
+<section id="principles">
+  <h2>7. 深层原理</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要把握三大核心原理：（1）为什么数据驱动 surrogate 优于手工 proxy——信息论视角；（2）为什么 KL 散度约束能防止策略 exploit——信任域优化视角；（3）为什么层级选择加数据聚合能实现高效闭环学习——主动学习视角。</p>
+
+  <h3>7.1 数据驱动 Surrogate 的信息论优势</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 —— Surrogate 建模了仿真器无法计算的互信息</span>
+    $$ I(i_t^{\text{real}}; \tau_t, \dot{q}_t) > I(i_t^{\text{real}}; \tau_t, \dot{q}_t \mid \text{physics proxy}) $$
+    <div class="eq-note">
+      <strong>直观理解</strong>：手工 proxy 已经利用了 ($\tau, \dot{q}$) 的<strong>部分</strong>信息，但留下了大量"残差信息"未被建模——FOC 开关损耗、电池非线性放电、电机效率曲面。LSTM <strong>从数据中自动发现并利用这些残差信息</strong>。手工 proxy 只用到了信息的"主成分"，而 LSTM 学到了完整的"非线性流形"。 &nbsp;|&nbsp;
+      <strong>为什么用 LSTM 而不是 MLP？</strong>功耗具有时序依赖性——加速和减速阶段的特性不同，关节间的耦合存在时序模式。LSTM 的隐状态以自然方式建模这些依赖关系。
+    </div>
+  </div>
+
+  <p>手工 proxy 只利用了 ($\tau, \dot{q}$) 信息量的"主成分"，而 LSTM 学会了利用完整的"非线性流形"——包含电机效率曲面、FOC 开关模式、电池放电曲线。</p>
+
+  <h3>7.2 KL 散度约束的信任域原理</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 —— 为什么约束策略更新步长</span>
+    $$ \mathbb{E}\left[ J(\pi) \right] \approx \mathbb{E}\left[ \hat{J}(\pi) \right] \quad \text{仅当 } \pi \approx \pi^{\text{anchor}} $$
+    $$ |\mathbb{E}[J(\pi)] - \mathbb{E}[\hat{J}(\pi)]| \propto D_{\text{KL}}(\pi \parallel \pi^{\text{anchor}}) $$
+    <div class="eq-note">
+      <strong>$J(\pi)$</strong> = 真实世界中的期望总功耗（未知） &nbsp;|&nbsp;
+      <strong>$\hat{J}(\pi)$</strong> = 使用 LSTM surrogate 在仿真中估计的总功耗 &nbsp;|&nbsp;
+      <strong>核心关系</strong>：Surrogate 的预测误差大致与策略偏离 anchor 的程度成正比。当接近 anchor 时，LSTM 预测接近 ground truth；当偏离很远时，误差可能急剧增大——甚至出现符号反转（预测功耗更低但真实功耗更高）。KL 约束维持"$\pi$ 不能离开 surrogate 的置信区域"这一要求。这类似于 TRPO 的 line search——如果 KL 超过阈值 $c$，减小更新步长直到约束满足。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🧠 KL 约束的工作原理</h4>
+      <p>每次更新后，检查 $\mathbb{E}[D_{\text{KL}}(\pi \parallel \pi^{\text{anchor}})]$。如果超过阈值 $c$，减小更新步长（类似于 TRPO 的 line search）直到满足约束。这防止了如"大步幅、低频"突变为"小步幅、高频"这样的剧烈变化。</p>
+      <p><strong>为什么扫描 $c \in \{0.2, 0.5, 1\}$？</strong>不同的 $c$ 值对应不同的"探索半径"，为每个阶段找到最优的探索-利用平衡。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>🔧 没有 KL 约束会发生什么</h4>
+      <p><strong>Reward hacking 示例</strong>：PPO 可能发现一种步态：扭矩极大但速度接近零（$\tau_i \gg 0, \dot{q}_i \approx 0$）。LSTM 从未见过这种组合——可能预测极低功耗。但实际中，虽然机械功率低，但电机堵转电流巨大 → 真实功耗其实非常高。KL 约束阻止了这种 OOD 跳跃，因为与正常行走策略的行为差异太大。</p>
+    </div>
+  </div>
+
+  <h3>7.3 主动学习视角：层级选择 + 数据聚合</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 —— 层级选择的信息采集效率</span>
+    $$ \pi^* = \arg\min_{\pi \in \Pi^{\text{elites}}} J_{\text{real}}(\pi) \quad \text{其中 } \Pi^{\text{elites}} = \text{TopK}_{\pi \in \Pi^{\text{all}}} \hat{J}_{\text{sim}}(\pi) $$
+    $$ D_{k+1} = D_k \cup \{(\tau, \dot{q}, i)_t \mid t \in \text{来自测试 } \Pi^{\text{elites}} \text{ 的轨迹}\} $$
+    <div class="eq-note">
+      <strong>$\Pi^{\text{all}}$</strong> = 本轮的全体候选策略（网格扫描产生约 9 个策略） &nbsp;|&nbsp;
+      <strong>$\hat{J}_{\text{sim}}$</strong> = 使用 LSTM surrogate 估计的功耗 &nbsp;|&nbsp;
+      <strong>$\Pi^{\text{elites}}$</strong> = Top-6 精英集合 &nbsp;|&nbsp;
+      <strong>$J_{\text{real}}$</strong> = 真实测试得到的实际功耗 &nbsp;|&nbsp;
+      <strong>$D_k$</strong> = 累积训练数据集 &nbsp;|&nbsp;
+      <strong>主动学习视角</strong>：选 Top-6 进行真实测试是利用 surrogate 来选择"最具信息量"（最可能最优）的策略。新数据扩展了 LSTM 的训练覆盖范围，因为精英策略探索了新颖的步态区域。DAgger 风格的"从不丢弃旧数据"防止灾难性遗忘，保证覆盖范围单调增长。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三大原理的协同交互</div>
+    数据驱动 surrogate 填补仿真器盲区 → KL 约束确保 surrogate 预测仅在其置信区域内被使用 → 层级选择 + 数据聚合使 surrogate 与策略协同进化 → <strong>三者形成闭环</strong>：更好的策略 → 更多样化数据 → 更准确的 surrogate → surrogate 引导策略找到更优步态。这个闭环是 24–28% 功耗降低背后的根本原因。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. 图表证据 ═══════════════ -->
+<section id="figures">
+  <h2>8. 图表证据</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文截图。图片保存于 <code>figures/</code> 子目录中。</p>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">总览图</span>
+      <span class="fig-caption">框架总览：针对难仿真目标的数据驱动迭代微调</span>
+      <span class="fig-source">来源：论文总览图</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/overview.png" alt="Fine-Tuning Hard-to-Simulate Objectives framework overview"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 Please save screenshot as <code>figures/overview.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>该图展示了</strong>完整的迭代微调框架。<strong>左侧</strong>：真实世界——将策略部署在 Unitree Go1 上，采集真实数据。<strong>中间</strong>：测量模型——在累积数据上训练 LSTM。<strong>右侧</strong>：仿真——将 LSTM 嵌入为奖励，在 KL 约束下微调，参数扫描产生候选策略。<strong>底部</strong>：层级选择——仿真 Top-6 在真实机器人上评估，最优者成为下一轮 anchor。</p>
+      <ul>
+        <li><strong>框架通用性</strong>：可扩展到任何真实可测但仿真缺失的目标——噪声（麦克风）、发热（温度传感器）、磨损（振动传感器）。只需更换 LSTM 输出</li>
+        <li><strong>数据效率</strong>：每轮仅测试 6 个策略——比纯真实机器人 RL 高效数个数量级</li>
+        <li><strong>逐步改进</strong>：循环箭头表示每轮数据、模型、策略的协同进化</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">实验图 1</span>
+      <span class="fig-caption">省电效果对比：数据驱动 proxy vs 解析 proxy vs 预训练基线</span>
+      <span class="fig-source">来源：论文实验</span>
+    </div>
+    <div class="fig-image">
+      <div class="fig-placeholder">📷 Save experimental comparison chart as <code>figures/exp_power_comparison.png</code></div>
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>展示了</strong>三个速度下的归一化电池总功耗：</p>
+      <ul>
+        <li><strong>0.5 m/s</strong>：解析法 11.8% vs 数据驱动法 <strong>28.4%</strong>（差距 2.4 倍）</li>
+        <li><strong>0.8 m/s</strong>：解析法 6.2% vs 数据驱动法 <strong>27.0%</strong>（差距 4.4 倍）</li>
+        <li><strong>1.1 m/s</strong>：解析法 5.0% vs 数据驱动法 <strong>24.2%</strong>（差距 4.8 倍）</li>
+        <li>高速下解析 proxy 几乎失效，因为 FOC 驱动动态损耗占主导——正是该公式忽略的部分</li>
+        <li>数据驱动 proxy 在所有速度上一致节省 24–28%，且方差更低</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">实验图 2</span>
+      <span class="fig-caption">逐轮改进：模型误差与策略功耗同步下降</span>
+      <span class="fig-source">来源：论文实验</span>
+    </div>
+    <div class="fig-image">
+      <div class="fig-placeholder">📷 Save iteration improvement curve as <code>figures/exp_iteration.png</code></div>
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>展示了</strong>各轮迭代（第 1 轮 → 第 2 轮 → 第 3 轮）中的协同进化：</p>
+      <ul>
+        <li><strong>策略功耗</strong>：每轮持续下降，3 轮后收敛——KL 约束下的渐进式改进</li>
+        <li><strong>测量模型误差</strong>：随数据集增长稳步改善，提升下一轮优化方向质量</li>
+        <li><strong>第 1 轮改进最大</strong>：初始 LSTM 已远比手工 proxy 准确</li>
+        <li><strong>低速（0.5 m/s）改进最大</strong>：静态扭矩维持时间更长 → 节能潜力更大</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">实验图 3</span>
+      <span class="fig-caption">行为分析：优化后的扭矩平滑度和足端着地位置</span>
+      <span class="fig-source">来源：论文实验</span>
+    </div>
+    <div class="fig-image">
+      <div class="fig-placeholder">📷 Save behavioral analysis as <code>figures/exp_behavior.png</code></div>
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>展示了</strong>解释 24–28% 省电效果的行为变化：</p>
+      <ul>
+        <li><strong>关节扭矩曲线更平滑</strong>：减少了扭矩"尖峰"——尖峰持续时间虽短但引起大幅瞬态 FOC 电流（电容充放电）</li>
+        <li><strong>前足更靠近质心（CoM）</strong>：减少前腿"刹车"效应，降低驱动功率</li>
+        <li><strong>步态频率/幅度自动调整</strong>：低速下步幅更小，高速下利用惯性</li>
+        <li><strong>室外测试验证</strong>：优化策略在长距离行走中表现出更好的电池续航</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. 局限与延伸 ═══════════════ -->
+<section id="flaw">
+  <h2>9. 局限与延伸</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>假设条件</strong>：（1）目标量必须可靠可测——电池电流容易，步态噪声受环境背景影响，电机磨损需长期运行；（2）测量模型输入特征（$\tau, \dot{q}$）必须在仿真中精确已知；（3）速度跟踪精度不能明显恶化——需要精心调节 $\lambda$。</li>
+    <li><strong>适用场景</strong>：仅在平地行走和 3 个固定速度（0.5, 0.8, 1.1 m/s）上验证——在非平坦地形（斜坡、楼梯、碎石路）和连续速度谱上的泛化未经验证。</li>
+    <li><strong>可扩展性</strong>：每轮需要约 6 次真实机器人测试——单机器人可行，但扩展到更大参数空间或多目标优化（功耗 + 噪声 + 发热）会导致更高的 Pareto 前沿搜索成本。</li>
+  </ul>
+
+  <h3>9.2 延伸方向</h3>
+  <ul>
+    <li><strong>多目标</strong>：从单目标（功耗）到多目标（功耗 + 噪声 + 热 + 冲击）。每个目标一个独立 LSTM，组合奖励 = $r_{\text{sim}} + \sum_k \lambda_k \cdot r_k$。权重调节需要偏好学习或 Pareto 前沿跟踪</li>
+    <li><strong>减少真实测试</strong>：用贝叶斯优化替代网格扫描，利用 surrogate 不确定性选择候选策略。多机器人并行数据采集，各机器人独立 adaptor 层</li>
+    <li><strong>地形泛化</strong>：每种地形单独训练 LSTM，或使用条件输入（地形类型编码）训练统一模型。添加地形高度图到 LSTM 输入</li>
+    <li><strong>在线自适应</strong>：部署后持续小规模在线微调——用实时电流更新 LSTM，适应电池老化和电机温度漂移</li>
+  </ul>
+
+  <h3>9.3 数据敏感性</h3>
+  <table>
+    <tr><th>数据问题</th><th>难度分析</th><th>严重程度</th></tr>
+    <tr><td>电流传感器噪声</td><td>~几 mA 噪声。高采样率（>100 Hz）可通过时间平均抑制噪声</td><td>★★</td></tr>
+    <tr><td>放电过程中电池电压衰减</td><td>电压从 ~25.2V 降至 ~22.2V → 相同机械功率需要更高电流。若电池状态变化过大，模型需要更新</td><td>★★★</td></tr>
+    <tr><td>环境温度对电机效率的影响</td><td>电机电阻每升高 1°C 增加 ~0.4% → 相同扭矩需要更高电流。室内训练的 LSTM 在室外可能存在系统性偏差</td><td>★★★</td></tr>
+    <tr><td>不同机器人个体的制造差异</td><td>不同 Go1 个体的电机效率和关节摩擦略有差异。在一台机器人上训练的模型用于另一台可能需要适配数据</td><td>★★★★</td></tr>
+  </table>
+
+  <h3>9.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>将该框架应用于无人机续航优化</strong>——从地面机器人到空中机器人的自然延伸。无人机难仿真目标包括：（1）<strong>电池总功耗</strong>——ESC 驱动损耗、螺旋桨气动效率非线性（Blade Element Theory 不足）；（2）<strong>电机发热</strong>——悬停和巡航阶段温升不同，过热导致退磁；（3）<strong>振动与噪声</strong>——对侦察任务至关重要。框架可直接迁移：在真实无人机上飞基线 → 记录 IMU/ESC + 电流/温度/振动 → 训练 LSTM → 嵌入 AirSim/Gazebo → 带 KL 约束的 PPO → 迭代。挑战更大（3D 动力学、坠毁风险、预算更紧），但回报也更大——24–28% 的功耗节省意味着 25–40% 的额外飞行时间。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. 动机推导 ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机推导</h2>
+
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>足式机器人面临一个根本性矛盾：最重要的指标（功耗、噪声、发热、可靠性）恰恰是仿真器最差的部分。仿真器知道关节扭矩和速度，但不知道电池电流、PWM 开关损耗或齿轮箱摩擦热。这造成了系统性鸿沟：在仿真中"优化得很好"的策略，在真实世界中可能功耗极高。</li>
+    <li><strong>先前工作如何处理？为什么不够？</strong><br>三条路线：（i）手工 proxy——将电-机系统压缩为 $\sum \tau_i \dot{q}_i + \frac{r}{k^2}\tau_i^2$，丢失大量信息（仅节省 5–12%）。（ii）Domain randomization——无法生成仿真中不存在的物理量。（iii）纯真实机器人 RL——样本效率低且危险。</li>
+    <li><strong>如果不是改造仿真器，而是从数据中"外挂"一个模块呢？</strong><br>核心洞察：电池电流直接可测。电机扭矩和速度在仿真中精确已知。从真实数据训练一个轻量 LSTM 来学习 ($\tau, \dot{q}$) → $i$ 的映射，然后将其嵌入仿真。这就是用数据"填补"仿真器的盲区。</li>
+    <li><strong>但 RL 会 exploit 这个模型——如何防止？</strong><br>KL 散度约束限制新策略不能偏离数据采集策略太远。这确保优化只在 LSTM 预测可信的区域内进行。</li>
+    <li><strong>单轮不够——如何形成持续改进？</strong><br>迭代闭环：更好的策略 → 更多样化数据 → 更准确模型 → 更大的 trust region → 下一轮策略可以更优。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    仿真器能计算关节扭矩和速度，但对电池电流一无所知——那为什么不直接用一个轻量神经网络从真实机器人数据中学出 ($\tau, \dot{q}$ → $i$) 的映射，嵌入仿真作为能耗奖励，在 KL 约束下微调策略，让模型和策略通过迭代共同进步？
+  </div>
+
+  <h3>10.3 如果让你来提出这个想法，你会怎么推</h3>
+  <ul>
+    <li><strong>第 1 步 —— 观察</strong>：手工 proxy 仅节省 5–12% 真实功耗——信息丢失太多。直觉：与其写公式，不如从数据中学。</li>
+    <li><strong>第 2 步 —— 分解</strong>：功耗优化 = 找一个（a）能跟踪速度且（b）最小化真实电流的步态。（b）在仿真中缺失 → 从数据中学它。</li>
+    <li><strong>第 3 步 —— 匹配合适的工具</strong>：LSTM 处理时序功耗依赖性；KL 约束确保安全探索；PPO 保证稳定优化；网格扫描 + 层级选择应对不确定性。</li>
+    <li><strong>第 4 步 —— 组装</strong>：数据驱动 surrogate + KL 约束 + 层级选择 + 迭代数据聚合 = 完整框架。在 Unitree Go1 上验证了 24–28% 的净功耗降低。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. 核心收获 ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+
+  <h3>11.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：本文展示了一种优雅的"用数据补充仿真器"的范式。不是对抗仿真器的局限（让它更精确）、也不是忽略它（让策略更鲁棒），而是承认仿真器在某些方面永远不够精确，并用真实数据训练一个小型"翻译"模型。这种"最小必要模型"（只针对目标相关量，而非完整动力学）极大降低了学习难度。</li>
+    <li><strong>技术技巧</strong>：（1）LSTM 输入仅用扭矩和速度——仿真中最可靠的量；（2）KL 约束 + 参数扫描 = 用计算量来对抗 surrogate 的不确定性；（3）数据累积（从不丢弃旧数据）避免灾难性遗忘——简单但常被忽视的设计。</li>
+    <li><strong>实验/写作层面</strong>：选择"总功耗"作为案例研究非常巧妙——一个直观、易量化、实践意义强且手工 proxy 确实效果不佳的指标，使对比极具说服力。</li>
+  </ul>
+
+  <h3>11.2 可直接应用于我的研究</h3>
+  <ul>
+    <li><strong>对于无人机运动优化</strong>：无人机领域面临完全相同的问题——电池功耗、电机温度、螺旋桨噪声都无法在仿真中精确建模。该框架可直接迁移：在真实无人机上飞基线 → 采集数据 → 训练 LSTM → 嵌入仿真 → 带 KL 约束的 PPO → 迭代。无人机测试更快（每次飞行仅数分钟）。</li>
+    <li><strong>对于无人机多目标优化</strong>：同时优化续航、噪声和热安全——每个目标独立 LSTM，组合奖励带可向量化权重。权重调节可利用偏好学习或约束优化。</li>
+    <li><strong>对于 sim-to-real 研究</strong>：核心哲学——"学习仿真到现实的残差映射"——具有广泛适用性。在无人机中，可学习仿真到真实的气动残差、IMU 噪声变换等，然后迭代微调策略。</li>
+  </ul>
+
+  <h3>11.3 值得追踪的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Rudin et al. (2022) — Advanced Skills by Learning Locomotion. <em>Science Robotics</em></td><td>在复杂地形上使用 PPO sim-to-real 训练 ANYmal 的 SOTA 工作，但未解决难仿真目标。本文是其下一步：学会了走之后，学会高效地走</td></tr>
+    <tr><td>Hwangbo et al. (2019) — Learning Agile and Dynamic Motor Skills. <em>Science Robotics</em></td><td>首个 PPO sim-to-real 四足运动工作。使用 actuator network 建模电机动力学——思路与本文 LSTM 类似，但需要手工建模。本文的 LSTM 完全从数据中学习</td></tr>
+    <tr><td>Peng et al. (2020) — Learning Agile Locomotion via Adversarial Imitation. <em>RSS</em></td><td>模仿学习 + RL，使用动物运动捕捉数据。关注运动质量（自然度），本文关注运动效率（功耗）——互补维度</td></tr>
+    <tr><td>Ross et al. (2011) — DAgger. <em>AISTATS</em></td><td>经典迭代数据聚合方法。本文"保留所有历史数据"的设计源于 DAgger，防止分布偏移退化</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Nai, You et al. · ICRA 2025 · Fine-Tuning Hard-to-Simulate Objectives for Quadruped Locomotion: A Case Study on Total Power Saving · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

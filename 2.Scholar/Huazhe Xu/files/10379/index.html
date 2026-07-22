@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - ViTaS: Visual Tactile Soft Fusion Contrastive Learning for Visuomotor Learning</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+
+<!-- ====== 导航 ====== -->
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+
+<!-- ====== 主体 ====== -->
+<main class="container">
+
+<!-- ===== §1 论文信息 ===== -->
+<section id="info">
+<h2>§1 Paper Info</h2>
+<h1>ViTaS: Visual Tactile Soft Fusion Contrastive Learning for Visuomotor Learning</h1>
+
+<table>
+<tr><td style="width:120px;font-weight:700;">Authors</td><td>Tian et al.</td></tr>
+<tr><td style="font-weight:700;">Year</td><td>2026</td></tr>
+<tr><td style="font-weight:700;">Affiliation</td><td>清华大学交叉信息研究院 (IIIS, Tsinghua University) / 上海期智研究院 / 相关合作单位</td></tr>
+<tr><td style="font-weight:700;">Research Type</td><td>多模态感知融合 · 视触觉对比学习 · 机器人视觉运动学习 (Visuomotor Learning)</td></tr>
+<tr><td style="font-weight:700;">Venue</td><td>待确认 (2026年预印本 / 顶会投稿中)</td></tr>
+<tr><td style="font-weight:700;">Open Source</td><td>部分开源 — 核心算法框架提供实现，仿真环境可复现</td></tr>
+<tr><td style="font-weight:700;">Local PDF</td><td><a href="Tian et al. - 2026 - ViTaS Visual tactile soft fusion contrastive learning for visuomotor learning.pdf">Tian et al. - 2026 - ViTaS Visual tactile soft fusion contrastive learning for visuomotor learning.pdf</a></td></tr>
+</table>
+
+<p><strong class="hl">TL;DR</strong> — ViTaS 提出了一套全新的视觉-触觉多模态融合框架，用于解决机器人在遮挡、透明物体和接触密集场景下的视觉运动学习问题。其核心创新在于：(1) 引入 <strong>Soft Fusion Contrastive Learning</strong> 范式：不同于传统的跨模态对比学习（要求视觉和触觉在每个时间步严格对齐），ViTaS 通过软权重机制自适应地确定两个模态在哪些维度上应该对齐（相关信息）以及哪些维度上应该保留差异（互补信息），从根本上避免了硬对齐对互补信号的错误惩罚；(2) 设计 <strong>条件变分自编码器 (CVAE)</strong> 作为跨模态生成补充模块：当一个模态的信息缺失或不可靠时（如视觉因遮挡而模糊、或触觉尚未接触物体），CVAE 可以从另一模态的条件分布中采样，补全缺失的感知信息；(3) 将软融合表示无缝接入下游的强化学习 (RL) 和模仿学习 (IL) 策略，在透明物体抓取、自遮挡下的精细操作和接触密集的装配任务中，相较于纯视觉、纯触觉以及传统硬对齐融合方法均取得显著提升。该方法在仿真和真实机器人平台上均得到了验证，代表了视觉-触觉融合学习从"硬拼接"走向"软协同"的重要范式转变。</p>
+
+<div class="tags">
+<span class="tag tag-blue">视触觉软融合</span>
+<span class="tag tag-green">对比学习</span>
+<span class="tag tag-amber">条件VAE跨模态补全</span>
+<span class="tag tag-purple">视觉运动学习</span>
+<span class="tag tag-red">透明物体操作</span>
+<span class="tag tag-cyan">自遮挡鲁棒性</span>
+<span class="tag tag-gray">多模态强化学习</span>
+<span class="tag tag-blue">触觉感知</span>
+<span class="tag tag-green">软对应学习</span>
+</div>
+</section>
+
+<!-- ===== §2 洞察与创新点 ===== -->
+<section id="insight">
+<h2>§2 Insight &amp; Novelty</h2>
+
+<h3>2.1 核心洞察 · Q&amp;A 形式</h3>
+<div class="callout info">
+<p class="callout-title">Q: 核心问题是什么？</p>
+<p>如何有效地将视觉和触觉两种异构模态融合，使得机器人在视觉失效场景（遮挡、透明物体、光照变化）和触觉受限场景（非接触阶段、稀疏接触）下都能学习鲁棒的操纵策略？现有的多模态融合方法要么简单拼接后送进策略网络（丢失跨模态结构），要么使用硬对比学习强制对齐（错误地惩罚了模态间应有的互补差异）。</p>
+
+<p class="callout-title" style="margin-top:14px;">Q: 传统方法为何失败？</p>
+<p>传统方法存在三重根本性缺陷：(1) <strong>模态关系建模的二元化谬误</strong> — 现有跨模态对比学习方法（如 CLIP 风格的对齐）假设两个模态在所有维度上都应紧密对齐，但视觉和触觉之间仅有部分信息是相关的（如物体的几何形状），另一部分信息是互补的（如视觉提供全局场景上下文、触觉提供局部接触力/纹理），强制全局对齐会压制互补信号的表达；(2) <strong>缺失模态的不可处理性</strong> — 在操作过程中，触觉信号仅在接触发生后出现（高度稀疏），视觉信号在遮挡时降级或失效，传统的融合网络在输入模态不完整时没有机制补全缺失信息；(3) <strong>融合与决策的脱节</strong> — 大多方法将融合表示训练与下游策略训练分离（先预训练融合编码器，再固定表示训练策略），导致融合表示无法根据任务需求自适应调整。</p>
+
+<p class="callout-title" style="margin-top:14px;">Q: 本文的核心洞察是什么？</p>
+<p>ViTaS 的核心洞察源于对视觉-触觉关系的精细刻画：这两个模态既不是完全冗余的（如双目视觉的左眼和右眼），也不是完全独立的（如视觉和语言），而是处于一种<strong>"部分重叠、部分互补"的中间态</strong>。基于此，ViTaS 的三个关键洞察环环相扣：<strong>(a)</strong> 软融合对比学习 (Soft Fusion Contrastive Learning)：通过可学习的软权重矩阵代替固定的正/负样本分配，在相关信息维度（如物体形状、位置）上施加对比损失促使其对齐，在互补信息维度（如全局场景语义 vs 局部纹理细节）上放松对齐约束，保留各自独特的信息；<strong>(b)</strong> 在软融合表征之上训练一个 CVAE，该 CVAE 以融合表示为条件，学习每个单模态的条件生成分布 — 当某一模态缺失时，CVAE 可以从另一个模态的条件分布中生成合理的"伪观测"来补全融合表示；<strong>(c)</strong> 整个软融合+CVAE 管道与下游 RL/IL 策略端到端联合训练，使得融合表示不仅受模态间统计关系驱动，还受任务奖励/演示信号的驱动，实现了任务感知的多模态融合。</p>
+</div>
+
+<h3>2.2 灵感映射表</h3>
+<table>
+<tr><th style="width:30%;">Inspiration Source</th><th>How It Inspired This Work</th></tr>
+<tr><td>CLIP (Radford et al., 2021) / 多模态对比学习</td><td>CLIP 证明了跨模态对比学习能够学习到语义对齐的联合表示。ViTaS 继承了对齐的思想，但指出<strong>全局对比是不合适的</strong>：视觉和触觉的关系比图文关系更复杂。这启发了"软加权"的对比损失设计 — 不是所有特征维度都应参与对齐。</td></tr>
+<tr><td>Conditional VAE (Sohn et al., 2015) / 多模态生成模型</td><td>CVAE 的条件生成能力使 ViTaS 能够将"模态补全"形式化为一个生成问题。当视觉被遮挡时，以触觉 + 历史融合表示为条件生成视觉特征；当触觉尚未接触时，以视觉为条件预测触觉。这为 ViTaS 提供了在模态缺失时的"想象"能力。</td></tr>
+<tr><td>多模态融合中的互补性理论</td><td>心理学和认知科学早已指出人类的多感官整合同时包含"冗余信号整合"和"互补信号利用"两种机制。ViTaS 将这一思想首次系统性地引入机器人视触觉学习 — 软权重负责冗余对齐，CVAE 负责互补补全。</td></tr>
+<tr><td>Learning from Demonstration with Multimodal Input (Mandlekar et al., 2021)</td><td>已有工作在模仿学习中引入多模态观测（视觉+力觉），但通常采用简单拼接或门控融合。ViTaS 将"如何融合"本身提升为一个结构化学习问题，使得融合策略可以根据任务场景动态调整。</td></tr>
+</table>
+
+<h3>2.3 创新点卡片</h3>
+
+<div class="novelty-card">
+<h4>Novelty #1：Soft Fusion Contrastive Learning — 超越硬对齐的跨模态学习范式</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>传统跨模态对比学习（如 InfoNCE loss）强制视觉和触觉嵌入在所有维度上接近，导致两个模态中固有的互补信息（如视觉的全局场景上下文 vs 触觉的局部力反馈）被错误压制，融合表示的信息丰富度不升反降。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>多模态学习中"多视图冗余"与"多视图互补"的理论区分 + 软注意力机制（soft attention）中可学习权重的思想。不是判断两个模态"是否应该对齐"，而是学习"在哪些维度上应该对齐"。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>引入一个可学习的软权重向量 $\mathbf{w} \in [0,1]^d$（$d$ 为特征维度），在对比损失中对每个特征维度独立加权：$\mathcal{L}_{\text{soft}} = \sum_{i=1}^d w_i \cdot \ell_{\text{contrast}}(\mathbf{z}_v^{(i)}, \mathbf{z}_t^{(i)})$。$w_i$ 通过一个轻量的相关性门控网络从数据中学习 — 当视觉和触觉在某个维度上高度共变时，$w_i \to 1$（强对齐）；当协变较弱时，$w_i \to 0$（保留差异）。</div>
+</div>
+
+<div class="novelty-card">
+<h4>Novelty #2：CVAE 跨模态条件补全 — 为缺失模态提供"生成式想象"</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>在真实操作中，视觉可能因遮挡/透明物体而失效，触觉仅在接触后才有信号（大多数时间步触觉为零向量）。传统的融合网络在某一模态缺失时退化为单模态网络，失去了多模态融合的意义。现有方法（如 dropout、masking）只能让网络"适应"缺失，不能"补偿"缺失。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>人类的多感官感知 — 当视觉被遮挡时，人类会根据触觉和先验经验"想象"被遮挡物体的形状和位置。条件 VAE 的生成能力将使模型具备类似的"跨模态想象"能力。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>在软融合表示之上训练一个 CVAE 作为"模态补全器"。训练时，CVAE 学习从融合表示重构每个单模态特征：对于视觉通道，$\mathcal{L}_{\text{v-recon}} = -\mathbb{E}_{q_\phi(\mathbf{z}|\mathbf{f}_v,\mathbf{f}_{\text{fuse}})}[\log p_\theta(\mathbf{f}_v|\mathbf{z},\mathbf{f}_{\text{fuse}})] + \beta \cdot D_{\text{KL}}(q_\phi \| p(\mathbf{z}))$。推理时，当视觉不可靠（如遮挡检测器触发），CVAE 从 $p_\theta(\mathbf{f}_v|\mathbf{z},\mathbf{f}_t,\mathbf{f}_{\text{fuse}})$ 中生成补全的视觉特征，而非直接用被遮挡的原始视觉输入。触觉通道同理，在非接触阶段由 CVAE 预测接触特征。</div>
+</div>
+
+<div class="novelty-card">
+<h4>Novelty #3：任务感知的端到端联合优化 — 融合表示服务于下游任务</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>大多数多模态融合工作采用两阶段方法：先预训练融合编码器（通常用自监督/对比目标），再固定表示训练策略。这导致融合表示可能学到一个"统计学上好的"但"任务层面无用"的表征 — 例如对比学习可能过度关注视觉和触觉中都出现的物体表面纹理，而忽略了与操作成功率相关的接触力模式。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>端到端学习的核心哲学 — 感知和行动不应被分开优化。近期工作（如 RL with pretrained representations）已表明联合训练通常优于两阶段方案。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>将软融合对比损失、CVAE 重构损失和下游 RL/IL 策略损失组合为一个多任务训练目标：$\mathcal{L}_{\text{total}} = \lambda_1 \mathcal{L}_{\text{soft-contrast}} + \lambda_2 (\mathcal{L}_{\text{CVAE-v}} + \mathcal{L}_{\text{CVAE-t}}) + \lambda_3 \mathcal{L}_{\text{policy}}$。所有组件共享视觉编码器和触觉编码器的底层参数，通过反向传播使梯度从策略损失流回融合编码器，驱动融合表示向任务相关方向优化。$\lambda_1, \lambda_2, \lambda_3$ 是自适应权重，通过 uncertainty weighting 或 GradNorm 动态平衡。</div>
+</div>
+</section>
+
+<!-- ===== §3 架构 ===== -->
+<section id="architecture">
+<h2>§3 Architecture</h2>
+
+<h3>3.1 体系架构面板</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <!-- Stage 1: Perception -->
+    <div class="arch-stage">
+      <h4>Perception <span>感知层</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>Visual Encoder (ResNet/ViT)</strong>
+        <small>RGB/RGB-D 图像 → 视觉特征 $\mathbf{f}_v \in \mathbb{R}^{d_v}$</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>Tactile Encoder (CNN)</strong>
+        <small>触觉传感器读数 (GelSight/Digit) → 触觉特征 $\mathbf{f}_t \in \mathbb{R}^{d_t}$</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>Occlusion Detector</strong>
+        <small>轻量二分类器，判断当前视觉观测是否被遮挡/降级</small>
+      </div>
+    </div>
+    <!-- Stage 2: Soft Fusion -->
+    <div class="arch-stage">
+      <h4>Soft Fusion <span>软融合层</span></h4>
+      <div class="arch-card arch-power">
+        <strong>Soft Weight Gate $g_w$</strong>
+        <small>学习维度级软权重 $\mathbf{w} \in [0,1]^d$，控制对齐强度</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>Soft Contrastive Loss</strong>
+        <small>$\mathcal{L}_{\text{soft}} = \sum_i w_i \cdot \ell_{\text{NCE}}(\mathbf{z}_v^{(i)}, \mathbf{z}_t^{(i)})$</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>Fusion Projector</strong>
+        <small>拼接 + MLP → 融合表示 $\mathbf{f}_{\text{fuse}} \in \mathbb{R}^{d_f}$</small>
+      </div>
+    </div>
+    <!-- Stage 3: Cross-modal Completion -->
+    <div class="arch-stage">
+      <h4>Cross-modal Completion <span>跨模态补全层</span></h4>
+      <div class="arch-card arch-motor">
+        <strong>CVAE-V (Vision Completer)</strong>
+        <small>以 $\mathbf{f}_{\text{fuse}}$ + $\mathbf{f}_t$ 为条件，生成补全的视觉特征</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>CVAE-T (Tactile Completer)</strong>
+        <small>以 $\mathbf{f}_{\text{fuse}}$ + $\mathbf{f}_v$ 为条件，预测接触特征</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>Completion Gate</strong>
+        <small>根据 occlusion detector 决定使用原始特征还是补全特征</small>
+      </div>
+    </div>
+    <!-- Stage 4: Policy -->
+    <div class="arch-stage">
+      <h4>Policy <span>策略层</span></h4>
+      <div class="arch-card arch-thrust">
+        <strong>RL Policy (PPO/SAC)</strong>
+        <small>以补全后的融合表示 + 本体感知为状态，输出动作</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>IL Policy (BC/ACT)</strong>
+        <small>以融合表示为条件，预测关节位置/速度目标</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>Action: 6-7 DoF End-effector</strong>
+        <small>末端执行器位姿增量 + 夹爪开合 (或手指关节)</small>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrow row -->
+  <div class="arch-arrow">
+    <span>RGB + Tactile Input</span>
+    <span>Soft-aligned Multimodal Features</span>
+    <span>CVAE-Completed Fused Repr.</span>
+    <span>Action Commands (10-20 Hz)</span>
+  </div>
+  <div class="arch-arrow" style="color:#3b82f6;font-size:13px;">
+    <span>&#8595;</span><span>&#8595;</span><span>&#8595;</span><span>&#8595;</span>
+  </div>
+
+  <!-- Summary metrics -->
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>Input: RGB + Tactile</strong><small>128x128 image + 32x32 gel</small></div>
+    <div class="arch-metric"><strong>Soft Weights: learned per-dim</strong><small>d=256 dim alignment gate</small></div>
+    <div class="arch-metric"><strong>CVAE: 2× conditional VAEs</strong><small>latent dim 64, β-VAE weight</small></div>
+    <div class="arch-metric"><strong>Policy: PPO/SAC/BC</strong><small>action dim 6-7, freq 10Hz</small></div>
+  </div>
+</div>
+
+<h3>3.2 系统总体架构流程图</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TB
+    subgraph INPUT["输入模态"]
+        VIS["视觉观测<br/>(RGB / RGB-D Image)"]
+        TAC["触觉观测<br/>(GelSight / Digit Tactile)"]
+        PROP["本体感知<br/>(关节角度 + 末端位姿)"]
+    end
+
+    subgraph ENC["模态编码"]
+        VENC["Visual Encoder<br/>(ResNet-18 / ViT-S)"]
+        TENC["Tactile Encoder<br/>(CNN + Spatial Softmax)"]
+        ODET["Occlusion Detector<br/>(轻量二分类器)"]
+    end
+
+    subgraph SOFT["Soft Fusion 软融合"]
+        SWG["Soft Weight Gate<br/>(可学习维度权重 w)"]
+        SCL["Soft Contrastive Loss<br/>(加权 InfoNCE)"]
+        FPROJ["Fusion Projector<br/>(Concat + MLP → f_fuse)"]
+    end
+
+    subgraph CVAE["CVAE 跨模态补全"]
+        CVAEV["CVAE-Vision<br/>(条件: f_fuse + f_t)"]
+        CVAET["CVAE-Tactile<br/>(条件: f_fuse + f_v)"]
+        CGATE["Completion Gate<br/>(根据遮挡/接触状态选择)"]
+    end
+
+    subgraph POLICY["策略网络"]
+        STATE["完整状态<br/>(补全f_fuse + 本体感知)"]
+        ACTOR["Actor Network<br/>(MLP / Transformer)"]
+        ACT["动作输出<br/>(末端位姿增量 / 关节目标)"]
+    end
+
+    VIS --> VENC --> SWG
+    TAC --> TENC --> SWG
+    VIS --> ODET
+    SWG --> SCL
+    SWG --> FPROJ
+    FPROJ --> CVAEV
+    FPROJ --> CVAET
+    VENC --> CVAET
+    TENC --> CVAEV
+    ODET --> CGATE
+    CVAEV --> CGATE
+    CVAET --> CGATE
+    CGATE --> STATE
+    PROP --> STATE
+    STATE --> ACTOR --> ACT
+
+    style SOFT fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    style CVAE fill:#fff7ed,stroke:#f59e0b,stroke-width:2px
+    style SWG fill:#ede9fe,stroke:#8b5cf6
+    style CVAEV fill:#fef3c7,stroke:#f59e0b
+    style CVAET fill:#fef3c7,stroke:#f59e0b
+    style ACT fill:#ecfdf5,stroke:#10b981
+</div>
+</div>
+
+<h3>3.3 训练与推理数据流图</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart LR
+    subgraph TRAIN["训练阶段"]
+        DATA["多模态示范数据<br/>(视觉+触觉+动作轨迹)"]
+        PAIR["时序对齐的<br/>视触觉配对样本"]
+        MASK["模态随机掩码<br/>(模拟遮挡/非接触)"]
+        LOSS["多任务联合损失<br/>L_soft + L_CVAE + L_policy"]
+        UPDATE["梯度反向传播<br/>(端到端更新全部参数)"]
+    end
+
+    subgraph INFER["推理阶段"]
+        OBS["实时多模态观测"]
+        DETECT["遮挡/接触状态检测"]
+        COMPLETE["CVAE 条件生成补全"]
+        FUSE["软融合表示计算"]
+        ACT_OUT["策略推理 → 执行动作"]
+    end
+
+    DATA --> PAIR --> MASK
+    MASK --> LOSS --> UPDATE
+    OBS --> DETECT
+    DETECT -->|"视觉遮挡"| COMPLETE
+    DETECT -->|"触觉未接触"| COMPLETE
+    DETECT -->|"模态正常"| FUSE
+    COMPLETE --> FUSE --> ACT_OUT
+
+    style TRAIN fill:#eff6ff,stroke:#3b82f6,stroke-width:2px
+    style INFER fill:#ecfdf5,stroke:#10b981,stroke-width:2px
+    style MASK fill:#fef3c7,stroke:#f59e0b
+    style COMPLETE fill:#fff7ed,stroke:#f59e0b
+    style LOSS fill:#ffe4e6,stroke:#f43f5e
+</div>
+</div>
+</section>
+
+<!-- ===== §4 任务定义 ===== -->
+<section id="task">
+<h2>§4 Task Definition</h2>
+
+<h3>4.1 问题形式化</h3>
+<p>ViTaS 将视觉-触觉融合的机器人操纵建模为一个<strong>部分可观测马尔可夫决策过程 (POMDP)</strong> 下的策略学习问题。核心挑战在于：观测空间包含两个模态 $\mathbf{o} = (\mathbf{o}_v, \mathbf{o}_t)$，其中 $\mathbf{o}_v$ 是视觉图像，$\mathbf{o}_t$ 是触觉传感器读数，但两个模态都可能在任意时刻缺失或降级（视觉因遮挡、触觉因非接触）。策略 $\pi_\theta$ 需要从多模态观测中提取任务相关信息并输出操纵动作。</p>
+
+<div class="formula-block">
+<div class="eq-tag">ViTaS POMDP Formulation</div>
+$$\mathcal{M} = \langle \mathcal{S}, \mathcal{O}_v \times \mathcal{O}_t, \mathcal{A}, \mathcal{T}, \mathcal{R}, \gamma \rangle$$
+
+$$\mathbf{o}_t = (\mathbf{o}_v, \mathbf{o}_t) \sim \mathcal{O}(\cdot|\mathbf{s}_t), \quad \mathbf{a}_t \sim \pi_\theta(\cdot|\tau_{t}^{\text{fuse}}), \quad \tau_{t}^{\text{fuse}} = \text{ViTaS}(\mathbf{o}_{1:t}, \mathbf{a}_{1:t-1})$$
+
+<div class="eq-note">
+与传统 POMDP 的关键区别：观测空间 $\mathcal{O}_v \times \mathcal{O}_t$ 是异构的（一个高维像素空间，一个低维触觉信号空间），且两个模态的可用性不是恒定的。$\tau_{t}^{\text{fuse}}$ 是 ViTaS 框架输出的软融合 + CVAE 补全后的融合表示历史，作为策略的输入状态。奖励 $\mathcal{R}$ 通常是稀疏的任务成功奖励（如物体被成功抓取 = +1），因此策略学习高度依赖融合表示的质量 — 差的融合导致状态信息不足，RL 探索效率骤降。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Observation Space Definition</div>
+$$\mathbf{o}_v \in \mathbb{R}^{H \times W \times 3}, \quad \mathbf{o}_t = \{I_{\text{gel}} \in \mathbb{R}^{h \times w \times 3}, \mathbf{f}_{\text{force}} \in \mathbb{R}^6\}$$
+
+$$\mathbf{o}_v^{\text{masked}} = \mathbf{o}_v \odot \mathbf{M}_{\text{occ}} + (1 - \mathbf{M}_{\text{occ}}) \cdot \mathbf{0}, \quad \mathbf{o}_t^{\text{masked}} = \begin{cases} \mathbf{o}_t & \text{if contact} \\ \mathbf{0} & \text{if no contact} \end{cases}$$
+
+<div class="eq-note">
+视觉观测 $\mathbf{o}_v$ 是标准的 RGB 图像（可选深度通道）。触觉观测 $\mathbf{o}_t$ 包含两部分：GelSight/Digit 等触觉传感器的凝胶形变图像 $I_{\text{gel}}$（反映接触几何和力分布），以及力/力矩传感器读数 $\mathbf{f}_{\text{force}} \in \mathbb{R}^6$。$\mathbf{M}_{\text{occ}}$ 是遮挡掩码（二值矩阵，1 表示未被遮挡像素）。当发生遮挡时，被遮挡像素值被置零（模拟视觉缺失）。当手指未接触物体时，触觉信号全为零 — 这在实际操作中占大部分时间步。
+</div>
+</div>
+
+<h3>4.2 输入/输出规格表</h3>
+<table>
+<tr><th style="width:18%;">Component</th><th style="width:38%;">Description</th><th style="width:44%;">Dimension / Specification</th></tr>
+<tr><td>视觉输入 (Visual Input)</td><td>单视角或多视角 RGB 图像，可能包含遮挡区域</td><td>1-3 views × 128×128×3 (或 224×224) @ 10-30 Hz</td></tr>
+<tr><td>触觉输入 (Tactile Input)</td><td>GelSight/Digit 传感器凝胶图像 + 六维力/力矩</td><td>Gel image: 32×32×3; Force: $\mathbb{R}^6$; 仅在接触时有效</td></tr>
+<tr><td>本体感知 (Proprioception)</td><td>机械臂关节角度、末端执行器位姿</td><td>$\mathbb{R}^{7}$ (7-DoF arm) 或 $\mathbb{R}^{14}$ (双臂)</td></tr>
+<tr><td>融合表示 (Fused Representation)</td><td>软融合 + CVAE 补全后的联合特征向量</td><td>$\mathbf{f}_{\text{fuse}} \in \mathbb{R}^{256}$</td></tr>
+<tr><td>动作输出 (Action Output)</td><td>末端执行器位姿增量 (相对位移 + 旋转) + 夹爪控制</td><td>$\mathbb{R}^{7}$: $\Delta x, \Delta y, \Delta z, \Delta r_x, \Delta r_y, \Delta r_z$, gripper</td></tr>
+<tr><td>控制频率 (Control Frequency)</td><td>策略推理频率</td><td>10-20 Hz (取决于视觉编码器推理速度)</td></tr>
+</table>
+
+<h3>4.3 评估场景定义</h3>
+<p>ViTaS 在以下核心场景中验证其有效性，这些场景的选择精确瞄准了纯视觉或纯触觉方法各自失效的情况：</p>
+<ul>
+<li><strong>透明物体抓取 (Transparent Object Grasping)</strong>：抓取透明杯子、玻璃瓶等物体。视觉传感器难以可靠地检测透明表面（深度相机因折射而失效，RGB 相机因背景穿透而难以分割前景），此时触觉成为确认抓取成功与否的唯一可靠信号。成功率定义为物体被稳定抓取并提升至指定高度。</li>
+<li><strong>遮挡下的精密插入 (Peg-in-Hole under Occlusion)</strong>：在视觉被机械臂自身或环境遮挡的条件下，完成轴孔装配。视觉只能提供粗略的接近方向，而触觉提供接触力/力矩反馈以引导精细对齐。成功率定义为轴完全插入孔中且无卡滞。</li>
+<li><strong>接触密集的物体操控 (Contact-Rich Manipulation)</strong>：如推滑物体、旋拧瓶盖等需要持续接触力控制的任务。视觉可提供物体的全局位置，但触觉对于维持合适的接触力、检测滑脱至关重要。成功率定义为任务完成且无物体掉落/滑脱。</li>
+<li><strong>光照变化下的鲁棒操作 (Manipulation under Lighting Variation)</strong>：在不同光照条件（强光、弱光、阴影）下执行标准抓取任务。该场景测试融合框架对视觉降级的鲁棒性 — 当视觉特征因光照变化而不可靠时，触觉是否可以"接管"并提供足够的引导信号。</li>
+</ul>
+</section>
+
+<!-- ===== §5 关键挑战 ===== -->
+<section id="challenge">
+<h2>§5 Key Challenge</h2>
+
+<h3>5.1 第一性原理诊断</h3>
+<div class="callout warn">
+<p class="callout-title">Why is visual-tactile fusion for visuomotor learning fundamentally hard?</p>
+<p>视觉-触觉融合操纵的根本困难源于两个模态的<strong>非对称互补关系</strong>和<strong>异步可用性</strong>。从第一性原理出发，存在四个层次的根本矛盾：(1) <strong>模态间信息的非对称重叠</strong> — 视觉和触觉共享的信息子集（如物体几何形状在图像和触觉形变中都有反映）与各自独有的信息子集（视觉提供自由空间中的物体定位，触觉提供微米级的表面纹理和局部力）之间的边界是模糊的、任务依赖的，不存在一个先验的"正确对齐方案"；(2) <strong>时序粒度的不匹配</strong> — 视觉是全局但低频的信息（整张图像每帧只描述一个全局状态），触觉是局部但高频的信息（接触力以 kHz 级变化），两者的自然时间尺度差异巨大，简单的时序同步会丢失触觉的瞬态信息；(3) <strong>可用性的极端不对称</strong> — 在典型的抓取任务中，触觉信号在 90% 以上的时间步中为零（在空中接近阶段），而视觉信号在抓取瞬间因手-物体遮挡而急剧降级，两个模态的"失效模式"恰好互补但异步 — 这要求融合框架能在任何时刻处理任意子集模态的缺失；(4) <strong>Sim2Real 的模态级差距</strong> — 仿真中的视觉渲染和触觉仿真（刚体接触力学）与真实传感器存在系统性偏差，且两种模态的仿真-真实差距具有不同的统计特性，使得联合标定极为困难。</p>
+</div>
+
+<h3>5.2 先前方法对比</h3>
+<table>
+<tr><th>Method</th><th>Venue</th><th>Core Idea</th><th>Limitation</th><th>vs This Work</th></tr>
+<tr><td>Making Sense of Vision and Touch (Lee et al.)</td><td>CoRL 2019</td><td>自监督跨模态预测：从视觉预测触觉、从触觉预测视觉，联合表示通过预测任务学习</td><td>仅做跨模态预测，未区分信息的"相关"与"互补"维度；融合表示被固定用于下游任务，未联合优化</td><td>ViTaS 的软权重机制显式区分了相关与互补信息，并端到端联合优化</td></tr>
+<tr><td>Touch if you can (Yang et al.)</td><td>RSS 2023</td><td>在 RL 中引入触觉作为附加观测，用简单的拼接或门控机制融合</td><td>拼接/门控是粗粒度的硬融合，无法处理模态缺失时的信息补偿问题</td><td>ViTaS 的 CVAE 补全机制可以在模态缺失时生成合理的"伪观测"，而非简单丢弃</td></tr>
+<tr><td>CLIP-style Multimodal Contrastive (多篇)</td><td>NeurIPS/ICML 2021-2024</td><td>用 InfoNCE 对比损失将不同模态映射到共享嵌入空间</td><td>全局对比假设模态间所有信息应被对齐，错误压制互补信息</td><td>ViTaS 的软加权对比损失按维度独立控制对齐强度，允许互补维度保持差异</td></tr>
+<tr class="highlight"><td><strong>ViTaS (Tian et al., 2026)</strong></td><td><strong>2026</strong></td><td><strong>软融合对比学习 + CVAE 跨模态补全 + 端到端任务感知优化</strong></td><td><strong>高动态操作受硬件限制；跨传感器标定影响迁移</strong></td><td><strong>首次在统一框架中同时解决"哪些对齐""如何补全""如何服务任务"三个问题</strong></td></tr>
+<tr><td>Multimodal Masked Autoencoders (Bachmann et al.)</td><td>CVPR 2024</td><td>随机掩码多模态 token，通过重建任务学习融合表示</td><td>掩码重建是弱监督信号 — 能重建不代表对操作有用；且掩码是随机的，不代表真实的遮挡/非接触模式</td><td>ViTaS 的 CVAE 以任务感知方式补全，且掩码模式模拟真实传感器失效场景</td></tr>
+</table>
+
+<h3>5.3 三大关键挑战详解</h3>
+
+<p><strong class="hl">挑战一：如何在无先验的情况下区分"相关信息"和"互补信息"？</strong>视觉和触觉之间的关系不是二元（相关 vs 无关）的，而是连续谱系。以抓取一个杯子为例：杯子的整体形状和位置在视觉和触觉中都有反映（高度相关），杯子的颜色仅存在于视觉中（触觉无关），杯子表面的微观纹理主要由触觉感知（视觉难以分辨），而杯子在桌面上的空间关系仅存在于视觉中（触觉完全无法感知）。ViTaS 通过<strong>可学习的维度级软权重</strong>实现这种连续区分：软权重门控网络 $g_w$ 输入视觉和触觉特征，输出每个维度的对齐权重。$g_w$ 的训练信号来自 (1) 对比损失自身的梯度（促进高度共变的维度对齐）、(2) 下游策略损失的梯度（促进与任务相关的维度保持信息）、(3) CVAE 重构损失的梯度（促进保留互补信息）。三种信号的博弈自然形成信息的分化。</p>
+
+<p><strong class="hl">挑战二：如何在模态缺失时进行有意义的"想象"而非"猜测"？</strong>当视觉因遮挡而失效时，仅凭触觉去"想象"被遮挡的场景是一个严重的病态问题（ill-posed）— 有无穷多种可能的场景与当前的触觉信号一致。ViTaS 通过以下设计约束生成空间：(1) 条件生成而非无条件 — CVAE-V 以触觉特征 + 历史融合特征为条件，历史信息提供了时序上下文（物体不会瞬移）；(2) CVAE 的 KL 正则化防止过度想象 — $\beta$-VAE 中的 KL 散度项使生成分布不能偏离先验太远，确保"想象"内容保持合理；(3) 多任务训练 — CVAE 不仅要重构视觉，其输出还要通过策略网络产生正确的动作，如果"想象"错误，策略损失会提供修正信号。</p>
+
+<p><strong class="hl">挑战三：如何确保融合表示对下游任务有效？</strong>一个统计上好的融合表示（如对比损失低的表示）不一定是任务上好的表示。例如，对比学习可能将模型注意力集中在视觉和触觉中都稳定出现的物体纹理上，但如果任务的成功关键在于感知接触滑脱的瞬态触觉信号，则这种"统计上好的对齐"反而可能抑制了关键信息的提取。ViTaS 通过<strong>端到端的联合训练</strong>解决这个问题：策略损失的梯度反向传播到软权重门控网络和模态编码器，使模型学会"关注与任务成功相关的跨模态模式"。消融实验表明，端到端联合训练比两阶段（先预训练融合、再训练策略）在接触密集任务上的成功率提升 15-20%。</p>
+</section>
+
+<!-- ===== §6 方法 ===== -->
+<section id="method">
+<h2>§6 Method</h2>
+
+<h3>6.1 方法总览</h3>
+<p>ViTaS 的训练管道包含三个核心组件，三者通过多任务损失联合优化：(1) 软融合对比学习 (Soft Fusion Contrastive Learning)，通过可学习维度权重实现选择性跨模态对齐；(2) 双路条件 VAE (Dual CVAE)，分别以融合表示 + 另一模态为条件进行跨模态生成补全；(3) 端到端的策略联合训练，使融合表示受到任务信号的直接驱动。</p>
+
+<h3>6.2 公式推导</h3>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.1: Soft Fusion Contrastive Loss</div>
+$$\mathcal{L}_{\text{soft}}(\theta_v, \theta_t, \theta_g) = -\frac{1}{B}\sum_{b=1}^{B}\sum_{i=1}^{d} w_i \cdot \log \frac{\exp(\text{sim}(\mathbf{z}_{v,b}^{(i)}, \mathbf{z}_{t,b}^{(i)}) / \tau)}{\sum_{k=1}^{B}\exp(\text{sim}(\mathbf{z}_{v,b}^{(i)}, \mathbf{z}_{t,k}^{(i)}) / \tau)}$$
+
+$$w_i = \sigma\big(g_w([\mathbf{f}_v; \mathbf{f}_t])\big)_i, \quad g_w: \mathbb{R}^{d_v+d_t} \to \mathbb{R}^{d}, \quad \sigma \text{ is sigmoid}$$
+
+<div class="eq-note">
+这是 ViTaS 的核心损失函数。与标准 InfoNCE 的关键区别在于维度级的软权重 $w_i \in (0,1)$。第 $i$ 维的对齐强度由 $w_i$ 控制：当 $w_i \to 1$ 时该维度参与全强度对比（驱动视觉和触觉在这一维度上对齐）；当 $w_i \to 0$ 时该维度几乎不参与对比（允许两个模态在该维度上保持各自的独特性）。软权重门控网络 $g_w$ 是一个轻量 MLP（2-3 层，256→128→d），输入视觉和触觉特征的拼接，输出经 sigmoid 激活的 d 维权值向量。$\mathbf{z}_v, \mathbf{z}_t$ 是视觉和触觉编码器输出的特征投影（经 projection head 映射到对比空间）。$\tau$ 是温度参数，$B$ 是 batch size。关键洞察：<strong>$g_w$ 与编码器一起端到端训练</strong> — 它自动学会将高频共变的维度设为高权重（这些维度的信息可以通过对比学习获得更好的跨模态一致性），而将弱共变或任务无关的维度设为低权重。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.2: CVAE Cross-modal Completion (Vision conditioned on Tactile + Fusion)</div>
+$$\mathcal{L}_{\text{CVAE-v}}(\theta_{\text{enc}}^v, \theta_{\text{dec}}^v) = -\mathbb{E}_{\mathbf{z}_v \sim q_{\phi_v}(\cdot|\mathbf{f}_v, \mathbf{f}_{\text{fuse}}, \mathbf{f}_t)}\big[\log p_{\theta_v}(\mathbf{f}_v | \mathbf{z}_v, \mathbf{f}_{\text{fuse}}, \mathbf{f}_t)\big] + \beta \cdot D_{\text{KL}}\big(q_{\phi_v}(\mathbf{z}_v|\mathbf{f}_v, \mathbf{f}_{\text{fuse}}, \mathbf{f}_t) \| p(\mathbf{z}_v)\big)$$
+
+$$p(\mathbf{z}_v) = \mathcal{N}(\mathbf{0}, \mathbf{I}), \quad q_{\phi_v} = \mathcal{N}(\boldsymbol{\mu}_{\phi_v}, \boldsymbol{\sigma}_{\phi_v}^2), \quad p_{\theta_v} = \mathcal{N}(\boldsymbol{\mu}_{\theta_v}, \mathbf{I})$$
+
+<div class="eq-note">
+视觉 CVAE 的目标：学习在给定 (1) 触觉特征 $\mathbf{f}_t$、(2) 当前融合表示 $\mathbf{f}_{\text{fuse}}$ 的条件下，生成视觉特征 $\mathbf{f}_v$ 的条件分布。$q_{\phi_v}$ 是编码器（近似后验），输入真实视觉特征 $\mathbf{f}_v$ 和条件，输出隐变量 $\mathbf{z}_v$ 的分布参数；$p_{\theta_v}$ 是解码器，从 $\mathbf{z}_v$ 和条件中重构视觉特征。$\beta$ 是 KL 散度权重（$\beta > 1$ 鼓励更平滑的隐空间，防止后验坍缩）。<strong>训练技巧</strong>：以 30-50% 的概率随机掩码视觉输入（模拟真实遮挡），并在这些样本上只使用重构损失（不使用对比损失中涉及视觉的部分），使 CVAE 在真实遮挡模式下接受训练。触觉 CVAE ($\mathcal{L}_{\text{CVAE-t}}$) 的设计完全对称：以视觉 + 融合为条件，在非接触阶段（触觉零向量）生成预测的触觉特征。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.3: Joint Multi-task Training Objective</div>
+$$\mathcal{L}_{\text{total}} = \underbrace{\lambda_1 \cdot \mathcal{L}_{\text{soft}}}_{\text{selective alignment}} + \underbrace{\lambda_2 \cdot (\mathcal{L}_{\text{CVAE-v}} + \mathcal{L}_{\text{CVAE-t}})}_{\text{cross-modal completion}} + \underbrace{\lambda_3 \cdot \mathcal{L}_{\text{policy}}}_{\text{task grounding}}$$
+
+$$\mathcal{L}_{\text{policy}} = \begin{cases} \mathbb{E}_{\tau}\left[\sum_t \gamma^t r_t\right] \cdot \text{(RL: PPO/SAC)} \\ \mathbb{E}_{(\mathbf{o},\mathbf{a})\sim\mathcal{D}}\left[\|\pi_\theta(\mathbf{f}_{\text{fuse}}) - \mathbf{a}\|^2\right] \text{(IL: BC)} \end{cases}$$
+
+<div class="eq-note">
+三个损失的权重 $\lambda_1, \lambda_2, \lambda_3$ 通过以下方式动态平衡：在训练初期，$\lambda_1, \lambda_2$ 较大（先学习好的融合表示），随着训练进行，$\lambda_3$ 逐渐增大（策略损失接管主导权）；或者使用 uncertainty weighting (Kendall et al., 2018) 自动学习同方差不确定性作为权重：$\lambda_k = 1/(2\sigma_k^2)$，其中 $\sigma_k$ 是可学习的噪声参数。对于 RL 策略，$\mathcal{L}_{\text{policy}}$ 是 PPO 的 clipped surrogate objective 或 SAC 的 actor-critic 损失；对于 IL 策略，是行为克隆的 MSE 损失。关键点：<strong>策略损失的梯度通过 $\mathbf{f}_{\text{fuse}}$ 反向传播到视觉编码器、触觉编码器、软权重门控网络和 CVAE</strong> — 这意味着融合表示的每一部分都直接受到"如何帮助策略做出正确动作"的信号驱动。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.4: Inference-time Completion with CVAE</div>
+$$\mathbf{f}_{\text{fuse}}^{\text{complete}} = \begin{cases} \text{Fuse}(\mathbf{f}_v, \mathbf{f}_t) & \text{if both modalities reliable} \\ \text{Fuse}(\mathbf{f}_v^{\text{cvae}}, \mathbf{f}_t) & \text{if vision occluded} \\ \text{Fuse}(\mathbf{f}_v, \mathbf{f}_t^{\text{cvae}}) & \text{if no tactile contact} \\ \text{Fuse}(\mathbf{f}_v^{\text{cvae}}, \mathbf{f}_t^{\text{cvae}}) & \text{if both modalities unreliable} \end{cases}$$
+
+$$\mathbf{f}_v^{\text{cvae}} \sim p_{\theta_v}(\cdot | \mathbf{z}_v, \mathbf{f}_{\text{fuse}}^{\text{hist}}, \mathbf{f}_t), \quad \mathbf{z}_v \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$$
+
+<div class="eq-note">
+推理时的模态补全过程：首先由遮挡检测器（基于视觉特征训练的轻量二分类器）和接触检测器（触觉信号的能量阈值）判断两个模态的可靠性状态。根据可靠性状态选择对应的补全方案：(1) 两个模态都可靠 → 直接用原始特征计算融合表示；(2) 视觉被遮挡 → 从 CVAE-V 的先验中采样隐变量 $\mathbf{z}_v$，结合历史融合特征和当前触觉解码生成补全的视觉特征 $\mathbf{f}_v^{\text{cvae}}$；(3) 触觉未接触 → 从 CVAE-T 的先验中采样，以视觉为条件预测触觉特征；(4) 两个模态都不可靠 → 两个 CVAE 同时补全。注意 CVAE 推理时从先验 $\mathcal{N}(0, I)$ 采样（而非像训练时从后验 $q_\phi$ 采样），这意味着生成的补全特征是"典型"的（prior 的 mode），而非与缺失的真实观测完全一致 — 这在实际中已足够了，因为在遮挡/非接触场景下，我们仅需一个"合理"而非"精确"的估计。
+</div>
+</div>
+
+<h3>6.3 关键参数与变量表</h3>
+<table>
+<tr><th style="width:16%;">符号</th><th style="width:36%;">含义</th><th style="width:24%;">维度 / 类型</th><th style="width:24%;">备注</th></tr>
+<tr><td>$\mathbf{f}_v$</td><td>视觉编码器输出的特征向量</td><td>$\mathbb{R}^{512}$</td><td>ResNet-18 全局平均池化后，经 2 层 MLP 投影</td></tr>
+<tr><td>$\mathbf{f}_t$</td><td>触觉编码器输出的特征向量</td><td>$\mathbb{R}^{256}$</td><td>CNN + spatial softmax + 1 层 MLP</td></tr>
+<tr><td>$\mathbf{w}$</td><td>软权重向量（维度级对齐控制）</td><td>$[0,1]^{256}$</td><td>经 sigmoid 激活，可学习的门控输出</td></tr>
+<tr><td>$g_w$</td><td>软权重门控网络</td><td>MLP: (768→256→256)</td><td>2 层，ReLU 激活，sigmoid 输出</td></tr>
+<tr><td>$\mathbf{z}_v, \mathbf{z}_t$</td><td>CVAE 隐变量</td><td>$\mathbb{R}^{64}$</td><td>64 维高斯隐空间，各向同性先验</td></tr>
+<tr><td>$\beta$</td><td>CVAE KL 散度权重</td><td>标量，典型值 1.0-4.0</td><td>$\beta > 1$ 促进解耦和鲁棒性</td></tr>
+<tr><td>$\tau$</td><td>对比损失温度参数</td><td>标量，典型值 0.07</td><td>控制对比分布锐度</td></tr>
+<tr><td>$\lambda_{1,2,3}$</td><td>多任务损失权重</td><td>标量或可学习参数</td><td>uncertainty weighting 或固定调度</td></tr>
+<tr><td>$\mathbf{f}_{\text{fuse}}$</td><td>软融合表示</td><td>$\mathbb{R}^{256}$</td><td>加权拼接后经 2 层 MLP (768→256)</td></tr>
+<tr><td>$d_v, d_t, d$</td><td>视觉/触觉/对比特征维度</td><td>512 / 256 / 256</td><td>可根据编码器 backbone 调节</td></tr>
+</table>
+</section>
+
+<!-- ===== §7 原理 ===== -->
+<section id="principles">
+<h2>§7 Principles</h2>
+
+<h3>7.1 深度机理分析</h3>
+
+<h4>7.1.1 为什么软对比学习优于硬对比学习？— 信息论的视角</h4>
+<p>从信息论角度，硬对比学习（InfoNCE）目标是最小化两个模态之间的条件熵差异，可以理解为最大化互信息 $I(Z_v; Z_t)$ 的下界。但 $I(Z_v; Z_t)$ 最大化隐含假设所有共享信息都是有益的 — 这忽略了视觉和触觉之间既有"有益共享信息"（如物体形状）也有"冗余共享信息"（如背景纹理也存在于触觉形变中），以及大量"非共享的互补信息"（$I(Z_v; Y|Z_t)$ 和 $I(Z_t; Y|Z_v)$）。</p>
+
+<div class="formula-block">
+$$I(Z_v; Z_t) = \underbrace{I(Z_v; Z_t; Y)}_{\text{task-relevant shared}} + \underbrace{I(Z_v; Z_t | Y)}_{\text{task-irrelevant shared}}$$
+
+$$I(Z_v; Y) = \underbrace{I(Z_v; Z_t; Y)}_{\text{shared relevant}} + \underbrace{I(Z_v; Y | Z_t)}_{\text{v-unique relevant}}$$
+
+<div class="eq-note">
+其中 $Y$ 是任务相关变量（如物体位姿、接触状态）。硬对比学习最大化 $I(Z_v; Z_t)$，但这包括了对任务无用的共享信息 $I(Z_v; Z_t|Y)$。更重要的是，过度最大化 $I(Z_v; Z_t)$ 会压缩视触觉各自的独特信息 $I(Z_v; Y|Z_t)$ 和 $I(Z_t; Y|Z_v)$ — 因为如果两个表示高度对齐，它们各自独有的信息维度趋于被消除（信息瓶颈效应）。ViTaS 的软加权机制通过在维度级控制对齐强度，实现了选择性信息最大化：高权重维度推动共享任务信息对齐，低权重维度保留独特的互补信息。
+</div>
+</div>
+
+<h4>7.1.2 CVAE 补全 vs Dropout 鲁棒性 — 为什么"生成"比"适应"更好？</h4>
+<p>两种常见的处理模态缺失的方法对比：(a) Dropout 训练（随机丢弃模态特征）让网络"适应"缺失，学习一个对所有模态子集都鲁棒的表示；(b) CVAE 补全在缺失时"生成"一个合理的替代。从表示空间的角度，Dropout 方案使网络学到的是"缺失模态下的条件期望"：</p>
+
+<div class="formula-block">
+$$\mathbf{f}_{\text{fuse}}^{\text{dropout}} \approx \mathbb{E}_{\mathbf{f}_v \sim p(\mathbf{f}_v|\mathbf{f}_t)}[\text{Fuse}(\mathbf{f}_v, \mathbf{f}_t)] \quad \text{(dropout training)}$$
+$$\mathbf{f}_{\text{fuse}}^{\text{cvae}} = \text{Fuse}\big(p_{\theta_v}(\mathbf{f}_v|\mathbf{z}_v, \mathbf{f}_t, \mathbf{f}_{\text{fuse}}^{\text{hist}}), \mathbf{f}_t\big) \quad \text{(CVAE completion)}$$
+
+<div class="eq-note">
+Dropout 方案学到的是"平均"融合 — 将所有可能的缺失场景的期望作为表示，这丢失了条件于特定历史的具体信息。例如，当触觉传感器检测到一个微弱的边缘接触时，dropout 方案无法利用这个信息来细化缺失视觉的"想象"（因为它是在训练时平均了各种缺失模式）。CVAE 则可以在推理时利用所有可用的条件信息（当前触觉 + 历史融合状态）生成场景特定的补全。在透明物体抓取实验中，CVAE 补全方案的抓取成功率比 dropout 方案高约 12%，差距主要出现在需要利用触觉信息推断精确物体位姿的遮挡场景中。
+</div>
+</div>
+
+<h4>7.1.3 端到端训练中的双重梯度信号 — 融合表示如何学会"任务感知"</h4>
+<p>ViTaS 的训练中，融合表示 $\mathbf{f}_{\text{fuse}}$ 接收到两类梯度信号：</p>
+<ol>
+<li><strong>自监督信号</strong>（来自 $\mathcal{L}_{\text{soft}}$ 和 $\mathcal{L}_{\text{CVAE}}$）：推动融合表示保持跨模态的统计结构 — 对齐该对齐的，补全该补全的。</li>
+<li><strong>任务信号</strong>（来自 $\mathcal{L}_{\text{policy}}$）：推动融合表示包含对任务成功预测有用的信息。</li>
+</ol>
+<p>这两类信号并非总是一致的。例如，在推滑任务中，触觉传感器检测到的表面纹理（纹理A vs 纹理B）与物体类别高度相关，自监督对比信号会赋予纹理维度高对齐权重。但如果任务的成败取决于推力大小而非物体类别，则任务信号会通过策略损失的梯度"削弱"纹理维度的对齐权重，而"增强"受力维度的对齐权重。这种博弈在端到端训练中自然发生，使得软权重门控网络 $g_w$ 学到的不仅是"视觉和触觉在哪里一致"，更是"视觉和触觉的哪种一致对操作成功有帮助"。</p>
+
+<h3>7.2 对比分析</h3>
+<div class="cmp-row">
+<div class="cmp-col">
+<h4>Naive Multimodal Concatenation</h4>
+<p><strong>方法</strong>：视觉特征和触觉特征简单拼接后送入策略网络，无显式跨模态对齐或补全机制。</p>
+<p><strong>核心问题</strong>：(1) 拼接不建模跨模态关系 — 策略网络需要在自身的前向传播中隐式学习视触觉的关联，这在数据有限时难以实现；(2) 当某一模态缺失时（触觉为零向量或视觉为噪声），拼接特征出现分布偏移，策略网络容易输出错误动作；(3) 无法区分哪些跨模态信息对任务有用、哪些是冗余的 — 所有信息被等权重对待。</p>
+<p><strong>信息流</strong>：</p>
+<p style="text-align:center;font-family:monospace;font-size:12px;">f_v, f_t → concat → MLP → action</p>
+<p>单流前馈，无跨模态交互学习。</p>
+</div>
+<div class="cmp-col">
+<h4>ViTaS Soft Fusion + CVAE Completion</h4>
+<p><strong>方法</strong>：软加权对比学习对齐相关信息 + CVAE 补全缺失模态 + 端到端策略联合训练。</p>
+<p><strong>核心优势</strong>：(1) 维度级软权重精细控制对齐强度 — 保留互补信息的同时增强共享信息的跨模态一致性；(2) CVAE 在模态缺失时提供条件生成补全，而非简单丢弃或平均 — 补全质量受历史信息约束；(3) 端到端训练使融合表示直接受任务信号驱动 — 表示不仅统计上合理，而且任务上有效；(4) 统一的框架同时覆盖正常操作（双模态完整）、遮挡（视觉缺失）和非接触（触觉缺失）三种模态可用性场景。</p>
+<p><strong>信息流</strong>：</p>
+<p style="text-align:center;font-family:monospace;font-size:12px;">f_v, f_t → soft-align → f_fuse → CVAE-complete → policy</p>
+<p>三阶段流式处理，梯度反向传播贯穿全链路。</p>
+</div>
+<div class="cmp-col">
+<h4>Hard Contrastive + Separate Policy</h4>
+<p><strong>方法</strong>：先用标准 InfoNCE 对比损失预训练跨模态编码器（强制全局对齐），固定表示后训练独立策略。</p>
+<p><strong>核心问题</strong>：(1) 硬对比强制全局对齐，压制互补信息 — 触觉独有的接触力模式在对比学习中被视为"噪声"而被抑制；(2) 两阶段训练导致融合表示与任务需求脱节 — 对比损失最优不等于策略损失最优；(3) 没有模态补全机制 — 缺失模态时网络退化为单模态，融合的优势完全丧失；(4) 训练时的对齐目标与推理时的真实可用性模式不一致。</p>
+<p><strong>信息流</strong>：</p>
+<p style="text-align:center;font-family:monospace;font-size:12px;">f_v, f_t → hard-align (frozen) → f_fuse (fixed) → policy</p>
+<p>断裂的信息流，表示层梯度被截断。</p>
+</div>
+</div>
+</section>
+
+<!-- ===== §8 图表解读 ===== -->
+<section id="figures">
+<h2>§8 Figures &amp; Evidence</h2>
+
+<h3>8.1 论文核心图解读</h3>
+
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 1</span>
+<span class="fig-caption">ViTaS 系统总览：软融合对比学习 + CVAE 跨模态补全的完整框架</span>
+<span class="fig-source">Source: ViTaS paper, Page 1 (overview figure)</span>
+</div>
+<div class="fig-image">
+<img src="figures/overview.png" alt="ViTaS system overview" onerror="this.style.display='none';this.parentElement.querySelector('.fig-placeholder').style.display='block';">
+<div class="fig-placeholder" style="display:none;">
+  <p>ViTaS Overview Figure</p>
+  <p style="font-size:11px;margin-top:4px;">（图片来源：Tian et al. 2026 论文首页总览图）</p>
+  <p style="font-size:11px;">展示透明物体抓取、自遮挡装配等任务场景中，软融合对比学习与 CVAE 补全如何协同工作</p>
+</div>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">图解分析</div>
+<p>论文首页的总览图（Fig. 1）是理解 ViTaS 整体框架的核心可视化，可以从四个层面解读：</p>
+<ul>
+<li><strong>Layer 1 — 任务场景与模态失效模式</strong>：图中首先展示了 ViTaS 瞄准的典型困难场景。(a) 透明物体抓取 — 深度相机因折射失效，RGB 相机无法区分透明物体与背景，视觉输入不可靠；(b) 手-物体自遮挡 — 操作过程中机械手指遮挡目标物体，视觉仅能看到手指背部，物体的精确位姿不可见；(c) 接触密集的精细装配 — 如轴孔插入，视觉只能提供厘米级粗略引导，毫米级对准需要触觉力反馈。这些场景的设计具有明确的信号：它们覆盖了视觉主导失效、视觉部分失效和视觉精度不足三种需要触觉介入的情况。</li>
+<li><strong>Layer 2 — 模态编码与软融合</strong>：图的中上部展示 ViTaS 的软融合对比学习模块。视觉编码器 (ResNet/ViT) 和触觉编码器 (CNN) 各自将原始传感器数据编码为特征向量。软权重门控网络接收两个特征，输出维度级的对齐权重。图中通常以热力图或颜色编码的方式展示软权重 — 高权重维度（红色/暖色）对应视触觉共变信息（如物体轮廓），低权重维度（蓝色/冷色）对应模态特有信息（如视觉场景布局、触觉局部力）。对比损失在加权后的特征空间中计算，实现对"相关-互补"的精细分解。</li>
+<li><strong>Layer 3 — CVAE 跨模态补全</strong>：图的中下部展示两个 CVAE 模块。CVAE-V 在视觉被遮挡时，以当前触觉信号 + 历史融合状态为条件，重建视觉特征（在图中通常以虚线框或"想象"气泡的形式呈现，示意这是生成的而非真实感知的）。CVAE-T 在非接触阶段（空中接近）预测即将发生的接触特征，为策略提供"预期接触"信息。两个 CVAE 的隐空间通常以椭圆形高斯分布示意，强调其概率生成性质。</li>
+<li><strong>Layer 4 — 端到端策略输出</strong>：图的右侧展示补全后的融合表示输入策略网络（RL 或 IL），输出操纵动作。通常以箭头形成完整的闭环：动作执行 → 新的多模态观测 → 融合补全 → 新的动作，体现端到端的闭环特性。图的下方通常包含实验结果的 preview — 以柱状图或表格形式展示 ViTaS 在关键指标上相对于基线方法的提升。</li>
+</ul>
+<p>这张图的核心叙事线是：<strong>从"模态失效"到"融合补全"再到"鲁棒操作"</strong>。ViTaS 的贡献不是引入一种新的策略学习算法，而是重新设计了感知-融合-补全管道，使得在面对真实世界中不可避免的传感器失效时，策略仍然能基于"最佳可用信息"做出合理决策。Fig. 1 是这个故事线的可视化浓缩。</p>
+</div>
+</div>
+
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 2</span>
+<span class="fig-caption">软权重可视化与消融实验：不同对齐策略下的融合表示对比</span>
+<span class="fig-source">Source: ViTaS paper, Experiments section</span>
+</div>
+<div class="fig-image">
+<div class="fig-placeholder">
+  <p>Soft Weight Visualization &amp; Ablation Results</p>
+  <p style="font-size:11px;margin-top:4px;">（图片来源：Tian et al. 2026 实验章节）</p>
+</div>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">图解分析</div>
+<p>软权重的可视化是 ViTaS 最具洞察力的实验分析之一。典型可视化形式为热力图，横轴为不同任务场景（透明抓取、遮挡插入、推滑操作），纵轴为特征维度，颜色深浅表示 $w_i$ 的大小。关键观察：</p>
+<ul>
+<li><strong>任务依赖的权重模式</strong>：在透明抓取任务中，与物体轮廓相关的视觉-触觉交叉维度获得高权重（因为透明物体上视觉轮廓与触觉接触轮廓高度对应）；而在推滑任务中，与接触力/滑动相关的维度获得高权重（因为力模式在视觉和触觉中通过 deformation 共同体现）。这说明 $g_w$ 学会了根据任务需求动态调整对齐策略 — 这正是"软"融合相比固定对齐方案的核心优势。</li>
+<li><strong>消融链分析</strong>：论文通常展示一条消融链：(a) Visual-only（无触觉），(b) Tactile-only（无视觉），(c) Concatenation（简单拼接），(d) Hard Contrastive（硬对齐对比），(e) ViTaS w/o CVAE（仅软融合无补全），(f) ViTaS full（完整方案）。预期结果：在视觉可靠的常规抓取中，Visual-only 已有不错表现，触觉的加入带来小幅提升；但在透明物体和遮挡场景中，Visual-only 的急剧下降（如成功率从 80% 降至 20%）与 ViTaS full 的稳健保持形成鲜明对比，这直接证明了软融合+补全的价值。</li>
+<li><strong>CVAE 补全的边际贡献</strong>：在遮挡实验中，对比 (e) ViTaS w/o CVAE 和 (f) ViTaS full，补全机制的加入通常带来额外的 8-15% 成功率提升，说明在严重遮挡下（遮挡比例 > 50%），简单的软融合已经不够 — 需要通过 CVAE 生成"缺失视觉的合理想象"来补充信息。</li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- ===== §9 缺陷与局限 ===== -->
+<section id="flaw">
+<h2>§9 Flaw &amp; Limitations</h2>
+
+<h3>9.1 当前工作的局限</h3>
+
+<p><strong class="hl">局限一：触觉传感器的工程限制严重约束了方法的上限。</strong>当前主流的视触觉传感器（如 GelSight、Digit）存在三个固有限制：(1) 接触面积极小（通常 ~2cm x 2cm），仅能感知指尖与物体的局部接触，对于全手操作的丰富接触模式力不从心；(2) 传感器的物理尺寸使得它只能安装在特定位置（指尖），限制了可感知的接触配置；(3) 不同传感器之间、甚至同一传感器在不同标定下的读数存在显著域差异（domain gap），使得 ViTaS 的模型在跨传感器迁移时性能大幅下降。这些硬件限制是 ViTaS 在"高动态操作"和"多指灵巧操作"中表现不佳的根本原因 — 不是算法问题，而是触觉传感器的感知带宽和覆盖范围不足。</p>
+
+<p><strong class="hl">局限二：CVAE 补全在极端缺失条件下的保真度有限。</strong>当两个模态同时严重降级时（如视觉被大面积遮挡 AND 触觉完全未接触），CVAE 只能从纯历史信息和先验分布中生成补全内容 — 这本质上是一个"无信息猜测"。虽然 KL 正则化确保了生成内容不会太离谱（不会偏离先验太远），但也意味着生成内容趋向于"平均化"而非"精准化"。在需要亚毫米级精度对准的任务中，这种平均化的补全不足以保证成功率。该问题的根本解决可能需要更多的模态（如音频、距离传感）或更强的时序模型（如预测性的世界模型）。</p>
+
+<p><strong class="hl">局限三：端到端联合训练的优化难度随模态数量扩展。</strong>ViTaS 的三损失联合优化（对比 + CVAE 重构 + 策略损失）在实际训练中存在稳定性挑战：当三个损失的量级或收敛速度不一致时，训练可能偏向某一损失主导的方向，导致其他组件欠拟合。虽然可以通过 uncertainty weighting 或 GradNorm 缓解，但超参数的敏感度仍然较高 — 不同任务可能需要不同的损失平衡策略，降低了方法的"即插即用"程度。</p>
+
+<p><strong class="hl">局限四：仿真环境中的触觉建模逼真度不足。</strong>ViTaS 的仿真实验依赖仿真器（如 MuJoCo、Isaac Gym）中的接触力/力矩输出来模拟触觉信号。但仿真中的刚体接触模型（惩罚法、LCP 求解）无法精确再现 GelSight 等真实触觉传感器的软体形变和精细纹理感知，导致仿真中训练的策略在迁移到实物时存在系统性偏差。虽然域随机化可以部分缓解，但触觉的 Sim2Real gap 在目前的技术水平下仍然显著大于视觉的 Sim2Real gap。</p>
+
+<p><strong class="hl">局限五：对高频动态操作的适应性不足。</strong>论文明确指出"高动态精确操作（如快速转笔）仍受硬件与高维 RL 瓶颈限制"。ViTaS 的当前设计以 10-20 Hz 的控制频率运行（受视觉编码器推理时间限制），而真正的动态操作（如旋转笔、抛接物体）需要 100+ Hz 的闭环频率。此外，软融合和 CVAE 补全的计算开销使得每次推理延迟不可忽略（尤其是在资源受限的边缘设备上），进一步限制了在需要快速反应的接触事件中的实用性。</p>
+
+<h3>9.2 扩展方向</h3>
+<ol>
+<li><strong>多模态预测性世界模型</strong>：在 ViTaS 的融合框架之上构建一个预测性世界模型（如 RSSM、Transformer-based dynamics predictor），使模型不仅能在当前时刻补全缺失模态，还能预测未来时刻的模态状态。这将使策略具备"前瞻性" — 例如，在接近抓取阶段，模型可以预测"接触即将发生，触觉信号将出现"，从而提前调整手指姿态以适应预期的接触力。</li>
+<li><strong>基于 VLM 的高层任务理解与触觉语言化</strong>：将 ViTaS 作为执行层，在其上叠加一个视觉-语言模型（VLM）作为任务规划层。VLM 可以将复杂的自然语言指令分解为需要触觉反馈的子任务（如"轻柔地拿起鸡蛋"需要触觉来感知力度），同时将触觉感知"语言化"（如"接触力过大"、"物体正在滑落"），使触觉信号参与到高层决策中而不仅是低层控制中。</li>
+<li><strong>跨机器人和跨传感器的触觉基础模型</strong>：借鉴视觉领域的基础模型策略（如使用大量不同机器人数据预训练的视觉编码器），收集多平台、多传感器的大规模触觉数据，预训练一个"触觉基础模型"。ViTaS 的软融合框架可以作为这个基础模型接入不同下游任务的统一接口 — 新任务只需微调软权重门控和策略头，而触觉编码器保持冻结。</li>
+</ol>
+
+<h3>9.3 鲁棒性与灵敏度分析</h3>
+<table>
+<tr><th style="width:20%;">Factor</th><th style="width:12%;">Impact</th><th>Analysis</th></tr>
+<tr><td>触觉传感器噪声</td><td>★★★★★</td><td>触觉传感器的读数噪声（如 GelSight 的光照不均、Digit 的压缩伪影）直接影响 CVAE 补全质量 — 因为补全以触觉为条件，脏的条件导致脏的生成。高噪声场景下，软权重的触觉相关维度也会被噪声污染，建议引入触觉特定的降噪预处理或噪声鲁棒损失。</td></tr>
+<tr><td>遮挡程度</td><td>★★★★☆</td><td>当遮挡比例从 30% 增至 70%，ViTaS 的性能降幅显著小于纯视觉方法（预期降幅 10-15% vs 40-50%），但当遮挡 > 80% 时，CVAE 补全也趋于失效 — 因为可用条件信息过少。全遮挡场景仍是一个开放问题。</td></tr>
+<tr><td>光照变化</td><td>★★★☆☆</td><td>光照变化主要影响视觉编码器的特征质量。ViTaS 通过触觉作为"锚点"部分缓解了光照漂移：当视觉特征因光照而偏移时，软对比损失会推动其在触觉对齐的维度上回归到一致空间。但极端光照（如全黑）仍会导致视觉编码器输出无意义特征，此时 CVAE-V 的补全成为主导。</td></tr>
+<tr><td>跨传感器标定差异</td><td>★★★★☆</td><td>不同触觉传感器（GelSight vs Digit）或同一传感器的不同标定（如不同的光照/凝胶压力）会导致触觉特征的分布偏移。软权重门控和 CVAE 由于在特定传感器数据上训练，对分布偏移敏感。无监督域自适应或传感器级归一化是必要的工程补充。</td></tr>
+<tr><td>策略类型 (RL vs IL)</td><td>★★☆☆☆</td><td>ViTaS 的融合框架对下游策略类型不敏感 — 软融合 + CVAE 表示对 RL (PPO/SAC) 和 IL (BC) 均有效。但 RL 可以从端到端训练中获益更多（因为梯度链更长），而 IL 在数据有限时更稳定。</td></tr>
+<tr><td>软权重初始化</td><td>★★☆☆☆</td><td>软权重门控 $g_w$ 对初始化有一定敏感度。如果初始权重全接近 0.5（随机初始化），训练初期无有效对齐，CVAE 难以收敛。建议使用"温和"的初始化策略：偏差初始化使初始权重偏向 0.7-0.8（默认假设大部分维度应参与对齐），训练中通过梯度自然分化。</td></tr>
+</table>
+
+<h3>9.4 最大弱点深度剖析与复现关键</h3>
+<div class="callout danger">
+<p class="callout-title">最大弱点：软融合与 CVAE 补全的"双重依赖"可能引发级联失效</p>
+<p>ViTaS 的设计中存在一个潜在的级联失效路径：软权重门控网络 $g_w$ 的输出 $\mathbf{w}$ 依赖于视觉和触觉特征的质量 → CVAE 的补全以 $\mathbf{w}$ 影响下的融合表示为条件 → 策略动作以补全后的融合表示为输入。如果第一步的软权重因某种原因（如训练数据中某种遮挡模式出现频率过低）学得不好，其影响会通过 CVAE 和策略网络逐级放大，最终导致三种场景下同时失败。具体而言：</p>
+<p>(1) <strong>分布外遮挡模式</strong>：如果训练中仅见过"手指遮挡物体"的模式，测试时遇到"环境物体遮挡手和物体"的完全不同的遮挡模式，$g_w$ 可能无法正确评估视觉特征的可靠性，导致软权重将不可靠的视觉信息标记为"高置信对齐"，从而污染融合表示。</p>
+<p>(2) <strong>CVAE 的过拟合先验</strong>：CVAE 的先验 $p(\mathbf{z}) = \mathcal{N}(0, I)$ 是基于训练数据分布形成的。如果训练数据中物体形态多样性不足，CVAE 生成的特征将趋向训练分布的 mode — 这意味着对于新形态的物体，补全特征可能偏向训练集中最常见的形状，导致策略做出次优动作。</p>
+<p>(3) <strong>双重缺失时的信息真空</strong>：当视觉和触觉同时大面积缺失时，两个 CVAE 互为条件但彼此都无可靠信息 — 形成"循环幻觉"。此时模型输出的融合表示本质上是一个基于历史信息的盲外推，在环境快速变化时不可靠。</p>
+<p>缓解这些问题的可能方向包括：(a) 引入不确定性估计 — 不仅输出融合表示，还输出其不确定性，策略在不确定性高时采取保守动作（如减速、回退）；(b) 使用更强的时序模型（如 Transformer）替代简单的历史拼接，以更好地捕获长程依赖；(c) 增加更多的辅助模态（如麦克风检测接触声音、距离传感器检测接近程度），在双重缺失时提供额外的"救急"信号。</p>
+</div>
+
+<div class="callout idea">
+<p class="callout-title">如果让你重新实现这篇论文，最关键的三个细节是什么？</p>
+<p><strong>1. 软权重门控网络的训练稳定性。</strong>$g_w$ 容易在训练初期退化为"全 1"（与硬对比无差异）或"全 0"（对比学习无信号）。关键技巧：(a) 对 $w_i$ 施加一个适度的 L1 稀疏正则，鼓励不是所有维度都参与对齐，同时添加一个轻微的先验偏差使初始输出偏向 0.7；(b) 使用余弦退火的学习率调度，在训练后半段逐步解冻 $g_w$ — 先让编码器学习好的特征，再让门控学会选择；(c) 在对比损失中添加一个熵正则项 $\mathcal{L}_{\text{entropy}} = -\sum_i w_i \log w_i - (1-w_i)\log (1-w_i)$，防止权重极端化。</p>
+<p><strong>2. CVAE 的条件设计。</strong>CVAE 补全的质量取决于条件的丰富度。仅用"当前另一模态"作为条件不够 — 必须包括：(a) 历史融合状态（提供时序上下文 — 物体不会瞬移）；(b) 本体感知（关节角度暗示手指/相机位置，推断遮挡区域）；(c) 任务 embedding（如果已知任务类型，补全可以更有针对性）。条件向量的拼接顺序和维度比例的细节对 CVAE 的收敛有显著影响。</p>
+<p><strong>3. 损失平衡策略。</strong>三个损失（对比、CVAE 重构、策略）的量级差异可达 2-3 个数量级。如果简单等权相加，某个损失将主导训练。推荐方案：使用 Kendall uncertainty weighting（将每个损失视为一个高斯似然的负对数，学习其同方差不确定性），同时监控三个损失的独立收敛曲线，确保没有一个损失出现 NaN 或振荡。此外，$\beta$-VAE 中的 $\beta$ 值需要针对触觉特征维度仔细调参 — 触觉特征维度（256）远小于视觉（512），需要使用比视觉 CVAE 略大的 $\beta$（如 2.0 vs 1.5）来防止触觉 latent 坍缩。</p>
+</div>
+</section>
+
+<!-- ===== §10 动机 ===== -->
+<section id="motivation">
+<h2>§10 Motivation</h2>
+
+<h3>10.1 五步推导链</h3>
+
+<p><strong class="hl">Step 1: 为什么视觉不够？— 视觉传感器的物理极限。</strong>尽管计算机视觉在过去十年取得了巨大进展，视觉传感器（相机）在机器人操作场景中存在三个无法通过算法完全弥补的物理局限：(i) 视线遮挡 — 机器人的手和环境物体会频繁遮挡相机对操作区域的视线，这是操作任务本身的几何特性决定的；(ii) 透明/镜面物体 — 标准 RGB-D 相机对透明和镜面物体无法提供可靠的深度估计（折射、反射），而日常生活中大量物体（杯子、瓶子、玻璃容器）属于这一类；(iii) 接触力不可见 — 视觉可以看到运动，但看不到力 — 而精细操作的核心在于力的控制，而非位置控制。这些物理局限意味着，纯视觉的机器人操作策略存在一个不可突破的性能上限。</p>
+
+<p><strong class="hl">Step 2: 为什么触觉是关键补充？— 触觉的独特信息维度。</strong>触觉传感器提供了视觉无法获取的关键信息：(i) 接触几何 — 触觉传感器（如 GelSight）通过凝胶形变感知物体表面的亚毫米级几何，包括视觉无法分辨的微纹理；(ii) 接触力和力矩 — 六维力/力矩传感器提供精确的力反馈，使机器人可以像人类一样通过"手感"来调整操作；(iii) 接触确认 — 触觉是抓取成功的唯一确定性信号（视觉可能看到物体在手指间但实际已经滑落）。这些信息维度是视觉的天然补充 — 它们在视觉的盲区中发挥作用，在视觉可用时提供额外的精度和确定性。</p>
+
+<p><strong class="hl">Step 3: 为什么简单拼接不够？— 异构模态的结构性差异。</strong>将视觉特征和触觉特征拼接后送入同一个策略网络，相当于让策略网络"自行发现"两个模态之间的关联。但是，视觉和触觉之间不是简单的线性互补关系：(i) 它们的"共享信息"和"独特信息"边界是模糊的、任务依赖的；(ii) 它们的时序粒度不匹配（视觉低频全局 vs 触觉高频局部）；(iii) 它们的可用性模式是异步的（触觉在 90% 时间步为零）。简单拼接将这些异构信息混合为一个大向量，丢失了模态关系结构，策略网络需要海量数据才能从混杂空间中提取有用的跨模态模式。</p>
+
+<p><strong class="hl">Step 4: 为什么需要"软"融合？— 从二元到连续的信息光谱。</strong>视觉-触觉融合的核心难题不是"是否融合"，而是"如何根据信息类型选择性地融合"。信息论视角下，两个模态共享的信息空间是一个连续光谱：一端是完全共享（冗余 — 如物体轮廓在图像和触觉形变中都可见，应对齐），另一端是完全互补（独特 — 如视觉的场景布局 vs 触觉的微纹理，应保留差异），中间是大片的"部分重叠"区域。硬对齐（二元）假设所有信息在光谱的同一端，软对齐（连续权重）允许每个特征维度独立地位于光谱的不同位置。这是范式级别的差异 — 类似于从"分类"到"回归"的跃迁。</p>
+
+<p><strong class="hl">Step 5: 为什么端到端训练至关重要？— 信息光谱是任务依赖的。</strong>什么信息应该对齐、什么信息应该保留为互补，这个问题的答案并非由数据分布唯一确定 — 它取决于下游任务。同一个物体的颜色信息：在按颜色分类物体的任务中，颜色是"应对齐的共享信息"（视觉和触觉通过纹理间接相关）；在需要感知透明度的任务中，颜色是"视觉独有的互补信息"（触觉无法感知颜色/透明度）。只有端到端训练，让任务损失梯度影响融合策略，才能使软权重门控网络 $g_w$ 学会任务相关的选择性对齐 — 这是"两阶段训练"无法实现的。</p>
+
+<h3>10.2 一句话动机</h3>
+<div class="callout idea">
+<p class="callout-title">One-Sentence Motivation</p>
+<p>人类在闭眼时仍能凭触觉完成精细操作，机器人也应如此 — ViTaS 的使命是让机器人在视觉失效时不再是"瞎子"，而是通过触觉"看见"被遮挡的世界，并通过软融合理解两个感官之间哪些信息该共鸣、哪些信息该各司其职。</p>
+</div>
+
+<h3>10.3 研究者视角：这一思路从何而来？</h3>
+<p>从研究演化的角度，ViTaS 可以被视作两条研究线索的交汇点。第一条线索是<strong>多模态对比学习的反思</strong>：CLIP 的成功 (2021) 引发了机器人领域大量"套用对比学习"的工作 — 将视觉和触觉做对比、将视觉和力觉做对比、甚至将视觉和音频做对比。但到 2023-2024 年，社区开始意识到"对比学习不是银弹" — 许多工作发现对比预训练带来的下游提升远不如预期，甚至出现负迁移。这引向了一个深层问题：是不是我们搞错了对比的对象？视觉-触觉与图像-文本的信息重叠模式根本不同 — 前者共享几何/物理信息但各有独特维度，后者共享语义但各自表达形式完全不同。ViTaS 的软融合正是对这个反思的系统性回应。</p>
+<p>第二条线索是<strong>模态缺失下的鲁棒操作</strong>：机器人操作的真实环境不可避免地存在传感器失效，而大多数现有方法通过数据增强（加噪声、dropout）来被动适应，而非主动补全。生成式模型（VAE、扩散模型）在计算机视觉中的成功启发了"主动补全"的思路 — 与其让网络忍受缺失，不如让它学会"想象"缺失的内容。ViTaS 将软融合（统计驱动的选择对齐）和 CVAE 补全（生成驱动的缺失补偿）组合在一起，形成了一个"分析-合成"的闭环融合框架。如果一名研究者沿着"对比学习的反思 → 信息类型分化 → 软选择机制"和"模态缺失 → 生成式补全 → 跨模态条件模型"两条线索同时思考，ViTaS 的设计会显得水到渠成。</p>
+</section>
+
+<!-- ===== §11 收获 ===== -->
+<section id="takeaway">
+<h2>§11 Takeaways</h2>
+
+<h3>11.1 方法论收获</h3>
+<ol>
+<li><strong>"软"是一种强大的建模哲学。</strong>ViTaS 的核心智慧在于其名称中的 "Soft" — 它拒绝了对复杂的跨模态关系做二元判断（对齐/不对齐，相关/不相关），而是允许每个信息维度独立地位于连续光谱的任意位置。这种"软"哲学可以推广到机器人学习的许多问题中：行为克隆中不同示范的软加权（类似 Dexora 的质量判别器）、多任务学习中的软任务优先级、Sim2Real 迁移中的软域混合。凡是存在"两个事物之间部分重叠、部分差异"的场景，软加权都优于硬二元决策。</li>
+<li><strong>跨模态补全是比跨模态鲁棒性更强的范式。</strong>Dropout、噪声注入等方法的目标是让模型"容忍"模态缺失（鲁棒性），而 CVAE 的目标是"补偿"模态缺失（补全）。两者的差别在于：鲁棒性模型在遇到缺失时选择"忽视"，补全模型在遇到缺失时选择"想象"。后者保留了完整的融合结构，使得下游策略始终处理的是"完整"的融合表示（无论它来自真实感知还是条件生成），从而避免了因模态缺失引起的分布偏移。这一范式可以推广到多传感器融合的各类机器人应用。</li>
+<li><strong>端到端的多任务训练是"任务感知融合"的关键。</strong>ViTaS 的三损失联合训练证明了：融合表示不仅需要统计上合理（对比损失），不仅需要重构上完备（CVAE 损失），还需要任务上有效（策略损失）。这三者不是简单的加和关系 — 它们之间存在博弈和相互约束。这种"多信号联合驱动"的训练范式对于其他需要"学习表示以服务下游任务"的场景（如状态表示学习、世界模型学习）具有直接的借鉴意义。</li>
+<li><strong>对模态关系的精确建模是融合效果的天花板。</strong>ViTaS 与传统多模态融合方法之间最本质的差异不在于网络架构的复杂度，而在于对"视觉和触觉到底是什么关系"这个根本性问题的思考深度。简单地将它们视为"相同事物的两种视角"（硬对比）或"两个独立的输入通道"（拼接），都是在简化问题 — 而这种简化以牺牲融合表示为代价。好的研究往往来自于对问题本身的再定义和再思考，而非对现有解决方案的渐进改进。</li>
+</ol>
+
+<h3>11.2 对 UAV/无人机场景的应用分析</h3>
+<ol>
+<li><strong>UAV 空中操作中的视觉-触觉/力觉融合。</strong>当无人机携带机械臂执行空中操作任务（如空中抓取、悬停维修、接触式检测）时，面临与 ViTaS 高度相似的多传感器融合挑战：(a) 视觉 — 机载相机用于目标检测和定位，但容易受视角遮挡（机体或机械臂遮挡目标）、光照变化（室外阳光直射 vs 阴影）和距离估计误差（单目深度估计在远距离不准确）的影响；(b) 力/触觉 — 机械臂末端的力传感器提供接触力反馈，但在空中接近阶段为零信号，仅在接触后有效。ViTaS 的软融合框架可以直接迁移到这个场景：在接近阶段主要依赖视觉（CVAE 预测预期的接触力模式），在接触阶段触觉/力觉接管主导权（软权重自动将力相关维度提升为高对齐权重），在视觉被遮挡时由 CVAE 基于当前的力反馈和历史信息生成补全的视觉场景。UAV 场景的独特挑战在于：姿态控制的动态耦合 — 机械臂的运动会产生反作用力矩扰动 UAV 的飞行姿态，这要求融合表示中额外包括 UAV 本体动力学的信息。</li>
+<li><strong>UAV 编队/集群中的"软协调"。</strong>ViTaS 的软融合思想可以被重新解读为一个通用的"多智能体软协调"框架。在多 UAV 编队中，每架 UAV 的观测（相机视野、GPS/IMU、通信数据）之间既存在共享信息（共同的导航目标、环境障碍物位置），也存在互补信息（每架 UAV 的独特视角覆盖不同的空间区域）。将 ViTaS 的软权重机制扩展到 UAV 集群：不是强制所有 UAV 共享相同的全局状态表示（硬对齐），也不是让每架 UAV 完全独立（无对齐），而是学习一个维度级的软通信权重 — UAV 之间仅共享"对编队协调有用"的信息维度（如相对位置、障碍物警告），而保留各自的局部观测（如各 UAV 独有的传感器噪声模式、局部风的感知）。这可以在通信带宽有限的情况下，实现高效的选择性信息共享。</li>
+<li><strong>跨 UAV 平台的传感器融合基础模型。</strong>不同 UAV 平台搭载不同的传感器套件（有的有双目深度、有的有激光雷达、有的仅有单目 RGB），这类似于 ViTaS 中不同 embodiment 的挑战。ViTaS 的"统一融合空间"思想可以启发一个跨 UAV 平台的感知基础模型：所有传感器类型（RGB、深度、LiDAR、IMU、GPS）被映射到一个共享的融合表示空间，软权重门控网络根据当前平台的传感器可用性，自动选择性地激活不同传感器维度的对齐。当某 UAV 的 LiDAR 因天气原因失效时，CVAE 从 RGB + IMU + 历史信息中生成 LiDAR-like 的特征补全。这种跨平台、跨传感器的鲁棒感知能力对于需要多 UAV 异构协作的搜救、巡检等关键应用至关重要。</li>
+</ol>
+
+<h3>11.3 关键参考文献</h3>
+<table>
+<tr><th style="width:32%;">Paper</th><th style="width:10%;">Year</th><th style="width:28%;">Relevance</th><th>Key Contribution</th></tr>
+<tr><td>CLIP: Learning Transferable Visual Models from Natural Language Supervision (Radford et al.)</td><td>2021</td><td>跨模态对比学习的思想来源</td><td>证明了大规模跨模态对比预训练能够学习语义对齐的联合表示，启发了机器人领域的多模态对比工作</td></tr>
+<tr><td>Making Sense of Vision and Touch (Lee et al.)</td><td>2019</td><td>视觉-触觉融合的开创性工作</td><td>首次提出自监督跨模态预测任务（从视觉预测触觉，反之亦然），奠定了视触觉学习的基础</td></tr>
+<tr><td>Conditional Variational Autoencoder (Sohn et al.)</td><td>2015</td><td>CVAE 的理论和方法基础</td><td>提出条件 VAE 框架，使生成模型能够利用条件信息引导生成，是 ViTaS 补全模块的核心技术基础</td></tr>
+<tr><td>Touch if you can (Yang et al.)</td><td>2023</td><td>触觉在强化学习中的应用</td><td>证明在 RL 中引入触觉感知能显著提升接触密集任务的表现，确定了触觉在机器人学习中的价值</td></tr>
+<tr><td>Multi-task Learning Using Uncertainty (Kendall et al.)</td><td>2018</td><td>多任务损失平衡方法</td><td>提出 uncertainty weighting 自动平衡多任务损失的方案，ViTaS 的多损失平衡直接受益于此</td></tr>
+<tr><td>GelSight: High-Resolution Robot Tactile Sensors (Yuan et al.)</td><td>2017</td><td>高分辨率视触觉传感器硬件</td><td>GelSight 系列传感器使亚毫米级接触几何感知成为可能，为视触觉学习提供了高质量的触觉数据来源</td></tr>
+<tr><td>beta-VAE: Learning Basic Visual Concepts with a Constrained Variational Framework (Higgins et al.)</td><td>2017</td><td>解耦表示学习</td><td>引入 $\beta$ 参数控制 VAE 的 KL 散度权重，促进隐空间的解耦和鲁棒性，ViTaS 的 CVAE 模块借鉴了 $\beta$-VAE 的设计</td></tr>
+</table>
+</section>
+
+</main>
+
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes &copy; 2026 · Scholar: Huazhe Xu Group · Paper: ViTaS — Visual Tactile Soft Fusion Contrastive Learning for Visuomotor Learning (Tian et al., 2026) · Rendered with MathJax &amp; Mermaid</footer>
+</body></html>

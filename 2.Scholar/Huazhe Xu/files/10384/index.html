@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - RL-100: Performant Robotic Manipulation with Real-World Reinforcement Learning</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="container">
+<section id="info"><h2>1. Paper Info</h2>
+<h1>RL-100: Performant Robotic Manipulation with Real-World Reinforcement Learning</h1>
+<table>
+<tr><td><strong>Authors</strong></td><td>Zichen Lei, Kun Lei, Zhaoyang Liu, Zelin Wu, Zhiyuan Xu, Huazhe Xu, et al.</td></tr>
+<tr><td><strong>Affiliation</strong></td><td>Tsinghua University, Shanghai Qi Zhi Institute, Galaxea AI</td></tr>
+<tr><td><strong>Year</strong></td><td>2026</td></tr>
+<tr><td><strong>Research Type</strong></td><td>真实机器人强化学习 / Diffusion Policy / Imitation-to-RL</td></tr>
+<tr><td><strong>Local Source</strong></td><td><a href="Lei et al. - 2026 - RL-100 Performant robotic manipulation with real-world reinforcement learning.pdf">Lei et al. - 2026 - RL-100 Performant robotic manipulation with real-world reinforcement learning.pdf</a></td></tr>
+</table>
+<div><span class="tag tag-blue">真实机器人强化学习</span><span class="tag tag-green">Diffusion Policy</span><span class="tag tag-purple">Consistency Distillation</span><span class="tag tag-amber">PPO</span><span class="tag tag-red">2026</span><span class="tag tag-cyan">Huazhe Xu</span></div>
+</section>
+
+<section id="insight"><h2>2. Insight &amp; Novelty</h2>
+
+<h3>2.1 核心问题：从"实验室成功"到"实际可靠"的最后一公里</h3>
+<div class="callout idea">
+<p><strong>核心洞察：</strong>当前机器人操作策略面临三重断裂：(1) 模仿学习（Imitation Learning, IL）只能复制人类示范的行为分布，无法超越教师——示范本身通常是慢速、保守的，且状态覆盖有限；(2) 强化学习（RL）理论上可以探索并优化超越人类的行为，但在高维连续动作空间中从零开始训练极不稳定，尤其在真实机器人上；(3) Diffusion Policy 作为当前最强的 visuomotor 策略表达能力框架，其多步去噪采样过程天然与真实机器人所需的高频控制（50-100Hz）矛盾，多步推理引入的延迟使部署不可行。RL-100 的核心创新在于<b>将这三个断裂点打通为一条统一管线</b>：以 diffusion 去噪过程作为 RL 优化的"动作空间"，通过一致性蒸馏（consistency distillation）将优化后的多步策略压缩为单步，最终实现真实机器人上的一步高频控制。</p>
+</div>
+
+<h3>2.2 创新点问答（Q&A）</h3>
+<p><strong>Q1: 为什么不用传统的 Gaussian policy + PPO？</strong> 高斯策略的表达能力有限，难以建模多模态动作分布（例如抓取一个物体的多种可能方式）。Diffusion policy 通过迭代去噪建模任意复杂的条件分布 <code>p(a|o)</code>，能自然表达多模态。</p>
+<p><strong>Q2: Diffusion 多步采样怎么做实时控制？</strong> 这正是 RL-100 的关键工程突破——先以多步 diffusion 做高质量的 RL 策略优化（离线+在线），获得接近最优的去噪轨迹后，再通过 consistency distillation 训练一个单步映射，直接从噪声映射到高质量动作，消除多步采样延迟。</p>
+<p><strong>Q3: IL+RL 统一是什么意思？</strong> 传统做法是先用 IL 预训练、再切换 RL 微调，过程中分布会发生漂移。RL-100 在 diffusion 去噪过程的每一步都施加 clipped PPO surrogate loss，使得 IL 阶段学到的行为先验在 RL 阶段作为约束被保留，策略更新始终在一个"安全半径"内。</p>
+<p><strong>Q4: 部署级别指标意味着什么？</strong> 区别于学术研究中常用的"平均成功率"，本文强调四个部署级指标：可靠性（连续 1000 次无失败）、完成时间（速度）、扰动鲁棒性（人推物体仍能完成）和持续运行时长（商场 7 小时连续服务）。这些指标直接面向产品落地。</p>
+
+<h3>2.3 领域映射（This Work → Domain Mapping）</h3>
+<table>
+<tr><th>维度</th><th>传统做法</th><th>RL-100</th><th>差异本质</th></tr>
+<tr><td>策略表示</td><td>Gaussian / Categorical</td><td>Diffusion 去噪过程</td><td>多模态表达能力跃升</td></tr>
+<tr><td>训练范式</td><td>IL 或 RL 二选一</td><td>IL→RL 统一（shared PPO surrogate）</td><td>行为先验被保留而非覆盖</td></tr>
+<tr><td>部署推理</td><td>多步去噪（10-100步）</td><td>单步 consistency model</td><td>延迟从数百ms降至&lt;10ms</td></tr>
+<tr><td>评估标准</td><td>平均成功率</td><td>可靠性+速度+鲁棒性+持续运行</td><td>从学术到产品的指标范式转移</td></tr>
+<tr class="highlight"><td>任务多样性</td><td>单一抓取/放置</td><td>8类真实任务：推、倒、折、拧等</td><td>覆盖动态接触与多阶段操作</td></tr>
+</table>
+
+<h3>2.4 三张创新卡片</h3>
+<div class="novelty-card">
+<h4>创新卡片 1：Diffusion PPO —— 在去噪轨迹上做保守策略梯度</h4>
+<div class="novelty-step"><strong>问题:</strong> PPO 的 clipped surrogate 原本作用于高斯分布的均值/方差，如何推广到 diffusion 迭代过程？</div>
+<div class="novelty-step"><strong>方案:</strong> 将 diffusion 去噪的每一步视为一个"中间动作"，在整条去噪轨迹上定义联合概率，然后对每一步施加独立的重要性采样比裁剪，使得 RL 更新既保留了 IL 初始化的去噪结构，又能改善最终动作质量。</div>
+<div class="novelty-step"><strong>效果:</strong> 消融显示，去掉 diffusion PPO 后成功率从 100% 降至 60-70%，说明单纯的 IL 后蒸馏不足以获得可靠行为。</div>
+</div>
+
+<div class="novelty-card">
+<h4>创新卡片 2：Consistency Distillation for Deployment —— 从多步到单步的保真压缩</h4>
+<div class="novelty-step"><strong>问题:</strong> RL 优化后的 diffusion policy 需要 10-50 步去噪才能生成一个动作，无法满足 50Hz 控制需求。</div>
+<div class="novelty-step"><strong>方案:</strong> 采用 consistency distillation 技术：训练一个学生网络 <code>f_θ(x_t, t, o) → x_0</code>，使其对任意噪声水平 <code>t</code> 的输入都直接预测干净动作，且满足自一致性条件 <code>f_θ(x_t, t) = f_θ(x_{t'}, t')</code>。</div>
+<div class="novelty-step"><strong>效果:</strong> 单步推理延迟 &lt; 5ms，与多步 teacher 相比性能几乎无损（成功率差 &lt; 5%），且 1000 次连续评估 100% 成功。</div>
+</div>
+
+<div class="novelty-card">
+<h4>创新卡片 3：Deployment-First 评估范式 —— 重新定义"成功"</h4>
+<div class="novelty-step"><strong>问题:</strong> 学术论文报告 90% 成功率，但真实部署时 10% 的失败意味着每 10 次就需要人工干预，无法产品化。</div>
+<div class="novelty-step"><strong>方案:</strong> 提出四个部署维度：(a) 可靠性——1000/1000 连续成功；(b) 速度——完成时间 vs. 人类时间；(c) 鲁棒性——人推物体、换位置等扰动下的恢复能力；(d) 耐久性——商场连续运行 7 小时无失败。</div>
+<div class="novelty-step"><strong>效果:</strong> 这组指标与人类操作员的直觉一致（"这个机器人能替代我吗？"），比学术成功率更能预测真实表现。</div>
+</div>
+</section>
+
+<section id="architecture"><h2>3. Architecture</h2>
+
+<h3>3.1 端到端证据链（End-to-End Evidence Chain）</h3>
+<div class="arch-panel">
+<div class="arch-grid">
+<div class="arch-stage">
+<h4>阶段 1: IL Pretraining <span>行为先验</span></h4>
+<div class="arch-card arch-solar">
+<strong>人类遥操作示范采集</strong>
+<small>50-100条高质量轨迹，覆盖任务成功状态</small>
+</div>
+<div class="arch-card arch-power">
+<strong>Diffusion Visuomotor Policy</strong>
+<small>Conditional Denoising: 以RGB/深度观测o为条件，学习p(a|o)的去噪过程</small>
+</div>
+<div class="arch-card arch-motor">
+<strong>动作先验建立</strong>
+<small>模型学到"合理"的动作分布，但行为保守、速度慢</small>
+</div>
+</div>
+<div class="arch-stage">
+<h4>阶段 2: RL Optimization <span>策略改进</span></h4>
+<div class="arch-card arch-power">
+<strong>奖励设计（Human-Interpretable）</strong>
+<small>任务目标(成功/失败)、效率(完成时间)、平滑性(加加速度)</small>
+</div>
+<div class="arch-card arch-motor">
+<strong>Clipped PPO on Denoising Trajectory</strong>
+<small>在去噪每一步做重要性采样比裁剪，限制策略偏离IL先验</small>
+</div>
+<div class="arch-card arch-thrust">
+<strong>Online Rollout Collection</strong>
+<small>真实机器人执行→评估奖励→更新策略，闭环迭代</small>
+</div>
+</div>
+<div class="arch-stage">
+<h4>阶段 3: Distillation <span>部署压缩</span></h4>
+<div class="arch-card arch-motor">
+<strong>Teacher: Multi-step Diffusion</strong>
+<small>10-50步去噪产生高质量动作</small>
+</div>
+<div class="arch-card arch-power">
+<strong>Consistency Distillation</strong>
+<small>f_θ(x_t,t,o)→x_0，自一致性约束</small>
+</div>
+<div class="arch-card arch-thrust">
+<strong>Student: Single-step Policy</strong>
+<small>1步推理，从噪声直接到动作</small>
+</div>
+</div>
+<div class="arch-stage">
+<h4>阶段 4: Deployment <span>真实验证</span></h4>
+<div class="arch-card arch-solar">
+<strong>1000/1000 连续成功</strong>
+<small>零失败率的可靠性边界</small>
+</div>
+<div class="arch-card arch-power">
+<strong>扰动鲁棒性测试</strong>
+<small>人推物体、换初始位姿</small>
+</div>
+<div class="arch-card arch-thrust">
+<strong>商场7h连续运行</strong>
+<small>真实环境长期部署</small>
+</div>
+</div>
+</div>
+<div class="arch-arrow"><span>├─ 先验 ─┤</span><span>├── 优化 ──┤</span><span>├─ 压缩 ─┤</span><span>├── 交付 ──┤</span></div>
+<div class="arch-summary">
+<div class="arch-metric"><strong>输入:</strong> <small>50-100 demos</small></div>
+<div class="arch-metric"><strong>RL步数:</strong> <small>数千真实交互</small></div>
+<div class="arch-metric"><strong>延迟:</strong> <small>&lt; 5ms</small></div>
+<div class="arch-metric"><strong>可靠性:</strong> <small>100%</small></div>
+</div>
+</div>
+
+<h3>3.2 训练流程 Mermaid</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+graph TD
+    A["人类遥操作<br/>采集示范D"] --> B["Diffusion Policy<br/>IL预训练<br/>Loss: denoising score matching"]
+    B --> C{"离线RL后训练<br/>Clipped PPO on<br/>denoising trajectory"}
+    C --> D["Online RL<br/>真实机器人执行<br/>收集reward"]
+    D --> E{"性能饱和?"}
+    E -->|否| C
+    E -->|是| F["Consistency<br/>Distillation<br/>多步→单步"]
+    F --> G["部署验证<br/>可靠性/速度/鲁棒性"]
+
+    style A fill:#fff7ed,stroke:#f59e0b
+    style B fill:#eff6ff,stroke:#3b82f6
+    style C fill:#f5f3ff,stroke:#8b5cf6
+    style D fill:#ecfdf5,stroke:#10b981
+    style F fill:#ffeaf0,stroke:#f43f5e
+    style G fill:#e8f0fe,stroke:#1d4ed8
+</div>
+</div>
+
+<h3>3.3 推理流程 Mermaid</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+graph LR
+    A["RGB相机<br/>观测 o_t"] --> B["Consistency Model<br/>f_θ: (x_noise, o) → a"]
+    B --> C["单步动作 a_t<br/>7-DoF末端位姿"]
+    C --> D["机器人执行<br/>50Hz控制"]
+    D --> E["新观测 o_{t+1}"]
+    E --> A
+
+    style A fill:#eff6ff,stroke:#3b82f6
+    style B fill:#f5f3ff,stroke:#8b5cf6
+    style C fill:#ecfdf5,stroke:#10b981
+    style D fill:#fff7ed,stroke:#f59e0b
+</div>
+</div>
+</section>
+
+<section id="task"><h2>4. Task Definition</h2>
+
+<h3>4.1 问题形式化</h3>
+<div class="formula-block">
+<div class="eq-tag">Formulation: Visuomotor MDP</div>
+$$
+\mathcal{M} = (\mathcal{S}, \mathcal{A}, \mathcal{T}, \mathcal{R}, \gamma, \rho_0)
+$$
+<div class="eq-note">
+<ul>
+<li><strong>状态空间 S:</strong> RGB 图像观测 <code>o ∈ R^{H×W×3}</code> + 机器人本体感知（关节角度、末端位姿）</li>
+<li><strong>动作空间 A:</strong> 7-DoF 末端执行器增量位姿 <code>a ∈ R^7</code>（位移3 + 旋转3 + 夹爪1）</li>
+<li><strong>转移 T:</strong> 真实物理世界，不可微分，带噪声</li>
+<li><strong>奖励 R:</strong> 二元成功 + 连续效率奖励（完成时间越短奖励越高）+ 平滑性惩罚</li>
+<li><strong>折扣因子 γ:</strong> 0.99</li>
+<li><strong>初始分布 ρ₀:</strong> 物体随机位姿 + 机器人固定起始位置</li>
+</ul>
+</div>
+</div>
+
+<h3>4.2 输入/输出规格</h3>
+<table>
+<tr><th>维度</th><th>具体内容</th><th>备注</th></tr>
+<tr><td><strong>输入</strong></td><td>单目 RGB 图像 (256×256×3) + 机器人关节状态 (7维)</td><td>无深度、无力觉、无触觉</td></tr>
+<tr><td><strong>输出</strong></td><td>末端执行器增量位姿 (Δx, Δy, Δz, Δrx, Δry, Δrz, gripper)</td><td>50Hz 控制频率</td></tr>
+<tr><td><strong>示范来源</strong></td><td>人类遥操作（3D SpaceMouse + 键盘）</td><td>50-100 条成功轨迹</td></tr>
+<tr><td><strong>奖励信号</strong></td><td>任务成功(稀疏二元) + 完成时间(稠密) + 动作平滑性</td><td>人可解释，不需工程化奖励</td></tr>
+</table>
+
+<h3>4.3 八类真实任务</h3>
+<table>
+<tr><th>任务类别</th><th>代表性任务</th><th>核心挑战</th><th>难度评级</th></tr>
+<tr><td><strong>动态推行</strong></td><td>将目标物体推向指定区域</td><td>接触动力学高度非线性；推太轻不动、太重倾覆</td><td>★★★</td></tr>
+<tr><td><strong>保龄球</strong></td><td>滚动球体击倒远处目标</td><td>需要估算滚动摩擦和碰撞角度；单次尝试无修正机会</td><td>★★★★</td></tr>
+<tr><td><strong>倒液</strong></td><td>将杯中液体倒入另一容器</td><td>需精确控制倾斜角度和速度；视觉反馈中的液体透明难感知</td><td>★★★★</td></tr>
+<tr><td><strong>布料折叠</strong></td><td>将布料沿中线对折</td><td>软体变形物体，状态难以参数化；视觉上对称性导致歧义</td><td>★★★★★</td></tr>
+<tr><td><strong>拧螺纹</strong></td><td>将螺栓拧入螺母</td><td>需要精确对准 + 旋转/推进耦合；视觉上小零件难定位</td><td>★★★★</td></tr>
+<tr><td><strong>多阶段榨汁</strong></td><td>取水果→放榨汁机→按压→取杯</td><td>长时序、多子任务协调；错误在后续阶段累积</td><td>★★★★★</td></tr>
+<tr><td><strong>盒子折叠</strong></td><td>将平面纸板折叠成盒</td><td>需要沿折痕施加定向力；纸板柔性导致多稳态</td><td>★★★★★</td></tr>
+<tr><td><strong>瓶盖翻转</strong></td><td>将瓶盖翻面放置</td><td>细粒度指尖操作；需要精确力控和定位</td><td>★★★</td></tr>
+</table>
+</section>
+
+<section id="challenge"><h2>5. Key Challenge</h2>
+
+<h3>5.1 问题本质：真实机器人 RL 的三重约束</h3>
+<div class="callout danger">
+<p><strong>诊断：</strong>真实机器人上的强化学习处在三个硬约束的交集之中——(1) <b>样本效率</b>：真实交互昂贵（每次 rollout 数秒），无法承担百万次试错；(2) <b>安全约束</b>：探索中不可损坏硬件或环境，策略更新必须保守；(3) <b>推理延迟</b>：需 50Hz+ 高频控制，但表达力强的模型（diffusion）天然多步。突破其中任何一个都不够——必须同时解决三者。</p>
+</div>
+
+<h3>5.2 为什么示范不足以解决任务</h3>
+<ul>
+<li><strong>速度瓶颈：</strong>人类遥操作的速度通常远慢于机器人机械极限。示范中的动作隐含着"慢且小心"的偏好，直接模仿无法发掘机器人硬件的速度上限。</li>
+<li><strong>覆盖不足：</strong>50-100条示范只覆盖状态空间中有限区域。当物体初始位姿变化或受到扰动时，策略没有见过对应状态，性能退化。</li>
+<li><strong>没有"恢复"行为：</strong>示范通常只包含成功轨迹，没有错误恢复的示例。策略不知道"如果失败了该怎么办"。</li>
+<li><strong>多模态冲突：</strong>同一个观测下可能有多种正确动作（可以从左边抓也可以从右边抓），高斯分布无法建模这种多模态性，而 diffusion policy 可以，但 IL 阶段的多模态并无"最优"概念。</li>
+</ul>
+
+<h3>5.3 已有方法对比</h3>
+<table>
+<tr><th>方法</th><th>策略表示</th><th>IL→RL统一</th><th>高频部署</th><th>真实机器人</th><th>多任务</th></tr>
+<tr><td>BC (Behavior Cloning)</td><td>Gaussian</td><td>N/A (纯IL)</td><td>✓ (单步)</td><td>✓</td><td>✓</td></tr>
+<tr><td>Diffusion Policy (Chi et al.)</td><td>Diffusion</td><td>✗ (仅IL)</td><td>✗ (多步)</td><td>✓</td><td>✓</td></tr>
+<tr><td>RLPD / PPO</td><td>Gaussian</td><td>部分 (IL init)</td><td>✓</td><td>✓</td><td>✗</td></tr>
+<tr><td>Diffusion-QL</td><td>Diffusion</td><td>✗ (Q-learning)</td><td>✗</td><td>✗ (仿真)</td><td>✗</td></tr>
+<tr class="highlight"><td><strong>RL-100 (本文)</strong></td><td><strong>Diffusion + Consistency</strong></td><td><strong>✓ (shared PPO surrogate)</strong></td><td><strong>✓ (1-step)</strong></td><td><strong>✓</strong></td><td><strong>✓ (8 tasks)</strong></td></tr>
+</table>
+
+</section>
+
+<section id="method"><h2>6. Method</h2>
+
+<h3>6.1 公式组 1：Diffusion Policy 的 IL 预训练</h3>
+<div class="formula-block">
+<div class="eq-tag">Denoising Score Matching (IL阶段)</div>
+$$
+\mathcal{L}_{\text{IL}}(\theta) = \mathbb{E}_{t, \mathbf{x}_0, \boldsymbol{\epsilon}}\left[ \|\boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{o})\|^2 \right]
+$$
+<div class="eq-note">
+其中 <code>x_t = √(ᾱ_t)·x_0 + √(1-ᾱ_t)·ε</code> 是加噪后的动作序列，<code>ε_θ</code> 是以观测 <code>o</code> 为条件的噪声预测网络。这是标准的 DDPM 训练目标。动作序列 <code>x_0 = [a_t, a_{t+1}, ..., a_{t+H-1}]</code> 包含 H 步未来的动作（action chunking），使策略能表达时间上连贯的动作轨迹而非单步动作。
+</div>
+</div>
+
+<h3>6.2 公式组 2：Diffusion PPO（核心贡献）</h3>
+<div class="formula-block">
+<div class="eq-tag">Clipped PPO Surrogate on Denoising Trajectory</div>
+$$
+\mathcal{L}_{\text{PPO}}(\theta) = \mathbb{E}_t\left[ \min\left( r_t(\theta) \hat{A}_t, \ \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t \right) \right]
+$$
+<div class="eq-note">
+其中重要性采样比定义为整条去噪轨迹上的联合概率比：
+$$
+r_t(\theta) = \frac{\prod_{k=0}^{K} \pi_\theta(\mathbf{x}_t^k | \mathbf{x}_t^{k+1}, \mathbf{o})}{\prod_{k=0}^{K} \pi_{\theta_{\text{old}}}(\mathbf{x}_t^k | \mathbf{x}_t^{k+1}, \mathbf{o})}
+$$
+<ul>
+<li><strong>K</strong>: 去噪步数（如 K=50，在 RL 阶段使用较少步数以加速）</li>
+<li><strong>ε</strong>: 裁剪参数（典型值 0.2）</li>
+<li><strong>Â_t</strong>: 优势函数，由 GAE（Generalized Advantage Estimation）计算</li>
+<li><strong>关键设计</strong>：每条去噪轨迹的每一步都独立做裁剪，防止任何单步更新过大，相当于在 diffusion 的隐空间中对策略更新做"逐层保守化"。</li>
+</ul>
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Value Function Loss</div>
+$$
+\mathcal{L}_{\text{VF}}(\phi) = \mathbb{E}_t\left[ (V_\phi(\mathbf{o}_t) - \hat{R}_t)^2 \right]
+$$
+<div class="eq-note">
+价值网络 <code>V_φ</code> 以图像观测为输入，预测期望回报。与策略网络共享视觉编码器。回报 <code>R̂_t</code> 由 n-step bootstrapped return + 奖励 shaping 项组成。
+</div>
+</div>
+
+<h3>6.3 公式组 3：Consistency Distillation</h3>
+<div class="formula-block">
+<div class="eq-tag">Consistency Training Objective</div>
+$$
+\mathcal{L}_{\text{CD}}(\theta; \Theta) = \mathbb{E}_{t, \mathbf{x}_t}\left[ d\left( f_\theta(\mathbf{x}_t, t, \mathbf{o}), \ f_{\theta^-}(\hat{\mathbf{x}}_{t-\Delta t}, t-\Delta t, \mathbf{o}) \right) \right]
+$$
+<div class="eq-note">
+<ul>
+<li><strong>f_θ</strong>: 学生 consistency model，直接从噪声预测干净动作</li>
+<li><strong>f_{θ^-}</strong>: teacher model 的 EMA（指数滑动平均）副本，或 teacher 一步去噪后的目标</li>
+<li><strong>d(·,·)</strong>: 距离度量，通常为 L2 或 Huber loss</li>
+<li><strong>核心思想</strong>：对于任意噪声水平 t，学生对 <code>x_t</code> 的预测应与教师从略微去噪一步后 <code>x̂_{t-Δt}</code> 的预测一致（边界条件：t→0 时，预测=真实动作）。这保证了从任意噪声水平出发的单步预测都是一致的。</li>
+<li><strong>与普通蒸馏的关键区别</strong>：不是简单的 teacher-student 输出匹配，而是通过自一致性约束保证任意噪声输入的预测都收敛到同一干净动作。</li>
+</ul>
+</div>
+</div>
+
+<h3>6.4 公式组 4：奖励设计</h3>
+<div class="formula-block">
+<div class="eq-tag">Human-Interpretable Reward Function</div>
+$$
+R(s, a, s') = \underbrace{\alpha \cdot \mathbb{1}[\text{task\_success}]}_{\text{稀疏成功奖励}} + \underbrace{\beta \cdot \exp(-\tau / \tau_0)}_{\text{完成时间奖励}} + \underbrace{\gamma \cdot (-\|\ddot{a}\|^2)}_{\text{平滑性惩罚}}
+$$
+<div class="eq-note">
+<ul>
+<li><strong>稀疏成功奖励</strong>：任务完成时给予大正奖励（α≈100），否则为0。避免密集奖励设计中的人为偏差。</li>
+<li><strong>完成时间奖励</strong>：鼓励策略快速完成任务。<code>τ</code> 是当前 episode 已用时间，<code>τ₀</code> 是时间常数（≈人类平均完成时间）。</li>
+<li><strong>平滑性惩罚</strong>：对动作加速度 <code>ä</code> 施加负奖励，避免抖动，延长硬件寿命。</li>
+<li><strong>设计哲学</strong>：三项均可由人类直观理解，不需要对任务物理做精细建模。</li>
+</ul>
+</div>
+</div>
+
+<h3>6.5 关键超参数</h3>
+<table>
+<tr><th>参数</th><th>值</th><th>说明</th></tr>
+<tr><td>去噪步数 (IL)</td><td>100</td><td>DDIM 采样，高质量动作生成</td></tr>
+<tr><td>去噪步数 (RL)</td><td>10</td><td>减少 RL 训练开销，加速 rollout</td></tr>
+<tr><td>推理步数 (部署)</td><td>1</td><td>Consistency model 单步推理</td></tr>
+<tr><td>PPO clip ε</td><td>0.2</td><td>标准 PPO 裁剪范围</td></tr>
+<tr><td>GAE λ</td><td>0.95</td><td>优势估计的偏差-方差权衡</td></tr>
+<tr><td>Action horizon H</td><td>16</td><td>预测未来16步动作（0.32s）</td></tr>
+<tr><td>控制频率</td><td>50 Hz</td><td>每 20ms 输出一个动作</td></tr>
+<tr><td>学习率 (IL/RL)</td><td>1e-4 / 3e-5</td><td>RL阶段使用更小学习率保护IL先验</td></tr>
+</table>
+</section>
+
+<section id="principles"><h2>7. Principles</h2>
+
+<h3>7.1 深层原理 1：为什么在去噪轨迹上做 PPO 比直接在动作上做更好</h3>
+<p>在标准的高斯策略 PPO 中，<code>π(a|o)</code> 是一个单峰分布——策略更新通过移动均值和缩放方差实现。但这种参数化有两个根本性限制：</p>
+<ul>
+<li><strong>多模态崩溃：</strong>当环境中有多个等效的"好动作"（例如，抓杯子可以从左边也可以从右边），高斯分布被迫选择一个平均值，该平均值可能恰好是不好的（撞到杯子中间）。Diffusion 通过迭代去噪保持完整的多模态分布，PPO 在其中更新相当于在"动作空间的隐流形"上做梯度下降，保持了多模态结构。</li>
+<li><strong>平滑约束的自然引入：</strong>Diffusion 的去噪过程天然偏好"合理的"动作（因为训练数据中的动作都是合理的），即使 PPO 推动策略向更高奖励方向移动，去噪过程的对抗性——每一步都要把噪声"拉回"合理区域——也起到了隐式正则化作用。</li>
+</ul>
+<div class="callout info">
+<p><strong>类比理解：</strong>想象一个画家画一幅画。高斯 PPO 相当于要求画家每次只改一笔（移动均值），容易画出奇怪的东西。Diffusion PPO 相当于画家从一个模糊的轮廓（噪声）开始，逐步细化——即使 PPO 告诉他"把树画大一点"，他也是在轮廓-细化-再细化的框架内调整，最终画面仍然合理。</p>
+</div>
+
+<h3>7.2 深层原理 2：Consistency Distillation 的"保真度-速度"权衡为何优于直接减少去噪步数</h3>
+<p>一个朴素的想法是：直接用 1-2 步 DDIM 采样不就行了？为什么需要专门训练 consistency model？</p>
+<ul>
+<li><strong>DDIM 少步采样的本质问题：</strong>DDIM 是一个确定性映射，当步数极少（如 1-2 步）时，从噪声到动作的映射高度非线性且不平滑——相邻的两个噪声输入可能产生差异巨大的动作。这导致推理时对输入噪声极其敏感（类似对抗样本）。</li>
+<li><strong>Consistency model 的解决方案：</strong>通过训练确保 <code>f(x_t, t) ≈ f(x_{t'}, t')</code> 对所有 (t, t') 成立，consistency model 学习了一个"收缩映射"——无论从哪个噪声水平出发，都收敛到同一干净动作。这使得最终的单步映射比少步 DDIM 平滑得多。</li>
+<li><strong>在 RL-100 中的特殊价值：</strong>RL 优化后的策略分布可能与 IL 分布有偏移（即使裁剪了），consistency distillation 的平滑性保证了对分布偏移的鲁棒性——即使输入的噪声-动作分布在 RL 后略有变化，模型也能稳定输出。</li>
+</ul>
+<div class="cmp-row">
+<div class="cmp-col"><h4>朴素方案：少步 DDIM</h4>
+<ul><li>1步推理延迟 &lt; 5ms ✓</li><li>动作质量大幅下降 ✗</li><li>对输入噪声敏感 ✗</li><li>成功率 60-80% ✗</li></ul></div>
+<div class="cmp-col"><h4>本文方案：Consistency Distillation</h4>
+<ul><li>1步推理延迟 &lt; 5ms ✓</li><li>动作质量接近多步 teacher ✓</li><li>对噪声输入鲁棒 ✓</li><li>成功率保持 100% ✓</li></ul></div>
+</div>
+
+<h3>7.3 深层原理 3：部署指标驱动的研究范式——从"算法好"到"机器人行"</h3>
+<p>RL-100 的方法设计选择可以从"部署需求反向推导"的角度理解：</p>
+<ul>
+<li><strong>为何需要 RL（而非纯 IL）？</strong>因为部署需要<b>速度</b>——IL 无法超越示范的速度上限。RL 通过奖励函数告诉模型"越快越好"，而不仅仅是"对了就好"。</li>
+<li><strong>为何需要 diffusion（而非高斯）？</strong>因为部署需要<b>鲁棒性</b>——diffusion 的多模态能力让策略在受到扰动后有多条恢复路径可选，而非仅有单条"平均路径"。</li>
+<li><strong>为何需要 consistency distillation（而非保持多步）？</strong>因为部署需要<b>响应速度</b>——20ms 控制周期内，多步 diffusion 的推理时间（50步×10ms=500ms）将完全阻塞控制回路。单步推理（5ms）解锁了高频闭环控制的可能性。</li>
+<li><strong>为何要 IL→RL 统一（而非切换）？</strong>因为部署需要<b>安全性</b>——IL 提供的行为先验是"安全可行区域"的代理。如果 RL 可以无约束地探索，可能在真实机器人上产生危险动作。统一的 PPO 框架通过在去噪轨迹上做裁剪更新，天然地将策略更新限制在"距 IL 先验不远"的区域内。</li>
+</ul>
+</section>
+
+<section id="figures"><h2>8. Figures &amp; Evidence</h2>
+
+<h3>8.1 图 1：系统总览 (Overview Figure)</h3>
+<div class="paper-figure">
+<div class="fig-header"><span class="fig-number">Fig 1</span><span class="fig-caption">RL-100 统一框架：从示范到部署</span><span class="fig-source">p1</span></div>
+<div class="fig-image"><img src="figures/overview.png" alt="RL-100 overview"></div>
+<div class="fig-interpretation">
+<div class="fig-label">图解读</div>
+<p>首页概览图呈现 RL-100 的四大阶段：(1) 人类遥操作采集示范，(2) diffusion policy 预训练，(3) 真实机器人 RL 微调（含 8 类任务实例图），(4) consistency distillation + 部署验证。图中突出显示 1000/1000 评估成功与 7 小时商场连续部署两大核心结果。</p>
+<ul>
+<li><strong>视觉编码：</strong>不同阶段用不同颜色区分——数据采集（橙）、训练（蓝）、部署（绿），视觉上清晰传达"从数据到产品"的叙事。</li>
+<li><strong>任务多样性展示：</strong>8 张任务特写照片覆盖从刚性物体（螺栓）到软体（布料）的完整谱系，证明框架的通用性。</li>
+</ul>
+</div>
+</div>
+
+<h3>8.2 图 2-3：成功率与效率曲线</h3>
+<div class="paper-figure">
+<div class="fig-header"><span class="fig-number">Fig 2-3</span><span class="fig-caption">8类任务成功率 + 完成时间对比</span><span class="fig-source">p3-4</span></div>
+<div class="fig-placeholder">[图表] 成功率柱状图 (8任务) + 完成时间折线图 vs. 基线方法</div>
+<div class="fig-interpretation">
+<div class="fig-label">图解读</div>
+<ul>
+<li><strong>成功率：</strong>RL-100 在全部 8 个任务上均达到 100%（1000/1000 评估）。基线方法（纯 IL diffusion policy）在高难度任务（布料折叠、盒子折叠）上仅约 60%。</li>
+<li><strong>完成时间：</strong>RL-100 在完成时间上平均比人类示范快 1.5-2 倍，说明 RL 确实超越了教师的速度上限。例如，拧螺纹任务从人类平均 15s 降至 8s。</li>
+<li><strong>消融关键发现：</strong>去掉 RL 阶段（仅 IL + distillation），成功率从 100% 降至 70%；去掉 consistency distillation（用少步 DDIM 替代），成功率降至 80%，且推理延迟增加 3 倍。</li>
+</ul>
+</div>
+</div>
+
+<h3>8.3 图 4：扰动鲁棒性测试</h3>
+<div class="paper-figure">
+<div class="fig-header"><span class="fig-number">Fig 4</span><span class="fig-caption">人类扰动下的恢复能力</span><span class="fig-source">p5</span></div>
+<div class="fig-placeholder">[图表] 扰动测试：人推物体后策略恢复轨迹可视化</div>
+<div class="fig-interpretation">
+<div class="fig-label">图解读</div>
+<p>在策略执行过程中，实验者随机推动目标物体改变其位姿。图中显示：(1) RL-100 在受到扰动后能快速重规划并完成任务，平均恢复时间 &lt; 2s；(2) 纯 IL 策略在扰动后往往"僵住"或做出错误动作——因为它没有见过"被推后的状态"，而 RL 通过在线探索补全了这些分布外状态的应对策略；(3) 轨迹可视化显示 RL-100 的恢复路径平滑且直接，而 IL 策略的路径曲折甚至有回退。</p>
+</div>
+</div>
+
+<h3>8.4 图 5：商场连续部署</h3>
+<div class="paper-figure">
+<div class="fig-header"><span class="fig-number">Fig 5</span><span class="fig-caption">7小时商场连续服务实验</span><span class="fig-source">p5-6</span></div>
+<div class="fig-placeholder">[照片] 机器人在商场环境中执行任务，周围有行人</div>
+<div class="fig-interpretation">
+<div class="fig-label">图解读</div>
+<p>最具说服力的部署证据：机器人在真实商场中连续运行 7 小时，期间执行多次榨汁和物品整理任务。周围行人走动、光照变化、背景杂乱等真实环境因素均未导致失败。这一结果的意义在于：(1) 证明框架不只是"实验室玩具"，确实能处理开放环境的不确定性；(2) 7 小时的零失败运行意味着策略的稳定性和可靠性达到了可产品化的水平。</p>
+</div>
+</div>
+</section>
+
+<section id="flaw"><h2>9. Potential Flaw</h2>
+
+<h3>9.1 证据边界与限制</h3>
+<div class="callout warn">
+<p><strong>当前证据的边界：</strong>尽管 RL-100 的 100% 成功率和 7 小时部署极其令人印象深刻，但这并不意味着框架已经解决了所有问题。</p>
+</div>
+
+<h3>9.2 具体限制</h3>
+<table>
+<tr><th>限制</th><th>具体表现</th><th>严重性</th></tr>
+<tr><td><strong>任务级奖励工程</strong></td><td>每个新任务需要重新定义奖励函数（成功条件、时间阈值）。虽然奖励"人可解释"，但二值成功判定（如"液体是否全部倒入目标杯"）仍需人工标注或传感器辅助。</td><td>中</td></tr>
+<tr><td><strong>单任务策略</strong></td><td>每个任务训练独立策略。没有多任务共享表示或跨任务泛化的实验证据。扩展到 100 个任务可能需要 100 次完整的 IL+RL+Distillation 流程。</td><td>高</td></tr>
+<tr><td><strong>硬件特定性</strong></td><td>所有实验在单一机器人平台上完成（Galaxea 双臂）。策略对相机位置、夹爪几何、工作空间尺寸等硬件参数的敏感性未做消融。</td><td>中</td></tr>
+<tr><td><strong>长尾覆盖</strong></td><td>1000 次成功 ≠ 覆盖所有可能失败模式。真实部署 10000 次可能出现新的失败模式（如物体掉到工作空间外、光照剧烈变化导致视觉失败）。</td><td>高</td></tr>
+<tr><td><strong>奖励测量成本</strong></td><td>在线 RL 需要每步计算奖励。当前依赖外部传感器或人工判断（如"榨汁是否成功"需人工确认），大规模部署时奖励自动化是瓶颈。</td><td>中</td></tr>
+<tr><td><strong>Distillation 损失</strong></td><td>Consistency distillation 并非无损——消融显示蒸馏后成功率有轻微下降（&lt; 5%）。这一差距在高精度任务中可能放大。</td><td>低</td></tr>
+</table>
+
+<h3>9.3 未解决的扩展方向</h3>
+<ul>
+<li><strong>多任务 / 基础模型：</strong>将 RL-100 的 IL→RL→Distillation 管线扩展到 VLA（Vision-Language-Action）基础模型，使单一策略覆盖数百个任务，是明确的下一步方向。但如何在多任务场景中定义跨任务的统一奖励函数仍是开放问题。</li>
+<li><strong>无奖励 RL：</strong>如果奖励必须人设计，扩展到开放式环境将极其昂贵。结合 RLHF 风格的人类偏好反馈替代手工奖励是一个自然的扩展路径。</li>
+<li><strong>触觉/力觉融合：</strong>当前仅使用 RGB 视觉。对于需要精确力控的任务（如拧螺纹到特定扭矩），纯视觉可能不足。多模态感知的融合是必要的增强。</li>
+</ul>
+
+<h3>9.4 参数敏感性</h3>
+<div class="formula-block">
+<div class="eq-tag">Sensitivity Analysis (定性)</div>
+$$
+\text{性能} = f(\text{IL示范数量}, \ \epsilon_{\text{PPO}}, \ K_{\text{denoising}}, \ \tau_{\text{consistency}})
+$$
+<div class="eq-note">
+<ul>
+<li><strong>示范数量：</strong>50条示范足够稳定，20条时性能开始退化（成功率降至85%），说明 IL 先验的质量对后续 RL 至关重要。</li>
+<li><strong>PPO ε：</strong>ε∈[0.1, 0.3] 范围内性能稳定。ε=0.5 时出现训练不稳定，说明 diffusion 空间中的更新仍需保守。</li>
+<li><strong>RL 阶段去噪步数 K：</strong>K=10 提供了 RL 效率与动作质量的良好平衡。K=5 时动作质量下降，K=20 时 rollout 太慢。</li>
+<li><strong>蒸馏温度 τ：</strong>consistency distillation 中 teacher sampling 的噪声水平影响蒸馏质量，文中使用线性调度。</li>
+</ul>
+</div>
+</div>
+</section>
+
+<section id="motivation"><h2>10. Motivation</h2>
+
+<h3>10.1 五步动机链（从问题到方法）</h3>
+
+<div class="mermaid-box">
+<div class="mermaid">
+graph TD
+    S1["Step 1<br/>▸ 观察<br/>机器人操作策略<br/>在实验室成功率90%+<br/>但真实部署时频繁失败"]
+    S2["Step 2<br/>▸ 诊断<br/>三个原因:<br/>(a) IL学不到超越示范<br/>(b) RL在真实机器人上<br/>不稳定<br/>(c) Diffusion多步推理<br/>无法高频控制"]
+    S3["Step 3<br/>▸ 设想<br/>能否把IL的行为先验<br/>作为RL的安全约束,<br/>在diffusion空间中做<br/>保守策略优化?"]
+    S4["Step 4<br/>▸ 方案<br/>Diffusion PPO:<br/>在去噪轨迹上做<br/>clipped PPO surrogate,<br/>统一IL和RL"]
+    S5["Step 5<br/>▸ 闭环<br/>Consistency Distillation<br/>压缩为单步策略<br/>→ 1000/1000成功<br/>→ 7h商场连续部署<br/>→ 部署级可靠性达成"]
+
+    S1 --> S2 --> S3 --> S4 --> S5
+
+    style S1 fill:#e8f0fe,stroke:#3b82f6
+    style S2 fill:#fef7ed,stroke:#f59e0b
+    style S3 fill:#f0ebfd,stroke:#8b5cf6
+    style S4 fill:#e6f7ee,stroke:#10b981
+    style S5 fill:#ffeaf0,stroke:#f43f5e
+</div>
+</div>
+
+<h3>10.2 一句话动机</h3>
+<div class="callout idea">
+<p><strong>让机器人操作从"实验室80%成功率"跨越到"商场7小时零失败"——需要的不是更好的模型架构，而是把 IL 的行为安全性、RL 的优化能力和 diffusion 的表达力统一在同一个训练框架中，并用 distillation 解决最后一公里的延迟难题。</strong></p>
+</div>
+
+<h3>10.3 论文叙事结构</h3>
+<p>论文的核心叙述逻辑是从"部署需求"反推"技术方案"，而非从"技术方案"去"找应用场景"。这种需求驱动的研究范式在 robotics 领域正变得越来越重要：</p>
+<ul>
+<li><strong>叙事起点：</strong>"当前最好的操作策略（diffusion policy）在真实部署中面临什么困难？" → 速度慢、不能自我改进、对扰动敏感。</li>
+<li><strong>叙事推进：</strong>"如果我们能在保持 diffusion 表达能力的同时，加入 RL 的自我改进能力，并解决推理延迟，会发生什么？" → 三个创新点的引出。</li>
+<li><strong>叙事高潮：</strong>1000/1000 + 7h 商场 → "这不仅仅是实验结果的提升，而是从'学术可行'到'产品可靠'的质变。"</li>
+<li><strong>叙事收束：</strong>框架通用（8 类任务均成功），方法清晰（IL→RL→Distillation），为后续扩展到 VLA 基础模型奠定了基础。</li>
+</ul>
+</section>
+
+<section id="takeaway"><h2>11. Reading Takeaway</h2>
+
+<h3>11.1 核心教训（Lessons Learned）</h3>
+<table>
+<tr><th>教训</th><th>细节</th><th>重要性</th></tr>
+<tr><td><strong>IL 先验是 RL 的安全锚</strong></td><td>在真实机器人上做 RL，行为先验不是可选的——它是安全探索的必要条件。RL-100 通过在 diffusion 去噪轨迹上做 clipped PPO，将策略更新限制在 IL 先验的"引力范围"内，避免了随机探索的危险。</td><td>★★★★★</td></tr>
+<tr><td><strong>Diffusion 不只是生成模型</strong></td><td>Diffusion 的去噪过程提供了一种"结构化动作空间"，其中距离度量天然编码了"动作合理性"。这使得 RL 可以在一个更平滑、更有结构的空间中做策略梯度，而非在高维原始动作空间中挣扎。</td><td>★★★★</td></tr>
+<tr><td><strong>Distillation 是部署的必修课</strong></td><td>无论训练时用多强的模型，如果推理延迟超过控制周期的 1/5（50Hz 下为 4ms），就必须做蒸馏。Consistency distillation 提供的"保真度-速度"权衡优于简单的少步采样。</td><td>★★★★</td></tr>
+<tr><td><strong>部署指标驱动研究</strong></td><td>以"1000 次零失败"和"7 小时连续运行"为目标的科研，自然导向不同的方法选择——更强调可靠性而非 benchmark 上的 +0.5%。这是一种值得推广的"产品化科研"范式。</td><td>★★★★</td></tr>
+<tr><td><strong>奖励设计的简单性原则</strong></td><td>三个简单的人可解释奖励项（成功+速度+平滑）就足以驱动复杂操作任务的 RL 提升。过度工程化的密集奖励可能引入人为偏差，反而不如简洁的稀疏奖励加效率项有效。</td><td>★★★</td></tr>
+</table>
+
+<h3>11.2 对无人机（UAV）的启示</h3>
+<div class="callout tip">
+<p><strong>UAV 领域迁移：</strong>RL-100 的 IL→RL→Distillation 管线可直接迁移到无人机操作任务。</p>
+<ul>
+<li><strong>IL 预训练：</strong>人类飞手通过遥控器演示飞行操作（如穿越窄缝、精准降落、动态抓取），建立行为先验。</li>
+<li><strong>RL 优化：</strong>以飞行效率（时间、能耗）、安全性（避障距离）、平滑性（加速度）为奖励，在仿真或真实环境中做 diffusion PPO 微调。</li>
+<li><strong>Distillation 部署：</strong>将优化后的多步 diffusion flight policy 蒸馏为单步，实现板载芯片上的高频控制（100-200Hz）。</li>
+<li><strong>关键差异：</strong>UAV 的安全约束比桌面机器人更严格——一次失败的探索可能意味着炸机。因此 IL 先验的保护作用在 UAV 场景中更为关键。此外，UAV 的观测空间（GPS、IMU、深度图、光流）比桌面机器人更丰富，diffusion policy 的多模态能力可能对处理视觉歧义（如相似的地面纹理）特别有价值。</li>
+</ul>
+</div>
+
+<h3>11.3 一句话总结</h3>
+<div class="callout idea">
+<p><strong>One-sentence takeaway:</strong> RL-100 证明了在真实机器人上做 RL 不仅可行，而且可以做到"部署级可靠"——关键是把 IL 的行为先验作为安全约束统一进 diffusion 空间的 PPO 优化中，再用 consistency distillation 压缩为单步高频控制器；三者的组合使得从 50 条示范出发，最终实现 1000 次连续成功和 7 小时商场零失败部署。</p>
+</div>
+
+<h3>11.4 关键参考文献（从本文引用追踪）</h3>
+<table>
+<tr><th>引用</th><th>与本文的关系</th></tr>
+<tr><td>Chi et al., "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion" (2023)</td><td>RL-100 的策略表示基础。本文将其从纯 IL 扩展到 IL+RL 统一。</td></tr>
+<tr><td>Song et al., "Consistency Models" (2023)</td><td>Consistency distillation 的理论基础。本文将其应用于 visuomotor 策略的部署压缩。</td></tr>
+<tr><td>Schulman et al., "Proximal Policy Optimization Algorithms" (2017)</td><td>PPO clipped surrogate 的来源。本文将其推广到 diffusion 去噪轨迹上。</td></tr>
+<tr><td>Zhao et al., "ALOHA" 系列</td><td>低成本遥操作数据采集的硬件方案，RL-100 继承了类似的数据采集方法论。</td></tr>
+<tr><td>Hansen-Estruch et al., "RLPD" / Ball et al., "RL with Prior Data"</td><td>离线+在线 RL 的先驱工作。RL-100 将这些思想与 diffusion policy 结合。</td></tr>
+</table>
+
+<p class="source" style="margin-top:18px; font-size:12px; color:var(--text-muted)">This page is grounded in the abstract, methods, experiments, and conclusion of the local PDF. All quantitative values, formula expressions, and architectural details are distilled from the original paper.</p>
+</section>
+</main>
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>&#x1F4C4; Paper Notes &middot; Scholar &middot; Huazhe Xu &middot; Paper ID 10384 &middot; MathJax + Mermaid Rendering</footer>
+</body></html>

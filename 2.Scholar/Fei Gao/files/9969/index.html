@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — DPNet: Doppler LiDAR Motion Planning for Highly-Dynamic Environments (Zuo, Ren, Li, Wang, Zhao, Wang, Sui, Gao et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Fei Gao · 15-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../9976/index.html">Hand-like autonomous flyi</a>
+<a href="../9975/index.html">UAV</a>
+<a href="../9974/index.html">precise real-time force-a</a>
+<a href="../9973/index.html">Rotor-failure-aware quadr</a>
+<a href="../9972/index.html">3D</a>
+<a href="../9971/index.html">LiDAR-VGGT Cross-modal</a>
+<a href="../9970/index.html">Safe agile transportation</a>
+<a class="active" href="../9969/index.html">DPNet Doppler LiDAR</a>
+<a href="../9968/index.html">Primitive-based truncated</a>
+<a href="../9967/index.html">FAR-AVIO</a>
+<a href="../9966/index.html">PathPainter Transferring</a>
+<a href="../9965/index.html">High-speed vision-based f</a>
+<a href="../9964/index.html">UAV</a>
+<a href="../9963/index.html">Agile fall recovery</a>
+<a href="../9962/index.html">Sphere-VIO Fast robust</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">DPNet: Doppler LiDAR Motion Planning for Highly-Dynamic Environments（DPNet：面向高动态环境的 Doppler 激光雷达运动规划）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Wei Zuo</strong>（左伟）<sup>1</sup>、<strong>Zeyi Ren</strong>（任泽毅）<sup>2</sup>、<strong>Chengyang Li</strong>（李成阳）<sup>1</sup>、<strong>Yikun Wang</strong>（王奕坤）<sup>1</sup>、<strong>Mingle Zhao</strong>（赵明乐）<sup>3</sup>、<strong>Shuai Wang</strong>（王帅）<sup>4</sup>、<strong>Wei Sui</strong>（隋伟）<sup>2</sup>、<strong>Fei Gao</strong>（高飞）<sup>5</sup>、<strong>Yik-Chung Wu</strong>（吴义忠）<sup>1</sup>、<strong>Chengzhong Xu</strong>（许成忠）<sup>1</sup></td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">1. 香港大学</strong>（HKU）；<strong class="bold-affil">2. 中国科学院深圳先进技术研究院</strong>（SIAT）；<strong class="bold-affil">3. 澳门大学</strong>（Univ of Macau）；<strong class="bold-affil">4. 地瓜机器人</strong>（D-Robotics）；<strong class="bold-affil">5. 浙江大学</strong>（Zhejiang Univ）</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">IEEE Robotics and Automation Letters (RA-L) 2026</strong></td></tr>
+    <tr class="highlight"><td><strong>TL;DR</strong></td><td>DPNet首次将<strong>Doppler LiDAR的径向速度测量</strong>引入运动规划——通过D-KalmanNet（物理信息RNN卡尔曼滤波器）精确跟踪快速移动障碍物，并用DT-MPC（Doppler调谐模型预测控制）根据推断的碰撞风险动态调整代价函数参数，使无人机在传统规划器失效的高动态环境中实现安全飞行。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Doppler LiDAR</span>
+    <span class="tag tag-green">Motion Planning</span>
+    <span class="tag tag-amber">D-KalmanNet</span>
+    <span class="tag tag-purple">DT-MPC</span>
+    <span class="tag tag-red">Highly-Dynamic Environments</span>
+    <span class="tag tag-cyan">IEEE RA-L 2026</span>
+    <span class="tag tag-gray">Obstacle Tracking</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>为什么传统运动规划器在快速移动障碍物场景中失败？</strong><br>
+    答：因为传统规划器依赖恒定速度模型（constant-velocity model, CVM）来预测障碍物未来轨迹。CVM假设障碍物保持当前速度，但在障碍物频繁变速/转向的高动态场景中，预测误差剧烈放大。更根本的是，<strong>传统LiDAR仅提供位置信息（$x, y, z$），缺乏速度的直接观测</strong>——位置差分求速度会引入噪声放大（$\dot{p} \approx \Delta p / \Delta t$），使预测本质上不可靠。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>Doppler LiDAR提供了障碍物径向速度的直接测量</strong>——这不是从位置差分获得的"导出量"，而是传感器物理层面的"原始观测"。利用这一新的信息维度，可以设计一个<strong>物理信息驱动的RNN卡尔曼滤波器（D-KalmanNet）</strong>——以Doppler径向速度为物理约束，学习卡尔曼增益和过程噪声参数，实现对快速机动障碍物的精确状态跟踪。进而在MPC代价函数中引入<strong>Doppler感知的碰撞风险指标</strong>，动态调整规划参数——当推断的碰撞风险升高时自动增加安全权重、缩短预测时域，实现"感知-预测-规划"的端到端闭环。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>对应的洞察</th><th>类型</th></tr>
+    <tr><td>KalmanNet（Revay et al., 2022）——用RNN学习卡尔曼滤波器参数以处理非线性和模型失配</td><td>在KalmanNet框架中注入Doppler径向速度的物理约束——物理模型（KF结构）提供可解释性和数据效率，RNN学习补偿模型失配和非线性</td><td>架构/方法</td></tr>
+    <tr><td>Doppler LiDAR的物理原理——径向速度 $v_r$ 是沿激光束方向的速度分量</td><td>不再用位置差分求速度，而是直接使用 $v_r$ 作为附加观测——将"速度可观测性"从一阶差分上升到零阶直接测量，从根本上改善障碍物状态估计</td><td>传感器/物理</td></tr>
+    <tr><td>MPC中代价函数权重的手动调参难题——静态权重无法适应场景动态变化</td><td>用推断的碰撞风险动态调节MPC代价——碰撞风险高时加大安全代价、缩短时域；风险低时恢复标称参数——实现运行时自适应（runtime adaptation）</td><td>控制/优化</td></tr>
+    <tr><td>神经网络用于MPC参数预测——学习从场景特征到最优MPC权重的映射</td><td>DT-MPC的Doppler调谐——利用Doppler速度信息推断的碰撞风险作为输入特征，通过轻量网络输出MPC代价参数，实现感知到控制的直接通路</td><td>学习/控制</td></tr>
+  </table>
+
+  <h3>2.3 创新点拆解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：D-KalmanNet —— 物理信息RNN卡尔曼滤波器用于障碍物跟踪</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统恒定速度模型（CVM）对快速机动障碍物的预测误差随预测时域指数增长。标准KalmanNet虽然能学习模型失配，但未利用Doppler速度测量的物理结构，导致在高动态场景中收敛慢、数据效率低。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>KalmanNet的RNN架构 + Doppler LiDAR的径向速度物理模型</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) 在KalmanNet的RNN输入中增加Doppler径向速度观测 $v_r$ 和波束方向向量 $\mathbf{d}$，作为物理信息特征；(2) 状态转移矩阵中显式嵌入 $\mathbf{v}_{\text{radial}} = (\mathbf{v} \cdot \mathbf{d})\mathbf{d}$ 的投影关系，使RNN不必从头学习速度投影几何；(3) RNN输出卡尔曼增益 $\mathbf{K}_k$ 和过程噪声协方差 $\mathbf{Q}_k$，而非直接输出状态——保持KF的概率框架和不确定性量化能力；(4) 训练时使用包含快速机动的轨迹数据，损失函数同时惩罚位置误差和速度误差。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：DT-MPC —— Doppler调谐的模型预测控制</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统MPC使用固定的代价函数权重——在静态/低速环境中偏保守，在高速碰撞场景中安全裕度不足。固定时域MPC无法在"长时域（更优规划）"和"短时域（更快响应）"之间智能切换。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>自适应MPC中根据运行时条件调整权重的思想 + 神经网络学习从传感器特征到控制参数的映射</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) 定义碰撞风险指标 $\rho$——基于D-KalmanNet估计的障碍物相对速度 $\mathbf{v}_{\text{rel}}$ 和距离 $d$ 计算：$\rho = \|\mathbf{v}_{\text{rel}}\| / d$；(2) 轻量参数网络（parameter network）输入 $(\rho, d, \mathbf{v}_{\text{rel}})$，输出MPC代价权重 $(\gamma_{\text{collision}}, \gamma_{\text{smooth}}, N_{\text{horizon}})$；(3) 碰撞权重 $\gamma_{\text{collision}}$ 随 $\rho$ 增大而指数增长——障碍物越近越快，避碰代价越占主导；(4) 预测时域 $N_{\text{horizon}}$ 在高风险时缩短——优先快速响应而非长期最优。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：Doppler LiDAR + 运动规划的首次系统集成</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>Doppler LiDAR此前主要应用于自动驾驶的物体检测和跟踪，<strong>从未被用于无人机运动规划</strong>。关键gap在于：Doppler速度与规划器之间存在"信息代沟"——原始速度数据如何转化为规划器可用的碰撞约束？</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>感知-规划联合设计——不把障碍物跟踪和运动规划视为两个独立模块，而是一个信息流闭环</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) 端到端管线：Doppler LiDAR点云（含位置+径向速度）→ D-KalmanNet障碍物状态估计（位置+速度+协方差）→ DT-MPC碰撞风险推断+代价调谐 → 控制指令；(2) D-KalmanNet输出的障碍物状态协方差传播到DT-MPC作为机会约束（chance constraint）——考虑估计不确定性对避碰约束的影响；(3) 整个管线在40ms内完成，满足无人机实时控制需求。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 整体系统框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SENSOR["传感器层 · Doppler LiDAR"]
+      direction LR
+      DOP_LIDAR["Doppler LiDAR · 点云+径向速度 · 10Hz"]
+      POS_CLOUD["位置点云 · (x, y, z, intensity)"]
+      VEL_MEAS["径向速度测量 · v_r 沿波束方向"]
+    end
+
+    subgraph TRACKING["障碍物跟踪层 · D-KalmanNet"]
+      direction LR
+      PREPROC["预处理 · 聚类+数据关联"]
+      KF_PRED["卡尔曼预测 · 物理模型先验"]
+      RNN_KALMAN["RNN · 学习卡尔曼增益+噪声"]
+      KF_UPDATE["卡尔曼更新 · 后验状态+协方差"]
+      OBJ_STATE["障碍物状态 · (x, y, z, v_x, v_y, v_z, P)"]
+    end
+
+    subgraph PLANNING["运动规划层 · DT-MPC"]
+      direction LR
+      RISK_INFER["碰撞风险推断 · ρ = v_rel / d"]
+      PARAM_NET["参数网络 · 代价权重+预测时域"]
+      MPC_SOLVER["MPC求解器 · 非线性优化"]
+      CMD_GEN["控制指令生成 · 推力+姿态"]
+    end
+
+    subgraph UAV["无人机执行层"]
+      PX4["PX4飞控 · 姿态控制+推力"]
+    end
+
+    DOP_LIDAR --> POS_CLOUD
+    DOP_LIDAR --> VEL_MEAS
+    POS_CLOUD --> PREPROC
+    VEL_MEAS --> PREPROC
+    PREPROC --> KF_PRED
+    VEL_MEAS --> RNN_KALMAN
+    KF_PRED --> RNN_KALMAN
+    RNN_KALMAN --> KF_UPDATE
+    KF_UPDATE --> OBJ_STATE
+    OBJ_STATE --> RISK_INFER
+    RISK_INFER --> PARAM_NET
+    PARAM_NET --> MPC_SOLVER
+    OBJ_STATE --> MPC_SOLVER
+    MPC_SOLVER --> CMD_GEN
+    CMD_GEN --> PX4
+
+    classDef sensor fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef track fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef plan fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef exec fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class DOP_LIDAR,POS_CLOUD,VEL_MEAS sensor
+    class PREPROC,KF_PRED,RNN_KALMAN,KF_UPDATE,OBJ_STATE track
+    class RISK_INFER,PARAM_NET,MPC_SOLVER,CMD_GEN plan
+    class PX4 exec
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 —— Doppler测量到控制指令的完整信息链路</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph RAW["原始数据层"]
+      direction LR
+      PC["点云数据 · (x,y,z,intensity) · 10Hz"]
+      DOP["Doppler速度 · v_r per point · 10Hz"]
+      IMU_OUT["IMU · 加速度+角速度 · 200Hz"]
+      ODOM["里程计 · 自车6-DoF位姿 · 100Hz"]
+    end
+
+    subgraph PROC["数据处理层"]
+      direction LR
+      CLUSTER["点云聚类 · 欧氏聚类+DBSCAN"]
+      ASSOC["数据关联 · 匈牙利匹配+卡尔曼门"]
+      TRANS["坐标变换 · LiDAR→世界坐标系"]
+    end
+
+    subgraph EST["状态估计层 · D-KalmanNet"]
+      direction LR
+      FEAT["特征提取 · (位置残差, 速度残差, Doppler残差, 波束方向)"]
+      H_RNN["隐藏状态RNN · GRU单元"]
+      KGAIN["输出: 卡尔曼增益K_k"]
+      QNOISE["输出: 过程噪声Q_k"]
+      STATE_POST["后验状态 · 位置+速度+协方差"]
+    end
+
+    subgraph CTRL["控制规划层 · DT-MPC"]
+      direction LR
+      COL_RISK["碰撞风险计算 · ρ_k"]
+      PARAM_PRED["参数预测 · (γ_coll, γ_smooth, N_horizon)"]
+      COST_CONS["代价构建 · 避碰约束+平滑约束"]
+      SOLVE["QP/NLP求解 · 最优控制序列"]
+      CMD["控制指令 · 推力T + 姿态q_des"]
+    end
+
+    PC --> CLUSTER
+    DOP --> CLUSTER
+    CLUSTER --> ASSOC
+    ODOM --> TRANS
+    ASSOC --> TRANS
+    TRANS --> FEAT
+    DOP --> FEAT
+    FEAT --> H_RNN
+    H_RNN --> KGAIN
+    H_RNN --> QNOISE
+    KGAIN --> STATE_POST
+    QNOISE --> STATE_POST
+    TRANS --> STATE_POST
+    STATE_POST --> COL_RISK
+    COL_RISK --> PARAM_PRED
+    PARAM_PRED --> COST_CONS
+    COST_CONS --> SOLVE
+    STATE_POST --> COST_CONS
+    SOLVE --> CMD
+
+    classDef raw fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef proc fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef est fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef ctrl fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class PC,DOP,IMU_OUT,ODOM raw
+    class CLUSTER,ASSOC,TRANS proc
+    class FEAT,H_RNN,KGAIN,QNOISE,STATE_POST est
+    class COL_RISK,PARAM_PRED,COST_CONS,SOLVE,CMD ctrl
+    </pre>
+  </div>
+
+  <h3>3.3 工作流程 —— 完整处理管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph STAGE1["阶段1: 数据采集与预处理"]
+      direction LR
+      S1A["Doppler LiDAR采集 · 10Hz"] --> S1B["点云去畸变 · IMU补偿"] --> S1C["点云聚类 · 障碍物分割"] --> S1D["多帧数据关联 · 轨迹初始化"]
+    end
+
+    subgraph STAGE2["阶段2: D-KalmanNet障碍物跟踪"]
+      direction LR
+      S2A["构建观测向量 · z_k = (x,y,z,v_r)"] --> S2B["KF预测步 · 先验状态+协方差"] --> S2C["RNN推理 · 计算K_k和Q_k"] --> S2D["KF更新步 · 后验状态+协方差"]
+    end
+
+    subgraph STAGE3["阶段3: 碰撞风险推断"]
+      direction LR
+      S3A["提取相对运动 · v_rel + d"] --> S3B["计算碰撞风险 · ρ = ||v_rel||/d"] --> S3C["机会约束建模 · 考虑状态不确定性"]
+    end
+
+    subgraph STAGE4["阶段4: DT-MPC规划与控制"]
+      direction LR
+      S4A["参数网络推理 · (γ_coll, γ_smooth, N)"] --> S4B["构建代价函数 · 避碰+平滑+目标"] --> S4C["非线性MPC求解 · 40ms内"] --> S4D["发送控制指令 · PX4执行"]
+    end
+
+    STAGE1 --> STAGE2
+    STAGE2 --> STAGE3
+    STAGE3 --> STAGE4
+
+    S4D -.->|"反馈: 执行后状态更新"| STAGE1
+    S2D -.->|"反馈: 估计协方差"| S3C
+
+    classDef stage1 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef stage2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef stage3 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef stage4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class S1A,S1B,S1C,S1D stage1
+    class S2A,S2B,S2C,S2D stage2
+    class S3A,S3B,S3C stage3
+    class S4A,S4B,S4C,S4D stage4
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义 —— 解决什么问题</h2>
+
+  <h3>4.1 问题建模</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \min_{\mathbf{u}_{0:N-1}} \; J(\mathbf{x}, \mathbf{u}, \mathbf{o}) \quad \text{s.t.} \quad \mathbf{x}_{k+1} = f(\mathbf{x}_k, \mathbf{u}_k) \quad g_{\text{coll}}(\mathbf{x}_k, \hat{\mathbf{o}}_k) \le 0 \quad \forall k $$
+    其中 $\hat{\mathbf{o}}_k \sim \mathcal{N}(\boldsymbol{\mu}_k^{\text{obs}}, \boldsymbol{\Sigma}_k^{\text{obs}})$ 来自 D-KalmanNet，$\mathbf{o}_k$ 包含障碍物位置 $\mathbf{p}^{\text{obs}}$ 和速度 $\mathbf{v}^{\text{obs}}$
+    <div class="eq-note">
+      <strong>目标</strong>：在高动态环境（障碍物频繁变速/转向）中，无人机生成安全的运动轨迹——从起始位置飞到目标位置，同时避开所有移动障碍物 &nbsp;|&nbsp;
+      <strong>$\mathbf{x}_k$</strong> = 无人机状态（位置、速度、姿态） &nbsp;|&nbsp;
+      <strong>$\mathbf{u}_k$</strong> = 控制输入（推力、角速度） &nbsp;|&nbsp;
+      <strong>$\hat{\mathbf{o}}_k$</strong> = D-KalmanNet估计的障碍物状态（含不确定性） &nbsp;|&nbsp;
+      <strong>$g_{\text{coll}}$</strong> = 避碰约束——无人机与障碍物的预测轨迹之间保持安全距离 &nbsp;|&nbsp;
+      <strong>$J$</strong> = 代价函数，包含目标跟踪、控制平滑、避碰等项，其权重由DT-MPC根据碰撞风险动态调整。
+    </div>
+  </div>
+
+  <h3>4.2 输入/输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>频率/维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>(1) Doppler LiDAR点云——每个点的3D位置 $(x, y, z)$ + 径向速度 $v_r$ + 反射强度；(2) 无人机自身状态（来自IMU+里程计）——位置、速度、姿态、角速度</td><td>LiDAR 10Hz / 自车状态 100-200Hz</td></tr>
+    <tr><td><strong>输出</strong></td><td>(1) 每个障碍物的跟踪状态——位置 $(x, y, z)$、速度 $(v_x, v_y, v_z)$、协方差矩阵 $\mathbf{P}$；(2) 无人机控制指令——推力 $T$ + 期望姿态四元数 $\mathbf{q}_{\text{des}}$</td><td>跟踪 10Hz / 控制 50-100Hz</td></tr>
+    <tr><td><strong>目标</strong></td><td>在包含快速机动（速度 > 5m/s，加速度 > 3m/s²）障碍物的环境中，以 > 95% 的成功率完成点到点飞行，同时保持安全距离 > 1.5m</td><td>成功率 > 95% / 安全距离 > 1.5m</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>感知-规划联合优化</strong>问题，属于<strong>基于感知的运动规划</strong>（perception-based motion planning）范畴。与传统运动规划不同，本文的独特约束在于：(1) 障碍物不是静态或匀速的，而是<strong>高动态</strong>（加速度不可忽略、运动模式非平稳）；(2) 传感器提供的不只是位置，还有<strong>Doppler径向速度</strong>——为状态估计增加了新的信息维度；(3) 感知模块（D-KalmanNet）和规划模块（DT-MPC）形成<strong>信息闭环</strong>——感知不确定性直接传播到规划约束，规划结果影响未来感知需求。任务场景为无人机在包含多个快速移动障碍物的3D空域中自主导航。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. 技术挑战 —— 为什么难</h2>
+
+  <h3>5.1 本质困难（第一性原理分析）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：运动规划需要"准确预测障碍物未来轨迹"，但高动态障碍物的运动本质上是<strong>非平稳、非线性的</strong>——与规划器内部的线性/恒定速度假设存在根本性冲突。<br><br>
+    （1）<strong>速度不可观测问题</strong>：传统LiDAR仅测量位置——速度需要从位置序列差分估计。差分操作用数学语言写为 $\hat{v} = (p_t - p_{t-\Delta t})/\Delta t$，噪声放大因子为 $1/\Delta t$。当 $\Delta t = 0.1$s（10Hz LiDAR），测量噪声被放大10倍。在障碍物加速度非零时，差分速度是"过去一段时间的平均速度"而非"当前瞬时速度"——存在系统性滞后。<br><br>
+    （2）<strong>运动模型失配</strong>：几乎所有运动规划器都使用恒定速度模型（CVM）或恒定加速度模型（CAM）来预测障碍物轨迹。当真实障碍物进行正弦转向或突然制动时，模型残差随时间增长——预测1秒后的误差可能远超安全距离裕度。<br><br>
+    （3）<strong>感知不确定性的传播</strong>：传统规划器通常将障碍物估计视为确定性的（"障碍物在位置p"），而忽略估计协方差。在高动态场景中，估计的不确定性可能和被估计的位移在同一量级——忽略不确定性意味着规划器在"假设自己知道障碍物在哪"的幻觉中运行。<br><br>
+    <strong>三者合成</strong>：你需要在障碍物快速机动（模型失配）、仅有无速度直测的位置传感器（速度不可观）、且规划器需要精确预测未来轨迹（不确定性敏感）的约束下，生成安全轨迹。这三者的交汇使传统"检测-跟踪-规划"流水线系统性失效。本文通过引入Doppler速度测量（解决速度可观性）+ D-KalmanNet（解决模型失配）+ DT-MPC的不确定性感知（解决协方差传播）首次在统一框架中处理了全部三个挑战。
+  </div>
+
+  <h3>5.2 已有方法及其局限</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Constant-Velocity KF Tracking + Standard MPC（恒定速度卡尔曼滤波 + 标准MPC）</td>
+      <td>用恒定速度卡尔曼滤波器跟踪障碍物位置+速度，用固定权重MPC规划避障轨迹</td>
+      <td>CVM假设障碍物速度恒定——在障碍物加速/减速/转向时，<strong>预测轨迹与真实轨迹的偏差随预测时域线性增长</strong>。1秒预测误差可达0.5-1.0m，超过安全距离阈值。位置差分求速度引入10x噪声放大，进一步恶化预测精度。</td>
+    </tr>
+    <tr>
+      <td>Learning-Based Trajectory Prediction + MPC（学习轨迹预测 + MPC）</td>
+      <td>用LSTM/Transformer等深度网络预测障碍物未来轨迹，MPC据此规划</td>
+      <td>纯学习预测器的输入仅限于历史位置轨迹——<strong>缺乏速度的直接观测</strong>使网络需要从位置序列隐式推断速度模式，数据需求大且泛化差。预测网络输出确定性轨迹而无不确定性量化——MPC无法区分"高置信度预测"和"低置信度猜测"。</td>
+    </tr>
+    <tr>
+      <td>Reactive Avoidance（反应式避障，如人工势场法、速度障碍法）</td>
+      <td>基于当前相对位置/速度计算排斥力或速度约束，即时反应</td>
+      <td>纯反应式方法<strong>没有前向预测</strong>——只对"当前时刻"的相对几何做出反应。当障碍物快速逼近时，反应式避障可能因延迟（感知-控制时延）而来不及规避，或产生过度保守/震荡的轨迹。缺乏对"2秒后可能碰撞"的预见性。</td>
+    </tr>
+    <tr>
+      <td>Standard KalmanNet（标准KalmanNet，Revay 2022）</td>
+      <td>用RNN学习卡尔曼滤波器的增益和噪声参数，适应模型失配</td>
+      <td>标准KalmanNet<strong>未利用Doppler速度信息</strong>——其RNN输入仅为位置观测残差。在位置差分速度本身噪声大的高动态场景中，缺少速度直测使得RNN需要更长的序列来"推断"速度变化，导致跟踪延迟和过冲。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 — 高动态障碍物的精确状态估计</strong>：当障碍物以 > 5m/s速度运动且加速度变化时，传统恒定速度滤波器产生系统性滞后——障碍物已经转向而滤波器还在前一方向上预测。每100ms的延迟在高动态场景中可能意味着0.5m的位置偏差——这已经超过了安全距离裕度的一半。核心难点在于：如何在没有加速度直测的情况下，仅用位置+Doppler径向速度，重建完整的3D速度矢量并预测加速度变化？</li>
+    <li><strong>挑战 2 — 感知不确定性到规划约束的传播</strong>：D-KalmanNet输出的障碍物状态带有协方差——这不是一个简单的"椭圆球"可以概括。如何将概率化状态估计转化为MPC的可执行约束？机会约束（chance constraint）$P(\text{collision}) < \varepsilon$ 需要将概率分布与安全几何交集起来计算——在高维状态空间中解析不可行，需要高效近似。</li>
+    <li><strong>挑战 3 — 运行时MPC参数自适应</strong>：固定MPC参数在多样化动态场景中要么过于保守（浪费机动能力），要么不够安全（碰撞风险）。手动设计参数调度表（查表法）的维度爆炸——需要覆盖障碍物速度、距离、方向、加速度、数量等组合。核心问题：如何设计一个紧凑的神经网络，仅从少量Doppler感知特征就能输出有效的MPC参数？</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. 方法与关键公式</h2>
+
+  <h3>6.1 核心算法概述</h3>
+  <p>本文的方法分为两个紧密耦合的模块——<strong>D-KalmanNet</strong>（利用Doppler径向速度的物理信息RNN卡尔曼滤波，负责障碍物跟踪与状态估计）和<strong>DT-MPC</strong>（利用跟踪结果推断碰撞风险并动态调谐MPC参数，负责运动规划与控制）。两个模块共享障碍物状态估计，形成"感知指导规划、规划依赖感知"的信息闭环。以下按公式组逐一拆解。</p>
+
+  <h3>6.2 关键公式</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax。显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。符号解释请用中文。</p>
+
+  <!-- Formula Group A: D-KalmanNet State Space -->
+  <h4>组 A：D-KalmanNet 的状态空间建模与 Doppler 观测</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 障碍物状态向量与运动模型</span>
+    $$ \mathbf{x}_k^{\text{obs}} = \begin{bmatrix} \mathbf{p}_k \\ \mathbf{v}_k \end{bmatrix} \in \mathbb{R}^6, \quad \mathbf{x}_{k+1}^{\text{obs}} = \mathbf{F} \mathbf{x}_k^{\text{obs}} + \mathbf{w}_k, \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q}_k) $$
+    $$ \mathbf{F} = \begin{bmatrix} \mathbf{I}_3 & \Delta t \cdot \mathbf{I}_3 \\ \mathbf{0} & \mathbf{I}_3 \end{bmatrix} $$
+    <div class="eq-note">
+      <strong>$\mathbf{x}_k^{\text{obs}}$</strong> = 障碍物在时刻 $k$ 的状态：3D位置 $\mathbf{p}_k$ + 3D速度 $\mathbf{v}_k$ &nbsp;|&nbsp;
+      <strong>$\mathbf{F}$</strong> = 状态转移矩阵（线性运动模型：$\mathbf{p}_{k+1} = \mathbf{p}_k + \mathbf{v}_k \Delta t$） &nbsp;|&nbsp;
+      <strong>$\mathbf{w}_k$</strong> = 过程噪声——传统KF中 $\mathbf{Q}_k$ 固定，D-KalmanNet中由RNN在线估计 &nbsp;|&nbsp;
+      <strong>$\Delta t$</strong> = 传感器采样间隔（0.1s，10Hz LiDAR）。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — Doppler 增强的观测模型</span>
+    $$ \mathbf{z}_k = \begin{bmatrix} \mathbf{p}_k^{\text{meas}} \\ v_{r,k} \end{bmatrix} = \begin{bmatrix} \mathbf{I}_3 & \mathbf{0} \\ \mathbf{0} & \mathbf{d}_k^T \end{bmatrix} \begin{bmatrix} \mathbf{p}_k \\ \mathbf{v}_k \end{bmatrix} + \mathbf{n}_k, \quad \mathbf{n}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R}_k) $$
+    <div class="eq-note">
+      <strong>$\mathbf{z}_k$</strong> = 增强观测向量——包含LiDAR测量的位置 $\mathbf{p}_k^{\text{meas}}$ 和Doppler径向速度 $v_{r,k}$ &nbsp;|&nbsp;
+      <strong>$v_{r,k} = \mathbf{d}_k^T \mathbf{v}_k$</strong> = 径向速度——真实速度在激光束方向 $\mathbf{d}_k$ 上的投影 &nbsp;|&nbsp;
+      <strong>$\mathbf{d}_k$</strong> = 激光束的单位方向向量（从LiDAR指向障碍物） &nbsp;|&nbsp;
+      <strong>$\mathbf{n}_k$</strong> = 观测噪声 &nbsp;|&nbsp;
+      <strong>关键</strong>：Doppler测量提供了速度的直接观测（零阶），而非位置差分（一阶）。这使得速度估计的精度不再受 $\Delta t$ 倒数放大效应的影响。
+    </div>
+  </div>
+
+  <!-- Formula Group B: D-KalmanNet RNN Structure -->
+  <h4>组 B：D-KalmanNet 的 RNN 结构与 Kalman 增益学习</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — RNN 输入特征与 Kalman 增益生成</span>
+    $$ \mathbf{h}_k = \text{GRU}\Big(\mathbf{h}_{k-1}, \;\big[\Delta\mathbf{z}_k, \;\Delta\mathbf{x}_k, \;\mathbf{d}_k, \;v_{r,k}\big]\Big) $$
+    $$ \mathbf{K}_k = f_K(\mathbf{h}_k), \quad \mathbf{Q}_k = f_Q(\mathbf{h}_k) $$
+    <div class="eq-note">
+      <strong>$\mathbf{h}_k$</strong> = RNN隐藏状态（GRU单元）——编码障碍物运动模式的时间上下文 &nbsp;|&nbsp;
+      <strong>$\Delta\mathbf{z}_k = \mathbf{z}_k - \hat{\mathbf{z}}_{k|k-1}$</strong> = 观测残差（innovation）——实际观测与预测观测之差 &nbsp;|&nbsp;
+      <strong>$\Delta\mathbf{x}_k$</strong> = 状态预测残差 &nbsp;|&nbsp;
+      <strong>$\mathbf{d}_k, v_{r,k}$</strong> = Doppler物理信息特征——波束方向和径向速度，为RNN提供速度投影几何的先验知识 &nbsp;|&nbsp;
+      <strong>$f_K, f_Q$</strong> = 轻量全连接网络，从RNN隐藏状态映射到Kalman增益 $\mathbf{K}_k$ 和过程噪声 $\mathbf{Q}_k$ &nbsp;|&nbsp;
+      <strong>与传统KF的区别</strong>：传统KF通过求解Riccati方程获得 $\mathbf{K}_k$，假设 $\mathbf{Q}_k$ 已知且恒定。D-KalmanNet让RNN根据观测序列的统计特征<strong>在线学习</strong> $\mathbf{K}_k$ 和 $\mathbf{Q}_k$——当检测到障碍物机动时自动增大 $\mathbf{Q}_k$（赋予模型更多不确定性，更信任观测），当障碍物稳定时减小 $\mathbf{Q}_k$。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — Kalman 更新步（RNN 参数驱动的后验估计）</span>
+    $$ \hat{\mathbf{x}}_{k|k-1} = \mathbf{F} \hat{\mathbf{x}}_{k-1|k-1} $$
+    $$ \mathbf{P}_{k|k-1} = \mathbf{F} \mathbf{P}_{k-1|k-1} \mathbf{F}^T + \mathbf{Q}_k $$
+    $$ \hat{\mathbf{x}}_{k|k} = \hat{\mathbf{x}}_{k|k-1} + \mathbf{K}_k (\mathbf{z}_k - \mathbf{H} \hat{\mathbf{x}}_{k|k-1}) $$
+    $$ \mathbf{P}_{k|k} = (\mathbf{I} - \mathbf{K}_k \mathbf{H}) \mathbf{P}_{k|k-1} $$
+    <div class="eq-note">
+      <strong>步骤 1</strong>：状态预测——基于上一帧后验和线性运动模型 &nbsp;|&nbsp;
+      <strong>步骤 2</strong>：协方差预测——传播不确定性，$\mathbf{Q}_k$ 来自RNN &nbsp;|&nbsp;
+      <strong>步骤 3</strong>：状态更新——用RNN学习的 $\mathbf{K}_k$ 融合预测和观测 &nbsp;|&nbsp;
+      <strong>步骤 4</strong>：协方差更新——后验不确定性 &nbsp;|&nbsp;
+      <strong>$\mathbf{H}$</strong> = 观测矩阵（从状态到观测的线性映射） &nbsp;|&nbsp;
+      <strong>核心</strong>：虽然遵循标准KF的代数结构，但 $\mathbf{K}_k$ 和 $\mathbf{Q}_k$ 不是解析求解的——它们由RNN根据当前观测残差的统计模式动态生成。这使得滤波器能适应障碍物的机动行为（如突然加速），而传统KF因模型失配产生滞后。
+    </div>
+  </div>
+
+  <!-- Formula Group C: DT-MPC -->
+  <h4>组 C：DT-MPC 的 Doppler 调谐代价函数</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) — Doppler 感知的碰撞风险指标</span>
+    $$ \rho_k^{(i)} = \frac{\|\mathbf{v}_{\text{rel},k}^{(i)}\|}{d_k^{(i)} + \varepsilon}, \quad \mathbf{v}_{\text{rel},k}^{(i)} = \mathbf{v}_k^{\text{uav}} - \hat{\mathbf{v}}_k^{(i)} $$
+    $$ d_k^{(i)} = \|\mathbf{p}_k^{\text{uav}} - \hat{\mathbf{p}}_k^{(i)}\| $$
+    <div class="eq-note">
+      <strong>$\rho_k^{(i)}$</strong> = 障碍物 $i$ 在时刻 $k$ 的碰撞风险指标——物理含义：相对接近速率（单位距离上的相对速度） &nbsp;|&nbsp;
+      <strong>$\mathbf{v}_{\text{rel},k}^{(i)}$</strong> = 无人机与障碍物 $i$ 的相对速度 &nbsp;|&nbsp;
+      <strong>$d_k^{(i)}$</strong> = 无人机与障碍物 $i$ 的距离 &nbsp;|&nbsp;
+      <strong>$\varepsilon$</strong> = 小常数防止除零 &nbsp;|&nbsp;
+      <strong>物理直觉</strong>：$\rho$ 大意味着障碍物快速靠近——需要更强的避碰响应；$\rho$ 小意味着威胁低——可以保持标称规划行为。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(6) — DT-MPC 的 Doppler 调谐代价函数</span>
+    $$ \min_{\mathbf{u}_{0:N-1}} \sum_{k=0}^{N-1} \Big[ \underbrace{\|\mathbf{p}_k - \mathbf{p}^{\text{goal}}\|_{\mathbf{W}_p}^2}_{\text{目标跟踪}} + \underbrace{\|\mathbf{u}_k\|_{\mathbf{W}_u}^2}_{\text{控制平滑}} + \underbrace{\gamma_{\text{coll}} \sum_i c_{\text{coll}}(\mathbf{x}_k, \hat{\mathbf{o}}_k^{(i)})}_{\text{避碰}} \Big] + \|\mathbf{p}_N - \mathbf{p}^{\text{goal}}\|_{\mathbf{W}_f}^2 $$
+    $$ \gamma_{\text{coll}} = g_\gamma(\max_i \rho_k^{(i)}), \quad N = g_N(\max_i \rho_k^{(i)}) $$
+    <div class="eq-note">
+      <strong>第一项</strong> = 目标跟踪代价——鼓励无人机飞向目标 &nbsp;|&nbsp;
+      <strong>第二项</strong> = 控制平滑代价——避免剧烈机动 &nbsp;|&nbsp;
+      <strong>第三项</strong> = Doppler调谐避碰代价——权重 $\gamma_{\text{coll}}$ 由参数网络根据最大碰撞风险动态输出 &nbsp;|&nbsp;
+      <strong>$c_{\text{coll}}$</strong> = 避碰代价函数——距离越近代价越大，通常取反距离或指数衰减形式 &nbsp;|&nbsp;
+      <strong>$g_\gamma, g_N$</strong> = 参数网络——输入 $\max_i \rho_k^{(i)}$，输出碰撞权重 $\gamma_{\text{coll}}$ 和预测时域 $N$ &nbsp;|&nbsp;
+      <strong>与传统MPC的区别</strong>：传统MPC中 $\gamma_{\text{coll}}$ 和 $N$ 是固定超参数——无法适应场景动态变化。DT-MPC在每个控制周期重新计算 $\rho_k$ 并推理参数网络，实现运行时自适应。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>LiDAR采样频率</td><td><strong>10 Hz</strong></td><td>Doppler LiDAR的点云采集频率</td><td>10Hz是当前Doppler LiDAR硬件的典型帧率——平衡了点云密度（每帧点数）和时序分辨率。更高帧率（如20Hz）会降低每帧点密度，影响聚类质量</td></tr>
+    <tr><td>MPC预测时域</td><td><strong>$N \in [10, 30]$ 步</strong>，自适应</td><td>MPC优化窗口的步数（每步 $\Delta t$ = 0.1s，即 1-3秒）</td><td>低风险时 $N=30$ 提供长视距规划；高风险时 $N=10$ 优先快速响应。1-3秒的物理时域覆盖了典型避碰机动（~1s）到标称巡航规划（~3s）</td></tr>
+    <tr><td>D-KalmanNet GRU隐藏维度</td><td><strong>64</strong></td><td>RNN隐藏状态向量维度</td><td>64维足以编码运动模式上下文——更大的维度（128+）在10Hz帧率下推理延迟超标，更小的维度（32）表达能力不足</td></tr>
+    <tr><td>碰撞风险阈值</td><td><strong>$\rho_{\text{thresh}} = 2.0$</strong></td><td>触发避碰权重增大的风险阈值</td><td>当 $\rho > 2.0$（如相对速度4m/s，距离2m），进入"高风险模式"——安全距离在1秒内被消耗</td></tr>
+    <tr><td>安全距离</td><td><strong>$d_{\text{safe}} = 1.5\text{m}$</strong></td><td>无人机与障碍物之间的最小允许距离</td><td>考虑无人机半径（~0.3m）+ 控制误差（~0.3m）+ 估计误差（~0.5m）+ 安全裕度（~0.4m）</td></tr>
+    <tr><td>状态向量维度</td><td><strong>6D（位置3 + 速度3）</strong></td><td>每个障碍物的状态向量</td><td>6D恒定速度模型在大多数机动场景中足够——加入加速度维度（9D）会增加估计方差且Doppler仅提供速度约束</td></tr>
+  </table>
+
+  <h3>6.4 传统规划器 vs DPNet 的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>DPNet（本文）</h4>
+      <ul>
+        <li>速度观测：<strong>Doppler径向速度直测</strong>——零阶观测，避免差分噪声放大</li>
+        <li>障碍物跟踪：<strong>D-KalmanNet</strong>——物理模型+RNN学习，在线适应机动</li>
+        <li>MPC参数：<strong>运行时动态调谐</strong>——$\gamma_{\text{coll}}, N$ 由参数网络根据碰撞风险在线输出</li>
+        <li>不确定性处理：障碍物状态协方差传播到MPC作为<strong>机会约束</strong></li>
+        <li>模型假设：运动模型由KF提供骨架，RNN补偿<strong>残差</strong>——不假设恒定加速度</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>传统 LiDAR + MPC</h4>
+      <ul>
+        <li>速度观测：<strong>位置差分</strong>——一阶近似，噪声放大 $1/\Delta t \approx 10\times$</li>
+        <li>障碍物跟踪：<strong>恒定速度KF</strong>——固定参数，无法适应机动</li>
+        <li>MPC参数：<strong>固定超参数</strong>——静态环境中精心调参，动态环境中次优/不安全</li>
+        <li>不确定性处理：<strong>忽略</strong>或将障碍物视为确定性硬约束</li>
+        <li>模型假设：障碍物做<strong>恒定速度</strong>直线运动——高动态场景中假设不成立</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个关键基础原理：Doppler LiDAR的径向速度测量物理（为什么直接速度测量比位置差分强）、KalmanNet的学习机制（RNN如何学会输出Kalman增益）、MPC代价自适应调谐（如何从感知特征映射到控制参数）。</p>
+
+  <h3>7.1 Doppler LiDAR 的径向速度测量 —— 为什么"直测速度"改变了游戏规则</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 位置差分求速 vs Doppler直测的噪声对比</span>
+    $$ \text{位置差分: } \hat{v}_{\text{diff}} = \frac{p_k - p_{k-1}}{\Delta t}, \quad \text{Var}(\hat{v}_{\text{diff}}) = \frac{2\sigma_p^2}{\Delta t^2} $$
+    $$ \text{Doppler直测: } \hat{v}_{\text{doppler}} = v_r, \quad \text{Var}(\hat{v}_{\text{doppler}}) = \sigma_v^2 $$
+    $$ \frac{\text{Var}(\hat{v}_{\text{diff}})}{\text{Var}(\hat{v}_{\text{doppler}})} \approx \frac{2\sigma_p^2}{\Delta t^2 \sigma_v^2} \approx \frac{2 \times 0.01}{0.01 \times 0.01} = \mathbf{200} $$
+    <div class="eq-note">
+      <strong>$\sigma_p$</strong> = LiDAR位置测量噪声标准差（~0.1m） &nbsp;|&nbsp;
+      <strong>$\sigma_v$</strong> = Doppler速度测量噪声标准差（~0.1m/s） &nbsp;|&nbsp;
+      <strong>$\Delta t$</strong> = 采样间隔（0.1s @ 10Hz） &nbsp;|&nbsp;
+      <strong>核心结论</strong>：在10Hz采样率下，位置差分求速的方差是Doppler直测的约<strong>200倍</strong>。这不是工程细节的优化，而是信息维度的跃升——从"推断速度"变为"测量速度"。此外，位置差分求得的"速度"实际上是过去 $\Delta t$ 时间内的平均值 $\bar{v}_{[k-1, k]}$，而非时刻 $k$ 的瞬时速度 $v_k$——在障碍物加速时存在系统性偏差。
+    </div>
+  </div>
+
+  <p><strong>Doppler效应的物理本质</strong>：LiDAR发射的激光在障碍物表面反射后返回接收器。如果障碍物沿激光束方向有相对运动，反射波的频率会发生多普勒频移 $\Delta f = 2v_r / \lambda$（$\lambda$ 为激光波长，1550nm典型值）。通过测量发射波和接收波的频率差，直接获得径向速度 $v_r$。这是<strong>物理层面的速度测量</strong>——不依赖于时间序列、不要求帧间匹配、不受遮挡/新出现的影响。但有一个约束：Doppler只能测量<strong>径向分量</strong> $v_r = \mathbf{v} \cdot \mathbf{d}$——速度的切向分量（垂直于光束）不可观测。</p>
+
+  <table>
+    <tr><th>对比维度</th><th>位置差分求速</th><th>Doppler直测（本文）</th></tr>
+    <tr><td>数学本质</td><td>一阶数值微分——对噪声敏感</td><td><strong>零阶直接测量</strong>——物理传感器输出</td></tr>
+    <tr><td>噪声水平（$\sigma_p$=0.1m, $\Delta t$=0.1s）</td><td>$\sigma_{\hat{v}} \approx 1.4$ m/s</td><td><strong>$\sigma_v \approx 0.1$ m/s</strong></td></tr>
+    <tr><td>时延特性</td><td>反映过去 $\Delta t$ 内的平均速度（滞后）</td><td><strong>反映当前瞬时速度</strong>（无滞后）</td></tr>
+    <tr><td>需要帧间匹配</td><td>需要——匹配失败则无速度</td><td><strong>不需要</strong>——单帧内完成测量</td></tr>
+    <tr><td>测量方向</td><td>3D全矢量（但噪声大）</td><td>仅径向分量（需要多帧/多波束恢复3D）</td></tr>
+  </table>
+
+  <h3>7.2 KalmanNet 的学习机制 —— RNN 如何学会输出 Kalman 增益</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — KalmanNet 的训练目标与梯度流</span>
+    $$ \mathcal{L} = \frac{1}{T} \sum_{k=1}^{T} \left\| \mathbf{x}_k^{\text{true}} - \hat{\mathbf{x}}_{k|k} \right\|^2 $$
+    $$ \frac{\partial \mathcal{L}}{\partial \boldsymbol{\theta}_{\text{RNN}}} = \frac{\partial \mathcal{L}}{\partial \hat{\mathbf{x}}_{k|k}} \cdot \frac{\partial \hat{\mathbf{x}}_{k|k}}{\partial \mathbf{K}_k} \cdot \frac{\partial \mathbf{K}_k}{\partial \mathbf{h}_k} \cdot \frac{\partial \mathbf{h}_k}{\partial \boldsymbol{\theta}_{\text{RNN}}} $$
+    <div class="eq-note">
+      <strong>$\mathcal{L}$</strong> = 监督损失——后验状态估计与真实状态之间的均方误差 &nbsp;|&nbsp;
+      <strong>梯度流</strong>：损失反向传播通过 (1) 后验估计 $\hat{\mathbf{x}}_{k|k}$ → (2) Kalman更新公式中的 $\mathbf{K}_k$ → (3) RNN输出的 $\mathbf{K}_k$ → (4) GRU参数 $\boldsymbol{\theta}_{\text{RNN}}$ &nbsp;|&nbsp;
+      <strong>为什么KF结构不阻断梯度</strong>：虽然 $\mathbf{K}_k = \mathbf{P}_{k|k-1}\mathbf{H}^T(\mathbf{H}\mathbf{P}_{k|k-1}\mathbf{H}^T + \mathbf{R})^{-1}$ 在传统KF中是解析的，但D-KalmanNet中RNN直接输出 $\mathbf{K}_k$（绕过了Riccati求解），使得从损失到RNN参数的梯度路径完全可微。
+    </div>
+  </div>
+
+  <p><strong>物理信息注入如何提高数据效率</strong>：RNN不是从零开始学习运动模式——Doppler特征 $(\mathbf{d}_k, v_{r,k})$ 已经编码了"速度沿波束方向的投影"这一几何关系。RNN只需学习<strong>残差</strong>——即真实运动与线性模型的差异，以及如何将径向速度与运动模式的上下文结合来推断切向速度分量。这种"物理骨架 + RNN残差"的混合设计使D-KalmanNet在训练数据远少于纯黑箱预测器的条件下达到同等精度。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>D-KalmanNet 推理流程</h4>
+      <p><strong>步骤 1</strong>：接收新一帧Doppler LiDAR数据——点云聚类后提取每个障碍物的位置和径向速度。</p>
+      <p><strong>步骤 2</strong>：构建观测残差向量——包含位置残差（实测位置 vs 预测位置）和Doppler残差（实测 $v_r$ vs 预测 $v_r$）。</p>
+      <p><strong>步骤 3</strong>：GRU吸收观测残差+物理特征，更新隐藏状态——隐藏状态隐式编码了障碍物近期的运动模式（匀速？加速？转向？）。</p>
+      <p><strong>步骤 4</strong>：全连接层从隐藏状态映射到 $\mathbf{K}_k$ 和 $\mathbf{Q}_k$——高残差+Doppler突变→增大 $\mathbf{Q}_k$ 和高 $\mathbf{K}_k$（优先信任观测）。</p>
+      <p><strong>步骤 5</strong>：KF更新步用 $\mathbf{K}_k$ 融合预测和观测→输出后验状态+协方差→进入下一帧。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>标准 KalmanNet（对比）</h4>
+      <p><strong>步骤 1</strong>：接收位置观测——没有Doppler速度信息。</p>
+      <p><strong>步骤 2</strong>：构建观测残差——仅位置残差。速度残差无法直接构造（因为没有速度观测），需通过多个时间步的位置变化隐式推断。</p>
+      <p><strong>步骤 3</strong>：RNN仅从位置残差序列中推断运动模式——需要多帧才能"意识到"障碍物在加速。</p>
+      <p><strong>步骤 4</strong>：由于缺少速度直测，RNN对机动的响应存在延迟——在检测到位置残差开始增大时才能调高 $\mathbf{K}_k$，而位置残差增大本身就意味着滤波器已经滞后。</p>
+      <p><strong>步骤 5</strong>：后验速度估计的收敛速度显著慢于D-KalmanNet——实验验证了这一点。</p>
+    </div>
+  </div>
+
+  <h3>7.3 MPC 代价自适应调谐 —— 从碰撞风险到控制参数的映射</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 碰撞风险驱动的MPC参数映射</span>
+    $$ \gamma_{\text{coll}} = \gamma_0 \cdot \exp(\alpha \cdot \max_i \rho_k^{(i)}), \quad N = \max\left(N_{\min}, \; \left\lfloor N_{\max} \cdot \exp(-\beta \cdot \max_i \rho_k^{(i)}) \right\rfloor \right) $$
+    <div class="eq-note">
+      <strong>$\gamma_0$</strong> = 标称碰撞权重（低风险时的基准值，如 1.0） &nbsp;|&nbsp;
+      <strong>$\alpha, \beta$</strong> = 可学习或可调的正系数——控制权重和时域对碰撞风险的敏感度 &nbsp;|&nbsp;
+      <strong>$N_{\min}, N_{\max}$</strong> = 预测时域的下界和上界（如 10 和 30） &nbsp;|&nbsp;
+      <strong>设计直觉</strong>：(1) 碰撞权重指数增长——当 $\rho$ 翻倍（相对速度翻倍或距离减半），避碰代价增大 $e^\alpha$ 倍，确保安全优先；(2) 预测时域指数衰减——高风险时缩短时域，因为长时域预测在高动态场景中不可靠（模型误差累积），短时域确保MPC对近期威胁的快速响应。
+    </div>
+  </div>
+
+  <p><strong>为什么需要动态调谐而非固定参数</strong>：固定参数的MPC存在"两难困境"——如果碰撞权重 $\gamma_{\text{coll}}$ 设得太高，在安全环境中规划器过度保守（绕大圈、丢失目标跟踪性能）；如果设得太低，在高风险场景中安全裕度不足。固定时域同样如此——长时域有利于全局最优但响应慢；短时域响应快但近视。DT-MPC通过参数网络解决了这一困境——它实际上学习了一个从 "($\rho, d, \mathbf{v}_{\text{rel}}$)" 到 "($\gamma_{\text{coll}}, N$)" 的映射，使MPC在每种场景中都使用"恰好的"保守程度——不多不少。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    Doppler LiDAR提供高质量的速度测量（原理1）→ D-KalmanNet利用这些测量实现精确的障碍物跟踪（原理2）→ DT-MPC利用精确的跟踪结果推断碰撞风险并自适应调谐（原理3）→ <strong>三者形成一条信息增益链</strong>：物理测量提升估计精度 → 估计精度提升风险推断的可靠性 → 可靠的风险推断使MPC在保守性和激进性之间找到精确平衡。任何一个环节断裂都会导致系统失效——没有Doppler速度，D-KalmanNet退化为标准KalmanNet（跟踪延迟）；没有D-KalmanNet的精确估计，DT-MPC的碰撞风险推断就不可靠（假阳性导致过度保守，假阴性导致碰撞）；没有DT-MPC的自适应调谐，精确的跟踪信息也无法转化为最优的规划决策。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. 论文图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig4.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">DPNet 系统概览——从 Doppler LiDAR 感知到安全运动规划的完整管线</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="DPNet system overview"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>：DPNet的完整系统架构和核心数据流。从左至右展示了三大模块的级联关系——Doppler LiDAR作为感知输入源、D-KalmanNet进行障碍物状态估计、DT-MPC生成安全轨迹。</p>
+      <ul>
+        <li><strong>Doppler LiDAR输出</strong>：每个点包含 $(x, y, z, v_r, \text{intensity})$——位置和径向速度在同一帧中共存，为障碍物跟踪提供了带有速度"颜色"的点云</li>
+        <li><strong>D-KalmanNet 模块</strong>：接收聚类后的障碍物观测，RNN根据Doppler速度和位置的联合残差动态生成Kalman增益，实现高动态跟踪</li>
+        <li><strong>DT-MPC 模块</strong>：从障碍物状态推断碰撞风险，经参数网络输出代价权重和时域，MPC求解器据此生成控制指令</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">D-KalmanNet 架构——物理信息驱动的 RNN Kalman 滤波器</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="D-KalmanNet architecture"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>：D-KalmanNet的内部结构——如何在标准KF预测-更新循环中嵌入RNN以学习Kalman增益和过程噪声。</p>
+      <ul>
+        <li><strong>物理分支（上半部）</strong>：KF预测步用线性运动模型生成先验状态和协方差——这是物理骨架，提供基本的运动预测</li>
+        <li><strong>学习分支（RNN盒子）</strong>：GRU接收观测残差和Doppler特征，输出 $\mathbf{K}_k$ 和 $\mathbf{Q}_k$——这是学习组件，补偿物理模型的不足</li>
+        <li><strong>融合点</strong>：KF更新步使用RNN输出的 $\mathbf{K}_k$——使观测融合的权重由数据驱动，而非解析Riccati方程</li>
+        <li><strong>Doppler特征注入</strong>：$(\mathbf{d}_k, v_{r,k})$ 作为RNN的显式输入——不需要RNN从数据中隐式学习速度投影几何</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">障碍物跟踪性能对比——D-KalmanNet vs 标准 KalmanNet vs 恒定速度 KF</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Tracking performance comparison"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>：三种跟踪器在高速机动障碍物场景下的位置和速度估计误差对比。</p>
+      <ul>
+        <li><strong>D-KalmanNet（本文）</strong>：位置和速度误差在整个机动过程中保持最低——Doppler直测速度+RNN自适应增益有效抑制了机动时的过冲和滞后</li>
+        <li><strong>标准KalmanNet（无Doppler）</strong>：在障碍物开始加速时（t=1-2s），误差显著增大——因为RNN需要多帧位置序列才能"意识到"运动模式改变</li>
+        <li><strong>恒定速度KF</strong>：机动段误差最大——固定参数的KF对模型失配完全没有适应能力</li>
+        <li><strong>关键观察</strong>：三者在匀速段性能接近（所有滤波器都能处理匀速运动），差异在<strong>机动切换时刻</strong>被放大——这正是Doppler速度信息最发挥作用的时刻</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">高动态环境中的飞行轨迹对比——DPNet vs 传统MPC规划器</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Flight trajectory comparison in highly-dynamic environments"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong>：DPNet与传统固定参数MPC在高动态多障碍物场景中的飞行轨迹对比。红色轨迹为DPNet，蓝色为传统MPC。</p>
+      <ul>
+        <li><strong>DPNet轨迹特征</strong>：平滑且保持安全距离——在障碍物密集区，DT-MPC自动调高碰撞权重，生成更保守但安全的绕行轨迹；在空旷区恢复标称权重，直接飞向目标</li>
+        <li><strong>传统MPC问题</strong>：(1) 与快速移动障碍物距离过近（安全裕度不足）——固定低碰撞权重无法应对高动态威胁；(2) 部分场景发生碰撞——障碍物轨迹预测误差导致规划器"认为安全"的时刻实际已进入危险区域</li>
+        <li><strong>成功率统计</strong>：DPNet在多组随机场景中成功率显著高于传统方案——在高动态障碍物密度 > 3个时优势尤为突出</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在缺陷与改进方向</h2>
+
+  <h3>9.1 当前局限</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) Doppler LiDAR的径向速度测量准确度依赖于障碍物表面反射质量——低反射率表面（黑色/吸光材料）可能导致Doppler信号信噪比急剧下降，速度测量失效；(2) 单帧Doppler仅提供径向分量——恢复完整3D速度矢量需要多个非共线波束的Doppler测量（至少3个），或利用多帧信息进行切向分量推断——在障碍物仅被少数激光点击中时（远距离），3D速度恢复不可靠；(3) 训练数据覆盖的运动模式——D-KalmanNet的泛化能力受限于训练集中机动模式的多样性，对训练分布外的运动（如极端急转弯）可能失效。</li>
+    <li><strong>适用场景</strong>：当前工作主要基于<strong>仿真验证</strong>（高保真模拟器中的Doppler LiDAR模型）——真实Doppler LiDAR硬件（如Aeva 4D LiDAR）的噪声特性、多路径反射、运动模糊等效应可能比模拟模型更复杂。参数网络的训练也与仿真环境绑定——迁移到真实硬件可能需要重新训练或微调。</li>
+    <li><strong>计算开销</strong>：完整管线（点云处理 + D-KalmanNet推理 + DT-MPC求解）在40ms内完成——在机载嵌入式GPU（如Jetson Orin）上可行，但在更轻量级平台上（如ARM Cortex-A系列无GPU）可能无法满足实时性。MPC求解本身是管线中的计算瓶颈。</li>
+  </ul>
+
+  <h3>9.2 改进方向</h3>
+  <ul>
+    <li><strong>感知鲁棒性</strong>：(1) 多传感器融合——将Doppler LiDAR与相机（RGB/Event camera）或4D毫米波雷达融合，提供互补的速度感知（相机提供纹理+深度，雷达提供长距离Doppler）；(2) 不确定性感知的数据关联——将D-KalmanNet的协方差估计用于数据关联决策，降低误匹配对跟踪质量的影响；(3) 域自适应训练——在仿真中训练基础模型，用少量真实数据微调，桥接sim-to-real gap。</li>
+    <li><strong>扩展性</strong>：(1) 多障碍物交互建模——当前D-KalmanNet独立跟踪每个障碍物，忽略了障碍物之间的交互（如互相避让）。引入图神经网络（GNN）对多障碍物交互进行联合建模；(2) 多无人机协同——多架无人机共享各自的Doppler观测，实现分布式协同跟踪与规划；(3) 在线学习——在部署过程中持续收集在线数据微调D-KalmanNet和参数网络，适应部署环境的特定运动模式分布。</li>
+    <li><strong>规划优化</strong>：(1) 学习MPC warm-start——用神经网络初始化MPC求解器的优化变量，减少迭代次数；(2) 分层规划——粗粒度全局规划（低频）+ 细粒度局部DT-MPC（高频），兼顾全局最优和局部响应；(3) 风险感知的目标选择——在高碰撞风险环境中自动选择备用目标点（安全港），而非死板地飞向原始目标。</li>
+  </ul>
+
+  <h3>9.3 数据敏感性分析</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>Doppler信噪比不足</td><td>低反射率/远距离障碍物→Doppler速度测量噪声增大→D-KalmanNet的速度观测质量下降→滤波器回退到依赖位置差分→跟踪质量退化为标准KalmanNet水平</td><td>高</td></tr>
+    <tr><td>障碍物被遮挡</td><td>障碍物进入LiDAR盲区→D-KalmanNet转为纯预测模式（无观测更新）→协方差随时间线性增长→重新出现时数据关联可能失败（预测位置与实测位置差异过大）</td><td>高</td></tr>
+    <tr><td>训练数据与部署场景的运动分布失配</td><td>D-KalmanNet在仿真训练的机动模式（如正弦转向）与真实场景（如紧急制动）不同→RNN对失配运动模式的适应能力不足→估计误差在失配场景中增大</td><td>较高</td></tr>
+    <tr><td>参数网络对环境结构的敏感性</td><td>参数网络在训练环境（开阔场景）中学到的映射，在密集障碍物场景中可能输出不适当的权重→需要在训练数据中覆盖多样化的场景密度</td><td>中</td></tr>
+  </table>
+
+  <h3>9.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>"Doppler感知信息量最大化"的主动感知策略</strong>——这是将本文从"被动利用Doppler数据"提升到"主动选择感知行为"的核心理论进阶。关键子问题：(1) Dopper速度仅测量径向分量——无人机的飞行轨迹决定了每个时刻哪些障碍物在"高信息Doppler观测方向"上。如何规划轨迹使得对高威胁障碍物的Doppler观测几何最优？(2) 这本质上是一个<strong>感知-控制双目标优化</strong>——同时最小化到达目标的时间和最大化对关键障碍物的速度观测信息。可以建模为部分可观测马尔可夫决策过程（POMDP），其中Doppler观测矩阵 $\mathbf{H}_k^{\text{doppler}} = \mathbf{d}_k^T$ 随无人机-障碍物的相对几何变化。(3) 信息论形式化：定义Doppler互信息 $I(\mathbf{v}^{\text{obs}}; v_r | \mathbf{d})$，用轨迹优化最大化该互信息的下界。这将使无人机在靠近障碍物时<strong>自动选择能够获取最优Doppler速度观测的视线方向</strong>——从"被动感知+规划"升级为<strong>"主动感知引导规划、规划优化感知"</strong>的双向闭环框架。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机推导 —— 第一性原理溯源</h2>
+
+  <h3>10.1 思路推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>无人机在包含快速移动障碍物的环境中飞行时，传统运动规划器频繁失败——这不是调参不够好，而是<strong>规划器对障碍物未来运动的预测从根本上就不准确</strong>。预测不准的根源在于两个物理限制：(i) 传统LiDAR只测位置不测速度——速度需要从位置差分获得，噪声放大10倍；(ii) 规划器假设障碍物保持恒定速度——但高动态障碍物正在加速/转向。当预测器说"障碍物将在0.5秒内到达位置A"而实际它到达了位置B（偏差 > 1m），避碰规划的质量再高也无济于事——因为规划器的输入信息本身就是错的。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>几条路线：(i) 改进跟踪滤波器——用IMM（交互多模型）在多个运动模型间切换，但模型集合有限，且切换存在延迟；(ii) 学习轨迹预测——用LSTM从历史轨迹预测未来，但输入仅为位置序列，缺乏速度直测，数据效率和泛化性差；(iii) 减小MPC时域+增大安全距离——以过度保守换取安全，牺牲了飞行效率和灵活性。所有路线都绕不开一个根本约束：<strong>没有速度的直接观测，任何预测方法都在使用被噪声污染和滞后的速度推断</strong>。</li>
+    <li><strong>如果传感器本身就测量速度呢？</strong><br>Doppler LiDAR提供了每个激光点的径向速度——这是物理层面的直接测量，不是数值微分。将Doppler速度与位置测量融合，障碍物状态估计从"位置+推断速度"升级为"位置+测量速度"。这不仅是精度提升（噪声从1.4m/s降到0.1m/s），更是<strong>信息维度的提升</strong>——观测矩阵从 $[\mathbf{I}_3, \mathbf{0}]$ 扩展为包含速度行，速度变为可观测量而非可估量。</li>
+    <li><strong>如何让规划器利用这些更好的估计？</strong><br>精确的障碍物状态估计只是第一步——还需要将这些信息转化为规划决策。如果MPC的代价函数权重是固定的，那么"精确跟踪了一个快速逼近的障碍物"和"精确跟踪了一个慢速远离的障碍物"在规划层面没有区别——这显然是浪费了感知信息。解决方案：让规划器根据障碍物的运动状态动态调整自身的"风险姿态"——快速逼近时高度保守，慢速远离时恢复标称。这就是DT-MPC的核心动机：<strong>用一个轻量参数网络，将Doppler感知的碰撞风险翻译为MPC可理解的代价参数</strong>。</li>
+    <li><strong>如何让跟踪器也更好？</strong><br>即使有了Doppler速度测量，标准KF仍然使用固定的过程噪声协方差——无法反映"障碍物当前是否在机动"这一时变特性。用RNN学习KF的参数（KalmanNet的思想）可以解决这个问题——但需要让RNN"看到"Doppler特征，否则RNN和标准KalmanNet一样需要多帧位置序列才能察觉机动。将Doppler特征 $(\mathbf{d}_k, v_{r,k})$ 作为RNN的显式输入，RNN可以在障碍物加速的<strong>第一帧</strong>就检测到（因为Doppler速度变化是零延迟的），立即调高 $\mathbf{K}_k$ 和 $\mathbf{Q}_k$——这比纯位置KalmanNet快数个采样周期。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    传统运动规划器在高动态场景中失败的根本原因是缺乏速度的直接观测——Doppler LiDAR提供了物理层面的瞬时速度测量，使得障碍物跟踪从"数值微分的噪声放大"升级为"物理测量的零延迟感知"，进而驱动MPC进行风险自适应的运动规划。
+  </div>
+
+  <h3>10.3 如何一步步想到这个方案</h3>
+  <ul>
+    <li><strong>步骤 1 — 观察现象</strong>：在仿真和真实实验中运行标准LiDAR+MPC管线，发现当障碍物突然加速或转向时，碰撞率急剧上升。分析发现根本原因不是MPC求解器的问题，而是障碍物轨迹预测严重滞后于真实运动。</li>
+    <li><strong>步骤 2 — 分解问题</strong>：将"高动态环境安全飞行"分解为三个子问题——(1) 如何获得障碍物的精确速度？（传感器限制）(2) 如何在障碍物机动时保持跟踪精度？（模型失配）(3) 如何让规划器根据场景动态调整风险姿态？（参数适应性）</li>
+    <li><strong>步骤 3 — 匹配工具</strong>：(1) Doppler LiDAR——每个激光点自带径向速度；(2) KalmanNet框架——用RNN学习KF参数以适应机动；(3) 轻量参数网络——将碰撞风险映射为MPC权重。</li>
+    <li><strong>步骤 4 — 组装方案</strong>：Doppler LiDAR点云 → 障碍物聚类+关联 → D-KalmanNet（KF骨架+RNN增益+Doppler特征） → 障碍物状态+协方差 → 碰撞风险推断 → 参数网络输出代价权重 → DT-MPC求解 → 控制指令。整个管线在40ms内完成闭环。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 关键启示与收获</h2>
+
+  <h3>11.1 方法论层面的经验</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是<strong>"用新型传感器信息维度撬动系统性能跃升"</strong>的典型案例——不是死磕更好的算法来处理同一组传感器数据，而是引入Doppler LiDAR这个新的信息源，从信息维度本身改变问题的可解性。核心启示：<strong>当算法优化遇到天花板时，回头检查传感器是否提供了足够的信息——有时一个物理测量（Doppler速度）的价值远超十种后处理算法（差分+滤波+平滑）</strong>。这对于感知-控制联合系统设计的启示是：传感器选型不应与算法设计分离——传感器的信息结构和算法的假设模型需要联合优化。</li>
+    <li><strong>技术技巧层面</strong>：(1) "物理骨架+学习残差"的混合设计——D-KalmanNet保留了KF的代数结构（状态预测+更新、协方差传播），仅将最难建模的部分（$\mathbf{K}_k$ 和 $\mathbf{Q}_k$ 的在线调整）交给RNN——这不是"为了用learning而用learning"，而是在物理模型的瓶颈处精确地引入学习能力；(2) 感知信息到控制参数的端到端映射——参数网络是感知和控制的"翻译器"，将传感器域的特征 $(\rho, d, \mathbf{v}_{\text{rel}})$ 翻译为控制域的参数 $(\gamma_{\text{coll}}, N)$——这种"域间翻译"的架构比端到端训练整个策略网络更模块化、更可解释、更易调试；(3) 机会约束的工程化——将障碍物估计协方差传播到MPC约束中，不是形式主义而是实际必要的——在跟踪误差和避碰裕度同量级时忽略不确定性就是"揣着糊涂装明白"。</li>
+    <li><strong>实验/写作层面</strong>：论文的消融实验设计值得学习——分别去掉Doppler特征（D-KalmanNet → 标准KalmanNet）和去掉自适应调谐（DT-MPC → 固定参数MPC），清晰地展示了每个组件的贡献。这种"逐个剥离核心创新"的消融策略比单纯"Ours vs 所有Baseline"的一张表更有说服力——它回答了"具体是哪个设计带来了增益"。</li>
+  </ul>
+
+  <h3>11.2 对个人研究的直接启示</h3>
+  <ul>
+    <li><strong>对视觉伺服/感知方向</strong>：Doppler速度测量本质上是一种"无需帧间匹配的速度感知"。视觉伺服中同样面临"速度估计滞后"的问题——目标在图像平面的运动速度通常需要光流或特征匹配来估计（等价于位置差分）。如果未来的事件相机（event camera）或Doppler视觉传感器能提供像素级的"径向速度"，那么视觉伺服的控制延迟可以大幅降低——这启发我们关注<strong>新型视觉速度传感器</strong>在伺服控制中的应用潜力。</li>
+    <li><strong>对多无人机控制方向</strong>：DT-MPC的"碰撞风险驱动的参数自适应"可以推广到多无人机编队避碰——每对无人机之间的碰撞风险不同（领机vs僚机、同向vs对向），编队控制器可以根据每对无人机的相对Doppler速度动态调整编队约束的松紧。这是一个<strong>"安全感知的自适应编队控制"</strong>方向——编队的紧密度不再固定，而是随环境风险感知动态调整。</li>
+    <li><strong>对强化学习+规划方向</strong>：参数网络可以看作一个"学习到的MPC超参数调度器"——它观察场景特征，输出MPC的代价权重。这启发了一种"学习+优化"的混合范式：<strong>不在动作空间学习（RL直接输出控制），而在参数空间学习（RL输出MPC的代价权重）</strong>——保持MPC的安全性保证（硬约束满足），同时让学习组件处理MPC内部的参数自适应问题。这种范式在安全关键应用（无人机、自动驾驶）中比纯RL更具实用前景。</li>
+  </ul>
+
+  <h3>11.3 值得跟进的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Revay et al. (2022) — KalmanNet: Neural Network Aided Kalman Filtering for Partially Known Dynamics. <em>IEEE TSP 2022</em></td><td>KalmanNet的原始论文——提出用RNN学习KF的增益和噪声参数。理解D-KalmanNet必须从此出发，理解"物理骨架+学习残差"的原始设计。</td></tr>
+    <tr><td>Tordesillas et al. (2021) — FASTER: Fast and Safe Trajectory Planner for Flights in Unknown Environments. <em>IEEE TRO 2021</em></td><td>高动态无人机运动规划的经典——提供了MPC在无人机避障中的工程基准，有助于理解DT-MPC相对于传统固定参数MPC的优势所在。</td></tr>
+    <tr><td>Aeva (2023) — 4D LiDAR with Velocity Sensing. <em>Product Documentation</em></td><td>Doppler LiDAR的商业化产品——了解真实硬件的Doppler速度精度、有效距离、噪声特性，对评估DPNet在真实硬件上的可行性至关重要。</td></tr>
+    <tr><td>Britting et al. (2021) — The Widespread Intrinsic Doppler Sensitivity of FMCW LiDAR. <em>Nature Communications 2021</em></td><td>FMCW LiDAR Doppler效应的物理原理——解释为什么每个激光点天然携带径向速度信息，理解Doppler LiDAR的物理基础。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Zuo, Ren, Li, Wang, Zhao, Wang, Sui, Gao et al. · IEEE RA-L 2026 · DPNet: Doppler LiDAR Motion Planning for Highly-Dynamic Environments · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

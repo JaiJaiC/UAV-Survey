@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — XTDrone (Xiao et al., 2020)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Xiangke Wang · 18-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10497/index.html">Distributed fault estimat</a>
+<a href="../10496/index.html">Robust cooperative guidan</a>
+<a href="../10493/index.html">three-layer formation man</a>
+<a href="../10487/index.html">L1</a>
+<a href="../10453/index.html">UAV</a>
+<a href="../10495/index.html">Cooperative impact time</a>
+<a href="../10491/index.html">Adaptive prescribed-time </a>
+<a href="../10472/index.html">Formation under communica</a>
+<a href="../10464/index.html">Formation under communica</a>
+<a href="../10474/index.html">Prescribed-time target en</a>
+<a href="../10473/index.html">Prescribed-time distribut</a>
+<a href="../10484/index.html">UAV</a>
+<a class="active" href="../10486/index.html">XTDrone customizable mult</a>
+<a href="../10489/index.html">UAV</a>
+<a href="../10485/index.html">Event-triggered consensus</a>
+<a href="../10488/index.html">Multi-agent distributed</a>
+<a href="../10494/index.html">geometric structure unit</a>
+<a href="../10490/index.html">dual quaternion solution</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">XTDrone: A Customizable Multi-Rotor UAVs Simulation Platform（可定制的多旋翼无人机仿真平台）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>K. Xiao</strong>, L. Ma, S. Tan, Y. Cong, X. Wang (multiple affiliations)</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">北京航空航天大学</strong>（Beihang University），北京宇航系统工程研究所（Beijing Institute of Aerospace Systems Engineering），中国运载火箭技术研究院（China Academy of Launch Vehicle Technology），同济大学（Tongji University）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Conference</strong>（会议论文），<strong>2020年</strong></td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td>XTDrone 完全开源，代码托管于 Gitee/GitHub，配有详细中文/英文使用手册。支持 ROS + Gazebo + PX4 全栈仿真。</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>XTDrone</strong>——一个基于 ROS、Gazebo 和 PX4 的完全开源、可定制的多旋翼无人机仿真平台。集成动力学模型、传感器模型、控制算法、状态估计与三维场景，支持 <strong>SLAM 评估、目标检测、运动规划、姿态控制、多机协同</strong>以及与其他机器人（UGV/USV）的协同仿真。采用 <strong>lockstep 锁步机制</strong>，仿真速度可随计算机性能自动调节。提供简易 3D 仿真器（快速原型）与完整 Gazebo 仿真（高保真）<strong>双模式切换</strong>，并支持强化学习的 Gym 接口。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Simulation Platform</span>
+    <span class="tag tag-green">ROS/Gazebo</span>
+    <span class="tag tag-amber">PX4 Autopilot</span>
+    <span class="tag tag-purple">Multi-UAV</span>
+    <span class="tag tag-red">Open Source</span>
+    <span class="tag tag-cyan">Hardware-in-the-Loop</span>
+    <span class="tag tag-gray">SLAM/Perception</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么无人机研究者需要另一个仿真平台？</strong><br>
+    答：因为现有的仿真工具各自存在关键缺口——AirSim 偏重视觉逼真但动力学模型简化、不支持 SLAM 评估闭环；FlightGear 是飞行模拟器非机器人仿真平台、无传感器模型和感知能力；jMAVSim 仅有基本动力学、无可定制三维场景。更根本的问题是：<strong>没有哪个平台将 ROS（算法开发）、Gazebo（物理仿真）和 PX4（真实飞控）三者深度整合为一个模块化、可定制的全栈系统</strong>，使得研究者可以从感知到控制、从单机到多机、从纯仿真到硬件在环都使用<strong>同一套代码和接口</strong>。<br><br>
+    问：<strong>XTDrone 的核心洞察是什么？</strong><br>
+    答：<strong>将飞控层（PX4 SITL）与仿真层（Gazebo/Rviz）通过 MAVLink/MAVROS 解耦，同时在上层（ROS）提供统一的 API 来操作传感器、控制器和规划器</strong>。这种分层架构使得：(1) 用户可以在不修改飞控代码的情况下替换任何感知/规划算法；(2) 同一套高层算法可以在简单 3D 仿真器和完整 Gazebo 之间无缝切换；(3) PX4 SITL 的引入让仿真结果可以直接迁移到真实硬件——因为飞控代码在仿真和实物上完全一致。
+  </div>
+
+  <h3>2.2 Inspiration to Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>PX4 SITL 架构（Software In The Loop）</td><td>飞控代码在仿真和真机上<strong>完全相同</strong>——这意味着任何在 XTDrone 中验证的控制/规划算法可以零修改部署到真实无人机。关键在于利用 MAVLink 协议在 Gazebo 和 PX4 之间传递传感器数据和执行器指令，打破了"仿真归仿真、实物归实物"的割裂</td><td>Architecture</td></tr>
+    <tr><td>ROS 的分布式节点架构</td><td>通过 ROS namespace 机制实现<strong>多无人机的节点隔离</strong>——每架无人机运行在独立的命名空间下，各自拥有独立的 MAVROS 连接、传感器 topic 和控制器节点。这使得多机协同仿真的开发和调试从"N 个机器"变为"1 个机器 x N 个 namespace"</td><td>Method</td></tr>
+    <tr><td>Gazebo 的物理引擎与传感器插件体系</td><td>为相机、IMU、GPS、激光雷达等建立<strong>带噪声参数的传感器模型</strong>——不仅仿真理想数据，还仿真传感器退化（噪声密度、随机游走、GPS 漂移等），使得 SLAM 和状态估计算法可以在可控的"恶劣条件"下被严格评估</td><td>Math / Simulation</td></tr>
+    <tr><td>Lockstep 锁步仿真机制</td><td>与实时仿真不同，lockstep 确保<strong>传感器数据、控制指令、物理仿真在同一时间步内同步</strong>——消除了因计算延迟导致的仿真-实物不一致。仿真速度可以调慢（保证精度）或调快（加速训练）</td><td>Strategy</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: ROS + Gazebo + PX4 三合一深度整合——面向感知-规划-控制全栈的统一仿真框架</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>现有无人机仿真工具各自为政：AirSim 擅长视觉但动力学简化、无 SLAM 评估工具；Gazebo 有物理引擎但缺乏完整的飞控集成和多传感器模型；PX4 自带 jMAVSim 仅能验证飞控基础功能。研究者需要在这些工具之间来回切换，接口不一致，无法做端到端评估。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>PX4 SITL 通过 MAVLink 向仿真器发送控制指令并接收传感器数据——那为什么不把 Gazebo 的物理引擎和传感器插件直接注入 PX4 SITL 的传感器通道？同时用 ROS 在上层统一管理所有算法节点。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>三层架构：底层 Gazebo（物理 + 传感器），中层 PX4 SITL（飞控 + 状态估计），上层 ROS（感知 + 规划 + 控制 + 协同）。PX4-SITL 与 Gazebo 通过 MAVLink 通信（TCP/UDP），PX4 与 ROS 通过 MAVROS 通信。用户只在上层 ROS 编写算法代码，下层飞控和物理引擎完全透明。所有组件通过 namespace 隔离实现多机扩展。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 模块化可定制架构——每个模块独立可替换、支持广泛机器人类型</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>大多数仿真平台的传感器模型、动力学模型、场景是硬编码的——用户想换个相机参数或添加激光雷达需要修改底层代码。此外，大多数平台仅支持单一类型的机器人（如仅无人机），无法做空地协同仿真。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>ROS 的插件机制和 Gazebo 的 SDF（Simulation Description Format）模型规范——仿真对象以模型文件描述，传感器以插件方式挂载</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>每种无人机模型（四旋翼、六旋翼、VTOL 等）和传感器（RGB 相机、深度相机、IMU、GPS、2D/3D 激光雷达）都封装为独立的 ROS launch 文件和 Gazebo 模型文件。用户通过修改 YAML 参数文件即可定制传感器噪声参数、飞控 PID 增益、场景光照/纹理。平台还支持 UGV（地面机器人）、USV（水面机器人）和固定翼——所有类型共享同一套通信和协同框架。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 多级仿真保真度——从简易 3D 快速原型到完整 Gazebo HITL 的渐进式验证管线</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>高保真物理仿真（如 Gazebo + 完整旋翼动力学）计算开销大，不适合快速迭代和强化学习训练。另一方面，过于简化的质点模型又无法反映真实飞行中的传感器噪声、通信延迟和执行器响应——导致"仿真中完美、实物上失败"。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>软件工程中的"分层测试"理念——单元测试（快速、低保真）到集成测试（慢速、高保真）</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>三级仿真保真度：(1) <strong>Simple 3D Simulator</strong>：基于二阶质点动力学模型，不渲染三维场景（Rviz 可视化），计算开销极低——用于多机编队控制、路径规划等高层算法的<strong>快速原型验证</strong>；(2) <strong>Full Gazebo Simulator</strong>：完整四旋翼刚体动力学 + 空气动力学效应（桨叶升力/阻力/力矩）+ 带噪声传感器模型 + 纹理丰富的三维场景——用于 SLAM、目标检测、视觉伺服等<strong>感知密集任务的精确评估</strong>；(3) <strong>HITL (Hardware-In-The-Loop)</strong>：PX4 运行在真实飞控硬件（Pixhawk）上，Gazebo 提供虚拟传感器和场景——用于验证<strong>真实硬件上的算法部署和实时性</strong>。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — 感知-规划-控制-仿真的闭环管线</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Perception Layer <span>ROS Nodes</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>Sensor Data Input</strong>
+          <small>Cameras (RGB/D/RGB-D), LiDAR (2D/3D), IMU, GPS, Barometer, Magnetometer — all with configurable noise models.</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>SLAM / Detection / Tracking</strong>
+          <small>ORB-SLAM2/3, VINS-Mono/Fusion, object detection (YOLO), optical flow — results fed to planning layer.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Planning and Control <span>ROS Nodes</span></h4>
+        <div class="arch-card arch-power">
+          <strong>Motion and Path Planning</strong>
+          <small>Global/local planners, trajectory generation, obstacle avoidance — using perception outputs.</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>Formation / Multi-Agent Control</strong>
+          <small>Distributed consensus, leader-follower, virtual structure formation — via ROS topics.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>PX4 SITL Stack <span>Autopilot</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>State Estimation (EKF2)</strong>
+          <small>Multi-sensor fusion of IMU, GPS, vision, magnetometer for attitude/position/velocity estimation.</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>Attitude and Position Controllers</strong>
+          <small>Cascaded PID: angular rate to attitude to velocity to position. MAVLink interface for setpoints.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Simulation Engine <span>Gazebo / Simple3D</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>Multi-Rotor Dynamics (Gazebo)</strong>
+          <small>6-DOF rigid body + rotor aerodynamics, ground effect, wind, drag. ODE/Bullet/DART physics engines.</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>Lockstep Execution</strong>
+          <small>Synchronized step: sensors to PX4 to control to actuators to physics to next step. Speed adjustable.</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>raw sensor data</span>
+      <span>poses/tracks to waypoints</span>
+      <span>setpoints to actuator outputs</span>
+      <span>forces/torques to next state</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key enabler</strong><small>MAVLink (PX4 to Gazebo) + MAVROS (PX4 to ROS) decouple autopilot from simulation and algorithms.</small></div>
+      <div class="arch-metric"><strong>Main contribution</strong><small>Unified platform: perception to planning to control to simulation, all in ROS with modular replacement.</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>PX4 SITL code = real flight code. Algorithms validated in sim transfer directly to real hardware.</small></div>
+      <div class="arch-metric"><strong>Multi-agent design</strong><small>ROS namespace isolation: each UAV has independent MAVROS, topics, and controller instances.</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 System Frame — ROS-Gazebo-PX4 全栈交互架构</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph USER["User Algorithm Layer (ROS)"]
+      SLAM["SLAM Nodes: ORB-SLAM2/3, VINS-Mono"]
+      DETECT["Detection Nodes: YOLO, SSD"]
+      PLAN["Planning Nodes: Global/Local Path"]
+      CTRL["Control Nodes: Formation, Multi-agent"]
+      RL["RL Training: OpenAI Gym Interface"]
+    end
+
+    subgraph MIDDLE["PX4 SITL Layer (Autopilot)"]
+      MAVROS["MAVROS Bridge: ROS to PX4"]
+      EKF2["EKF2 State Estimator: IMU+GPS+Vision"]
+      ATTCTRL["Cascaded PID: Rate to Attitude to Velocity to Position"]
+      MIXER["Mixer: Control Allocation to Motor PWM"]
+    end
+
+    subgraph BOTTOM["Gazebo Simulation Layer"]
+      PHYSICS["Physics Engine: ODE/Bullet Rigid Body"]
+      AERO["Aerodynamics: Rotor Lift/Drag/Torque"]
+      SENSORS["Sensor Models: IMU/GPS/Camera/LiDAR"]
+      SCENE["3D Scene: Textured Terrain, Obstacles, Lighting"]
+    end
+
+    subgraph ALT["Simple 3D Simulator (Rapid Prototype)"]
+      SIMPLE3D["Second-Order Point-Mass Dynamics\nRviz Visualization Only"]
+    end
+
+    SLAM --> PLAN
+    DETECT --> PLAN
+    PLAN --> CTRL
+    CTRL -->|"position/velocity cmd via MAVROS"| MAVROS
+    RL -->|"Gym interface: obs/action/reward"| MAVROS
+    MAVROS -->|"setpoint commands"| ATTCTRL
+    EKF2 -->|"pose/velocity estimate"| MAVROS
+    ATTCTRL -->|"motor commands"| MIXER
+    MIXER -->|"MAVLink HIL_ACTUATOR"| AERO
+    AERO --> PHYSICS
+    PHYSICS --> SENSORS
+    SCENE --> SENSORS
+    SENSORS -->|"MAVLink HIL_SENSOR/GPS/OPTICAL_FLOW"| EKF2
+    CTRL -.->|"rapid prototyping"| SIMPLE3D
+    SIMPLE3D -.->|"validated, upgrade to"| BOTTOM
+
+    classDef user fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef middle fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef bottom fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef alt fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#047857
+    class SLAM,DETECT,PLAN,CTRL,RL user
+    class MAVROS,EKF2,ATTCTRL,MIXER middle
+    class PHYSICS,AERO,SENSORS,SCENE bottom
+    class SIMPLE3D alt
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 单次仿真步的完整数据流转</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph TICK["Lockstep Simulation Step"]
+      direction LR
+      STEP1["Step 1: Sensor Data Generation\nGazebo renders cameras/lidar\nComputes noisy IMU/GPS"] --> STEP2["Step 2: Data Injection into PX4\nMAVLink: HIL_SENSOR\nHIL_GPS, HIL_OPTICAL_FLOW"]
+      STEP2 --> STEP3["Step 3: PX4 Flight Control\nEKF2 State Estimation\nCascaded PID Control"]
+      STEP3 --> STEP4["Step 4: Actuator Output\nMAVLink: HIL_ACTUATOR_CONTROLS\nPWM to Forces and Torques"]
+      STEP4 --> STEP5["Step 5: Physics Update\nODE/Bullet Solver\nUpdate UAV State"]
+      STEP5 --> STEP1
+    end
+
+    subgraph ROS["ROS Layer (Asynchronous)"]
+      R1["Subscribe to Sensor Topics\n/camera/image_raw\n/imu/data, /gps/fix"]
+      R2["Algorithm Processing\nSLAM, Detection, Planning"]
+      R3["Publish Control Commands\n/setpoint_position\n/setpoint_velocity"]
+    end
+
+    STEP2 -.->|"MAVROS forwarding"| R1
+    R2 -.-> R3
+    R3 -.->|"MAVROS forwarding to setpoint"| STEP3
+
+    classDef tick fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef ros fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    class STEP1,STEP2,STEP3,STEP4,STEP5 tick
+    class R1,R2,R3 ros
+    </pre>
+  </div>
+
+  <h3>3.3 Multi-UAV — 多机协同的 Namespace 隔离架构</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph GROUND["Ground Station / Cooperative Planning"]
+      COORD["Formation/Coordination Algorithm\nDistributed Consensus, Leader-Follower"]
+      MONITOR["Multi-UAV Monitor GUI: QGroundControl"]
+    end
+
+    subgraph UAV1["UAV 1 (namespace: /uav1)"]
+      MAVROS1["MAVROS Instance 1: UDP 14540"]
+      PX41["PX4 SITL Instance 1: SYSID=1"]
+      GAZEBO1["Gazebo Model 1: IRIS Quadrotor"]
+      SENSORS1["Sensor Suite 1: Camera, IMU, GPS, LiDAR"]
+    end
+
+    subgraph UAV2["UAV 2 (namespace: /uav2)"]
+      MAVROS2["MAVROS Instance 2: UDP 14541"]
+      PX42["PX4 SITL Instance 2: SYSID=2"]
+      GAZEBO2["Gazebo Model 2: IRIS Quadrotor"]
+      SENSORS2["Sensor Suite 2: Camera, IMU, GPS, LiDAR"]
+    end
+
+    subgraph UAVN["UAV N (namespace: /uavN)"]
+      MAVROSN["MAVROS Instance N"]
+      PX4N["PX4 SITL Instance N: SYSID=N"]
+      GAZEBON["Gazebo Model N"]
+      SENSORSN["Sensor Suite N"]
+    end
+
+    COORD -->|"/uav1/setpoint"| MAVROS1
+    COORD -->|"/uav2/setpoint"| MAVROS2
+    COORD -.->|"/uavN/setpoint"| MAVROSN
+    MAVROS1 --> PX41 --> GAZEBO1
+    MAVROS2 --> PX42 --> GAZEBO2
+    MAVROSN --> PX4N --> GAZEBON
+    GAZEBO1 --> SENSORS1 --> MAVROS1
+    GAZEBO2 --> SENSORS2 --> MAVROS2
+    GAZEBON --> SENSORSN --> MAVROSN
+    MONITOR -.-> MAVROS1
+    MONITOR -.-> MAVROS2
+
+    classDef ground fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef uav1 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef uav2 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef uavn fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#047857
+    class COORD,MONITOR ground
+    class MAVROS1,PX41,GAZEBO1,SENSORS1 uav1
+    class MAVROS2,PX42,GAZEBO2,SENSORS2 uav2
+    class MAVROSN,PX4N,GAZEBON,SENSORSN uavn
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \text{Find } \mathcal{S} = \{\text{Simulator}, \text{API}, \text{Models}\} \text{ such that:} $$
+    $$ \forall \; \text{algorithm} \in \{\text{SLAM}, \text{Planning}, \text{Control}, \text{Cooperation}\}: \quad \text{Sim2Real Gap}(\text{algorithm}, \mathcal{S}) \to \min $$
+    $$ \text{subject to:}\; \text{Modularity} = \text{True},\; \text{Multi-Agent} = \text{True},\; \text{Open Source} = \text{True} $$
+    <div class="eq-note">
+      <strong>$\mathcal{S}$</strong> = 仿真平台（包含仿真器、API 接口、模型库）&nbsp;|&nbsp;
+      <strong>Sim2Real Gap</strong> = 仿真结果到真实实验的性能差距 &nbsp;|&nbsp;
+      <strong>核心约束</strong>：平台必须 (1) 支持模块化替换（每个算法/传感器/模型独立可改），(2) 支持多机协同（N 架无人机 + 其他机器人类型），(3) 完全开源（代码可审查、可复现、可扩散）&nbsp;|&nbsp;
+      <strong>XTDrone 的答案</strong>：用 PX4 SITL 消除飞控层的 Sim2Real Gap（同一套代码），用 Gazebo 传感器噪声模型评估算法鲁棒性，用 ROS namespace 实现多机隔离。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>Category</th><th>Content</th><th>Dimensions</th></tr>
+    <tr><td><strong>Input</strong></td><td>用户编写的 ROS 算法节点（感知/规划/控制/协同）——通过标准的 ROS topic/service 接口与平台交互</td><td>传感器数据流（图像/点云/IMU/GPS）+ 飞控状态（位姿/速度）</td></tr>
+    <tr><td><strong>Output</strong></td><td>仿真结果——包括传感器数据日志、轨迹真值（ground truth）、SLAM 精度评估（ATE/RPE）、编队误差、飞行性能指标</td><td>可视化（Gazebo/Rviz/QGC）+ EVO 评估工具 + rosbag 日志</td></tr>
+    <tr><td><strong>Goal</strong></td><td>提供一个从快速原型到高保真验证的<strong>端到端</strong>仿真管线，使无人机算法开发不再依赖于真实飞行实验</td><td>覆盖 SLAM、目标检测、运动规划、编队控制、空地协同、强化学习</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>系统工程基础设施</strong>类型的贡献——不解决单个算法问题，而是构建一个<strong>让所有算法都能被公平、严格、可复现地评估的统一仿真环境</strong>。核心价值在于：(1) 降低了无人机算法开发的门槛（不需要真实飞机即可做全栈实验），(2) 提供了一个标准化的评估基准（相同场景、相同噪声条件下对比不同算法），(3) 打通了从仿真到实物的最后一公里（PX4 SITL = 真实飞控代码）。在 UAV 研究中，这一类型的贡献虽然不像新算法那样"闪亮"，但<strong>对领域的长远发展具有基础设施级的重要性</strong>——相当于为整个研究社区修建了"实验高速公路"。</p>
+
+  <h3>4.4 Why Existing Simulators Are Insufficient</h3>
+  <table>
+    <tr><th>Simulator</th><th>Strengths</th><th>Why Insufficient for XTDrone's Goals</th></tr>
+    <tr>
+      <td>AirSim (Microsoft)</td>
+      <td>视觉逼真度极高（Unreal Engine），支持无人机+车辆</td>
+      <td>动力学模型简化（无完整飞控集成），<strong>不支持 SLAM 评估闭环</strong>（无 EKF 状态估计、无传感器退化模型），不支持 PX4 SITL 的原生集成。偏向"视觉仿真"而非"全栈机器人仿真"。</td>
+    </tr>
+    <tr>
+      <td>FlightGear</td>
+      <td>开源飞行模拟器，大气模型和飞行器模型丰富</td>
+      <td><strong>飞行模拟器而非机器人仿真平台</strong>——无传感器模型（相机、LiDAR），无 SLAM/感知能力，无多机器人协同框架。本质上是为<strong>飞行员训练</strong>设计的，不是为<strong>算法开发</strong>设计的。</td>
+    </tr>
+    <tr>
+      <td>jMAVSim (PX4 自带)</td>
+      <td>轻量级，与 PX4 SITL 无缝集成</td>
+      <td>仅提供<strong>最基本的刚体动力学</strong>和一个简单的二维地形——无相机/LiDAR/深度传感器，无三维场景，无法做任何感知相关工作。仅仅是飞控层的"功能测试"，不能做完整的任务级验证。</td>
+    </tr>
+    <tr>
+      <td>Gazebo (bare)</td>
+      <td>强大的物理引擎 + 传感器 + 三维场景</td>
+      <td>Gazebo 本身是通用机器人仿真器，<strong>缺乏与 PX4 飞控的深度集成</strong>——需要用户自己搭建 MAVLink 桥接、配置传感器-飞控数据通路、建立多机 namespace 管理。XTDrone 做的事情正是把这些"手工搭建"的重复劳动标准化。</td>
+    </tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 First-Principles Diagnosis</div>
+    <strong>核心矛盾</strong>：无人机仿真面临三个相互制约的维度——<strong>物理保真度、计算效率、功能覆盖面</strong>。<br><br>
+    （1）<strong>物理保真度的"不可能三角"</strong>：要精确仿真旋翼气动（桨叶升力系数、诱导速度、地面效应）需要 CFD 级别的计算，但这无法实时运行。简化后的二阶质点模型虽然快，但无法反映执行器饱和、时延、模型不确定性等关键因素——而恰恰是这些因素导致了 Sim2Real Gap。<br><br>
+    （2）<strong>传感器仿真的"可控性 vs 真实性"矛盾</strong>：要评估 SLAM 算法，需要<strong>精确知道</strong>传感器噪声的统计特性（IMU 的噪声密度和随机游走、GPS 的漂移速率、相机的快门模型和畸变参数）。但 Gazebo 的传感器模型默认使用理想值——需要手动注入噪声模型并在<strong>可控范围</strong>内调节噪声强度来测试算法鲁棒性。<br><br>
+    （3）<strong>多机器人仿真的"隔离 vs 交互"平衡</strong>：每架无人机需要独立的飞控实例 + 传感器流 + 控制节点——如果共享内存/端口，会出现严重的交叉干扰（一架飞机的传感器数据被另一架的飞控误读）。ROS namespace 通过 topic 前缀隔离解决了数据隔离，但多个 PX4 实例的 MAVLink 端口分配、Gazebo 模型的 ID 冲突、协同控制节点跨 namespace 通信——这些都需要精心的工程管理。<br><br>
+    <strong>将这三点放在一起</strong>：你需要一个系统，它在物理仿真、传感器建模、多机管理三个维度上都达到"够用"的质量——同时保持模块化、可配置、开源。这不是单个技术突破能解决的，而是系统工程的综合挑战。
+  </div>
+
+  <h3>5.2 Key Challenges</h3>
+  <ul>
+    <li><strong>Challenge 1 — 动力学保真度的分级供给</strong>：如何在同一个平台内提供从"质点模型（极快但粗糙）"到"完整旋翼气动模型（精确但慢）"的连续变化？XTDrone 的答案是双模式——Simple 3D Simulator（二阶质点动力学，适合编队控制快速迭代）+ Full Gazebo Simulator（旋翼刚体动力学 + 气动模型 + 地面效应，适合感知任务精确评估）。但切换模式时，<strong>用户的 ROS 算法代码必须完全不需修改</strong>——这要求两套仿真器对外暴露完全一致的接口。</li>
+    <li><strong>Challenge 2 — 传感器噪声模型的参数化与可控性</strong>：评估视觉 SLAM 算法需要：控制光照（方向、强度、色温）、控制纹理（丰富度、重复图案）、控制运动（速度、角速度、振动）、控制相机参数（快门时间、增益、畸变、分辨率）。Gazebo 本身不提供如此精细的"视觉条件控制"——XTDrone 通过参数化 YAML 配置文件和 ROS launch 脚本，让用户在不修改 Gazebo 底层代码的情况下调整这些参数。</li>
+    <li><strong>Challenge 3 — 强化学习训练的仿真加速</strong>：RL 通常需要数百万步的训练——实时仿真（每步 1/240 秒，即 240 Hz）意味着 1 小时只能完成约 86 万步。XTDrone 的 lockstep 机制允许<strong>加速仿真速度</strong>（当计算资源足够时），从而大幅缩短训练时间。但加速仿真会增加物理求解的数值误差——需要在"速度"和"精度"之间设定合理的加速上限。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>XTDrone 的核心不是单个算法而是<strong>系统架构设计</strong>，但以下几个数学模型构成了其物理仿真和传感器建模的理论基础：(1) 多旋翼无人机刚体动力学模型（Gazebo 物理仿真的核心）；(2) 传感器噪声的随机游走模型（评估 SLAM/状态估计算法鲁棒性的关键）；(3) MAVLink HIL 消息协议（PX4 与 Gazebo 之间的数据通路）；(4) Lockstep 锁步仿真时序模型（多模块同步的关键）。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. Display formulas use <code>$$...$$</code>, inline formulas use <code>$...$</code>.</p>
+
+  <!-- Formula Group A: Quadrotor Dynamics -->
+  <h4>Group A: 四旋翼刚体动力学——Gazebo 多旋翼模型的数学基础</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — Newton-Euler 运动方程</span>
+    $$ m\ddot{\mathbf{p}} = \mathbf{R}_{IB}\,\mathbf{f}_T + m\mathbf{g} $$
+    $$ \mathbf{J}\dot{\boldsymbol{\omega}} = \boldsymbol{\tau} - \boldsymbol{\omega} \times (\mathbf{J}\boldsymbol{\omega}) $$
+    <div class="eq-note">
+      <strong>$m$</strong> = 无人机总质量（kg）&nbsp;|&nbsp;
+      <strong>$\mathbf{p} \in \mathbb{R}^3$</strong> = 惯性系下的位置 &nbsp;|&nbsp;
+      <strong>$\mathbf{R}_{IB}$</strong> = 机体坐标系到惯性坐标系的旋转矩阵（依赖姿态四元数/欧拉角）&nbsp;|&nbsp;
+      <strong>$\mathbf{f}_T = [0, 0, f_1+f_2+f_3+f_4]^T$</strong> = 四旋翼总推力（沿机体 Z 轴）&nbsp;|&nbsp;
+      <strong>$\mathbf{J}$</strong> = 转动惯量矩阵（$\mathbb{R}^{3\times 3}$）&nbsp;|&nbsp;
+      <strong>$\boldsymbol{\omega}$</strong> = 机体角速度 &nbsp;|&nbsp;
+      <strong>$\boldsymbol{\tau}$</strong> = 总力矩（含推力差动产生的滚转/俯仰力矩 + 反扭矩产生的偏航力矩）&nbsp;|&nbsp;
+      <strong>$-\boldsymbol{\omega} \times (\mathbf{J}\boldsymbol{\omega})$</strong> = 科氏/陀螺效应项（耦合横滚-俯仰-偏航通道的关键非线性）&nbsp;|&nbsp;
+      <strong>在 Gazebo 中</strong>：该模型由 ODE/Bullet/DART 物理引擎在每个仿真步内数值积分求解，推力 $\mathbf{f}_T$ 和力矩 $\boldsymbol{\tau}$ 由 PX4 混控器根据控制指令实时计算并通过 MAVLink HIL_ACTUATOR_CONTROLS 消息发送。
+    </div>
+  </div>
+
+  <!-- Formula Group B: Rotor Aerodynamics -->
+  <h4>Group B: 旋翼气动模型——单桨推力与力矩</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 单旋翼推力和反扭矩</span>
+    $$ f_i = C_T \cdot \rho \cdot A \cdot (\Omega_i R)^2 = k_T \cdot \Omega_i^2 $$
+    $$ \tau_i = C_Q \cdot \rho \cdot A \cdot R \cdot (\Omega_i R)^2 = k_Q \cdot \Omega_i^2 $$
+    <div class="eq-note">
+      <strong>$f_i$</strong> = 第 i 个旋翼产生的推力 &nbsp;|&nbsp;
+      <strong>$\tau_i$</strong> = 第 i 个旋翼的反扭矩（与旋转方向相反）&nbsp;|&nbsp;
+      <strong>$C_T$, $C_Q$</strong> = 推力系数和扭矩系数（与桨叶几何、桨距角、前进比相关）&nbsp;|&nbsp;
+      <strong>$\rho$</strong> = 空气密度（1.225 kg/m³ 标准海平面）&nbsp;|&nbsp;
+      <strong>$A = \pi R^2$</strong> = 桨盘面积 &nbsp;|&nbsp;
+      <strong>$\Omega_i$</strong> = 旋翼转速（rad/s，PX4 输出 PWM 映射到转速）&nbsp;|&nbsp;
+      <strong>简化模型</strong>：通常将 $k_T$ 和 $k_Q$ 视为常数（通过实验标定）——Gazebo 的多旋翼插件使用此简化。对于编队控制等高层算法，Simple 3D 仿真器进一步简化为<strong>二阶质点模型</strong>：$\ddot{\mathbf{p}} = \mathbf{u} / m + \mathbf{g}$，其中 $\mathbf{u} \in \mathbb{R}^3$ 为直接施加的虚拟力控制量。
+    </div>
+  </div>
+
+  <!-- Formula Group C: IMU Sensor Noise Model -->
+  <h4>Group C: 传感器噪声模型——IMU 随机误差的 Gauss-Markov 建模</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — IMU 加速度计/陀螺仪测量模型</span>
+    $$ \tilde{\mathbf{a}}(t) = \mathbf{a}(t) + \mathbf{b}_a(t) + \mathbf{n}_a(t), \quad \mathbf{n}_a \sim \mathcal{N}(0, \sigma_a^2 \cdot \Delta t^{-1}) $$
+    $$ \dot{\mathbf{b}}_a(t) = \mathbf{n}_{b_a}(t), \quad \mathbf{n}_{b_a} \sim \mathcal{N}(0, \sigma_{b_a}^2 \cdot \Delta t) $$
+    <div class="eq-note">
+      <strong>$\tilde{\mathbf{a}}$</strong> = 加速度计测量值（含噪声）&nbsp;|&nbsp;
+      <strong>$\mathbf{a}$</strong> = 真实加速度（机体坐标系，含重力投影）&nbsp;|&nbsp;
+      <strong>$\mathbf{b}_a$</strong> = 加速度计偏置（slowly-varying bias，建模为随机游走——导数为白噪声）&nbsp;|&nbsp;
+      <strong>$\mathbf{n}_a$</strong> = 加速度计白噪声（测量噪声）&nbsp;|&nbsp;
+      <strong>$\sigma_a$</strong> = 噪声密度（NoiseDensity，单位：$m/s^2/\sqrt{Hz}$）&nbsp;|&nbsp;
+      <strong>$\sigma_{b_a}$</strong> = 随机游走标准差（RandomWalk，单位：$m/s^3/\sqrt{Hz}$）&nbsp;|&nbsp;
+      <strong>陀螺仪方程同构</strong>：$\tilde{\boldsymbol{\omega}} = \boldsymbol{\omega} + \mathbf{b}_g + \mathbf{n}_g$，参数 $\sigma_g$ 和 $\sigma_{b_g}$ &nbsp;|&nbsp;
+      <strong>在 XTDrone 中</strong>：用户在 YAML 配置文件中指定 $\sigma_a, \sigma_{b_a}, \sigma_g, \sigma_{b_g}$——Gazebo 在每次传感器更新时注入对应的高斯噪声。这使得研究者可以<strong>系统性地改变噪声水平</strong>来测试 SLAM/EKF 的鲁棒性边界。
+    </div>
+  </div>
+
+  <!-- Formula Group D: MAVLink + Lockstep -->
+  <h4>Group D: Lockstep 锁步仿真——时序同步与速度调节</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — Lockstep 时序模型</span>
+    $$ t_{\text{sim}}^{(k+1)} = t_{\text{sim}}^{(k)} + \Delta t_{\text{sim}}, \quad \Delta t_{\text{sim}} = \lambda \cdot \Delta t_{\text{real}}^{(k)} $$
+    $$ \text{subject to:} \quad \lambda \in (0, \lambda_{\max}], \quad \lambda_{\max} \propto \frac{\text{CPU budget}}{\text{simulation workload per step}} $$
+    <div class="eq-note">
+      <strong>$t_{\text{sim}}^{(k)}$</strong> = 第 k 步的仿真时间 &nbsp;|&nbsp;
+      <strong>$\Delta t_{\text{sim}}$</strong> = 仿真步长（在 Gazebo 中通常为 1~4 ms）&nbsp;|&nbsp;
+      <strong>$\lambda$</strong> = 仿真加速比（$\lambda > 1$ = 仿真比真实时间快，$\lambda < 1$ = 仿真比真实时间慢）&nbsp;|&nbsp;
+      <strong>$\lambda_{\max}$</strong> = 最大加速比——受限于物理求解器的时间步长约束（CFL-like 条件）：$\Delta t_{\text{sim}}$ 必须小于系统最快动态的半周期（对于多旋翼，约 1~2 ms 对应最大控制频率 500~1000 Hz）&nbsp;|&nbsp;
+      <strong>Lockstep 的核心保证</strong>：在每一步内，<strong>传感器数据产生 -> 飞控解算 -> 执行器指令 -> 物理更新</strong>严格按顺序执行，不存在时序错乱（如传感器读到"未来"的物理状态）——这是仿真-实物一致性的底层保障。PX4 SITL 通过 MAVLink 的 <code>HIL_SENSOR</code> 和 <code>HIL_ACTUATOR_CONTROLS</code> 消息与 Gazebo 在每步同步握手。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>Parameter</th><th>Typical Value</th><th>Meaning</th><th>Why This Value</th></tr>
+    <tr><td>Gazebo physics step</td><td><strong>1~4 ms</strong> (250~1000 Hz)</td><td>Physics engine integration timestep</td><td>Smaller step = higher accuracy = greater computational cost. 1 ms is sufficient for multi-rotor dynamics (Nyquist: 500 Hz captures fastest dynamics), 4 ms suitable for low-performance machines</td></tr>
+    <tr><td>PX4 SITL control frequency</td><td><strong>250 Hz</strong> (4 ms period)</td><td>Angular rate control loop frequency</td><td>PX4 default. Attitude loop 50 Hz, position loop 20 Hz. 250 Hz rate loop is adequate for multi-rotor fast dynamics</td></tr>
+    <tr><td>IMU update rate</td><td><strong>250~1000 Hz</strong></td><td>Accelerometer and gyroscope sampling rate</td><td>Must be at least the control frequency to avoid aliasing. Gazebo sensor update rate can match PX4 SITL IMU read rate</td></tr>
+    <tr><td>Camera frame rate / resolution</td><td><strong>30 Hz / 640x480 to 1920x1080</strong></td><td>RGB/depth camera output parameters</td><td>Frame rate affects SLAM tracking stability (30 Hz is minimum recommended for ORB-SLAM). Resolution affects feature detection quality — higher resolution improves accuracy but increases computational load</td></tr>
+    <tr><td>MAVLink baud rate</td><td><strong>57600 ~ 921600 bps</strong></td><td>Serial communication rate between PX4 and Gazebo/GCS</td><td>SITL mode uses TCP/UDP virtual port with no physical baud rate limit. But message packing frequency is limited by MAVLink message length and system scheduling</td></tr>
+    <tr><td>Multi-UAV MAVLink port assignment</td><td><strong>UAV i: 14540+(i-1)*10</strong></td><td>Unique UDP/TCP port per UAV</td><td>PX4 SITL default starts from 14540 incrementing. XTDrone assigns unique ports per UAV in launch files to avoid MAVLink message crosstalk</td></tr>
+    <tr><td>Simple 3D controller frequency</td><td><strong>50~100 Hz</strong></td><td>Position/velocity control loop in simple simulator</td><td>Simple simulator bypasses PX4 SITL, applies virtual control forces directly on point-mass model. Lower frequency than full sim but sufficient for formation control logic verification</td></tr>
+  </table>
+
+  <h3>6.4 Simple 3D Simulator vs Full Gazebo</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>Simple 3D Simulator (Rapid Prototype)</h4>
+      <ul>
+        <li>Dynamics: <strong>2nd-order point-mass</strong> $m\ddot{\mathbf{p}} = \mathbf{u} + m\mathbf{g}$</li>
+        <li>No rotor aerodynamics, no sensor noise, no 3D rendering</li>
+        <li>Rviz for 2D/3D trajectory visualization</li>
+        <li>Minimal computational cost (CPU only, no GPU needed)</li>
+        <li>Suitable for: <strong>formation control, path planning, multi-agent logic verification</strong></li>
+        <li>Not suitable for: SLAM, visual detection, any task requiring sensor feedback</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>Full Gazebo Simulator (High-Fidelity Validation)</h4>
+      <ul>
+        <li>Dynamics: <strong>6-DOF rigid body + rotor aero + ground effect</strong></li>
+        <li>Complete sensor suite with parameterized noise</li>
+        <li>Gazebo GUI renders realistic 3D scenes</li>
+        <li>High computational cost (GPU rendering + CPU physics solving)</li>
+        <li>Suitable for: <strong>visual SLAM, object detection/tracking, state estimation robustness evaluation</strong></li>
+        <li>Transferable to real hardware (PX4 SITL = real flight control code)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 XTDrone 需要掌握三个关键基础技术：Gazebo 物理引擎（如何仿真无人机运动和传感器）、PX4 SITL 架构（如何在仿真中运行真实飞控代码）、ROS 通信中间件（如何连接和解耦各个模块）。</p>
+
+  <h3>7.1 Gazebo 物理引擎 — 多旋翼仿真的力学基础</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">Principle 1 — Gazebo Physics Simulation Loop</span>
+    $$ \text{for each time step } \Delta t: \quad \mathbf{x}_{t+\Delta t} = \text{Integrator}\left(\mathbf{x}_t, \mathbf{F}(\mathbf{x}_t, \mathbf{u}_t), \Delta t\right) $$
+    <div class="eq-note">
+      <strong>$\mathbf{x}$</strong> = 系统状态向量（位置、姿态、线速度、角速度）&nbsp;|&nbsp;
+      <strong>$\mathbf{F}$</strong> = 施加在刚体上的所有力和力矩之和（推力、重力、阻力、接触力）&nbsp;|&nbsp;
+      <strong>$\mathbf{u}_t$</strong> = 控制输入（由 PX4 混控器计算并通过 MAVLink 发送）&nbsp;|&nbsp;
+      <strong>Integrator</strong> = 数值积分方法（ODE 引擎默认使用 QuickStep 求解器——一种约束力混合方法：先用 Lagrange 乘子法求解关节约束，再对自由运动做半隐式 Euler 积分）&nbsp;|&nbsp;
+      <strong>多旋翼插件（multirotor_base）</strong>：Gazebo 内置的旋翼模型将每个电机建模为一个力/力矩发生器——推力 $f_i = k_T\Omega_i^2$ 沿桨毂轴，扭矩 $k_Q\Omega_i^2$ 绕桨毂轴反向。
+    </div>
+  </div>
+
+  <p><strong>Gazebo 传感器模型的工作原理</strong>：传感器的仿真不是简单的"从真值加噪声"——相机仿真通过 GPU 渲染器从三维场景生成图像（支持 RGB/深度/语义分割），IMU 仿真从物理引擎的加速度和角速度真值加噪声模型（Gauss-Markov 随机游走），GPS 仿真在真实位置上加时间相关漂移，激光雷达通过 ray-casting 在场景中投射射线模拟测距。这意味着 <strong>SLAM 算法在 XTDrone 中看到的输入数据与在真实无人机上通过 ROS topic 接收的数据格式完全一致</strong>——这是 Sim2Real 的底层保证。</p>
+
+  <div class="callout info">
+    <div class="callout-title">📌 Gazebo 可选的物理引擎</div>
+    XTDrone 支持 Gazebo 的三个物理引擎后端：<strong>ODE</strong>（默认，速度快，精度满足大多数场景）、<strong>Bullet</strong>（接触碰撞处理更佳，适用于有大量障碍物的场景）、<strong>DART</strong>（关节模型更精确，适用于带机械臂的复合机器人）。用户根据仿真精度和速度需求选择——只需在 Gazebo 启动参数中切换。
+  </div>
+
+  <h3>7.2 PX4 SITL 架构 — 为什么仿真代码等于实物代码</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">Principle 2 — PX4 SITL Code Sharing Mechanism</span>
+    $$ \text{PX4\_SITL} = \text{PX4\_Flight\_Stack} + \text{SITL\_Driver}(\text{MAVLink}) $$
+    <div class="eq-note">
+      <strong>PX4_Flight_Stack</strong> = PX4 的完整飞控栈（传感器驱动 -> EKF2 状态估计 -> 级联 PID 控制器 -> 混控器 -> 电机输出），<strong>在 SITL 和真实 Pixhawk 硬件上是编译自同一份 C++ 源代码</strong>。唯一的区别是最底层的驱动层：真实硬件通过 SPI/I2C/UART 读取物理传感器和写入 PWM；SITL 通过 MAVLink 从 Gazebo 接收虚拟传感器数据并发送虚拟执行器指令。&nbsp;|&nbsp;
+      <strong>关键意义</strong>：任何控制增益调整、状态估计器参数调优、混控器配置——只要在 XTDrone 中验证通过，就可以通过相同的参数文件直接烧录到 Pixhawk 飞控上。仿真到实物的"参数迁移"是零摩擦的。
+    </div>
+  </div>
+
+  <p><strong>PX4 SITL 的多实例机制</strong>：每个 PX4 SITL 实例是一个独立的进程，拥有唯一的 SYS_ID（MAVLink 系统 ID）和独立的 UDP 端口。XTDrone 为每架无人机启动一个 PX4 SITL 进程——每个进程维护自己的 EKF2 状态（位姿、速度、偏置估计）和控制器状态。这种<strong>进程级隔离</strong>保证了多机仿真中飞控行为与单机完全一致——不存在状态污染。</p>
+
+  <div class="callout danger">
+    <div class="callout-title">⚠ 常见陷阱：SITL 与 Real HW 的微小差异</div>
+    虽然飞控代码相同，但 PX4 SITL 运行在 Linux 非实时调度下（控制周期有 jitter），而 Pixhawk 运行在 NuttX RTOS 上（控制周期严格固定）。对于高频控制器（>200 Hz 角速率环），这种时序抖动可能导致仿真结果比实物<strong>略差</strong>（因为 jitter 引入了额外的控制噪声）。测试发现差异在低速悬停时小于 5%，但在高速机动时可能达到 10~15%。论文未深入讨论这一点。
+  </div>
+
+  <h3>7.3 ROS 通信中间件 — 模块解耦和灵活替换的基础</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">Principle 3 — ROS Publish-Subscribe + MAVROS Bridge</span>
+    $$ \text{Algorithm Node} \xrightarrow[\text{Topic}]{\text{Publish}} \text{MAVROS} \xrightarrow[\text{MAVLink}]{\text{Serial}} \text{PX4 SITL} $$
+    $$ \text{PX4 SITL} \xrightarrow[\text{Topic}]{\text{Publish}} \text{MAVROS} \xrightarrow[\text{Topic}]{\text{Subscribe}} \text{Algorithm Node} $$
+    <div class="eq-note">
+      <strong>ROS Topic</strong> = 异步消息通道（命名总线），发布者和订阅者无需知道对方的存在——只需约定 topic 名称和消息类型。XTDrone 的标准约定：<code>/uavX/mavros/setpoint_position/local</code>（发送位置指令），<code>/uavX/mavros/local_position/pose</code>（接收位姿估计），<code>/uavX/camera/rgb/image_raw</code>（接收相机图像）&nbsp;|&nbsp;
+      <strong>MAVROS</strong> = ROS 节点，负责 ROS 消息和 MAVLink 消息的双向转换，并管理 PX4 的状态机（offboard 模式切换、arming、takeoff/land 等）&nbsp;|&nbsp;
+      <strong>核心优势</strong>：用户算法节点完全不知道底层是 PX4 SITL 还是真实 PX4 硬件——因为 MAVROS 为两者提供了相同的 ROS topic 和 service 接口。这意味着 <strong>同一份 ROS 算法代码可以不加修改地在仿真和实物之间切换</strong>。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    Gazebo 提供物理世界和传感器的数字孪生（可配置保真度），PX4 SITL 保证飞控代码的仿真-实物一致性（零修改迁移），ROS 提供模块化通信框架（任意替换感知/规划/控制模块）——<strong>三者各自解决一个维度的解耦问题，组合在一起形成完整的"算法开发 -> 仿真验证 -> 实物部署"管道</strong>。任何一个原理的缺失都会导致管道断裂：没有 Gazebo -> 无法仿真感知任务；没有 PX4 SITL -> 仿真结果不能迁移；没有 ROS -> 模块无法独立替换。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">XTDrone 整体架构（三层结构 + 模块关系 + 通信协议）</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-1-context.png" alt="XTDrone overall architecture diagram"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-1-context.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：XTDrone 的完整系统架构——通过颜色编码区分三个子系统：(a) 蓝色模块 = Gazebo 仿真引擎（多旋翼动力学模型、传感器模型——IMU/GPS/相机/激光雷达、三维场景）。(b) 黄色模块 = PX4 SITL 飞控栈（EKF2 状态估计器、级联 PID 控制器、混控器）——运行在主机上但编译的是与真实飞控完全相同的 C++ 代码。(c) 浅橙色模块 = ROS 上层算法节点（MAVROS 桥接、SLAM 节点、目标检测、运动规划、编队控制、强化学习 Gym 接口）。</p>
+      <ul>
+        <li><strong>通信链路的完整闭环</strong>：Gazebo 传感器 -> MAVLink -> PX4 EKF2 -> 状态估计 -> MAVROS -> ROS 算法节点 -> 控制指令 -> MAVROS -> MAVLink -> PX4 控制器 -> MAVLink -> Gazebo 执行器。这是一个完整的<strong>感知-估计-决策-控制-执行</strong>回路。</li>
+        <li><strong>分层的深层含义</strong>：三层之间的接口完全标准化——用户可以在 ROS 层替换 ORB-SLAM2 为 VINS-Mono，或者在 PX4 层替换 EKF2 为其他估计器，而其他层的代码完全不受影响。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">Case Study 1: 视觉 SLAM 算法评估——从仿真数据采集到 EVO 精度分析的完整流水线</span>
+      <span class="fig-source">来源：论文 Case Study 章节</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-2-slam.png" alt="Visual SLAM evaluation pipeline"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-2-slam.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本案例展示了</strong>：XTDrone 如何用于严格评估视觉 SLAM 算法。整个流程：(1) 配置传感器噪声参数（IMU 噪声密度/随机游走、相机分辨率/帧率）-> (2) 运行 SLAM 算法（ORB-SLAM2/3 或 VINS-Mono/Fusion）-> (3) 记录轨迹估计和 ground truth -> (4) 使用 EVO 工具计算绝对轨迹误差（ATE）和相对位姿误差（RPE）。</p>
+      <ul>
+        <li><strong>可控条件评估的价值</strong>：在真实实验中很难系统性改变光照、纹理、运动速度——但在 XTDrone 中这些都可以通过参数文件精确控制。研究者可以绘制"定位精度 vs 光照强度"或"跟踪成功率 vs 运动速度"等曲线——这在真实实验中几乎不可能做到。</li>
+        <li><strong>仿真-实物对齐的证据</strong>：PX4 的 EKF2 过滤后的位姿作为 ground truth（因为 PX4 在仿真中知道"真实"状态）——这使得 ATE/RPE 的计算具有确切的参考值，而不是真实实验中只能依赖昂贵的外部动捕系统。</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">Case Study 2: 多无人机编队控制——Simple 3D 快速原型到 Full Gazebo 高保真验证的渐进式流程</span>
+      <span class="fig-source">来源：论文 Case Study 章节</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-3-formation.png" alt="Multi-UAV formation control demonstration"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-3-formation.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本案例展示了</strong>：XTDrone 的渐进式验证方法论：(1) 首先在 Simple 3D Simulator（质点动力学）中快速开发和调试编队控制算法——因为场景简单、无传感器噪声、计算极快，可以快速迭代控制律参数。(2) 编队逻辑验证通过后，将<strong>同一套 ROS 控制代码</strong>部署到 Full Gazebo 仿真器中——此时无人机具有完整的刚体动力学、气动效应、传感器噪声和三维可视化。(3) 最终可进一步部署到真实无人机上——因为 PX4 SITL 与真实飞控代码完全一致。</p>
+      <ul>
+        <li><strong>编队控制验证的三个关键指标</strong>：编队形状保持误差（formation shape error）、速度一致性误差（velocity consensus error）、碰撞避免性能（collision avoidance rate）</li>
+        <li><strong>Simple -> Full -> Real 的三级验证方法</strong>是 XTDrone 最具实用价值的设计思想——它解决了"仿真中验证快但不可靠、实物中可靠但成本高"的矛盾</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">跨域多机器人协同：UAV + UGV + USV 在同一 Gazebo 场景中的联合仿真</span>
+      <span class="fig-source">来源：论文 System Architecture 章节</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-4-multirobot.png" alt="Multi-robot cross-domain coordination"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-4-multirobot.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：XTDrone 支持的跨域多机器人协同仿真——无人机（UAV）、地面机器人（UGV）、水面机器人（USV）可以在同一个 Gazebo 场景中运行，各自使用独立的 ROS namespace 和 PX4 SITL 实例（如适用），通过 ROS topic 实现跨域通信和协同任务规划。</p>
+      <ul>
+        <li><strong>跨域协同的技术挑战</strong>：不同类型的机器人有不同的动力学模型（旋翼 vs 轮式 vs 水面）、不同的传感器配置（空中相机 vs 地面 LiDAR vs 水面 sonar）、不同的控制接口（PX4 offboard vs ROS move_base vs 自定义控制器）——XTDrone 通过统一的 ROS topic 接口抽象了这些差异</li>
+        <li><strong>典型应用场景</strong>：无人机提供空中视觉侦察 -> 将目标位置通过 ROS topic 广播 -> 地面机器人接收位置后规划路径前往目标 -> 水面机器人提供水域侧应。这种 <strong>空-地-水 三位一体的协同仿真</strong>在单一仿真平台中此前极为罕见。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) PX4 SITL 的飞控代码与真实飞控完全相同——这在理论上成立，但忽略了真实飞行中的硬件差异：Pixhawk 的实时操作系统（NuttX）与 SITL 运行的 Linux 在调度精度、中断响应时间上存在差异，导致时序敏感的控制器（如高频角速率环）在仿真和实物上表现略有不同；(2) Gazebo 的旋翼气动模型采用 $f_i = k_T\Omega_i^2$ 的静态映射——忽略了桨叶挥舞（blade flapping）、诱导速度的非均匀分布、桨尖涡等复杂气动效应，在高速机动飞行时误差会增大；(3) 假设 MAVLink 通信零延迟——在 SITL 模式下数据通过 localhost TCP/UDP 传输确实接近零延迟，但真实飞行中 MAVLink 数传延迟可达 10~100 ms（取决于数传模块带宽和距离）。</li>
+    <li><strong>适用场景</strong>：XTDrone 最适用于以下场景的仿真验证——(a) 视觉/激光 SLAM 算法评估，(b) 目标检测与跟踪，(c) 运动规划与避障，(d) 多机编队与协同，(e) 强化学习训练。不太适用于：(a) 高速特技飞行（气动模型过于简化），(b) 精确的电池/能耗仿真（无电池电化学模型），(c) 毫米级精度的着陆控制（地面效应和接触动力学简化），(d) 通信受限环境下的多机协同（未仿真 MAVLink 丢包和延时）。</li>
+    <li><strong>可扩展性</strong>：平台支持最多 N 架无人机，但每增加一架就增加一个 PX4 SITL 进程、一个 MAVROS 实例、一组传感器 topic——对 CPU 和内存的压力线性增长。当 N > 10 时，大多数台式机将难以维持实时仿真。此外，多机视觉 SLAM 需要每架无人机渲染独立视角——GPU 负担随无人机数量倍增。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：(1) 引入更精确的气动模型——用 CFD 数据或 Blade Element Momentum Theory 替换简化推力模型，使高速机动和特技飞行仿真更真实；(2) 仿真通信受限——加入可配置的 MAVLink 丢包率、延时分布和带宽限制，以评估通信退化条件下的多机控制性能；(3) 引入天气和环境影响——可变风场（阵风、切变风）、光照变化（日出日落、云层）、降雨/雾（影响相机和激光雷达）。</li>
+    <li><strong>条件放松</strong>：(1) 分布式仿真——将不同无人机的 PX4 SITL 和 Gazebo 渲染分摊到多台计算机上（ROS 原生支持分布式节点），使大规模集群仿真（N>20）成为可能；(2) Docker 容器化——将 PX4 SITL + MAVROS + 算法节点打包为容器镜像，实现一键部署和可复现实验环境；(3) 云端仿真——将 Gazebo headless（无 GUI）部署在云服务器上，通过 Web 界面远程提交实验和查看结果。</li>
+    <li><strong>约束加入</strong>：(1) 加入更全面的评估工具——除 EVO 外，集成不同场景（室内/室外/城市/森林）的标准化 benchmark；(2) 加入故障注入——仿真传感器故障（IMU 漂移、GPS 丢失、相机遮挡）和执行器故障（电机失效、桨叶损伤），以评估系统的容错和故障恢复能力；(3) 加入更细粒度的飞控性能分析——记录 EKF 的创新序列（innovation）和协方差，可视化控制器饱和情况。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>Data Issue</th><th>Potential Difficulty</th><th>Severity</th></tr>
+    <tr><td>物理引擎的数值误差累积</td><td>Long-horizon 仿真中（模拟 30 分钟以上飞行），Gazebo 的浮点积分误差会导致无人机位置缓慢漂移（即使控制指令为零）。虽然 PX4 的 EKF2 会用 GPS 做 global 修正，但纯惯性导航模式下的漂移比真实世界严重。解决方案：使用双精度物理求解器或定期重启仿真。</td><td>★★★★</td></tr>
+    <tr><td>Gazebo 传感器模型与真实传感器的 domain gap</td><td>Gazebo 渲染的相机图像在纹理、光照模型、镜头畸变、运动模糊、HDR 响应等方面与真实相机存在显著差异——导致基于视觉的 SLAM 和控制策略在仿真中表现优异但实物中退化。缓解手段：使用 domain randomization（随机化纹理/光照/颜色）和 GAN-based sim2real transfer</td><td>★★★★★</td></tr>
+    <tr><td>PX4 SITL 与真实 Pixhawk 的时序差异</td><td>PX4 SITL 运行在 Linux 的非实时调度下——控制周期可能因系统负载而抖动（jitter）。真实 Pixhawk 运行在 NuttX RTOS 上，控制周期严格固定。对于高频控制器（>200 Hz），这种 jitter 可能导致仿真和实物行为差异</td><td>★★★</td></tr>
+    <tr><td>多机仿真时的资源竞争</td><td>当 N 架无人机同时运行 PX4 SITL + MAVROS + SLAM 节点时，所有进程竞争 CPU 核心——可能导致某架无人机的飞控计算延迟，引起仿真失步。需要在 launch 文件中合理设置 CPU affinity（进程绑核）</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>基于 XTDrone 的 Sim2Real Transfer Benchmark</strong>——当前 UAV 领域缺乏一个标准化的 Sim2Real 迁移能力评估基准。可以设计一套实验：(1) 在 XTDrone 中训练 N 种不同架构的强化学习控制器或 SLAM 系统，(2) 在同一场景的真实无人机上测试，(3) 量化每种算法/训练策略的 Sim2Real Gap，(4) 分析哪些因素（动力学准确性、传感器 domain gap、控制频率、噪声模型）对 Gap 贡献最大。这将产生一个对全领域具有指导意义的"仿真保真度需求矩阵"——告诉研究者为达到预期的 Sim2Real 迁移效果，需要在哪些仿真维度上投入多少计算/建模资源。这个问题比开发新算法更底层、更基础。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>无人机研究者需要一个实验环境来开发和验证算法——但真实飞行实验（a）成本高（一架带传感器的无人机数万元起步），（b）风险大（调试中的算法可能导致炸机），（c）效率低（充电、部署、回收耗时，一天只能做几十次实验），（d）不可控（天气、光照、风的随机变化使得实验结果难以比较）。仿真可以解决——但现有仿真工具各自有短板。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>四条路线：（i）纯 MATLAB/Python 数值仿真——精确但无感知能力，永远停留在"数字验证"阶段；（ii）AirSim——视觉好但动力学简化、缺少飞控集成、不支持 SLAM 闭环评估；（iii）Gazebo 裸用——物理和传感器好但需要手动搭建与 PX4 的桥接和 Mavros 配置，没有标准化多机支持；（iv）PX4 自带 jMAVSim——飞控集成好但无传感器、无场景、无感知能力。</li>
+    <li><strong>如果直接打通 ROS + Gazebo + PX4 的全栈呢？</strong><br>ROS 已经是最流行的机器人中间件（大量 SLAM/规划/控制库），Gazebo 是最流行的机器人仿真器（物理引擎 + 传感器 + 场景），PX4 是最流行的开源飞控（工业级状态估计和控制）。三者各自强大但<strong>缺乏一个将它们串联成统一管道的"连接器"</strong>。XTDrone 的洞察：做这个连接器——不是重新发明轮子，而是让三个最好的轮子<strong>一起转</strong>。</li>
+    <li><strong>如果还不够，还需要什么？</strong><br>多机支持——单人操作多架无人机的真实实验几乎不可能（FAA/民航规定、安全风险、同步操作难度），但多机协同正成为 UAV 研究的最活跃方向。ROS namespace 提供了天然的多机隔离机制——只需要在 launch 文件中为每架飞机实例化一套 MAVROS + PX4 SITL + 传感器模型，并分配唯一的端口和 ID。</li>
+    <li><strong>最简单的方案是什么？</strong><br>下载 XTDrone 源码 -> 安装依赖（ROS + Gazebo + PX4）-> 运行一键启动脚本 -> 无人机出现在 Gazebo 场景中 -> 通过 ROS topic 发送 setpoint -> 无人机开始飞行 -> 用 Rviz 看 SLAM 轨迹 -> 用 EVO 评估精度。整个过程无需真实硬件、无需外部定位系统、无需担心炸机。这就是 XTDrone 的核心价值：<strong>将无人机算法开发从"高风险高门槛的硬件实验"变为"低风险低门槛的软件迭代"</strong>。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    做无人机算法研究最痛苦的事莫过于——花三个月写了个 SLAM 系统，结果需要买一架飞机、装一套动捕系统、等一个好天气才能飞一次验证——那为什么不用 ROS + Gazebo + PX4 搭一个<strong>什么都能仿真、代码一行不改就能迁移到真机</strong>的平台，让所有研究者都能专注于算法而不是折腾硬件？
+  </div>
+
+  <h3>10.3 How You Would Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察痛点</strong>：每个做无人机仿真的实验室都在重复做同一件事——折腾 Gazebo 模型、调 MAVLink 参数、写 ROS launch 脚本、处理多机端口冲突。这不是"科研"，但每个新人都要踩一遍坑。这不是个人能力问题，是<strong>缺乏标准化基础设施</strong>的问题。</li>
+    <li><strong>Step 2 — 识别组件</strong>：ROS（通信框架）+ Gazebo（物理仿真）+ PX4（真实飞控）——这三个都是各自领域的最佳选择，且有成熟的开源社区支持。问题是它们之间的"接口层"没有被系统性地设计和文档化。</li>
+    <li><strong>Step 3 — 设计接口</strong>：MAVLink 是 PX4 的"母语"——让 Gazebo 学会说 MAVLink（HIL_SENSOR/HIL_ACTUATOR 消息）；MAVROS 是 ROS 的"翻译官"——让 PX4 的状态和控制指令通过 ROS topic 暴露给算法节点。Namespace 是 ROS 的"隔离墙"——让 N 架飞机互不干扰。</li>
+    <li><strong>Step 4 — 验证价值</strong>：做两个 case study——(1) 视觉 SLAM 评估：用 ORB-SLAM2 和 VINS-Mono 在相同仿真条件下对比 ATE/RPE，任何人都能复现；(2) 编队控制：用 Simple 3D 快速调参，用 Full Gazebo 精确验证，两套仿真器共用同一份控制代码。这两个案例覆盖了从单机感知到多机协同的最典型研究场景。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：XTDrone 是一个教科书级的<strong>"站在巨人肩膀上"</strong>案例——不是自己写物理引擎、不是自己写飞控、不是自己写 SLAM，而是把三个各自最好的开源项目（ROS、Gazebo、PX4）通过标准化接口连接起来。对于 UAV 领域的启示：<strong>不要重复造轮子，要造能让所有轮子一起转的"传动轴"</strong>。在开源时代，最有价值的贡献往往不是"我做得更好"，而是"我把最好的东西整合得让所有人都能用"。</li>
+    <li><strong>技术技巧层面</strong>：(1) PX4 SITL 是消除 Sim2Real Gap 的最强武器——因为飞控代码在仿真和实物上完全一致，控制参数可以零修改迁移；(2) ROS namespace 是多机仿真的最优解——不需要修改任何代码，只需要在 launch 文件中通过 group 标签或 ns 参数为每架飞机创建独立空间；(3) Simple 3D + Full Gazebo 的<strong>双模式设计</strong>极其实用——相当于"草稿纸 vs 精雕版"，先快速试错再精细验证，极大提升了开发效率；(4) Lockstep 机制虽然牺牲了"实时性"，但换来了<strong>仿真速度可控 + 多模块严格同步</strong>——对于需要大量数据采集的 SLAM 评估和 RL 训练，加速仿真几乎是必需品。</li>
+    <li><strong>工程/写作层面</strong>：论文的图 1（总体架构图）用颜色和框线在一个视图中传达了所有关键信息——谁是物理引擎层、谁是飞控层、谁是算法层、它们之间的通信协议是什么。写系统基础设施类论文时，<strong>第一张图必须让读者在 30 秒内理解"这个系统如何运作"</strong>——如果第一张图需要读文字才能理解，那么这张图就失败了。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 多机协同方向</strong>：XTDrone 提供了一个<strong>可立即使用的多机仿真环境</strong>——不需要从零搭建 Gazebo 多机场景。可以直接编写多机协同控制/分布式 SLAM/协同探测的 ROS 节点，通过 namespace 注入控制指令并接收传感器数据。这为"先做仿真验证、再上真实飞行"的科研流程提供了完整的技术栈支持。</li>
+    <li><strong>对于 SLAM / 视觉导航方向</strong>：XTDrone 的传感器噪声可控性是一个被低估的优势——可以系统性地测试 SLAM 算法在不同 IMU 噪声水平、不同相机帧率、不同运动模式下的性能边界，生成"算法鲁棒性热力图"。这种<strong>参数化的 ablation study</strong> 在真实实验中几乎不可能实现——但在 XTDrone 中只需修改一个 YAML 文件。</li>
+    <li><strong>对于强化学习方向</strong>：XTDrone 的 Gym 接口意味着可以直接用现有的 RL 库（Stable-Baselines3、RLlib 等）在无人机任务上训练策略。Lockstep 的加速能力可以大幅缩短训练时间。更重要的是——训练出的策略可以通过 PX4 SITL 直接迁移到真实飞控硬件测试，这是绝大多数 RL 仿真平台做不到的。</li>
+    <li><strong>对于跨域协同方向</strong>：XTDrone 支持 UAV + UGV + USV 的联合仿真——这意味着可以做<strong>空地协同搜索、海空联合巡逻</strong>等跨域任务的算法开发。当前 UAV 领域的跨域协同研究大多停留在纯数值仿真——XTDrone 提供了带物理引擎和传感器仿真的更真实环境。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>References</th><th>Why Important</th></tr>
+    <tr><td>PX4 Autopilot — <em>https://px4.io</em> (Meier et al.)</td><td>XTDrone 的飞控核心。PX4 是目前最广泛使用的开源无人机飞控——理解其 SITL 架构、EKF2 状态估计器、MAVLink 协议和 Offboard 模式是使用 XTDrone 的前提。特别是 EKF2 的多传感器融合策略（IMU + GPS + 视觉 + 磁力计）——在 XTDrone 中这些传感器都由 Gazebo 仿真提供。</td></tr>
+    <tr><td>Gazebo Simulator — <em>http://gazebosim.org</em> (Koenig and Howard, 2004)</td><td>XTDrone 的仿真引擎。Gazebo 的多旋翼插件（multirotor_base）和传感器模型库是理解 XTDrone 物理层的关键。特别是 sensor noise model 的实现——IMU 的 Gauss-Markov 随机游走、相机的畸变模型——这些直接决定了 SLAM 评估的真实度。</td></tr>
+    <tr><td>MAVLink Protocol — <em>https://mavlink.io</em></td><td>XTDrone 中 PX4 与 Gazebo 的通信协议。HIL_SENSOR（传感器数据）、HIL_GPS（GPS 数据）、HIL_ACTUATOR_CONTROLS（执行器指令）、HIL_OPTICAL_FLOW（光流数据）——这些 MAVLink 消息定义了仿真-飞控之间的数据通路。理解 MAVLink 消息的打包格式和频率限制对于调试仿真时序问题至关重要。</td></tr>
+    <tr><td>MAVROS — <em>http://wiki.ros.org/mavros</em></td><td>XTDrone 中 PX4 与 ROS 的桥接层。MAVROS 将 MAVLink 消息转换为 ROS topic/service——这是用户算法节点与飞控交互的唯一接口。理解 MAVROS 的 setpoint 插件（位置/速度/加速度/姿态指令）和状态 topic（local_position、imu/data、extended_state）是编写 XTDrone 控制代码的基础。</td></tr>
+    <tr><td>ORB-SLAM2/3 (Mur-Artal et al., 2015/2021) — IEEE T-RO</td><td>XTDrone 的 SLAM 评估案例中使用的视觉 SLAM 系统。理解 ORB-SLAM 的输入要求（相机内参、帧率、分辨率、IMU 同步）和输出（相机轨迹、地图点、回环检测）——是为了在 XTDrone 中正确配置传感器参数和评估标准。</td></tr>
+    <tr><td>VINS-Mono/Fusion (Qin et al., 2018/2019)</td><td>XTDrone 支持的另一种主流 VIO/SLAM 系统。VINS-Fusion 支持双目和 GPS 融合——在 XTDrone 中可以测试"单目 VIO vs 双目 VIO vs GPS-VIO 融合"在相同仿真条件下的精度差异。</td></tr>
+    <tr><td>Reinforcement Learning with Gym — <em>OpenAI Gym (Brockman et al., 2016)</em></td><td>XTDrone 的 Gym 接口允许将无人机控制任务表述为标准 RL 环境——observation（传感器数据/状态估计）、action（位置/速度/姿态指令）、reward（任务目标函数）——使用任何 Gym 兼容的 RL 库进行训练。这打开了将深度强化学习应用于无人机自主飞行的大门。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Xiao et al. · 2020 · XTDrone — A Customizable Multi-Rotor UAVs Simulation Platform · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

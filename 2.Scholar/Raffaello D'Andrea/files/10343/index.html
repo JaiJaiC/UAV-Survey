@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes - Reinforcement learning-based control for an inline skating humanoid robot</title>
+
+<script>
+
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 files · 7-note reading path</div>
+    <div class="series-links">
+
+<a href="../../index.html">Index</a>      <a href="../10342/index.html">10342</a>      <a class="active" href="../10343/index.html">10343</a>      <a href="../10344/index.html">10344</a>      <a href="../10345/index.html">10345</a>      <a href="../10346/index.html">10346</a>      <a href="../10347/index.html">10347</a>      <a href="../10348/index.html">10348</a>
+    </div>
+  </div>
+
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Reinforcement Learning-Based Control for an Inline Skating Humanoid Robot</td></tr>
+    <tr><td><strong>作者</strong></td><td>Ethan Marot¹, Thomas Bi¹, Clemens Schwarke², Victor Klemm², Marco Hutter², <strong class="bold-affil">Raffaello D'Andrea</strong>¹</td></tr>
+    <tr><td><strong>单位</strong></td><td>¹ Institute for Dynamic Systems and Control (IDSC), ETH Zurich; ² Robotic Systems Lab (RSL), ETH Zurich</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">2026 (arXiv / 机器人学顶级会议投稿)</strong></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>首次利用深度强化学习（PPO）在仿真中训练人形机器人（Booster T1）穿戴消费级直排轮滑鞋完成轮滑运动，并通过零样本 sim-to-real 迁移在真实硬件上实现流畅的滑行、转向与动态平衡。核心创新在于使用不同几何基元（球形 vs 椭球形）分别用于训练和验证阶段的轮子建模，以绕过仿真中的接触伪影，同时通过基于成功率的指令课程学习与专门的滚动奖励函数引导策略收敛至类人滑行步态。</td></tr>
+    <tr><td><strong>文件</strong></td><td>Marot et al. - 2026 - Reinforcement learning-based control for an inline skating humanoid robot.pdf</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">深度强化学习 (PPO)</span>
+    <span class="tag tag-green">2026</span>
+    <span class="tag tag-purple">人形机器人 · 运动控制</span>
+    <span class="tag tag-amber">Sim-to-Real · 课程学习</span>
+    <span class="tag tag-red">欠驱动 · 部分可观 · 非完整约束</span>
+    <span class="tag tag-cyan">轮滑运动 · 动态平衡</span>
+    <span class="tag tag-gray">arXiv / ETH Zurich</span>
+  </div>
+</section>
+
+<section id="insight">
+<h2>2. 洞察与创新点</h2>
+
+<div class="callout info">
+  <div class="callout-title">💡 核心洞察：这篇论文最本质的发现或设计哲学是什么？</div>
+  <p><strong>核心洞察：</strong>人形机器人轮滑的关键瓶颈不在于控制策略本身，而在于<strong>仿真器对轮子-地面接触物理的建模偏差</strong>。传统的单线排列被动滚轮在仿真中会产生严重的接触伪影（如轮缘与地面的非物理摩擦/穿透），导致强化学习策略学会"欺骗"仿真器而非学习真正的轮滑技巧。本文的设计哲学是<strong>"以对抗的方式利用仿真缺陷"</strong>——在训练阶段故意使用简化的球形轮子模型（降低接触物理的复杂度，使策略更容易探索到有效行为），在验证阶段切换为更真实的椭球形轮子模型（确保策略没有依赖球形简化带来的虚假优势），从而迫使策略在训练过程中学会真正鲁棒的轮滑控制，而非利用仿真器漏洞。这一"双几何模型验证"策略保证了零样本 sim-to-real 迁移的成功，是方法论上的关键创新。</p>
+  <p>更深层次的启示是：<strong>在仿真训练中，策略优化器会无情地利用任何建模漏洞</strong>。本文不试图"修好"仿真器（那需要完美的接触力学建模，目前仍是一个开放问题），而是通过训练/验证阶段使用不同假设来"侧通道"绕过问题——这为所有涉及复杂接触物理的 sim-to-real 任务提供了一个通用范式。</p>
+</div>
+
+<h3>2.1 灵感来源 → 核心洞察 → 设计转化</h3>
+<table>
+  <tr><th style="width:22%;">灵感来源</th><th style="width:38%;">核心洞察</th><th style="width:40%;">设计转化</th></tr>
+  <tr>
+    <td><strong>人类轮滑运动学</strong>：轮滑者通过刀刃推地（edge push）和交替重心转移产生推进力，而非连续滚动摩擦</td>
+    <td>轮滑推进的本质是<strong>脉冲式侧向刀刃推力</strong>，而非稳态滚动——这暗示奖励函数不应仅奖励前进速度，还应奖励"蹬地"动作模式</td>
+    <td>设计<strong>专门滚动奖励（specialized rolling reward）</strong>：奖励策略在滑行阶段保持轮子纯滚动（无滑动），同时通过足部运动奖励激励交替蹬地模式</td>
+  </tr>
+  <tr>
+    <td><strong>仿真接触伪影问题</strong>：轮缘与地面的尖锐接触在刚性体仿真中产生非物理的大摩擦力或穿透力，导致 RL 策略利用这些伪影"作弊"</td>
+    <td>与其修复接触模型（几乎不可能完美），不如<strong>让策略在简化的世界中学习，在真实的世界中验证</strong>——训练与验证使用不同保真度的物理模型</td>
+    <td>训练阶段使用<strong>球形轮子模型</strong>（单点接触，无边缘伪影），验证阶段使用<strong>椭球形轮子模型</strong>（近似真实轮缘形状），确保策略不依赖训练阶段的简化</td>
+  </tr>
+  <tr>
+    <td><strong>部分可观测性挑战</strong>：被动滚轮无编码器，控制器无法直接获取轮子转速/滑移信息</td>
+    <td>人类轮滑者也<strong>不需要精确感知轮子转速</strong>——通过本体感觉（身体姿态、关节力矩、惯性感知）即可推断轮子运动状态</td>
+    <td>策略输入仅使用<strong>本体感知状态</strong>（关节位置/速度、IMU 读数、基座角速度），强迫策略从可观测状态中隐式推断轮子运动——实现了观测空间与真实硬件传感器配置的精确对齐</td>
+  </tr>
+  <tr>
+    <td><strong>足式机器人课程学习</strong>：渐进式增加任务难度的课程学习在四足和双足行走中已证明有效</td>
+    <td>轮滑任务的"难度"应由<strong>目标速度指令的执行成功率</strong>定义，而非简单的时间步数——低速滑行比高速滑行更容易保持平衡</td>
+    <td>设计<strong>基于成功率的指令课程（success-based command curriculum）</strong>：仅在策略在当前速度范围内达到一定成功率后，才扩展速度指令范围，确保策略稳步掌握递增难度的动力学</td>
+  </tr>
+</table>
+
+<h3>2.2 三大核心创新点</h3>
+
+<div class="novelty-card">
+  <h4>💎 创新点 1：双几何轮子模型训练-验证分离策略</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>仿真中单线排列的被动滚轮与地面接触时产生非物理的轮缘摩擦和穿透力，RL 策略会利用这些伪影，导致 sim-to-real 失败。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>在仿真中完美建模轮子-地面接触目前仍是一个开放问题；与其等待接触力学突破，不如设计一个对建模误差鲁棒的训练范式。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>训练阶段使用球形几何基元（sphere primitive）对每个轮子建模——球-地接触为单点接触，消除了轮缘相关的伪影。验证/测试阶段切换为椭球形基元（ellipsoid primitive）——椭球的长轴近似真实轮子的轮廓，恢复轮缘接触条件。策略在球形环境中训练后，必须在椭球形环境中验证其性能不下降，才能通过课程检查点。这种设计迫使策略学习真正由身体动力学驱动的轮滑行为，而非依赖特定几何简化。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>💎 创新点 2：基于成功率的指令速度课程学习</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>常规课程学习按固定时间表或固定难度递增，但不同速度区间的轮滑动力学有质的差异（低速类似行走，高速依赖刀刃推进），简单的时间驱动课程无法保证策略对每个速度区间都充分掌握。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>人类学习轮滑是先掌握低平衡速度，再逐步尝试提升速度——这是一种天然的"成功率驱动"的学习方式。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>指令速度范围从低到高逐步扩展。当前速度区间内，策略必须在连续 N 个 episode 中达到预设成功率阈值（如跟踪误差小于某界限），才自动解锁下一个更高的速度区间。若高阶速度区间失败率过高，指令范围会回退。该机制确保策略具备稳定基础后再接受更具挑战性的动态任务。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>💎 创新点 3：被动轮滑的专用奖励函数设计</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>常规的足式机器人奖励（前进速度 + 能耗 + 姿态）不足以引导策略发现轮滑特有的边缘推进（edge-driven propulsion）策略——机器人可能只是以"带轮子的行走"方式移动，而非真正的轮滑。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>轮滑的核心物理是轮子与地面的纯滚动加上周期性的侧向蹬地，奖励函数应将这些运动学约束编码进去。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>引入专门的滚动奖励项：在滑行阶段惩罚轮子与地面的滑移速度，鼓励纯滚动；引入交替蹬地奖励项：奖励左右足在运动方向上的交替性加速度模式；结合常规的姿态正则化（保持躯干直立）、脚间距离约束（防止双足碰撞或分叉过大）和肢体对称性奖励。整个奖励结构引导策略收敛到类似人类的"swizzle"滑行步态（双脚呈内八字、外八字交替滑行推进）。</div>
+</div>
+</section>
+
+<section id="architecture">
+<h2>3. 系统架构</h2>
+
+<h3>3.1 四阶段架构全景</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <div class="arch-stage">
+      <h4>🔍 阶段 1 · 输入/感知 <span>Input & Perception</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>本体感知状态向量</strong>
+        <small>关节位置/速度、基座方向（四元数）、基座角速度、上一步动作、速度指令 (v_cmd, ω_cmd)</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>无轮子编码器</strong>
+        <small>被动滚轮无传感器——轮子状态由策略隐式推断，模仿人类本体感觉（无需感知轮速）</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>⚙️ 阶段 2 · 处理/核心 <span>Processing Core</span></h4>
+      <div class="arch-card arch-power">
+        <strong>PPO Actor-Critic 网络</strong>
+        <small>MLP 编码器 + 策略头（高斯分布输出关节目标位置）+ 价值头（状态价值估计）</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>训练：球形轮子模型</strong>
+        <small>每轮简化为单点接触球体，消除轮缘伪影，降低接触复杂度以加速探索</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>🎯 阶段 3 · 控制/策略 <span>Control & Policy</span></h4>
+      <div class="arch-card arch-motor">
+        <strong>PD 位置控制器</strong>
+        <small>RL 策略输出关节目标位置，底层 PD 控制器跟踪目标（40-50Hz 策略推理 + 1kHz PD 控制）</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>验证：椭球形轮子模型</strong>
+        <small>切换为椭球体以测试策略在更真实接触条件下的鲁棒性，作为课程通过条件</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>🚀 阶段 4 · 输出/执行 <span>Output & Execution</span></h4>
+      <div class="arch-card arch-thrust">
+        <strong>20 个关节的目标位置</strong>
+        <small>Booster T1 下肢 12 关节（双腿各 6-DoF） + 上肢关节 → PD 力矩 → 轮滑运动</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>零样本 Sim-to-Real 部署</strong>
+        <small>训练仅使用域随机化，无需微调或系统辨识——策略直接部署至真实 Booster T1</small>
+      </div>
+    </div>
+  </div>
+  <div class="arch-arrow">
+    <span>→</span><span>→</span><span>→</span><span>→</span>
+  </div>
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>观测维度</strong><small>~100+ 维 (本体感知 + 指令 + 前一步动作)</small></div>
+    <div class="arch-metric"><strong>动作维度</strong><small>20 维 (下肢各关节目标位置)</small></div>
+    <div class="arch-metric"><strong>控制频率</strong><small>策略 40-50Hz / PD 1kHz</small></div>
+    <div class="arch-metric"><strong>训练环境</strong><small>Isaac Gym · 4096 并行环境</small></div>
+  </div>
+</div>
+
+<h3>3.2 Mermaid 流程图</h3>
+
+<div class="mermaid-box">
+  <p style="font-weight:700;font-size:13px;margin-bottom:10px;color:#0f172a;">系统推理管道 (Inference Pipeline)</p>
+  <pre class="mermaid">
+flowchart LR
+    A["本体感知状态<br/>(关节位置/速度<br/>IMU + 基座姿态)"] --> B["观测构造<br/>拼接指令 v_cmd, ω_cmd<br/>+前一步动作"]
+    B --> C["PPO Actor 网络<br/>MLP 编码 → 高斯均值"]
+    C --> D["目标关节位置<br/>(20维输出)"]
+    D --> E["PD 控制器<br/>(1kHz 底层跟踪)"]
+    E --> F["Booster T1<br/>轮滑运动执行"]
+    F -->|"本体感知反馈"| A
+  </pre>
+</div>
+
+<div class="mermaid-box">
+  <p style="font-weight:700;font-size:13px;margin-bottom:10px;color:#0f172a;">训练与验证工作流 (Training & Validation Workflow)</p>
+  <pre class="mermaid">
+flowchart TB
+    subgraph TRAIN["🟦 训练阶段 · 球形轮子模型"]
+        T1["Isaac Gym 并行仿真<br/>(4096 环境)"]
+        T2["域随机化注入<br/>质量/摩擦/重心偏移"]
+        T3["PPO 策略梯度更新"]
+        T4["基于成功率的<br/>指令课程学习"]
+        T1 --> T2 --> T3 --> T4 --> T1
+    end
+    subgraph VALID["🟩 验证阶段 · 椭球形轮子模型"]
+        V1["切换几何基元<br/>球 → 椭球"]
+        V2["性能评估<br/>跟踪误差/成功率"]
+        V3{通过?}
+        V4["扩展速度指令范围"]
+        V5["回退速度指令范围"]
+        V1 --> V2 --> V3
+        V3 -->|"成功"| V4
+        V3 -->|"失败"| V5
+    end
+    subgraph DEPLOY["🚀 真实部署"]
+        D1["域随机化策略<br/>零样本迁移"]
+        D2["Booster T1<br/>消费级直排轮滑鞋"]
+    end
+    TRAIN --> VALID
+    VALID -->|"课程完成"| DEPLOY
+  </pre>
+</div>
+
+<h3>3.3 全文结构</h3>
+<table>
+  <tr><th>章节</th><th>内容</th><th>关键作用</th></tr>
+  <tr><td>I. Introduction</td><td>问题背景、人形机器人轮滑的挑战、主要贡献概述</td><td>建立 motivation：传统 wheeled locomotion 依赖主动驱动或连续接触假设</td></tr>
+  <tr><td>II. Related Work</td><td>RL for dynamic locomotion、被动轮控制、轮式/足式混合平台</td><td>定位贡献：现有工作未解决被动单线滚轮的完整 6-DoF 控制</td></tr>
+  <tr><td>III. Mechanical Design</td><td>Booster T1 平台、SLA 3D 打印轮滑鞋转接座、消费级直排轮滑鞋规格</td><td>硬件基础：确保消费级轮滑鞋的几何和动力学属性与仿真对齐</td></tr>
+  <tr><td>IV. Method</td><td>RL 框架：双几何轮子建模、奖励函数设计、课程学习、域随机化</td><td><strong>核心方法章</strong></td></tr>
+  <tr><td>V. Results & Discussion</td><td>Sim-to-Sim 消融实验、Sim-to-Real 部署评估、速度跟踪性能</td><td>验证双几何策略有效性 + 零样本迁移可行性</td></tr>
+  <tr><td>VI. Conclusion</td><td>贡献总结、局限性讨论（主导腿策略、速度上限）、未来工作</td><td>诚实记录失败模式与方法边界</td></tr>
+</table>
+</section>
+
+<section id="task">
+<h2>4. 任务形式化</h2>
+
+<h3>4.1 问题定义</h3>
+<p>考虑一个人形机器人，其双足末端安装消费级直排轮滑鞋（每足 4 个被动滚轮，单线排列）。任务目标：通过控制机器人全身关节，使其能够在平坦地面上以指定的前进速度 <code>v_cmd</code> 和转向角速度 <code>ω_cmd</code> 进行稳定轮滑运动。这是一个<strong>欠驱动、部分可观、非完整约束</strong>的全身运动控制问题。</p>
+
+<h3>4.2 强化学习形式化</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">马尔可夫决策过程 (MDP)</span>
+  $$ \mathcal{M} = (\mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma) $$
+  <div class="eq-note">其中状态空间 $\mathcal{S}$ 包含本体感知观测（关节位置 $q_t$、关节速度 $\dot{q}_t$、基座方向四元数、基座角速度、上一步动作 $a_{t-1}$、目标速度指令 $v_{\text{cmd}}, \omega_{\text{cmd}}$）；动作空间 $\mathcal{A} \subset \mathbb{R}^{20}$ 为各关节的目标位置（由 PD 控制器跟踪）；转移概率 $\mathcal{P}$ 由 Isaac Gym 物理引擎仿真，包含域随机化扰动；折扣因子 $\gamma = 0.99$。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">策略目标函数 (PPO-Clipped)</span>
+  $$ L^{\text{CLIP}}(\theta) = \mathbb{E}_t \left[ \min\left( r_t(\theta) \hat{A}_t, \ \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t \right) \right] $$
+  $$ r_t(\theta) = \frac{\pi_\theta(a_t | s_t)}{\pi_{\theta_{\text{old}}}(a_t | s_t)} $$
+  <div class="eq-note">使用 PPO 的剪辑目标函数，其中 $\epsilon = 0.2$ 为剪辑范围，$\hat{A}_t$ 为广义优势估计（GAE）。策略网络输出高斯分布的均值，标准差在训练中退火衰减。价值网络通过 MSE 损失拟合回报。</div>
+</div>
+
+<h3>4.3 输入/输出定义表</h3>
+<table>
+  <tr><th style="width:15%;">维度</th><th style="width:35%;">具体内容</th><th style="width:25%;">约束</th><th style="width:25%;">优化目标</th></tr>
+  <tr>
+    <td><strong>输入（观测）</strong></td>
+    <td>关节位置 $q \in \mathbb{R}^{20}$、关节速度 $\dot{q} \in \mathbb{R}^{20}$、基座方向（四元数）、基座角速度 $\omega_b \in \mathbb{R}^3$、上一步动作 $a_{t-1}$、速度指令 $(v_{\text{cmd}}, \omega_{\text{cmd}})$</td>
+    <td><strong>无轮子编码器</strong>：被动轮状态不可观测，策略须从本体感觉隐式推断。无外部感知（无视觉、无地形感知）。</td>
+    <td rowspan="3">最大化累积折扣奖励，使策略能够在真实硬件上零样本迁移，实现指令速度范围内的稳定轮滑运动</td>
+  </tr>
+  <tr>
+    <td><strong>输出（动作）</strong></td>
+    <td>20 个关节的目标位置 $a \in \mathbb{R}^{20}$，经 PD 控制器转换为关节力矩，驱动 Booster T1 下肢 + 上肢运动</td>
+    <td>关节位置应在物理限位内；PD 增益固定，策略输出增量式目标位置（相对于名义站立姿态）</td>
+  </tr>
+  <tr>
+    <td><strong>环境交互</strong></td>
+    <td>物理引擎仿真轮子-地面接触（训练用球形，验证用椭球形），域随机化注入质量/摩擦/质心/地面属性扰动</td>
+    <td>纯平坦地面（无地形变化）；轮滑鞋固定于足端，不可主动驱动；单线排列 4 个被动滚轮</td>
+  </tr>
+</table>
+
+<h3>4.4 奖励函数结构</h3>
+<div class="formula-block">
+  <span class="eq-tag">总奖励分解</span>
+  $$ R = r_{\text{track}} + r_{\text{roll}} + r_{\text{posture}} + r_{\text{symmetry}} + r_{\text{energy}} + r_{\text{contact}} $$
+  <div class="eq-note">
+    <code>r_track</code>：速度跟踪奖励，衡量实际前进速度/偏航角速度与指令的匹配度（高斯核或分段线性函数）。<br/>
+    <code>r_roll</code>：滚动奖励，在滑行阶段惩罚轮地滑移速度，鼓励纯滚动。<br/>
+    <code>r_posture</code>：姿态正则化，惩罚躯干偏离直立姿态和期望高度。<br/>
+    <code>r_symmetry</code>：肢体对称性奖励，鼓励左右腿交替运动模式。<br/>
+    <code>r_energy</code>：能耗惩罚，对关节力矩和功率施加 L2 惩罚。<br/>
+    <code>r_contact</code>：脚间距离约束，防止双足碰撞或分叉过宽。
+  </div>
+</div>
+</section>
+
+<section id="challenge">
+<h2>5. 挑战分析</h2>
+
+<div class="callout info">
+  <div class="callout-title">🔬 第一性原理分析</div>
+  <p>轮滑运动的本质是<strong>非完整约束下的脉冲式边缘推进</strong>。单线排列的四轮结构将地面接触限制在一条窄线上，轮子仅允许沿前进方向滚动（非完整约束）——侧向运动需要轮子与地面的侧向滑移或倾斜滚动边缘（edging）。这一物理特性从根本上区别于双足行走：行走依赖足底与地面的静摩擦力产生反作用力，而轮滑的推进力来自<strong>轮子倾斜时边缘与地面的动态接触力</strong>。这产生了三个层次的挑战：(1) <strong>物理层</strong>：轮子-地面的复杂接触动力学极难在仿真中精确建模；(2) <strong>控制层</strong>：欠驱动 + 非完整约束使可行控制输入流形高度受限；(3) <strong>学习层</strong>：部分可观测性使策略必须在无直接轮子状态反馈的条件下推断运动状态。</p>
+</div>
+
+<h3>5.1 关键技术挑战对比</h3>
+<table>
+  <tr><th style="width:25%;">先前方法</th><th style="width:38%;">局限性</th><th style="width:37%;">本文解决方案</th></tr>
+  <tr>
+    <td><strong>SKATER [8] 等 RL 方法</strong>：使用连续接触约束 + 固定足部轨迹</td>
+    <td>(1) 依赖显式相位建模和预编程足部轨迹；(2) 连续接触约束限制了动态机动能力；(3) 严重依赖前进方向地面反力，不适用于单线排列滚轮的非完整约束</td>
+    <td><strong>无预编程轨迹</strong>：策略完全自主学习足部运动模式；<strong>放松连续接触约束</strong>：允许策略在蹬地阶段抬轮离地</td>
+  </tr>
+  <tr>
+    <td><strong>四足轮滑平台 [4][5]</strong>：可变形足（足-轮转换）或高摩擦爪</td>
+    <td>(1) 局限于四足平台，不适用于双足平衡；(2) 依赖主动驱动轮或特殊硬件改装；(3) 四足稳定性裕度远大于双足，结论不可迁移</td>
+    <td><strong>双足人形平台</strong>：在 Booster T1 上使用标准消费级轮滑鞋，无主动驱动；<strong>6-DoF 足端控制</strong>实现刀刃推进</td>
+  </tr>
+  <tr>
+    <td><strong>常规 sim-to-real 方法</strong>：单一几何模型的域随机化</td>
+    <td>(1) RL 策略学会利用仿真中非物理的轮缘接触力；(2) 域随机化不足以覆盖结构性的建模误差（如轮缘尖锐接触）</td>
+    <td><strong>双几何轮子模型</strong>：训练与验证使用不同几何基元以检测和消除仿真伪影依赖</td>
+  </tr>
+  <tr>
+    <td><strong>传统足式机器人课程学习</strong>：固定时间表或地形难度递增</td>
+    <td>(1) 不关联策略实际掌握程度；(2) 速度区间的动力学差异被忽略</td>
+    <td><strong>基于成功率的指令课程</strong>：根据策略在目标速度区间的跟踪精度自动调节课程进度并允许回退</td>
+  </tr>
+</table>
+
+<h3>5.2 三大核心挑战详解</h3>
+
+<h4>挑战 1：被动单线滚轮的固有失稳性</h4>
+<p>单线排列的被动滚轮仅在前进方向具有稳定性（滚动约束），在侧向（滚转）和偏航方向均不稳定。人类通过微调身体重心和刀刃角度维持平衡，但机器人缺乏人类级别的传感和运动精度。策略必须在没有轮子编码器反馈的条件下，仅通过本体感觉（IMU + 关节传感器）实时推断轮子状态并维持平衡——这是一个高度动态的"感知-行动"闭环控制问题。</p>
+
+<h4>挑战 2：仿真中的接触物理建模缺陷</h4>
+<p>刚性体仿真引擎（如 Isaac Gym 使用的 PhysX）在处理尖锐几何体（如薄轮缘）与地面的接触时，容易出现穿透、非物理摩擦力和数值不稳定。这些伪影在训练中成为"可利用的信号"——RL 策略会学会让轮缘穿透地面以获取额外摩擦力，而非学习真正的 edge-driven propulsion。本文的双几何验证策略对此提出了一个优雅的解决方案，但本质上仍然是"绕道走"而非"修复"仿真器。</p>
+
+<h4>挑战 3：欠驱动系统的无轨迹学习</h4>
+<p>轮滑是一个欠驱动系统：轮子不可主动驱动，所有推进力必须通过全身协调运动间接产生——这本质上是利用重力和惯性力将身体重量转化为轮子滚动动力的过程。策略需要自主学习这种耦合全身动力学，而没有任何预编程的足部轨迹或运动基元作为引导。加上非完整约束的限制（轮子不能侧滑），可行运动策略的搜索空间极其狭窄，常规划奖励函数极易导致策略收敛到局部最优（如静止不动、或缓慢行走而非轮滑）。</p>
+</section>
+
+<section id="method">
+<h2>6. 方法详解</h2>
+
+<h3>6.1 核心公式</h3>
+
+<div class="formula-block">
+  <span class="eq-tag">策略表示（高斯策略）</span>
+  $$ a_t \sim \mathcal{N}\left( \mu_\theta(s_t), \ \sigma^2 I \right) $$
+  $$ \mu_\theta(s_t) = f_\theta\left( [q_t, \dot{q}_t, o_{\text{imu}, t}, a_{t-1}, v_{\text{cmd}}, \omega_{\text{cmd}}] \right) $$
+  <div class="eq-note"><strong>中文解释：</strong>策略网络 $f_\theta$（多层感知机 MLP）将本体感知观测向量映射为高斯分布的均值 $\mu_\theta$，标准差 $\sigma$ 在训练中从初始值逐步退火至较小值。动作 $a_t$ 为 20 维向量，每个维度对应一个关节的目标位置偏移（相对于默认站立姿态）。观测包含关节位置和速度（各 20 维）、IMU（基座方向四元数 4 维 + 角速度 3 维）、上一时间步的动作（20 维）和速度指令（2 维），总计约 110 维度。标准差退火策略实现从探索（高方差）到精炼（低方差）的自然过渡。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">广义优势估计 (GAE)</span>
+  $$ \hat{A}_t = \sum_{l=0}^{\infty} (\gamma \lambda)^l \delta_{t+l}, \quad \delta_t = r_t + \gamma V(s_{t+1}) - V(s_t) $$
+  <div class="eq-note"><strong>中文解释：</strong>使用 GAE 计算优势函数估计，其中 $\lambda \in [0, 1]$ 控制偏差-方差的权衡（$\lambda=0$ 退化为 TD(0) 的高偏差低方差，$\lambda=1$ 退化为 Monte Carlo 的低偏差高方差）。在 PPO 中使用 $\lambda=0.95$，在偏差和方差之间取得平衡。价值网络 $V_\phi(s)$ 通过 MSE 回归目标 $\hat{R}_t = \hat{A}_t + V(s_t)$ 进行拟合。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">滚动奖励（核心创新项）</span>
+  $$ r_{\text{roll}} = -\sum_{w \in \text{wheels}} \| v_{\text{slip}, w} \|^2 $$
+  $$ v_{\text{slip}, w} = v_{\text{contact}, w} - (v_{\text{contact}, w} \cdot \hat{d}_{\text{roll}, w}) \hat{d}_{\text{roll}, w} $$
+  <div class="eq-note"><strong>中文解释：</strong>$r_{\text{roll}}$ 是滚动奖励项。对每个轮子 $w$，在接触点处计算滑移速度 $v_{\text{slip}, w}$——即接触点速度中垂直于轮子滚动方向 $\hat{d}_{\text{roll}, w}$ 的分量。通过惩罚滑移速度的平方，策略被激励在轮子接触地面时保持纯滚动（无侧滑），这是实现真实轮滑而非"拖拽滑动"的关键。在滑行阶段（轮子接触地面但不主动蹬地时）该项权重较高，蹬地阶段权重降低以允许必要的侧向推动。</div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">成功条件（课程学习判断标准）</span>
+  $$ \text{success}(v_{\text{cmd}}) = \mathbb{E}_{\text{episode}}\left[ \mathbb{1}\left( \frac{\|v_{\text{actual}} - v_{\text{cmd}}\|}{|v_{\text{cmd}}|} < \tau_{\text{track}} \right) \right] > \rho_{\text{threshold}} $$
+  <div class="eq-note"><strong>中文解释：</strong>在给定速度指令 $v_{\text{cmd}}$ 下，策略在一个 episode 内（最长 60 秒）的实际平均速度 $v_{\text{actual}}$ 与指令的相对误差需小于阈值 $\tau_{\text{track}}$（约 15-20%）。若连续多个 episode 的成功率超过阈值 $\rho_{\text{threshold}}$（约 70-80%），则认为策略在该速度区间已掌握，课程自动扩展至更高速度范围。反之，若成功率持续低于阈值，课程回退至上一速度区间。</div>
+</div>
+
+<h3>6.2 参数配置表</h3>
+<table>
+  <tr><th>符号</th><th>含义</th><th>典型值/范围</th><th>角色</th></tr>
+  <tr><td>$\gamma$</td><td>折扣因子</td><td>0.99</td><td>平衡短期与长期奖励的折现率</td></tr>
+  <tr><td>$\lambda$ (GAE)</td><td>GAE 权衡参数</td><td>0.95</td><td>控制优势估计的偏差-方差平衡</td></tr>
+  <tr><td>$\epsilon$ (PPO clip)</td><td>PPO 剪辑范围</td><td>0.2</td><td>限制策略更新幅度，防止破坏性大更新</td></tr>
+  <tr><td>$\sigma_{\text{init}}$ → $\sigma_{\text{end}}$</td><td>策略标准差退火</td><td>1.0 → 0.3</td><td>从探索到精炼的逐渐过渡</td></tr>
+  <tr><td>$v_{\text{cmd}}$ range</td><td>前进速度指令范围</td><td>[0.0, 2.0] m/s</td><td>课程学习中逐步扩展的目标速度范围</td></tr>
+  <tr><td>$\omega_{\text{cmd}}$ range</td><td>转向角速度指令范围</td><td>[-0.5, 0.5] rad/s</td><td>转向能力范围，对称设计</td></tr>
+  <tr><td>$N_{\text{envs}}$</td><td>并行仿真环境数</td><td>4096</td><td>利用 GPU 大规模并行加速样本采集</td></tr>
+  <tr><td>Episode duration</td><td>单次 episode 最大时长</td><td>60 seconds</td><td>长时 episode 评估持续滚动滑行能力</td></tr>
+</table>
+
+<h3>6.3 域随机化配置</h3>
+<table>
+  <tr><th>参数</th><th>随机化方式</th><th>范围</th><th>目的</th></tr>
+  <tr><td>地面摩擦力</td><td>均匀采样</td><td>[0.5, 1.5] (缩放系数)</td><td>覆盖真实地面材质变化</td></tr>
+  <tr><td>地面恢复系数</td><td>加法扰动</td><td>[0.1, 0.9]</td><td>覆盖不同硬度地面</td></tr>
+  <tr><td>基座质量</td><td>缩放因子</td><td>[0.8, 1.2]</td><td>覆盖制造公差和附加载荷</td></tr>
+  <tr><td>质心偏移</td><td>加法扰动</td><td>[-0.1, 0.1] m (各轴)</td><td>覆盖质心建模误差</td></tr>
+  <tr><td>关节阻尼/刚度</td><td>缩放因子</td><td>[0.8, 1.2]</td><td>覆盖执行器参数不确定性</td></tr>
+  <tr><td>外部推/拉力</td><td>加法扰动</td><td>推 ≤ 5N, 扭矩 ≤ 0.5 Nm</td><td>增强对突发外力扰动的鲁棒性</td></tr>
+</table>
+</section>
+
+<section id="principles">
+<h2>7. 基础原理</h2>
+
+<h3>7.1 原理一：非完整约束下的脉冲推进动力学</h3>
+<p>轮滑的基本物理原理是<strong>利用非完整约束的方向选择性</strong>产生有效推进力。单线排列的被动滚轮对沿滚动方向的运动无阻力（无滑动时几乎无摩擦），但对垂直于滚动方向的运动有强约束（轮子几乎不能侧移）。人类轮滑者利用这一特性：(1) 将轮滑鞋倾斜（edging），使轮子边缘而非滚动面接触地面；(2) 通过腿部向外蹬出，产生垂直于轮子方向的地面反力；(3) 该反力在前进方向的分量推动身体向前；(4) 收回蹬地腿时减小倾斜角，使轮子恢复纯滚动状态（低阻力），滑行前进。这就是经典的<strong>"蹬-滑"（push-glide）周期</strong>。</p>
+<p>在控制理论视角下，这是一个<strong>混合动力学系统</strong>：蹬地阶段（主动接触 + 斜面推力）和滑行阶段（被动滚动 + 最小阻力）交替出现，每次切换由足端倾斜角和接触状态决定。RL 策略需要学习两个阶段的时序协调——何时蹬地、以多大力度蹬地、蹬地角度如何、以及如何在不同速度下调整节奏。</p>
+
+<h3>7.2 原理二：双几何模型训练验证分离的对抗性鲁棒化</h3>
+<p>本文的"双几何模型"策略可被理解为一种<strong>对抗性训练</strong>思想在 sim-to-real 问题上的应用。传统域随机化通过在训练中注入参数扰动来增强策略鲁棒性，但它假设扰动的分布能覆盖真实环境的参数空间——当仿真存在结构性误差（如接触模型的系统性偏差，而非参数性偏差）时，域随机化失效。本文的解决方案可以形式化为：</p>
+<ol>
+  <li><strong>训练分布</strong> $\mathcal{P}_{\text{train}}$：在简化物理模型（球形轮子）下，接触物理具有较少的虚假模式，RL 更容易发现真正的轮滑策略。</li>
+  <li><strong>验证分布</strong> $\mathcal{P}_{\text{val}}$：在较真实物理模型（椭球形轮子）下，接触物理更接近真实，但包含可能被利用的伪影。</li>
+  <li><strong>损失函数设计</strong>：课程学习要求策略在 $\mathcal{P}_{\text{train}}$ 和 $\mathcal{P}_{\text{val}}$ 中都表现良好——如果策略仅在 $\mathcal{P}_{\text{train}}$ 中有效，说明它依赖了球形简化；如果策略在 $\mathcal{P}_{\text{val}}$ 中也有效，说明它学会了独立于特定几何模型的控制行为。</li>
+</ol>
+<p>这一范式的本质是：<strong>与其让一个仿真器同时满足"容易训练"和"高保真"两个矛盾目标，不如使用两个仿真器各司其职</strong>——一个降低接触复杂度以促进学习，另一个恢复接触复杂度以测试策略是否学到了真正的物理规律。</p>
+
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>🟢 本文方法</h4>
+    <ul>
+      <li><strong>双几何模型分离</strong>：训练用球形（简化）、验证用椭球形（真实），分工明确</li>
+      <li><strong>策略被迫学习鲁棒控制</strong>：必须在两种截然不同的接触物理中都表现良好</li>
+      <li><strong>无需精确建模仿真</strong>：承认接触物理存在结构性误差，设计方法绕开而非修复</li>
+      <li><strong>零样本 sim-to-real 迁移</strong>：仅靠域随机化即可，无需真实数据微调</li>
+      <li><strong>自动化筛选</strong>：课程学习自动检测策略是否依赖仿真伪影</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>🔴 传统方法</h4>
+    <ul>
+      <li><strong>单一高保真模型</strong>：试图用最精确的接触模型，但 RL 仍能找到漏洞</li>
+      <li><strong>策略可能利用仿真伪影</strong>：无机制检测策略是否学到了错误的物理依赖</li>
+      <li><strong>依赖域随机化覆盖误差</strong>：结构性误差往往不在随机化分布范围内</li>
+      <li><strong>需要真实数据微调或系统辨识</strong>：sim-to-real gap 需要额外步骤弥补</li>
+      <li><strong>人工评估</strong>：sim-to-real 迁移成功与否只能在部署后才能判断</li>
+    </ul>
+  </div>
+</div>
+
+<h3>7.3 原理三：课程学习中的成功率驱动自调节机制</h3>
+<p>标准的课程学习按预定义的时间表递增难度（"每 N 步提高一次难度"），但这种时间驱动设计有两个关键缺陷：(1) 它不反映学习者的实际掌握程度——策略可能在某难度区间过早或过晚进入下一阶段；(2) 它不提供回退机制——一旦难度过高，策略在后续训练中持续失败，之前学到的能力也可能被遗忘。</p>
+<p>本文的<strong>基于成功率的指令课程</strong>解决了这两个问题。它等价于一个<strong>闭环自调节控制器</strong>：难度级别（速度指令范围）是受控变量，策略成功率是反馈信号，调节目标是维持成功率在目标区间。当成功率高于阈值 → 扩展速度范围（增加难度）；成功率低于阈值 → 缩小速度范围（降低难度）。这一机制确保：(a) 策略始终在"最近发展区"（维果茨基）——既不太容易也不太难——进行学习；(b) 能力遗忘被回退机制抑制；(c) 最终的策略在所有速度子区间都经过验证。</p>
+</section>
+
+<section id="figures">
+<h2>8. 图表与证据</h2>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 1</span>
+    <span class="fig-caption">Zero-shot sim-to-real transfer of an inline skating policy on the Booster T1 humanoid</span>
+    <span class="fig-source">PDF Page 1</span>
+  </div>
+  <div class="fig-placeholder">
+    📷 <strong>原图描述：</strong>展示 Booster T1 人形机器人在真实环境中进行轮滑运动的关键帧序列。上方为仿真训练截图（Isaac Gym 环境中的轮滑姿态），下方为真实硬件部署照片/序列。对比展示零样本 sim-to-real 迁移效果——仿真中学习的运动策略在真实机器人上呈现一致的姿态和运动模式。图中可观察到典型的轮滑姿态：身体前倾、双足交替外展-内收（swizzle 步态）、滑行阶段单足支撑。
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">🔍 中文解读</div>
+    <p><strong>图 1 的核心信息是验证零样本 sim-to-real 迁移在视觉和运动学层面的一致性。</strong></p>
+    <ul>
+      <li><strong>运动模式迁移保真度：</strong>仿真和真实环境中呈现相同的 swizzle 滑行步态——双脚交替呈外八字推出、内八字收回，产生类正弦轨迹的推进力。这表明双几何训练策略成功地学到了对仿真几何不敏感的控制行为。</li>
+      <li><strong>姿态一致性：</strong>躯干倾斜角度、膝关节弯曲幅度、足端离地高度在 sim 和 real 之间高度一致。这暗示域随机化（质量、质心、摩擦力）成功覆盖了真实硬件的不确定性。</li>
+      <li><strong>动态平衡：</strong>机器人能在单足支撑滑行阶段维持平衡——这是轮滑中最困难的环节，要求策略精确协调身体重心与支撑足的位置关系。平衡能力在零样本条件下得以保留，说明策略学到的是物理原则（动量守恒、重心投影）而非仿真特定模式。</li>
+      <li><strong>局限性信号：</strong>如果原图包含速度曲线或跟踪误差对比，应关注真实环境中的速度波动是否显著大于仿真——这可能反映未建模的物理效应（如轴承摩擦、地面不平坦）。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 2</span>
+    <span class="fig-caption">Training pipeline overview: dual-geometry wheel modeling, curriculum learning, and domain randomization</span>
+    <span class="fig-source">PDF Page 3-4</span>
+  </div>
+  <div class="fig-placeholder">
+    📷 <strong>原图描述：</strong>展示完整训练管道的示意图。包含：(a) 球形 vs 椭球形轮子模型的对比示意——球形为点接触，椭球形恢复轮缘轮廓；(b) 课程学习中速度指令范围随训练步数的扩展过程；(c) 域随机化参数及其采样分布的图示；(d) 奖励函数各组成部分的权重或贡献。整体以流程图形式展示从仿真设置到策略部署的完整路径。
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">🔍 中文解读</div>
+    <p><strong>图 2 解释了方法管道的三个核心组件如何协同工作。</strong></p>
+    <ul>
+      <li><strong>双几何对比的物理意义：</strong>球形模型的点接触意味着接触力始终通过轮心，无扭矩产生；椭球形模型允许接触点偏离轮心中垂线，产生滚转力矩——这更接近真实轮滑鞋的物理行为。RL 策略在球形环境中更容易找到有效行为（搜索空间更平滑），在椭球形环境中被验证是否学会了独立于接触几何的控制策略。</li>
+      <li><strong>课程学习的过程可视化：</strong>速度指令范围阶梯式扩展（非平滑增长），每个台阶对应成功率达标。台阶间的"平台期"代表策略在该速度区间的巩固训练。若观察到回退（台阶下降），说明策略遇到了能力瓶颈。</li>
+      <li><strong>域随机化的覆盖策略：</strong>随机化参数采样自均匀分布，在每次环境重置时独立采样。关键观察是参数扰动幅度是否大于真实硬件的不确定性范围——这决定了 sim-to-real 迁移的鲁棒性上限。</li>
+    </ul>
+  </div>
+</div>
+
+<h3>8.1 关键实验结果汇总</h3>
+<table>
+  <tr><th>实验</th><th>条件</th><th>关键指标</th><th>结果</th></tr>
+  <tr>
+    <td><strong>Sim-to-Sim 消融</strong></td>
+    <td>球形训练 + 椭球验证 vs 纯球形 vs 纯椭球</td>
+    <td>速度跟踪误差、成功率</td>
+    <td>双几何方案显著优于单一几何模型（纯椭球训练策略学会利用轮缘伪影，纯球训练策略在验证中性能退化）</td>
+  </tr>
+  <tr>
+    <td><strong>速度跟踪性能</strong></td>
+    <td>v_cmd ∈ [0.0, 2.0] m/s</td>
+    <td>平均速度误差</td>
+    <td>低速区间 (v_cmd &lt; 0.5 m/s) 轮滑策略匹配并超过行走策略表现；高速区间跟踪误差增大但仍在可用范围内</td>
+  </tr>
+  <tr>
+    <td><strong>零样本 Sim-to-Real</strong></td>
+    <td>域随机化训练策略 → Booster T1 硬件</td>
+    <td>成功率、平衡时间、最大滑行速度</td>
+    <td>成功部署，展示流畅的滑行与转向；策略呈现"主导腿"推进策略（不对称性）</td>
+  </tr>
+  <tr>
+    <td><strong>转向能力</strong></td>
+    <td>ω_cmd ∈ [-0.5, 0.5] rad/s</td>
+    <td>角速度跟踪误差</td>
+    <td>双向转向有效；高速转向时转向半径增大（离心力效应）</td>
+  </tr>
+  <tr>
+    <td><strong>最大滑行时长</strong></td>
+    <td>持续滑行（最长 60s episode）</td>
+    <td>无跌倒完成率</td>
+    <td>策略在多数 episode 中能完成 60s 持续滑行，偶有高速失稳</td>
+  </tr>
+</table>
+</section>
+
+<section id="flaw">
+<h2>9. 潜在缺陷与局限性</h2>
+
+<h3>9.1 方法局限性</h3>
+
+<h4>局限 1：主导腿推进策略——对称性约束失效</h4>
+<p>尽管奖励函数中包含了肢体对称性奖励项，RL 优化景观仍导致策略收敛至<strong>"主导腿"推进模式</strong>：一条腿主要负责蹬地产生推进力，另一条腿辅助维持平衡。这种不对称性并非最优策略——对称交替蹬地理论上更高效（人类轮滑即对称模式）。论文作者承认这一局限性（"despite efforts to enforce symmetrical constraints"），但未深入分析原因。可能的原因包括：(1) 不对称策略在奖励景观中形成了更宽的局部最优；(2) 对称性奖励权重过低，不足以克服探索偏差；(3) 初始条件或随机种子引入了不对称偏差，且网络容量不足以跳出该局部最优。这对长时间滑行的疲劳分布和硬件磨损有实际影响。</p>
+
+<h4>局限 2：速度上限受限于物理而非算法</h4>
+<p>策略的速度上限约 2.0 m/s（约 7.2 km/h，人类业余轮滑者轻松的巡航速度），高速指令下跟踪误差显著增大。速度瓶颈可能来自：(1) Booster T1 的关节驱动功率和响应带宽不足以支持更高频率的蹬地-滑行周期；(2) 域随机化参数范围未覆盖高速下的关键参数（如更高频率的外部扰动）；(3) 被动滚轮轴承在高转速下的摩擦特性偏离了仿真中的简化模型。</p>
+
+<h4>局限 3：平坦地面假设——非结构化地形不可用</h4>
+<p>整个方法建立在平坦、均匀地面的假设之上。滚轮遇到裂缝、石子、斜坡或崎岖地形时，单线排列的物理脆弱性暴露无遗：(1) 小障碍物可导致轮子卡死；(2) 斜坡改变重力分量在滚动方向上的投影；(3) 不同地面材质导致摩擦系数突变。尽管域随机化涵盖了摩擦力的范围扰动，但它假设摩擦力在空间上是均匀的——真实的非结构化环境需要感知和适应地面属性。</p>
+
+<h4>局限 4：无外部感知——缺乏环境感知能力</h4>
+<p>策略完全依赖本体感觉，无任何外部感知（相机、LiDAR、地形传感器等）。这意味着：(1) 机器人无法预判前方地形变化；(2) 无法感知和规避障碍物；(3) 无法进行全局导航。从实现完整自主轮滑机器人的角度来看，这只是运动控制层的解决方案，需要与感知和规划模块集成。</p>
+
+<h4>局限 5：消费级轮滑鞋的硬件不确定性</h4>
+<p>论文使用标准消费级轮滑鞋通过 SLA 3D 打印转接座连接到 Booster T1。消费级轮滑鞋的轴承质量、轮子硬度、磨损速度均不在机器人系统设计控制范围内。随着轮子磨损，接触几何变化，仿真中使用的理想几何模型（甚至椭球形近似）将逐渐偏离真实物理——长期运行中策略性能可能漂移。</p>
+
+<h3>9.2 未来扩展建议</h3>
+<ol>
+  <li><strong>自适应对称性约束：</strong>在训练中动态调整对称性奖励权重——对过度依赖单侧的策略施加更强的对称性惩罚，可尝试使用对抗性奖励设计（惩罚策略与对称策略的 KL 散度）。</li>
+  <li><strong>多模态运动能力：</strong>将轮滑策略与行走策略整合为一个统一策略。输入中包含模态选择信号（walk vs skate），使机器人能根据地形的可滑行性自动切换运动模式——这对非结构化环境中的实用部署至关重要。</li>
+  <li><strong>轮地感知与适应：</strong>在策略输入中增加轮子状态估计（通过本体感觉间接推断，如关节力矩分析轮子阻力），使策略能在线适应地面属性变化（湿滑、粗糙、松软等）。</li>
+</ol>
+
+<h3>9.3 参数敏感性分析</h3>
+<table>
+  <tr><th>参数</th><th>对性能的影响</th><th>敏感度</th><th>分析</th></tr>
+  <tr><td>滚动奖励权重</td><td>过高：过度抑制侧向运动，无法产生有效推进；过低：策略以拖拽滑动代替轮滑</td><td>★★★★☆</td><td>存在一个适中区间使纯滚动和推进力平衡</td></tr>
+  <tr><td>对称性奖励权重</td><td>权重升高应抑制主导腿偏差，但论文未报告效果</td><td>★★★☆☆</td><td>作者尝试调整但未成功，需要更强的约束机制</td></tr>
+  <tr><td>域随机化幅度</td><td>幅度过大导致策略过于保守（慢速）；幅度过小导致 sim-to-real gap</td><td>★★★★★</td><td>最关键的超参之一，直接影响迁移成功率</td></tr>
+  <tr><td>课程成功率阈值</td><td>阈值过高延缓训练；阈值过低导致策略在高难度区间不稳定</td><td>★★★☆☆</td><td>70-80% 范围是合理的工程经验值</td></tr>
+  <tr><td>PPO 剪辑范围 ε</td><td>影响策略更新稳定性</td><td>★★☆☆☆</td><td>0.2 为 PPO 标准值，在多数任务中鲁棒</td></tr>
+  <tr><td>并行环境数</td><td>更多环境 → 更快样本采集，但 GPU 内存受限</td><td>★★☆☆☆</td><td>4096 是 Isaac Gym 的典型配置</td></tr>
+  <tr><td>Episode 最大时长</td><td>更长提供更多时序上下文，但增加计算开销</td><td>★★☆☆☆</td><td>60s 足够捕捉完整的滑行动力学模式</td></tr>
+</table>
+
+<div class="callout danger">
+  <div class="callout-title">⚠️ 深度剖析：双几何策略是否真的解决了 sim-to-real gap？</div>
+  <p><strong>需要保持审慎：</strong>双几何模型验证策略解决的是<strong>仿真伪影利用</strong>问题（策略不会依赖不存在的物理效应），但它不解决<strong>仿真保真度不足</strong>问题（仿真中的椭球形接触模型仍然不完美）。真实的轮子-地面接触涉及弹性形变、滚动阻力、轴承摩擦、滑移-粘滞转换等复杂现象。双几何策略确保策略"不利用明显的伪影"，但不能保证策略"学会了所有真实的物理效应"。Sim-to-real 迁移成功部分可能归因于 Booster T1 本身硬件的鲁棒性（高带宽 PD 控制器吸收了一部分建模误差）。此外，论文仅在受控实验室环境中展示部署——真实世界的户外轮滑（路面不平、坡度、行人）性能未经验证。该方法的泛化能力需要更多样化的测试场景来确认。</p>
+</div>
+</section>
+
+<section id="motivation">
+<h2>10. 动机与推导链</h2>
+
+<h3>10.1 核心算法的五步推导链</h3>
+
+<p><strong>Step 1：问题定位 —— 为什么现有方法不能直接用于人形机器人轮滑？</strong></p>
+<p>起点是观察到一个根本性的 gap：RL 驱动的足式运动取得了显著进展（行走、跑步、跳跃），但这些方法依赖足底与地面的静摩擦接触——脚掌设计为提供大面积稳定接触。轮滑鞋的单线排列滚轮将这种稳定的大面积分布式接触替换为<strong>一系列窄线接触</strong>，彻底改变了系统的约束拓扑结构。四足轮滑平台 [4][5] 利用四足的多边形支撑区域天然具有静态稳定性，但对于双足平台，单线滚轮的动力学引入了<strong>双重的稳定性挑战</strong>：既要维持双足平衡，又要管理被动滚轮的非完整约束。</p>
+
+<p><strong>Step 2：接触建模困境 —— 完美仿真是不可能的，怎么办？</strong></p>
+<p>识别到接触物理是瓶颈后，设计者面临两个选择：(A) 改进仿真器，实现更精确的轮子-地面接触模型；(B) 接受仿真器的不完美，但设计方法使策略对接触建模误差鲁棒。选择 (A) 需要解决弹性接触力学、摩擦锥建模、数值积分稳定性等一系列开放问题——对于单篇论文而言不可行。选择 (B) 引出了核心问题：<strong>如何在有偏仿真中训练出无偏的控制策略？</strong></p>
+
+<p><strong>Step 3：对抗性验证方案 —— 用两个仿真器互相制衡</strong></p>
+<p>选择 (B) 的解是引入第二个仿真器作为"对抗性验证器"。在训练分布（球形轮子）中，接触物理被有意简化——RL 更容易找到有效行为。但简化是否过度？通过在验证分布（椭球形轮子）中测试，可以检测策略是否仅仅"作弊"（学习了仅对球形有效的策略）还是"学会"（学习了独立于几何的轮滑控制）。这本质上是<strong>分布外泛化测试</strong>的思想：用 $\mathcal{P}_{\text{val}}$ 测试在 $\mathcal{P}_{\text{train}}$ 上训练的策略的泛化性能。</p>
+
+<p><strong>Step 4：课程学习 —— 如何组织训练使策略稳步提升？</strong></p>
+<p>双几何验证方案解决了"学什么"的问题，但还需要解决"怎么学"的问题——即训练的组织方式。关键洞察是：速度指令不是同质的——不同速度区间的轮滑动力学存在质变（低速类似行走、中速呈现稳定的滑行模式、高速需要更强的边缘推进和更高的蹬地频率）。成功率驱动的课程学习通过闭环调节速度指令范围，确保策略在进入更高速度区间前已具备扎实的基础能力。</p>
+
+<p><strong>Step 5：奖励函数工程 —— 如何将人类的轮滑直觉编码为数学信号？</strong></p>
+<p>最后一步是将轮滑的物理直觉和期望行为编码为奖励函数的具体项。滚动奖励捕获纯滚动约束，滑移惩罚抑制拖拽行为，姿态正则化维持平衡，对称性奖励鼓励交替运动。每个奖励项的权重通过消融实验调节——各项之间存在权衡（例如，滚动奖励太高会抑制蹬地时必要的侧向力）。最终的奖励函数是这些项的加权和，权重反映了各项优先级的工程判断。</p>
+
+<div class="callout idea">
+  <div class="callout-title">💡 一句话总结推导逻辑</div>
+  <p><strong>从"单线滚轮的非完整约束打破了传统足式 RL 的接触范式"出发，推导出"必须让策略学会对接触建模误差鲁棒的控制行为"，进而在"不能用完美仿真、也不能放任策略作弊"的约束下，设计了"双几何模型对抗性验证 + 成功率驱动课程学习 + 专门的滚动奖励函数"这套完整的方法论闭环。</strong></p>
+</div>
+
+<h3>10.2 动机溯源</h3>
+<p>本文的动机从根本上源于一个更大的科学问题：<strong>如何在仿真中训练机器人完成涉及复杂、不完美仿真接触物理的任务？</strong>轮滑是一个理想的测试案例，因为它放大了仿真接触建模的核心矛盾——策略优化的贪婪本性（exploit any advantage）与仿真器的不完美性之间的冲突。成功解决这一矛盾的方法学贡献（双几何验证范式）可被外推到其他涉及复杂接触的任务：夹具操作、多指灵巧手、攀爬、甚至多机器人交互——任何仿真器的保真度成为瓶颈的场景。</p>
+</section>
+
+<section id="takeaway">
+<h2>11. 关键要点</h2>
+
+<h3>11.1 三个层次的经验教训</h3>
+<ul>
+  <li><strong>方法论层面：</strong>双几何模型训练验证分离策略提供了一种通用的"仿真缺陷对抗"范式——不对抗仿真器的不完美性，而是设计方法来检测和消除策略对仿真伪影的依赖。这一范式可迁移到任何仿真保真度成为瓶颈的 RL 训练任务（UAV 的接触操纵、空中抓取、穿越狭小空间等）。</li>
+  <li><strong>技术技巧层面：</strong>(1) 基于成功率的指令课程学习是比固定时间表更智能的难度调节机制——尤其适用于不同难度区间有质变（不同动力学模式）的任务；(2) 滚动奖励通过惩罚滑移速度间接编码非完整约束，比硬约束更灵活且可微分；(3) 域随机化的参数范围选择需要覆盖真实硬件的不确定性，但不能过大（过度保守策略）。</li>
+  <li><strong>实验/写作层面：</strong>论文诚实地记录和讨论了方法的失败模式（主导腿不对称性），这比选择性展示最优点更有学术价值。Sim-to-Sim 消融实验设计清晰：通过控制变量（单球形/单椭球/双几何）分离每个组件对性能的贡献，是验证方法贡献的标准范式。</li>
+</ul>
+
+<h3>11.2 UAV 研究适用性分析</h3>
+<table>
+  <tr><th>方法组件</th><th>UAV 可迁移性</th><th>迁移思路</th></tr>
+  <tr>
+    <td><strong>双几何验证策略</strong></td>
+    <td>⭐⭐⭐⭐☆ 高度适用</td>
+    <td>UAV 的旋翼-空气相互作用、着陆脚架-地面接触、抓取器-物体接触都存在仿真建模误差。可设计"简化空气动力学（训练）+ 高保真 CFD（验证）"的双模型范式</td>
+  </tr>
+  <tr>
+    <td><strong>成功率驱动课程学习</strong></td>
+    <td>⭐⭐⭐⭐⭐ 直接可用</td>
+    <td>UAV 飞行任务的难度（低速悬停 → 高速巡航 → 激进机动）天然适合成功率驱动课程。可定义飞行器在目标速度/姿态/轨迹下的跟踪成功率作为课程调节信号</td>
+  </tr>
+  <tr>
+    <td><strong>专用滚动奖励</strong></td>
+    <td>⭐⭐⭐☆☆ 部分适用</td>
+    <td>UAV 不存在"滚动"概念，但类似的专用运动学奖励可设计为：旋翼气动效率奖励（惩罚不合理的迎角）、能量最优轨迹奖励、平滑姿态变化奖励</td>
+  </tr>
+  <tr>
+    <td><strong>零样本 sim-to-real</strong></td>
+    <td>⭐⭐⭐⭐⭐ 核心目标</td>
+    <td>UAV sim-to-real 面临类似的挑战（空气动力学不确定性、电机差异、传感器噪声）。域随机化 + 对抗性验证的范式可直接借鉴</td>
+  </tr>
+  <tr>
+    <td><strong>非完整约束下的策略学习</strong></td>
+    <td>⭐⭐⭐☆☆ 类比适用</td>
+    <td>UAV 是完整系统（可独立控制各方向加速度），但某些特殊模式（固定翼模式、旋翼失效滑翔）退化为非完整约束——可借鉴本文在欠驱动约束下的探索策略</td>
+  </tr>
+</table>
+
+<h3>11.3 关键参考文献</h3>
+<table>
+  <tr><th>参考文献</th><th>为何重要</th></tr>
+  <tr><td>[3] Booster T1 — 本论文的硬件平台</td><td>理解机器人的关节配置、驱动能力和传感器套件是评估 sim-to-real 迁移成功度的基础</td></tr>
+  <tr><td>[8] SKATER — 利用 RL 进行轮滑控制的先驱工作</td><td>本文的直接前驱，使用了连续接触约束和显式相位建模。对比 SKATER 可深入理解本文方法突破的边界</td></tr>
+  <tr><td>[4][5] 四足轮滑/转换平台</td><td>轮式-足式混合平台的代表性工作；理解四足 vs 双足轮滑的动力学差异对掌握本文贡献粒度至关重要</td></tr>
+  <tr><td>Isaac Gym [21] — GPU 大规模并行 RL 仿真</td><td>本文的训练基础设施；4096 并行环境对样本效率的价值需要理解 Isaac Gym 的架构</td></tr>
+  <tr><td>PPO / GAE 原始论文</td><td>策略梯度标准算法；消融实验中 PPO 超参的影响需要对算法细节的理解</td></tr>
+  <tr><td>域随机化经典论文 (Peng et al., Tobin et al.)</td><td>域随机化方法的基础文献；理解其假设（参数不确定性可被随机化覆盖）和局限（结构性误差不可覆盖）有助于评价本文的增量贡献</td></tr>
+</table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · files · Paper ID 10343 · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

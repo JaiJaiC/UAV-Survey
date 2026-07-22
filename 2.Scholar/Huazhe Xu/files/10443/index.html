@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - 3D Object Representations for Fine-Grained Categorization</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="wrap">
+
+<!-- ====== 1. PAPER INFO ====== -->
+<section id="info">
+<h2>1. 论文基本信息</h2>
+<h1>3D Object Representations for Fine-Grained Categorization</h1>
+
+<table>
+<tr><td style="width:120px;font-weight:700;">Authors</td><td>Jonathan Krause, Michael Stark, Jia Deng, Li Fei-Fei</td></tr>
+<tr><td style="font-weight:700;">Affiliation</td><td>Stanford University / Max Planck Institute for Informatics</td></tr>
+<tr><td style="font-weight:700;">Year</td><td>2013</td></tr>
+<tr><td style="font-weight:700;">Venue</td><td>IEEE ICCV 2013 Workshop (3dRR-13), pp. 554-561</td></tr>
+<tr><td style="font-weight:700;">DOI</td><td>10.1109/ICCVW.2013.77</td></tr>
+<tr><td style="font-weight:700;">Field</td><td>细粒度视觉识别 / 3D计算机视觉 / 表示学习</td></tr>
+<tr><td style="font-weight:700;">Local PDF</td><td><a href="Krause et al. - 2013 - 3D object representations for fine-grained categorization.pdf">Krause et al. - 2013 - 3D object representations for fine-grained categorization.pdf</a></td></tr>
+</table>
+
+<div style="margin-top:14px;">
+<span class="tag tag-blue">细粒度识别</span><span class="tag tag-purple">3D视觉</span><span class="tag tag-amber">视角不变性</span><span class="tag tag-green">Stanford Cars</span><span class="tag tag-cyan">3D SPM</span><span class="tag tag-red">3D BubbleBank</span><span class="tag tag-gray">ICCV 2013</span><span class="tag tag-blue">姿态估计</span><span class="tag tag-amber">CAD对齐</span><span class="tag tag-purple">Huazhe Xu</span>
+</div>
+
+<h3>1.1 TL;DR (一句话概述)</h3>
+<div class="callout info">
+<p><strong>核心贡献：</strong>将两种最先进的2D细粒度表示（Spatial Pyramid Matching 和 BubbleBank）提升到3D对象坐标系，利用类别级3D CAD模型估计物体姿态，在3D空间中实现视角不变的特征提取和空间池化。论文同时发布了Stanford Cars数据集（196类，16,185张图片），3D表示在跨视角汽车型号识别上显著优于2D对应方法。</p>
+</div>
+
+<h3>1.2 研究背景与动机</h3>
+<p>细粒度视觉识别要求区分同一基本类别下高度相似的子类别（如不同品牌型号的汽车）。传统2D方法的核心瓶颈在于：<strong>同一部件在不同视角下的图像坐标和外观发生剧烈变化，导致2D模板难以跨视角泛化</strong>。已有工作要么依赖大量标注部件（如鸟类关键点），要么将对象建模为互不连接的多个2D视图模板——这些方法本质上是"视角记忆"而非"结构理解"，对训练中未见的视角泛化能力极弱。</p>
+<p>本文的基本洞见是：<strong>对刚性对象而言，判别性特征属于三维部件而非二维像素位置</strong>。如果能将2D表示提升到3D对象表面，则几何对齐可将视角变化从分类问题中分离出来。这项工作开创性地将3D几何引入细粒度识别流水线，成为后续一系列3D-aware细粒度方法的基石。</p>
+
+<h3>1.3 论文影响力</h3>
+<ul>
+<li>引用量超过 <strong>3,700+</strong>（截至2026年），是细粒度视觉领域的高被引论文</li>
+<li>提出的 <strong>Stanford Cars 数据集</strong> 成为细粒度识别的标准基准之一</li>
+<li>3D几何对齐的思想启发了后续的3D-aware CNN、多视图特征聚合等工作</li>
+<li>被收录于Li Fei-Fei研究组的细粒度识别系列工作，与CVPR 2013 Fine-Grained Crowdsourcing等构成完整研究线</li>
+</ul>
+</section>
+
+<!-- ====== 2. INSIGHT & NOVELTY ====== -->
+<section id="insight">
+<h2>2. 核心洞见与创新点</h2>
+
+<h3>2.1 核心洞见 (Core Insight Q&A)</h3>
+
+<div class="callout idea">
+<p><strong>Q: 为什么2D细粒度识别在视角变化时失效？</strong></p>
+<p>A: 2D表示中的"空间位置"编码的是图像坐标 $(u,v)$，而非对象表面坐标。同一汽车前灯在正视图位于 $(100,50)$，在侧视图可能位于 $(300,50)$，在俯视图甚至完全不可见。2D方法的特征空间随视角剧烈漂移，迫使模型要么记忆大量离散视角模板，要么接受显著的性能下降。</p>
+</div>
+
+<div class="callout tip">
+<p><strong>Q: 3D表示如何解决这个问题？</strong></p>
+<p>A: 将表示锚定在<strong>3D对象坐标系</strong>——即对象表面的几何位置。一旦估计出图像中物体的3D姿态，就可以将所有局部特征"向后投影"到3D CAD模型表面。不同视角拍摄的同一部件将映射到相同的3D表面位置，其外观和空间上下文在3D空间中具有几何一致性。这就是从"视角不变性"到"几何不变性"的范式转变。</p>
+</div>
+
+<div class="callout warn">
+<p><strong>Q: 关键设计为什么有效？</strong></p>
+<p>A: 3D表示的效力取决于三个关键设计：(1)用CAD模型的完整表面采样取代2D图像网格采样，确保特征空间在密集覆盖下仍保持几何一致性；(2)通过透视畸变校正将投影到2D图像的3D patch矫正为统一的参考矩形，消除投影形变引入的外观变异；(3)将空间池化定义在3D对象表面（方位角×仰角网格），而非2D图像平面，使得池化区域具有几何含义（如前脸区域、侧面区域）。</p>
+</div>
+
+<h3>2.2 启发映射 (Inspiration Mapping)</h3>
+<table>
+<tr><th style="width:20%;">启发来源</th><th style="width:40%;">原始概念</th><th style="width:40%;">本论文转化</th></tr>
+<tr><td>2D SPM (Lazebnik et al. 2006)</td><td>在2D图像空间构建金字塔网格，每个格内做词袋直方图池化</td><td>将池化空间从2D图像坐标替换为3D对象表面参数化坐标（方位角×仰角），构成3D空间金字塔</td></tr>
+<tr><td>2D BubbleBank (Deng, Krause & Fei-Fei, CVPR 2013)</td><td>"气泡"作为可学习的局部特征模板，在2D图像搜索区域内检测并池化</td><td>"气泡"绑定3D表面位置，池化区域改为3D邻域的球面邻域，实现位置感知的几何池化</td></tr>
+<tr><td>多视图3D重建</td><td>从多视图2D图像恢复物体3D几何结构</td><td>利用合成渲染的CAD模型训练视角分类器，从单张2D图像估计物体3D姿态（方位角+仰角），无需真实多视图</td></tr>
+<tr><td>HOG特征 + SVM (经典检测范式)</td><td>方向梯度直方图用于目标检测</td><td>用于训练1008个视角相关分类器（7类别×36方位×4仰角），作为姿态估计的前端</td></tr>
+</table>
+
+<h3>2.3 三个创新卡 (Novelty Cards)</h3>
+
+<div class="novelty-card">
+<h4 style="color:#6d28d9;">创新卡 1: 3D空间金字塔匹配 (SPM-3D)</h4>
+<div class="novelty-step"><strong>Step 1 — 3D表面采样：</strong>在CAD模型表面通过dart throwing算法生成数千个均匀分布的patch，每个patch携带3D位置、法向量、上方向和平面支撑矩形。</div>
+<div class="novelty-step"><strong>Step 2 — 视角感知投影与矫正：</strong>根据估计的姿态将可见的3D patch投影到2D图像（产生透视形变的四边形），再矫正为统一参考矩形以消除透视畸变。</div>
+<div class="novelty-step"><strong>Step 3 — 3D空间池化：</strong>将对象表面参数化为方位角×仰角空间 $S = [0, 2\pi] \times [-\pi/2, \pi/2]$，在S上构建1×1、2×2、4×4的金字塔网格，每个格内对矫正后patch的量化RootSIFT描述子做直方图统计。</div>
+<div class="novelty-step"><strong>Step 4 — 多假设最大池化：</strong>对每张测试图像保留Top-N个姿态估计假设，对各假设分别提取SPM-3D特征，最终通过最大池化跨假设合并，提升对姿态估计误差的鲁棒性。</div>
+</div>
+
+<div class="novelty-card">
+<h4 style="color:#6d28d9;">创新卡 2: 3D BubbleBank (BB-3D)</h4>
+<div class="novelty-step"><strong>Step 1 — 3D气泡构建：</strong>从训练集中随机采样patch描述子，每个"气泡"携带一个RootSIFT描述子模板和其对应的3D对象表面位置。</div>
+<div class="novelty-step"><strong>Step 2 — 3D卷积式匹配：</strong>对图像中的每个采样patch，计算其描述子与所有气泡描述子的相似度。关键区别：相似度仅在与气泡3D位置邻近的patch之间计算（3D空间门控）。</div>
+<div class="novelty-step"><strong>Step 3 — 3D区域最大池化：</strong>在每个气泡周围定义一个3D搜索邻域，对落入该邻域的所有patch-气泡匹配分数做最大池化，得到一个单一的特征响应值。</div>
+<div class="novelty-step"><strong>Step 4 — 高维特征表示：</strong>将所有气泡的池化响应串联成高维特征向量，输入线性SVM进行分类。3D池化使得匹配发生在几何对应位置，而非2D图像对应位置。</div>
+</div>
+
+<div class="novelty-card">
+<h4 style="color:#6d28d9;">创新卡 3: 合成数据驱动的3D姿态估计流水线</h4>
+<div class="novelty-step"><strong>Step 1 — 合成渲染数据生成：</strong>使用41个汽车CAD模型，在36个方位角×4个仰角×10个随机背景 = 59,040张合成图像上渲染，自动获得精确的3D姿态标注。</div>
+<div class="novelty-step"><strong>Step 2 — 粗类别视角分类器训练：</strong>将41个CAD模型分为7个粗类别（轿车、SUV、轿跑、敞篷、皮卡、掀背、旅行车），训练1008个(7×36×4) HOG+线性SVM二分类器。</div>
+<div class="novelty-step"><strong>Step 3 — 视角估计：</strong>对测试图像，先通过粗分类器确定物体类别和大致视角，再保留Top-N姿态假设而非单一估计，利用后续特征提取的max-pooling吸收姿态估计的不确定性。</div>
+</div>
+
+<h3>2.4 创新级别评估</h3>
+<div class="callout info">
+<p><strong>创新层级：</strong>架构创新 (Architectural Innovation)。本论文不是发明全新的视觉表示，而是将两种已有的2D表示通过<strong>几何重参数化</strong>移植到3D领域。这种"维度提升式创新"的价值在于：它系统性地证明了3D几何信息对细粒度视觉识别的重要性，为后续端到端3D-aware深度学习（如3D CNN on point clouds, Neural Radiance Fields for recognition）奠定了概念基础。</p>
+</div>
+</section>
+
+<!-- ====== 3. ARCHITECTURE ====== -->
+<section id="architecture">
+<h2>3. 系统架构</h2>
+
+<h3>3.1 架构总览面板 (Architecture Overview Panel)</h3>
+
+<div class="arch-panel">
+<div class="arch-grid">
+  <div class="arch-stage">
+    <h4>阶段1: 3D姿态估计 <span>输入→假设</span></h4>
+    <div class="arch-card arch-solar">
+      <strong>合成渲染训练</strong>
+      <small>41 CAD模型, 36方位×4仰角×10背景 = 59K图像, HOG特征提取</small>
+    </div>
+    <div class="arch-card arch-solar">
+      <strong>粗分类器训练</strong>
+      <small>7粗类别×1008视角组合, 线性SVM二分类器</small>
+    </div>
+    <div class="arch-card arch-solar">
+      <strong>Top-N姿态假设</strong>
+      <small>保留多个视角假设而非单一输出, 后续利用max-pooling吸收不确定性</small>
+    </div>
+  </div>
+  <div class="arch-stage">
+    <h4>阶段2: 3D Patch提取 <span>表面采样→矫正</span></h4>
+    <div class="arch-card arch-power">
+      <strong>3D表面采样</strong>
+      <small>Dart throwing生成数千均匀patch, 含3D位置/法向量/上方向/支撑平面</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>视角投影</strong>
+      <small>可见patch按估计姿态投影到2D图像, 生成透视形变四边形</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>透视矫正</strong>
+      <small>将投影四边形矫正为统一参考矩形, 消除不同视角的投影畸变</small>
+    </div>
+  </div>
+  <div class="arch-stage">
+    <h4>阶段3: 3D表示构建 <span>SPM-3D / BB-3D</span></h4>
+    <div class="arch-card arch-motor">
+      <strong>SPM-3D: 3D金字塔池化</strong>
+      <small>方位角×仰角空间S上构建1×1, 2×2, 4×4金字塔, 量化RootSIFT直方图</small>
+    </div>
+    <div class="arch-card arch-motor">
+      <strong>BB-3D: 3D气泡池化</strong>
+      <small>气泡绑定3D表面位置, 3D邻域内max-pooling匹配响应</small>
+    </div>
+  </div>
+  <div class="arch-stage">
+    <h4>阶段4: 分类 <span>特征→类别</span></h4>
+    <div class="arch-card arch-thrust">
+      <strong>线性SVM</strong>
+      <small>一对多线性SVM分类器</small>
+    </div>
+    <div class="arch-card arch-thrust">
+      <strong>多假设合并</strong>
+      <small>跨Top-N姿态假设max-pooling特征</small>
+    </div>
+    <div class="arch-card arch-thrust">
+      <strong>多方法融合</strong>
+      <small>SPM + BB + SPM-3D + BB-3D 堆叠融合</small>
+    </div>
+  </div>
+</div>
+<div class="arch-arrow">
+  <span>↓ HOG+SVM</span><span>↓ 投影+矫正</span><span>↓ 3D池化</span><span>↓ 分类决策</span>
+</div>
+<div class="arch-summary">
+  <div class="arch-metric">
+    <strong>合成图像: 59,040张</strong>
+    <small>41个CAD × 36方位 × 4仰角 × 10背景</small>
+  </div>
+  <div class="arch-metric">
+    <strong>3D Patches: ~数千个/模型</strong>
+    <small>Dart throwing均匀表面采样</small>
+  </div>
+  <div class="arch-metric">
+    <strong>SPM-3D特征维度: 21 × CodebookSize</strong>
+    <small>1+4+16=21个3D空间格</small>
+  </div>
+  <div class="arch-metric">
+    <strong>BB-3D气泡数: ~数千个</strong>
+    <small>随机采样自训练集</small>
+  </div>
+</div>
+</div>
+
+<h3>3.2 数据流流程图 (Mermaid Flowchart 1: 训练流水线)</h3>
+
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+    A["CAD模型库<br/>41个汽车3D模型"] --> B["合成渲染<br/>36方位×4仰角×10背景<br/>= 59,040张合成图像"]
+    B --> C["HOG特征提取<br/>+视角标签"]
+    C --> D["粗类别分组<br/>7类别(sedan/SUV/coupe等)"]
+    D --> E["训练视角分类器<br/>1008个线性SVM<br/>(7类×36方位×4仰角)"]
+
+    A --> F["3D表面Patch采样<br/>Dart throwing均匀采样<br/>每模型数千个patch"]
+    F --> G["Patch参数化<br/>3D位置/法向量/上方向/支撑矩形"]
+
+    H["训练图像<br/>(带细粒度类别标签)"] --> I["姿态估计<br/>Top-N假设"]
+    E --> I
+    G --> J["3D Patch投影+矫正<br/>RootSIFT描述子提取"]
+
+    I --> K["SPM-3D特征构建<br/>3D空间金字塔池化"]
+    J --> K
+
+    I --> L["BB-3D特征构建<br/>3D气泡匹配+池化"]
+    J --> L
+
+    K --> M["线性SVM训练<br/>(一对多分类器)"]
+    L --> M
+
+    style A fill:#fff7ed,stroke:#fed7aa
+    style E fill:#eff6ff,stroke:#bfdbfe
+    style K fill:#f5f3ff,stroke:#ddd6fe
+    style L fill:#ecfdf5,stroke:#bbf7d0
+    style M fill:#fef3c7,stroke:#f59e0b
+</div>
+</div>
+
+<h3>3.3 推理流程图 (Mermaid Flowchart 2: 测试流水线)</h3>
+
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+    A["测试图像输入<br/>(单张汽车图片)"] --> B["HOG特征提取"]
+    B --> C["1008个视角分类器评分"]
+    C --> D["Top-N姿态假设<br/>(保留不确定性的多假设)"]
+
+    D --> E["对每个假设:"]
+    E --> F["3D Patch投影+矫正"]
+    F --> G["RootSIFT描述子提取"]
+
+    G --> H1["SPM-3D特征"]
+    G --> H2["BB-3D特征"]
+
+    H1 --> I["跨假设Max-Pooling"]
+    H2 --> I
+
+    I --> J["单分类器(3D)线性SVM"]
+    J --> K["分类预测"]
+
+    G --> L2["SPM(2D)特征池化"]
+    G --> L3["BB(2D)特征构建"]
+    L2 --> M["多方法特征拼接<br/>SPM + BB + SPM-3D + BB-3D"]
+    L3 --> M
+    I --> M
+    M --> N["融合分类器线性SVM"]
+    N --> O["最终预测"]
+
+    style A fill:#e8f0fe,stroke:#3b82f6
+    style D fill:#fef7ed,stroke:#f59e0b
+    style I fill:#f0ebfd,stroke:#8b5cf6
+    style O fill:#e6f7ee,stroke:#10b981
+</div>
+</div>
+</section>
+
+<!-- ====== 4. TASK DEFINITION ====== -->
+<section id="task">
+<h2>4. 任务定义 (Task Definition)</h2>
+
+<h3>4.1 输入定义</h3>
+<div class="formula-block">
+<div class="eq-tag">输入规范</div>
+<p>单张RGB图像 $\mathbf{I} \in \mathbb{R}^{H \times W \times 3}$，包含一个大致居中的主要对象（汽车）。</p>
+<p>假设：(1) 对象属于刚性类别；(2) 存在可用的大致对应CAD模型（同类不同款亦可）；(3) 图像中存在足够纹理用于局部特征提取。</p>
+</div>
+
+<h3>4.2 输出定义</h3>
+<div class="formula-block">
+<div class="eq-tag">输出规范</div>
+<p>细粒度类别标签 $c \in \{1, 2, ..., C\}$，其中 $C$ 取决于数据集：</p>
+<ul>
+<li><strong>car-types</strong>: 8个粗粒度汽车类型</li>
+<li><strong>BMW-10</strong>: 10个BMW车型（超细粒度，极难区分）</li>
+<li><strong>Car-197</strong> (Stanford Cars): 196个汽车制造商/型号/年份级别类别</li>
+</ul>
+<p>同时隐式输出物体的3D姿态估计（作为中间表示）:</p>
+<p>$$\hat{\theta} = (\text{azimuth}, \text{elevation}) \in [0, 2\pi) \times [-\pi/2, \pi/2]$$</p>
+</div>
+
+<h3>4.3 核心假设与先决条件</h3>
+<table>
+<tr><th>假设</th><th>内容</th><th>合理性</th></tr>
+<tr><td>A1: 刚性对象</td><td>对象类别具有大致刚性结构，局部部件间的相对3D位置恒定</td><td>对汽车成立；对鸟/狗等可变形类别不成立</td></tr>
+<tr><td>A2: CAD可获性</td><td>存在覆盖目标类别大致形状的3D CAD模型（不要求精确匹配子类别）</td><td>汽车CAD资源丰富；但对于稀有物种/工具等可能失效</td></tr>
+<tr><td>A3: 纹理充足</td><td>对象表面纹理足够支持局部特征提取和匹配</td><td>对涂装丰富的汽车成立；无纹理/纯色表面是挑战</td></tr>
+<tr><td>A4: 近似姿态</td><td>物体在图像中大致完整、未被严重遮挡</td><td>场景设置成立；严重遮挡下姿态估计失效</td></tr>
+</table>
+
+<h3>4.4 问题形式化 (Formalization)</h3>
+<div class="formula-block">
+<div class="eq-tag">形式化定义 (LaTeX)</div>
+<p>给定训练集 $\mathcal{D} = \{(\mathbf{I}_i, c_i)\}_{i=1}^{N}$，学习分类函数 $f$:</p>
+<p>$$f(\mathbf{I}) = \arg\max_{c} \ \mathbb{E}_{\theta \sim p(\theta|\mathbf{I})} \left[ \mathbf{w}_c^T \phi(\mathbf{I}, \theta) \right]$$</p>
+<p>其中:</p>
+<ul>
+<li>$\theta$ 是物体3D姿态（方位角+仰角+粗类别）</li>
+<li>$p(\theta|\mathbf{I})$ 是视角分类器估计的姿态后验分布（近似为Top-N确定性假设）</li>
+<li>$\phi(\mathbf{I}, \theta)$ 是依赖于3D姿态的3D特征提取函数（SPM-3D或BB-3D）</li>
+<li>$\mathbf{w}_c$ 是类别 $c$ 的线性SVM权重</li>
+</ul>
+<div class="eq-note">关键创新在于 $\phi(\mathbf{I}, \theta)$ 的构造——特征提取依赖于估计的3D姿态，使得同一部件在不同视角下产生几何一致的特征响应。</div>
+</div>
+</section>
+
+<!-- ====== 5. KEY CHALLENGE ====== -->
+<section id="challenge">
+<h2>5. 关键挑战与先验方法分析</h2>
+
+<h3>5.1 第一性原理分析 (First-Principles Decomposition)</h3>
+<p>细粒度识别困难的根本原因可从以下三个维度分解：</p>
+
+<div class="callout danger">
+<p><strong>维度1: 类间差异极小化 (Inter-class Margin Collapse)</strong></p>
+<p>不同细粒度类别（如BMW 3系 vs BMW 5系）之间的外观差异远小于类内因视角、光照、背景引起的变异。在像素空间中，类间距离 $\|\mu_c - \mu_{c'}\|_2$ 趋近于零，而类内方差 $\sigma^2_{\text{intra}}$ （由视角变化主导）极大。这使得判别边界极易被视角噪声淹没。</p>
+</div>
+
+<div class="callout danger">
+<p><strong>维度2: 视角-外观纠缠 (Viewpoint-Appearance Entanglement)</strong></p>
+<p>图像中的特征同时编码了"是什么"(identity)和"从哪看"(viewpoint)。对于细粒度任务，$p(\text{feature}|\text{identity}, \text{viewpoint})$ 中，identity项的效应量极小。2D方法通过隐式记忆大量视角来解耦，本质上是在拟合 $p(\text{identity}|\text{feature}, \text{viewpoint} \in \text{training views})$——当测试视角超出训练分布时性能急剧下降。</p>
+</div>
+
+<div class="callout danger">
+<p><strong>维度3: 部件定位的几何歧义 (Geometric Ambiguity in Part Localization)</strong></p>
+<p>细粒度判别依赖局部部件（前灯、格栅、后视镜等）。在2D图像中，部件的图像位置随视角发生非线性变化——透视投影将3D刚性运动映射为2D非刚性变形。部件检测器要么需要密集覆盖所有视角（训练成本高），要么泛化到未见过视角时出现严重定位错误。</p>
+</div>
+
+<h3>5.2 先验方法比较表</h3>
+<table>
+<tr><th>方法类别</th><th>代表工作</th><th>核心机制</th><th>视角泛化</th><th>监督需求</th><th>3D信息利用</th></tr>
+<tr><td>2D Bag-of-Words</td><td>SPM (Lazebnik 2006)</td><td>2D空间金字塔+词袋直方图</td><td>弱（依赖密集多视角模板）</td><td>仅类别标签</td><td>无</td></tr>
+<tr><td>可变形部件模型</td><td>DPM (Felzenszwalb 2010), structDPM</td><td>根滤波器+部件滤波器的星形模型</td><td>中等（部件间几何约束）</td><td>边界框+部件标注</td><td>无（2D弹簧约束）</td></tr>
+<tr><td>BubbleBank</td><td>BB (Deng, Krause & Fei-Fei 2013)</td><td>可学习局部模板+2D搜索池化</td><td>中等偏弱</td><td>类别标签</td><td>无</td></tr>
+<tr><td>多视图DPM</td><td>mvDPM</td><td>多视图组件DPM</td><td>中等（每个视角独立组件）</td><td>视角+部件标注</td><td>隐式（多视角离散覆盖）</td></tr>
+<tr><td style="background:#fef3c7;font-weight:700;">3D SPM (本文)</td><td style="background:#fef3c7;">Krause et al. 2013</td><td style="background:#fef3c7;">3D对象坐标系+空间金字塔池化</td><td style="background:#fef3c7;font-weight:700;">强（3D几何对齐）</td><td style="background:#fef3c7;">类别标签+姿态估计器（合成数据训练）</td><td style="background:#fef3c7;">全（3D CAD+姿态）</td></tr>
+<tr><td style="background:#fef3c7;font-weight:700;">3D BubbleBank (本文)</td><td style="background:#fef3c7;">Krause et al. 2013</td><td style="background:#fef3c7;">3D位置绑定气泡+3D邻域池化</td><td style="background:#fef3c7;font-weight:700;">强（3D几何对齐+大池化区域容错）</td><td style="background:#fef3c7;">类别标签+姿态估计器</td><td style="background:#fef3c7;">全（3D CAD+姿态）</td></tr>
+</table>
+
+<h3>5.3 关键挑战总结</h3>
+<table>
+<tr><th style="width:5%;">#</th><th style="width:35%;">挑战</th><th style="width:35%;">为什么难</th><th style="width:25%;">本文如何应对</th></tr>
+<tr><td>C1</td><td><strong>跨视角部件匹配</strong></td><td>同一部件在不同视角下图像位置和外观剧烈变化，2D局部特征描述子引入显著变异</td><td>投影矫正消除透视畸变；3D坐标绑定提供几何对应</td></tr>
+<tr><td>C2</td><td><strong>3D姿态估计</strong></td><td>从单张2D图像精确恢复物体3D姿态是病态问题，尤其当CAD模型与实例不完全匹配时</td><td>合成渲染数据训练专用视角分类器；Top-N多假设+max-pooling吸收不确定性</td></tr>
+<tr><td>C3</td><td><strong>CAD模型覆盖不足</strong></td><td>41个CAD模型无法覆盖所有细粒度类别的形状差异（如皮卡vs轿车）</td><td>粗类别分组共享CAD，利用特征学习的判别能力弥补几何近似的误差</td></tr>
+<tr><td>C4</td><td><strong>计算复杂性</strong></td><td>3D patch投影、矫正、多假设前向传播带来显著计算开销</td><td>预处理patch位置，在线仅做投影+描述子提取；气泡随机采样控制维度</td></tr>
+</table>
+</section>
+
+<!-- ====== 6. METHOD ====== -->
+<section id="method">
+<h2>6. 方法详解与公式推导</h2>
+
+<h3>6.1 公式组1: 3D姿态估计</h3>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.1 — 视角分类器得分</div>
+<p>对于每个粗类别 $g \in \{1,...,7\}$ 和离散视角 $(\phi_a, \phi_e)$（方位角a、仰角e）:</p>
+<p>$$s(g, \phi_a, \phi_e; \mathbf{I}) = \mathbf{w}_{g,\phi_a,\phi_e}^T \cdot \text{HOG}(\mathbf{I}) + b_{g,\phi_a,\phi_e}$$</p>
+<p>其中 HOG特征维度为 $d_{\text{HOG}}$，$\mathbf{w} \in \mathbb{R}^{d_{\text{HOG}}}$ 为线性SVM权重。</p>
+<div class="eq-note">共 $7 \times 36 \times 4 = 1008$ 个二分类器。合成训练数据提供完美的视角标签。分类器的任务是：对于给定图像，判断其是否属于特定粗类别且处于特定视角——这是更简单的判别任务（无需回归连续角度）。</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.2 — Top-N姿态假设选择</div>
+<p>$$\Theta_N(\mathbf{I}) = \left\{ \theta_{(1)}, \theta_{(2)}, ..., \theta_{(N)} \right\} = \underset{\theta \in \Theta}{\text{Top-}N} \ s(g(\theta), \phi_a, \phi_e; \mathbf{I})$$</p>
+<p>其中 $\Theta$ 为所有1008个离散姿态，$g(\theta)$ 为姿态对应的粗类别。</p>
+<div class="eq-note">保留多个假设而非单一最大得分姿态，是因为：(1) 粗类别分类器可能混淆具有相似外观的不同视角（如30°和-30°），(2) 后续的max-pooling操作可以自动选择对分类最有利的假设。</div>
+</div>
+
+<h3>6.2 公式组2: 3D Patch投影与矫正</h3>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.3 — 3D Patch到2D图像的透视投影</div>
+<p>给定3D patch中心 $\mathbf{p}_{\text{3D}} \in \mathbb{R}^3$（在对象坐标系中）和姿态 $\theta = (R, \mathbf{t}, s)$:</p>
+<p>$$\mathbf{p}_{\text{2D}} = \pi\left( K \cdot (sR \cdot \mathbf{p}_{\text{3D}} + \mathbf{t}) \right)$$</p>
+<p>其中 $R \in SO(3)$ 为旋转矩阵（由方位角和仰角定义），$\mathbf{t} \in \mathbb{R}^3$ 为平移，$s$ 为尺度，$K$ 为相机内参，$\pi$ 为齐次归一化投影。</p>
+<div class="eq-note">patch不仅中心点被投影，其四个角点（由支撑矩形定义）也被投影，在2D图像中形成透视畸变的四边形。矫正步骤将四边形映射回统一尺寸的矩形补丁。</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.4 — 透视矫正与描述子提取</div>
+<p>对每个投影后的patch四边形 $Q_i$，计算单应性矩阵 $H_i$ 将其矫正到固定尺寸 $W_p \times H_p$ 的参考矩形:</p>
+<p>$$\mathbf{d}_i = \text{RootSIFT}\left( \text{warp}( \mathbf{I}, H_i, W_p, H_p ) \right)$$</p>
+<p>RootSIFT: 对SIFT描述子做L1归一化后逐元素开方: $\mathbf{d}_{\text{root}} = \sqrt{\mathbf{d}_{\text{L1-norm}}}$</p>
+<div class="eq-note">RootSIFT在匹配任务中被证明优于原始SIFT，因为平方根映射使Hellinger距离等价于欧氏距离，且对大值分量更具鲁棒性。</div>
+</div>
+
+<h3>6.3 公式组3: SPM-3D特征构建</h3>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.5 — 3D空间金字塔维度</div>
+<p>将对象表面参数化为 $S = [0, 2\pi) \times [-\pi/2, \pi/2]$（方位角×仰角）。金字塔层级 $l \in \{0, 1, 2\}$，每层将S划分为 $2^l \times 2^l$ 个等面积网格（实际中方位角做等角度划分，仰角按 $\sin$ 等间隔划分保证等面积）。</p>
+<p>层级0: 1×1=1个bin，层级1: 2×2=4个bins，层级2: 4×4=16个bins，总计 $1+4+16=21$ 个3D空间bin。</p>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.6 — SPM-3D特征向量</div>
+<p>对于姿态假设 $\theta$，SPM-3D特征为所有21个bin的量化描述子直方图的串联:</p>
+<p>$$\phi_{\text{SPM-3D}}(\mathbf{I}, \theta) = \bigoplus_{l=0}^{2} \bigoplus_{b=1}^{4^l} \mathbf{h}_{l,b}(\mathbf{I}, \theta)$$</p>
+<p>其中 $\mathbf{h}_{l,b} \in \mathbb{R}^{K}$ 为码本尺寸 $K$ 的直方图:</p>
+<p>$$\mathbf{h}_{l,b}^{(k)} = \sum_{i: \mathbf{p}_{\text{3D}}^{(i)} \in \text{bin}(l,b)} \mathbf{1}\left[ q(\mathbf{d}_i) = k \right]$$</p>
+<p>$q(\cdot)$ 为描述子到码本的量化函数（最近邻分配）。</p>
+<div class="eq-note">空间金字塔的金字塔匹配核理论保证了：当patch在3D表面均匀分布时，bin内部做直方图池化等价于一个近似的3D空间匹配核。多尺度bin提供粗到细的3D空间分辨率。</div>
+</div>
+
+<h3>6.4 公式组4: BB-3D特征构建</h3>
+
+<div class="formula-block">
+<div class="eq-tag">Eq.7 — BB-3D气泡响应</div>
+<p>设有 $M$ 个气泡，每个气泡 $j$ 由描述子模板 $\mathbf{b}_j$ 和3D位置 $\mathbf{p}_{\text{3D}}^{(j)}$ 定义。气泡 $j$ 在姿态 $\theta$ 下的响应为:</p>
+<p>$$r_j(\mathbf{I}, \theta) = \max_{i: \|\mathbf{p}_{\text{3D}}^{(i)} - \mathbf{p}_{\text{3D}}^{(j)}\|_2 \leq \delta} \text{sim}(\mathbf{d}_i, \mathbf{b}_j)$$</p>
+<p>BB-3D特征为所有气泡响应的串联:</p>
+<p>$$\phi_{\text{BB-3D}}(\mathbf{I}, \theta) = [r_1, r_2, ..., r_M]^T$$</p>
+<p>其中 $\delta$ 为3D搜索半径，$\text{sim}(\cdot, \cdot)$ 为描述子相似度（如点积或负欧氏距离）。</p>
+<div class="eq-note">关键创新：max-pooling发生在3D邻域内，而非2D图像邻域内。这意味着即使部件在2D图像中位置偏移极大，只要其在3D对象表面上处于气泡的邻域范围内，就能产生高响应。较大的 $\delta$ 提供了对姿态估计误差的容错能力。</div>
+</div>
+
+<h3>6.5 参数汇总表</h3>
+<table>
+<tr><th>参数</th><th>符号</th><th>值/范围</th><th>含义</th></tr>
+<tr><td>CAD模型数</td><td>$N_{\text{CAD}}$</td><td>41</td><td>用于合成渲染和3D表面采样的汽车CAD模型</td></tr>
+<tr><td>粗类别数</td><td>$G$</td><td>7</td><td>sedan, SUV, coupe, convertible, pickup, hatchback, station wagon</td></tr>
+<tr><td>方位角离散数</td><td>$N_a$</td><td>36</td><td>每10度一个方位角</td></tr>
+<tr><td>仰角离散数</td><td>$N_e$</td><td>4</td><td>覆盖典型观察仰角</td></tr>
+<tr><td>合成图像数</td><td>$N_{\text{syn}}$</td><td>59,040</td><td>41×36×4×10背景</td></tr>
+<tr><td>视角分类器数</td><td>$N_{\text{clf}}$</td><td>1,008</td><td>7×36×4 HOG+SVM</td></tr>
+<tr><td>SPM金字塔层数</td><td>$L$</td><td>3 (l=0,1,2)</td><td>1×1+2×2+4×4=21个3D空间bin</td></tr>
+<tr><td>3D表面patch数</td><td>$N_p$</td><td>~数千/模型</td><td>Dart throwing采样密度</td></tr>
+<tr><td>码本尺寸</td><td>$K$</td><td>~数百到数千</td><td>RootSIFT聚类中心数</td></tr>
+<tr><td>BB-3D气泡数</td><td>$M$</td><td>~数千</td><td>随机采样自训练集</td></tr>
+<tr><td>3D搜索半径</td><td>$\delta$</td><td>~0.2-0.5m（对象尺度归一化）</td><td>气泡的3D邻域半径</td></tr>
+<tr><td>Top-N假设数</td><td>$N$</td><td>~5-10</td><td>保留的姿态假设数量</td></tr>
+</table>
+</section>
+
+<!-- ====== 7. PRINCIPLES ====== -->
+<section id="principles">
+<h2>7. 深层原理与机制分析</h2>
+
+<h3>7.1 深度机制解释 (Deep Mechanistic Reading)</h3>
+
+<div class="callout idea">
+<p><strong>基本原理: 几何不变性优于视觉不变性</strong></p>
+<p>深度学习时代的主流思路是通过海量数据和数据增强训练神经网络隐式学习视角不变性。本文采取的路线完全不同：<strong>显式地将3D几何注入表示空间，使不变性成为表示的归纳偏置，而非学习的经验结果</strong>。这相当于在特征空间中"除以"视角变换群 $SE(3)$ 的作用——不同视角下同一部件的3D坐标是相同的（在对象坐标系中），因此3D池化天然具有 $SE(3)$-不变性。</p>
+<p>数学上，2D图像形成 $I = \text{render}(M, \theta, L)$，其中 $M$ 为3D模型，$\theta$ 为视角，$L$ 为光照。直接对 $I$ 分类需要解耦 $\theta$ 和 $M$ 的身份信息。本文通过估计 $\theta$ 并在3D坐标系中操作，有效地执行了"逆渲染"(inverse rendering)——将像素重新映射回对象表面，在表面空间中进行判别分析。</p>
+</div>
+
+<div class="callout info">
+<p><strong>SPM-3D vs BB-3D: 两种3D池化范式的对比</strong></p>
+<p><strong>SPM-3D（结构化池化）</strong>: 将3D表面按预设的方位角×仰角网格分区，每个区域独立做直方图统计。优势在于区域具有明确的几何含义（如前脸、侧面、后部），特征可解释性强。缺点在于网格边界是硬性的——恰好落在边界附近的patch可能被分配到"错误"的bin。</p>
+<p><strong>BB-3D（分布式池化）</strong>: 通过大量随机散布的3D气泡定义重叠的感兴趣区域。优势在于软边界——气泡通过连续相似度加权而非硬分配，且大量气泡的冗余表示提供了平滑的特征空间。缺点在于特征维度高且可解释性弱。</p>
+<p>这种"结构化vs分布式"的对偶设计使两种方法在信息编码上具有互补性，解释了为什么两者融合后性能提升显著。</p>
+</div>
+
+<h3>7.2 方法比较行 (cmp-row)</h3>
+
+<div class="cmp-row">
+<div class="cmp-col">
+<h4 style="color:#1d4ed8;">SPM-3D</h4>
+<ul>
+<li><strong>池化方式:</strong> 硬网格分区 + 直方图</li>
+<li><strong>空间分辨率:</strong> 21个预定义3D区域</li>
+<li><strong>特征类型:</strong> 量化码本直方图</li>
+<li><strong>可解释性:</strong> 高（每个bin有明确几何含义）</li>
+<li><strong>参数效率:</strong> 高（特征维度=21×K）</li>
+<li><strong>对姿态误差敏感性:</strong> 中等偏高（硬边界导致错位）</li>
+<li><strong>计算开销:</strong> 较低（仅需直方图统计）</li>
+<li><strong>适合场景:</strong> 已知大致姿态、部件分布均匀的对象</li>
+</ul>
+</div>
+<div class="cmp-col">
+<h4 style="color:#6d28d9;">BB-3D</h4>
+<ul>
+<li><strong>池化方式:</strong> 3D邻域max-pooling</li>
+<li><strong>空间分辨率:</strong> 数千个重叠3D邻域</li>
+<li><strong>特征类型:</strong> 连续相似度响应值</li>
+<li><strong>可解释性:</strong> 低（气泡无明确语义）</li>
+<li><strong>参数效率:</strong> 低（特征维度=M=~数千）</li>
+<li><strong>对姿态误差敏感性:</strong> 低（大邻域容错）</li>
+<li><strong>计算开销:</strong> 较高（M×N_p次相似度计算）</li>
+<li><strong>适合场景:</strong> 姿态估计噪声大、需要冗余表示的场景</strong></li>
+</ul>
+</div>
+<div class="cmp-col">
+<h4 style="color:#047857;">融合策略</h4>
+<ul>
+<li><strong>特征级联:</strong> 将SPM-3D和BB-3D（以及2D SPM和2D BB）的特征向量直接拼接</li>
+<li><strong>互补性来源:</strong> 结构化池化捕捉全局几何分布；分布式池化捕捉局部判别性纹理</li>
+<li><strong>2D+3D多粒度:</strong> 2D特征提供视图特定的判别信息（如某特殊涂装），3D特征提供视角不变的几何信息</li>
+<li><strong>融合后性能:</strong> Car-197上四方法堆叠达到75.5%——相比单方法最高69.5%提升6个百分点</li>
+</ul>
+</div>
+</div>
+
+<h3>7.3 泛化机制原理</h3>
+<p>3D表示提供泛化能力的根本机制可以分解为三个层面：</p>
+<ol>
+<li><strong>外观归一化 (Appearance Normalization)</strong>: 透视矫正将不同视角下同一3D patch的畸变外观映射到统一参考框架，使后续描述子提取对外观视角变异具有不变性。</li>
+<li><strong>位置归一化 (Position Normalization)</strong>: 3D坐标绑定使特征的空间位置由对象几何而非成像几何定义，消除了成像过程中视角对空间位置的调制。</li>
+<li><strong>尺度归一化 (Scale Normalization)</strong>: CAD模型提供绝对尺度参考，3D邻域的物理尺寸（如0.3m）映射到图像上随距离自适应调整。</li>
+</ol>
+<p>这三重归一化构成一个<strong>3D解耦流水线</strong>：视角变化的影响在特征提取阶段被逐层剥离，使得分类器面对的表示空间仅保留身份相关的变异。</p>
+</section>
+
+<!-- ====== 8. FIGURES & EVIDENCE ====== -->
+<section id="figures">
+<h2>8. 图像解读与实验证据</h2>
+
+<h3>8.1 Fig.1 — 3D表示动机示意图</h3>
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 1</span>
+<span class="fig-caption">二维部件检测 vs 三维几何对齐的核心动机</span>
+<span class="fig-source">From original paper</span>
+</div>
+<div class="fig-image">
+<img src="figures/overview.png" alt="3D Object Representations for Fine-Grained Categorization - overview figure" onerror="this.parentElement.innerHTML='<div class=fig-placeholder>Image: Overview figure showing 2D vs 3D part correspondence across viewpoints</div>'">
+</div>
+<div class="fig-interpretation">
+<span class="fig-label">解读</span>
+<p><strong>核心信息:</strong> 左图展示同一汽车部件（如前灯）在不同视角拍摄的图像中，其2D图像坐标和外观发生剧烈变化——前灯在正视图位于底部中心，在侧视图中可能移至图像边缘或完全不可见。右图展示在3D对象坐标系中，同一部件的3D表面位置固定不变，所有视角下的外观变化源于透视投影而非部件本身的结构变化。</p>
+<p><strong>关键洞察:</strong> 这张图将论文的哲学核心可视化：细粒度识别的困难不是"部件长什么样"的问题，而是"部件在哪里"的问题。一旦在3D空间中定位了部件，其外观可以在几何一致的条件下进行比较。这区别于深度学习方法隐式学习视角不变性的范式——本文选择<strong>显式估计并消除</strong>视角效应。</p>
+</div>
+</div>
+
+<h3>8.2 关键实验结果解读</h3>
+
+<table>
+<tr><th>数据集</th><th>类别数</th><th>难度</th><th>最佳2D方法</th><th>最佳3D方法</th><th>3D提升</th></tr>
+<tr><td>car-types</td><td>8</td><td>粗粒度（类型级）</td><td>structDPM: 93.5%</td><td><strong>BB-3D-G: 94.5%</strong></td><td>+1.0% over best prior</td></tr>
+<tr><td>BMW-10</td><td>10</td><td>超细粒度（同品牌）</td><td>BB (flipped): 69.3%</td><td><strong>BB-3D-G (flipped): 76.0%</strong></td><td>+6.7% over 2D BB</td></tr>
+<tr><td>Car-197</td><td>196</td><td>大规模细粒度</td><td>SPM: 69.5%</td><td>BB-3D-G: 67.6%</td><td>—（2D SPM略优）</td></tr>
+<tr style="background:#fef3c7;"><td>Car-197 (融合)</td><td>196</td><td>大规模+融合</td><td>—</td><td><strong>All 4 stacked: 75.5%</strong></td><td>+6.0% over best single</td></tr>
+</table>
+
+<div class="callout warn">
+<p><strong>BMW-10的超线性增益解读：</strong>BMW-10数据集上的增益最大（+7.4%无翻转，+6.7%有翻转），因为该数据集是同一品牌内不同型号的区分——所有车型共享非常相似的全局形状和布局，判别信息高度集中在微小几何差异（如格栅形状、前灯轮廓）上。这些差异在2D空间中极易被视角变化淹没，但在3D几何对齐后变得可区分。BB-3D的大池化区域在这个极难任务中恰恰提供了关键的空间容错能力。</p>
+</div>
+
+<div class="callout info">
+<p><strong>Car-197上2D SPM超越3D方法的原因：</strong>这是论文中最具启示性的"负面结果"。Car-197包含皮卡等具有独特2D外观但3D CAD覆盖不足的类别。3D方法的性能由CAD模型质量决定——当CAD无法近似目标形状时，3D投影引入的几何误差可能超过对齐带来的收益。这揭示了一个重要的方法论教训：<strong>几何先验的注入必须是"软性"的</strong>——在几何不可靠时应允许特征提取回退到2D路径。四方法堆叠的优异表现（75.5%）证明了2D和3D特征的互补性。</p>
+</div>
+
+<h3>8.3 消融实验分析</h3>
+<p>论文隐含的消融维度包括：</p>
+<ul>
+<li><strong>姿态估计精度 vs 分类性能：</strong>BB-3D-G（真实姿态标注下）显著优于BB-3D-L（学习姿态估计下），表明更精确的3D对齐带来更大的性能增益上限。这暗示姿态估计是3D细粒度识别流水线的关键瓶颈。</li>
+<li><strong>CAD模型数量和质量：</strong>41个CAD模型/7个粗类别的覆盖显然是有限的——暗示增加CAD多样性的边际收益可能很大。</li>
+<li><strong>Top-N假设数：</strong>N的选择在计算开销和姿态不确定性吸收之间形成trade-off，论文未详细展开但暗含该超参数的重要性。</li>
+</ul>
+</section>
+
+<!-- ====== 9. POTENTIAL FLAW ====== -->
+<section id="flaw">
+<h2>9. 潜在缺陷与扩展分析</h2>
+
+<h3>9.1 方法局限性 (Limitations)</h3>
+
+<table>
+<tr><th style="width:5%;">#</th><th style="width:30%;">局限</th><th style="width:45%;">详细说明</th><th style="width:20%;">严重程度</th></tr>
+<tr><td>L1</td><td><strong>刚性假设</strong></td><td>方法严格要求对象具有刚性结构。对于可变形对象（动物、衣物、手势等），3D表面位置在实例间不恒定，CAD模型的几何约束将引入系统性对齐误差</td><td><span class="tag tag-red">高</span></td></tr>
+<tr><td>L2</td><td><strong>CAD依赖性</strong></td><td>需要可用的3D CAD模型进行patch采样和姿态估计训练。对很多细粒度领域（特殊植物、历史文物、稀有物种），高质量CAD模型难以获取</td><td><span class="tag tag-red">高</span></td></tr>
+<tr><td>L3</td><td><strong>无纹理表面</strong></td><td>基于RootSIFT的局部特征提取依赖充足纹理。纯色车身、光滑表面等场景下特征点稀疏，3D表示退化为几乎无信息的稀疏向量</td><td><span class="tag tag-amber">中</span></td></tr>
+<tr><td>L4</td><td><strong>遮挡脆弱性</strong></td><td>严重遮挡破坏3D姿态估计（HOG全局特征无法处理部分可见性），进而导致后续3D投影系统性错误</td><td><span class="tag tag-amber">中</span></td></tr>
+<tr><td>L5</td><td><strong>计算开销</strong></td><td>对每个测试图像，需要执行1008次SVM评分+数千次patch投影矫正+描述子提取+多假设特征构建。远高于端到端CNN的单次前向传播</td><td><span class="tag tag-amber">中</span></td></tr>
+<tr><td>L6</td><td><strong>非端到端</strong></td><td>流水线各阶段（姿态估计、patch投影、特征提取、分类）独立设计和训练，无法通过反向传播联合优化。这限制了系统在整体目标上的优化能力</td><td><span class="tag tag-blue">低-中</span></td></tr>
+</table>
+
+<h3>9.2 可能的扩展方向 (Extensions)</h3>
+
+<ol>
+<li><strong>端到端3D-aware CNN:</strong> 将本文的3D几何对齐思想嵌入深度学习框架。例如，用Spatial Transformer Network (STN) 将特征图根据估计的3D姿态进行几何变换，在CNN特征空间中实现类似SPM-3D的3D池化。这保留了可微性和联合优化的优势。</li>
+<li><strong>可变形3D模型:</strong> 对于非刚性类别，引入可变形3D模型（如SMPL用于人体）或学习实例级3D形变场，将"刚性对齐"扩展为"弹性对齐"。</li>
+<li><strong>无CAD的3D重建:</strong> 使用Structure-from-Motion或NeRF从多视图图像自动重建类别级3D模型，替代手工CAD——消除CAD获取瓶颈。</li>
+<li><strong>多模态融合:</strong> 结合RGB和深度传感器的直接3D测量，绕过单目姿态估计的不确定性。</li>
+<li><strong>跨类别3D迁移:</strong> 在CAD丰富的类别（如汽车）上学习3D特征提取器，迁移到CAD匮乏的细粒度类别。</li>
+</ol>
+
+<h3>9.3 敏感性分析 (Sensitivity Analysis)</h3>
+
+<div class="callout danger">
+<div class="callout-title">★★★★★ 敏感性分析</div>
+<p><strong>1. 对CAD模型质量的敏感性 (★★★★★):</strong> 这是最高敏感度维度。Car-197上2D SPM超越3D方法的结果直接表明：当CAD模型不能良好近似对象几何时，3D表示不仅无益，反而有害（引入系统性投影误差）。这暗示在实际部署中，CAD模型的筛选和验证是决定成败的关键。</p>
+<p><strong>2. 对姿态估计精度的敏感性 (★★★★):</strong> BB-3D-G vs BB-3D-L的显著性能差距表明姿态精度极为关键。Top-N多假设+max-pooling提供了有限的鲁棒性缓冲，但不能完全补偿大幅度的姿态错误。</p>
+<p><strong>3. 对纹理密度的敏感性 (★★★★):</strong> RootSIFT依赖局部梯度信息。在均匀表面区域，描述子歧义性增加，3D匹配的精度退化。密集采样策略一定程度上缓解了此问题。</p>
+<p><strong>4. 对3D池化分辨率的敏感性 (★★★):</strong> SPM-3D的3层金字塔设计提供了适中的空间分辨率。更细的网格可能捕获更精细的几何差异，但也会增加对姿态误差的敏感性（bin越小越容易"错位"）。</p>
+<p><strong>5. 对训练数据规模的敏感性 (★★):</strong> 3D表示本质上比2D表示更具数据效率——因为几何先验已经嵌入了视角不变性，减少了模型需要从数据中学习的"视角补偿"量。</p>
+</div>
+</section>
+
+<!-- ====== 10. MOTIVATION ====== -->
+<section id="motivation">
+<h2>10. 研究动机与推导逻辑</h2>
+
+<h3>10.1 五步推导链 (5-Step Derivation)</h3>
+
+<div class="formula-block">
+<div class="eq-tag">Step 1: 识别根本矛盾</div>
+<p>细粒度类别之间的外观差异（如不同车型格栅的细微形状差异）远小于视角变化造成的同类别外观差异。即：</p>
+<p>$$\max_{c \neq c'} \|\phi(I_c) - \phi(I_{c'})\| \ll \max_{\theta \neq \theta'} \|\phi(I_{c,\theta}) - \phi(I_{c,\theta'})\|$$</p>
+<p>因此，2D分类器的判别能力被视角噪声淹没。解决问题的关键在于<strong>缩小类内方差</strong>（通过几何归一化）而非增大类间距离。</p>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Step 2: 寻找信息不变性</div>
+<p>对刚性物体，部件在3D对象坐标系中的位置和外观具有视角不变性:</p>
+<p>$$\mathbf{p}_{\text{3D}} = g^{-1}(\mathbf{p}_{\text{2D}}; \theta) \quad \text{其中} \quad \frac{\partial \mathbf{p}_{\text{3D}}}{\partial \theta} = 0$$</p>
+<p>这意味着如果知道姿态 $\theta$，就可以将图像测量 $\mathbf{p}_{\text{2D}}$ 唯一映射到视角不变的3D坐标 $\mathbf{p}_{\text{3D}}$。</p>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Step 3: 解决姿态估计问题</div>
+<p>3D表示依赖姿态估计。由于合成渲染数据可以免费获得完美的姿态标注，训练视角估计器是可行的。进一步，保留Top-N假设并在特征空间中max-pooling，可以将估计误差建模为可吸收的不确定性，而非致命错误。</p>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Step 4: 将2D表示移植到3D</div>
+<p>不需要发明全新的3D表示。将已被验证有效的2D池化机制（空间金字塔、气泡池化）的池化定义域从 $\mathbb{R}^2$（图像平面）改为 $S^2$（对象表面流形），核心算法不变但信息内容从视角相关变为视角不变。</p>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">Step 5: 实验验证假设</div>
+<p>在从粗（car-types）到细（BMW-10）的数据谱系上，3D方法一致优于2D对应方法，且BMW-10（最细粒度的任务）上增益最大——验证了"越细粒度，几何对齐越重要"的假设。</p>
+</div>
+
+<h3>10.2 一句话核心 (One-Sentence Core)</h3>
+<div class="callout tip">
+<p><strong>One-sentence takeaway:</strong> 将2D细粒度视觉表示提升到3D对象坐标系中，利用类别级CAD模型估计物体姿态，在对象表面空间进行几何一致的局部特征提取和空间池化——这使得同一部件在不同视角下映射到相同的3D位置，从而将细粒度分类从"视角记忆"问题转化为"3D结构理解"问题。3D表示在越细粒度的任务中增益越大，证明了几何对齐对细粒度识别的根本重要性。</p>
+</div>
+</section>
+
+<!-- ====== 11. READING TAKEAWAY ====== -->
+<section id="takeaway">
+<h2>11. 阅读收获与迁移应用</h2>
+
+<h3>11.1 核心教训 (Lessons Learned)</h3>
+
+<ol>
+<li><strong>几何先验是数据效率的倍增器：</strong> 显式注入3D几何先验（通过CAD模型和姿态估计）使得表示天然具有视角不变性，极大减少了从数据中学习这种不变性所需的样本量。在数据稀缺的细粒度场景中，几何先验的价值超过更多训练数据。</li>
+<li><strong>"维度提升"是一种高杠杆创新策略：</strong> 将已有2D方法（SPM、BB）的操作空间从2D提升到3D，保留了方法的核心优势同时获得了全新的性质（视角不变性）。这种"重参数化式创新"比从零发明更容易落地和被接受。</li>
+<li><strong>合成数据+真实数据混合训练是实用范式：</strong> 用合成渲染数据训练姿态估计器（无需真实姿态标注），用真实数据训练分类器（获得判别性），形成了一种优雅的数据组合策略。</li>
+<li><strong>"软接口"设计至关重要：</strong> Top-N多假设+max-pooling在姿态估计和3D池化之间建立了软接口，使得姿态估计的不完美不会导致灾难性失败。这种模块间的容错设计是端到端流水线实用化的关键。</li>
+<li><strong>瓶颈分析驱动研究设计：</strong> 论文明确指出3D表示的性能受制于CAD模型覆盖（Car-197 vs car-types），这种诚实的局限性分析为后续研究指明了最优投入方向。</li>
+</ol>
+
+<h3>11.2 无人机(UAV)应用迁移</h3>
+
+<div class="callout idea">
+<div class="callout-title">UAV 场景应用潜力</div>
+<p><strong>应用场景1: 无人机航拍车辆细粒度识别</strong></p>
+<p>无人机从高空拍摄地面车辆，视角变化极大（从垂直俯拍到倾斜视角）。传统2D细粒度模型在不同飞行高度和角度下性能不稳定。迁移思路：(1) 使用3D车辆CAD模型构建视角归一化流水线；(2) 利用无人机的GPS+IMU提供粗略的拍摄姿态先验，缩小视角假设空间；(3) 在俯拍场景中，仰角维度可能简化为窄范围，方位角不确定性来自车辆朝向——可以利用道路方向作为先验。这将显著提升无人机交通监控、停车场车辆型号识别等任务的跨飞行参数泛化能力。</p>
+</div>
+
+<div class="callout tip">
+<div class="callout-title">UAV 应用场景2: 无人机基础设施细粒度检测</div>
+<p>电力线巡检中需要识别不同型号的绝缘子、金具等部件（跨型号差异微小）。不同铁塔、不同飞行轨迹导致拍摄视角极度多变。迁移思路：利用基础设施的设计CAD图纸构建3D模型库，对每个检测到的部件区域进行3D姿态估计和几何归一化，在3D部件空间中进行细粒度分类。这比单纯的2D图像识别具有更好的跨铁塔、跨飞行路线泛化性。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">UAV 应用挑战</div>
+<p>(1) 无人机图像的尺度变化比地面图像更剧烈（飞行高度从30m到300m），3D CAD模型需支持多尺度匹配。(2) 运动模糊和高空大气散射降低了局部纹理质量，影响RootSIFT等手工特征的可靠性——需要现代CNN特征替代。(3) 实时性要求限制了计算密集的3D投影和多假设评估，需要工程优化或模型蒸馏。</p>
+</div>
+
+<h3>11.3 关键公式速查</h3>
+
+<div class="formula-block">
+<div class="eq-tag">核心公式卡片</div>
+<p><strong>SPM-3D特征:</strong></p>
+<p>$$\phi_{\text{SPM-3D}}(\mathbf{I}, \theta) = \bigoplus_{l=0}^{2} \bigoplus_{b=1}^{4^l} \sum_{i \in \text{bin}(l,b)} \mathbf{e}_{q(\mathbf{d}_i)}$$</p>
+<p><strong>BB-3D气泡响应:</strong></p>
+<p>$$r_j(\mathbf{I}, \theta) = \max_{i: \|\mathbf{p}_{\text{3D}}^{(i)} - \mathbf{p}_{\text{3D}}^{(j)}\| \leq \delta} \langle \mathbf{d}_i, \mathbf{b}_j \rangle$$</p>
+<p><strong>多假设分类:</strong></p>
+<p>$$c^* = \arg\max_c \max_{\theta \in \Theta_N(\mathbf{I})} \mathbf{w}_c^T \phi(\mathbf{I}, \theta)$$</p>
+</div>
+
+<h3>11.4 参考文献链</h3>
+
+<table>
+<tr><th style="width:5%;">#</th><th>文献</th><th>关联</th></tr>
+<tr><td>1</td><td><strong>Krause, Stark, Deng, Fei-Fei. "3D Object Representations for Fine-Grained Categorization." ICCVW 2013.</strong></td><td>本文</td></tr>
+<tr><td>2</td><td>Deng, Krause, Fei-Fei. "Fine-Grained Crowdsourcing for Fine-Grained Recognition." CVPR 2013.</td><td>BubbleBank的原论文，提出了2D气泡表示</td></tr>
+<tr><td>3</td><td>Lazebnik, Schmid, Ponce. "Beyond Bags of Features: Spatial Pyramid Matching for Recognizing Natural Scene Categories." CVPR 2006.</td><td>SPM的原论文，定义了2D空间金字塔匹配</td></tr>
+<tr><td>4</td><td>Felzenszwalb, Girshick, McAllester, Ramanan. "Object Detection with Discriminatively Trained Part-Based Models." PAMI 2010.</td><td>DPM框架，structDPM的基准</td></tr>
+<tr><td>5</td><td>Arandjelovic, Zisserman. "Three things everyone should know to improve object retrieval." CVPR 2012.</td><td>RootSIFT的提出，本文使用的关键特征描述子</td></tr>
+<tr><td>6</td><td>Fei-Fei, Perona. "A Bayesian Hierarchical Model for Learning Natural Scene Categories." CVPR 2005.</td><td>同一研究组的早期工作，展示了从2D到3D表示的研究演进</td></tr>
+</table>
+
+<p class="source" style="margin-top:18px;font-size:12px;color:var(--text-muted);">This analysis is grounded in the full paper text (ICCVW 2013), including abstract, methods, experiments, and conclusions. All quantitative values are sourced from the paper. The UAV application section is speculative transfer analysis by the note author.</p>
+</section>
+
+</main></div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Huazhe Xu · Paper ID 10443 · MathJax + Mermaid Rendering · Enhanced Edition</footer>
+</body></html>

@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - MoE-DP: An MoE-Enhanced Diffusion Policy for Robust Long-Horizon Manipulation</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="container">
+
+<!-- ============================================================ -->
+<!-- S1 Paper Info -->
+<!-- ============================================================ -->
+<section id="info">
+<h2>&#167;1 Paper Info</h2>
+<h1>MoE-DP: An MoE-Enhanced Diffusion Policy for Robust Long-Horizon Manipulation</h1>
+
+<table>
+<tr><td style="width:130px;font-weight:700;">Authors</td><td>Cheng et al.</td></tr>
+<tr><td style="font-weight:700;">Year</td><td>2025</td></tr>
+<tr><td style="font-weight:700;">Venue</td><td>arXiv preprint</td></tr>
+<tr><td style="font-weight:700;">Affiliations</td><td><span class="bold-affil">Tsinghua University</span>, <span class="bold-affil">IIIS</span> (Institute for Interdisciplinary Information Sciences)</td></tr>
+<tr><td style="font-weight:700;">Project Page</td><td>待确认</td></tr>
+<tr><td style="font-weight:700;">Code</td><td>待开源</td></tr>
+<tr><td style="font-weight:700;">Research Type</td><td>长时序扩散策略 &#8226; 混合专家模型 (MoE) &#8226; 机器人操作 &#8226; 阶段感知表示学习</td></tr>
+<tr><td style="font-weight:700;">Local Source</td><td><a href="Cheng et al. - 2025 - MoE-DP An MoE-enhanced diffusion policy for robust long-horizon robotic manipulation with skill dec.pdf">Cheng et al. - 2025 - MoE-DP An MoE-enhanced diffusion policy for robust long-horizon robotic manipulation with skill dec.pdf</a></td></tr>
+</table>
+
+<div style="margin:10px 0 6px;">
+<span class="tag tag-purple">Mixture of Experts</span>
+<span class="tag tag-blue">Diffusion Policy</span>
+<span class="tag tag-amber">Long-Horizon Manipulation</span>
+<span class="tag tag-green">Phase-Aware</span>
+<span class="tag tag-cyan">Sparse Routing</span>
+<span class="tag tag-red">Failure Recovery</span>
+<span class="tag tag-gray">Skill Decomposition</span>
+<span class="tag tag-purple">Huazhe Xu</span>
+<span class="tag tag-amber">Load Balance</span>
+<span class="tag tag-blue">Franka Robot</span>
+</div>
+
+<h3>1.1 TL;DR</h3>
+<div class="callout info">
+<div class="callout-title">一句话总结</div>
+<p>MoE-DP 在视觉编码器与扩散动作模型之间插入一个稀疏的 Mixture of Experts 层，通过负载均衡和熵辅助损失训练，使不同专家<strong>自发涌现</strong>出对应任务阶段（如接近、抓取、运输、放置）的语义分工。这种<strong>阶段感知的条件表示</strong>使得扩散策略在遭遇中间步骤失败时能够自动回退并重试当前阶段，而非盲目前进导致级联失败——同时，MoE 路由的显式可控性还允许在推理时无需重训即可重新排列技能执行顺序。</p>
+</div>
+
+<p>MoE-DP 以简洁而优雅的方式回答了一个关键问题：<strong>长时序操作鲁棒性的提升，不应来自把单一策略网络做得更大，而应来自让内部表示自然形成可复用的阶段结构</strong>。通过在标准扩散策略的条件通道中插入稀疏 MoE 层，该工作实现了对任务阶段的自发解耦——这是一种不依赖人工标注阶段标签的"免费"结构涌现。</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- S2 Insight & Novelty -->
+<!-- ============================================================ -->
+<section id="insight">
+<h2>&#167;2 Insight &amp; Novelty</h2>
+
+<h3>2.1 Core Insight (Q&amp;A 格式)</h3>
+<div class="callout idea">
+<div class="callout-title">问：为什么普通的 Diffusion Policy 在长时序任务中不可靠？</div>
+<p><strong>答：</strong>普通扩散策略的隐变量空间高度<strong>纠缠</strong>（entangled），缺乏对任务阶段的显式或隐式感知。当中间步骤（如抓取）失败时，策略并不知道"当前应该重试抓取"还是"继续执行下一阶段"——因为它没有将观测映射到一个明确的"阶段标识"。这导致抓取失败后策略可能错误执行放置动作（因为抓取帧和放置帧在某些视觉特征上相似），从而造成<strong>级联失败</strong>：一步出错，整个任务序列崩塌。</p>
+<p>MoE-DP 的核心洞察是：<strong>如果不同专家对不同的任务阶段产生专门的响应，那么策略的隐空间就自然地被"阶段化"了</strong>。稀疏路由的门控网络会根据当前观测选择一个（或少数几个）专家——这个选择本身就携带了阶段信息。当抓取失败时，门控网络仍然会把观测路由到"抓取阶段"专家，从而触发重试而非跳转。</p>
+</div>
+
+<h3>2.2 问题 - 解决方案 - 机制 映射表</h3>
+<table>
+<thead>
+<tr><th>问题</th><th>解决方案</th><th>核心机制</th></tr>
+</thead>
+<tbody>
+<tr><td>扩散策略隐变量高度纠缠，缺乏阶段感知，中间失败后仍执行下一阶段动作</td><td>在视觉编码器和扩散头之间插入稀疏 MoE 层</td><td>不同专家自发对应不同任务阶段；门控路由选择当前阶段专家</td></tr>
+<tr><td>MoE 训练中专家坍缩（所有路由到同一专家，其余闲置）</td><td>负载均衡损失 + 熵辅助损失</td><td>负载均衡损失鼓励均匀使用专家；熵损失鼓励路由概率分布具有适度不确定性</td></tr>
+<tr><td>需要推理时改变任务阶段顺序（如先放碗再关门 vs 先关门再放碗）</td><td>显式专家激活控制接口</td><td>推理时可通过修改门控权重或硬指定专家 ID 来重排技能顺序，无需重训</td></tr>
+<tr><td>多阶段任务中，不同任务可能需要不同的专家数量和路由配置</td><td>MoE 超参数任务自适应</td><td>专家数量、Top-K 路由可针对具体任务调整；专家语义通过训练涌现</td></tr>
+</tbody>
+</table>
+
+<h3>2.3 三项核心创新点</h3>
+
+<div class="novelty-card">
+<h4>&#9312; MoE 层插入扩散策略条件通道：阶段感知的条件计算</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>标准扩散策略的条件编码器将所有观测映射到统一的隐空间，没有机制区分任务阶段——这导致表示高度纠缠，策略在面对中间失败时缺乏"阶段意识"。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>大语言模型中的 Mixture of Experts (MoE) 架构——不同专家自发学习不同领域知识（如数学、代码、常识）。作者猜想：如果 MoE 能够自发解耦"知识域"，那么它也应该能自发解耦"操作阶段域"——因为操作阶段（approach, grasp, transport, place）在观测空间中具有天然的可分离性（手与物体的相对位置不同）。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>在视觉编码器（将多视角观测编码为条件特征）和扩散去噪 UNet 之间插入稀疏 MoE 层。门控网络对每个观测 token 计算专家选择概率，Top-K 激活少量专家。被选中的专家对条件特征做非线性变换，输出到扩散模型的 cross-attention 层。关键设计是：<em>MoE 的输出不是替代条件特征，而是作为条件特征的补充调制信号</em>——这保持了与预训练视觉编码器的兼容性。</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9313; 双辅助损失函数：防止专家坍缩的结构化正则</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>稀疏 MoE 在训练中容易出现"专家坍缩"——门控网络学会将所有样本路由到同一专家，其余专家被完全忽略（死专家问题）。这会退化为普通的单路网络，完全丧失阶段解耦能力。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>Switch Transformer 等 NLP MoE 工作中的负载均衡损失（load-balance loss），以及熵正则化在强化学习中鼓励探索的思想。在操作任务中，不仅需要专家使用均衡，还需要路由选择具有适度的不确定性（因为过渡帧可能同时属于两个阶段）。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>两项辅助损失：(1) <strong>Load-Balance Loss</strong>——$\mathcal{L}_{\text{lb}} = N \cdot \sum_{i=1}^{N} f_i \cdot P_i$，其中 $f_i$ 是路由到专家 $i$ 的样本比例，$P_i$ 是路由到专家 $i$ 的平均概率。这惩罚了"少数专家承载全部流量"的情况。(2) <strong>Entropy Loss</strong>——$\mathcal{L}_{\text{ent}} = -\sum_{i} p_i \log p_i$，鼓励路由概率分布的熵不过低，避免门控网络过于确定性地选择单一专家（尤其在阶段过渡边界处）。两项损失的系数通过网格搜索调优。</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9314; 推理时技能重排（Inference-Time Skill Reordering）：零样本任务泛化</h4>
+<div class="novelty-step"><strong>【解决的问题】</strong>在长时序操作中，任务的子阶段顺序可能需要改变——例如，"把物体放入容器然后关抽屉" vs "先关抽屉再放物体旁边"。传统方法需要为每种顺序重新收集数据并训练策略。</div>
+<div class="novelty-step"><strong>【灵感来源】</strong>MoE 路由的显式可控性：既然每个专家已经自发对应一个任务阶段，那么通过人为干预门控网络的输出（强制激活特定专家），就可以在推理时改变阶段执行顺序——就像一个"任务编排器"。</div>
+<div class="novelty-step"><strong>【具体设计】</strong>在推理时，用户可以通过一个简单接口指定专家激活序列（例如 [Expert 2, Expert 1, Expert 3, Expert 4]），替代门控网络的自动路由。扩散策略随后按照指定顺序生成对应阶段的动作。值得注意的是，这种重排<em>完全不需重训</em>——因为每个专家本身的"技能"（如何完成对应阶段）没有改变，改变的只是执行顺序。这赋予了 MoE-DP 一种类似"技能编排"的零样本泛化能力。</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- S3 Architecture -->
+<!-- ============================================================ -->
+<section id="architecture">
+<h2>&#167;3 Architecture</h2>
+
+<h3>3.1 系统架构总览：四阶段信息流</h3>
+
+<div class="arch-panel">
+<div class="arch-grid">
+  <!-- Stage 1: Perception -->
+  <div class="arch-stage">
+    <h4>&#9312; Perception <span>视觉编码</span></h4>
+    <div class="arch-card arch-solar">
+      <strong>多视角视觉观测</strong>
+      <small>RGB 图像从多个相机视角采集（如 Franka 腕部相机 + 第三视角相机），提供任务的丰富视觉上下文</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>视觉编码器 (ResNet/ViT)</strong>
+      <small>将多视角图像编码为统一的条件特征向量 $\mathbf{c} \in \mathbb{R}^{d_c}$，作为扩散策略的条件输入</small>
+    </div>
+  </div>
+
+  <!-- Stage 2: MoE Routing -->
+  <div class="arch-stage">
+    <h4>&#9313; MoE Router <span>专家路由</span></h4>
+    <div class="arch-card arch-motor">
+      <strong>Sparse Gating Network</strong>
+      <small>$g(\mathbf{c}) = \text{Softmax}(\text{TopK}(\mathbf{W}_g \mathbf{c} + \boldsymbol{\epsilon}))$ —— 学习对观测条件向量的稀疏门控</small>
+    </div>
+    <div class="arch-card arch-motor">
+      <strong>Expert Network $\times N$</strong>
+      <small>$N$ 个并行专家 MLP：$\mathbf{e}_i = \text{MLP}_i(\mathbf{c})$；每个专家学习对应特定操作阶段</small>
+    </div>
+    <div class="arch-card arch-thrust">
+      <strong>Auxiliary Losses</strong>
+      <small>Load-Balance Loss + Entropy Loss 防止专家坍缩，鼓励阶段化分工</small>
+    </div>
+  </div>
+
+  <!-- Stage 3: Conditioning -->
+  <div class="arch-stage">
+    <h4>&#9314; Conditioning <span>条件融合</span></h4>
+    <div class="arch-card arch-thrust">
+      <strong>Expert Output Aggregation</strong>
+      <small>$\mathbf{c}_{\text{moe}} = \sum_{i} g_i(\mathbf{c}) \cdot \mathbf{e}_i$：被激活专家的加权组合</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>Cross-Attention Fusion</strong>
+      <small>MoE 输出 $\mathbf{c}_{\text{moe}}$ 作为扩散 UNet 的 cross-attention 键/值，调制去噪过程</small>
+    </div>
+  </div>
+
+  <!-- Stage 4: Action Generation -->
+  <div class="arch-stage">
+    <h4>&#9315; Diffusion <span>动作生成</span></h4>
+    <div class="arch-card arch-solar">
+      <strong>Denoising UNet</strong>
+      <small>以噪声动作 $\mathbf{a}^k$、扩散步 $k$、MoE 条件 $\mathbf{c}_{\text{moe}}$ 为输入，逐步去噪</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>Action Horizon: $H$ steps</strong>
+      <small>每次推理输出未来 $H$ 步的 SE(3) 末端执行器动作序列</small>
+    </div>
+  </div>
+</div>
+
+<div class="arch-arrow">
+  <span>&#9660; 条件特征</span>
+  <span>&#9660; 专家加权特征</span>
+  <span>&#9660; 阶段感知条件</span>
+  <span>&#9660; 动作序列</span>
+</div>
+
+<div class="arch-summary">
+  <div class="arch-metric">
+    <strong>输出：条件特征 $\mathbf{c}$</strong>
+    <small>维度 $d_c$，融合多视角视觉信息，无阶段意识</small>
+  </div>
+  <div class="arch-metric">
+    <strong>输出：阶段化表示 $\mathbf{c}_{\text{moe}}$</strong>
+    <small>专家加权输出，隐式编码当前任务阶段</small>
+  </div>
+  <div class="arch-metric">
+    <strong>输出：去噪动作 $\mathbf{a}^0$</strong>
+    <small>在阶段感知条件的引导下逐步从纯噪声恢复</small>
+  </div>
+  <div class="arch-metric">
+    <strong>输出：执行动作序列</strong>
+    <small>末端执行器位姿序列，支持推理时重排</small>
+  </div>
+</div>
+</div>
+
+<h3>3.2 Mermaid 流程图 1：MoE-DP 系统总览</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+graph LR
+  A["Multi-View Images<br/>腕部相机 + 第三视角"] --> B["Vision Encoder<br/>ResNet / ViT"]
+  B --> C["Condition Feature c"]
+  C --> D["MoE Gating Network<br/>g(c) = Softmax(TopK(W_g c))"]
+  D --> E1["Expert 1<br/>Approach"]
+  D --> E2["Expert 2<br/>Grasp"]
+  D --> E3["Expert 3<br/>Transport"]
+  D --> E4["Expert 4<br/>Place"]
+  E1 --> F["Weighted Sum<br/>c_moe = sum(g_i * e_i)"]
+  E2 --> F
+  E3 --> F
+  E4 --> F
+  F --> G["Diffusion UNet<br/>Cross-Attention with c_moe"]
+  G --> H["Denoised Action Sequence<br/>SE(3) trajectory for H steps"]
+  C --> I["Auxiliary Losses<br/>L_lb + L_ent"]
+  D --> I
+  I --> D
+</div>
+</div>
+
+<h3>3.3 Mermaid 流程图 2：MoE 路由与专家激活工作流</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+  O["Current Observation o_t<br/>多视角 RGB + 机器人状态"] --> VE["Vision Encoder<br/>编码为条件特征 c_t"]
+  VE --> GN{"Gating Network<br/>计算路由概率 p = g(c_t)"}
+  GN --> LB["Load-Balance Loss<br/>L_lb = N * sum(f_i * P_i)<br/>惩罚专家使用不均"]
+  GN --> ENT["Entropy Loss<br/>L_ent = -sum(p_i log p_i)<br/>防止路由过度确定"]
+  GN --> TK["Top-K Selection<br/>选择概率最高的 K 个专家"]
+  TK --> E1["Expert 1 激活<br/>输出 e_1 = MLP_1(c_t)"]
+  TK --> E2["Expert 2 激活<br/>输出 e_2 = MLP_2(c_t)"]
+  E1 --> WS["加权聚合<br/>c_moe = sum(g_i * e_i)"]
+  E2 --> WS
+  WS --> DIFF["Diffusion Denoising<br/>以 c_moe 为条件去噪动作"]
+  DIFF --> ACT["执行动作序列<br/>H 步 SE(3) 轨迹"]
+
+  TK -->|"推理时可干预<br/>手动指定专家顺序"| SKILL["Skill Reordering<br/>[E2,E1,E3,E4] -> 新任务顺序"]
+  SKILL --> WS
+</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- S4 Task Definition -->
+<!-- ============================================================ -->
+<section id="task">
+<h2>&#167;4 Task Definition</h2>
+
+<h3>4.1 问题数学形式化</h3>
+<p>给定一个多阶段长时序操作任务，由 $M$ 个子阶段组成（如"接近物体 -> 抓取 -> 运输 -> 放置 -> 关闭抽屉"），目标是在每个时间步 $t$ 根据观测 $\mathbf{o}_t$（多视角 RGB 图像）生成末端执行器动作 $\mathbf{a}_t$，使任务完成并具有<strong>中间步骤故障恢复</strong>能力。关键假设是任务阶段边界<em>不</em>由人工标注——阶段信息是 MoE 路由在训练过程中<em>自发涌现</em>的。</p>
+
+<div class="formula-block">
+<div class="eq-tag">扩散策略基础公式</div>
+$$
+p_\theta(\mathbf{a}^0 | \mathbf{o}) = \int p(\mathbf{a}^K) \prod_{k=1}^K p_\theta(\mathbf{a}^{k-1} | \mathbf{a}^k, \mathbf{c}_{\text{moe}}(\mathbf{o})) \, d\mathbf{a}^{1:K}
+$$
+<div class="eq-note">
+其中 $\mathbf{a}^0$ 是去噪后的干净动作序列（$H$ 步），$\mathbf{a}^K \sim \mathcal{N}(0, \mathbf{I})$ 是初始纯噪声，$\mathbf{c}_{\text{moe}}(\mathbf{o})$ 是经过 MoE 路由阶段化处理后的条件特征。反向去噪过程的每一步 $p_\theta(\mathbf{a}^{k-1} | \mathbf{a}^k, \mathbf{c}_{\text{moe}})$ 以阶段感知条件为引导，逐步将噪声精炼为符合当前任务阶段语义的动作。
+</div>
+</div>
+
+<div class="formula-block">
+<div class="eq-tag">MoE 条件特征计算</div>
+$$
+\mathbf{c}_{\text{moe}}(\mathbf{o}) = \sum_{i=1}^{N} g_i(\mathbf{c}) \cdot \text{MLP}_i(\mathbf{c}), \quad \mathbf{c} = f_{\text{enc}}(\mathbf{o})
+$$
+$$
+g(\mathbf{c}) = \text{Softmax}\big(\text{TopK}(\mathbf{W}_g \mathbf{c} + \boldsymbol{\epsilon}_{\text{noise}})\big)
+$$
+<div class="eq-note">
+<strong>TopK</strong> 操作保留概率最高的 $K$ 个专家，其余置零后重归一化。$\boldsymbol{\epsilon}_{\text{noise}}$ 是可选的探索噪声（训练时注入以鼓励路由多样性）。$f_{\text{enc}}$ 是视觉编码器（如 ResNet-18），$\mathbf{W}_g$ 是门控网络的权重矩阵。不同专家 MLP 共享输入 $\mathbf{c}$ 但各自独立参数化，通过辅助损失诱导阶段化分工。
+</div>
+</div>
+
+<h3>4.2 输入/输出规范表</h3>
+<table>
+<thead>
+<tr><th>组件</th><th>输入</th><th>输出</th><th>维度/范围</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td>Visual Encoder</td><td>多视角 RGB 图像 (2-3 views)</td><td>条件特征向量 $\mathbf{c}$</td><td>$\mathbb{R}^{256} \sim \mathbb{R}^{512}$</td><td>预训练 ResNet/ViT，参数可冻结或微调</td></tr>
+<tr><td>MoE Gating</td><td>条件特征 $\mathbf{c}$</td><td>路由概率 $\mathbf{g} \in \Delta^{N-1}$</td><td>$N=4 \sim 8$ 个专家，Top-$K$ with $K=2$</td><td>门控网络是一个可学习的线性层 + Softmax</td></tr>
+<tr><td>Expert MLP</td><td>条件特征 $\mathbf{c}$</td><td>专家输出 $\mathbf{e}_i$</td><td>每个 MLP 2-3 层，隐藏维度 128-256</td><td>$N$ 个专家并行，共享输入，独立参数</td></tr>
+<tr><td>Condition Aggregation</td><td>专家输出 + 路由权重</td><td>阶段化条件 $\mathbf{c}_{\text{moe}}$</td><td>与 $\mathbf{c}$ 同维或经投影对齐</td><td>加权求和 + 可选残差连接</td></tr>
+<tr><td>Diffusion UNet</td><td>噪声动作 $\mathbf{a}^k$ + $\mathbf{c}_{\text{moe}}$ + $k$</td><td>预测噪声 $\hat{\boldsymbol{\epsilon}}$</td><td>动作维度 $d_a \times H$</td><td>Cross-attention 以 $\mathbf{c}_{\text{moe}}$ 为 K/V</td></tr>
+<tr><td>Action Output</td><td>去噪动作 $\mathbf{a}^0$</td><td>末端执行器位姿序列</td><td>$H=16 \sim 32$ 步, SE(3) 或关节角</td><td>执行前 $T_{\text{exec}}$ 步后重新推理 (receding horizon)</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- S5 Key Challenge -->
+<!-- ============================================================ -->
+<section id="challenge">
+<h2>&#167;5 Key Challenges</h2>
+
+<h3>5.1 第一性原理分析：为什么长时序操作难以鲁棒？</h3>
+<div class="callout warn">
+<div class="callout-title">根本原因：隐变量纠缠导致缺少阶段边界感知</div>
+<p>长时序操作任务的核心挑战不是"执行每个子阶段很难"，而是"<strong>在子阶段之间切换时不知道当前处于哪个阶段</strong>"。标准扩散策略的条件编码器将所有历史观测压缩为一个固定维度的隐向量——在这个压缩过程中，阶段信息（"我在抓取" vs "我在运输"）被与其它视觉信息（光照、纹理、背景）<strong>不可逆地混合</strong>在一起。当中间步骤失败时（如抓取滑落），观测 $\mathbf{o}_t$ 可能同时匹配"抓取阶段"和"放置阶段"的某些视觉特征（如手接近桌面），导致策略错误地认为自己已经完成了抓取并进入下一阶段。这本质上是一个<strong>表示的可辨识性 (identifiability)</strong>问题——策略的隐空间没有将"任务阶段"作为一个独立的可辨识因子。</p>
+</div>
+
+<h3>5.2 已有方法对比</h3>
+<table>
+<thead>
+<tr><th>Method Category</th><th>Representative Work</th><th>Phase Awareness</th><th>Failure Recovery</th><th>Skill Reordering</th><th>Real Robot Validation</th></tr>
+</thead>
+<tbody>
+<tr><td>Vanilla Diffusion Policy</td><td>Chi et al. (2023)</td><td>&#10007; 隐变量纠缠</td><td>&#10007; 容易级联失败</td><td>&#10007;</td><td>&#10003;</td></tr>
+<tr><td>Hierarchical / Subgoal Policy</td><td>Pertsch et al. (2021)</td><td>&#10003; 显式子目标</td><td>&#9651; 需要重规划</td><td>&#9651; 需重设子目标</td><td>&#9651; (sim mostly)</td></tr>
+<tr><td>Skill Chaining / TAP</td><td>Lee et al. (2022)</td><td>&#10003; 预定义技能</td><td>&#10003; 技能级恢复</td><td>&#10007; 技能顺序固定</td><td>&#10003;</td></tr>
+<tr><td>LLM Task Planning + Policy</td><td>Ahn et al. (2022), SayCan</td><td>&#10003; LLM 阶段推理</td><td>&#10003; LLM 重规划</td><td>&#10003; 文本即可重排</td><td>&#10003;</td></tr>
+<tr class="highlight"><td><strong>MoE-DP (Ours)</strong></td><td><strong>本文</strong></td><td><strong>&#10003; 涌现式阶段解耦</strong></td><td><strong>&#10003; 专家级自动恢复</strong></td><td><strong>&#10003; 推理时重排</strong></td><td><strong>&#10003; Franka</strong></td></tr>
+</tbody>
+</table>
+
+<h3>5.3 三项关键挑战的详细拆解</h3>
+
+<h4>挑战 1: 隐变量纠缠与阶段不可辨识性</h4>
+<div class="callout danger">
+<div class="callout-title">为什么难？</div>
+<p>扩散策略的去噪过程本质上是在学习从噪声到动作的条件生成分布 $p(\mathbf{a} | \mathbf{o})$。当 $\mathbf{o}$ 被编码为单一向量时，不同任务阶段的"独特性"可能在编码过程中被抹除。例如，"手在物体上方 5cm"（接近阶段）和"手在物体下方 5cm"（放置阶段）如果共享相似的背景纹理，编码器可能将它们映射到隐空间中的相邻点——导致策略无法区分这两个阶段。更根本地，这是<strong>无监督表示学习中的可辨识性 (identifiability) 问题</strong>：在没有显式阶段标签的情况下，如何让隐空间自然地"组织"出与阶段对应的结构？</p>
+</div>
+<p><strong>MoE-DP 的应对策略：</strong>通过稀疏 MoE 路由引入<strong>条件计算的离散性</strong>——不同专家对应不同的"计算路径"，这种离散的选择行为天然具有"聚类"效应（相似的观测被路由到同一专家）。辅助损失（负载均衡 + 熵）进一步强化了这种聚类结构，使得阶段分离更加清晰。</p>
+
+<h4>挑战 2: 中间步骤失败后的级联故障</h4>
+<div class="callout danger">
+<div class="callout-title">为什么难？</div>
+<p>在真实机器人操作中，抓取失败（滑落/碰撞）、放置不准（偏差 > 容差）、环境扰动（人推动物体）等中间故障是<strong>常态而非异常</strong>。普通扩散策略在面对这种故障时的行为不可预测——它可能"以为"自己已经完成了当前步骤并继续执行下一步（因为观测在某些维度上匹配了"成功"的模式），导致级联故障（cascading failure）：抓取失败 -> 空手运输 -> 放置空气 -> 全任务失败。</p>
+</div>
+<p><strong>MoE-DP 的应对策略：</strong>关键创新在于——阶段识别和动作生成被<strong>解耦</strong>为两个模块。门控网络负责阶段识别（"我在哪个阶段？"），扩散 UNet 负责动作生成（"这个阶段该做什么动作？"）。当抓取失败时，观测仍然被路由到"抓取阶段"专家，因此策略自然会尝试重新抓取，而非跳转到运输阶段。这种解耦是实现鲁棒故障恢复的结构性基础。</p>
+
+<h4>挑战 3: 专家训练中的坍缩与死专家问题</h4>
+<div class="callout danger">
+<div class="callout-title">为什么难？</div>
+<p>稀疏 MoE 的一个著名难题是<strong>专家坍缩</strong>——训练早期某个专家获得略微更好的初始参数后，门控网络倾向于将所有样本路由给它（因为从梯度角度看这是局部最优），导致其余专家完全不被使用（"死专家"）。此时 MoE 退化为普通 MLP，阶段解耦能力丧失。更棘手的是，在操作任务中，不同阶段的数据量天然不均衡（如"运输"阶段通常比"抓取"阶段长得多），这会加剧路由偏差。</p>
+</div>
+<p><strong>MoE-DP 的应对策略：</strong>双辅助损失函数设计：(1) <strong>Load-Balance Loss</strong> 直接惩罚专家使用频率的不均衡（$f_i \cdot P_i$ 乘积，$f_i$ 是使用比例，$P_i$ 是平均分配概率）；(2) <strong>Entropy Loss</strong> 鼓励路由概率保持适度均匀——尤其是在阶段过渡帧（这些帧可能同时属于两个阶段），过低的熵会导致路由僵化、对新观测缺乏弹性。两项损失的系数需要精心调优——过高会迫使专家"伪分工"（每个专家处理随机子集而非语义子集），过低则无法防止坍缩。</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- S6 Method -->
+<!-- ============================================================ -->
+<section id="method">
+<h2>&#167;6 Method Details</h2>
+
+<h3>6.1 公式组 1：MoE 门控与专家激活</h3>
+<div class="formula-block">
+<div class="eq-tag">Eq. 1-3: Sparse MoE Gating</div>
+$$
+\mathbf{h}(\mathbf{c}) = \mathbf{W}_g \mathbf{c} + \boldsymbol{\epsilon}_{\text{noise}}, \quad \boldsymbol{\epsilon}_{\text{noise}} \sim \mathcal{N}(0, \sigma^2 \mathbf{I})
+$$
+
+$$
+g_i(\mathbf{c}) = \frac{\exp(h_i(\mathbf{c})) \cdot \mathbb{1}[i \in \text{TopK}(\mathbf{h}(\mathbf{c}))]}{\sum_{j \in \text{TopK}(\mathbf{h}(\mathbf{c}))} \exp(h_j(\mathbf{c}))}
+$$
+
+$$
+\mathbf{c}_{\text{moe}} = \sum_{i=1}^{N} g_i(\mathbf{c}) \cdot \text{MLP}_i(\mathbf{c}), \quad \text{MLP}_i(\mathbf{c}) = \mathbf{W}_i^{(2)} \sigma(\mathbf{W}_i^{(1)} \mathbf{c} + \mathbf{b}_i^{(1)}) + \mathbf{b}_i^{(2)}
+$$
+<div class="eq-note">
+<strong>Eq. 1</strong> (门控 logits): $\mathbf{W}_g \in \mathbb{R}^{N \times d_c}$ 是门控权重，$\boldsymbol{\epsilon}_{\text{noise}}$ 是训练时的探索噪声（标准差 $\sigma$ 通常设为 $0.01 \sim 0.1$），推理时置零。<br/><br/>
+<strong>Eq. 2</strong> (稀疏路由): $\text{TopK}$ 选择 logits 最大的 $K$ 个专家（通常 $K=2$），其余置零后做 Softmax 归一化。这确保了只有少数专家被激活，实现稀疏条件计算。指示函数 $\mathbb{1}[\cdot]$ 在 TopK 集合内为 1，否则为 0。<br/><br/>
+<strong>Eq. 3</strong> (专家计算与聚合): 每个专家是一个 2 层 MLP（隐藏维度通常 128-256），$\sigma$ 是 GELU 激活函数。所有被选中的专家输出以门控权重加权求和，形成最终的阶段化条件特征。注意此处保留了残差连接的可能性（$\mathbf{c}_{\text{moe}} = \mathbf{c} + \sum_i g_i \cdot \text{MLP}_i(\mathbf{c})$），使 MoE 作为原始特征的"调制"而非"替代"。
+</div>
+</div>
+
+<h3>6.2 公式组 2：负载均衡与熵辅助损失</h3>
+<div class="formula-block">
+<div class="eq-tag">Eq. 4-5: Auxiliary Losses for Expert Collapse Prevention</div>
+$$
+\mathcal{L}_{\text{lb}} = N \cdot \sum_{i=1}^{N} f_i \cdot P_i, \quad f_i = \frac{1}{B} \sum_{j=1}^{B} \mathbb{1}[\text{Expert } i \text{ is in TopK for sample } j], \quad P_i = \frac{1}{B} \sum_{j=1}^{B} g_i(\mathbf{c}^{(j)})
+$$
+
+$$
+\mathcal{L}_{\text{ent}} = -\frac{1}{B} \sum_{j=1}^{B} \sum_{i=1}^{N} \tilde{g}_i(\mathbf{c}^{(j)}) \log \tilde{g}_i(\mathbf{c}^{(j)}), \quad \tilde{g}_i = \frac{\exp(h_i)}{\sum_k \exp(h_k)} \text{ (pre-TopK softmax)}
+$$
+<div class="eq-note">
+<strong>Eq. 4</strong> (负载均衡损失): $f_i$ 是 batch 中被路由到专家 $i$ 的样本比例（二值统计），$P_i$ 是 batch 中门控网络分配给专家 $i$ 的平均概率。乘积 $f_i \cdot P_i$ 在专家使用不均匀时变大——当所有样本路由到专家 1 时，$f_1=1, P_1=1$，乘积为 1；对于其他专家 $f_i=0, P_i=0$，乘积为 0。乘以 $N$ 使损失规模与 batch size 无关。<br/><br/>
+<strong>Eq. 5</strong> (熵辅助损失): 使用 TopK 之前的完整 softmax $\tilde{g}_i$（而非 TopK 后的截断概率）计算熵。负熵的最小值在均匀分布（最大不确定性）时取得。在阶段过渡帧处，适中的熵允许门控同时考虑多个相邻专家，避免边界处的"硬切换"导致动作不连续。注意：<strong>熵损失的目标不是最大化熵（那会导致完全均匀的路由，丧失阶段分工），而是防止熵过低</strong>——通常使用一个目标熵阈值或仅惩罚低于阈值的部分。
+</div>
+</div>
+
+<h3>6.3 公式组 3：扩散策略去噪损失</h3>
+<div class="formula-block">
+<div class="eq-tag">Eq. 6-7: Diffusion Denoising with MoE Conditioning</div>
+$$
+\mathcal{L}_{\text{diff}} = \mathbb{E}_{(\mathbf{o}, \mathbf{a}^0), k \sim \mathcal{U}(1,K), \boldsymbol{\epsilon} \sim \mathcal{N}(0,\mathbf{I})} \left[ \left\| \boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\theta\left(\mathbf{a}^k, \mathbf{c}_{\text{moe}}(\mathbf{o}), k\right) \right\|^2 \right]
+$$
+
+$$
+\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{diff}} + \alpha \cdot \mathcal{L}_{\text{lb}} + \beta \cdot \mathcal{L}_{\text{ent}}
+$$
+<div class="eq-note">
+<strong>Eq. 6</strong> (扩散损失): 标准的 DDPM 去噪目标。$\mathbf{a}^k = \sqrt{\bar{\alpha}_k} \mathbf{a}^0 + \sqrt{1-\bar{\alpha}_k} \boldsymbol{\epsilon}$ 是加噪后的动作序列，$\boldsymbol{\epsilon}_\theta$ 是噪声预测网络（UNet）。关键区别在于条件输入 $\mathbf{c}_{\text{moe}}(\mathbf{o})$ 而非原始的 $\mathbf{c}$——这意味着去噪过程受到<strong>阶段感知</strong>的条件引导。当门控网络将观测路由到"抓取"专家时，UNet 的 cross-attention 层接收到的 K/V 来自该专家，因此去噪过程自然偏重于生成抓取类动作。<br/><br/>
+<strong>Eq. 7</strong> (总损失): $\alpha$ 和 $\beta$ 是辅助损失的权重系数。典型设置为 $\alpha \in [0.01, 0.1]$，$\beta \in [0.001, 0.01]$。这些系数需要针对具体任务调优：任务阶段越多（$N$ 越大），$\alpha$ 应适当增大以确保所有专家被充分训练；阶段过渡越频繁，$\beta$ 可适当增大以在边界处保持路由弹性。
+</div>
+</div>
+
+<h3>6.4 公式组 4：推理时技能重排</h3>
+<div class="formula-block">
+<div class="eq-tag">Eq. 8: Inference-Time Expert Activation Override</div>
+$$
+\mathbf{g}^{\text{infer}}(\mathbf{c}) = \text{OneHot}\big(\text{schedule}[t]\big) \quad \text{or} \quad \mathbf{g}^{\text{infer}}(\mathbf{c}) = \text{Softmax}\big(\mathbf{W}_g \mathbf{c} \odot \mathbf{m}_{\text{schedule}}\big)
+$$
+<div class="eq-note">
+<strong>硬重排 (Hard Reordering):</strong> $\text{schedule}[t]$ 是一个预定义的时间-专家映射，指定在时间步 $t$ 应激活哪个专家。例如 <code>schedule = [2, 1, 3, 4]</code> 表示先执行 Expert 2（抓取）再执行 Expert 1（接近）——实现"先抓取远处物体再接近"的反序操作。<br/><br/>
+<strong>软重排 (Soft Reordering):</strong> $\mathbf{m}_{\text{schedule}}$ 是一个掩码向量，通过 Hadamard 积 $\odot$ 放大期望专家的 logit 同时抑制不期望专家的 logit。这保持了门控网络的部分自主性（在阶段内部仍可微调），但总体执行顺序由人的调度控制。软重排的优点是过渡更平滑——边界处门控仍可根据实际观测微调"何时切换"。
+</div>
+</div>
+
+<h3>6.5 关键参数配置表</h3>
+<table>
+<thead>
+<tr><th>Parameter</th><th>Value</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td>Number of Experts $N$</td><td>4 ~ 8</td><td>专家数量：对应预期的任务阶段数；需根据具体任务复杂度设置</td></tr>
+<tr><td>Top-K</td><td>2</td><td>每次激活的专家数；$K=2$ 在表达能力和计算效率间取平衡</td></tr>
+<tr><td>Expert MLP Hidden Dim</td><td>128 ~ 256</td><td>每个专家的隐藏层维度；过大易过拟合，过小表达不足</td></tr>
+<tr><td>Load-Balance Weight $\alpha$</td><td>0.01 ~ 0.1</td><td>负载均衡损失系数；过大会强制均匀路由破坏阶段语义</td></tr>
+<tr><td>Entropy Weight $\beta$</td><td>0.001 ~ 0.01</td><td>熵损失系数；过大会导致路由完全均匀丧失选择性</td></tr>
+<tr><td>Gating Noise $\sigma$</td><td>0.01 ~ 0.1</td><td>训练时门控噪声标准差；帮助路由探索防止早期塌陷</td></tr>
+<tr><td>Action Horizon $H$</td><td>16 ~ 32</td><td>每次推理预测的未来动作步数</td></tr>
+<tr><td>Diffusion Steps (Inference)</td><td>10 ~ 20 (DDIM)</td><td>DDIM 采样加速；推理速度与质量的平衡</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- S7 Principles -->
+<!-- ============================================================ -->
+<section id="principles">
+<h2>&#167;7 Core Principles / Deep Mechanistic Reading</h2>
+
+<h3>7.1 "让表示自然涌现阶段结构" vs "显式添加阶段分类器" -- 为什么涌现比灌输更鲁棒？</h3>
+
+<div class="cmp-row">
+<div class="cmp-col">
+<h4>Explicit Phase Classifier (Naive approach)</h4>
+<ul>
+<li>在条件编码器后添加一个阶段分类头，用人工标注的阶段标签做监督训练</li>
+<li>假设：人类可以准确标注所有帧的阶段边界</li>
+<li><strong>失败原因：</strong>阶段边界的标注是<strong>主观且模糊</strong>的——"接近"和"抓取"之间的精确边界在哪里？接触的哪一帧算"抓取开始"？不同的标注者会给出不同答案。这种标注噪声会直接污染分类器的训练信号。</li>
+<li>更严重的是，阶段标签训练出来的分类器可能会<strong>过拟合</strong>到与阶段语义无关的视觉特征（如背景颜色），因为它被强制在每帧给出一个离散决策——即使该帧的视觉信息不足以支持阶段区分。</li>
+<li>此外，人工标注<strong>不具可扩展性</strong>——每个新任务需要新标注，且阶段类别数量（分类头维度）需要预先固定。</li>
+</ul>
+</div>
+<div class="cmp-col">
+<h4>Emergent Phase Discovery (MoE-DP)</h4>
+<ul>
+<li>不提供任何阶段标签——专家分工完全通过<strong>辅助损失引导的端到端训练</strong>自发涌现</li>
+<li>核心机制：门控网络的稀疏性和辅助损失共同构成一个<strong>隐式的聚类正则</strong>：相似的观测自然路由到同一专家（因为 MLP 的参数化使其对相似输入产生相似输出），负载均衡损失确保每个专家都有"生存空间"，熵损失在边界处保持弹性</li>
+<li><strong>为什么更好：</strong>涌现的阶段边界是<strong>数据驱动的</strong>——它反映了观测空间中<em>实际存在</em>的聚类结构，而非人类<em>期望看到</em>的结构。如果观测空间中"接近"和"抓取"确实不可分（如视觉遮挡严重），系统可能将它们合并为一个专家——这是<strong>适应性</strong>的体现，而非"错误"。</li>
+<li>涌现式分工天然具有<strong>任务自适应</strong>能力——不同任务的专家可能学习到不同的阶段划分粒度。例如，简单任务可能只需要 3 个专家（接近-抓取-放置），复杂任务可能需要 6 个（预接近-精调-闭合抓取-运输-精放置-释放）。</li>
+</ul>
+</div>
+</div>
+
+<h3>7.2 "Load-Balance + Entropy" vs "Load-Balance Only" -- 为什么仅有负载均衡不够？</h3>
+
+<div class="cmp-row">
+<div class="cmp-col">
+<h4>Load-Balance Only (Switch Transformer style)</h4>
+<ul>
+<li>仅使用 $\mathcal{L}_{\text{lb}} = N \cdot \sum_i f_i \cdot P_i$ 鼓励专家使用频率均匀</li>
+<li>假设：只要每个专家处理的样本量均衡，阶段分工就会自然出现</li>
+<li><strong>不足：</strong>负载均衡损失<strong>不约束路由的确定性</strong>。门控网络可以在"不同 batch"之间切换专家选择来实现负载均衡（batch 1 全路由到 Expert 1，batch 2 全路由到 Expert 2），但在<strong>单个样本</strong>级别上仍然是确定性的——TopK 之后的概率可能极高（如 0.99），导致路由僵化。</li>
+<li>在阶段过渡区域（如前一个阶段的最后几帧和后一个阶段的最初几帧），确定性路由会创建一个<strong>硬边界</strong>——门控在某一帧突然从 Expert 1 切换到 Expert 2，而非逐渐过渡。这种硬切换可能导致生成的动作在边界处出现不连续跳变。</li>
+</ul>
+</div>
+<div class="cmp-col">
+<h4>Load-Balance + Entropy (MoE-DP)</h4>
+<ul>
+<li>追加熵损失 $\mathcal{L}_{\text{ent}}$ 在<strong>单样本</strong>级别上鼓励路由保持适度的不确定性</li>
+<li>关键洞察：在操作任务中，阶段过渡不是瞬时发生的——接近物体的最后几帧，手仍然在"接近"，但抓取动作已经开始准备。此时路由如果同时激活"接近"和"抓取"两个专家（概率各 ~0.5），去噪过程就能同时考虑两个阶段的信息，生成更平滑的过渡动作。</li>
+<li><strong>熵损失的具体作用：</strong>它作为"软化正则"——在数据明确的阶段内部（如运输途中，手离物体很远，抓取和放置都不相关），门控仍然可以高置信度地选择单一专家（低熵）。但在过渡区域（观测模棱两可），熵损失会压低过度自信的路由，保持多专家的"协商"状态。</li>
+<li><strong>类比：</strong>这类似于模糊逻辑中从一个隶属函数到另一个隶属函数的<strong>渐进过渡</strong>——相比于布尔逻辑的"咔嗒"切换，模糊逻辑在边界区域同时维持两个状态的隶属度，产生更自然的输出。</li>
+</ul>
+</div>
+</div>
+
+<h3>7.3 "条件计算" vs "条件特征" -- 为什么要在计算路径而非特征空间做阶段分离？</h3>
+
+<div class="callout idea">
+<div class="callout-title">深层原理：计算路径的离散性天然提供更强的"可分离先验"</div>
+<p>一个自然的问题是：为什么不在特征空间直接做阶段分离——例如，在条件特征 $\mathbf{c}$ 上拼接一个阶段嵌入向量（phase embedding），然后让扩散策略学习利用这个嵌入？这是更简单直接的做法。</p>
+<p>答案在于<strong>计算路径的离散性</strong>提供了比连续嵌入更强的"分离先验"（separability prior）。当一个连续嵌入（如 one-hot 阶段 ID 的可学习嵌入）被拼接到条件特征上时，扩散 UNet 仍然可以通过其连续的交叉注意力机制混合不同阶段的信息——阶段分离的约束是软的（soft constraint），依赖于策略是否"学会"利用这个嵌入。而 MoE 的 TopK 路由是一个<strong>硬约束</strong>（hard constraint）——不同专家在网络中走的是<em>不同的参数路径</em>（不同的权重矩阵），它们的输出空间天然被参数化分离。</p>
+<p>这本质上是<strong>结构化归纳偏置</strong>（structural inductive bias）的差异：连续嵌入说"我告诉你这是阶段 2，请你自己注意"，MoE 路由说"你的计算路径已经被限定为阶段 2 专属的路径"。后者提供的监督信号更强、更难被忽略——即使扩散 UNet 试图混合不同阶段的信息，MoE 层的输出已经在源头被分离了。实验证据表明：在相同条件下，MoE 路由比拼接阶段嵌入的基线在故障恢复成功率上提升了 15-25%，验证了这种"硬分离"的价值。</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- S8 Figures -->
+<!-- ============================================================ -->
+<section id="figures">
+<h2>&#167;8 Figures &amp; Evidence</h2>
+
+<h3>8.1 Fig. 1: MoE-DP 系统概览图</h3>
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 1</span>
+<span class="fig-caption">MoE-DP 整体框架：视觉编码器 -> MoE 层 -> 扩散去噪 -> 动作序列</span>
+<span class="fig-source">Source: Paper Fig. 1</span>
+</div>
+<div class="fig-placeholder">
+[Fig. 1: MoE-DP 架构全景图]<br/>
+<small>展示 MoE 层位于视觉编码器与扩散 UNet 之间的位置，门控网络选择专家<br/>
+专家输出作为扩散去噪的条件，同时展示辅助损失的回传路径</small>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">&#9654; FIGURE INTERPRETATION</div>
+<p><strong>Fig. 1 的信息架构：</strong>首页概览图展示了 MoE-DP 的核心架构设计——在标准扩散策略的视觉编码器和扩散头之间插入 MoE 层。关键视觉要素：</p>
+<ul>
+<li><strong>数据流方向：</strong>从左到右——多视角 RGB 观测 -> 视觉编码器 -> 条件特征 $\mathbf{c}$ -> MoE 路由（分叉为 N 个专家）-> 专家加权聚合 -> 扩散 UNet（cross-attention 接收 MoE 条件）-> 去噪动作序列。</li>
+<li><strong>辅助损失回传：</strong>从门控网络的输出引出 Load-Balance Loss 和 Entropy Loss——这表明辅助损失<strong>仅影响门控网络的参数</strong>（和专家 MLP 间接通过梯度），而不直接影响扩散损失的计算。</li>
+<li><strong>推理时技能重排接口：</strong>通常以一个"开关"或"用户输入"箭头标注，表明在推理阶段可以绕过门控网络的自动路由，直接指定专家激活序列。这是 MoE-DP 区别于其他 MoE 架构的重要设计。</li>
+</ul>
+</div>
+</div>
+
+<h3>8.2 Fig. 2: 专家激活可视化（阶段涌现证据）</h3>
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 2</span>
+<span class="fig-caption">训练后专家激活模式：不同颜色代表不同专家，横轴为任务时间线</span>
+<span class="fig-source">Source: Paper Fig. 2/3</span>
+</div>
+<div class="fig-placeholder">
+[Fig. 2: Expert Activation Heatmap / Timeline]<br/>
+<small>横轴为任务执行时间（如 approach -> grasp -> transport -> place -> close drawer）<br/>
+纵轴为专家索引（Expert 0 到 Expert 5），颜色深浅表示该专家在当前帧的激活强度<br/>
+展示门控概率随时间的变化，验证专家自发对应任务阶段</small>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">&#9654; FIGURE INTERPRETATION</div>
+<p><strong>Fig. 2 的关键证据价值：</strong>这张热力图/时间线图是论文最核心的实验证据——它直接证明了"专家自发对应任务阶段"的声明不是假设而是观测结果。</p>
+<ul>
+<li><strong>阶段-专家对应关系：</strong>热力图中应清晰看到——Expert 1 在接近阶段高激活，Expert 2 在抓取阶段高激活，Expert 3 在运输阶段高激活，Expert 4 在放置和关抽屉阶段高激活。这种对应不是预先编程的，而是训练后自动涌现的。</li>
+<li><strong>过渡区域的混合激活：</strong>在阶段边界处（如抓取->运输），应看到两个相关专家同时具有中等激活——这反映了熵损失在过渡区域的"软化"效果，确保动作的平滑衔接。</li>
+<li><strong>死专家检测：</strong>如果某个专家在所有帧都接近零激活，说明该专家已经"死亡"——这是辅助损失权重不足的信号。</li>
+<li><strong>任务特异性：</strong>不同任务的专家映射可能不同——"把物体放入容器后关抽屉"可能需要 5 个专家，"放置多个方块"可能只需要 3 个专家。这与 MoE-DP 的设计预期一致。</li>
+</ul>
+</div>
+</div>
+
+<h3>8.3 Fig. 3: 故障恢复对比实验</h3>
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 3</span>
+<span class="fig-caption">故障恢复对比：MoE-DP vs Vanilla DP 在人为扰动后的任务完成率</span>
+<span class="fig-source">Source: Paper Experiment Section</span>
+</div>
+<div class="fig-placeholder">
+[Fig. 3: Failure Recovery Comparison Bar Chart]<br/>
+<small>横轴：不同扰动类型（抓取失败 / 放置偏离 / 物体被推走 / 多阶段干扰）<br/>
+纵轴：任务完成率 (%)<br/>
+对比柱状图：Vanilla DP (蓝色) vs MoE-DP (橙色)，展示 MoE-DP 在各类扰动下的显著优势</small>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">&#9654; FIGURE INTERPRETATION</div>
+<p><strong>Fig. 3 的实验设计逻辑：</strong>故障恢复实验通过在任务执行中人为施加扰动来测试策略的鲁棒性。这是验证"阶段感知"价值的直接方式。</p>
+<ul>
+<li><strong>抓取失败测试：</strong>在机器人闭合夹爪时，实验者手动将物体拨开——模拟抓取滑落。Vanilla DP 在此之后通常会继续执行"运输"动作（因为视觉编码器将拨开后的手-物关系误判为接近而非抓取），而 MoE-DP 的门控仍然路由到抓取专家，触发重抓。</li>
+<li><strong>放置偏离测试：</strong>放置后实验者将物体从目标位置移开——模拟放置精度不足。MoE-DP 应重新执行"接近+放置"子序列。</li>
+<li><strong>中间阶段干扰：</strong>在运输途中实验者遮挡相机或推挡机械臂——测试策略在非标准观测下的行为。阶段感知使策略能在干扰消失后从当前阶段的正确位置继续，而非从任务开头重启。</li>
+<li><strong>级联故障测试：</strong>连续施加多个扰动（抓取失败 + 放置失败）——这是最严苛的测试。MoE-DP 在此测试中展示出阶段级恢复能力，每次故障后在当前阶段内重试。</li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- S9 Flaw / Limitations -->
+<!-- ============================================================ -->
+<section id="flaw">
+<h2>&#167;9 Limitations &amp; Weakness Analysis</h2>
+
+<h3>9.1 论文明确或隐含的局限</h3>
+
+<div class="callout warn">
+<div class="callout-title">局限 1: 专家语义是涌现的，不可控、不可解释、不可预测</div>
+<p>专家与任务阶段的对应关系是<strong>训练后观察到的涌现现象</strong>，而非训练中保证的结果。在极端情况下（如辅助损失权重设置不当、任务阶段在观测空间中不可分），专家可能学习到<strong>与任务阶段无关的分工</strong>——例如按光照条件划分（一个专家处理亮帧，另一个处理暗帧），或按视角划分。这完全违背了 MoE-DP 的设计初衷，但门控网络不会"知道"它学错了——因为它只受辅助损失的统计约束，缺乏语义监督。作者在论文中也承认，不同任务可能需要专门的 MoE 超参数调优，专家语义的质量无严格保证。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">局限 2: 错误路由仍可导致阶段跳转</div>
+<p>虽然 MoE-DP 降低了阶段混淆的概率，但<strong>并未消除</strong>。门控网络是一个可学习的函数，它在训练分布内可能表现良好，但在分布外（OOD）观测下——如极端光照变化、相机位姿显著偏移、场景中出现训练时未见物体——可能做出错误的路由决策。一旦门控网络将处于"抓取阶段"的观测错误地路由到"放置阶段"专家，策略仍然会生成错误的动作。与显式阶段分类器不同，MoE-DP 的"阶段识别"是一个<strong>软决策</strong>（soft decision），即使在正常工作条件下也可能有 5-15% 的路由"错误"（从人类视角看）。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">局限 3: 专家数量的任务依赖性（调参负担）</div>
+<p>不同任务需要不同数量的专家——简单任务（2-3 阶段）用 8 个专家会造成冗余（多个专家竞争相同阶段或产生无意义分工），复杂任务（6-8 阶段）用 4 个专家会造成阶段合并（不同阶段被迫共享专家，丧失细粒度分工）。确定最优专家数量目前依赖于<strong>启发式搜索</strong>（尝试多个值并检查热力图中阶段-专家的对应质量），缺乏自动化的确定方法。这与 MoE-DP "自适应阶段发现"的愿景存在张力——系统的一部分（阶段发现）是自适应的，但另一部分（专家数量）需要人工调参。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">局限 4: 推理时技能重排的范围限制</div>
+<p>技能重排的可行性依赖于两个前提：(1) 每个专家确实独立掌握了一个完整的子技能，(2) 不同顺序下各阶段的前置条件（precondition）仍然满足。例如，如果任务需要"先关抽屉再把物体放上去"，但重排后变成了"先把物体放上去（此时抽屉开着，物体可以放在平台上）再关抽屉"——这个顺序也是物理可行的。但如果重排为"先关抽屉（盖上平台）再放物体"——平台已不可达，放物体阶段必然失败。目前 MoE-DP 不提供任何<strong>物理可行性验证</strong>机制来检查重排后的序列是否合理。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">局限 5: 仅在结构化桌面任务上验证，泛化到非结构化环境存疑</div>
+<p>论文中的多阶段任务——"把物体放入容器后关抽屉"、"按顺序放置多个方块"、"装载并运输碗"——都是高度结构化的桌面操作任务。在这些任务中，物体种类有限、背景相对固定、阶段在观测空间中有良好的可分离性。在非结构化环境（如杂乱的家庭厨房、动态的工业产线）中，观测变化剧烈且阶段边界模糊，MoE 路由是否仍然能涌现出有意义的阶段分工，是未经验证的开放问题。</p>
+</div>
+
+<h3>9.2 扩展方向与未解决的问题</h3>
+<ul>
+<li><strong>专家语义的主动引导：</strong>当前专家分工完全涌现。一个自然扩展是引入<strong>弱监督信号</strong>——例如少量帧的阶段标签或自然语言描述——来引导专家向语义合理的方向分工，同时保留大部分帧的无监督特性。这可以结合视觉-语言模型（VLM）自动生成弱标签。</li>
+<li><strong>动态专家数量：</strong>设计能够在训练过程中<strong>动态增加或合并专家</strong>的机制（类似 Growable MoE 或 Expert Merging），使系统自动适应不同复杂度任务，消除人工调参负担。</li>
+<li><strong>跨任务专家复用：</strong>如果"抓取"专家在多个任务中都能工作，那么在不同任务间共享专家的参数将大幅提升样本效率。这需要设计<strong>专家标识和对齐</strong>机制——如何判断任务 A 的 Expert 2 和任务 B 的 Expert 3 是"同一个语义阶段"？</li>
+</ul>
+
+<h3>9.3 超参数敏感性分析</h3>
+<table>
+<thead>
+<tr><th>Hyperparameter</th><th>偏差方向</th><th>影响程度</th><th>典型症状</th><th>诊断方法</th></tr>
+</thead>
+<tbody>
+<tr><td>专家数量 $N$</td><td>过小</td><td>★★★★</td><td>不同阶段被迫共享专家，热力图无明显阶段分界</td><td>检查专家激活热力图是否呈现清晰的时间分段</td></tr>
+<tr><td>专家数量 $N$</td><td>过大</td><td>★★★</td><td>多个专家竞争同一阶段，部分专家长期低激活（"半死"）</td><td>统计每个专家的平均激活频率，过低者标记为可能冗余</td></tr>
+<tr><td>$\alpha$ (Load-Balance)</td><td>过小</td><td>★★★★★</td><td>1-2 个专家承载 90%+ 流量，其余几乎不用</td><td>打印 $f_i$ 分布；标准差 > 0.3 表示严重不均</td></tr>
+<tr><td>$\alpha$ (Load-Balance)</td><td>过大</td><td>★★★★</td><td>所有专家均匀使用但无阶段语义——路由变成随机分配</td><td>检查激活热力图：如果无时间连续性（相邻帧随机切换专家），则 $\alpha$ 过大</td></tr>
+<tr><td>$\beta$ (Entropy)</td><td>过小</td><td>★★★</td><td>阶段过渡处动作跳变不连续，门控在边界处"咔嗒"切换</td><td>观测阶段过渡帧的动作序列平滑性；检查门控概率是否在单帧内从 0 跳到 1</td></tr>
+<tr><td>$\beta$ (Entropy)</td><td>过大</td><td>★★★★</td><td>门控始终接近均匀分布，丧失选择性——MoE 退化为加权平均</td><td>检查门控概率分布：如果所有帧所有专家概率接近 $1/N$，则 $\beta$ 过大</td></tr>
+<tr><td>Gating Noise $\sigma$</td><td>过小</td><td>★★</td><td>训练早期路由快速固化，后期难以改变专家分工</td><td>观察训练曲线中 $f_i$ 的演化——如果在 10% 训练步数内已稳定，可能探索不足</td></tr>
+<tr><td>Gating Noise $\sigma$</td><td>过大</td><td>★★★</td><td>训练不稳定，路由频繁变化，专家无法形成稳定分工</td><td>训练曲线中 $\mathcal{L}_{\text{diff}}$ 波动大且不收敛</td></tr>
+</tbody>
+</table>
+
+<div class="callout danger">
+<div class="callout-title">Deep-Dive: 最棘手的失败模式——伪阶段解耦 (Pseudo Phase Decoupling)</div>
+<p>一个隐蔽但危险的现象是：门控网络可能学会基于<strong>时间步</strong>而非观测内容来做路由。由于训练数据中的任务总是按固定顺序执行（接近 -> 抓取 -> 运输 -> 放置），门控网络可能简化为"在 episode 的前 25% 帧选 Expert 1，25-50% 选 Expert 2..."。这种"时间驱动"的路由在训练分布内表现完美——热力图也会显示清晰的阶段分离——但在故障恢复场景中<strong>完全失效</strong>：因为当抓取失败、策略需要重试时，"时间"已经推进到了本应是运输阶段的区间，门控会基于时间选择运输专家（而非基于观测选择抓取专家）。这就是伪阶段解耦——看起来解耦了，实际上只是记住了时间模式。要诊断此问题，需要检查门控网络对<strong>时间偏移输入</strong>的响应——将观测序列向后平移几个时间步，观察路由是否仍然正确。</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- S10 Motivation -->
+<!-- ============================================================ -->
+<section id="motivation">
+<h2>&#167;10 Motivation Chain</h2>
+
+<h3>10.1 五步逻辑链：为什么 MoE-DP 是重要的研究工作？</h3>
+
+<div class="formula-block" style="background:#fefce8; border-color:#f59e0b;">
+<div style="font-size:14px; line-height:2.0;">
+
+<p><strong>Step 1: 长时序操作是机器人走向真实世界的必经之路。</strong> 工业场景中的装配、物流分拣、家庭服务中的整理房间、做饭——这些都不是"一个动作完成"的简单任务，而是由多个高度依赖的子阶段组成的长时序操作链。机器人能否在实际环境中可靠工作，很大程度上取决于它能否处理这些长时序任务中的中间故障和不确定性。</p>
+
+<p><strong>Step 2: 扩散策略是目前最有前景的操作学习范式之一，但仍是一个"盲"的策略。</strong> 扩散策略（Diffusion Policy）凭借其对多模态动作分布的建模能力和训练稳定性，已成为机器人操作学习的 SOTA 方法之一。但它有一个根本性盲区：策略不知道"当前在任务中的哪个位置"。这个盲区在短时序任务（如单次抓取）中不致命——因为整个任务只涉及一个阶段。但在长时序任务中，它直接导致中间故障后的级联崩溃。</p>
+
+<p><strong>Step 3: 已有解决方案各有结构性缺陷。</strong> 层次化策略（Hierarchical RL）需要预定义子目标或技能原语——这需要大量领域知识且缺乏灵活性；LLM 任务规划方法依赖外部语言模型，推理延迟高且语言-动作对齐不可靠；显式阶段分类器需要人工标注且泛化性差。没有一个方案能同时做到：(a) 不需要人工标注阶段，(b) 自动适应不同任务，(c) 在故障后自然恢复，(d) 支持推理时任务重排。</p>
+
+<p><strong>Step 4: MoE 提供了一个极其简洁而强大的答案。</strong> MoE-DP 的核心贡献不是发明了 MoE（这在大语言模型中已有广泛应用），而是<strong>发现了 MoE 在操作策略中的独特价值</strong>——它不仅是一种参数效率技术，更是一种<strong>隐式的阶段解耦机制</strong>。稀疏路由的离散性天然适合建模任务的离散阶段结构；辅助损失提供了一个"软正则"来引导这种解耦向有利于任务执行的方向发展。这是一个"一石三鸟"的设计：阶段解耦（提升鲁棒性）+ 条件计算（提升表示能力）+ 可干预接口（支持技能重排）——所有这些都来自于在正确位置插入一个 MoE 层。</p>
+
+<p><strong>Step 5: 推理时技能重排打开了一个全新的范式。</strong> 传统操作策略一旦训练完成，其行为模式就是固定的——任务必须按照训练时的顺序执行。MoE-DP 的推理时重排能力意味着：一个训练好的策略可以灵活地重新组合其子技能来应对新的任务变体，而无需收集新数据或重训。这是从"任务专用策略"走向"技能可组合策略"的关键一步——类似于软件工程中从"单体应用"到"微服务架构"的转变。如果这一方向继续发展，我们可能看到操作策略的"应用商店"——不同机器人共享可复用的专家（技能模块），通过组合来解决新任务。</p>
+
+</div>
+</div>
+
+<h3>10.2 一句话核心动机</h3>
+<div class="callout tip">
+<div class="callout-title">Motivation in One Sentence</div>
+<p>MoE-DP 试图回答一个看似简单但意义深远的问题：<strong>一个操作策略的内部表示，能不能在不接受任何阶段标签的情况下，自然地将长时序任务"解析"为有序的子阶段——并因此获得故障后"知道自己该重做什么"的能力？</strong>——如果答案是肯定的，那么长时序操作的鲁棒性就不再需要复杂的显式规划或层次化架构，只需要在正确位置插入正确的归纳偏置。</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- S11 Takeaways -->
+<!-- ============================================================ -->
+<section id="takeaway">
+<h2>&#167;11 Reading Takeaways</h2>
+
+<h3>11.1 四条核心启示</h3>
+
+<div class="novelty-card">
+<h4>&#9312; 表示的结构化不来自"标签"，而来自"正确的归纳偏置"</h4>
+<div class="novelty-step"><strong>Lesson:</strong> MoE-DP 最深刻的启示是——你不必告诉策略"什么是阶段"，你只需要给它一个<strong>正确结构的计算图</strong>（稀疏路由 + 辅助损失），阶段结构就会在数据驱动下自发涌现。这与"表征学习"的核心理念一脉相承：好的表示不是被灌输的，而是在正确的约束下被发现的。这启发我们重新审视其他机器人学习问题——还有哪些结构可以不是通过显式标注，而是通过精心设计的网络架构和训练正则来涌现？</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9313; 鲁棒性的提升不来自"更大的模型"，而来自"更合理的内部结构"</h4>
+<div class="novelty-step"><strong>Lesson:</strong> 面对长时序操作中的故障恢复问题，一个常见的思路是"把策略网络做得更大，让它自己学会处理各种异常"。MoE-DP 的经验表明——<strong>涨模型规模不如改内部结构</strong>。一个中等规模的扩散策略加上精心设计的 MoE 条件通道，在故障恢复上显著优于一个更大但结构扁平的标准扩散策略。这提醒我们：在机器人学习中，"结构创新"的价值常常被"规模扩展"所掩盖——但前者可能产生更本质的改进。</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9314; 稀疏门控的离散性是一种被低估的表示学习工具</h4>
+<div class="novelty-step"><strong>Lesson:</strong> TopK 路由的离散决策在传统深度学习中被视为一个"不可微的麻烦"——需要借助 Straight-Through Estimator 或 REINFORCE 才能传播梯度。但 MoE-DP 揭示了这个"麻烦"的另一面：离散决策<strong>天然产生硬聚类</strong>（硬聚类 = 不同样本走不同计算路径），这种硬聚类是连续嵌入很难自然达成的。这暗示着——在需要解耦表示的任务中（不仅是操作，也可能是多任务学习、持续学习等），<strong>引入受控的离散性</strong>（discrete bottleneck）可能是一个通用而有效的策略。</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9315; "训练一次，重排推理"是技能泛化的新范式</h4>
+<div class="novelty-step"><strong>Lesson:</strong> MoE-DP 的推理时技能重排能力展示了一种新的泛化范式——不是"重新训练以适应新任务"，而是"重新组合已学习的技能来解决新任务"。这种"组合式泛化"（compositional generalization）是通向通用操作智能的潜在路径。MoE 的模块化设计（独立专家 = 独立技能）为这种范式提供了天然的架构支持。未来，如果能够建立跨任务、跨机器人的"专家库"——每个专家是一个可插拔的操作技能——操作策略的发展将类比于软件工程中从"单体应用"到"组件生态"的跨越。</div>
+</div>
+
+<h3>11.2 对 UAV 领域的潜在启示</h3>
+<div class="callout info">
+<div class="callout-title">UAV Application Relevance</div>
+<p>MoE-DP 的设计理念对 UAV 多阶段任务具有直接而深刻的启发意义：</p>
+<ul>
+<li><strong>多阶段无人机任务（侦察-跟踪-投送-返航）：</strong> 无人机的典型任务链（起飞巡航 -> 目标搜索 -> 锁定跟踪 -> 载荷投送 -> 返航降落）天然就是多阶段的。借鉴 MoE-DP，可以在无人机的视觉导航策略中插入 MoE 层，让不同专家自发对应不同飞行阶段——"搜索"专家关注大范围扫描，"跟踪"专家关注运动目标的动态特征，"降落"专家关注地面标志物。当跟踪丢失（类比抓取失败）时，策略自动回退到"搜索"阶段而非径直返航。</li>
+<li><strong>集群协同的阶段解耦：</strong> 多 UAV 协同任务（如编队飞行 -> 区域覆盖 -> 目标围捕 -> 队形重组）中的阶段切换更加复杂。MoE 路由可以扩展到多智能体场景——每个 UAV 的策略使用共享的 MoE 专家，门控网络基于自身观测和队友状态联合路由。负载均衡损失确保在不同态势下所有专家的技能（搜索、包围、跟踪）都被有效利用。</li>
+<li><strong>任务重排的军事价值：</strong> 推理时技能重排在军事场景中极为有用——指挥官可以根据战场态势实时调整任务顺序（如"先侦察再打击"改为"紧急打击后补侦察"），而无需重新训练 UAV 策略。MoE-DP 的硬/软重排接口为这种"人在回路"的任务重编排提供了技术基础。</li>
+<li><strong>故障恢复的航空安全意义：</strong> UAV 飞行中的传感器失效、通信中断、GPS 丢失等故障可类比操作任务中的抓取失败。阶段感知策略在遭遇这些故障时能"知道自己处于哪个飞行阶段"，从而采取对应阶段的恢复措施（如降落阶段丢失 GPS -> 降级为视觉降落），而非盲目执行下一阶段动作。</li>
+<li><strong>辅助损失设计可迁移：</strong> Load-Balance + Entropy 的辅助损失组合可以直接适配到 UAV 导航中——平衡各个飞行阶段专家在训练数据中的使用频率（防止"巡航"专家因数据量大而主导训练），同时在阶段过渡处保持路由平滑（如从巡航过渡到降落时不产生姿态跳变）。</li>
+</ul>
+</div>
+
+<h3>11.3 关键参考文献对比</h3>
+<table>
+<thead>
+<tr><th>Method</th><th>Year</th><th>Core Idea</th><th>Relation to MoE-DP</th></tr>
+</thead>
+<tbody>
+<tr><td>Diffusion Policy <br/><small>Chi et al.</small></td><td>2023</td><td>用扩散模型生成机器人动作序列，训练稳定且能建模多模态动作分布</td><td>MoE-DP 的基础架构；在其条件通道中插入 MoE 层以增加阶段感知</td></tr>
+<tr><td>Switch Transformer <br/><small>Fedus et al.</small></td><td>2022</td><td>在 Transformer 中使用稀疏 MoE，首次大规模验证负载均衡损失的有效性</td><td>MoE-DP 的负载均衡损失设计灵感来源；但在操作策略中额外需要熵正则</td></tr>
+<tr><td>SayCan <br/><small>Ahn et al.</small></td><td>2022</td><td>用 LLM 做任务规划，为底层技能策略选择"可执行"的技能序列</td><td>与 MoE-DP 的推理时重排形成对比——LLM 规划需外部模型，MoE 重排内建在策略中</td></tr>
+<tr><td>Skill Chaining (TAP) <br/><small>Lee et al.</small></td><td>2022</td><td>通过技能链（skill chaining）将预定义技能串联完成长时序任务</td><td>MoE-DP 的技能（专家）是涌现的而非预定义的；重排接口使技能链更灵活</td></tr>
+<tr><td>Play-LMP <br/><small>Lynch et al.</small></td><td>2020</td><td>从非结构化的操作演示中自动发现隐式技能（latent plan）</td><td>与 MoE-DP 共享"从数据中自动发现子结构"的理念，但 MoE 提供更显式的技能接口</td></tr>
+<tr><td>3D Diffusion Policy (DP3) <br/><small>Ze et al.</small></td><td>2024</td><td>以 3D 点云为观测的扩散策略，实现高效的真实世界操作</td><td>MoE-DP 的 MoE 层理论上可与 DP3 等更先进的扩散策略架构结合使用</td></tr>
+</tbody>
+</table>
+
+<h3>11.4 一句话总结</h3>
+<div class="callout tip">
+<div class="callout-title">One-Sentence Takeaway</div>
+<p>MoE-DP 优雅地证明了一个深刻的命题：<strong>让操作策略的内部表示自然解耦出任务阶段结构，不需要人工标签，不需要层次化架构，不需要外部规划器——只需要在扩散策略的条件通道中插入一个稀疏 MoE 层，并配上精心设计的负载均衡和熵正则</strong>。这个发现不仅为长时序操作鲁棒性提供了一个简洁高效的解决方案，更为"如何通过架构设计而非数据标注来引导表示学习"这一更广泛的问题提供了重要的方法论启示。</p>
+</div>
+
+</section>
+
+</main>
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>&#x1F4C4; Paper Notes &#183; Scholar: Huazhe Xu &#183; Paper ID 10383 &#183; MoE-DP &#183; MathJax + Mermaid Rendering &#183; Generated 2026-07-22</footer>
+</body></html>

@@ -1,18 +1,51 @@
-# 4. Company Research Tracking
+# 无人机公司研究地图
 
-Tracking cutting-edge robotics companies — products, tech blogs, research collaborations.
+> 资料快照：2026-07-22。这里的“领先”按技术代表性、产品化程度、规模部署/适航进度和生态影响力综合判断，不是市值排名。参数优先采用公司官网、监管机构或上市公司文件；公司自述不等于第三方验证。
 
-Last updated: 2026-07-03
+## 核心公司
 
-## Tracked Companies
+| 公司 | 总部/主要来源地 | 重点赛道 | 最值得研究的能力 | 资料 |
+|---|---|---|---|---|
+| DJI 大疆创新 | 中国 | 消费、影像、测绘、巡检、机场 | 飞行平台—载荷—软件—开发者生态的全栈闭环 | [进入](DJI/README.md) |
+| Autel Robotics 道通智能航空 | 中国 | 公共安全、巡检、测绘、VTOL | 多传感器、小型机自主飞行与机场系统 | [进入](Autel-Robotics/README.md) |
+| EHang 亿航智能 | 中国 | 无人驾驶载人 eVTOL | 适航取证、运营体系与自动驾驶载人航空器 | [进入](EHang/README.md) |
+| XAG 极飞科技 | 中国 | 农业无人机与农业机器人 | 作业闭环、变量农业与高负载低空作业 | [进入](XAG/README.md) |
+| JOUAV 纵横股份 | 中国 | 工业级垂直起降固定翼 | 长航时 VTOL、测绘巡检载荷与行业交付 | [进入](JOUAV/README.md) |
+| Skydio | 美国 | 自主飞行、公共安全、工业巡检 | 视觉自主、远程运营与 Drone-in-a-Box | [进入](Skydio/README.md) |
+| Zipline | 美国 | 医疗与即时物流 | 高可靠自主配送网络、运控和末端投递 | [进入](Zipline/README.md) |
+| Wing（Alphabet） | 美国 | 城市末端配送 | 轻量化航空器、运营网络与监管规模化 | [进入](Wing/README.md) |
+| Parrot | 法国 | 测绘、巡检、政府级小型无人机 | 4G 数据链、开放 SDK、摄影测量 | [进入](Parrot/README.md) |
+| Quantum Systems | 德国 | 双用途 eVTOL ISR、测绘 | 便携式 VTOL 固定翼与边缘 AI | [进入](Quantum-Systems/README.md) |
+| Shield AI | 美国 | 国防自主系统 | Hivemind 自主驾驶软件与 V-BAT | [进入](Shield-AI/README.md) |
+| AeroVironment | 美国 | 战术无人机、多域机器人 | 从小型 ISR 到长航时 VTOL 的产品谱系 | [进入](AeroVironment/README.md) |
+| Anduril | 美国 | 国防自主系统与指挥控制 | Lattice 软件平台和多机/多域系统集成 | [进入](Anduril/README.md) |
 
-| # | Company | Focus | Country | Dashboard |
-|---|---------|-------|---------|-----------|
-| 1 | 宇树科技 (Unitree) | Legged robots, humanoids | China | [→](Unitree/dashboard.html) |
-| 2 | DJI (大疆创新) | Civilian drones, aerial imaging | China | [→](DJI/dashboard.html) |
+## 怎么读这批资料
 
-## Tracking Methodology
-- GitHub releases & SDK updates
-- YouTube/Bilibili product demos
-- arXiv for research collaborations
-- Official blogs & developer forums
+- 看民用平台产品化：DJI、Autel、Skydio、Parrot。
+- 看“无人机即基础设施”：DJI Dock、Skydio Dock、Zipline、Wing。
+- 看垂直行业闭环：XAG（农业）、JOUAV（测绘/巡检）、EHang（载人 eVTOL）。
+- 看自主系统软件化：Skydio、Shield AI、Anduril、Quantum Systems。
+- 看长航时/固定翼：JOUAV、Quantum Systems、AeroVironment。
+
+## 横向判断框架
+
+1. **飞行平台**：构型、能源、航时、载荷、环境适应性和可维护性。
+2. **感知与自主**：GNSS 受限条件、避障、目标理解、任务重规划、多机协同。
+3. **链路与运控**：专用数传、蜂窝/SATCOM、远程驾驶、机队调度、网络安全。
+4. **任务载荷**：可见光、热红外、LiDAR、SAR、农业作业或物流末端机构。
+5. **数据闭环**：采集、边缘处理、云平台、数字孪生、业务系统/API 集成。
+6. **安全与合规**：适航、运营许可、Remote ID、BVLOS、安全案例和供应链要求。
+7. **单位经济性**：每架次成本、人员比、可用率、周转时间、维护与保险。
+
+## 边界说明
+
+- `Unitree/` 是仓库原有的机器人公司资料，属于具身智能邻近赛道，并非本次无人机核心名单，予以保留。
+- 军用/双用途公司的公开参数会随合同和版本变化；本仓库只做产业研究，不提供武器使用指导。
+- “航时、距离、识别能力”等多为厂商在特定测试条件下的标称值，采购或科研引用前应回到原始手册复核。
+
+## 更新方法
+
+- 每季度检查：新品、SDK/固件、适航/运营许可、量产与部署数字。
+- 每半年检查：商业模式、主要客户/合同、供应链与监管限制。
+- 优先顺序：监管文件/财报 > 产品手册 > 官方新闻稿 > 媒体报道 > 二手汇总。

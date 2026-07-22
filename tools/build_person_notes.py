@@ -34,7 +34,7 @@ def diagram(nodes):
 def make_note(key,p):
     tags="".join(f'<span class="tag">{escape(t)}</span>' for t in p["tags"])
     return f'''<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Paper Notes - {escape(p['title'])}</title><script>MathJax={{tex:{{inlineMath:[['$','$']],displayMath:[['$$','$$']] }},options:{{enableMenu:false}}}};</script><script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script><script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script><script>mermaid.initialize({{startOnLoad:true,theme:'neutral',securityLevel:'loose'}});</script><style>{CSS}</style></head><body>
-<nav><a class="home" href="../../../../index.html">🏠 HOME</a><span class="brand">Paper Notes</span><a href="#info">Info</a><a href="#insight">Insight</a><a href="#architecture">Architecture</a><a href="#task">Task</a><a href="#challenge">Challenge</a><a href="#method">Method</a><a href="#principles">Principles</a><a href="#evidence">Evidence</a><a href="#flaw">Flaw</a><a href="#motivation">Motivation</a><a href="#takeaway">Takeaways</a></nav><main class="wrap">
+<nav><a class="home" href="../../index.html">🏠 SCHOLAR</a><span class="brand">Paper Notes</span><a href="#info">Info</a><a href="#insight">Insight</a><a href="#architecture">Architecture</a><a href="#task">Task</a><a href="#challenge">Challenge</a><a href="#method">Method</a><a href="#principles">Principles</a><a href="#evidence">Evidence</a><a href="#flaw">Flaw</a><a href="#motivation">Motivation</a><a href="#takeaway">Takeaways</a></nav><main class="wrap">
 <section id="info"><h1>{escape(p['title'])}</h1><div class="meta">{escape(p['authors'])} · {escape(p['venue'])}</div><div class="tags">{tags}</div><h3>TL;DR</h3><div class="callout info">{p['tldr']}</div><p class="source">本笔记依据本目录 PDF 全文整理。论文入口：<a target="_blank" href="{p['link']}">{p['link']}</a></p></section>
 <section id="insight"><h2>2. Insight &amp; Novelty</h2><h3>核心洞察</h3><div class="callout">{p['insight']}</div><h3>创新的逻辑</h3>{lis([p['challenges'][0],p['method'][0],p['evidence'][0]])}</section>
 <section id="architecture"><h2>3. System / Argument Architecture</h2><div class="mermaid-box"><div class="mermaid">{diagram(p['architecture'])}</div></div><p>这条链路按论文中的问题设定、核心模块和评价闭环重构；对综述/书籍类文献，它表示论证框架而非单一软件管线。</p></section>
@@ -51,29 +51,17 @@ def make_note(key,p):
 def make_index(person, entries):
     cards=[]
     for key,p in entries:
-        cards.append(f'<a class="card" href="{person}/files/{key}/note.html"><span>{escape(p["venue"])}</span><h2>{escape(p["title"])}</h2><p>{escape(p["tldr"])}</p></a>')
+        cards.append(f'<a class="card" href="files/{key}/index.html"><span>{escape(p["venue"])}</span><h2>{escape(p["title"])}</h2><p>{escape(p["tldr"])}</p></a>')
     return f'''<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(person)} - Scholar Dashboard</title><style>:root{{--bg:#0f1117;--card:#1a1d27;--text:#e5e7eb;--muted:#9ca3af;--accent:#60a5fa}}*{{box-sizing:border-box}}body{{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif}}header{{padding:24px 32px;border-bottom:1px solid #2d3342;background:linear-gradient(135deg,#171b27,#20263a)}}header a{{color:var(--accent);text-decoration:none}}main{{max-width:1100px;margin:auto;padding:30px 22px}}.stat{{display:inline-block;border:1px solid #303649;border-radius:9px;padding:12px 20px;margin:10px 0 24px}}.stat b{{font-size:28px;color:var(--accent)}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}}.card{{display:block;padding:18px 20px;border:1px solid #2d3342;border-radius:10px;background:var(--card);color:inherit;text-decoration:none;transition:.2s}}.card:hover{{transform:translateY(-2px);border-color:var(--accent)}}.card span{{font-size:11px;color:var(--accent)}}.card h2{{font-size:16px;line-height:1.4}}.card p{{font-size:13px;line-height:1.65;color:var(--muted)}}footer{{text-align:center;color:#6b7280;padding:28px}}</style></head><body><header><a href="../../index.html">← Back to UAV-Survey</a><h1>👤 {escape(person)}</h1><p>Scholar Dashboard · 已添加 PDF 精读笔记</p></header><main><div class="stat"><b>{len(entries)}</b><br>Tracked Papers</div><div class="grid">{''.join(cards)}</div></main><footer>UAV-Survey · Scholar Tracking</footer></body></html>'''
 
 for key,p in PAPERS.items():
-    candidates=list((ROOT/"2.Person"/p["person"]).glob(f"**/files/{key}/note.html"))
+    candidates=list((ROOT/"2.Scholar"/p["person"]/"files"/key).glob("note.html"))
     if len(candidates)!=1: raise RuntimeError(f"{key}: expected one note, got {candidates}")
     candidates[0].write_text(make_note(key,p),encoding="utf-8")
 
-for person in ("Dario Floreano","Tairan He"):
-    entries=[]
-    files_root=ROOT/"2.Person"/person/person/"files"
-    for note in sorted(files_root.glob("*/note.html"),key=lambda x:x.parent.name):
-        key=note.parent.name
-        if key in PAPERS:
-            p=PAPERS[key]
-        else:
-            pdf=next(note.parent.glob("*.pdf"))
-            stem=pdf.stem
-            parts=stem.split(" - ",2)
-            title=parts[2] if len(parts)==3 else stem
-            year=parts[1] if len(parts)==3 else ""
-            p=dict(title=title,venue=f"{year} · local PDF",tldr="已完成全文精读：打开笔记查看核心洞察、方法、公式、实验、局限与研究启示。")
-        entries.append((key,p))
-    (ROOT/"2.Person"/person/"index.html").write_text(make_index(person,entries),encoding="utf-8")
+# Keep all directory pages under the single canonical index builder. This
+# prevents this specialized note generator from overwriting scholar indexes.
+from rebuild_scholar_indexes import main as rebuild_scholar_indexes
 
-print(f"Built {len(PAPERS)} notes and 2 scholar indexes")
+rebuild_scholar_indexes()
+print(f"Built {len(PAPERS)} notes and refreshed all scholar indexes")

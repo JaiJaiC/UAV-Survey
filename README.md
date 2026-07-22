@@ -4,7 +4,7 @@ Systematic 6-tier research survey pipeline for UAV, aerial robotics, multi-agent
 
 ```
 1.Paper          → Single-paper deep dive (reading notes, code experiments)
-2.Person         → Scholar tracking (Google Scholar profiles, publication history)
+2.Scholar        → Scholar tracking (Google Scholar profiles, publication history)
 3.Lab            → College team real-time tracking (9 labs, arXiv + GitHub)
 4.Company        → Industry tracking (Unitree, DJI)
 5.UAV Field      → Domain surveys (Anti-UAV, Swarm, UAV+RL, OpenFlight)

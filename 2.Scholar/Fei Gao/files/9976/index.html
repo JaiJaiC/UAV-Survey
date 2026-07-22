@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — HI-ARM Hand-like Robot (Wu et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 4px; margin-right: 5px; margin-bottom: 4px; }
+  .tag-blue{background:#dbeafe;color:#1d4ed8} .tag-green{background:#d1fae5;color:#047857} .tag-amber{background:#fef3c7;color:#92400e}
+  .tag-purple{background:#ede9fe;color:#6d28d9} .tag-red{background:#ffe4e6;color:#be123c} .tag-gray{background:#f3f4f6;color:#4b5563} .tag-cyan{background:#cffafe;color:#0f766e}
+  .callout { border-left: 4px solid; border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 12px 0; font-size: 13.5px; }
+  .callout.info{background:#e8f0fe;border-color:#3b82f6;color:#1e3a5f} .callout.tip{background:#e6f7ee;border-color:#10b981;color:#064e3b}
+  .callout.warn{background:#fef7ed;border-color:#f59e0b;color:#78350f} .callout.danger{background:#ffeaf0;border-color:#f43f5e;color:#7f1d1d}
+  .callout.idea{background:#f0ebfd;border-color:#8b5cf6;color:#3b1f7e} .callout-title{font-weight:700;font-size:13px;margin-bottom:3px}
+  .formula-block { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 22px; margin: 12px 0; overflow-x: auto; }
+  .formula-block .eq-tag { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong); background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 12.5px; color: #64748b; line-height: 1.65; }
+  .mermaid-box { background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center; }
+  .paper-figure { background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0; margin: 16px 0; overflow: hidden; }
+  .paper-figure .fig-header { background: #f1f5f9; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .paper-figure .fig-header .fig-number { font-weight: 700; font-size: 12.5px; color: var(--blue-strong); background: #dbeafe; padding: 3px 10px; border-radius: 4px; }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img { max-width: 100%; height: auto; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .paper-figure .fig-placeholder { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px; }
+  .paper-figure .fig-interpretation { padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8; }
+  .paper-figure .fig-interpretation .fig-label { font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px; }
+  .paper-figure .fig-interpretation p, .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin: 12px 0; background: #fafbfc; }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step { font-size: 13px; margin-bottom: 8px; padding-left: 12px; border-left: 3px solid var(--purple-stroke); }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Fei Gao · 15-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a class="active" href="../9976/index.html">Hand-like autonomous flyi</a>
+<a href="../9975/index.html">UAV</a>
+<a href="../9974/index.html">precise real-time force-a</a>
+<a href="../9973/index.html">Rotor-failure-aware quadr</a>
+<a href="../9972/index.html">3D</a>
+<a href="../9971/index.html">LiDAR-VGGT Cross-modal</a>
+<a href="../9970/index.html">Safe agile transportation</a>
+<a href="../9969/index.html">DPNet Doppler LiDAR</a>
+<a href="../9968/index.html">Primitive-based truncated</a>
+<a href="../9967/index.html">FAR-AVIO</a>
+<a href="../9966/index.html">PathPainter Transferring</a>
+<a href="../9965/index.html">High-speed vision-based f</a>
+<a href="../9964/index.html">UAV</a>
+<a href="../9963/index.html">Agile fall recovery</a>
+<a href="../9962/index.html">Sphere-VIO Fast robust</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Hand-like Autonomous Flying Robot for Airborne Grasping and Interaction（手型自主飞行机器人：面向空中抓取与交互）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yuze Wu</strong>、Fan Yang、Rui Jin、Yuhang Zhong、Junjie Wang、Xuankang Wu、<strong>Fei Gao</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">浙江大学</strong>（Zhejiang University）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">Nature Communications</strong>，<strong>2026年</strong></td></tr>
+      <div class="journal-meta"><span class="jif-name">Nat. Commun.</span> <span class="jif-badge if-value">IF 16.6</span> <span class="jif-badge if-q1">JCR Q1</span> <span class="jif-badge if-cas">CAS 1区</span></div>
+    <tr><td><strong>DOI</strong></td><td><a href="https://doi.org/10.1038/s41467-026-68967-3" target="_blank">10.1038/s41467-026-68967-3</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出<strong>HI-ARM</strong>——灵感来自人手的紧凑型飞行操作机器人，C形抓取轮廓+5自由度手指结构+腱驱动机构，仅手掌大小，实现了手掌抓握、指尖捏取、树枝栖息、开门、人机交互和物体运输等多样化功能，发表于<strong>Nature Communications</strong>。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Aerial Manipulation</span>
+    <span class="tag tag-green">Bio-inspired Design</span>
+    <span class="tag tag-amber">Nature Communications</span>
+    <span class="tag tag-purple">Deformable Quadrotor</span>
+    <span class="tag tag-red">Human-Robot Interaction</span>
+    <span class="tag tag-cyan">Tendon-Driven</span>
+    <span class="tag tag-gray">Hand-like Robot</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么现有飞行操作机器人功能单一？</strong><br>
+    答：传统方案要么是"四旋翼悬挂一个夹爪"（仅能抓取，无法栖息/开门/交互），要么是大型机械臂无人机（太重太贵）。根本原因在于：机身的飞行功能和操作功能是分离的——飞行器做飞行，夹爪做抓取，两者互不增益。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>将操作功能融入机身结构本身</strong>——设计一个"手型飞行机器人"，C形机身既是飞行器的结构框架也是抓取的手掌，5-DOF手指既是操作末端也是飞行姿态的调节器。这种"机身即末端"的一体化设计哲学，使得仅手掌大小的机器人可以完成从抓取到栖息到开门到人机交互的全谱系操作任务。发表于Nature Communications——这是飞行操作领域里程碑式的工作。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>人手的功能多样性——手掌抓握+指尖捏取+手指推拉</td><td>→ 不是设计"更好的夹爪"，而是模仿人手的多模式操作能力：C形机身=手掌（包裹抓握）、5-DOF手指=手指（灵活操作）、腱驱动=肌腱（轻量紧凑）</td><td>架构</td></tr>
+    <tr><td>鸟类爪子的多功能性——飞行、栖息、抓取、推动</td><td>→ 飞行机器人的操作工具不应该是附加的，而应该像鸟爪一样是机身的一部分——轻量、多功能、不显著增加飞行负担</td><td>策略</td></tr>
+    <tr><td>腱驱动——用绳索远距离传递力，减少末端重量</td><td>→ 将手指驱动电机放在机身基座，通过腱将力传递到手指关节——减少手指末端的惯量，提高动态响应速度，同时保护电机免受末端冲击</td><td>方法</td></tr>
+    <tr><td>变形四旋翼——通过改变机臂角度调节推力和姿态</td><td>→ 手指不只是操作工具——主动调节手指姿态可以辅助飞行控制（类似变形机臂），实现操作与飞行的协同</td><td>数学 / 控制</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 手型仿生一体化设计——机身=手掌+手指=操作器</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统空中操作平台=飞行器+外挂机械臂/夹爪——操作工具是附加重量、降低飞行效率、限制操作空间</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>人手——手掌提供包裹面，手指提供灵活操作点，整个结构紧凑且多功能</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>C形抓取轮廓（手掌）+ 复合5-DOF手指结构（2-DOF扭转+3-DOF伸展）+ 腱驱动机构。C形机身既是碳纤维飞行框架也是抓取时包裹物体的"手掌"，手指安装在C形机身上——整个机器人仅手掌大小，无额外机械臂重量</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 解耦任务规划——毫秒级飞行轨迹+微秒级变形规划</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>飞行器的位置/姿态变化（慢动态，~100ms）和手指的变形动作（快动态，~1ms）耦合在一起时，规划问题的维度爆炸——6DoF飞行+5DoF手指=11维规划空间</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>分层任务规划——飞行控制关心"去哪"，手指控制关心"怎么抓"，两者带宽不同，可以解耦</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>飞行轨迹规划（毫秒级）——只规划四旋翼的6-DoF轨迹。末端变形规划（微秒级）——在飞行轨迹确定后，独立规划手指的最优变形序列。两个规划器异步但共享同一个代价函数，通过离线预计算的变形动作库加速在线查询</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 6-DoF状态估计器+电机观测器联合反馈</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>变形过程中，手指位移和飞行器COG（重心）位置同时变化，形成相互耦合的观测问题——传统IMU只能测量机身的姿态/加速度，无法直接测量手指的变形状态</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>并联机器人的运动学状态估计——多链机构的关节状态可以通过基座运动+电机编码器联合推断</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>6-DoF状态估计器（VIO+IMU融合）估计飞行器基座位姿→电机观测器（读取每个手指电机的位置/电流编码器）推断手指关节的实际位置→两者联合在线更新COG位姿和末端位移。这使得飞行控制器可以实时补偿手指变形引起的重心偏移</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph HARDWARE["硬件平台层"]
+      CFRAME["C形碳纤维机身 · 手掌结构"]
+      FINGERS["5-DOF手指 · 2扭转+3伸展"]
+      TENDONS["腱驱动机构 · 绳索传动"]
+      MOTORS_ARM["机臂电机 ×4 · 飞行推进"]
+      MOTORS_FINGER["手指电机 ×5 · 变形驱动"]
+      SENSORS["VIO+IMU · 电机编码器"]
+    end
+
+    subgraph ESTIMATION["状态估计层"]
+      POSE6D["6-DoF基座位姿 · VIO+IMU融合"]
+      FINGER_STATE["手指关节状态 · 电机观测器"]
+      COG["COG位姿在线更新 · 补偿手指变形"]
+    end
+
+    subgraph PLANNING["规划层"]
+      FLIGHT_PLAN["飞行轨迹规划 · 毫秒级 · 6-DoF"]
+      DEFORM_PLAN["变形规划 · 微秒级 · 动作库查询"]
+      MANEUVER_LIB["动作库 · 离线预计算 · 抓取/栖息/开门"]
+    end
+
+    subgraph CONTROL["控制层"]
+      FLIGHT_CTRL["飞行控制器 · 姿态+位置"]
+      DEFORM_CTRL["变形控制器 · 手指角度/力"]
+      COORD["协同控制 · 重心补偿 · 反扭矩抵消"]
+    end
+
+    HARDWARE --> ESTIMATION --> PLANNING --> CONTROL
+    CONTROL --> HARDWARE
+
+    COORD -.->|"重心偏移反馈"| FLIGHT_CTRL
+    FINGER_STATE -.->|"关节状态更新"| DEFORM_CTRL
+
+    classDef hardware fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef est fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef plan fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef control fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class CFRAME,FINGERS,TENDONS,MOTORS_ARM,MOTORS_FINGER,SENSORS hardware
+    class POSE6D,FINGER_STATE,COG est
+    class FLIGHT_PLAN,DEFORM_PLAN,MANEUVER_LIB plan
+    class FLIGHT_CTRL,DEFORM_CTRL,COORD control
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 状态→规划→控制→执行</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["传感器输入"]
+      direction LR
+      CAM["VIO相机 · 30Hz · 位姿估计"] --> POSE["6-DoF基座状态"]
+      IMU["IMU · 200Hz · 加速度+角速度"] --> POSE
+      ENC["电机编码器 · 500Hz · 位置+电流"] --> FINGER["手指关节状态"]
+    end
+
+    subgraph TASK["任务分解"]
+      direction LR
+      TASK_CMD["任务指令: 抓取/栖息/开门/交互"] --> MODE["模式选择: 自主 或 遥操作"]
+      MODE --> DECOUPLE["解耦: 飞行子任务 + 变形子任务"]
+    end
+
+    subgraph FLIGHT_PIPE["飞行子任务管线"]
+      direction LR
+      TRAJ_OPT["轨迹优化 · 最小化snap · 碰撞约束"] --> WAYPOINTS["无碰撞waypoints序列"]
+      WAYPOINTS --> POS_CTRL["位置+姿态控制器"]
+    end
+
+    subgraph DEFORM_PIPE["变形子任务管线"]
+      direction LR
+      MANEUVER["动作库查询 · 离线预计算动作"] --> FINGER_TRAJ["手指关节轨迹"]
+      FINGER_TRAJ --> TENDON_CTRL["腱驱动控制器 · 力/位置混合"]
+    end
+
+    subgraph SYNC["协同执行"]
+      direction LR
+      SYNC_CTRL["时序同步器 · 飞行位姿↔手指变形"] --> MOTOR_OUT["电机指令输出 · 9轴"]
+    end
+
+    INPUT --> TASK
+    TASK --> FLIGHT_PIPE
+    TASK --> DEFORM_PIPE
+    FLIGHT_PIPE --> SYNC
+    DEFORM_PIPE --> SYNC
+
+    MOTOR_OUT -.->|"执行反馈"| INPUT
+
+    classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef task fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef flight fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef deform fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef sync fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class CAM,IMU,ENC,POSE,FINGER input
+    class TASK_CMD,MODE,DECOUPLE task
+    class TRAJ_OPT,WAYPOINTS,POS_CTRL flight
+    class MANEUVER,FINGER_TRAJ,TENDON_CTRL deform
+    class SYNC_CTRL,MOTOR_OUT sync
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 全任务执行管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph INIT["阶段1: 任务初始化"]
+      direction LR
+      START["接收任务 · 选择操作模式"] --> LOAD["加载对应动作库 · 离线预计算"]
+      LOAD --> CALIB["在线标定 · 电机零位 · VIO初始化"]
+    end
+
+    subgraph NAV["阶段2: 飞行接近"]
+      direction LR
+      FLY["自主飞行至目标位置 · 轨迹规划"] --> HOVER["目标附近悬停 · 姿态稳定"]
+      HOVER --> READY["手指预张开 · 准备操作"]
+    end
+
+    subgraph ACT["阶段3: 操作执行"]
+      direction LR
+      GRASP["抓取模式: 手掌抓握或指尖捏取"] --> VERIFY["力/触觉反馈 · 确认抓取成功"]
+      PERCH["栖息模式: 手指钩住树枝/杆子"] --> POWER_OFF["电机停转 · 节能栖息"]
+      DOOR["开门模式: 手指推/拉门把手"]
+      INTERACT["交互模式: 人机手递手 · 遥操作"]
+    end
+
+    subgraph COMPLETE["阶段4: 任务完成"]
+      direction LR
+      LIFT["提升/运输物体"] --> RELEASE["到达目标位置 · 释放"]
+      RELEASE --> RETURN["返回 · 待命"]
+    end
+
+    INIT --> NAV --> ACT --> COMPLETE
+
+    VERIFY -.->|"抓取失败→重试"| GRASP
+    POWER_OFF -.->|"需要起飞"| FLY
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef nav fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef act fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef done fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class START,LOAD,CALIB init
+    class FLY,HOVER,READY nav
+    class GRASP,VERIFY,PERCH,POWER_OFF,DOOR,INTERACT act
+    class LIFT,RELEASE,RETURN done
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \max_{\text{design}} \; \text{Functionality} \quad \text{s.t.} \quad m_{\text{total}} \le 1\,\text{kg},\quad \text{Compact},\quad T_{\text{plan}} \ll T_{\text{execution}} $$
+    <div class="eq-note">
+      <strong>Functionality</strong> = 操作功能的多样性（抓取/栖息/开门/交互/运输）&nbsp;|&nbsp;
+      <strong>$m_{\text{total}}$</strong> = 飞行器总质量（约手掌大小，百克级）&nbsp;|&nbsp;
+      <strong>Compact</strong> = 紧凑性约束——不允许外挂大型机械臂 &nbsp;|&nbsp;
+      <strong>$T_{\text{plan}} \ll T_{\text{execution}}$</strong> = 规划必须远快于执行（真实时操作的要求）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：在手掌大小的体积和百克级的质量预算内，实现人手般的多功能操作——同时保持飞行能力、实时规划能力和操作安全性。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>任务指令（抓取/栖息/开门/交互）+ VIO位姿 + IMU + 电机编码器 + 可选触觉反馈</td><td>离散任务类型 + 连续传感器数据流</td></tr>
+    <tr><td><strong>输出</strong></td><td>9轴电机指令（4机臂电机 + 5手指电机）——驱动机器人完成指定操作任务</td><td>4个飞行推力指令 + 5个手指角度/力指令</td></tr>
+    <tr><td><strong>目标</strong></td><td>在真实环境中实现全自主或半自主（遥操作）的多模式空中操作——从抓取到栖息到人机交互</td><td>功能多样性>5种操作模式，成功率>90%（典型任务），Nature Communications级验证</td></tr>
+  </table>
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>硬件-设计-控制全栈系统创新</strong>。核心贡献不是新算法而是<strong>仿生一体化设计范式</strong>——通过"机身=手掌+手指=操作器"的设计哲学，将飞行操作从"飞行器外挂工具"升级为"飞行器本身就是工具"。发表于Nature Communications表明这项工作在仿生设计、系统集成和功能验证三个维度都达到了顶级水平。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：飞行与操作的"物理对立"——飞行追求轻量（每克升力都珍贵），操作追求力量和灵活性（需要结构刚度和多自由度）。<br><br>
+    （1）<strong>质量-功能的矛盾</strong>：每增加一个操作自由度（一个手指关节），就增加一个电机+传动机构的质量。在手掌大小的尺度上，5个手指关节的驱动系统如何不超过飞行系统的推力上限？<br><br>
+    （2）<strong>重心-稳定性的动态耦合</strong>：手指的运动不仅改变末端的操作位置——还改变整个飞行器的重心位置。如果COG偏移过大，飞行控制器可能失稳。而且这种耦合是双向的——飞行姿态变化也影响手指相对于目标的位置。<br><br>
+    （3）<strong>规划-执行的实时性矛盾</strong>：11维（6飞行+5手指）的联合规划空间在计算上可能爆炸——但操作任务要求快速响应（发现目标后必须在秒级内完成抓取）。解耦是必须的，但解耦引入了近似误差。<br><br>
+    <strong>将这三点放在一起</strong>：在手掌大小的空间和百克级的质量内，集成多种操作功能（5+种模式），同时保证飞行稳定性和实时规划能力——每一步都在与物理极限对抗。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr><td>四旋翼+悬挂夹爪（Quadrotor + Gripper）</td><td>在商用四旋翼下方安装一自由度夹爪——抓取/释放</td><td>功能单一（仅抓取）、无灵巧操作（不能栖息、不能开门）、夹爪增加额外重量和风阻</td></tr>
+    <tr><td>大型机械臂无人机（Aerial Manipulator with Arm）</td><td>在大型无人机上安装多自由度机械臂</td><td>体积大（>1m翼展）、重量大（>5kg）、成本高。不适合室内/狭小空间操作</td></tr>
+    <tr><td>软体抓取（Soft Gripper UAV）</td><td>用软体材料做自适应夹爪——被动适应物体形状</td><td>抓取力有限、无主动手指灵活性（不能捏取小物体）、无法栖息/开门/交互</td></tr>
+    <tr><td>扑翼/鸟型操作机器人</td><td>仿鸟类用爪子栖息和抓取——扑翼飞行+机械爪</td><td>扑翼技术本身尚未成熟（飞行稳定性差、载重能力极低），大多数只有演示级别</td></tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 多功能操作的设计空间探索</strong>：5根手指、每根2-3个自由度→数十种可能的关节配置。如何在手掌大小的空间中布局指节长度、关节运动范围、腱驱动路径以同时支持"手掌抓握大物体"和"指尖捏取小物体"？</li>
+    <li><strong>挑战 2 — 飞行-操作耦合的重心补偿</strong>：手指从张开状态变为合拢状态时，5个手指+腱的质量分布发生改变→COG移动可达数厘米→飞行控制器如果不知道这个偏移，会产生错误的推力分配和姿态振荡</li>
+    <li><strong>挑战 3 — 解耦规划的最优性损失</strong>：飞行轨迹和手指变形分开规划意味着它们只对"平均COG"和"标称手指状态"最优——在极端操作（如动态抓取移动物体）中，解耦引入的近似误差可能导致任务失败</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心方法包括三个层面：（1）硬件设计——手型仿生结构的运动学和腱驱动；（2）解耦规划——飞行轨迹与手指变形的异步优化；（3）联合状态估计——6-DoF基座状态+手指状态+COG在线更新。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <h4>Group A: 解耦规划</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 解耦优化的结构</span>
+    $$ \min_{\mathbf{x}_f, \mathbf{u}_f} J_f(\mathbf{x}_f, \mathbf{u}_f) + \min_{\mathbf{x}_d, \mathbf{u}_d} J_d(\mathbf{x}_d, \mathbf{u}_d \mid \mathbf{x}_f^*) $$
+    <div class="eq-note">
+      <strong>$\mathbf{x}_f, \mathbf{u}_f$</strong> = 飞行状态（位置/速度/姿态/角速度）和控制（推力/角速度指令）&nbsp;|&nbsp;
+      <strong>$\mathbf{x}_d, \mathbf{u}_d$</strong> = 手指变形状态（关节角度/速度）和控制（腱张力/电机电流）&nbsp;|&nbsp;
+      <strong>$J_d(\cdot \mid \mathbf{x}_f^*)$</strong> = 变形优化以最优飞行轨迹为条件——飞行先被优化，然后手指变形在飞行的"影子"下优化 &nbsp;|&nbsp;
+      <strong>解耦合理性</strong>：飞行带宽~10Hz，手指带宽~100Hz——两个子系统的时间常数相差一个数量级，分层优化是合理的工程近似。
+    </div>
+  </div>
+
+  <h4>Group B: COG在线更新</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 重心在线估计</span>
+    $$ \mathbf{p}_{\text{COG}}(t) = \mathbf{p}_{\text{base}}(t) + \frac{\sum_{i=1}^{5} m_i \cdot \mathbf{p}_{\text{finger},i}(\mathbf{q}_i(t))}{m_{\text{total}}} $$
+    <div class="eq-note">
+      <strong>$\mathbf{p}_{\text{COG}}(t)$</strong> = 实时重心位置 &nbsp;|&nbsp;
+      <strong>$\mathbf{p}_{\text{base}}(t)$</strong> = 基座（C形机身）的重心位置（由VIO+IMU估计）&nbsp;|&nbsp;
+      <strong>$m_i$</strong> = 第i根手指的质量（已知，离线测量）&nbsp;|&nbsp;
+      <strong>$\mathbf{p}_{\text{finger},i}(\mathbf{q}_i)$</strong> = 第i根手指在关节角$\mathbf{q}_i$时的质心位置（通过正运动学计算）&nbsp;|&nbsp;
+      <strong>$\mathbf{q}_i(t)$</strong> = 第i根手指的实时关节角（由电机编码器+腱传动模型推断）&nbsp;|&nbsp;
+      <strong>用途</strong>：COG估计被馈入飞行控制器——推力分配不再假设重心在几何中心，而是使用实时估计的COG位置，从而在手指运动期间保持姿态稳定。
+    </div>
+  </div>
+
+  <h4>Group C: 腱驱动模型</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 腱驱动关节力矩与位移</span>
+    $$ \tau_{\text{joint}} = r_{\text{pulley}} \cdot T_{\text{tendon}} \quad \text{（腱张力→关节扭矩）} $$
+    $$ \Delta \theta_{\text{joint}} = \frac{\Delta l_{\text{tendon}}}{r_{\text{pulley}}} \quad \text{（腱位移→关节转角）} $$
+    <div class="eq-note">
+      <strong>$\tau_{\text{joint}}$</strong> = 关节输出扭矩 &nbsp;|&nbsp;
+      <strong>$r_{\text{pulley}}$</strong> = 关节滑轮的半径（腱绕过滑轮的力臂）&nbsp;|&nbsp;
+      <strong>$T_{\text{tendon}}$</strong> = 腱张力（由基座电机通过收/放腱控制）&nbsp;|&nbsp;
+      <strong>$\Delta l_{\text{tendon}}$</strong> = 腱的收/放长度变化（由电机编码器精确测量）&nbsp;|&nbsp;
+      <strong>$\Delta \theta_{\text{joint}}$</strong> = 关节角变化 &nbsp;|&nbsp;
+      <strong>腱驱动优势</strong>：电机放在机身基座→手指末端非常轻→快速运动时惯量小→而且手指与物体碰撞时冲击力不会直接传递到电机（腱可以缓冲）→保护电机和齿轮。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>手指自由度</td><td><strong>5 DOF</strong>（2扭转+3伸展）</td><td>5根手指的主动关节总数</td><td>2-DOF扭转=内侧/外侧弯曲（类似拇指的对掌运动）；3-DOF伸展=指节弯曲。5 DOF在手大小空间内是可驱动上限</td></tr>
+    <tr><td>C形机身开口</td><td><strong>~15cm</strong>（手掌大小）</td><td>抓取物体的最大开口尺寸</td><td>类似人手虎口的开口范围——可抓取从硬币（指尖捏取）到茶杯（手掌抓握）的跨度</td></tr>
+    <tr><td>腱驱动传动比</td><td><strong>滑轮半径比 ≈ 5:1</strong></td><td>电机转角→手指关节转角的减速比</td><td>减速=增扭——电机高速低扭矩→手指低速高扭矩。5:1的减速比在腱的强度极限和电机扭矩范围内实现足够的抓取力</td></tr>
+    <tr><td>飞行规划周期</td><td><strong>~10 ms</strong>（100 Hz）</td><td>飞行轨迹重规划的时间间隔</td><td>飞行控制的带宽~10-20 Hz，100 Hz重规划够用且不超过计算budget</td></tr>
+    <tr><td>变形规划周期</td><td><strong>~0.1 ms</strong>（动作库查询）</td><td>手指变形指令的更新时间</td><td>微秒级——因为变形规划只是查询预计算的动作库表格（查表而非在线优化），几乎没有计算延迟</td></tr>
+  </table>
+
+  <h3>6.4 操作模式对比</h3>
+  <table>
+    <tr><th>操作模式</th><th>手指姿态</th><th>典型物体</th><th>关键挑战</th></tr>
+    <tr><td><strong>手掌抓握</strong></td><td>C形机身+手指环绕包裹</td><td>杯子、盒子、球体</td><td>包裹力分布均匀——需要多个手指同步弯曲</td></tr>
+    <tr><td><strong>指尖捏取</strong></td><td>仅指尖接触，其余手指缩回</td><td>硬币、钥匙、笔</td><td>精确的指尖位置控制——腱驱动的滞回和柔性导致指尖定位有不确定性</td></tr>
+    <tr><td><strong>树枝栖息</strong></td><td>手指钩住树枝，机身悬吊</td><td>树枝、杆子、绳索</td><td>钩住后电机停转——手指的被动自锁能力决定栖息可靠性</td></tr>
+    <tr><td><strong>开门</strong></td><td>手指推/拉门把手+飞行器平移</td><td>门把手（杠杆型/球形）</td><td>手指力和飞行推力的协同——飞行器悬停时推力波动可能干扰手指力</td></tr>
+    <tr><td><strong>人机交互</strong></td><td>遥操作或自主手递手</td><td>人手传递的任意物体</td><td>力感知和柔性响应——无触觉反馈时需要依赖电机电流估计接触力</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解HI-ARM需要掌握三个关键技术原理：仿人手一体化设计（为什么C形+手指是好设计）、腱驱动（如何远距离传动）、解耦规划（如何让11维优化变得可实时计算）。</p>
+
+  <h3>7.1 仿人手一体化设计——手掌+手指的力学协同</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — C形手掌的力学优势</span>
+    $$ \text{抓取稳定性条件（form closure）：} \sum \mathbf{f}_{\text{contact},i} = \mathbf{f}_{\text{external}} $$
+    $$ \text{C形提供被动包裹面 → 减少达成稳定抓取所需的主动手指力} $$
+    <div class="eq-note">
+      <strong>C形轮廓的力学意义</strong>：人手抓取物体时，手掌的凹面提供了天然的被动约束（物体被手掌包裹，不会向后滑出）。C形机身模拟了这一功能——物体进入C形开口后，只需要手指在开口侧施加较小的法向力即可实现稳定的form closure。相比之下，两指平行夹爪需要产生物体重量数倍的夹持力（克服摩擦系数的不确定性）。&nbsp;|&nbsp;
+      <strong>手指的布局</strong>：类似人手的拇指+四指——5根手指从C形机身的开口侧向内弯曲，形成对被抓物体的多点包围。2根扭转手指（类似拇指的对掌运动）可以从侧面切入抓取，3根伸展手指从正面弯曲包裹。
+    </div>
+  </div>
+
+  <h3>7.2 腱驱动——远距离传动的轻量化解决方案</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 腱驱动 vs 直驱 vs 连杆</span>
+    $$ \text{直驱：电机安装在关节处 → 末端惯量大 → 动态响应慢} $$
+    $$ \text{连杆：刚性连接 → 重量大 + 关节耦合 → 运动学约束多} $$
+    $$ \text{腱驱动：电机在基座 → 末端极轻 → 高动态响应 + 被动柔顺} $$
+    <div class="eq-note">
+      <strong>腱驱动的工作方式</strong>：每个手指关节通过一对拮抗腱（agonist-antagonist）连接到基座的电机。电机旋转→收/放腱→腱绕过关节滑轮→关节弯曲/伸展。腱路径沿手指骨骼结构布线，类似人手的肌腱。&nbsp;|&nbsp;
+      <strong>核心优势——被动柔顺</strong>：腱是弹性体（高强度纤维绳有一定弹性模量）→当手指接触物体时，腱的弹性自然吸收冲击力→保护手指结构（不会被撞击损坏）→同时对手指施加的力是柔性的（不像直驱齿轮那样刚性）。这就是为什么手型机器人可以抓易碎物体——腱的弹性提供了天然的力缓冲。
+    </div>
+  </div>
+
+  <h3>7.3 解耦规划——时间常数分离的工程美学</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 时间常数分离 → 结构分离</span>
+    $$ \tau_{\text{flight}} \sim 0.1\,\text{s} \quad \text{（飞行时间常数）} \qquad \tau_{\text{deform}} \sim 0.01\,\text{s} \quad \text{（变形时间常数）} $$
+    $$ \tau_{\text{flight}} \gg \tau_{\text{deform}} \implies \text{两者可以解耦规划} $$
+    <div class="eq-note">
+      <strong>物理依据</strong>：飞行器的质量（百克级）远大于手指的质量（克级）→飞行的惯量远大于手指的惯量→手指可以在飞行器姿态变化发生之前完成变形→从飞行规划的角度看，手指变形可以视为瞬时的（准静态假设）。&nbsp;|&nbsp;
+      <strong>动作库方法</strong>：离线预计算数百种典型操作场景下的最优手指变形序列→在线运行时只需查询"当前任务+当前飞行状态→查表→输出手指关节轨迹"。查询时间微秒级——因为不需要任何优化或搜索。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    C形手掌提供被动包裹稳定性（原理1）→腱驱动以最小的末端惯量提供手指驱动力（原理2）→解耦规划利用时间常数分离使实时操作成为可能（原理3）。这三个原理共同支撑了"手掌大小的飞行机器人可以进行多种操作"这一看似不可能的命题——每一个原理单独看都不足以实现，但三者协同就产生了涌现性的功能多样性。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig4.png</code> 即可自动显示。</p>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 1</span><span class="fig-caption">HI-ARM系统概览——手型飞行机器人的仿生设计与多功能操作</span><span class="fig-source">来源：论文 Fig. 1</span></div>
+    <div class="fig-image"><img src="figures/fig1.png" alt="HI-ARM overview" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) HI-ARM的整体外观——C形碳纤维机身（手掌）+ 5根手指（2扭转+3伸展）+ 四旋翼推进系统。(b) 手指的复合自由度——2-DOF扭转实现类似拇指的对掌运动（内侧/外侧弯曲），3-DOF伸展实现指节弯曲。(c) 多种操作模式的快照——手掌抓握水杯、指尖捏取硬币、手指钩住树枝栖息、推开门的把手、人手递物体的交互。</p>
+      <ul><li><strong>手掌大小的惊人集成度</strong>：整机仅手掌大小——C形机身既是飞行框架（安装4个电机）也是操作末端（抓取时包裹物体）。五指+腱驱动全部集成在机身内部，无任何外部悬挂部件</li><li><strong>Nature Communications的视觉冲击</strong>：图1的多种操作快照直观地展示了"一架机器人=多种功能"的核心卖点——这是Nature Communications这类综合期刊最看重的东西</li></ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 2</span><span class="fig-caption">手指运动学与腱驱动机构的详细设计</span><span class="fig-source">来源：论文 Fig. 2</span></div>
+    <div class="fig-image"><img src="figures/fig2.png" alt="Finger kinematics" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 单根手指的关节结构——2-DOF万向节（扭转）+ 3个指节连杆（伸展）+ 滑轮和腱路径。(b) 腱驱动的布线图——拮抗腱对（agonist-antagonist）沿手指骨骼布线，基座电机收/放控制关节运动。(c) 手指的工作空间——指尖可达范围的3D体积。(d) 手指力的测量——指尖在不同关节角下的输出力曲线。</p>
+      <ul><li><strong>拮抗腱对的精妙之处</strong>：两根腱对拉同一关节——一根收（agonist）时另一根放（antagonist），反之亦然。同时收紧两根腱→关节刚度增加→类似人手指"用力绷紧"</li><li><strong>工作空间的对称性</strong>：C形机身的开口方向决定了手指的弯曲方向——所有手指向C形内部弯曲，形成对被抓物体的包围</li></ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 3</span><span class="fig-caption">解耦规划框架——飞行轨迹与手指变形的异步优化</span><span class="fig-source">来源：论文 Fig. 3</span></div>
+    <div class="fig-image"><img src="figures/fig3.png" alt="Decoupled planning" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 解耦规划的时间线——飞行轨迹先被优化（10ms内求解），然后在飞行轨迹的"影子"下查询动作库得到手指变形序列（<0.1ms）。(b) 动作库的结构——一个多维查找表，维度=任务类型×目标位置×物体尺寸。(c) COG在线估计——手指运动过程中COG的实时偏移（可达1~3cm），飞行控制器利用该估计进行推力分配补偿。</p>
+      <ul><li><strong>动作库的预计算成本</strong>：离线生成数千种操作场景的变形序列（可能需要数小时计算），但换来的是在线微秒级查询——这是典型的"离线重+在线轻"的机器人工程策略</li><li><strong>COG补偿的飞行影响</strong>：如果不用COG估计→手指弯曲时重心前移→飞行控制器检测到姿态偏差→施加反向扭矩→但在重心偏移的情况下，这反而加剧了不稳定</li></ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 4</span><span class="fig-caption">多种操作模式的真实实验验证——抓取/栖息/开门/交互</span><span class="fig-source">来源：论文 Fig. 4</span></div>
+    <div class="fig-image"><img src="figures/fig4.png" alt="Multi-mode experiments" onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig4.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 抓取实验——从水杯到硬币，手掌抓握和指尖捏取的成功率统计。(b) 栖息实验——手指钩住不同直径的树枝（5~20mm）后电机停转，栖息的稳定时间和成功率。(c) 开门实验——手指推/拉杠杆式门把手的力曲线。(d) 人机交互——遥操作模式下手递手传递物体的成功率。(e) 越障运输——抓取物体后穿越狭窄窗口到达目标位置释放。</p>
+      <ul><li><strong>栖息实验的节能意义</strong>：栖息后电机停转→功耗从飞行时的~50W降到接近0W→这对于需要在野外长时间待机的场景（环境监测、侦察）具有革命性意义</li><li><strong>遥操作模式的潜力</strong>：人手通过遥控器控制手指开合+飞行方向→可以实现远程物体操作。这是搜救场景的核心需求</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 动作库离线预计算覆盖了所有操作场景——但现实中物体的形状、位置、姿态是无穷的，动作库不可能完全覆盖；(2) 解耦规划假设手指变形比飞行快得多——在某些动态抓取场景（如抓取移动物体），手指和飞行的时间常数接近，解耦误差不可忽略；(3) 腱驱动的滞回效应在长时间使用后可能加剧</li>
+    <li><strong>适用场景</strong>：主要针对<strong>结构化或半结构化环境中的离散操作任务</strong>。对于需要连续力反馈的动态操作（如用工具写字、拧螺丝），当前的动作库+位置控制方案精度不够</li>
+    <li><strong>可扩展性</strong>：5-DOF手指的运动学已经接近手掌大小空间的极限——增加更多自由度将超过重量/体积预算</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：(1) 触觉传感集成——将力感知传感器嵌入手指指尖，实现闭环力控制而非纯位置控制；(2) 视觉-触觉融合抓取——用深度相机检测物体几何+指尖触觉确认接触状态</li>
+    <li><strong>条件放松</strong>：(1) 在线动作生成——用强化学习或MPC在线替代动作库，覆盖动作库无法覆盖的新操作场景；(2) 户外多风环境——加入风扰动估计和补偿</li>
+    <li><strong>约束加入</strong>：(1) 双手机器人——两台HI-ARM协同操作（如一起搬运长杆件）；(2) 移动平台搭载——将HI-ARM搭载到地面AGV上作为移动操作平台</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>腱磨损与断裂</td><td>腱在高张力/高循环下逐渐磨损→弹性模量变化→关节角度标定漂移→手指定位精度下降→抓取失败</td><td>★★★★</td></tr>
+    <tr><td>VIO在操作场景中的退化</td><td>手指接近/接触物体时→相机视野被遮挡或近距离失焦→VIO位姿估计漂移→飞行控制器收到错误的位姿反馈</td><td>★★★★</td></tr>
+    <tr><td>COG估计的滞后</td><td>COG更新依赖电机编码器→编码器读数有延迟（~2ms）→COG估计滞后于实际重心变化→在快速手指运动时可能出现暂时的不稳定</td><td>★★★</td></tr>
+    <tr><td>动作库覆盖盲区</td><td>如果目标物体的尺寸/形状/姿态不在库中→查询返回最邻近匹配→但最邻近的手指轨迹可能不适用于实际物体→抓取失败</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>学习型手操作——从动作库到强化学习</strong>：当前的动作库方案本质上是"离线优化+在线查表"——适用于离散化任务但缺乏泛化能力。一个自然的发展方向是用强化学习替代动作库——在仿真环境中训练一个策略，输入=飞行状态+物体几何+任务类型，输出=手指+飞行联合动作。核心挑战是sim-to-real transfer——腱驱动的滞回和弹性在仿真中难以精确建模，导致仿真策略在真实硬件上失败。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>现有飞行器可以飞得很好，但操作能力极差——因为飞行和操作是两套独立系统。真正的突破不是让夹爪更小或让飞行器更大，而是重新思考"飞行器本身能不能就是操作工具"。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三种方案：（i）悬挂夹爪——功能单一；（ii）外挂机械臂——太重太大；（iii）软体抓取——力不够。共性问题：操作工具是附加的、分离的、非一体化的。</li>
+    <li><strong>如果机身就是手呢？</strong><br>人手是自然界最灵巧的操作工具——手掌提供包裹面、手指提供灵活操作点、肌腱提供轻量传动。如果飞行器的机身天然就是一只"手"——C形机身=手掌、5根手指=操作末端、腱驱动=肌腱——那么飞行和操作不再对立，而是同一结构的两种功能。</li>
+    <li><strong>一体化设计的核心约束：手指怎么驱动？</strong><br>手指必须轻（在机身末端）但有力（能抓取物体）。腱驱动解决了这个矛盾：把电机放在机身基座（利用机身质量），用腱（轻量高强度的绳子）把力传到手指。手指几乎没有电机质量→极低惯量→极快响应。</li>
+    <li><strong>飞行和手指如何协同？</strong><br>解耦：飞得慢（100Hz）、手指快（1000Hz）→让飞行先规划，手指在飞行的"影子"下优化。COG在线补偿：手指运动改变重心→但飞行控制器实时知道重心在哪→推力分配自动修正。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    传统飞行操作是"飞机挂个夹子"——但为什么不造一架<strong>机身就是手</strong>的飞行器？C形机身做手掌、5-DOF手指做操作末端、腱驱动像肌腱一样轻量远距离传力——用仿生设计让手掌大小的飞行器拥有人手般的多功能操作能力。
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：鸟类可以用爪子完成飞行+栖息+抓取+筑巢等多种操作——而且鸟爪的质量只占体重的很小一部分。为什么没有飞行器能做到类似的功能多样性？因为人类的工程惯性是"飞行器+工具"，而大自然是"飞行器=工具"。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"多功能飞行操作机器人"分解为——（1）机身如何同时是飞行框架和操作末端（C形手掌）？（2）手指如何轻量且有力（腱驱动）？（3）飞行和操作如何协同而不冲突（解耦规划+COG补偿）？</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）仿人手几何——C形轮廓+五指布局；（2）腱驱动——基座电机+高强度纤维绳+关节滑轮；（3）分层优化——飞行轨迹优化+动作库查询。</li>
+    <li><strong>Step 4 — 组装方案</strong>：C形碳纤维机身→安装4个飞行电机→机身内部安装5个手指驱动电机→腱从电机通过手指骨骼布线到关节滑轮→手指集成到C形开口侧→VIO+IMU+编码器提供状态反馈→离线动作库+在线分层规划器→实现多模式空中操作。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是<strong>仿生设计学在飞行机器人领域的里程碑式应用</strong>——不是简单模仿人的某个操作动作，而是从人手的结构-功能关系出发重新设计整个飞行器。核心方法论是"功能一体化"——让飞行和操作共用同一结构而非叠加分离模块。这种设计哲学可以推广到任何多功能机器人系统。</li>
+    <li><strong>技术技巧层面</strong>：(1) 腱驱动=轻量远距离传动的最佳方案——把电机放在基座，用绳子传力，末端极轻；(2) 拮抗腱对=可调刚度——两根腱对拉同一关节，同时收紧=增大关节刚度；(3) 动作库=离线重计算换在线零计算——对于离散操作任务的通用工程策略</li>
+    <li><strong>实验/写作层面</strong>：一张图展示5+种操作模式（抓取/栖息/开门/交互/运输）是Nature Communications级别的视觉论证——不需要文字描述，读者看图就明白"这架机器能做什么"</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于UAV总体设计方向</strong>：HI-ARM的"机身=操作器"设计范式可以启发任何需要多功能的UAV设计——比如"机身=传感器吊舱"（机头就是相机云台）、"机身=机械臂基座"（机身就是机械臂的第一关节）。核心思想是打破"飞行器"和"载荷"的界面——让它们共享结构</li>
+    <li><strong>对于飞行器控制方向</strong>：COG在线补偿方案可以直接用于任何变形飞行器——不管变形是为了操作（手指）还是为了机动（变形机臂），重心在变→飞行控制器必须知道。本文的COG估计公式（电机编码器+正运动学→重心）是通用的</li>
+    <li><strong>对于操作/抓取方向</strong>：腱驱动的弹性柔顺特性使得手指天然适合抓取易碎物体——即使没有精确的力传感器，腱的弹性也能提供被动力缓冲。这是一个"硬件即控制"的范例——在硬件层面解决了一部分控制问题</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Hoi, Wu et al. (2026) — A Precise Real-Time Force-Aware Grasping System for Robust Aerial Manipulation. <em>arXiv:2602.08599</em></td><td>同组并行工作——将触觉传感器集成到手型飞行器上，实现力感知自适应抓取。9974是9976的"感官升级"，9976是9974的"硬件平台"</td></tr>
+    <tr><td>Roderick, Cutkosky & Lentink (2021) — Bird-inspired dynamic grasping and perching in arboreal environments. <em>Science Robotics</em> 6, eabj7562</td><td>鸟爪仿生抓取与栖息——展示了仿生爪子如何实现多功能空中操作。是HI-ARM仿生设计的重要对比工作</td></tr>
+    <tr><td>Dollar & Howe (2005) — A robust compliant grasper via shape deposition manufacturing. <em>IEEE/ASME Trans. Mechatronics</em> 10, 245–253</td><td>欠驱动柔性夹爪的经典工作——展示了被动柔顺在抓取中的核心作用。理解腱驱动的柔顺性需要追溯到这篇</td></tr>
+    <tr><td>Mellinger et al. (2012) — Trajectory generation and control for precise aggressive maneuvers with quadrotors. <em>IJRR</em> 31, 664–674</td><td>四旋翼轨迹优化的经典工作——HI-ARM的飞行轨迹规划基于这一框架。理解轨迹优化方法对理解解耦规划的时间预算很重要</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Wu et al. · Nature Communications, 2026 · HI-ARM: Hand-like Autonomous Flying Robot for Airborne Grasping and Interaction · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

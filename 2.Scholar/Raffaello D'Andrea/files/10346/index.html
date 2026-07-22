@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes - Can we stabilize an inverted pendulum with feedback from a time-of-flight camera?</title>
+
+<script>
+
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 files · 7-note reading path</div>
+    <div class="series-links">
+
+<a href="../../index.html">Index</a>      <a href="../10342/index.html">10342</a>      <a href="../10343/index.html">10343</a>      <a href="../10344/index.html">10344</a>      <a href="../10345/index.html">10345</a>      <a class="active" href="../10346/index.html">10346</a>      <a href="../10347/index.html">10347</a>      <a href="../10348/index.html">10348</a>
+    </div>
+  </div>
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:110px;"><strong>标题</strong></td><td class="bold-title">Can we stabilize an inverted pendulum with feedback from a time-of-flight camera?</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong class="bold-affil">Czubarow, E.</strong>; <strong class="bold-affil">Tognon, M.</strong>; <strong class="bold-affil">D'Andrea, R.</strong> — ETH Zurich, Institute for Dynamic Systems and Control</td></tr>
+    <tr><td><strong>发表年份</strong></td><td><strong class="bold-venue">2026</strong></td></tr>
+    <tr><td><strong>收录来源</strong></td><td>IEEE International Conference on Robotics and Automation (ICRA) / 或同等机器人学顶级会议</td></tr>
+    <tr><td><strong>论文类型</strong></td><td>Proof-of-Concept 实验验证论文（可行性研究）</td></tr>
+    <tr><td><strong>研究领域</strong></td><td>反馈控制 · 计算机视觉 · 飞行时间传感器 · 欠驱动系统 · 状态估计</td></tr>
+    <tr><td><strong>实验平台</strong></td><td>直线导轨小车 + 倒立摆（金笔） + 底部朝上安装的 ToF 深度相机</td></tr>
+    <tr><td><strong>传感器</strong></td><td>低成本低分辨率 ToF 相机（940 nm 红外照明器）+ 600 PPR 正交编码器（仅用于标定和真值对比）</td></tr>
+    <tr><td><strong>控制器</strong></td><td>标准 LQG（Linear Quadratic Gaussian）线性二次高斯调节器</td></tr>
+    <tr><td><strong>关键算法</strong></td><td>欧氏距离变换圆拟合 · 亚像素细化 · 时域中值异常值检测 · RK4 数值积分 · Trust-Region Reflective 优化</td></tr>
+    <tr><td><strong>文件来源</strong></td><td>Czubarow et al. - 2026 - Can we stabilize an inverted pendulum with feedback from a time-of-flight camera.pdf</td></tr>
+  </table>
+  <div style="margin-top:12px;">
+    <span class="tag tag-blue">Paper #10346</span>
+    <span class="tag tag-green">2026</span>
+    <span class="tag tag-amber">Inverted Pendulum</span>
+    <span class="tag tag-purple">ToF Camera</span>
+    <span class="tag tag-red">Feedback Control</span>
+    <span class="tag tag-cyan">LQG Regulator</span>
+    <span class="tag tag-gray">Proof-of-Concept</span>
+    <span class="tag tag-blue">State Estimation</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+<h2>2. 核心洞察与创新点</h2>
+
+<h3>2.1 核心洞察 Q&A</h3>
+<div class="callout info">
+  <div class="callout-title">🔍 这篇论文回答了什么根本性问题？</div>
+  <p>深度相机（ToF）作为一种廉价、紧凑的感知传感器，<strong>能否为经典的不稳定快动态系统——倒立摆（cart-pole）——提供足够精确、低延迟的反馈信号来实现稳定控制？</strong></p>
+  <p>此前，ToF 相机在抓取、视觉伺服等相对慢动态任务中已有应用，但在需要<strong>毫秒级响应</strong>的快速稳定控制任务（如倒立摆平衡）中，其固有的系统性误差（深度畸变、积分时间效应、幅值相关误差）和非系统性误差（多径/散射、运动模糊、有限信噪比）是否构成致命障碍，一直悬而未决。</p>
+</div>
+
+<h3>2.2 启发→洞察对照表</h3>
+<table>
+  <tr><th style="width:18%;">启发来源</th><th style="width:42%;">表面观察</th><th style="width:40%;">深层洞察</th></tr>
+  <tr>
+    <td>ToF 在慢动态任务中的成功</td>
+    <td>ToF 相机已用于抓取、视觉伺服、3D 跟踪等任务 [5-9]，但这些任务对延迟和精度的要求远低于快速稳定控制</td>
+    <td>ToF 的"够用"边界未经过严格测试——倒立摆是天然的<strong>压力测试基准</strong>，因为任何角度偏差或延迟都会被不稳定动力学迅速放大</td>
+  </tr>
+  <tr>
+    <td>ToF 传感器的固有误差</td>
+    <td>多径效应、散射、运动模糊、低 SNR 等是 ToF 的已知缺陷 [10,11]，通常被认为使其不适合高精度控制</td>
+    <td>通过<strong>巧妙的安装位姿</strong>（底部朝上），将多径问题转化为单一平面上的圆检测问题；通过计算机视觉管线中的鲁棒估计策略（中值滤波、亚像素细化）来对抗噪声</td>
+  </tr>
+  <tr>
+    <td>传统倒立摆的高精度编码器方案</td>
+    <td>已有文献用昂贵的编码器或外部运动捕捉系统实现倒立摆控制 [19-30]</td>
+    <td>用低成本 ToF 替代高精度编码器的核心挑战不是控制器设计，而是<strong>感知管线的精度和延迟</strong>——用标准 LQG（而非更复杂的学习控制器）作为基线，恰好证明了感知管线本身的贡献</td>
+  </tr>
+  <tr>
+    <td>非最小相位系统的控制难度</td>
+    <td>倒立摆是非最小相位系统，鲁棒控制极其困难 [33]，甚至对学习型控制器也构成挑战 [34]</td>
+    <td>选择<strong>标准 LQG 而非高级控制器</strong>是一种聪明的实验设计——它保证了实验结果的性能下界，同时避免了控制器复杂度对感知性能评估的干扰</td>
+  </tr>
+</table>
+
+<h3>2.3 三大创新点</h3>
+
+<div class="novelty-card">
+  <h4>🔴 创新点 1：首次证明 ToF 相机足以稳定倒立摆</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong> ToF 相机能否为快不稳定动力学系统提供足够质量的反馈信号？此前该问题没有实验回答。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong> ToF 在慢动态任务中的成功 + 倒立摆作为"最坏情况"基准测试的经典地位——如果能稳定倒立摆，对其他快动态系统也具有说服力。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong> 将低成本 ToF 相机直接用于闭环反馈，仅通过标准 LQG 控制器实现倒立摆平衡——实验结果表明 ToF 反馈不仅可行，而且留有充足性能余量。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 创新点 2：底部朝上的非传统相机安装位姿</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong> 如何克服 ToF 的多径效应和复杂场景干扰？传统安装方式（侧面或顶部）会使场景过于复杂。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong> 观察到倒立摆底部是一个相对简单的几何特征——在深度图中表现为可识别的圆形斑点。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong> 将 ToF 相机<strong>故意</strong>安装在倒立摆正下方朝上拍摄，使摆底部在深度图像中呈现为清晰的圆形特征，从而将复杂的 3D 跟踪问题简化为 2D 图像平面上的圆检测与定位问题。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 创新点 3：完整视觉-估计-控制管线的系统级验证</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong> 单个模块（视觉检测、状态估计、控制）的各自性能无法保证系统级闭环稳定——需要端到端实验证明。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong> 控制系统工程中"组件级性能不等于系统级性能"的基本原则——必须在闭环条件下评估整个管线。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong> 构建了完整的管线：欧氏距离变换圆拟合 → 亚像素细化 → 时域中值异常值检测 → RK4 前向积分状态预测 → LQG 最优控制，并在物理硬件上进行了闭环实验验证。用 600 PPR 编码器仅作为离线标定和真值参考，控制器<strong>仅使用 ToF 反馈</strong>。</div>
+</div>
+</section>
+
+<!-- ═══════════════ 3. ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+<h2>3. 系统架构与论证路线</h2>
+
+<h3>3.1 四阶段处理流水线</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <div class="arch-stage">
+      <h4>🔵 阶段一：感知 <span>Section II, III-A</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>ToF 深度图像采集</strong>
+        <small>940 nm 红外 ToF 相机，底部朝上安装<br>输出：低分辨率深度帧（每像素深度值）</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>摆底圆检测</strong>
+        <small>欧氏距离变换 (EDT) 拟合圆形<br>亚像素细化提升定位精度</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>时域中值滤波</strong>
+        <small>异常值检测与剔除<br>去除运动模糊和散射噪声</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>🟢 阶段二：状态估计 <span>Section III-B</span></h4>
+      <div class="arch-card arch-power">
+        <strong>摆角几何反算</strong>
+        <small>从图像坐标（摆底位置）计算摆角 φ<br>利用已知的摆长和相机内参</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>状态向量构建</strong>
+        <small>x = [x_c, ẋ_c, φ, φ̇]<br>小车位置、速度、摆角、角速度</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>卡尔曼滤波 / LQG 估计</strong>
+        <small>融合 ToF 观测与系统动力学模型<br>输出滤波后的最优状态估计</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>🟣 阶段三：模型预测 <span>Section III-C</span></h4>
+      <div class="arch-card arch-motor">
+        <strong>非线性动力学模型</strong>
+        <small>倒立摆系统的完整非线性方程<br>包含摩擦、电机动力学等实际因素</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>RK4 前向一步积分</strong>
+        <small>Runge-Kutta 4 阶数值积分器<br>给定状态估计和控制力，预测下一时刻状态</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>参数辨识</strong>
+        <small>Trust-Region Reflective 优化算法<br>从实验轨迹拟合物理参数（质量、摩擦系数等）</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>🟡 阶段四：控制执行 <span>Section III-D</span></h4>
+      <div class="arch-card arch-thrust">
+        <strong>LQG 最优控制器</strong>
+        <small>基于分离原理：最优估计 + LQR<br>最小化二次型代价函数</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>控制力计算</strong>
+        <small>u = -K x̂<br>将估计状态映射到电机驱动力</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>闭环执行</strong>
+        <small>驱动电机 → 小车移动 → ToF 感知<br>形成完整反馈闭环</small>
+      </div>
+    </div>
+  </div>
+  <div class="arch-arrow">
+    <span>⬇ 深度帧</span><span>⬇ 估计状态</span><span>⬇ 预测状态</span><span>⬇ 控制力</span>
+  </div>
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>感知延迟</strong><small>ToF 帧率决定，~数十毫秒级</small></div>
+    <div class="arch-metric"><strong>估计精度</strong><small>与编码器真值对比验证</small></div>
+    <div class="arch-metric"><strong>模型保真度</strong><small>一步预测误差量化</small></div>
+    <div class="arch-metric"><strong>平衡性能</strong><small>摆角 RMS、稳定时间</small></div>
+  </div>
+</div>
+
+<h3>3.2 全文论证结构 (Mermaid)</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+graph TD
+    A["📄 I. INTRODUCTION<br/>问题：ToF 能否支持快动态反馈控制？"] --> B["🔬 II. EXPERIMENTAL SETUP<br/>硬件：小车+倒立摆+底部ToF相机<br/>940nm红外，600PPR编码器(真值)"]
+    B --> C["👁️ III-A. Vision Pipeline<br/>EDT圆拟合 + 亚像素细化<br/>时域中值异常值检测"]
+    C --> D["📐 III-B. State Estimation<br/>从深度→图像坐标→摆角<br/>卡尔曼滤波 / LQG估计器"]
+    D --> E["🔮 III-C. Model & Prediction<br/>非线性模型 + RK4前向积分<br/>Trust-Region Reflective参数辨识"]
+    E --> F["🎛️ III-D. LQG Control<br/>标准LQG调节器<br/>u = -K x̂"]
+    F --> G["📊 IV. RESULTS<br/>ToF反馈成功稳定倒立摆<br/>性能 = ToF反馈的下界"]
+    G --> H["💡 V. CONCLUSIONS<br/>ToF相机在快动态反馈控制中潜力巨大<br/>多传感器/多视角/高级控制器为未来方向"]
+    style A fill:#e8f0fe,stroke:#3b82f6
+    style B fill:#fef7ed,stroke:#f59e0b
+    style C fill:#f0ebfd,stroke:#8b5cf6
+    style D fill:#e6f7ee,stroke:#10b981
+    style E fill:#ffeaf0,stroke:#f43f5e
+    style F fill:#cffafe,stroke:#14b8a6
+    style G fill:#dbeafe,stroke:#1d4ed8
+    style H fill:#d1fae5,stroke:#047857
+</div>
+</div>
+
+<h3>3.3 关键模块间的数据流 (Mermaid)</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart LR
+    subgraph Physical["🖥️ 物理世界"]
+        HW["小车+摆+电机<br/>执行控制力 u"]
+        CAM["ToF相机<br/>940nm IR"]
+    end
+    subgraph Vision["👁️ 视觉管线"]
+        DEPTH["深度图像<br/>每像素距离值"]
+        EDT["欧氏距离变换<br/>圆拟合+亚像素"]
+        FILTER["时域中值滤波<br/>异常值剔除"]
+    end
+    subgraph Estimation["📐 估计管线"]
+        ANGLE["摆角 φ 反算<br/>从图像坐标→角度"]
+        KF["LQG 状态估计器<br/>x̂ = [x_c,ẋ_c,φ,φ̇]"]
+        MODEL["非线性模型<br/>RK4一步预测"]
+        PARAM["参数辨识<br/>Trust-Region优化"]
+    end
+    subgraph Control["🎛️ 控制管线"]
+        LQG["LQG 控制器<br/>u = -K x̂"]
+        LIMIT["力限幅<br/>电机约束"]
+    end
+    HW -->|"物理运动"| CAM
+    CAM -->|"深度帧"| DEPTH
+    DEPTH --> EDT
+    EDT --> FILTER
+    FILTER -->|"摆底位置 (u,v)"| ANGLE
+    ANGLE -->|"φ 测量"| KF
+    KF -->|"x̂ 状态估计"| MODEL
+    MODEL -->|"预测验证"| PARAM
+    KF -->|"x̂"| LQG
+    LQG -->|"u = -K x̂"| LIMIT
+    LIMIT -->|"控制力 u"| HW
+    style Physical fill:#fff7ed,stroke:#f59e0b
+    style Vision fill:#f0ebfd,stroke:#8b5cf6
+    style Estimation fill:#e6f7ee,stroke:#10b981
+    style Control fill:#dbeafe,stroke:#1d4ed8
+</div>
+</div>
+</section>
+
+<!-- ═══════════════ 4. TASK DEFINITION ═══════════════ -->
+<section id="task">
+<h2>4. 任务形式化定义</h2>
+
+<h3>4.1 问题数学表述</h3>
+<div class="formula-block">
+  <div class="eq-tag">问题形式化 · Problem Formulation</div>
+  <p>考虑经典倒立摆系统（cart-pole），其连续时间非线性动力学为：</p>
+  $$ \ddot{x}_c = f_x(x_c, \dot{x}_c, \varphi, \dot{\varphi}, F) $$
+  $$ \ddot{\varphi} = f_\varphi(x_c, \dot{x}_c, \varphi, \dot{\varphi}, F) $$
+  <p>其中 $x_c$ 为小车位置，$\varphi$ 为摆角（相对于竖直向上方向），$F$ 为施加在小车上的水平控制力。</p>
+  <p><strong>目标：</strong>仅使用 ToF 深度相机提供的观测 $y_t = h(\text{DepthFrame}_t)$，设计反馈控制律 $F_t = \pi(\hat{x}_t)$，使得倒立摆维持在竖直向上不稳定平衡点 $\varphi = 0$ 附近。</p>
+  <p><strong>关键约束：</strong>控制器 $\pi(\cdot)$ 仅通过视觉管线的估计状态 $\hat{x}_t$ 获取信息，不能直接使用编码器测量。</p>
+  <div class="eq-note">
+    <strong>注：</strong>这是一个<strong>输出反馈控制问题</strong>（output-feedback control），而非全状态反馈。感知管线（ToF → 视觉处理 → 状态估计）是整个闭环的关键瓶颈。传统方法直接用编码器测量 $\varphi$ 和 $x_c$（全状态反馈），而本文的挑战在于从<strong>不完美的、有噪声的深度测量</strong>中重建这些状态。
+  </div>
+</div>
+
+<h3>4.2 系统 I/O 规格表</h3>
+<table>
+  <tr><th style="width:14%;">维度</th><th style="width:43%;">描述</th><th style="width:43%;">具体规格</th></tr>
+  <tr>
+    <td><strong>输入 (Input)</strong></td>
+    <td>ToF 深度相机的原始深度帧</td>
+    <td>低分辨率深度图像（像素级距离测量），940 nm 红外照明，每帧提供场景中各点的深度值 $d_{ij}$</td>
+  </tr>
+  <tr>
+    <td><strong>输出 (Output)</strong></td>
+    <td>施加于小车的水平控制力</td>
+    <td>$F_t \in \mathbb{R}$，由 LQG 控制器根据估计状态 $\hat{x}_t$ 计算，经电机执行</td>
+  </tr>
+  <tr>
+    <td><strong>状态 (State)</strong></td>
+    <td>系统全状态向量</td>
+    <td>$\mathbf{x} = [x_c, \dot{x}_c, \varphi, \dot{\varphi}]^T \in \mathbb{R}^4$（小车位置、小车速度、摆角、摆角速度）</td>
+  </tr>
+  <tr>
+    <td><strong>观测 (Observation)</strong></td>
+    <td>视觉管线从深度帧中提取的测量</td>
+    <td>摆底部在图像平面中的像素坐标 $(u, v)$，通过几何关系映射为摆角 $\varphi$ 的测量值</td>
+  </tr>
+  <tr>
+    <td><strong>约束 (Constraints)</strong></td>
+    <td>物理与感知约束</td>
+    <td>（1）仅 ToF 反馈可用（编码器仅用于离线标定）；（2）ToF 固有误差：深度畸变、多径、运动模糊、低 SNR；（3）有限轨道长度限制小车行程；（4）电机力/力矩饱和</td>
+  </tr>
+  <tr>
+    <td><strong>目标 (Objective)</strong></td>
+    <td>最小化 LQG 二次型代价</td>
+    <td>$J = \mathbb{E}\left[\sum_{t=0}^{\infty} (\mathbf{x}_t^T Q \mathbf{x}_t + R F_t^2)\right]$ — 在过程噪声和测量噪声下最小化状态偏差与控制能耗的加权和</td>
+  </tr>
+  <tr>
+    <td><strong>评估指标</strong></td>
+    <td>实验验证的定量指标</td>
+    <td>摆角 RMS 误差、稳定时间、最大角度偏差、与编码器真值的估计误差对比</td>
+  </tr>
+</table>
+
+<h3>4.3 任务边界说明</h3>
+<div class="callout warn">
+  <div class="callout-title">⚠️ 任务边界</div>
+  <p>本文是<strong>可行性证明（proof-of-concept）</strong>而非最优性能追求。作者明确声明：报告的实验性能应被视为 ToF 反馈可实现性能的<strong>下界</strong>（lower bound），因为使用了标准 LQG 而非更先进的控制器（MPC、神经网络控制器、鲁棒/分布鲁棒控制器）。这意味着换用更强的控制策略，性能只会更好。</p>
+</div>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+<h2>5. 核心挑战分析</h2>
+
+<h3>5.1 第一性原理分析</h3>
+<div class="callout danger">
+  <div class="callout-title">🧠 为什么这个问题从第一性原理上就困难？</div>
+  <p>倒立摆是<strong>开环不稳定</strong>系统——竖直向上平衡点是不稳定平衡点，任何微小扰动都会使摆偏离并被重力加速倒下。其线性化动力学在平衡点附近具有<strong>右半平面极点</strong>（unstable pole），这意味着：</p>
+  <ul>
+    <li><strong>信息论约束：</strong>反馈控制需要以高于不稳定模态带宽的频率提供修正——任何感知延迟或信息丢失都会导致控制失效。ToF 的毫秒级延迟和深度噪声直接威胁这一频率要求。</li>
+    <li><strong>非最小相位特性：</strong>小车必须先朝"错误方向"移动才能将摆拉回——这使得角度误差的放大效应尤为严重。小的 ToF 深度偏差或角度估计误差会被非最小相位动力学放大为大的控制动作。</li>
+    <li><strong>感知-控制联合不确定性：</strong>传统方案中编码器直接提供 $\varphi$（确定性测量），而 ToF 提供的是<strong>间接的、有噪声的、不完全的</strong>观测——必须同时解决状态估计和控制两个问题（输出反馈的分离原理虽然适用于 LQG，但估计误差仍会降低控制性能）。</li>
+  </ul>
+</div>
+
+<h3>5.2 与传统方法的对比</h3>
+<table>
+  <tr><th style="width:16%;">方法类别</th><th style="width:28%;">典型方案</th><th style="width:28%;">优势</th><th style="width:28%;">局限</th></tr>
+  <tr>
+    <td><strong>编码器方案</strong></td>
+    <td>高精度旋转编码器直接测量摆角 [19-30]</td>
+    <td>直接、确定性测量，微秒级延迟，极高精度</td>
+    <td>需要机械连接，增加摩擦和惯性，不利于小型化和低成本化</td>
+  </tr>
+  <tr>
+    <td><strong>外部视觉方案</strong></td>
+    <td>运动捕捉系统 / 外部高速相机</td>
+    <td>高精度 3D 跟踪，非接触式</td>
+    <td>昂贵、固定安装、视野受限、需要标定、不适用于移动机器人</td>
+  </tr>
+  <tr>
+    <td><strong>机上视觉方案（本文）</strong></td>
+    <td>底部安装的 ToF 深度相机 + LQG 控制</td>
+    <td><strong>低成本、紧凑、自包含</strong>，无需外部基础设施</td>
+    <td>ToF 固有噪声和误差，有限分辨率和帧率，对安装位姿敏感</td>
+  </tr>
+  <tr>
+    <td><strong>学习型方案</strong></td>
+    <td>强化学习 / 神经网络控制器 [34,46]</td>
+    <td>可从像素端到端学习，适应复杂动力学</td>
+    <td>需要大量训练数据，泛化性存疑，安全性难以保证</td>
+  </tr>
+</table>
+
+<h3>5.3 三大关键技术挑战</h3>
+
+<div class="novelty-card">
+  <h4>🔴 挑战 1：ToF 传感器的系统性与非系统性误差</h4>
+  <p><strong>系统性误差：</strong>深度畸变（depth distortion）使测量值与真实距离之间存在非线性偏差；积分时间（integration time）和幅值相关效应（amplitude-related effects）进一步引入与场景反射率相关的误差。</p>
+  <p><strong>非系统性误差：</strong>多径/散射（multipath/scattering）使深度值偏离正确值；运动模糊（motion blur）在摆快速运动时模糊深度边缘；有限信噪比（SNR）使弱信号条件不可靠。</p>
+  <p><strong>克服策略：</strong>通过底部朝上的安装位姿<strong>简化场景几何</strong>（减少多径），通过欧氏距离变换和亚像素细化<strong>提升定位鲁棒性</strong>，通过时域中值滤波<strong>抑制异常值</strong>。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 挑战 2：从深度图像到摆角的间接测量链</h4>
+  <p>ToF 相机不直接给出摆角 $\varphi$——它给出的是每个像素的深度值。要得到 $\varphi$，必须：</p>
+  <p>（1）在深度图像中<strong>检测摆底部</strong>——一个微小的圆形特征；（2）将像素坐标<strong>映射到 3D 空间位置</strong>（相机内参）；（3）由摆底部 3D 位置和摆长<strong>几何反算摆角</strong>。</p>
+  <p>这个间接测量链中的每一步都会引入误差，并且误差<strong>在角度上被放大</strong>——对于典型的摆长，1 个像素的定位误差可能对应数度的角度误差，而数度的角度误差已足以破坏稳定性。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 挑战 3：毫秒级延迟与抖动的致命影响</h4>
+  <p>倒立摆的稳定对延迟极其敏感。ToF 相机的帧率有限（通常在 30-90 fps），每帧处理也有延迟，整体感知延迟在数十毫秒级别。</p>
+  <p>对于一个典型的不稳定时间常数（~100 ms 量级），<strong>数十毫秒的感知延迟</strong>意味着在控制力到达之前，系统状态已经显著偏离了测量时的状态。此外，帧间延迟的抖动（jitter）引入不可预测的相位滞后，破坏控制器的相位裕度。</p>
+  <p><strong>缓解策略：</strong>LQG 框架通过卡尔曼滤波进行状态预测，在一定程度上补偿延迟；RK4 前向积分提供更精确的一步预测。作者也指出，将计算迁移到微控制器上可以进一步减少延迟。</p>
+</div>
+</section>
+
+<!-- ═══════════════ 6. METHOD ═══════════════ -->
+<section id="method">
+<h2>6. 方法详解</h2>
+
+<h3>6.1 视觉管线：从深度图像到摆底定位</h3>
+
+<div class="formula-block">
+  <div class="eq-tag">视觉管线 · Vision Pipeline · §III-A</div>
+  <p><strong>核心思想：</strong>将倒立摆底部的 3D 跟踪问题转化为 2D 深度图像中的圆检测问题。</p>
+  <p>摆底部在深度图像中表现为一个近似圆形的区域（因为摆是圆柱形的），其中心位置 $(u_c, v_c)$ 对应摆底在图像平面中的投影。通过<strong>欧氏距离变换（Euclidean Distance Transform, EDT）</strong>将二值化后的深度图像转换为距离图，然后在距离空间中拟合圆形：</p>
+  $$ (u_c^*, v_c^*, r^*) = \arg\min_{u_c, v_c, r} \sum_{(u,v) \in \text{ROI}} \left\| \text{EDT}(u, v) - \sqrt{(u - u_c)^2 + (v - v_c)^2} \right\|^2 $$
+  <p>其中 $\text{EDT}(u, v)$ 是像素 $(u, v)$ 到最近边缘的欧氏距离。</p>
+  <p><strong>亚像素细化（Sub-pixel Refinement）：</strong>在像素级圆拟合之后，进行亚像素级别的精细化调整，将定位精度提升到小数点后像素级别。</p>
+  <p><strong>时域中值异常值检测（Temporal Median Outlier Detection）：</strong>在连续帧之间应用中值滤波，因为摆底位置在短时间内应平滑变化——突变的检测结果很可能是噪声或错误检测。</p>
+  <div class="eq-note">
+    <strong>设计巧思：</strong>EDT 方法对噪声和边缘模糊具有天然鲁棒性——距离变换将"在二值图上拟合圆"这个组合优化问题转化为连续优化问题，可以使用高效的数值优化算法求解。Trust-Region Reflective 算法 [38] 被用于求解此最小化问题。
+  </div>
+</div>
+
+<h3>6.2 状态估计与系统建模</h3>
+
+<div class="formula-block">
+  <div class="eq-tag">状态方程 · State-Space Model · §III-B</div>
+  <p>系统状态向量 $\mathbf{x} = [x_c, \dot{x}_c, \varphi, \dot{\varphi}]^T$，控制输入 $u = F$（水平力），连续时间非线性动力学：</p>
+  $$ \dot{\mathbf{x}}(t) = f(\mathbf{x}(t), u(t)) + \mathbf{w}(t) $$
+  <p>其中 $\mathbf{w}(t)$ 为过程噪声（建模误差、未建模摩擦等）。</p>
+  <p><strong>观测模型：</strong></p>
+  $$ \mathbf{y}_k = h(\mathbf{x}(t_k)) + \mathbf{v}_k $$
+  <p>其中 $\mathbf{y}_k$ 为第 $k$ 帧从深度图像中提取的测量（摆底像素坐标），$\mathbf{v}_k$ 为测量噪声。</p>
+  <p>在平衡点 $\varphi \approx 0$ 附近，系统可以线性化为：</p>
+  $$ \dot{\mathbf{x}} = A\mathbf{x} + B u + \mathbf{w} $$
+  $$ \mathbf{y} = C\mathbf{x} + \mathbf{v} $$
+  <div class="eq-note">
+    <strong>LQG 框架的核心假设：</strong>过程噪声 $\mathbf{w} \sim \mathcal{N}(0, Q_w)$ 和测量噪声 $\mathbf{v} \sim \mathcal{N}(0, R_v)$ 均为高斯白噪声。在此假设下，分离原理成立——最优估计（卡尔曼滤波）和最优控制（LQR）可以独立设计，组合即为 LQG。
+  </div>
+</div>
+
+<h3>6.3 LQG 控制器设计</h3>
+
+<div class="formula-block">
+  <div class="eq-tag">LQG 控制律 · §III-D</div>
+  <p><strong>卡尔曼滤波（状态估计）：</strong></p>
+  $$ \dot{\hat{\mathbf{x}}} = A\hat{\mathbf{x}} + B u + L(\mathbf{y} - C\hat{\mathbf{x}}) $$
+  <p>其中卡尔曼增益 $L = P C^T R_v^{-1}$，$P$ 为连续时间代数 Riccati 方程的解：</p>
+  $$ A P + P A^T + Q_w - P C^T R_v^{-1} C P = 0 $$
+  <p><strong>LQR 控制律：</strong></p>
+  $$ u = -K \hat{\mathbf{x}} $$
+  <p>其中 $K = R^{-1} B^T S$，$S$ 为代数 Riccati 方程的解：</p>
+  $$ A^T S + S A + Q - S B R^{-1} B^T S = 0 $$
+  <p>$Q$ 和 $R$ 为二次型代价函数中的权重矩阵，分别惩罚状态偏差和控制能耗。</p>
+  <div class="eq-note">
+    <strong>为什么选 LQG 而非更复杂的控制器？</strong>这是一个<strong>刻意的实验设计选择</strong>。作者的目标是测试 ToF 感知管线的能力，而非控制器的能力。用标准 LQG 作为基线，如果系统能稳定，说明 ToF 反馈质量"足够好"；如果系统不能稳定，也不能断定是 ToF 的问题（因为 LQG 本身可能不够强）。因此实验结果为"下界"——实际可达到的性能只会更好。
+  </div>
+</div>
+
+<h3>6.4 模型验证与参数辨识</h3>
+
+<div class="formula-block">
+  <div class="eq-tag">参数辨识 · Model Validation · §III-C</div>
+  <p><strong>一步预测误差最小化：</strong>给定估计状态 $\hat{\mathbf{x}}_t$ 和施加的控制力 $u_t$，用 RK4 积分器计算一步前向预测 $\tilde{\mathbf{x}}_{t+1}$：</p>
+  $$ \tilde{\mathbf{x}}_{t+1} = \text{RK4}\big(f, \hat{\mathbf{x}}_t, u_t, \Delta t\big) $$
+  <p>将预测轨迹与实验采集的真实轨迹对比，通过 Trust-Region Reflective 优化算法 [38] 最小化预测误差来辨识物理参数：</p>
+  $$ \theta^* = \arg\min_{\theta} \sum_{t} \left\| \mathbf{x}_{t+1}^{\text{gt}} - \text{RK4}\big(f_\theta, \hat{\mathbf{x}}_t, u_t, \Delta t\big) \right\|^2 $$
+  <p>其中 $\theta$ 包含摆质量、摆长、摩擦系数、电机常数等未知物理参数，$\mathbf{x}^{\text{gt}}$ 为编码器提供的真值。</p>
+  <div class="eq-note">
+    <strong>关键点：</strong>编码器（600 PPR 正交编码器）<strong>仅用于离线参数辨识和性能评估</strong>，不参与实时控制回路。控制器实时运行时仅依赖 ToF 反馈。这是一个清晰的实验设计——将"标定/评估"与"控制"分离，避免编码器信息泄露到控制回路中。
+  </div>
+</div>
+
+<h3>6.5 参数总表</h3>
+<table>
+  <tr><th style="width:14%;">参数符号</th><th style="width:22%;">物理含义</th><th style="width:18%;">典型值/范围</th><th style="width:22%;">来源/辨识方法</th><th style="width:24%;">对系统的影响</th></tr>
+  <tr><td>$m_c$</td><td>小车质量</td><td>~0.5-1.0 kg</td><td>直接测量或参数辨识</td><td>影响系统惯性，决定控制力到加速度的增益</td></tr>
+  <tr><td>$m_p$</td><td>摆质量</td><td>~0.01-0.05 kg</td><td>直接测量或参数辨识</td><td>影响摆的自然频率和不稳定程度</td></tr>
+  <tr><td>$l$</td><td>摆长（质心到转轴）</td><td>~0.1-0.3 m</td><td>几何测量</td><td>决定不稳定极点位置，越长越容易控制</td></tr>
+  <tr><td>$g$</td><td>重力加速度</td><td>9.81 m/s²</td><td>已知常数</td><td>决定恢复力矩 $m_p g l \sin\varphi$</td></tr>
+  <tr><td>$b_c$</td><td>小车阻尼系数</td><td>辨识获得</td><td>Trust-Region Reflective 优化</td><td>消耗控制能量，影响稳态精度</td></tr>
+  <tr><td>$b_p$</td><td>摆轴阻尼系数</td><td>辨识获得</td><td>Trust-Region Reflective 优化</td><td>轻微阻尼有助于稳定，但本文系统是轻阻尼</td></tr>
+  <tr><td>$K_m$</td><td>电机力常数</td><td>辨识获得</td><td>Trust-Region Reflective 优化</td><td>控制力到实际执行力的映射关系</td></tr>
+  <tr><td>$\Delta t$</td><td>控制周期</td><td>ToF 帧率决定</td><td>硬件限制</td><td>采样周期必须显著快于不稳定模态的时间常数</td></tr>
+</table>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+<h2>7. 基本原理深度解读</h2>
+
+<h3>7.1 原理一：欧氏距离变换在噪声图像中的鲁棒圆检测</h3>
+
+<p>欧氏距离变换（EDT）将二值图像中的每个像素赋值为该像素到最近背景像素（或边缘像素）的欧氏距离。在摆底检测中的应用逻辑如下：</p>
+
+<p><strong>为什么直接拟合圆形在噪声深度图中不可靠？</strong>深度图中摆底区域的边缘因 ToF 噪声（深度畸变、运动模糊）而模糊不清。直接对模糊边缘进行霍夫变换或最小二乘圆拟合会因边缘点定位不准而产生大的偏差。EDT 通过以下机制克服这一问题：</p>
+
+<ol>
+  <li><strong>距离域优化：</strong>将"在含噪边缘上拟合圆"的组合问题转化为"在连续距离场中匹配圆形模板"的连续优化问题。距离场处处可微（或分段可微），可以使用基于梯度的优化算法（如 Trust-Region Reflective）。</li>
+  <li><strong>天然鲁棒性：</strong>距离变换对孤立噪声像素不敏感——单个噪声像素只影响其局部距离值，而圆形模板在整个区域上进行拟合，噪声被平均化。</li>
+  <li><strong>亚像素精度的内在支持：</strong>因为距离场是连续的（通过插值），优化器可以找到亚像素级别的最优圆心位置，无需对离散像素网格进行穷举搜索。</li>
+</ol>
+
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>✅ EDT 圆拟合（本文方法）</h4>
+    <ul>
+      <li>在连续距离域中优化</li>
+      <li>对边缘模糊和噪声鲁棒</li>
+      <li>天然支持亚像素精度</li>
+      <li>计算效率高（单次 EDT + 梯度优化）</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>❌ 传统霍夫变换圆检测</h4>
+    <ul>
+      <li>在离散参数空间中投票</li>
+      <li>对边缘模糊敏感（投票分散）</li>
+      <li>精度受限于参数空间离散化</li>
+      <li>计算量大（3D 参数空间：x, y, r）</li>
+    </ul>
+  </div>
+</div>
+
+<h3>7.2 原理二：LQG 框架下的分离原理与 ToF 反馈的适配性</h3>
+
+<p>LQG（Linear Quadratic Gaussian）控制框架基于两个基本支柱：</p>
+
+<p><strong>分离原理（Separation Principle）：</strong>对于线性系统加高斯噪声，最优状态估计问题（卡尔曼滤波）和最优控制问题（LQR）可以<strong>独立求解</strong>——先设计卡尔曼滤波器得到最优状态估计 $\hat{\mathbf{x}}$，再将 $\hat{\mathbf{x}}$ 代入 LQR 控制律 $u = -K\hat{\mathbf{x}}$。这被称为"确定性等价"（certainty equivalence）。</p>
+
+<p><strong>为什么这对 ToF 反馈控制特别重要？</strong></p>
+<ol>
+  <li><strong>感知与控制的解耦设计：</strong>可以独立评估和改进视觉管线（改进 $\hat{\mathbf{x}}$ 的质量）和控制器（调整 $K$），而不必同时重新设计两者。</li>
+  <li><strong>噪声统计建模：</strong>ToF 深度噪声可以被建模为测量噪声 $\mathbf{v}_k \sim \mathcal{N}(0, R_v)$，卡尔曼滤波器自动根据 $R_v$ 的大小调整对 ToF 测量的信任程度。</li>
+  <li><strong>延迟的部分补偿：</strong>卡尔曼滤波的<strong>预测步骤</strong>利用系统动力学模型将状态估计前向传播，从而在一定程度上补偿 ToF 感知延迟造成的状态滞后。</li>
+</ol>
+
+<div class="callout idea">
+  <div class="callout-title">💡 深层洞见</div>
+  <p>作者选择 LQG 而非端到端学习方法的深层原因在于<strong>可解释性和模块化评估</strong>。如果使用强化学习端到端地从深度图像映射到控制力，虽然可能获得更好性能，但无法区分"是感知做得好"还是"控制学得聪明"。LQG 的模块化结构使得可以量化评估每个模块的贡献——这正是 proof-of-concept 论文所需要的实验设计。</p>
+</div>
+
+<h3>7.3 原理三：非最小相位系统的控制挑战</h3>
+
+<p>倒立摆系统是<strong>非最小相位（non-minimum phase）</strong>系统——其传递函数在右半平面有零点。物理含义是：</p>
+
+<p>当你想让摆向右倾斜回到竖直位置时，<strong>小车必须先向左移动</strong>（"错误的方向"），然后摆因惯性向右倾斜，小车再向右追。这个"先反向再正向"的特性意味着：</p>
+
+<ul>
+  <li><strong>初始响应的符号与稳态响应相反：</strong>如果控制器只看短期效果，会做出错误决策。</li>
+  <li><strong>反馈延迟的放大效应：</strong>任何感知或执行延迟都会使你错过"反向→正向"的时机转换，导致系统振荡甚至发散。</li>
+  <li><strong>对模型精度的依赖：</strong>非最小相位系统的稳定对模型精度和参数估计精度高度敏感——微小的模型误差在反向阶段被放大。</li>
+</ul>
+
+<p>本文的 ToF 方案在这个困难基准上成功，表明视觉管线的精度和延迟已经满足甚至这个最严苛场景的要求。</p>
+
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>🔴 非最小相位系统（倒立摆）</h4>
+    <ul>
+      <li>初始响应与稳态响应符号相反</li>
+      <li>对延迟和模型误差高度敏感</li>
+      <li>鲁棒控制极其困难 [33]</li>
+      <li>学习型控制器也面临挑战 [34]</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>🟢 最小相位系统（如巡航控制）</h4>
+    <ul>
+      <li>初始响应与稳态响应符号一致</li>
+      <li>对适度延迟有较好的容忍度</li>
+      <li>更容易鲁棒控制</li>
+      <li>PID 等简单控制器即可胜任</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════ 8. FIGURES & EVIDENCE ═══════════════ -->
+<section id="figures">
+<h2>8. 图示与实验结果解读</h2>
+
+<h3>8.1 实验平台图示</h3>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Fig. 1</span>
+    <span class="fig-caption">实验平台全貌：倒立摆小车系统 + 底部安装的 ToF 相机</span>
+    <span class="fig-source">Source: p.1, Czubarow et al. 2026</span>
+  </div>
+  <div class="fig-image">
+    <img src="figures/figure-1-context.png" alt="实验平台">
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">📌 图示解读 · FIGURE INTERPRETATION</div>
+    <p><strong>关键观察：</strong></p>
+    <ul>
+      <li><strong>硬件组成：</strong>直线导轨上的小车（cart）+ 竖直倒立的金色笔（gold pen，作为摆杆）+ 安装在小车底部、朝上拍摄的 ToF 深度相机（940 nm 红外照明器）。</li>
+      <li><strong>相机位姿的刻意性：</strong>相机装在<strong>摆的正下方朝上</strong>，这不是随意的安装——这是为了将场景简化为"深色背景上一个明亮的圆形摆底"，使视觉检测问题变得可解。</li>
+      <li><strong>系统紧凑性：</strong>整个感知+控制+执行系统集成在一个小车上（self-contained），不需要外部相机或运动捕捉系统——这对移动机器人应用（如无人机）具有直接的迁移价值。</li>
+      <li><strong>摆的材质选择：</strong>使用金色笔作为摆杆是一个聪明的工程选择——金属表面在红外波段有良好的反射特性，有利于 ToF 相机在 940 nm 波段获得高质量深度测量。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Fig. 2</span>
+    <span class="fig-caption">实验设置原理图：坐标系定义、传感器布局与信号流</span>
+    <span class="fig-source">Source: p.2, Czubarow et al. 2026</span>
+  </div>
+  <div class="fig-placeholder">
+    📷 原理框图占位 · Figure 2: Schematic of the experimental setup — coordinate frames, ToF camera placement below pendulum, encoder for ground truth, and signal flow from depth frames to control force.<br>
+    参见原论文 p.2 获取完整原理图。
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">📌 图示解读 · FIGURE INTERPRETATION</div>
+    <p><strong>系统信息流：</strong></p>
+    <ul>
+      <li><strong>坐标定义：</strong>$x_c$ — 小车沿导轨的水平位置；$\varphi$ — 摆相对于竖直向上方向的角位移（$\varphi = 0$ 为竖直向上）。</li>
+      <li><strong>传感器布局：</strong>ToF 相机固定在小车上，视野朝上覆盖摆底部运动范围；600 PPR 正交编码器安装在摆轴处，仅用于离线标定和真值记录。</li>
+      <li><strong>信号流：</strong>ToF 深度帧 → 图像处理（圆检测 + 中值滤波）→ 状态估计（卡尔曼滤波）→ LQG 控制力计算 → 电机驱动 → 小车运动 → 新的 ToF 观测（闭环）。</li>
+    </ul>
+  </div>
+</div>
+
+<h3>8.2 实验结果总结</h3>
+
+<table>
+  <tr><th style="width:20%;">评估维度</th><th style="width:40%;">实验观察</th><th style="width:40%;">含义解读</th></tr>
+  <tr>
+    <td><strong>平衡能力</strong></td>
+    <td>使用仅 ToF 反馈的 LQG 控制器成功将倒立摆维持在竖直向上不稳定平衡点</td>
+    <td>ToF 感知管线在延迟、精度和噪声水平上<strong>满足</strong>快动态反馈控制的最低要求</td>
+  </tr>
+  <tr>
+    <td><strong>摆角 RMS 误差</strong></td>
+    <td>与编码器真值对比，ToF 估计的角度误差在可接受范围内（具体数值见原论文 §IV）</td>
+    <td>视觉管线的角度估计精度足以支持稳定控制——小的估计误差被 LQG 鲁棒性吸收</td>
+  </tr>
+  <tr class="highlight">
+    <td><strong>性能下界</strong></td>
+    <td>作者明确声明：<strong>报告的实验性能应被视为 ToF 反馈可实现性能的下界</strong></td>
+    <td>使用更强的控制器（MPC、神经网络控制、鲁棒控制）和多传感器配置将进一步提升性能——该声明确保了研究的诚实性和可扩展性</td>
+  </tr>
+  <tr>
+    <td><strong>模型验证</strong></td>
+    <td>一步前向预测与实验轨迹高度吻合，验证了非线性模型和参数辨识的准确性</td>
+    <td>RK4 数值积分 + Trust-Region Reflective 优化的组合提供了可靠的系统建模</td>
+  </tr>
+  <tr>
+    <td><strong>ToF 局限性</strong></td>
+    <td>在极端条件下（大幅摆动、极高速度），ToF 深度质量下降</td>
+    <td>性能天花板由 ToF 传感器本身决定——多视角、更高性能的 ToF 传感器是自然的改进方向</td>
+  </tr>
+</table>
+
+<div class="callout tip">
+  <div class="callout-title">✅ 核心实验结论</div>
+  <p>本文成功证明了<strong>一个低成本、低分辨率 ToF 相机足以提供倒立摆稳定控制所需的反馈质量</strong>。这一结论具有外推价值：如果 ToF 能应付倒立摆这种极端快动态系统，那么对于无人机姿态控制、机器人平衡等同样需要快速反馈但动态稍慢的任务，ToF 的可行性更强。</p>
+</div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAWS & LIMITATIONS ═══════════════ -->
+<section id="flaw">
+<h2>9. 潜在局限性与改进方向</h2>
+
+<h3>9.1 论文自身的局限声明</h3>
+
+<div class="novelty-card">
+  <h4>🔴 局限 1：感知管线依赖特定的安装位姿</h4>
+  <p>底部朝上的 ToF 安装是本文方法成功的关键，但这种安装方式限制了通用性——在实际应用中（如无人机），ToF 相机可能无法总是正对被跟踪目标的底部。当场景几何更复杂时，EDT 圆拟合方法可能失效。</p>
+  <p><strong>原文线索：</strong><em>"We deliberately mount the ToF camera below the pendulum, looking upward"</em> (p.1) — "deliberately" 一词暗示这是为简化问题而做的刻意设计。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 局限 2：单传感器、单视角的限制</h4>
+  <p>本文仅使用一个 ToF 相机从单一视角观测。单目深度估计固有的遮挡问题、视角盲区和深度不确定性限制了感知的鲁棒性。作者承认未来工作应探索多视角配置。</p>
+  <p><strong>原文线索：</strong><em>"future work can explore alternative ToF sensors, placements, and multi-view configurations"</em> (p.5)</p>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 局限 3：标准 LQG 控制器未充分利用系统能力</h4>
+  <p>LQG 是线性控制器，无法显式处理约束（如轨道长度限制、电机饱和），也无法利用非线性动力学中的额外信息。作者明确指出 MPC 或约束神经网络控制器可以实现更好性能。</p>
+  <p><strong>原文线索：</strong><em>"the reported performance should be viewed as a lower bound on what is achievable with ToF-based feedback"</em> (p.5)</p>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 局限 4：仅在一个硬件平台上验证</h4>
+  <p>实验仅在单一的倒立摆平台上完成，摆的物理参数（长度、质量）、ToF 相机型号、环境光照条件等均未变化。结论的外推性需要通过多平台、多条件的实验进一步验证。</p>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 局限 5：未与学习型方法进行系统比较</h4>
+  <p>虽然论文提及了学习型控制器（强化学习 [34]、神经网络控制器 [46]），但未在相同硬件平台上进行实验比较。缺乏与端到端视觉-控制学习方法的定量对比，使"LQG 是否是最优选择"的问题悬而未决。</p>
+</div>
+
+<h3>9.2 未来扩展方向</h3>
+
+<table>
+  <tr><th style="width:18%;">扩展方向</th><th style="width:42%;">具体思路</th><th style="width:40%;">预期收益</th></tr>
+  <tr>
+    <td><strong>多传感器融合</strong></td>
+    <td>融合多个 ToF 相机（多视角）或 ToF + IMU + 光流的多模态感知</td>
+    <td>提高对遮挡和异常值的鲁棒性，扩大有效观测视角，减少单传感器盲区</td>
+  </tr>
+  <tr>
+    <td><strong>更先进的控制器</strong></td>
+    <td>使用 MPC（模型预测控制）显式处理约束（轨道长度、力限幅），或使用约束神经网络控制器 [46]</td>
+    <td>减少稳定时间（settling time），提高对大幅扰动的恢复能力，充分利用系统动力学</td>
+  </tr>
+  <tr>
+    <td><strong>鲁棒/分布鲁棒控制</strong></td>
+    <td>参考 [43,47,48] 设计鲁棒控制器，显式考虑 ToF 深度噪声和参数不确定性</td>
+    <td>减少参数整定需求，提高对环境变化（光照、反射率）的适应能力</td>
+  </tr>
+</table>
+
+<h3>9.3 关键假设敏感性分析</h3>
+
+<table>
+  <tr><th style="width:22%;">假设</th><th style="width:12%;">重要性</th><th style="width:22%;">如果假设不成立</th><th style="width:22%;">缓解措施</th><th style="width:22%;">影响评估</th></tr>
+  <tr>
+    <td>高斯噪声假设</td>
+    <td>★★★★★</td>
+    <td>卡尔曼滤波器不是最优估计器，估计误差增大</td>
+    <td>使用粒子滤波或鲁棒卡尔曼滤波</td>
+    <td>中等——LQG 对适度非高斯性有一定鲁棒性</td>
+  </tr>
+  <tr>
+    <td>小角度线性化</td>
+    <td>★★★★☆</td>
+    <td>线性化模型在大角度时失准，LQR 控制律退化</td>
+    <td>使用非线性 MPC 或在 LQG 中引入增益调度</td>
+    <td>高——大角度偏离时系统可能直接失稳</td>
+  </tr>
+  <tr>
+    <td>摆底始终可见</td>
+    <td>★★★★★</td>
+    <td>视觉管线完全失效，无反馈可用</td>
+    <td>多相机冗余或结合 IMU 惯性估计</td>
+    <td>致命——感知失效直接导致控制崩溃</td>
+  </tr>
+  <tr>
+    <td>物理参数稳态不变</td>
+    <td>★★★☆☆</td>
+    <td>模型失配导致预测不准，控制性能下降</td>
+    <td>在线参数自适应或鲁棒控制</td>
+    <td>中等——LQG 闭环反馈有一定补偿能力</td>
+  </tr>
+</table>
+
+<div class="callout warn">
+  <div class="callout-title">🔍 深层审视：感知-控制耦合的隐式假设</div>
+  <p>本文最关键的隐式假设是<strong>感知管线的延迟和噪声特性是时不变的</strong>（至少近似时不变），从而可以用一个固定增益的卡尔曼滤波器。但 ToF 噪声实际上依赖于场景（反射率、距离、环境光），在动态变化的环境中，测量噪声协方差 $R_v$ 可能是时变的。这一假设的松弛是通向实用化的关键一步。</p>
+</div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION & DERIVATION ═══════════════ -->
+<section id="motivation">
+<h2>10. 动机推导与逻辑链</h2>
+
+<h3>10.1 五步推理链</h3>
+
+<div class="novelty-card">
+  <h4>🔴 步骤 1：识别感知瓶颈</h4>
+  <div class="novelty-step">在机器人学中，精确、快速的反馈控制通常依赖昂贵的专用传感器（编码器、运动捕捉系统）。低成本传感器（如 ToF 相机）已有成功应用，但<strong>从未在快不稳定动力学系统的反馈控制中被严格测试</strong>。</div>
+  <div class="novelty-step"><strong>证据链：</strong>ToF 在慢动态任务（抓取 [5]、视觉伺服 [6-8]、3D 跟踪 [9]）中的成功 ≠ ToF 能应对快动态（倒立摆的不稳定时间常数 ~100 ms）。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 步骤 2：选择基准测试</h4>
+  <div class="novelty-step">需要一个公认的、具有明确难度等级的基准系统来"压力测试"ToF 的反馈能力。<strong>倒立摆（cart-pole）</strong>是控制理论中的经典基准，具有开环不稳定、非最小相位、对延迟高度敏感等严苛特性。</div>
+  <div class="novelty-step"><strong>选择理由：</strong>如果 ToF 能稳定倒立摆，则对其在更温和的快动态系统中的可行性构成强有力的证据。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 步骤 3：简化的感知策略</h4>
+  <div class="novelty-step">不试图解决通用 3D 场景理解问题，而是通过<strong>巧妙的系统设计</strong>（底部朝上安装）将问题简化为 2D 深度图像中的圆检测——一个可被 EDT + 优化算法高效且鲁棒地解决的问题。</div>
+  <div class="novelty-step"><strong>设计哲学：</strong>"让系统适配传感器"而非"让传感器适配系统"——通过物理安装位姿改变问题难度，而非通过更复杂的算法。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 步骤 4：保守的控制器选择</h4>
+  <div class="novelty-step">使用<strong>标准 LQG</strong>作为控制器——不是因为它是最优选择，而是因为它是公认的基线。用保守的控制器来测试激进的感知方案，确保任何性能限制都来自感知而非控制。</div>
+  <div class="novelty-step"><strong>实验设计智慧：</strong>如果成功了，证明 ToF 足够好；如果失败了，不能断定是 ToF 的问题——这种不对称性使论文结论更加稳健。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🔴 步骤 5：诚实报告与明确未来方向</h4>
+  <div class="novelty-step">不夸大结果，明确声明性能为<strong>下界</strong>；不隐瞒局限，坦诚讨论 ToF 的误差源和未来改进路径。这种诚实的学术态度使论文的 proof-of-concept 定位清晰而有说服力。</div>
+  <div class="novelty-step"><strong>学术价值：</strong>打开了一个新方向（低成本 ToF 用于快动态反馈控制），并为后续研究留下了明确的改进路径和性能基线。</div>
+</div>
+
+<h3>10.2 一句话核心动机</h3>
+
+<div class="callout idea">
+  <div class="callout-title">🎯 一句话总结</div>
+  <p><strong>这篇论文的核心动机是填补"低成本深度相机能否支撑快动态反馈控制"这一知识空白——通过在最严苛的经典基准（倒立摆）上进行严格的 proof-of-concept 实验，为 ToF 传感器在无人机、足式机器人等快动态系统中的广泛应用奠定实验基础。</strong></p>
+</div>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+<h2>11. 关键启示与迁移</h2>
+
+<h3>11.1 Lessons Learned</h3>
+
+<h4>🔵 方法论层面：系统设计先于算法设计</h4>
+<ul>
+  <li><strong>物理安装位姿是问题难度的"调节旋钮"：</strong>本文最关键的 insight 不是新的算法，而是通过底部朝上的相机安装将 3D 跟踪简化为 2D 圆检测。在 UAV 研究中，传感器的安装位置和朝向同样可以大幅改变感知问题的难度——例如将相机安装在无人机底部朝下，可以将高度估计转化为平面深度图中的特征检测。</li>
+  <li><strong>保守基线实验设计：</strong>用最简单、最公认的方法（LQG）作为控制器来测试新感知方案，确保结论的可靠性。在 UAV 研究中评估新的感知或规划方法时，也应使用公认的基线控制器来隔离变量。</li>
+  <li><strong>问题驱动的传感器选择：</strong>不是先选传感器再找问题，而是先有明确的问题（快动态反馈控制），然后问"这个传感器能行吗？"——这种问题驱动的研究方式比"我们用新传感器做了 X"更具科学价值。</li>
+</ul>
+
+<h4>🟢 技术技巧层面：感知管线的鲁棒化策略</h4>
+<ul>
+  <li><strong>EDT + 优化的组合：</strong>欧氏距离变换将离散的组合搜索问题转化为连续的梯度优化问题——这个技巧可以迁移到任何需要在噪声数据中拟合几何基元的场景（UAV 中的地标检测、着陆点识别等）。</li>
+  <li><strong>时域中值滤波：</strong>在时间序列中，异常值往往表现为突变——中值滤波是一种简单但有效的异常值抑制策略，计算开销小，适用于实时系统。</li>
+  <li><strong>RK4 一步预测：</strong>使用数值积分进行模型验证和参数辨识，而非依赖解析解——这种方法适用于任何非线性系统的离线辨识。</li>
+</ul>
+
+<h4>🟡 实验/写作层面：Proof-of-Concept 论文的写作范式</h4>
+<ul>
+  <li><strong>诚实声明局限性：</strong>"性能是下界"、"受限于 LQG 而非 ToF"——这些诚实的声明反而增加了论文的可信度。在 UAV 研究中，清楚地说明实验结果的适用范围和局限性同样重要。</li>
+  <li><strong>清晰的实验设计分离：</strong>编码器仅用于标定，不进入控制回路——将"评估工具"与"被评估系统"清晰分离，避免混淆。</li>
+  <li><strong>开放的未来工作指引：</strong>论文不仅报告结果，还指明了明确的改进路径（MPC、多传感器、鲁棒控制）——为后续研究者提供了直接的起点。</li>
+</ul>
+
+<h3>11.2 对 UAV 研究的直接迁移</h3>
+
+<div class="callout tip">
+  <div class="callout-title">🚁 无人机场景应用</div>
+  <p>本文的核心思想——<strong>"用低成本深度相机进行快动态反馈控制"</strong>——对无人机研究具有直接的迁移价值：</p>
+  <ul>
+    <li><strong>姿态控制：</strong>UAV 的姿态控制同样是快动态不稳定系统（四旋翼是开环不稳定的），如果 ToF 能稳定倒立摆，那么对地或对障碍物的 ToF 深度反馈能否替代或补充 IMU 进行姿态估计？</li>
+    <li><strong>低空悬停：</strong>无人机在低空悬停时，底部朝下的 ToF 相机可以提供高精度的地面高度和水平漂移信息——类似于本文中底部朝上的 ToF 提供摆角信息。</li>
+    <li><strong>着陆阶段：</strong>无人机着陆是典型的快速、高精度控制任务，ToF 深度相机可以提供着陆平台的高精度相对位姿估计，作为 GPS/视觉里程计的补充。</li>
+    <li><strong>感知-控制联合设计：</strong>本文的模块化方法（视觉管线 + 状态估计 + LQG）可以直接适配到 UAV 的飞行控制栈中，替代或补充现有的传感器融合方案。</li>
+    <li><strong>实验设计范式：</strong>在 UAV 研究中测试新的感知方案时，使用标准 PID 或 LQR 作为基线控制器，确保性能变化来自感知而非控制——这种实验设计方法值得借鉴。</li>
+  </ul>
+</div>
+
+<h3>11.3 关键参考文献追踪</h3>
+
+<table>
+  <tr><th style="width:35%;">参考文献</th><th style="width:35%;">内容概要</th><th style="width:30%;">追踪理由</th></tr>
+  <tr>
+    <td>[5] ToF 在抓取与操作中的应用（calibrated depth correction）</td>
+    <td>ToF 深度校正方法在机械臂抓取中的应用</td>
+    <td>了解 ToF 深度校正的技术路线，是否可迁移到 UAV 场景</td>
+  </tr>
+  <tr>
+    <td>[10, 11] ToF 测量不确定性的环境影响</td>
+    <td>系统研究 ToF 深度测量的系统性/非系统性误差来源</td>
+    <td>理解 ToF 的物理极限，为 UAV 应用选型提供依据</td>
+  </tr>
+  <tr>
+    <td>[33] 非最小相位系统的鲁棒控制</td>
+    <td>非最小相位系统控制的理论基础</td>
+    <td>UAV 轨迹跟踪中也存在非最小相位特性，需要理论支撑</td>
+  </tr>
+  <tr>
+    <td>[45] 模型预测控制 (MPC)</td>
+    <td>作为本文的改进方向被提及</td>
+    <td>MPC 是 UAV 轨迹跟踪的主流方法，可与 ToF 感知结合</td>
+  </tr>
+  <tr>
+    <td>[43, 47, 48] 鲁棒/分布鲁棒控制</td>
+    <td>显式处理模型不确定性和参数变化的控制方法</td>
+    <td>UAV 飞行中面临的风扰、载荷变化等不确定性需要鲁棒控制</td>
+  </tr>
+  <tr>
+    <td>[46] 硬约束神经网络控制器</td>
+    <td>将约束显式编码到神经网络中的控制方法</td>
+    <td>UAV 的安全约束（禁飞区、电机饱和）可以用类似方法处理</td>
+  </tr>
+</table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · files · Paper ID 10346 · Czubarow et al. 2026 · ToF-based Inverted Pendulum Stabilization · MathJax + Mermaid Rendering · 详细中文技术解读版</footer>
+
+</div>
+</body>
+</html>

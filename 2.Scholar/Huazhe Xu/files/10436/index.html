@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — ImageNet (Deng et al., 2009)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p, .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 论文笔记</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">关键挑战</a>
+  <a href="#method">方法与公式</a>
+  <a href="#principles">深层原理</a>
+  <a href="#figures">图表证据</a>
+  <a href="#flaw">局限延伸</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Huazhe Xu · 26-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10384/index.html">RL-100</a>
+<a href="../10382/index.html">RL</a>
+<a href="../10381/index.html">X-distill Cross-architect</a>
+<a href="../10380/index.html">DexImit Learning bimanual</a>
+<a href="../10379/index.html">ViTaS Visual tactile</a>
+<a href="../10378/index.html">Beyond action residuals</a>
+<a href="../10377/index.html">One-policy-fits-all Geome</a>
+<a href="../10376/index.html">VLA</a>
+<a href="../10392/index.html">Fine-tuning hard-to-simul</a>
+<a href="../10391/index.html">DemoSpeedup Accelerating </a>
+<a href="../10390/index.html">forget-and-grow strategy </a>
+<a href="../10389/index.html">Morpheus neural-driven an</a>
+<a href="../10388/index.html">HERMES</a>
+<a href="../10387/index.html">VLA</a>
+<a href="../10386/index.html">Entropy regularizing acti</a>
+<a href="../10385/index.html">Dtactive vision-based tac</a>
+<a href="../10383/index.html">MoE-DP MoE-enhanced diffu</a>
+<a href="../10438/index.html">opportunities risks found</a>
+<a href="../10442/index.html">Visual genome Connecting</a>
+<a href="../10437/index.html">Perceptual losses real-ti</a>
+<a href="../10441/index.html">Deep visual-semantic alig</a>
+<a href="../10439/index.html">ImageNet large scale</a>
+<a href="../10440/index.html">Large-scale video classif</a>
+<a href="../10443/index.html">3D</a>
+<a class="active" href="../10436/index.html">Imagenet large-scale hier</a>
+<a href="../10444/index.html">bayesian hierarchical mod</a>
+    </div>
+  </div>
+
+
+<!-- 1. 论文信息 -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">ImageNet: A Large-Scale Hierarchical Image Database（ImageNet：大规模层次化图像数据库）</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Jia Deng</strong>、<strong>Wei Dong</strong>、Richard Socher、Li-Jia Li、<strong>Kai Li</strong>、<strong>Li Fei-Fei</strong></td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">Stanford University</strong>（斯坦福大学），Computer Science Department</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">CVPR 2009</strong> — IEEE Conference on Computer Vision and Pattern Recognition, Miami, FL, USA</td></tr>
+      <div class="journal-meta"><span class="jif-name">CVPR</span> <span class="jif-badge if-conf-top">🏆 Top Conference</span></div>
+    <tr><td><strong>DOI / 链接</strong></td><td><a href="https://doi.org/10.1109/CVPR.2009.5206848" target="_blank">10.1109/CVPR.2009.5206848</a> | 发表时间：2009年6月</td></tr>
+    <tr><td><strong>核心摘要</strong></td><td>介绍 <strong>ImageNet</strong>——首个基于 WordNet 语义层次结构组织的大规模图像数据库：覆盖 21,841 个 synset（同义词集），包含 1,419 万+ 张人验清洁的高分辨率图像。论文提出完整的数据构建 pipeline（多引擎爬取 + 两轮 MTurk 众包标注 + 质量控制）、以及基于 WordNet 树距离的层次化评估指标。ImageNet 后来衍生出 ILSVRC 挑战赛（2010-2017），直接催生了 AlexNet（2012）和整个深度学习革命。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">ImageNet Dataset</span>
+    <span class="tag tag-green">WordNet Hierarchy</span>
+    <span class="tag tag-amber">Crowdsourced Annotation</span>
+    <span class="tag tag-purple">Large-Scale Vision</span>
+    <span class="tag tag-red">Deep Learning Era</span>
+    <span class="tag tag-cyan">CVPR 2009</span>
+    <span class="tag tag-gray">Data Infrastructure</span>
+  </div>
+</section>
+
+<!-- 2. 核心洞察与创新点 -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 核心洞察 — Core Insight</div>
+    <strong>问题：2009年计算机视觉最大的瓶颈是什么？</strong><br>
+    答案：不是算法，而是<strong>数据规模和覆盖率</strong>。当时最大的标注数据集 Caltech-101 仅有 101 个类别、约 9,000 张图片，而真实世界包含数万个物体类别。机器学习的基本前提——训练和测试数据来自同一分布——在如此有限的类别覆盖下根本不可能满足。<br><br>
+    <strong>问题：这篇论文的核心洞察是什么？</strong><br>
+    答案：<strong>将 WordNet 的语义层次结构作为图像数据集的结构骨架。</strong>WordNet 将 80,000+ 英文名词 synset 组织成一个 IS-A 树——这恰好为图像数据提供了一个具有数学严谨性的组织方案。核心创新链条：(1) 利用互联网图像搜索引擎为每个 WordNet synset 爬取候选图片 → (2) 引入众包平台（Amazon Mechanical Turk）进行多阶段人工标注与清洗 → (3) 产出包含 21,841 个 synset、14M+ 张清洁图片的最终数据集 → (4) 设计基于 WordNet 树距离的层次化精度指标。这种「语义骨架 + 众包标注」的范式，成为后续所有大规模视觉数据集的标准方法论。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>→ 洞察转化</th><th>类型</th></tr>
+    <tr><td>WordNet (Miller, 1995)：普林斯顿大学开发的英语层次化词汇数据库</td><td>→ WordNet 的 IS-A 层次结构为类别组织提供了数学严谨、语义自然的框架。不再随意选取 N 个类别，而是系统地遍历 WordNet 树来收集视觉数据。数据集的本质质量取决于其语义结构的质量。</td><td>架构</td></tr>
+    <tr><td>2000年代末互联网图像搜索引擎（Google Images、Flickr 等）的兴起</td><td>→ 搜索引擎对视觉概念的覆盖已经足够广泛，可以作为数据来源。虽然搜索结果含噪声（错误标签、水印、卡通图），但「采集阶段以量取胜」的策略是可行的：每 synset 爬取数千张，再通过人验清洗。</td><td>方法</td></tr>
+    <tr><td>Amazon Mechanical Turk（众包平台）的出现</td><td>→ 标注 14M+ 张图片在传统标注模型下是不可能的（成本和时间）。MTurk 使每条 HIT 仅需 $0.01-$0.05，且速度合理。两轮验证策略确保质量：第一轮快速二值过滤，第二轮多工作者投票进行细粒度验证。</td><td>方法</td></tr>
+    <tr><td>图像分类中非参数方法（KNN/BoW）的复苏</td><td>→ 非参数方法天然受益于数据规模——更多训练数据直接转化为更高准确率。这与「更好的特征」方向互补：不需要设计更好的特征，只需要提供更好的数据。ImageNet 的基线实验恰好证明了这一点。</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：首个基于语义层次的大规模图像数据集——从「N 个随意类别」到「语义全覆盖」</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>此前所有图像分类数据集（Caltech-101/256、PASCAL VOC、COIL-100）的类别选择都是临时的、凭直觉的，缺乏系统性原则。类别数量被限制在数百个。两个根本问题：(1) 类别之间没有编码语义关系；(2) 类别覆盖不足以应对真实世界的多样性。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>WordNet 是数十年计算语言学研究的成果，提供 80,000+ 名词 synset 及层次化 IS-A 关系——恰好是图像数据集所需的「语义骨架」。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>以全部 80,000+ WordNet 名词 synset 作为候选类别。过滤掉抽象/不可图像化的概念，得到 21,841 个目标 synset。为每个 synset 生成多个查询词（同义词 + 上位词 + 多语翻译）。每个查询词在多个图像搜索引擎上爬取。两轮 MTurk 验证——第一轮二值过滤，第二轮多工作者投票做细粒度验证。最终数据集：21,841 synset，平均每类 500+ 张清洁图片。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：可扩展的清洗流水线——从嘈杂的网络图片到研究级数据集</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>互联网爬取的图片高度嘈杂——水印、卡通、素描、错误搜索结果、模糊/低分辨率图片。此前没有工作探索如何将嘈杂的网络图片规模化地转化为研究级数据集。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>MTurk 使微任务标注在经济上可行——但需要一个精心设计的过滤流水线来确保质量，而不是简单地直接吞入所有爬取结果。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>三阶段流水线：(1) URL 爬取——每个 synset 使用多个搜索引擎和多个查询词，去重和死链过滤；(2) 第一轮 MTurk 标注——二值判断「这张图片是否包含查询目标物体？」，用于快速筛选；(3) 第二轮 MTurk——细粒度验证，多工作者投票与质量控制统计（工作者一致性、欺诈检测、金标准测试）。最终清洁率：每 synset 约 500-1000 张图片。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：层次化精度——用 WordNet 树距离定义「部分正确」的预测</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统的 flat accuracy 只有一个维度——对或错。但在层次化分类系统中，将「狼」预测为「犬科动物」与将其预测为「汽车」是完全不同的错误程度。现有指标无法捕获这种语义错误严重性。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>两个 synset 在 WordNet 树中的 LCA（最低公共祖先）天然定义了语义距离——错误预测在树中的高度直接对应语义偏差程度。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>定义层次化精度：对于真值 $c_t$ 和预测值 $c_p$，计算它们在 WordNet IS-A 树中 LCA 的高度 $h$，按该 synset 的最大可能高度归一化。取值范围从 0（完全无关）到 1（精确匹配），中间值表示部分正确。这使得「语义分级」评估成为可能，例如预测父节点可以获得部分分数。</div>
+  </div>
+</section>
+
+<!-- 3. 系统架构 -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.0 架构总览 — 数据构建流水线</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>语义骨架 <span>WordNet</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>WordNet 3.0 名词 synset</strong>
+          <small>80,000+ 概念；过滤后保留 21,841 个可图像化 synset。</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>IS-A 层次树</strong>
+          <small>Entity → Physical Object → ...，最深可达 19 层。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>网络爬取 <span>URL 获取</span></h4>
+        <div class="arch-card arch-power">
+          <strong>多引擎多查询</strong>
+          <small>Google、Flickr、PicSearch。每 synset 多个查询变体。</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>URL 去重</strong>
+          <small>每查询取前 1000 条 URL；去重和死链过滤。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>人工标注 <span>MTurk 众包</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>两轮验证</strong>
+          <small>第 1 轮：二值过滤（约 $0.01/HIT）。第 2 轮：细粒度投票（约 $0.05/HIT）。</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>质量控制</strong>
+          <small>工作者一致性统计、欺诈检测、金标准样本。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>最终产出 <span>14M+ 图片</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>14,197,122 张清洁图片</strong>
+          <small>21,841 类别，平均每类 650+ 张。</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>公开发布</strong>
+          <small>非商业研究许可，按 synset 层次结构组织。</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>语义骨架</span>
+      <span>候选图片</span>
+      <span>人验标签</span>
+      <span>14M+ 数据集</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>关键瓶颈</strong><small>在空前规模下平衡众包标注成本与质量控制。</small></div>
+      <div class="arch-metric"><strong>核心发明</strong><small>以 WordNet 层次结构作为视觉数据的原则性基础骨架。</small></div>
+      <div class="arch-metric"><strong>为什么有效</strong><small>语义结构提供了原则性的类别选择和分级评估机制。</small></div>
+      <div class="arch-metric"><strong>局限性</strong><small>各 synset 覆盖不均；非摄影噪声仍然存在（约 5-10%）。</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 系统全景 — 完整流水线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SEMANTIC["语义骨架 Semantic Backbone"]
+      WN["WordNet 3.0 · 80,000+ noun synsets"]
+      FILTER["筛选：排除抽象概念 · 保留 21,841 可图像化 synset"]
+      TREE["IS-A hierarchy tree · 类别间语义距离"]
+    end
+
+    subgraph CRAWL["网络爬取 Web Crawling"]
+      QUERY["查询生成：synset 名称 + 同义词 + 上位词 + 多语翻译"]
+      ENGINES["多引擎：Google Images + Flickr + PicSearch + Others"]
+      URLS["候选 URL · 去重 · 死链过滤 · 每查询取 top-1000"]
+    end
+
+    subgraph ANNOTATE["众包标注 Crowdsourced Annotation"]
+      MTURK["Amazon Mechanical Turk · $0.01-$0.05 per HIT"]
+      PASS1["第1轮：二值过滤 · '图片是否包含目标物体？'"]
+      PASS2["第2轮：细粒度验证 · 多工作者投票 · 共识判定"]
+      QC["质量控制：欺诈检测 · 工作者统计 · 金标准样本"]
+    end
+
+    subgraph OUTPUT["最终数据集 Final Dataset"]
+      IMG["14,197,122 clean images · 21,841 synsets"]
+      META["元数据：URL、工作者统计、每 synset 数量"]
+      ILSVRC["后续子集：ILSVRC 1000 classes · 1.2M training images"]
+    end
+
+    WN --> FILTER --> TREE
+    TREE --> QUERY
+    QUERY --> ENGINES --> URLS
+    URLS --> PASS1 --> PASS2
+    PASS2 --> QC
+    QC --> IMG --> META --> ILSVRC
+
+    ILSVRC -.->|"反馈 → 为覆盖不足的 synset 补充爬取"| QUERY
+    QC -.->|"反馈 → 改进工作者界面"| MTURK
+
+    classDef s fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef c fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef a fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef o fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class WN,FILTER,TREE s
+    class QUERY,ENGINES,URLS c
+    class MTURK,PASS1,PASS2,QC a
+    class IMG,META,ILSVRC o
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 — 评估框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["输入：测试图片 Input: Test Image"]
+      IMG["测试图片 x，真值 synset 为 c_t"]
+    end
+
+    subgraph CLASSIFY["分类 Classification (KNN/NBNN baseline)"]
+      KNN["K-Nearest Neighbors · k=10 · 特征空间 L2 距离"]
+      FEAT["特征：SIFT BoW, color histogram, GIST, LBP 等"]
+    end
+
+    subgraph EVAL["评估指标 Evaluation Metrics"]
+      FLAT["Flat Accuracy: 1[c_t == c_p] · 二值对/错"]
+      HIER["Hierarchical Precision: h = LCA(c_t, c_p) 高度 / 最大高度"]
+      PARTIAL["部分得分：语义接近的预测获得分级评分"]
+    end
+
+    subgraph RESULT["结果：准确率 vs. 数据集规模"]
+      SCALE["更多训练数据 → 更高准确率（对数线性增长）"]
+      LIMIT["此规模下手工特征工程的上限已可见"]
+    end
+
+    IMG --> KNN --> FEAT
+    FEAT --> FLAT
+    FEAT --> HIER
+    FLAT --> PARTIAL
+    HIER --> PARTIAL
+    PARTIAL --> SCALE --> LIMIT
+
+    classDef i fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef cl fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef ev fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef res fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class IMG i
+    class KNN,FEAT cl
+    class FLAT,HIER,PARTIAL ev
+    class SCALE,LIMIT res
+    </pre>
+  </div>
+
+  <h3>3.3 工作流 — 从概念到基准</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph P1["阶段 1：类别设计 Phase 1: Category Design"]
+      direction LR
+      A1["选定 WordNet 作为类别骨架"] --> A2["过滤 80,000+ → 21,841 可图像化 synset"] --> A3["为每个 synset 生成多个查询词"]
+    end
+
+    subgraph P2["阶段 2：大规模爬取 Phase 2: Large-Scale Crawling"]
+      direction LR
+      B1["多引擎并行爬取"] --> B2["每查询取 top-1000 候选 URL"] --> B3["URL 去重和有效性检查"]
+    end
+
+    subgraph P3["阶段 3：众包清洗 Phase 3: Crowdsourced Cleaning"]
+      direction LR
+      C1["MTurk 第1轮：快速二值筛选"] --> C2["MTurk 第2轮：多工作者投票验证"] --> C3["质量控制：欺诈检测 + 一致性统计"]
+    end
+
+    subgraph P4["阶段 4：评估与发布 Phase 4: Evaluation & Release"]
+      direction LR
+      D1["非参数基线：KNN + NBNN"] --> D2["层次化精度评估"] --> D3["公开发布 · CVPR 2009 · ILSVRC 2010-"]
+    end
+
+    P1 -->|"21,841 个类别定义"| P2
+    P2 -->|"候选图片池"| P3
+    P3 -->|"14M+ 清洁图片"| P4
+    D3 -.->|"反馈：ILSVRC 催生 AlexNet, VGG, ResNet 革命"| A1
+
+    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class A1,A2,A3 p1
+    class B1,B2,B3 p2
+    class C1,C2,C3 p3
+    class D1,D2,D3 p4
+    </pre>
+  </div>
+</section>
+
+<!-- 4. 任务定义 -->
+<section id="task">
+  <h2>4. 任务定义 — 解决什么问题</h2>
+
+  <h3>4.1 问题建模</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \max_{D} \; \text{Coverage}(D) \quad \text{s.t.} \quad \text{Quality}(D) \ge \tau,\quad |D| \to \text{scale},\quad D \subset \text{WordNet} \times \text{Images} $$
+    <div class="eq-note">
+      <strong>$D$</strong> = 图像数据集（类别标签与图片的配对） |
+      <strong>Coverage（覆盖率）</strong> = 数据集的语义覆盖范围——理想情况下应覆盖绝大多数真实世界物体类别 |
+      <strong>Quality（质量）</strong> = 每张图片与其类别标签的相关性（由人工标注保证） |
+      <strong>scale（规模）</strong> = 数据集总大小——此前最大仅约 10K 张图片，ImageNet 目标为 10M+ |
+      <strong>约束条件</strong>：在有限的人力和资金预算下，同时最大化类别覆盖、每类别图片数和标注质量。这是一个典型的多目标优化问题。
+    </div>
+  </div>
+
+  <h3>4.2 输入 / 输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>规模/维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>WordNet 3.0 80,000+ 名词 synset + 互联网图像搜索引擎 API（Google、Flickr、PicSearch）</td><td>语义结构 + 候选图片来源</td></tr>
+    <tr><td><strong>输出</strong></td><td>ImageNet 数据集：14,197,122 张清洁图片，21,841 synset，层次化类别标签，每张图片的 URL 和标注元数据</td><td>21,841 类 × 平均每类 650 张</td></tr>
+    <tr><td><strong>目标</strong></td><td>为 CV 社区提供一个比现有数据集大两个数量级、具有良好定义的语义结构、可控质量的数据集，使研究范式从「小数据算法设计」转向「数据驱动方法」</td><td>层次化精度 + flat 精度双重评估</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一项<strong>数据基础设施工程</strong>——不是算法创新，而是为整个计算机视觉社区提供全新的实验平台和评估基准。核心贡献包括：(1) 定义了「好的图像数据集」应具备哪些属性；(2) 设计并实施了一条从原始互联网数据到高质量标注数据集的可扩展端到端流水线；(3) 提出了与层次化语义结构匹配的评估指标。非参数基线实验证明了「更多数据 → 更高准确率」的 scaling law，为后续深度学习革命铺平了道路。</p>
+</section>
+
+<!-- 5. 关键挑战 -->
+<section id="challenge">
+  <h2>5. 关键挑战 — 为什么困难</h2>
+
+  <h3>5.1 本质分析（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">🔬 第一性原理诊断 — First Principles Diagnosis</div>
+    <strong>核心矛盾</strong>：构建一个「对 CV 研究真正有用」的图像数据集，需要同时满足三个相互制约的条件：(1) 广覆盖（数万个类别），(2) 大规模（每类数百张图片），(3) 高质量（人验正确性）。在 2009 年的技术和经济约束下，这构成了一个三角困境。<br><br>
+    (1) <strong>覆盖率 vs. 标注成本</strong>：覆盖 21,841 个类别意味着跨越数万个语义概念的人工标注——传统专家标注将耗费数百万美元和数年时间。众包（MTurk）大幅降低了单张图片成本，但引入了新的质量控制挑战。<br><br>
+    (2) <strong>规模 vs. 计算资源</strong>：处理和存储 14M+ 高分辨率图片（TB 级）在 2009 年是重大工程挑战。网络爬取、图片下载、格式转换、去重——每一步都需要高效并行化。<br><br>
+    (3) <strong>质量 vs. 规模</strong>：自动化互联网图片采集天然引入大量噪声（错误标签、卡通、水印、模糊图片）。如何将噪声率从初始 ~30-50% 降至 <5%，同时不过度消耗人工？答案：精心设计的多次众包验证流水线。
+  </div>
+
+  <h3>5.2 先前方法及其局限</h3>
+  <table>
+    <tr><th>先前方法</th><th>核心思路</th><th>为什么不够</th></tr>
+    <tr>
+      <td>Caltech-101/256 (Fei-Fei et al., 2004/2007)</td>
+      <td>手工从 Google Images 收集 + 人工标注 101/256 个类别</td>
+      <td>类别数太少（101/256）；类别选择随意，缺乏系统性原则。无法覆盖大多数真实世界物体——几乎任何「in the wild」图片都包含 OOD 类别。在此类数据集上训练的模型缺乏有效的泛化评估。</td>
+    </tr>
+    <tr>
+      <td>PASCAL VOC (Everingham et al., 2005-2012)</td>
+      <td>手工选定 20 个常见类别 + 精细标注（bounding box + segmentation mask）</td>
+      <td>类别极少（20 类）。虽然标注质量极高，但设计目标是检测/分割任务而非大规模识别。20 个类别无法支撑「通用物体识别」研究。</td>
+    </tr>
+    <tr>
+      <td>TinyImages (Torralba et al., 2008)</td>
+      <td>网络爬取 80M 图片，自动匹配 WordNet 名词标签</td>
+      <td>80M 图片听起来惊人，但<strong>没有人工标注验证</strong>——所有标签通过搜索关键词自动分配，噪声率估计 >50%，且图片分辨率极低（32x32）。数据集质量不足以支撑可靠的算法评估。</td>
+    </tr>
+    <tr>
+      <td>LabelMe (Russell et al., 2008)</td>
+      <td>众包图像分割标注平台</td>
+      <td>设计目标是分割 mask 而非分类标签。标注成本高，覆盖率增长缓慢。开放式标注（用户自行选择类别）导致类别体系不一致，不适用于标准化分类评估。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 — 语义类别体系设计</strong>：如何决定「哪些类别值得收集」？传统的 ad-hoc 方式（凭直觉选 N 个类别）缺乏科学依据。需要一个经过验证的语义框架作为骨架——WordNet 完美匹配。但并非所有 WordNet synset 都有丰富的视觉实例（如「自由」「公正」等抽象概念），需要设计过滤机制从 80,000+ 中筛选出 21,841 个「可图像化」synset。</li>
+    <li><strong>挑战 2 — 互联网图片噪声过滤</strong>：搜索引擎排名基于文本相关性（关键词匹配），而非视觉内容验证。对常见类别如「dog」，噪声率可能较低（>80% 相关）；但对细粒度类别如「Syrian hamster」，top-100 结果中可能仅 ~20% 真正包含该亚种。如何以最小人工成本过滤海量噪声？</li>
+    <li><strong>挑战 3 — 层次化评估</strong>：如何在 21,841 个语义组织的类别上公平评估算法性能？传统的 flat accuracy 只有一个正确答案——但在 WordNet 树中，预测父节点是「部分正确」的。如何量化「错误的程度」？</li>
+  </ul>
+</section>
+
+<!-- 6. 方法与公式 -->
+<section id="method">
+  <h2>6. 方法与公式</h2>
+
+  <h3>6.1 核心方法</h3>
+  <p>本篇论文的核心不在于算法，而在于<strong>数据集构建方法学</strong>和<strong>评估指标设计</strong>。关键组件包括：(1) 基于 WordNet 的层次化类别体系；(2) 多引擎、多查询的互联网图片爬取；(3) 基于 MTurk 的两轮众包标注与质量控制；(4) 基于树距离的层次化精度评估。</p>
+
+  <h3>6.2 关键公式</h3>
+
+  <h4>A 组：层次化精度 — 基于树距离的语义评估</h4>
+  <div class="formula-block">
+    <span class="eq-tag">公式 (1) — LCA 高度</span>
+    $$ h(c_t, c_p) = \text{height}\big(\text{LCA}(c_t, c_p)\big) $$
+    <div class="eq-note">
+      <strong>$c_t$</strong> = 测试图片的真实类别（ground-truth synset） |
+      <strong>$c_p$</strong> = 算法预测的类别（predicted synset） |
+      <strong>LCA</strong> = $c_t$ 和 $c_p$ 在 WordNet IS-A 树中的最低公共祖先（Lowest Common Ancestor） |
+      <strong>$h$</strong> = 从 LCA 到根节点（"entity"）的路径长度——越高表示越语义相似 |
+      <strong>直观理解</strong>：若预测完全正确（$c_t = c_p$），$h$ 等于叶节点的完整高度。若预测错误但语义接近（如「dog」vs「wolf」），LCA 仍然较深（「犬科动物」），得到较高的 $h$。若预测完全无关，LCA 极高（靠近根节点），$h$ 极低。这天然编码了分级错误严重性。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 (2) — 层次化精度（归一化）</span>
+    $$ \text{H-Precision} = \frac{1}{N}\sum_{i=1}^{N} \frac{h(c_t^{(i)}, c_p^{(i)})}{h_{\max}(c_t^{(i)})} $$
+    <div class="eq-note">
+      <strong>$N$</strong> = 测试图片总数 |
+      <strong>$h_{\max}$</strong> = 真值类别 $c_t$ 的最大可能高度（从叶到根） |
+      <strong>归一化</strong>：将每个预测的高度除以其最大可能值——使不同树深度的 synset 之间可以公平比较 |
+      <strong>取值范围</strong>：0（完全无关的预测）到 1（精确匹配），中间值表示不同程度的部分正确。
+    </div>
+  </div>
+
+  <h4>B 组：非参数基线</h4>
+  <div class="formula-block">
+    <span class="eq-tag">公式 (3) — ImageNet 上的 KNN</span>
+    $$ \hat{y} = \arg\max_{c \in C} \sum_{x_i \in \text{NN}_k(x)} \mathbf{1}[y_i = c] $$
+    <div class="eq-note">
+      <strong>$x$</strong> = 测试图片的特征向量（来自手工特征：SIFT、color histogram、GIST、LBP） |
+      <strong>$\text{NN}_k(x)$</strong> = $x$ 在训练集中的 $k$ 近邻（通过 $L_2$ 距离） |
+      <strong>$C$</strong> = 所有候选类别的集合（21,841 synset） |
+      <strong>$y_i$</strong> = 训练图片 $x_i$ 的类别标签 |
+      <strong>为什么用 KNN</strong>：作为纯非参数方法，KNN 的复杂度天然随训练数据规模增长——不存在参数瓶颈。这使其成为衡量「纯粹数据规模提升能带来多大性能提升」的理想基线，不受算法设计因素混淆。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>选取理由</th></tr>
+    <tr><td>目标 synset 数量</td><td><strong>21,841</strong></td><td>从 80,000+ WordNet 名词中过滤出的可图像化 synset</td><td>排除抽象概念、专有名词和非视觉概念后，约 22K synset 具备可图像化属性</td></tr>
+    <tr><td>每 synset 平均图片数</td><td><strong>~650</strong></td><td>经两轮人工验证后的清洁图片数</td><td>统计上，每类 500+ 张图片提供足够的方差用于 ML 训练；边际收益在 ~1000 后递减</td></tr>
+    <tr><td>每查询 URL 数</td><td><strong>top-1000</strong></td><td>每个搜索引擎每个查询词返回的 URL 数</td><td>搜索结果相关性在排名 ~500 后急剧下降；1000 提供良好召回同时不过多引入噪声</td></tr>
+    <tr><td>MTurk HIT 单价</td><td><strong>$0.01-$0.05</strong></td><td>每条 Human Intelligence Task 支付金额</td><td>在标注速度（太低则无工作者）和质量（太高则吸引欺诈）之间取得平衡</td></tr>
+    <tr><td>KNN: k 值</td><td><strong>k=10</strong></td><td>KNN 中的近邻数量</td><td>经典的折中选择；更大的 k 增加计算量但不一定提升准确率</td></tr>
+    <tr><td>WordNet 树深度</td><td><strong>1~19</strong></td><td>从根节点 "entity" 到最深的叶节点的深度</td><td>树深度不均匀——抽象概念较浅，具体物体较深。评估时必须归一化</td></tr>
+  </table>
+
+  <h3>6.4 层次化评估 vs. 平面评估对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>层次化精度 Hierarchical Precision</h4>
+      <ul>
+        <li>使用 WordNet IS-A 树：$h = \text{height}(LCA(c_t, c_p))$</li>
+        <li>「部分正确」获得分数——预测父节点算作部分成功</li>
+        <li>语义上更公平：将「dog」与「wolf」混淆的得分远高于将「dog」与「car」混淆</li>
+        <li>非常适合细粒度分类评估</li>
+        <li>依赖 WordNet 树的质量和完整性</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>平面精度 Flat Accuracy</h4>
+      <ul>
+        <li>二值对/错：$\mathbf{1}[c_t = c_p]$</li>
+        <li>所有错误同等对待——「几乎正确」与「完全错误」不可区分</li>
+        <li>简单、易于解释</li>
+        <li>适用于没有类间语义关系的任务</li>
+        <li>不依赖外部知识库</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7. 深层原理 -->
+<section id="principles">
+  <h2>7. 深层原理 — 深入剖析</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 ImageNet 需要掌握三个原理：WordNet 语义层次结构（为什么它被用作骨架）、大规模网络图片采集工程方法（如何规模化采集和清洗数据）、以及数据规模与模型性能之间的 scaling law（为什么更多数据能让模型更好）。</p>
+
+  <h3>7.1 WordNet 语义层次结构 — 为什么它适合作为骨架</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — WordNet IS-A 层次结构</span>
+    $$ \text{Entity} \supset \text{Physical Entity} \supset \text{Object} \supset \text{Living Thing} \supset \text{Animal} \supset \text{Canine} \supset \text{Dog} \supset \text{Working Dog} \supset \text{Husky} $$
+    <div class="eq-note">
+      <strong>IS-A 关系</strong> = 上下位关系（hyponymy）——每个子节点「是一种」父节点 |
+      <strong>树结构</strong>：从根节点 "Entity" 到叶节点 "Siberian Husky" 跨越约 19 层 |
+      <strong>语义编码</strong>：树结构天然定义了类间相似性——在树中越接近的节点越语义相似。共享祖先越多 = 语义相关性越高。
+    </div>
+  </div>
+
+  <p>WordNet 并非为计算机视觉设计——它是计算语言学家 George Miller 自 1980 年代起在普林斯顿大学构建的词汇语义数据库。ImageNet 的关键创新在于<strong>将这一语言学资源系统地映射到视觉领域</strong>——一个词映射到一个图片集合，一个语义子树映射到一个视觉概念层次簇。</p>
+
+  <table>
+    <tr><th>WordNet 属性</th><th>对图像数据集的意义</th></tr>
+    <tr><td>层次化 IS-A 树</td><td>提供类别间的语义距离——使「层次化精度」和基于子树的检索成为可能。语义子树查询变得可行。</td></tr>
+    <tr><td>synset 作为基本单元</td><td>每个 synset 聚合一个概念的所有近义词（{dog, canine, hound}），天然解决了「同一物体、不同名称」的标注歧义问题。</td></tr>
+    <tr><td>80,000+ 名词 synset</td><td>提供近乎穷举的语义覆盖——任何真实世界可观测物体都是某个 WordNet 叶节点的实例。这为构建「完整」图像数据集提供了理论基础。</td></tr>
+    <tr><td>领域无关</td><td>WordNet 覆盖所有语义领域（动物、植物、人造物、自然物、抽象概念……），避免了 ad-hoc 数据集的「无意领域偏见」问题。</td></tr>
+  </table>
+
+  <h3>7.2 大规模网络图片采集与清洗</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 查询扩展策略</span>
+    $$ Q(s) = \{s.\text{name}\} \cup \text{synonyms}(s) \cup \text{hypernyms}(s) \cup \text{translations}(s) $$
+    <div class="eq-note">
+      <strong>$Q(s)$</strong> = synset $s$ 的查询词集合 |
+      <strong>$s.\text{name}$</strong> = synset 的主要名称（如 "dog"） |
+      <strong>synonyms</strong> = WordNet 中该 synset 的所有同义词 |
+      <strong>hypernyms</strong> = 上位词（如 "canine", "animal"）——提高罕见 synset 的召回率 |
+      <strong>translations</strong> = 多语种翻译（中文、日文、韩文等）——覆盖非英语图片说明
+    </div>
+  </div>
+
+  <p>查询扩展是爬取策略中最关键的工程决策。对于高频 synset 如 "dog"，单一查询 "dog" 就能返回大量相关图片。但对于低频/细粒度 synset 如 "Felis chaus"（丛林猫），仅凭学名可能几乎无结果。扩展策略——加入同义词、上位词、多语翻译——大幅提升了搜索引擎召回率。</p>
+
+  <h3>7.3 数据规模与性能的 Scaling Law</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 非参数 scaling（经验观察）</span>
+    $$ \text{Accuracy}(N) \propto \log(N) \quad \text{(empirical)} $$
+    <div class="eq-note">
+      <strong>$N$</strong> = 训练集大小 |
+      <strong>核心发现</strong>：使用非参数方法（KNN、NBNN），分类准确率随训练数据呈近似对数增长。从 10K 到 10M 训练图片（1000 倍），准确率提升可与多代特征工程的改进相媲美。 |
+      <strong>工程洞见</strong>：在 2009 年，「更多数据」是杠杆最高的改进方向——比设计更复杂的特征提取器或分类器更有前途。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">🔗 三原理的系统级协同 — System-Level Synergy</div>
+    WordNet 提供语义结构 → 多查询扩展对抗数据稀疏 → MTurk 众包保障质量 → 非参数方法天然受益于数据量 → 14M+ 图片 = <strong>整个深度学习革命的燃料</strong>。2012 年，AlexNet 在 ILSVRC（ImageNet 的 1000 类子集）上将 top-5 错误率从 26% 降至 16%，其动力正来自「ImageNet 海量数据 + GPU 训练大 CNN」的组合——而 ImageNet 的源头，正是这篇 CVPR 2009 论文。
+  </div>
+</section>
+
+<!-- 8. 图表证据 -->
+<section id="figures">
+  <h2>8. 图表证据 — 深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">PDF 源文件：<code>Deng et al. - 2009 - Imagenet A large-scale hierarchical image database.pdf</code>。将截图保存为 <code>figures/fig1.png</code> 等。</p>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">ImageNet 层次结构：从 WordNet IS-A 树到图片集合</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="ImageNet hierarchy illustration"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">🔍 图解分析</div>
+      <p><strong>本图展示了</strong> ImageNet 的核心理念——如何将 WordNet 的词汇层次转化为视觉层次。(a) WordNet IS-A 树的一个分支：从「Entity」→「Physical object」→「Artifact」→「Vehicle」→ ……到叶节点。(b) 每个 synset 映射到一组真实图片——「Mammal」→「Placental」→「Carnivore」→「Canine」→「Dog」→「Working dog」→「Husky」的路径用每层的代表性图片展示。</p>
+      <ul>
+        <li><strong>语义可扩展性的可视化</strong>：本图直观展示了为什么 ImageNet 优于 Caltech-101——Caltech-101 只有一个「Faces」类；ImageNet 则将「Faces」层次化细分为数十个子类</li>
+        <li><strong>树结构支持「语义缩放」</strong>：研究者可选择在任意树深度进行评估——粗粒度（「动物 vs. 车辆」）或细粒度（「Siberian Husky vs. Alaskan Malamute」）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">数据采集与标注流水线流程图</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Data collection pipeline"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">🔍 图解分析</div>
+      <p><strong>本图展示了</strong>从 WordNet synset 到最终数据集的完整工程流水线。(a) 从 WordNet 选取 synset → 生成查询词 → 多引擎爬取 → URL 收集。(b) MTurk 第一轮：工作者看到图片 + 查询词，回答「这张图片是 {word} 的好样例吗？」→ 二值标签。(c) MTurk 第二轮：对通过第一轮的图片进行细粒度验证。(d) 最终统计：14M+ 图片，21,841 synset，平均每类 650 张。</p>
+      <ul>
+        <li><strong>两轮设计的智慧</strong>：单轮标注意味着要么成本过高（所有图片都做细粒度验证），要么质量不足（一次粗筛留下大量假阳性）。两轮设计：第一轮以极低成本（$0.01）快速筛除明显负样本，第二轮仅对高质量子集进行细粒度验证（$0.05）——大幅降低总成本同时保持质量</li>
+        <li><strong>MTurk 界面细节至关重要</strong>：论文展示了实际的工作者 UI——正负样例示范、清晰的「Yes/No/Unclear」选项、质量控制题目。这些细节才是众包能够规模化运作的关键</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">ImageNet 与其他数据集的对比：规模比较与类别分布统计</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Dataset comparison"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">🔍 图解分析</div>
+      <p><strong>本图展示了</strong> (a) ImageNet 与当时所有主流数据集的对比——ImageNet 在类别数（21K vs. 最多 256）和图片数（14M vs. 最多 ~1M）两个维度上均遥遥领先。(b) 每 synset 的图片数分布——大多数 synset 拥有 500-1000 张图片，分布相对均匀。(c) WordNet 树中的类别分布——揭示了不均匀的覆盖：某些子树（如「动物」）密集填充，另一些（特定人造物类型）则稀疏。</p>
+      <ul>
+        <li><strong>量变引起质变</strong>：在 100 类数据集上，类别增加导致非参数准确率下降——更多类别使 KNN「命中」更难。但在 ImageNet 的 21K 类规模及相应的数据量下，准确率遵循不同的 scaling 模式</li>
+        <li><strong>长尾挑战</strong>：21,841 个类别的分布并不均匀——常见类别（如「dog」）的图片数远多于罕见类别（特定甲虫种类）。这种天然的不平衡催生了一系列研究方向（few-shot learning、long-tail recognition）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">基线实验：ImageNet 上的非参数分类准确率</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Baseline experiments"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>将截图保存为 <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">🔍 图解分析</div>
+      <p><strong>本图展示了</strong>在 ImageNet 子集上使用多种特征（SIFT、color histogram、GIST、LBP）的 KNN 和 NBNN 基线性能。关键发现：(1) 随着训练数据增加，分类准确率持续提升（验证了「更多数据 = 更好」的假设）；(2) 层次化精度始终高于 flat 精度（部分正确预测获得分数）；(3) top-1 flat accuracy：10 类子集约 60%，100 类子集约 30%，1000 类子集进一步下降——反映大规模分类的本质难度。</p>
+      <ul>
+        <li><strong>数据 scaling law 的首次实证验证</strong>：虽然未使用「scaling law」这个术语（后来由 OpenAI 普及），基线实验明确展示了「更多数据 → 更好性能」的关系——这是驱动 ILSVRC 及后续深度学习革命的关键实证</li>
+        <li><strong>层次化精度的实用价值</strong>：在 1000 类上，flat accuracy 可能较低（<10%），但层次化精度仍可达 30-40%——模型虽未预测精确的叶类别，但预测了正确的父类别。这种「粗粒度正确性」对图片检索应用已足够有用</li>
+        <li><strong>手工特征工程的上限</strong>：手工特征（SIFT、color、GIST）在此规模下显示出明显的性能上限——为后续深度学习（端到端学习特征）提供了强有力的动机</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9. 局限与延伸 -->
+<section id="flaw">
+  <h2>9. 局限与延伸</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>前提假设</strong>：(1) 「可图像化」过滤依赖人工判断——排除「自由」「早餐」等概念引入了主观性。(2) 假设 WordNet 的类别体系完美映射到视觉世界——但 WordNet 是为语言设计的，视觉概念的聚类可能不同（不同狗品种有独立 synset，但可能视觉上无法区分）。(3) 假设各类别的互联网搜索覆盖是均匀的——实际上长尾 synset（罕见动物、特殊工具）的互联网覆盖极低。</li>
+    <li><strong>适用场景</strong>：ImageNet 面向<strong>物体识别（Object Recognition）</strong>——即包含可明确命名的前景物体的图片。对于场景识别、动作识别、关系理解，ImageNet 的类别体系并不直接适用。此外，ImageNet 图片来自搜索引擎（多为自然摄影），与监控、医疗、遥感图像之间存在领域鸿沟。</li>
+    <li><strong>可扩展性</strong>：基于 WordNet 的结构在 ~22K 类别处触及天花板——剩余 synset 大多为抽象/不可图像化。对于更大规模的数据集（100K+ 类别），需要超越 WordNet 的全新语义框架。</li>
+  </ul>
+
+  <h3>9.2 延伸方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从 ImageNet 分类 → <strong>ILSVRC 挑战赛</strong>（2010-2017）。ILSVRC 在 1000 类子集上增加了检测、定位任务和 bounding box 标注。这是从「数据集论文」到「社区基准」的关键一步——AlexNet（2012）、VGG（2014）、GoogLeNet（2014）、ResNet（2015）相继在此平台上展示了深度学习的统治力。</li>
+    <li><strong>约束松弛</strong>：ImageNet 原始类别体系主要覆盖「自然和日常生活中的常见物体」。后续扩展包括：ImageNet-21K（全 21,841 类用于预训练）、Places（场景识别，Zhou et al. 2014）、Open Images（Google, 2016, 6M 图片, 6000+ 类）。全部继承了 ImageNet 的「语义骨架 + 众包 + QC」方法论。</li>
+    <li><strong>新约束</strong>：(1) 多模态——文本-图片对齐数据集（Conceptual Captions、LAION）将「类别-图片」范式扩展为「文本描述-图片」，使 CLIP、DALL-E 等成为可能。(2) 视频——Kinetics 延续了 ImageNet 的层次化类别思想。</li>
+  </ul>
+
+  <h3>9.3 数据敏感性问题</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在影响</th><th>严重程度</th></tr>
+    <tr><td>残留标签噪声</td><td>两轮 MTurk 仍无法保证 100% 正确率——估计 5-10% 标签错误残留。对于细粒度任务（区分狗品种），这种噪声会严重影响训练。后续工作（Northcutt et al. 2021）发现 ILSVRC 验证集中约 6% 的错误标签</td><td></td></tr>
+    <tr><td>版权与隐私</td><td>图片来自公开 URL，但未获取个人版权许可。这在学术界属灰色地带——非商业研究使用通常被视为合理使用（fair use），但 GDPR 等法规对人脸图片存储提出顾虑</td><td></td></tr>
+    <tr><td>类别不平衡偏差</td><td>常见 synset（如「dog」）的图片数量远超罕见 synset。这种不平衡在 ILSVRC 平衡的 1000 类子集中被掩盖，但在全 21,841 类 ImageNet 中持续存在，可能使模型偏向高频类别</td><td></td></tr>
+    <tr><td>地理/文化偏差</td><td>搜索引擎以英语为主 → ImageNet 图片集中在西方文化语境。例如「婚礼」类别几乎全部是西式婚礼——可能在非西方文化场景中降低泛化能力</td><td></td></tr>
+  </table>
+
+  <h3>9.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深入探索 — Worth Investigating</div>
+    <strong>从 ImageNet 到基础模型：Scaling Law 的演进</strong>——ImageNet 2009 年提出的「数据规模驱动模型性能」范式，在 2020 年代被 GPT-3、CLIP 等推向极致。关键问题：(1) ImageNet 的 scaling 曲线（准确率 vs. 数据量）能否外推到 1000 倍数据？CLIP 使用了 400M 图片-文本对（~30 倍 ImageNet）——scaling law 是否仍然成立？(2) 分类监督 vs. 自监督学习——ImageNet 提供离散类别标签，而现代基础模型在连续语义空间中采用对比/自监督学习。两者在数据效率上有何差异？(3) 从「更多数据」到「更好数据」——ImageNet 证明 14M 标注图片还不够「大」；GPT-3 需要 570GB 文本数据；但更大就一定更好吗？数据策展（data curation）在其中扮演什么角色？
+  </div>
+</section>
+
+<!-- 10. 动机推导 -->
+<section id="motivation">
+  <h2>10. 动机推导 — 第一性原理推导</h2>
+
+  <h3>10.1 思路推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>计算机视觉在 2000 年代末触及天花板——算法在 Caltech-101 上展示 >80% 准确率，但在真实场景中全面失灵。根本原因：训练数据的规模和覆盖面太有限。一个仅在 101 个类别上训练的分类器，无法应对真实世界中数万种物体类别。</li>
+    <li><strong>先前工作做了什么，为什么不够？</strong><br>路线一：设计更好的特征（SIFT → HOG → BoW → Fisher Vector）——这条路径进展稳定但缓慢，始终受限于训练数据的覆盖范围。路线二：无监督/半监督方法——在 2009 年，基于原始像素的表征学习尚不可行。路线三：小数据集上的迁移学习——有用，但类别覆盖的鸿沟依然存在。</li>
+    <li><strong>如果数据量本身才是瓶颈呢？</strong><br>这是一个元层面的洞察：与其设计更好的算法去适配现有小数据集，不如构建一个足够大、足够全面的数据集来驱动算法研究。如同物理学——你无法通过优化测量工具来发现新粒子，你首先需要一台强大的加速器（LHC）。ImageNet 就是计算机视觉的「LHC」。</li>
+    <li><strong>如何系统性地组织数万个类别？</strong><br>不能随机挑选 N 个类别——需要一个具备先验语义基础的体系。WordNet 完美匹配——它虽不为视觉设计，但恰好提供了一个近乎穷举的物体类别树。将语言学语义映射到视觉数据——这个想法在当时是革命性的。</li>
+    <li><strong>如何经济地采集和标注 14M 张图片？</strong><br>仅靠斯坦福实验室无法完成。互联网搜索引擎的成熟（批量 URL 获取）+ MTurk 众包平台的出现（美分级规模化标注）= 技术前提恰好在 2009 年同时成熟。这不是偶然——ImageNet 诞生于网络规模数据采集和众包标注两者恰好同时变得可行的历史节点。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机 — One-Sentence Motivation</div>
+    现有的图像分类数据集仅有数百个类别和数千张图片——远不足以覆盖真实世界的视觉多样性，CV 算法已在其上过拟合到我们无法区分「好算法」和「好数据集」的地步——那么为什么不构建一个基于 WordNet 语义树、拥有数万个类别和数千万张图片的数据库，让社区真正能在规模上开发和测试算法？
+  </div>
+
+  <h3>10.3 如何自己推导出这个想法</h3>
+  <ul>
+    <li><strong>第 1 步 — 观察</strong>：2000 年代末的 CV 研究者共同感到沮丧——在 Caltech-101 上微调几个百分点对真实部署毫无意义。与此同时，NLP 因大规模标注资源（Penn Treebank、WordNet）而蓬勃发展——为什么视觉领域没有可比的资源？</li>
+    <li><strong>第 2 步 — 分解</strong>：构建大规模视觉数据集 = (a) 决定收集哪些类别 → (b) 采集足够多的图片 → (c) 标注并验证正确性 → (d) 公平评估算法。四个子问题都需要创新性解决方案。</li>
+    <li><strong>第 3 步 — 匹配工具</strong>：(a) WordNet 提供语义类别体系；(b) Google/Flickr 图片搜索引擎提供候选来源；(c) Amazon Mechanical Turk 提供可规模化的人工标注；(d) 层次化精度（WordNet 树距离）提供语义感知的评估机制。</li>
+    <li><strong>第 4 步 — 组装</strong>：Synset → 多查询多引擎爬取 → 两轮 MTurk 验证 → 层次化存储与评估——整条流水线形成从语义设计、工程实现到评估框架的完整闭环。最终交付：14M+ 图片，21,841 类别，开放下载。</li>
+  </ul>
+</section>
+
+<!-- 11. 核心收获 -->
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+
+  <h3>11.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：在深度学习爆发的前夜，这篇论文明确展示了<strong>在「数据驱动」范式中，数据本身才是最关键的基础设施</strong>。ImageNet 之后，整个视觉领域的工作模式被永久改变——不再是在小数据集上设计精巧的特征，而是在 ImageNet 上比拼谁构建了更好的模型。对 UAV 研究者而言：<strong>问题不一定出在模型或算法上——有时根源瓶颈就是缺乏一个像 ImageNet 这样的大规模标准化数据集</strong>。考虑为 UAV 构建大规模视觉或控制数据集，可能催生范式转变。</li>
+    <li><strong>技术层面</strong>：(1) 「骨架 + 数据」的设计模式——使用已有且经过广泛验证的语义结构（WordNet）作为骨架，随后填入数据——这一范式已被无数次复制（Places、Kinetics、Conceptual Captions）。(2) 两轮众包 QC 策略——便宜轮次用于快速过滤，昂贵轮次用于精细验证——是大规模数据中平衡成本与质量的经典技巧。(3) 层次化精度——在二值对/错之外引入「部分正确性」，使大规模分类系统的评估更加公平。</li>
+    <li><strong>写作层面</strong>：论文结构极其清晰——「为什么需要（问题 + 相关工作）→ 怎么做（方法 + 流水线）→ 效果如何（基线 + 统计）→ 结论」——这是数据集论文的标准格式。论文的影响力不仅来自数据本身，更来自其有力地论证了「这个数据集值得使用」。</li>
+  </ul>
+
+  <h3>11.2 可直接应用于我的研究</h3>
+  <ul>
+    <li><strong>对 UAV 感知</strong>：ImageNet 的构建方法学可以直接指导 UAV 视觉数据集设计——尤其是「骨架 + 分布式标注」的范式。例如，设计一个层次化 UAV 场景数据集：根 = 场景类型（城市/乡村/森林/水域），中间层 = 飞行条件（白天/黄昏/雾天），叶节点 = 任务目标（行人/车辆/建筑/电力线）——仿照 ImageNet 的层次结构构建 UAV 感知基准。</li>
+    <li><strong>对大规模数据工程</strong>：两轮众包 QC 是任何大规模数据集项目必须掌握的技巧。对于 UAV 数据（通常涉及时序视频、多视角、多光谱等复杂模态），标注成本更高（每项任务耗时更长）。如何在预算内保证质量？ImageNet 的经验（便宜轮 + 昂贵轮 + QC 指标）可直接迁移。</li>
+    <li><strong>对 scaling law 研究</strong>：ImageNet 的基线实验展示了早期形式的 scaling law（数据量 vs. 准确率）。在 UAV 领域，类似的研究可以回答：当训练数据从 1K 增加到 100K 帧时，感知模型的 mAP 如何变化？数据多样性（不同天气/场景/高度）与单纯的数据量哪个更重要？</li>
+  </ul>
+
+  <h3>11.3 关键后续参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Miller (1995) — WordNet: A Lexical Database for English. <em>CACM</em></td><td>WordNet 原始论文——理解 ImageNet 语义基础必读。WordNet 的设计原则（synset、IS-A 层次、整体部分关系）直接决定了 ImageNet 的类别组织方式</td></tr>
+    <tr><td>Krizhevsky, Sutskever & Hinton (2012) — ImageNet Classification with Deep CNNs. <em>NIPS 2012</em>（AlexNet）</td><td>首次在 ImageNet（ILSVRC-2012）上展示深度学习统治力的工作——ImageNet + GPU + CNN = 现代深度学习时代开启。100,000+ 引用；对这篇数据集论文影响力的终极证明</td></tr>
+    <tr><td>Russakovsky et al. (2015) — ImageNet Large Scale Visual Recognition Challenge. <em>IJCV</em></td><td>ILSVRC 挑战赛总结论文——描述 ImageNet 从数据集到社区基准的演进，以及 top-5 错误率从 28% 降至 3.6%（2010-2015）的历程</td></tr>
+    <tr><td>Torralba & Efros (2011) — Unbiased Look at Dataset Bias. <em>CVPR 2011</em></td><td>数据集偏差的经典分析——证明在单一数据集上测试会系统性地高估泛化能力。对理解 ImageNet 作为「单一基准」的局限性至关重要</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>论文笔记 · Deng, Dong, Socher, Li, Li & Fei-Fei · CVPR 2009 · ImageNet: A Large-Scale Hierarchical Image Database · MathJax + Mermaid 渲染</footer>
+
+</div>
+</body>
+</html>

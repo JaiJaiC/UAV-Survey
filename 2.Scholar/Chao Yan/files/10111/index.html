@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Real-time avoidance of obstacles and emergent geo-fences for urban air mobility using deep reinforcement learning - Paper Notes</title>
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body><nav><a href="../../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a><span class="brand">📄 Paper Notes</span><a href="#info">Info</a><a href="#insight">Insight &amp; Novelty</a><a href="#architecture">Architecture</a><a href="#task">Task</a><a href="#challenge">Challenge</a><a href="#method">Method</a><a href="#principles">Principles</a><a href="#figures">Figures</a><a href="#flaw">Potential Flaw</a><a href="#motivation">Motivation</a><a href="#takeaway">Takeaways</a></nav><div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Chao Yan · 11-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../5805/index.html">UAV</a>
+<a href="../5804/index.html">MADRL</a>
+<a href="../5802/index.html">UAV</a>
+<a href="../5478/index.html">Learning adaptive cross-e</a>
+<a href="../5476/index.html">3D</a>
+<a href="../5806/index.html">UAV</a>
+<a href="../5800/index.html">Emergent cooperative stra</a>
+<a href="../5477/index.html">Oracle-guided masked cont</a>
+<a href="../2918/index.html">Flexible multi-UAV format</a>
+<a href="../10112/index.html">Selective imitation enhan</a>
+<a class="active" href="../10111/index.html">Real-time avoidance obsta</a>
+    </div>
+  </div>
+
+<header class="hero"><div class="eyebrow">Level-3 paper note &middot; local evidence</div><h1>Real-time avoidance of obstacles and emergent geo-fences for urban air mobility using deep reinforcement learning</h1><div class="meta">Scholar: Chao Yan &middot; Paper ID: 10111 &middot; Zhang et al., 2025 &middot; IEEE Access (或相关IEEE汇刊)</div></header>
+
+<!-- ═══════════════ 1. PAPER INFORMATION ═══════════════ -->
+<section id="info">
+  <h2>&#167;1 Paper Information</h2>
+
+  <h3>1.1 Complete Metadata</h3>
+  <table>
+    <tr><td style="width:140px;font-weight:700;">Title</td><td>Real-time avoidance of obstacles and emergent geo-fences for urban air mobility using deep reinforcement learning</td></tr>
+    <tr><td style="font-weight:700;">Authors</td><td>Zhang et al.</td></tr>
+    <tr><td style="font-weight:700;">Year / Venue</td><td>2025 / IEEE (received Jul 2024, revised Apr 2025, accepted Jul 2025, published Jul-Nov 2025)</td></tr>
+    <tr><td style="font-weight:700;">Funding</td><td>National Research Foundation (NRF), Singapore; Civil Aviation Authority of Singapore (CAAS), Aviation Transformation Program (ATP)</td></tr>
+    <tr><td style="font-weight:700;">Pages</td><td>18 pages</td></tr>
+    <tr><td style="font-weight:700;">Scholar</td><td>Chao Yan (时属南京航空航天大学自动化工程学院)</td></tr>
+    <tr><td style="font-weight:700;">Paper ID</td><td>10111</td></tr>
+  </table>
+
+  <h3>1.2 TL;DR (Chinese Summary)</h3>
+  <p>本文针对城市空中交通（UAM）场景中密集建筑障碍物和动态突现禁飞区（geo-fences）并存的挑战，提出了<strong>FMGRU-DDPG</strong>算法——一种融合门控循环单元（GRU）、输入随机化层和特征匹配损失（Feature Matching Loss）的深度确定性策略梯度框架。该方法将geo-fences视为可在飞行途中<strong>动态出现</strong>的临时约束（而非预先静态标注），利用GRU的循环记忆捕获时序依赖、随机化层增强策略对动态约束的鲁棒性、特征匹配损失抑制路径偏离。在新加坡真实住宅区空间数据构建的仿真环境中，面对多达10个动态geo-fences时仍保持<strong>超过90%</strong>的目的地到达成功率，且在训练未见区域仍维持<strong>超过60%</strong>成功率，显著优于GRU-DDPG和原始DDPG。该工作是面向UAM战术冲突消解的首批系统性DRL方案之一。</p>
+
+  <h3>1.3 Tags</h3>
+  <span class="tag tag-blue">Deep Reinforcement Learning</span>
+  <span class="tag tag-green">Urban Air Mobility</span>
+  <span class="tag tag-amber">Geo-fence Avoidance</span>
+  <span class="tag tag-purple">DDPG + GRU</span>
+  <span class="tag tag-red">Feature Matching Loss</span>
+  <span class="tag tag-cyan">Input Randomization</span>
+  <span class="tag tag-gray">Tactical Conflict Resolution</span>
+</section>
+
+<!-- ═══════════════ 2. CORE INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>&#167;2 Core Insight &amp; Novelty</h2>
+
+  <div class="callout info">
+    <div class="callout-title">&#128161; 核心洞察</div>
+    <p><strong>这个工作的核心insight是什么？</strong></p>
+    <p>UAM场景中，geo-fences不是静态障碍——它们会在飞行过程中因人群聚集、恶劣天气等突发事件<strong>临时涌现</strong>。现有方法将geo-fences视为预先已知的静态禁区，或仅处理静态建筑物障碍，无法应对这种"未知环境中约束的实时演化"。本文的insight在于：<strong>将动态geo-fence规避建模为部分可观测马尔可夫决策过程（POMDP），以GRU的记忆能力压缩约束演化的时序历史，同时用输入随机化和特征匹配损失两项互补机制，提升策略对动态约束分布变化的适应能力和泛化能力。</strong>三者形成的协同效应——GRU提供时序上下文，随机化层强制策略不过度依赖特定输入模式，FM损失正则化特征空间——使得AAV在密集建筑+动态geo-fences的复合挑战下首次达到实用级成功率。</p>
+  </div>
+
+  <h3>2.1 灵感 &rarr; Insight映射表</h3>
+  <table>
+    <tr><th>灵感来源</th><th>核心洞察</th><th>具体体现</th></tr>
+    <tr>
+      <td>POMDP与部分可观测性理论</td>
+      <td>动态geo-fence的出现/消失历史无法从单帧观测感知，需要时序记忆</td>
+      <td>使用GRU聚合历史观测序列，将隐状态作为策略网络的输入上下文</td>
+    </tr>
+    <tr>
+      <td>Domain Randomization / 泛化理论</td>
+      <td>训练环境与未见测试环境的分布差异导致策略退化；在输入层注入随机扰动可增强鲁棒性</td>
+      <td>在神经网络输入观测后插入随机化层（randomized layer），对传感器读数施加可控噪声</td>
+    </tr>
+    <tr>
+      <td>Feature Matching (GAN-inspired)</td>
+      <td>约束中间特征表示的分布相似性比仅匹配最终输出更有利于策略稳定和泛化</td>
+      <td>引入Feature Matching Loss，使Actor的特征表示在不同环境条件下保持一致</td>
+    </tr>
+    <tr>
+      <td>DDPG连续控制框架</td>
+      <td>UAM中的避障/绕飞需要连续的速度和航向控制，离散动作空间不够精细</td>
+      <td>基于DDPG的Actor-Critic架构输出连续飞行控制量（速度矢量、偏航角等）</td>
+    </tr>
+  </table>
+
+  <h3>2.2 创新点卡片</h3>
+
+  <div class="novelty-card">
+    <h4>&#9312; 创新点一：GRU增强的部分可观测性建模</h4>
+    <div class="novelty-step"><strong>&#128204; 解决的问题：</strong>动态geo-fence的出现/消失使得环境状态在时间维度上高度非平稳，单帧LiDAR或位置观测无法区分"暂时无围栏"和"围栏即将出现"两种状态。</div>
+    <div class="novelty-step"><strong>&#128161; 灵感来源：</strong>POMDP理论表明，通过维护关于隐藏状态的信念（belief state），可由历史观测序列推断当前真实状态。</div>
+    <div class="novelty-step"><strong>&#128736; 具体设计：</strong>将连续多帧观测（包括相对目标位置、LiDAR距离扫描、当前速度等）依次输入GRU单元，GRU的隐状态 $h_t$ 作为当前时刻的状态表征，输入Actor和Critic网络。GRU的门控机制自动学习哪些历史信息对当前的围栏规避决策关键。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>&#9313; 创新点二：输入随机化层（Randomized Layer）</h4>
+    <div class="novelty-step"><strong>&#128204; 解决的问题：</strong>训练环境和未见测试环境之间存在分布偏移（不同城区的建筑密度、道路布局、geo-fence触发模式均不同），传统DRL策略在此情况下性能急剧下降。</div>
+    <div class="novelty-step"><strong>&#128161; 灵感来源：</strong>Domain Randomization的核心思想——在训练时对输入的某些维度注入随机噪声，迫使策略学习对输入扰动不变的鲁棒特征。这类似于数据增强在视觉任务中的作用。</div>
+    <div class="novelty-step"><strong>&#128736; 具体设计：</strong>在神经网络的原始观测输入之后、GRU之前，插入一个随机化层。该层对观测的特定分量（如距离传感器读数、目标方位角等）施加高斯噪声 $\\mathcal{N}(0, \\sigma^2)$，噪声标准差 $\\sigma$ 为可调超参数。这种随机化使得策略必须学会从"模糊"的输入中提取不变特征，而非记忆训练环境中的特定距离阈值。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>&#9314; 创新点三：Feature Matching Loss</h4>
+    <div class="novelty-step"><strong>&#128204; 解决的问题：</strong>在动态geo-fence出现时，AAV需要偏离原始参考路径进行绕飞，但过度偏离会导致绕行距离过大甚至无法返回目标。如何在"灵活避障"和"路径跟随"之间取得平衡？</div>
+    <div class="novelty-step"><strong>&#128161; 灵感来源：</strong>生成对抗网络中的Feature Matching技术（Salimans et al., 2016）——约束生成器中间层特征与真实数据特征的统计匹配，而非仅匹配最终输出，可以产生更稳定和多样化的生成结果。</div>
+    <div class="novelty-step"><strong>&#128736; 具体设计：</strong>在Actor网络的中层特征空间引入Feature Matching Loss: $\\mathcal{L}_{FM} = \\| \\mathbb{E}_{\\pi} [f(s)] - \\mathbb{E}_{\\pi_{ref}} [f(s)] \\|_2^2$，其中 $f(\\cdot)$ 为Actor中间层的特征映射，$\\pi_{ref}$ 为参考策略（指向目标的简单策略）。该损失作为Actor的辅助正则化项，与原始策略梯度损失联合优化，确保策略在遇到geo-fence偏离路径后，其内部特征表示仍"记住"指向目标的基本模式。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>&#167;3 System Architecture</h2>
+
+  <h3>3.1 架构总览面板</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>&#9312; 感知与预处理 <span>Perception</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>多源观测融合</strong>
+          <small>LiDAR距离扫描(360&deg;分段)、相对目标位置(距离+方位)、当前速度矢量、历史geo-fence状态</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>输入随机化层</strong>
+          <small>对观测分量施加高斯噪声 $\\mathcal{N}(0,\\sigma^2)$，增强策略对传感器噪声和环境变化的鲁棒性</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>&#9313; 时序编码 <span>Encoding</span></h4>
+        <div class="arch-card arch-power">
+          <strong>GRU时序压缩</strong>
+          <small>将随机化后的观测序列编码为固定维度的隐状态 $h_t$，捕捉geo-fence动态出现的时序模式</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>信念状态维护</strong>
+          <small>隐状态隐式编码了对"附近是否存在即将出现的geo-fence"的信念，弥补单帧观测的不足</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>&#9314; 策略决策 <span>Decision</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>Actor网络 (策略)</strong>
+          <small>以GRU隐状态为输入，输出连续飞行控制量: 速度大小 $v_t$、偏航角速率 $\\dot{\\psi}_t$</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>Critic网络 (价值)</strong>
+          <small>评估状态-动作对的Q值，提供TD误差驱动Actor更新</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>&#9315; 损失优化 <span>Optimization</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>策略梯度 + FM损失</strong>
+          <small>$\\mathcal{L}_{total} = \\mathcal{L}_{DDPG} + \\lambda \\mathcal{L}_{FM}$，联合优化控制性能和路径保持</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>经验回放与目标网络</strong>
+          <small>标准DDPG训练技巧: 经验回放池、软更新目标网络($\\tau$=0.001)</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow"><span>&darr; 观测向量</span><span>&darr; 隐状态 $h_t$</span><span>&darr; 动作 $a_t$</span><span>&darr; TD误差/梯度</span></div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>输入维度</strong><small>多帧LiDAR + 位姿 + 速度 + 目标</small></div>
+      <div class="arch-metric"><strong>GRU隐状态维度</strong><small>128/256 (推断)</small></div>
+      <div class="arch-metric"><strong>输出: 连续动作</strong><small>$v \\in [v_{min}, v_{max}]$, $\\dot{\\psi} \\in [-\\dot{\\psi}_{max}, \\dot{\\psi}_{max}]$</small></div>
+      <div class="arch-metric"><strong>成功率 (10 geo-fences)</strong><small>&gt;90% (训练区), &gt;60% (未见区)</small></div>
+    </div>
+  </div>
+
+  <h3>3.2 Mermaid 流程图</h3>
+
+  <h4>总览流程图</h4>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    A["&#127758; 新加坡住宅区<br/>真实空间数据<br/>建筑物 + 动态geo-fences"] --> B["&#128225; 观测获取<br/>LiDAR扫描<br/>GPS位姿<br/>目标方位"]
+    B --> C["&#127922; 输入随机化<br/>高斯噪声 N(0,&#963;&sup2;)"]
+    C --> D["&#128268; GRU编码<br/>时序观测&#8594;隐状态 h<sub>t</sub>"]
+    D --> E["&#127919; Actor-Critic<br/>DDPG决策"]
+    E --> F["&#9992; 飞行控制<br/>速度 v<sub>t</sub><br/>偏航率 &#968;<sub>t</sub>"]
+    F --> G{"&#9989; 到达目标?"}
+    G -- 是 --> H["&#127942; 成功<br/>(成功率 >90%)"]
+    G -- 否 --> B
+    E -.-> I["&#128207; Feature Matching Loss<br/>特征空间正则化"]
+    I -.-> E
+    D -.-> J["&#128190; 经验回放池<br/>(s<sub>t</sub>, a<sub>t</sub>, r<sub>t</sub>, s<sub>t+1</sub>)"]
+    J -.-> E
+  </pre>
+  </div>
+
+  <h4>FMGRU-DDPG算法详细组件图</h4>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph ENV["&#127758; 仿真环境 (新加坡真实数据)"]
+        OBS["观测 o<sub>t</sub>:<br/>- LiDAR 360&deg;扫描(N段)<br/>- 目标相对距离/方位<br/>- AA V速度与姿态<br/>- 当前geo-fence状态"]
+        DYN["动态geo-fences:<br/>最多10个临时出现<br/>位置随机/时间随机<br/>持续时间可变"]
+    end
+
+    subgraph NET["&#127976; FMGRU-DDPG神经网络"]
+        RL["输入随机化层<br/>o&#771;<sub>t</sub> = o<sub>t</sub> + &#1013;, &#1013;~N(0,&#963;&sup2;I)"]
+        GRU["GRU单元<br/>h<sub>t</sub> = GRU(o&#771;<sub>t</sub>, h<sub>t-1</sub>)"]
+        ACTOR["Actor网络 &#956;<sub>&#952;</sub><br/>a<sub>t</sub> = &#956;(h<sub>t</sub>) + 探索噪声"]
+        CRITIC["Critic网络 Q<sub>&#966;</sub><br/>Q(s<sub>t</sub>, a<sub>t</sub>)"]
+        TARGET_A["目标Actor &#956;<sup>-</sup>"]
+        TARGET_C["目标Critic Q<sup>-</sup>"]
+    end
+
+    subgraph LOSS["&#128207; 损失函数"]
+        PL["策略梯度: &#8711;<sub>&#952;</sub>J &#8776; E[&#8711;<sub>a</sub>Q &#183; &#8711;<sub>&#952;</sub>&#956;]"]
+        FM["特征匹配损失:<br/>L<sub>FM</sub> = &#8741;E[f(s)]-E[f<sub>ref</sub>(s)]&#8741;&sup2;"]
+        TD["TD误差: L<sub>critic</sub> = E[(y<sub>t</sub> - Q(s<sub>t</sub>,a<sub>t</sub>))&sup2;]"]
+        TOTAL["总损失: L = L<sub>critic</sub> + &#955;<sub>1</sub>L<sub>actor</sub> + &#955;<sub>2</sub>L<sub>FM</sub>"]
+    end
+
+    OBS --> RL
+    RL --> GRU
+    GRU --> ACTOR
+    GRU --> CRITIC
+    ACTOR --> CRITIC
+    ACTOR --> DYN
+    CRITIC --> PL
+    CRITIC --> TD
+    ACTOR --> FM
+    TARGET_A --> TARGET_C
+    PL --> TOTAL
+    FM --> TOTAL
+    TD --> TOTAL
+  </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. RESEARCH TASK ═══════════════ -->
+<section id="task">
+  <h2>&#167;4 Research Task &amp; Problem Formulation</h2>
+
+  <h3>4.1 问题形式化（POMDP）</h3>
+  <div class="formula-block">
+    <span class="eq-tag">问题定义: POMDP Modeling</span>
+    <p>本文将UAM场景下障碍物与动态geo-fence规避问题建模为<strong>部分可观测马尔可夫决策过程（POMDP）</strong>，定义为六元组 $\\langle \\mathcal{S}, \\mathcal{A}, \\mathcal{O}, \\mathcal{T}, \\mathcal{R}, \\mathcal{Z} \\rangle$：</p>
+    <p>$$\\mathcal{S}: \\text{真实环境状态空间（AAV位姿、障碍物位置、geo-fence状态、目标位置）}$$</p>
+    <p>$$\\mathcal{A}: \\text{连续动作空间，} a_t = [v_t, \\dot{\\psi}_t]^T \\in \\mathbb{R}^2$$</p>
+    <p>$$\\mathcal{O}: \\text{观测空间，} o_t = [d_1, d_2, ..., d_N, \\Delta x_{goal}, \\Delta y_{goal}, v_{t-1}, \\psi_{t-1}]$$</p>
+    <p>$$\\mathcal{T}: \\mathcal{S} \\times \\mathcal{A} \\rightarrow \\Delta(\\mathcal{S}), \\text{状态转移概率（包含AAV动力学和geo-fence随机涌现）}$$</p>
+    <p>$$\\mathcal{R}: \\mathcal{S} \\times \\mathcal{A} \\rightarrow \\mathbb{R}, \\text{奖励函数}$$</p>
+    <p>$$\\mathcal{Z}: \\mathcal{S} \\times \\mathcal{A} \\rightarrow \\Delta(\\mathcal{O}), \\text{观测概率（LiDAR噪声等）}$$</p>
+    <div class="eq-note"><strong>为什么是POMDP而非MDP？</strong> 关键原因在于动态geo-fence的出现具有时间随机性——当围栏尚未出现时，AAV无法从当前观测区分"这个区域永远不会出现围栏"和"这个区域10秒后会出现围栏"。GRU通过维护信念状态（belief over hidden geo-fence states）来解决这一部分可观测性问题。</div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 1: 奖励函数设计</span>
+    <p>$$R(s_t, a_t) = R_{goal} + R_{obstacle} + R_{geofence} + R_{deviation} + R_{step}$$</p>
+    <p>其中各项定义为：</p>
+    <p>$$R_{goal} = \\begin{cases} +R_{arrive} & \\text{if } d_{goal} < d_{threshold} \\\\ 0 & \\text{otherwise} \\end{cases}$$</p>
+    <p>$$R_{obstacle} = \\begin{cases} -R_{collision} & \\text{if collision with building} \\\\ 0 & \\text{otherwise} \\end{cases}$$</p>
+    <p>$$R_{geofence} = \\begin{cases} -R_{breach} & \\text{if entering geo-fence} \\\\ 0 & \\text{otherwise} \\end{cases}$$</p>
+    <p>$$R_{deviation} = -\\alpha \\cdot \\frac{d_{deviation}}{d_{direct}} \\quad \\text{(路径偏离惩罚)}$$</p>
+    <p>$$R_{step} = -\\beta \\quad \\text{(每步时间惩罚，鼓励快速到达)}$$</p>
+    <div class="eq-note"><strong>奖励设计要点：</strong>(1) 采用稀疏终态奖励 + 稠密过程惩罚的混合设计——到达目标给予大额正奖励，碰撞和geo-fence侵入给予大额负奖励，偏离路径和时间消耗给予小额持续惩罚；(2) $R_{deviation}$ 是本文的特色设计，与Feature Matching Loss形成互补——一个在奖励层面，一个在特征空间层面，共同约束策略不偏离目标方向太远。</div>
+  </div>
+
+  <h3>4.2 输入/输出规格表</h3>
+  <table>
+    <tr><th style="width:120px;">类别</th><th>条目</th><th>具体规格</th></tr>
+    <tr><td rowspan="4"><strong>输入</strong></td><td>LiDAR距离扫描</td><td>360&deg;均匀分为N个扇区（如36或72段），每段返回最近障碍物距离</td></tr>
+    <tr><td>相对目标位置</td><td>目标在AAV机体坐标系下的距离 $d_t$ 和方位角 $\\theta_t$</td></tr>
+    <tr><td>AAV自身状态</td><td>当前速度大小 $v_{t-1}$，当前航向角 $\\psi_{t-1}$（或航向角速率）</td></tr>
+    <tr><td>历史观测帧数</td><td>最近 $K$ 帧观测（如 $K=10$）作为GRU的输入序列</td></tr>
+    <tr><td rowspan="2"><strong>输出</strong></td><td>速度控制量 $v_t$</td><td>连续值，范围 $[0, v_{max}]$，控制AAV前进速度</td></tr>
+    <tr><td>偏航角速率 $\\dot{\\psi}_t$</td><td>连续值，范围 $[-\\dot{\\psi}_{max}, +\\dot{\\psi}_{max}]$，控制AAV转弯</td></tr>
+    <tr><td rowspan="3"><strong>约束</strong></td><td>建筑物碰撞</td><td>严格禁止（终止条件），碰撞即判定失败</td></tr>
+    <tr><td>Geo-fence侵入</td><td>严格禁止（终止条件），一旦进入动态围栏即判定失败</td></tr>
+    <tr><td>最大步数</td><td>每episode限制最大步数 $T_{max}$，超时视为失败</td></tr>
+    <tr><td rowspan="2"><strong>评测</strong></td><td>成功率 (Success Rate)</td><td>$\\frac{\\text{到达episode数}}{\\text{总episode数}}$，核心指标</td></tr>
+    <tr><td>路径偏离度</td><td>实际飞行路径长度与直线距离的比值</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 5. KEY CHALLENGES ═══════════════ -->
+<section id="challenge">
+  <h2>&#167;5 Key Challenges</h2>
+
+  <div class="callout danger">
+    <div class="callout-title">&#9888; 第一性原理诊断</div>
+    <p>UAM场景中动态geo-fence规避的本质困难在于<strong>三个时间尺度的耦合</strong>：</p>
+    <ol>
+      <li><strong>快速时间尺度</strong>（毫秒-秒级）：AAV的飞行动力学响应和传感器采样——需要连续、实时的控制决策；</li>
+      <li><strong>中等时间尺度</strong>（秒-分钟级）：geo-fence的动态涌现和消失——围栏可能在飞行途中突然激活，AAV必须快速识别并响应；</li>
+      <li><strong>慢速时间尺度</strong>（分钟级别）：完整的飞行任务——从起点到终点的全局路径规划，需要平衡局部避障和全局目标。</li>
+    </ol>
+    <p>这三个尺度的耦合使得问题不能简单地分解为"先规划再执行"——因为geo-fence的出现会实时改变可行空间，需要一种<strong>能够在线融合历史观测、当前感知和未来预测</strong>的端到端决策方案。</p>
+  </div>
+
+  <h3>5.1 前人方法比较</h3>
+  <table>
+    <tr><th>方法类别</th><th>核心思路</th><th>局限性</th><th>代表性工作</th></tr>
+    <tr>
+      <td>经典路径规划<br/>(A*, RRT, PRM)</td>
+      <td>在静态地图上离线计算全局最优路径，在线重规划应对变化</td>
+      <td>重规划延迟不满足实时性要求；需要完整地图先验；动态geo-fence使地图频繁失效</td>
+      <td>LaValle (2006), Karaman &amp; Frazzoli (2011)</td>
+    </tr>
+    <tr>
+      <td>人工势场法<br/>(APF)</td>
+      <td>目标产生吸引力，障碍物产生排斥力，合力引导飞行</td>
+      <td>局部极小值陷阱；在密集障碍+动态围栏场景振荡严重；无法处理时序约束</td>
+      <td>Khatib (1986), Ge &amp; Cui (2002)</td>
+    </tr>
+    <tr>
+      <td>模型预测控制<br/>(MPC)</td>
+      <td>在预测时域内优化控制序列，滚动执行第一步</td>
+      <td>计算成本随障碍物数量增长；动态围栏使预测模型不准确；需要精确动力学模型</td>
+      <td>Richards &amp; How (2002)</td>
+    </tr>
+    <tr>
+      <td>纯DRL方法<br/>(DDPG/PPO/SAC)</td>
+      <td>端到端学习从观测到控制的映射，无需显式地图</td>
+      <td>缺乏时序记忆导致对动态约束响应滞后；训练-测试分布偏移导致泛化差</td>
+      <td>Lillicrap et al. (2015)</td>
+    </tr>
+  </table>
+
+  <h3>5.2 三大关键挑战详细分析</h3>
+
+  <h4>&#9312; 挑战一：动态约束的时序不可观测性</h4>
+  <p>geo-fences不是静态特征——它们可以在AAV飞行途中因突发事件（如人群聚集、恶劣天气预警）而<strong>临时涌现</strong>。当AAV在时刻 $t$ 观测到一个区域"安全"时，这并不意味着该区域在时刻 $t+\\Delta t$ 仍然安全。单帧观测无法捕捉这种<strong>隐式的时序依赖</strong>。更复杂的是，geo-fence的出现位置和持续时间服从某种<strong>空间-时间联合分布</strong>（更可能在人群密集区域、更可能在特定时段出现），传统方法缺乏对这种分布建模的能力。这本质上是一个<strong>部分可观测性（Partial Observability）</strong>问题：geo-fence是否"即将出现"是一个隐藏变量，需要通过历史观测序列进行推断。</p>
+
+  <h4>&#9313; 挑战二：连续动作空间下的多约束协同优化</h4>
+  <p>AAV的飞行控制是连续域问题——速度和航向角速率需要精确的连续值，离散化会引入量化误差和控制不稳定性。在此连续动作空间上，策略必须同时满足：(a) 避免与静态建筑物的碰撞；(b) 避免进入动态出现的geo-fences；(c) 保持向目标方向前进；(d) 在约束(a)(b)与目标(c)冲突时做出合理折衷（例如是否需要绕飞，绕飞路径的偏折程度）。这四个目标之间存在<strong>固有的竞争关系</strong>——过于保守的避障会导致路径过长，过于激进的目标趋向会导致碰撞风险升高。在连续动作空间中设计能够自动平衡这些竞争的奖励函数和策略架构是非平凡的。</p>
+
+  <h4>&#9314; 挑战三：训练-部署的环境分布偏移（Domain Shift）</h4>
+  <p>UAM系统将部署在不同的城市区域，每个区域的建筑密度、道路拓扑、geo-fence触发模式均不相同。DRL策略在训练区域学到的行为模式往往<strong>过度拟合训练场景</strong>——例如，策略可能记忆了"在第3栋楼左转"这样的空间特异性策略，而非"在遇到密集障碍时寻找开放方向"这样可泛化的行为模式。论文明确验证了这一挑战：在未见区域中，DDPG和GRU-DDPG的性能均显著下降。引入输入随机化和特征匹配损失的动机正是为了解决这一泛化问题——前者通过训练时注入噪声扩展训练分布，后者通过特征空间约束保持核心导航能力不因环境变化而退化。</p>
+</section>
+
+<!-- ═══════════════ 6. METHOD DETAILS ═══════════════ -->
+<section id="method">
+  <h2>&#167;6 Method Details</h2>
+
+  <h3>6.1 核心公式组</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 1: DDPG基础框架</span>
+    <p><strong>Actor更新（确定性策略梯度）：</strong></p>
+    <p>$$\\nabla_{\\theta} J \\approx \\mathbb{E}_{s_t \\sim \\rho^\\beta} \\left[ \\nabla_a Q(s, a | \\phi) \\big|_{s=s_t, a=\\mu(s_t|\\theta)} \\cdot \\nabla_\\theta \\mu(s | \\theta) \\big|_{s=s_t} \\right]$$</p>
+    <p><strong>Critic更新（TD学习）：</strong></p>
+    <p>$$y_t = r_t + \\gamma Q'(s_{t+1}, \\mu'(s_{t+1} | \\theta') | \\phi')$$</p>
+    <p>$$L_{critic}(\\phi) = \\mathbb{E}_{s_t, a_t, r_t, s_{t+1} \\sim \\mathcal{D}} \\left[ (y_t - Q(s_t, a_t | \\phi))^2 \\right]$$</p>
+    <p><strong>目标网络软更新：</strong></p>
+    <p>$$\\theta' \\leftarrow \\tau \\theta + (1-\\tau) \\theta', \\quad \\phi' \\leftarrow \\tau \\phi + (1-\\tau) \\phi'$$</p>
+    <div class="eq-note"><strong>说明：</strong>DDPG是离线(off-policy)的确定性Actor-Critic算法，天然适合连续动作空间。Actor直接输出动作值（而非动作分布），Critic提供Q值估计。目标网络的软更新（通常 $\\tau=0.001$）使训练更稳定。经验回放池 $\\mathcal{D}$ 打破样本时间相关性。</div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 2: GRU时序编码</span>
+    <p><strong>GRU状态更新方程（将观测序列编码为信念状态）：</strong></p>
+    <p>$$z_t = \\sigma(W_z \\cdot [h_{t-1}, \\tilde{o}_t] + b_z) \\quad \\text{(更新门)}$$</p>
+    <p>$$r_t = \\sigma(W_r \\cdot [h_{t-1}, \\tilde{o}_t] + b_r) \\quad \\text{(重置门)}$$</p>
+    <p>$$\\tilde{h}_t = \\tanh(W_h \\cdot [r_t \\odot h_{t-1}, \\tilde{o}_t] + b_h) \\quad \\text{(候选隐状态)}$$</p>
+    <p>$$h_t = (1 - z_t) \\odot h_{t-1} + z_t \\odot \\tilde{h}_t \\quad \\text{(最终隐状态)}$$</p>
+    <p>其中 $\\tilde{o}_t = o_t + \\epsilon_t, \\epsilon_t \\sim \\mathcal{N}(0, \\sigma^2 I)$ 为经过随机化层处理后的观测。</p>
+    <div class="eq-note"><strong>为什么选择GRU而非LSTM？</strong> GRU参数更少（少一个门），在相同计算预算下训练更快；对于UAM避障这类中等序列长度（10-50步）的任务，GRU的记忆能力已经足够。更新门 $z_t$ 控制保留多少历史信息，重置门 $r_t$ 控制遗忘多少历史——这种机制使得GRU能够针对不同geo-fence动态模式自适应地调整记忆范围。</div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 3: Feature Matching Loss</span>
+    <p><strong>FM损失定义：</strong></p>
+    <p>$$\\mathcal{L}_{FM} = \\left\\| \\mathbb{E}_{s \\sim \\mathcal{D}} \\left[ f_{\\theta}^{mid}(\\tilde{o}|h) \\right] - \\mathbb{E}_{s \\sim \\mathcal{D}_{ref}} \\left[ f_{ref}^{mid}(o) \\right] \\right\\|_2^2$$</p>
+    <p>其中：</p>
+    <ul>
+      <li>$f_{\\theta}^{mid}(\\cdot)$：Actor网络中间层（如第一个全连接层之后）的特征输出</li>
+      <li>$f_{ref}^{mid}(\\cdot)$：参考策略（如简单指向目标的比例控制器）对应层的特征输出</li>
+      <li>$\\mathcal{D}_{ref}$：参考策略在环境中采集的轨迹数据</li>
+    </ul>
+    <p><strong>总训练目标：</strong></p>
+    <p>$$\\mathcal{L}_{total} = \\mathcal{L}_{critic} - \\alpha \\cdot J(\\theta) + \\beta \\cdot \\mathcal{L}_{FM}$$</p>
+    <p>其中 $\\alpha$ 和 $\\beta$ 为权重超参数，$J(\\theta)$ 为策略目标函数。</p>
+    <div class="eq-note"><strong>FM loss的直觉：</strong>该损失不直接约束动作输出（那会退化为行为克隆），而是约束<strong>中间特征表示</strong>——要求Actor在处理geo-fence场景时的内部特征模式与简单导航场景下的特征模式"总体相似"。这是一种<strong>软约束</strong>，防止Actor在复杂场景中完全"忘记"基本导航能力。FM loss源自GAN训练中的技巧（匹配生成器与判别器的中间层特征统计量），本文将其迁移到DRL领域作为策略正则化手段。</div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 4: 输入随机化层</span>
+    <p>$$\\tilde{o}_t^{(i)} = o_t^{(i)} + \\epsilon_t^{(i)}, \\quad \\epsilon_t^{(i)} \\sim \\mathcal{N}(0, \\sigma_i^2)$$</p>
+    <p>其中 $i$ 为观测向量的第 $i$ 个分量，$\\sigma_i$ 可针对不同传感器类型设置：</p>
+    <ul>
+      <li>LiDAR距离读数：$\\sigma_{lidar} \\propto \\text{距离}$ （远处噪声更大，模拟真实传感器特性）</li>
+      <li>目标方位角：$\\sigma_{angle}$ 较小，模拟GPS精度</li>
+      <li>自身速度：$\\sigma_{vel}$ 中等，模拟惯性测量噪声</li>
+    </ul>
+    <div class="eq-note"><strong>与Domain Randomization的区别：</strong>传统DR在环境参数空间（物理参数、视觉纹理等）施加随机化，而本文的随机化层直接在<strong>观测空间</strong>施加——这是一种更轻量、更易控制的随机化形式。实际上，输入随机化可看作一种特殊的data augmentation，迫使策略对输入扰动学习不变性。</div>
+  </div>
+
+  <h3>6.2 参数总表</h3>
+  <table>
+    <tr><th>参数</th><th>含义</th><th>取值/范围</th></tr>
+    <tr><td>$N_{lidar}$</td><td>LiDAR扫描线数</td><td>36 或 72 (扇区数)</td></tr>
+    <tr><td>$K$</td><td>GRU输入序列长度</td><td>10 (历史观测帧数)</td></tr>
+    <tr><td>$h_{dim}$</td><td>GRU隐状态维度</td><td>128 或 256</td></tr>
+    <tr><td>$v_{max}$</td><td>最大飞行速度</td><td>取决于AAV型号 (如15 m/s)</td></tr>
+    <tr><td>$\\dot{\\psi}_{max}$</td><td>最大偏航角速率</td><td>取决于AAV机动能力 (如60&deg;/s)</td></tr>
+    <tr><td>$\\sigma$</td><td>输入随机化噪声标准差</td><td>可调超参数 (例如0.05-0.2)</td></tr>
+    <tr><td>$\\lambda_{FM}$</td><td>FM损失权重</td><td>可调 (例如0.01)</td></tr>
+    <tr><td>$\\gamma$</td><td>折扣因子</td><td>0.99</td></tr>
+    <tr><td>$\\tau$</td><td>目标网络软更新系数</td><td>0.001</td></tr>
+    <tr><td>$|\\mathcal{D}|$</td><td>经验回放池大小</td><td>10^5 或 10^6</td></tr>
+    <tr><td>$B$</td><td>小批量大小 (Batch Size)</td><td>64 或 128</td></tr>
+    <tr><td>$lr_{actor}$</td><td>Actor学习率</td><td>10^{-4}</td></tr>
+    <tr><td>$lr_{critic}$</td><td>Critic学习率</td><td>10^{-3}</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 7. UNDERLYING PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>&#167;7 Underlying Principles</h2>
+
+  <h3>7.1 深度机理解释</h3>
+
+  <h4>&#9312; 原理一：GRU如何在部分可观测环境中隐式学习信念状态</h4>
+  <p>在POMDP框架下，最优决策需要基于<strong>信念状态</strong> $b_t(s) = P(s_t = s | o_{1:t}, a_{1:t-1})$——即给定历史观测序列条件下当前真实状态的概率分布。然而，直接维护和更新信念状态在高维连续状态空间中不可行。GRU提供了一种<strong>隐式近似</strong>：</p>
+  <p>$$h_t = \\text{GRU}(o_t, h_{t-1}) \\approx \\text{sufficient statistic of } b_t(s)$$</p>
+  <p>从信息论角度，GRU的隐状态 $h_t$ 压缩了观测历史 $o_{1:t}$ 中<strong>与未来决策相关的全部信息</strong>（充分统计量）。门控机制——特别是更新门 $z_t$ 和重置门 $r_t$——允许网络自适应地决定：当前观测是否包含关于geo-fence状态的新信息（更新门接近1），还是当前环境态势稳定、应保留历史信念（更新门接近0）。具体地：</p>
+  <ul>
+    <li>当LiDAR扫描突然在某个方向检测到新的距离截断（可能是新出现的geo-fence边界），重置门可能激活——部分清除旧信念，让新观测主导状态更新；</li>
+    <li>当连续多帧扫描保持相似模式（飞行在开阔区域），更新门可能关闭——维持原有信念，节省计算并保持策略稳定。</li>
+  </ul>
+  <p>这种自适应机制使得GRU天然适合处理geo-fence的间歇性涌现模式。</p>
+
+  <h4>&#9313; 原理二：输入随机化作为隐式正则化与不变性学习</h4>
+  <p>输入随机化层的效果可以从<strong>分布鲁棒优化（Distributionally Robust Optimization, DRO）</strong>的角度理解。标准DRL优化的是训练分布下的期望回报：</p>
+  <p>$$\\max_{\\pi} \\mathbb{E}_{P_{train}} [R(\\pi)]$$</p>
+  <p>而输入随机化实际优化的是以训练观测为中心、以噪声幅度 $\\sigma$ 为半径的<strong>Wasserstein球</strong>内最差情况下的回报：</p>
+  <p>$$\\max_{\\pi} \\min_{Q: W(P_{train}, Q) \\leq \\sigma} \\mathbb{E}_Q [R(\\pi)]$$</p>
+  <p>这迫使策略学习对输入空间中半径 $\\sigma$ 内的所有扰动都不变的<strong>鲁棒特征</strong>。进一步地，从表征学习视角，随机化层等同于在观测空间上施加了以下约束：</p>
+  <p>$$\\forall \\epsilon: \\|\\epsilon\\| \\leq \\sigma, \\quad \\pi(o) \\approx \\pi(o + \\epsilon)$$</p>
+  <p>即策略在输入空间的<strong>Lipschitz连续性</strong>被显式增强。这使得训练好的策略在面对未见环境时——即使未见环境的观测分布与训练分布有显著差异——只要差异不超过"有效感受野"，策略仍能做出合理决策。</p>
+
+  <h4>&#9314; 原理三：Feature Matching Loss的解耦正则化效应</h4>
+  <p>FM损失的精妙之处在于它在<strong>特征空间</strong>而非<strong>动作空间</strong>施加约束。在动作空间做行为克隆（标准模仿学习）的问题是：当参考策略（简单指向目标）的动作在geo-fence场景中不可行时，强制匹配动作会产生冲突梯度，损害避障学习。</p>
+  <p>FM损失通过在中间层做特征匹配避免了这一问题：</p>
+  <p>$$\\mathcal{L}_{FM} = \\|\\Phi_{mid}(o_{geo}) - \\Phi_{mid}(o_{free})\\|^2$$</p>
+  <p>其中 $\\Phi_{mid}$ 为中间层特征。这里的关键是：<strong>中间层特征编码的是"对场景的理解方式"而非"具体该做什么"</strong>。FM损失要求Actor在geo-fence场景下的场景理解方式（如目标方向的特征激活模式）与无障碍场景保持一致，但并不要求最终动作也一致。这实现了以下解耦：</p>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>&#127919; 行为克隆 (BC)</h4>
+      <p>约束层：<strong>动作输出层</strong></p>
+      <p>效果：强制 $\\pi(o_{geo}) \\approx a_{ref}$</p>
+      <p>问题：geo-fence场景中 $a_{ref}$ 可能不可行 &rarr; 冲突梯度</p>
+      <p>泛化：差（策略被"锁定"到参考行为）</p>
+    </div>
+    <div class="cmp-col">
+      <h4>&#128207; Feature Matching (FM)</h4>
+      <p>约束层：<strong>特征中间层</strong></p>
+      <p>效果：约束 $\\Phi_{mid}(o_{geo}) \\approx \\Phi_{mid}(o_{free})$</p>
+      <p>优势：不强制动作一致 &rarr; 避障自由度保留</p>
+      <p>泛化：好（仅约束"理解"，不约束"反应"）</p>
+    </div>
+  </div>
+  <p>这种设计的深层哲学是：<strong>好的泛化需要保持核心感知不变，同时允许行为灵活适应</strong>。FM损失在特征层的正则化恰好实现了这种"感知一致性 + 行为灵活性"的分离。</p>
+</section>
+
+<!-- ═══════════════ 8. REPRESENTATIVE FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>&#167;8 Representative Figures &amp; Interpretation</h2>
+
+  <h3>8.1 仿真环境示意图</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig 1-2</span>
+      <span class="fig-caption">新加坡住宅区3D建模与geo-fence布局</span>
+      <span class="fig-source">Source: PDF page 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/overview.png" alt="Simulation environment with buildings and geo-fences" onerror="this.parentElement.innerHTML='<div class=\'fig-placeholder\'>&#128205; 仿真环境示意图: 新加坡真实住宅区空间数据构建的3D环境。<br/>蓝色: 建筑物 | 红色虚线: 动态geo-fences | 绿色: 目标点 | 黄色: AAV轨迹</div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">&#128270; 图示解读</div>
+      <p>该图展示了FMGRU-DDPG的训练/测试环境核心要素：</p>
+      <ul>
+        <li><strong>建筑建模：</strong>使用新加坡真实住宅区的空间数据（OSM或政府GIS数据），包含不同高度和密度的建筑群。训练区域和测试区域被划分为不同街区，以验证泛化能力。</li>
+        <li><strong>动态geo-fences：</strong>以红色虚线圆柱体或多边形表示。可在仿真运行中随机出现（模拟突发事件触发的禁飞区），每次出现的数量、位置和时间段可以配置（论文测试了最多10个同时存在的场景）。</li>
+        <li><strong>AAV轨迹：</strong>展示从起点（可能位于城市边缘）穿越建筑群到达目标点的完整飞行路径。成功轨迹应呈现"沿建筑间隙飞行 + 绕开geo-fences"的特征。</li>
+        <li><strong>信息流示例：</strong>该图通常还包含从传感器→GRU→Actor→控制的标注箭头，帮助理解FMGRU-DDPG的端到端信息处理流程。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>8.2 算法性能对比</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig 5-8 (推测)</span>
+      <span class="fig-caption">成功率/碰撞率 vs. geo-fence数量的对比曲线与消融实验</span>
+      <span class="fig-source">Source: PDF pages 8-12</span>
+    </div>
+    <div class="fig-placeholder">&#128202; 性能对比图表: DDPG vs GRU-DDPG vs FMGRU-DDPG，分别展示成功率随geo-fence数量(0→10)的变化、训练区域 vs 未见区域的泛化性能、以及各组件消融实验。</div>
+    <div class="fig-interpretation">
+      <div class="fig-label">&#128270; 图示解读</div>
+      <p>论文包含以下关键实验图表：</p>
+      <ul>
+        <li><strong>成功率 vs. geo-fence数量：</strong>横轴为动态geo-fence数量(1-10)，纵轴为到达成功率。预期FMGRU-DDPG在全范围内保持最高成功率，DDPG随围栏增多迅速下降。</li>
+        <li><strong>训练区 vs. 未见区对比：</strong>双栏图展示三种算法在训练过的区域和完全未见的区域上的性能差异。FMGRU-DDPG在未见区域仍维持&gt;60%成功率（相对泛化损失最小），验证了输入随机化和FM损失对泛化能力的贡献。</li>
+        <li><strong>消融实验：</strong>依次移除GRU、输入随机化层、FM损失三个组件，展示完整FMGRU-DDPG与各消融变体的性能差距，量化每个组件的贡献度。</li>
+        <li><strong>轨迹可视化：</strong>俯视图展示在相同环境配置下三种算法的实际飞行轨迹。FMGRU-DDPG的轨迹更平滑、路径偏离更小；DDPG可能在geo-fence出现时大幅偏转甚至无法回到目标方向。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>8.3 关键数值证据（从摘要提取）</h3>
+  <table>
+    <tr><th>指标</th><th>FMGRU-DDPG</th><th>GRU-DDPG</th><th>DDPG</th></tr>
+    <tr class="highlight"><td>成功率 (10 dynamic geo-fences, 训练区)</td><td><strong>&gt; 90%</strong></td><td>低于FMGRU</td><td>显著更低</td></tr>
+    <tr><td>成功率 (未见环境)</td><td><strong>&gt; 60%</strong></td><td>低于FMGRU</td><td>显著更低</td></tr>
+    <tr><td>路径偏离度</td><td>最小</td><td>中等</td><td>最大</td></tr>
+    <tr><td>泛化损失 (训练区→未见区)</td><td>最小 (约30%)</td><td>中等</td><td>最大</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAWS & BOUNDARIES ═══════════════ -->
+<section id="flaw">
+  <h2>&#167;9 Potential Flaws &amp; Boundaries</h2>
+
+  <h3>9.1 局限性分析</h3>
+
+  <h4>&#9312; 局限性一：仿真-现实差距（Sim2Real Gap）未充分验证</h4>
+  <p>论文的全部实验在基于新加坡空间数据的仿真环境中进行，未涉及硬件在环（HIL）或实物飞行测试。真实UAM环境中存在以下仿真无法完美建模的因素：(a) LiDAR点云的稀疏性和噪声特性（尤其是对细长障碍物如路灯杆的检测）；(b) 通信延迟和GPS定位误差对geo-fence边界感知的影响；(c) 风扰等空气动力学效应导致的轨迹跟踪误差。输入随机化层在一定程度上缓解了噪声鲁棒性问题，但其噪声模型（高斯白噪声）与真实传感器的噪声特性（可能是非高斯、非平稳的）存在差距。该方法的实际部署可行性仍有待验证。</p>
+
+  <h4>&#9313; 局限性二：geo-fence模型的假设过于简化</h4>
+  <p>论文将geo-fence建模为随机出现/消失的圆柱体或简单多边形区域。但真实UAM中的禁飞区可能具有更复杂的时空特性：(a) <strong>分层高度限制</strong>——不同高度的可飞空域不同；(b) <strong>渐变式禁飞</strong>——预警区域（不建议进入）和严格禁飞区域的区别；(c) <strong>时间窗约束</strong>——某些区域仅在特定时段禁飞；(d) <strong>不确定性边界</strong>——禁飞区边界可能具有概率性质（如"以人群聚集中心为圆心、半径与人群密度成正比"）。当前方法尚未考虑这些更贴近实际的geo-fence特性，将其纳入建模可能需要重新设计观测空间和奖励结构。</p>
+
+  <h4>&#9314; 局限性三：单智能体假设忽略了多机交互</h4>
+  <p>论文考虑的是单个AAV在静态建筑和动态geo-fences环境中的导航。真实UAM场景的核心特征是<strong>多机共存</strong>——多个AAV共享同一空域，彼此互为动态障碍物。这引入了一阶交互（AAV之间直接避碰）和高阶交互（多机决策的相互影响导致环境非平稳性）。将FMGRU-DDPG扩展到多智能体场景并非平凡——GRU的时序编码需要处理其他智能体的行为预测，输入随机化和FM损失的设计也需要针对多智能体交互重新考虑。</p>
+
+  <h4>&#9315; 局限性四：计算资源与实时性约束</h4>
+  <p>虽然论文声称方法是"实时"的，但未提供具体的推理延迟数据。GRU序列处理（需要考虑历史K帧）和神经网络前向传播的总延迟需要满足飞行控制的实时约束（通常要求在10-50ms内完成）。此外，DDPG在复杂场景下的训练收敛本身就需要大量交互样本（数万到数十万episodes），训练效率是否满足实际部署前的调优需求也值得关注。</p>
+
+  <h3>9.2 扩展与未来方向</h3>
+  <ol>
+    <li><strong>多模态感知融合：</strong>将视觉（RGB/深度相机）与LiDAR融合，利用视觉信息检测geo-fence的视觉标记（如地面标识、警示灯光），补充LiDAR对非实体围栏（如"礼宾禁区"）感知不足的问题。</li>
+    <li><strong>分层决策架构：</strong>将全局路径规划（慢频率，如1Hz）与FMGRU-DDPG的局部避障（快频率，如20Hz）分层结合。全局规划器提供参考方向和waypoints，FMGRU-DDPG负责在参考路径附近实时规避动态geo-fences。</li>
+    <li><strong>元学习泛化：</strong>用MAML或Reptile等元学习算法替代当前的输入随机化，在多个不同城市场景上训练元策略，使策略能在少量新场景交互样本后快速适应。</li>
+  </ol>
+
+  <h3>9.3 数据/参数敏感度分析</h3>
+  <table>
+    <tr><th>数据/参数维度</th><th>敏感度</th><th>影响机制</th><th>缓解策略</th></tr>
+    <tr><td>LiDAR扫描线数 $N_{lidar}$</td><td>&#9733;&#9733;&#9733;&#9733;</td><td>太少导致障碍检测遗漏（尤其是窄间隙），太多增加输入维度可能导致维数灾难</td><td>针对场景障碍密度做grid search选择最优 $N$</td></tr>
+    <tr><td>输入噪声标准差 $\\sigma$</td><td>&#9733;&#9733;&#9733;&#9733;&#9733;</td><td>过小则泛化效果不足，过大则完全淹没有用信号，策略无法学习</td><td>采用渐进式噪声衰减：训练初期 $\\sigma$ 较大，随后逐步减小</td></tr>
+    <tr><td>FM损失权重 $\\lambda_{FM}$</td><td>&#9733;&#9733;&#9733;&#9733;</td><td>过大导致策略过度保守（不敢偏离直线路径），过小则路径偏离惩罚失效</td><td>与奖励中的 $\\alpha$ 参数协同调节</td></tr>
+    <tr><td>GRU序列长度 $K$</td><td>&#9733;&#9733;&#9733;</td><td>过短则信念状态信息不足，过长则引入冗余历史并增加延迟</td><td>通过分析geo-fence出现频率确定合适的记忆范围</td></tr>
+    <tr><td>训练/测试区域相似度</td><td>&#9733;&#9733;&#9733;&#9733;&#9733;</td><td>区域差异越大，泛化损失越大；根本性影响方法的实用性</td><td>在不同风格城区上做多域训练</td></tr>
+  </table>
+
+  <h3>9.4 边界条件深潜 (Deep Dive)</h3>
+  <div class="callout warn">
+    <div class="callout-title">&#128270; 边界条件分析</div>
+    <p><strong>该方法在什么情况下可能失效？</strong></p>
+    <ol>
+      <li><strong>geo-fence密度超过训练分布：</strong>论文测试最多10个同时存在的geo-fences。如果实际场景中geo-fences数量远超此值（如大型活动期间全城大面积禁飞），策略可能因为"可行空间被完全封堵"而无法找到到达目标的路径——这本质上不是DRL的问题而是物理可达性问题。</li>
+      <li><strong>城市峡谷效应：</strong>在高楼林立的核心CBD区域，LiDAR信号可能因多径反射而引入虚假检测，随机化层的高斯噪声模型可能不足以覆盖这种结构性偏差。</li>
+      <li><strong>传感器失效：</strong>如果LiDAR部分扇区失效（如被污损遮挡），现有的GRU记忆可以短暂弥补（靠历史信念推断），但长时间失效后的策略行为未经验证。</li>
+      <li><strong>高度动态的目标：</strong>本文的目标点是固定的。如果目标也在移动（如跟踪另一架AAV），问题转化为追逃或跟踪问题，需要重新设计奖励和网络架构。</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION & RESEARCH VALUE ═══════════════ -->
+<section id="motivation">
+  <h2>&#167;10 Motivation &amp; Research Value</h2>
+
+  <h3>10.1 问题推导链（5步）</h3>
+
+  <table>
+    <tr><th>步骤</th><th>内容</th></tr>
+    <tr>
+      <td><strong>&#9312; 问题背景</strong></td>
+      <td>城市空中交通（UAM）旨在利用低空空域实现高效、安全、可持续的短距离城市运输。随着eVTOL和无人机配送等应用快速增长，城市低空空域的交通密度将急剧上升。</td>
+    </tr>
+    <tr>
+      <td><strong>&#9313; 现有方法局限</strong></td>
+      <td>目前的避障方法主要处理<strong>静态建筑物</strong>和<strong>预先已知的固定禁飞区</strong>。但在真实UAM运营中，禁飞区可能因人群聚集、恶劣天气预警、VIP出行等突发事件<strong>动态涌现</strong>——这类约束是现有方法无法有效应对的。经典规划方法（A*, RRT）需要完整地图和重规划时间；纯DRL方法缺乏时序记忆导致对动态约束响应滞后。</td>
+    </tr>
+    <tr>
+      <td><strong>&#9314; 核心矛盾</strong></td>
+      <td>矛盾在于<strong>动态约束的时序不可观测性</strong>与<strong>实时决策的连续性需求</strong>之间的冲突。geo-fence的出现具有随机性和间歇性，单帧传感器数据无法捕捉其演化模式；同时，飞行控制是连续域决策，离散化会导致控制品质下降。经典的部分可观测性处理（如显式信念状态维护）在高维连续状态空间中不可行。</td>
+    </tr>
+    <tr>
+      <td><strong>&#9315; 本文突破口</strong></td>
+      <td>用<strong>循环神经网络（GRU）隐式学习信念状态</strong>，以端到端方式解决部分可观测性；同时引入<strong>输入随机化（domain randomization的轻量替代）</strong>和<strong>特征匹配损失（中间层正则化）</strong>两个辅助机制，在不牺牲避障灵活性的前提下增强泛化能力和路径保持能力。三者协同形成FMGRU-DDPG框架。</td>
+    </tr>
+    <tr>
+      <td><strong>&#9316; 方案设计</strong></td>
+      <td>基于DDPG的Actor-Critic架构 + GRU时序编码 + 输入随机化层 + Feature Matching辅助损失。在新加坡真实空间数据仿真环境中验证，设置动态geo-fence数量从1到10的递增测试，并划分训练/测试区域评估泛化能力。</td>
+    </tr>
+  </table>
+
+  <h3>10.2 一句话核心价值</h3>
+  <div class="callout idea">
+    <div class="callout-title">&#128161; One-Sentence Core Value</div>
+    <p>FMGRU-DDPG首次为UAM动态geo-fence规避提供了一个<strong>带时序记忆、输入鲁棒性和特征空间正则化的端到端DRL方案</strong>，在密集建筑+动态约束的复合场景下达到实用级成功率，其GRU+随机化+FM的三组件协同设计范式为"部分可观测+分布偏移"类DRL问题提供了一个可复用的方法论模板。</p>
+  </div>
+
+  <h3>10.3 方法论反思：如何想到这个方法？</h3>
+  <p>如果从头开始研究这个问题，可以沿以下思路推导出类似方案：</p>
+  <ol>
+    <li><strong>识别问题本质：</strong>首先意识到geo-fence的动态涌现使得问题本质上是POMDP而非MDP——这是选择GRU/LSTM等序列模型的核心动机。</li>
+    <li><strong>选择连续控制基座：</strong>AAV飞行控制天然是连续的 &rarr; 在DDPG、SAC、PPO（连续版）中选择。DDPG的确定性策略更适合航空控制（确定性控制更可预测、可认证）。</li>
+    <li><strong>发现泛化瓶颈：</strong>在初步实验中观察到训练-测试分布偏移导致性能退化 &rarr; 需要泛化增强机制。输入随机化是最简单且计算开销最小的选择。</li>
+    <li><strong>发现路径偏离问题：</strong>在geo-fence密集时，策略可能过度转向而无法回到路径 &rarr; 需要一种不牺牲避障灵活性的路径保持约束。传统的行为克隆太"硬"，FM损失（源自GAN）提供了一种"软"约束——在特征层面保持导航直觉而不强制动作一致。</li>
+    <li><strong>三组件协同调优：</strong>GRU提供记忆、随机化提供鲁棒性、FM提供正则化——三者在功能上互补，形成完整的解决方案。</li>
+  </ol>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>&#167;11 Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+
+  <h4>&#9312; 方法论层面：POMDP问题的"GRU隐式信念"解法极具通用性</h4>
+  <p>本文展示了如何用GRU隐式学习POMDP的信念状态，而无需显式建模状态转移和观测概率。这种模式可以迁移到任何"环境状态存在隐藏时间变量"的DRL问题——例如：无人机跟踪中目标可能短暂被遮挡（隐藏变量：目标是否还在观测盲区内），机器人操作中零件可能间歇性卡住（隐藏变量：零件当前是否被卡住）。核心设计原则是：<strong>当环境存在时间维度上的隐藏状态时，考虑在策略网络前插入循环单元（GRU/LSTM）而非仅用前馈网络。</strong></p>
+
+  <h4>&#9313; 技术技巧层面：输入随机化作为"穷人版Domain Randomization"</h4>
+  <p>Domain Randomization（在环境参数空间随机化）虽然有效但实现复杂（需要修改仿真环境参数）。本文展示了一个轻量级替代方案：<strong>直接在观测空间注入噪声</strong>。这种方法的实现成本极低（一行代码的事），且可以与任何DRL算法无缝结合。从理论角度看，观测空间噪声等同于在输入分布上构造了一个平滑的Wasserstein球，提供了对分布偏移的一定程度的鲁棒性保证。在实际应用中，可以先用输入噪声快速实验，确认泛化是瓶颈后再考虑更重的环境级Domain Randomization。</p>
+
+  <h4>&#9314; 实验设计层面：训练/测试区域分离是验证泛化能力的黄金标准</h4>
+  <p>论文将新加坡真实空间数据划分为<strong>不相交的训练区域和测试区域</strong>，是评估方法泛化能力的严格设计。相比常见的"随机划分episode"（每个episode从全地图随机采样起点和geo-fence位置），空间分离能更真实地反映策略在新城区的表现。这为UAV导航研究的实验设计提供了一个重要参照：<strong>不应仅在同一地理区域内的不同起点/终点间测试，而应使用完全不同的地图区域来评估泛化。</strong></p>
+
+  <h3>11.2 Directly Applicable to My UAV Research</h3>
+  <ol>
+    <li><strong>FM损失的迁移应用：</strong>FM损失作为特征空间正则化的思路可以应用于多旋翼/固定翼的任意DRL导航任务中。例如，在<strong>多UAV编队避障</strong>中，可以用FM损失约束每架UAV在避障时的特征表示与"理想编队状态"下的特征表示保持一致——在避免碰撞的同时保持编队结构的"感知"。这比直接约束队形位置更灵活，允许临时变形以适应环境。</li>
+    <li><strong>GRU+DRL架构在UAV追踪问题中的应用：</strong>如果研究目标是<strong>UAV对地面移动目标的跟踪</strong>，当目标短暂进入建筑阴影或树冠遮挡时，GRU的记忆能力可以帮助UAV维持对目标运动方向的信念（"它很可能继续往前走"），而非在失去视觉后立即悬停或随机搜索。</li>
+    <li><strong>输入随机化在sim2real迁移中的应用：</strong>如果计划将仿真训练的UAV策略部署到实物平台，训练时在观测空间施加与真实传感器噪声特性匹配的随机化（而非简单的高斯噪声），可能显著缩小sim2real差距，而且无需复杂的域适应或域随机化基础设施。</li>
+  </ol>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>文献</th><th>核心内容</th><th>与本文关系</th><th>推荐理由</th></tr>
+    <tr>
+      <td>Lillicrap et al. (2015) - DDPG</td>
+      <td>深度确定性策略梯度，连续控制奠基性工作</td>
+      <td>本文算法基座</td>
+      <td>理解DDPG是理解FMGRU-DDPG的前提</td>
+    </tr>
+    <tr>
+      <td>Hausknecht &amp; Stone (2015) - DRQN</td>
+      <td>在DQN中引入LSTM处理POMDP的Atari游戏</td>
+      <td>GRU+POMDP思路的前驱</td>
+      <td>理解为何循环网络能处理部分可观测性</td>
+    </tr>
+    <tr>
+      <td>Salimans et al. (2016) - Improved GANs</td>
+      <td>提出Feature Matching作为GAN训练的稳定技巧</td>
+      <td>FM损失的原始出处</td>
+      <td>理解Feature Matching的数学基础与直觉</td>
+    </tr>
+    <tr>
+      <td>Tobin et al. (2017) - Domain Randomization</td>
+      <td>通过在仿真中随机化视觉/物理参数实现sim2real迁移</td>
+      <td>输入随机化的方法论前驱</td>
+      <td>对比了解观测层随机化与环境级随机化的权衡</td>
+    </tr>
+    <tr>
+      <td>Yan et al. (2024) - Collision-avoiding flocking</td>
+      <td>多固定翼UAV在障碍密集环境中的编队避碰</td>
+      <td>同一学者(Chao Yan)的相关工作</td>
+      <td>了解该课题组在多UAV DRL方向的研究脉络</td>
+    </tr>
+    <tr>
+      <td>Kochenderfer et al. (2022) - Decision Making Under Uncertainty</td>
+      <td>POMDP和不确定条件下决策的理论框架</td>
+      <td>POMDP建模的理论基础</td>
+      <td>深化对部分可观测决策问题的理论理解</td>
+    </tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5804/index.html">5804</a></td><td>GDMAAC (Yan, Jiang, Chen et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>&#128196; Paper Notes &middot; Scholar: Chao Yan &middot; Paper ID: 10111 &middot; FMGRU-DDPG &middot; MathJax + Mermaid Rendering</footer></div></body></html>

@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Hierarchical LLMs Multi-Robot Target Tracking (Wu et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">核心挑战</a>
+  <a href="#method">关键方法</a>
+  <a href="#principles">基本原理</a>
+  <a href="#figures">实验结果</a>
+  <a href="#flaw">缺陷与扩展</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Vijay Kumar · 17-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10002/index.html">Safety guardrails llm-ena</a>
+<a href="../10001/index.html">Contextual safety reasoni</a>
+<a href="../10017/index.html">Jailbreaking llm-controll</a>
+<a href="../10016/index.html">Deploying foundation mode</a>
+<a href="../10015/index.html">Spine Online semantic</a>
+<a href="../10014/index.html">Vision transformers end-t</a>
+<a href="../10013/index.html">EvMAPPER High-altitude or</a>
+<a href="../10012/index.html">Constrained learning dece</a>
+<a href="../10011/index.html">Air-ground collaboration</a>
+<a href="../10010/index.html">Distilling on-device lang</a>
+<a href="../10009/index.html">Compositional coordinatio</a>
+<a href="../10008/index.html">Rt-guide Real-time gaussi</a>
+<a href="../10007/index.html">SPAR</a>
+<a href="../10006/index.html">PIP-LLM</a>
+<a href="../10005/index.html">Slideslam Sparse, lightwe</a>
+<a href="../10004/index.html">Heterogeneous robot colla</a>
+<a class="active" href="../10003/index.html">Hierarchical llms in-the-</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. 论文信息 ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Hierarchical LLMs In-the-Loop Optimization for Real-Time Multi-Robot Target Tracking under Unknown Hazards（未知危险环境下实时多机器人目标跟踪的分层LLM在环优化）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yuwei Wu</strong>, Yuezhan Tao, Peihan Li, Guangyao Shi, Gaurav S. Sukhatme, <strong>Vijay Kumar</strong>, Lifeng Zhou</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">宾夕法尼亚大学</strong>（University of Pennsylvania）GRASP 实验室（Wu, Tao, Kumar）；Drexel University（Li, Zhou）；University of Southern California（Shi, Sukhatme）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">arXiv preprint</strong>（arXiv:2409.12274v3），<strong>2025年11月</strong></td></tr>
+      <div class="journal-meta"><span class="jif-name">arXiv</span> <span class="jif-badge if-preprint">📄 Preprint</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://arxiv.org/abs/2409.12274" target="_blank">arXiv:2409.12274v3</a> | 资助：ARL DCIST CRA + NSF TILOS | GRASP Lab, Penn Engineering</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出了一种<strong>分层LLM在环优化框架</strong>，将大语言模型（LLM）集成到多机器人目标跟踪的决策回路中。LLM不直接生成控制动作，而是作为高层推理器观察环境状态和机器人团队状态，在<strong>双层优化</strong>（外环任务分配 + 内环轨迹规划）中动态调整任务配置和优化参数。人类监督者可以在遇到意外危险或局部最优时提供高层指导。在动态危险环境中实时运行，LLM负责理解危险语义并调整优化结构，优化求解器负责生成安全可行的控制。仿真和真实实验（两架无人机跟踪两个地面机器人）验证了框架的实时适应性和鲁棒性。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">LLM-in-the-Loop</span>
+    <span class="tag tag-green">Multi-Robot Coordination</span>
+    <span class="tag tag-amber">Target Tracking</span>
+    <span class="tag tag-purple">Bi-Level Optimization</span>
+    <span class="tag tag-red">Hazardous Environments</span>
+    <span class="tag tag-cyan">Safe Autonomy</span>
+    <span class="tag tag-gray">Vijay Kumar</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. 核心洞察与创新点 ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    <strong>为什么 LLM 不应直接为危险环境下的多机器人系统生成控制动作？</strong><br>
+    LLM 从根本上不可靠，不适合生成精确、实时的控制指令。它们会产生幻觉、延迟高（秒级）、缺乏形式化安全保证。然而，LLM 擅长对危险进行<strong>语义推理</strong>——理解感知危险区会降低相机传感器性能、通信危险区会破坏团队协调、以及这些危险在跟踪性能与机器人安全之间产生了权衡。这些推理任务超出了传统基于优化的方法的处理能力，因为它们需要世界知识和常识。<br><br>
+    <strong>本文的核心洞察是什么？</strong><br>
+    <strong>将 LLM 用作"优化配置器"而非"控制生成器"。</strong>LLM 观察环境状态（危险类型、位置、严重程度）和机器人团队状态（位置、传感器健康、通信链路），然后为双层优化框架输出<strong>任务配置和参数调整</strong>。外环（Task LLM）管理离散任务分配——哪个机器人跟踪哪个目标。内环（Action LLM）管理连续参数调节——调整跟踪精度、控制能量、感知安全和通信安全之间的权重。实际控制指令由数值优化求解器（FORCES Pro MPC，10Hz）生成，提供安全性和可行性保证。人类监督者可提供自然语言反馈，由 LLM 转化为参数变化。核心设计原则：<strong>LLM 决定优先做什么；求解器决定如何安全执行。</strong>
+  </div>
+
+  <h3>2.2 灵感映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>启发了什么洞察</th><th>类型</th></tr>
+    <tr><td>双层优化理论（Stackelberg 博弈、分层规划）</td><td>多机器人目标跟踪自然分解为两层：离散分配（哪个机器人跟踪哪个目标）和连续控制（每个机器人如何移动）。与求解难以处理的联合 MINLP 不同，LLM 管理<strong>外层分配层</strong>，而数值求解器运行<strong>内层控制层</strong>——各自以适当的频率运行。</td><td>架构</td></tr>
+    <tr><td>LLM 作为数值优化的辅助工具（奖励设计、超参数调节）</td><td>LLM 可以成为"优化伴侣"而非"优化替代品"。LLM 识别环境变化并建议参数调整，但实际的约束满足和最优性由数值求解器保证。这消除了 LLM 直接控制的可靠性问题。</td><td>方法</td></tr>
+    <tr><td>复杂多机器人操作中的人类监督控制</td><td>非专家人类监督者无法直接调整数学优化参数，但他们可以提供<strong>自然语言反馈</strong>（如"更积极一些"、"避开那片区域"）。LLM 充当翻译层，将人类直觉转化为形式化的优化参数变化——桥接自然语言和数值优化。</td><td>策略</td></tr>
+    <tr><td>控制系统层级：慢外环（规划）+ 快内环（控制）</td><td>时序分解反映了经典控制架构：Task LLM 0.05Hz（规划层）、Action LLM 0.2Hz（战术调整层）、MPC 求解器 10Hz（实时控制层）。这种<strong>三层频率分解</strong>（200:4:1 比例）确保每个模块在其自然时间尺度上运行，同时维持整体系统一致性。</td><td>系统</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：分层双 LLM 架构 —— 两个 LLM 以不同频率管理不同优化层级</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>单个 LLM 无法同时处理离散任务分配（"哪个机器人跟踪哪个目标"）和连续参数调节（"如何平衡跟踪与安全权重"）。这些任务需要不同的推理粒度、更新频率和信息范围。单一的 LLM 要么对外环太慢，要么对内环太短视。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>经典控制层级——慢外环（规划器）和快内环（控制器）。将相同原理应用于 LLM 部署：Task LLM 以 0.05Hz 运行，使用全局信息进行离散决策；Action LLM 以 0.2Hz 运行，使用局部性能趋势进行连续权重调节。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Task LLM（外环，0.05Hz）：接收全局状态、危险地图、5 步历史记录和可选人类反馈；输出分配矩阵 A（二值，哪个机器人跟踪哪个目标）；由约束函数 beta(A) 验证。Action LLM（内环，0.2Hz）：接收当前状态、先前权重和性能反馈；输出权重向量 (w1, w2, w3, w4) 用于跟踪/能量/感知安全/通信安全；经经验界过滤。MPC 求解器（10Hz）：以 LLM 提供的 A 和 w 求解实际轨迹优化。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：LLM 作为优化参数化器 —— LLM 配置优化问题而不求解它</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>先前的 LLM-机器人集成落入两个极端：(a) LLM 直接生成航点/轨迹（不安全，无保证），或 (b) LLM 仅用于高层任务规划，底层控制器固定（刚性，无法适应变化的危险）。两者都不允许 LLM 根据环境变化动态重新配置优化问题结构。</div>
+    <div class="novelty-step"><strong>【关键区别】</strong>LLM 不求解优化——它<strong>参数化</strong>优化。LLM 输出：(i) 分配矩阵 A 定义离散优化结构（外环），(ii) 权重向量 w 定义连续优化目标（内环）。实际的优化解——满足动力学、安全和避碰约束的轨迹——来自数值求解器。LLM 提供智能；求解器提供保证。</div>
+    <div class="novelty-step"><strong>【为什么这很重要】</strong>这种分离创建了一个清晰的安全边界：即使 LLM 产生幻觉或输出次优参数，数值求解器仍确保所有硬约束（动力学、避碰、执行器限制）得到满足。最坏情况下的失败模式是次优的跟踪性能，而非坠毁或碰撞。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：人类自然语言接口 —— 非专家监督者通过语言引导优化</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统优化框架需要精确的数学模型——但真实世界的危险可能比假设的更严重，机器人可能遇到未建模的情况或局部极小值。非专家人类监督者无法调整数学参数（代价权重、约束界限），但可以用自然语言表达关切。人类直觉与数学优化之间的鸿沟此前没有桥梁。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>支持的人类输入类型：(1) 性能评估——"专注于跟踪目标"；(2) 风险评估——"感知危险区比我们假设的更严重"；(3) 异常指示——"无人机 21 为什么卡住了？"；(4) 具体指令——"无人机 21 应专注于跟踪目标 122"。这些自然语言输入注入两个 LLM 的提示中。LLM 解析意图，推理对优化配置的影响，并相应调整 A 或 w。人类引导是异步且可选的——系统在无输入时完全自主运行。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. 系统架构 ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 系统框架 —— 分层 LLM 在环双层优化</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["Input Layer"]
+        direction LR
+        STATE["Robot States · pos, vel, sensor health"]
+        TARGET["Target States · pos, vel, class"]
+        DANGER["Hazard Map · Sensing zones + Communication zones"]
+        HUMAN["Human Supervisor · optional NL feedback"]
+    end
+
+    subgraph OUTER["Outer Loop · Task LLM · 0.05 Hz"]
+        direction LR
+        TASK_PROMPT["System Prompt: You are a task allocation optimizer"]
+        TASK_CTX["Context: robot capabilities + target positions + hazard map + 5-step history"]
+        TASK_OUT["Output: Assignment Matrix A (binary)"]
+        TASK_VERIFY["Validation: beta(A) ≤ 0? Capacity + coverage constraints"]
+    end
+
+    subgraph INNER["Inner Loop · Action LLM · 0.2 Hz"]
+        direction LR
+        ACT_PROMPT["System Prompt: You are a multi-objective weight tuner"]
+        ACT_CTX["Context: current state + previous weights + performance feedback"]
+        ACT_OUT["Output: Weight vector (w1, w2, w3, w4)"]
+        ACT_VERIFY["Validation: weights within empirical bounds?"]
+    end
+
+    subgraph SOLVER["Optimization Solver · FORCES Pro MPC · 10 Hz"]
+        direction LR
+        MPC["MPC: min w1·tracking_err + w2·‖u‖ + w3·‖ν‖ + w4·‖ξ‖"]
+        CONSTRAINTS["Constraints: dynamics + sensing safety + comm safety + collision"]
+        CMD["Control Commands: u → each robot"]
+    end
+
+    subgraph FEEDBACK["Feedback Loop"]
+        direction LR
+        EXEC["Robots execute commands · update states"]
+        UPDATE["Detect new hazards · attacks on sensors/comm"]
+        PERF["Performance: tracking covariance trace + attack counts"]
+    end
+
+    STATE --> TASK_CTX
+    TARGET --> TASK_CTX
+    DANGER --> TASK_CTX
+    HUMAN -.->|"async NL input"| TASK_CTX
+    HUMAN -.->|"async NL input"| ACT_CTX
+    TASK_PROMPT --> TASK_CTX --> TASK_OUT --> TASK_VERIFY
+    TASK_VERIFY -->|"pass"| MPC
+    TASK_VERIFY -->|"fail: retry"| TASK_CTX
+    ACT_PROMPT --> ACT_CTX --> ACT_OUT --> ACT_VERIFY
+    ACT_VERIFY -->|"pass"| MPC
+    ACT_VERIFY -->|"fail: use previous"| MPC
+    STATE --> MPC
+    CONSTRAINTS --> MPC --> CMD --> EXEC --> UPDATE --> PERF
+    PERF --> ACT_CTX
+    UPDATE --> STATE
+
+    classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef outer fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef inner fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef solver fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef feed fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class STATE,TARGET,DANGER,HUMAN input
+    class TASK_PROMPT,TASK_CTX,TASK_OUT,TASK_VERIFY outer
+    class ACT_PROMPT,ACT_CTX,ACT_OUT,ACT_VERIFY inner
+    class MPC,CONSTRAINTS,CMD solver
+    class EXEC,UPDATE,PERF feed
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 —— 三层频率信息流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph HIGH["10 Hz · MPC Solver · Control Layer"]
+        direction LR
+        H1["Receive A and (w1,w2,w3,w4) from LLMs"] --> H2["Solve MPC: optimal control over horizon H"]
+        H2 --> H3["Broadcast control commands to all robots"]
+        H3 --> H4["Robots execute: state transition with dynamics"]
+        H4 --> H5["Generate performance feedback: tracking error, attack count"]
+    end
+
+    subgraph MID["0.2 Hz · Action LLM · Weight Tuning Layer"]
+        direction LR
+        M1["Receive: tracking error + control energy + safety violations"] --> M2["Action LLM reasoning: assess objective importance"]
+        M2 --> M3["Adjust weights: w1 for tracking, w3 for sensing safety, w4 for comm safety"]
+        M3 --> M4["Empirical bound filtering → output valid weights"]
+    end
+
+    subgraph LOW["0.05 Hz · Task LLM · Assignment Layer"]
+        direction LR
+        L1["Receive: global state + hazard map + 5-step history + human feedback"] --> L2["Task LLM reasoning: analyze need for reassignment"]
+        L2 --> L3["Generate new assignment matrix A or keep current"]
+        L3 --> L4["Validate: capacity constraint and coverage constraint"]
+        L4 --> L5["If A infeasible: re-prompt LLM with constraint violation info"]
+    end
+
+    subgraph HUMAN_LAYER["Human Feedback · Asynchronous"]
+        direction LR
+        HUM1["Performance: 'focus on tracking targets'"] --> HUM2["Risk: 'sensing zone more dangerous than assumed'"]
+        HUM2 --> HUM3["Specific: 'drone 21 should track target 122'"]
+    end
+
+    LOW -->|"assignment A"| HIGH
+    MID -->|"weights w"| HIGH
+    HIGH -->|"performance metrics"| MID
+    HIGH -->|"state + history"| LOW
+    HUMAN_LAYER -.->|"natural language"| LOW
+    HUMAN_LAYER -.->|"natural language"| MID
+
+    classDef high fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    classDef mid fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef low fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    classDef human fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    class H1,H2,H3,H4,H5 high
+    class M1,M2,M3,M4 mid
+    class L1,L2,L3,L4,L5 low
+    class HUM1,HUM2,HUM3 human
+    </pre>
+  </div>
+
+  <h3>3.3 工作流 —— 从危险检测到任务重分配的完整执行流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph INIT["Initialization"]
+        I1["Deploy M UAVs · N moving targets · unknown hazard zones"] --> I2["Initial assignment: Task LLM first inference → generate A₀"]
+        I2 --> I3["Initial weights: Action LLM sets default (w1,w2,w3,w4)"]
+        I3 --> I4["Start MPC loop with initial configuration"]
+    end
+
+    subgraph OPERATION["Runtime Closed-Loop Operation"]
+        direction LR
+        O1["Timestep t: robots publish observations"] --> O2{"t mod 3 == 0? Action LLM trigger"}
+        O2 -->|"Yes"| O3["Action LLM updates weights based on recent performance"]
+        O2 -->|"No"| O4{"t mod 9 == 0? Task LLM trigger"}
+        O3 --> O4
+        O4 -->|"Yes"| O5["Task LLM evaluates reassignment need"]
+        O4 -->|"No"| O6["MPC solver: receding horizon optimization"]
+        O5 --> O6
+        O6 --> O7["Execute first control step on each robot"]
+        O7 --> O8["Robots move · sensors update · detect new hazards?"]
+        O8 --> O9{"New hazard detected or robot attacked?"}
+        O9 -->|"Yes"| O10["Update hazard map · force Task LLM reassignment"]
+        O9 -->|"No"| O11{"Human feedback received?"}
+        O11 -->|"Yes"| O12["Inject human feedback into LLM prompts · adjust params"]
+        O11 -->|"No"| O1
+        O10 --> O1
+        O12 --> O1
+    end
+
+    subgraph ADAPT["Hazard Adaptation Scenarios"]
+        direction LR
+        A1["Robot enters sensing danger zone → attacked → sensor degraded"] --> A2["Task LLM: remove damaged robot from critical assignments"]
+        A2 --> A3["Action LLM: increase w3 → more conservative about sensing zones"]
+        A3 --> A4["Other robots take over tracking · team adapts"]
+    end
+
+    subgraph RECOVER["Recovery Scenarios"]
+        direction LR
+        R1["Damaged robot recovers → rejoins team"] --> R2["Task LLM: re-add robot to assignment pool"]
+        R2 --> R3["Action LLM: reduce w3 → less conservative if hazard resolved"]
+    end
+
+    INIT --> OPERATION
+    OPERATION --> ADAPT
+    ADAPT --> RECOVER
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    classDef op fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef adapt fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px
+    classDef recover fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class I1,I2,I3,I4 init
+    class O1,O2,O3,O4,O5,O6,O7,O8,O9,O10,O11,O12 op
+    class A1,A2,A3,A4 adapt
+    class R1,R2,R3 recover
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. 任务定义 ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义 —— 解决什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 —— 危险环境下多机器人目标跟踪的双层优化</span>
+    $$ \min_{A, u} \; J(A, u) \quad \text{s.t. } H(A, u)=0,\; G(A, u) \preceq 0 \quad \text{（原始 MINLP，无法实时求解）} $$
+    $$ \Downarrow \text{解耦为双层} \Downarrow $$
+    $$ \text{外环（Task LLM）: } \min_A J(A, u^*(A)) \qquad \text{内环（求解器 + Action LLM）: } u^*(A) \in \arg\min_u \{J(A, u) \mid H=0, G\preceq 0\} $$
+    <div class="eq-note">
+      <strong>$A \in \{0,1\}^{M \times N}$</strong> = 任务分配矩阵（M 个机器人, N 个目标） &nbsp;|&nbsp;
+      <strong>$u = (u_1, \ldots, u_M)$</strong> = 所有机器人的控制输入向量 &nbsp;|&nbsp;
+      <strong>$J(\cdot)$</strong> = 多目标函数集（跟踪性能 + 控制能量 + 感知安全 + 通信安全） &nbsp;|&nbsp;
+      <strong>$H, G$</strong> = 等式/不等式约束（动力学、安全、容量、覆盖、避碰） &nbsp;|&nbsp;
+      <strong>未知危险</strong>: 感知危险区（攻击传感器，降低跟踪能力）和通信危险区（破坏团队协调）——初始未知，通过探索发现 &nbsp;|&nbsp;
+      <strong>LLM 的角色</strong>: LLM 不求解 MINLP——它选择 A（Task LLM）并调整 J 中的权重（Action LLM）。数值求解器处理实际的约束优化。
+    </div>
+  </div>
+
+  <h3>4.2 输入 / 输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度 / 格式</th></tr>
+    <tr><td><strong>输入（LLM）</strong></td><td>实时机器人/目标状态（位置、速度），已知危险区地图，5 步历史记录，可选人类自然语言反馈</td><td>每个 LLM 的结构化文本提示；状态向量（位置、速度、故障状态）</td></tr>
+    <tr><td><strong>输入（优化器）</strong></td><td>来自 Task LLM 的任务分配 A + 来自 Action LLM 的权重向量 w + 机器人动力学模型 + 当前状态估计</td><td>A: 二值矩阵 MxN; w: 4 维实向量; 动力学: 非线性模型</td></tr>
+    <tr><td><strong>输入（人类，可选）</strong></td><td>自然语言引导："更积极一些"、"避开感知区"、"无人机 21 应专注于目标 122"、"感知危险比我们想的更严重"</td><td>自由格式文本，异步，任意粒度</td></tr>
+    <tr><td><strong>输出</strong></td><td>所有机器人的安全可行控制指令：滚动时域内的位置/速度序列 + 当前任务分配</td><td>连续控制指令（M 个机器人 x 控制维度）+ 离散分配 A</td></tr>
+    <tr><td><strong>目标</strong></td><td>最大化目标跟踪精度（最小化估计协方差迹）同时最小化感知/通信攻击次数，控制能量消耗，并适应动态发现的危险</td><td>多目标：跟踪性能 vs 能量 vs 感知安全 vs 通信安全</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>在线多机器人协调与控制问题</strong>，集成任务分配（组合优化）、运动规划（连续优化）和安全约束（未知危险下的概率安全）。核心创新在于<strong>LLM 不输出控制</strong>——它充当优化框架内的<strong>"智能参数调节器"</strong>。LLM 在语义层面理解环境变化（如"感知危险区的破坏力比我们的模型假设的更严重"），并将这种理解转化为优化参数调整。平台：多架 UAV（仿真：2-5 架 UAV 跟踪 2-8 个目标；真实世界：2 架 UAV 通过 VGA 下视相机 + AprilTag 定位 + 无迹卡尔曼滤波跟踪 2 个地面机器人），在具有未知感知和通信危险区的动态环境中运行。</p>
+</section>
+
+<!-- ═══════════════ 5. 核心挑战 ═══════════════ -->
+<section id="challenge">
+  <h2>5. 核心挑战 —— 为什么难？</h2>
+
+  <h3>5.1 本质（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：实时性能与全局最优性之间的矛盾，叠加环境不确定性与模型精度之间的矛盾。<br><br>
+    (1) <strong>计算复杂性的诅咒</strong>：原始的多机器人目标跟踪问题是一个<strong>非线性混合整数规划（MINLP）</strong>——将 M 个机器人分配给 N 个目标的分支因子为 M^N。结合连续轨迹优化，实时求解是不可能的。问题必须被<strong>分解</strong>为可在实时速率下求解的子问题，同时保持解的质量。<br><br>
+    (2) <strong>模型失配问题</strong>：现有的危险感知方法假设已知危险模型（如已知各区被攻击的概率）。但在真实部署中：(a) 危险区的存在可能需要被发现，(b) 危险的影响可能比模型假设的更严重，(c) 可能出现新型危险。纯数学优化无法处理这种<strong>模型层面的不确定性</strong>——它需要对危险对任务"意味着什么"进行语义推理。<br><br>
+    (3) <strong>人类监督瓶颈</strong>：在复杂多机器人任务中，人类监督者面临<strong>认知过载</strong>——他们必须同时监控多架 UAV 的位置、目标运动、危险区变化和通信状态。人类无法实时解析大量数值数据，但他们可以用自然语言表达高层关切。LLM 充当<strong>人机翻译层</strong>，将模糊的人类反馈转化为精确的优化参数调整。
+  </div>
+
+  <h3>5.2 前人方法及其局限</h3>
+  <table>
+    <tr><th>前人方法</th><th>核心思想</th><th>失败原因</th></tr>
+    <tr>
+      <td>纯优化（FORCES Pro, MILP/MIQP 求解器）</td>
+      <td>将任务分配和运动规划联合求解为单一优化问题</td>
+      <td>需要<strong>完整的先验模型</strong>（所有危险区已知且参数精确）。在开放世界部署中，危险是在线发现的，且其影响可能超出模型假设。联合 MINLP 求解对于实时多机器人场景计算上不可行。</td>
+    </tr>
+    <tr>
+      <td>LLM 直接控制（LLM 生成航点或轨迹）</td>
+      <td>用环境描述提示 LLM，让它直接输出机器人的动作</td>
+      <td>LLM 输出<strong>缺乏安全保证和约束满足</strong>——在多机器人直接控制中可能导致碰撞、通信中断或进入危险区。LLM 推理延迟（秒级）无法满足控制频率要求（大于 10Hz）。安全关键场景中的幻觉风险。</td>
+    </tr>
+    <tr>
+      <td>多机器人团队的人类监督</td>
+      <td>人类操作员直接监控和调整多机器人行为</td>
+      <td>认知过载——同时监控多架 UAV 的数值状态超出人类能力。非专家操作员无法直接调整数学优化参数（代价权重、约束界限）。从人类意图到参数变化缺乏系统性翻译。</td>
+    </tr>
+    <tr>
+      <td>概率约束规划用于危险规避</td>
+      <td>将危险建模为概率约束，在优化中平衡风险与性能</td>
+      <td>假设<strong>已知危险模型</strong>——但在真实部署中，危险区的位置、形状和影响程度可能随时间变化且不可预测。无法处理新型危险或对危险含义的语义理解。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 —— LLM 输出的可靠性验证</strong>：Task LLM 输出分配矩阵 A——必须验证容量约束（每架 UAV 最多跟踪 c_i 个目标，每个目标至少被一架 UAV 跟踪）。验证函数：beta(A) = 1^T max(0, A1 - c) + 1^T max(0, 1 - A^T 1)，必须满足 beta(A) 小于等于 0。若验证失败，丢弃输出并保留先前的分配。Action LLM 输出权重向量——通过经验界过滤以拒绝不合理值。验证层是防止 LLM 错误到达控制系统的关键安全网。</li>
+    <li><strong>挑战 2 —— 双 LLM 在不同频率下的协调</strong>：Task LLM（0.05Hz）和 Action LLM（0.2Hz）以不同速率运行——如果 Task LLM 的重分配和 Action LLM 的权重调整方向相反怎么办？解决方案：Action LLM 的权重调整是短时域的（2-3 步），而 Task LLM 的分配调整是长时域的（8-10 步）——它们的时标自然分离，实践中冲突罕见，因为它们在不同的抽象层次上优化。冲突发生时，最新的 Task LLM 决策优先（结构变化优先于参数微调）。</li>
+    <li><strong>挑战 3 —— 人类反馈中的歧义消解</strong>：类似"更积极一些"的自然语言反馈可能有多种解释——加快跟踪？降低安全裕度？部署更多 UAV？LLM 必须从上下文中推断<strong>真实意图</strong>。例如，当人在跟踪误差高时说"更积极一些"，Action LLM 应解释为"降低安全权重 w3 以允许更接近危险区以获得更好的跟踪"。设计挑战在于使 LLM 的解释在不同人类措辞和上下文中保持鲁棒。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. 关键方法与公式 ═══════════════ -->
+<section id="method">
+  <h2>6. 关键方法与公式</h2>
+
+  <h3>6.1 核心算法</h3>
+  <p>该框架作为一个<strong>三层层次化系统</strong>运行，层间异步通信。第 1 层（Task LLM，0.05Hz）：接收全局状态 + 危险地图 + 5 步历史 + 可选人类反馈，输出任务分配矩阵 A，由约束函数 beta(A) 验证。第 2 层（Action LLM，0.2Hz）：接收性能指标 + 先前权重 + 可选人类反馈，输出权重向量 w = (w1, w2, w3, w4)，经经验界过滤。第 3 层（MPC 求解器，10Hz）：给定 A 和 w，使用 FORCES Pro 求解约束轨迹优化，生成所有机器人的控制指令。关键的算法贡献是 LLM 与优化器之间的<strong>先验证后执行接口</strong>——LLM 输出在硬约束下检查通过后才被接受，确保即使是错误的 LLM 输出也不会产生不安全的控制。</p>
+
+  <h3>6.2 关键公式</h3>
+
+  <h4>Group A: 双层优化解耦</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1)(2) -- 从 MINLP 到双层分解</span>
+    $$ \text{原始: } \min_{A, u} \; J(A, u) \quad \text{s.t. } H=0,\; G \preceq 0 \quad \text{(MINLP, 实时不可解)} $$
+    $$ \text{分解后: } \begin{cases} \displaystyle \min_A J(A, u^*(A)) & \text{外环（Task LLM 管理）} \\[8pt] u^*(A) \in \arg\min_u \{J(A, u) \mid H=0,\; G \preceq 0\} & \text{内环（求解器 + Action LLM）} \end{cases} $$
+    <div class="eq-note">
+      <strong>关键假设</strong>: 给定分配 A，内层控制优化 u*(A) 可按机器人独立求解（共享避碰约束）。这是合理的，因为一旦确定"谁跟踪谁"，每个机器人的轨迹优化基本解耦。<strong>LLM 的角色</strong>: Task LLM 选择 A（避免枚举 M^N 种组合）；Action LLM 调整 J 中引导内层优化的权重。
+    </div>
+  </div>
+
+  <h4>Group B: 内环加权多目标 MPC</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) -- 加权多目标 MPC 优化</span>
+    $$ \min_{u, \nu, \xi} \; w_1 f(x_{t+1}) + w_2 \|u\| + w_3 \|\nu\| + w_4 \|\xi\| $$
+    $$ \text{s.t. } x_{t+1} = g(x_t, u) \quad \text{(dynamics)} $$
+    $$ G(x_{t+1}, \mathcal{S}) \preceq \nu \quad \text{(sensing danger zone constraints)} $$
+    $$ G(x_{t+1}, \mathcal{C}) \preceq \xi \quad \text{(communication danger zone constraints)} $$
+    $$ u \in \mathcal{U},\; x_{t+1} \in \mathcal{X}_{\text{free}},\; \nu, \xi \succeq 0 $$
+    <div class="eq-note">
+      <strong>$w_1$</strong> = 跟踪性能权重（估计协方差矩阵的迹） &nbsp;|&nbsp;
+      <strong>$w_2$</strong> = 控制能量权重（控制输入范数） &nbsp;|&nbsp;
+      <strong>$w_3$</strong> = 感知安全权重（感知危险区违反的松弛变量范数） &nbsp;|&nbsp;
+      <strong>$w_4$</strong> = 通信安全权重（通信危险区违反的松弛变量范数） &nbsp;|&nbsp;
+      <strong>$\nu, \xi$</strong> = 松弛变量——允许概率安全约束在一定程度上被违反（在目标函数中惩罚） &nbsp;|&nbsp;
+      <strong>Action LLM 的角色</strong>: 调整 (w1, w2, w3, w4) 以改变优化偏好方向。示例：感知危险区被发现非常严重 → w3 增大 → 优化器倾向于远离感知区的轨迹。
+    </div>
+  </div>
+
+  <h4>Group C: Task LLM 输出验证</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) -- 分配矩阵约束验证</span>
+    $$ \beta(A) = \mathbf{1}^T \max(0, A\mathbf{1} - \mathbf{c}) + \mathbf{1}^T \max(0, \mathbf{1} - A^T \mathbf{1}) $$
+    <div class="eq-note">
+      <strong>第一项</strong> = 容量约束违反——每架 UAV 的跟踪目标数不得超过其容量 c_i（小于等于 3 个目标）。逐元素 max 检查超容量。 &nbsp;|&nbsp;
+      <strong>第二项</strong> = 覆盖约束违反——每个目标必须至少被一架 UAV 跟踪。检查未被跟踪的目标。 &nbsp;|&nbsp;
+      <strong>如果 beta(A) > 0</strong>: 约束被违反 → 丢弃此 A，保留先前有效分配，将约束违反信息反馈给 LLM 并要求重新生成。<strong>此验证是 LLM 输出与优化执行之间的关键安全屏障。</strong>
+    </div>
+  </div>
+
+  <h4>Group D: 人类-LLM 优化配置融合</h4>
+  <div class="formula-block">
+    <span class="eq-tag">人类引导的集成</span>
+    $$ \theta_{\text{final}} = \text{LLM}_{\text{fuse}}\left( \theta_{\text{auto}}, \; \text{guidance}_{\text{human}} \right) $$
+    <div class="eq-note">
+      <strong>$\theta_{\text{auto}}$</strong> = 自主 LLM 配置（来自环境观测，无人类输入） &nbsp;|&nbsp;
+      <strong>$\text{guidance}_{\text{human}}$</strong> = 来自人类监督者的可选自然语言输入（任意粒度：战略级、个体级、具体指令、环境评估、风险警告） &nbsp;|&nbsp;
+      <strong>$\text{LLM}_{\text{fuse}}$</strong> = 同一个 LLM 解析人类引导并与自主推理融合。当人类意图明确时优先（如"无人机 21 应跟踪目标 122"），但仍受优化器安全可行性检查约束。 &nbsp;|&nbsp;
+      <strong>五种人类输入类型</strong>: (1) 战略级——"更积极一些"；(2) 个体关注——"无人机 21 为什么卡住了？"；(3) 具体指令——"无人机 21 专注于目标 122"；(4) 环境评估——"感知区比假设的更严重"；(5) 风险警告——"目标 122 在危险区内"。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值 / 范围</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>Task LLM 频率</td><td><strong>0.05 Hz（每 8-10 步）</strong></td><td>外环分配更新速率</td><td>任务分配不需要高频更新——目标位置必须显著变化才会影响分配最优性。过频更新导致分配振荡而无性能收益</td></tr>
+    <tr><td>Action LLM 频率</td><td><strong>0.2 Hz（每 2-3 步）</strong></td><td>内环权重更新速率</td><td>权重需要对环境变化（如进入危险区）做出更快响应，但不需要逐步调整——2-3 步足以观察性能趋势</td></tr>
+    <tr><td>MPC 求解器频率</td><td><strong>10 Hz</strong></td><td>控制指令生成速率</td><td>连续控制需要高频更新以稳定跟踪动态目标。FORCES Pro 在 3.4ms 内求解，远在 100ms 预算内</td></tr>
+    <tr><td>测试的 LLM 模型</td><td><strong>GPT-4o, GPT-4.1-mini, LLaMA-3-70B, DeepSeek-V3</strong></td><td>多种 LLM 后端对比</td><td>所有模型在 Action LLM 上达到 100% 成功率（输出格式简单）。Task LLM 成功率各异但即使无先验示例也都能生成有效分配</td></tr>
+    <tr><td>历史长度 k</td><td><strong>5 个时间步</strong></td><td>输入 Task LLM 的近期历史</td><td>足够评估趋势（如"跟踪误差增加"）而不超出令牌限制。平衡信息量和简洁性</td></tr>
+    <tr><td>令牌限制（Task LLM）</td><td><strong>50 x (c_bar + 2)</strong></td><td>Task LLM 的输出令牌限制</td><td>c_bar = 平均跟踪容量——输出长度随任务规模缩放，防止浪费同时确保大分配任务有足够空间</td></tr>
+    <tr><td>分配验证</td><td><strong>beta(A) 小于等于 0</strong></td><td>约束满足检查</td><td>硬屏障：任何违反容量或覆盖的分配均被拒绝。失败分配触发 LLM 重新提示并提供违反详情</td></tr>
+  </table>
+
+  <h3>6.4 LLM 在环优化 vs. 传统多机器人优化</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🧠 LLM 在环优化（本文）</h4>
+      <ul>
+        <li>LLM <strong>配置参数</strong>——不生成控制</li>
+        <li>优化器<strong>保证安全和约束满足</strong></li>
+        <li>人类反馈<strong>由 LLM 翻译</strong>为参数变化</li>
+        <li><strong>三层频率层级</strong>：LLM 慢，优化器快</li>
+        <li>LLM 提供<strong>语义推理</strong>（如"此危险比模型预期更严重"）</li>
+        <li>支持<strong>多种 LLM 后端</strong>（GPT, LLaMA, DeepSeek 均可用）</li>
+        <li>LLM 决定<strong>优先做什么</strong>；求解器决定<strong>如何安全执行</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🔧 传统多机器人优化</h4>
+      <ul>
+        <li>需要<strong>完整且精确的先验模型</strong></li>
+        <li>约束处理<strong>严格但静态</strong></li>
+        <li>人类参与<strong>困难</strong>——必须调整数学参数</li>
+        <li>单一时标——要么太慢要么太粗糙</li>
+        <li><strong>无法理解</strong>自然语言或高层概念</li>
+        <li>模型<strong>在设计时固定</strong>——无法调整结构</li>
+        <li>设计者在开发时决定<strong>优化什么和如何优化</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. 基本原理 ═══════════════ -->
+<section id="principles">
+  <h2>7. 基本原理 —— 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本框架需要掌握三个关键原理：Bi-Level 优化的分离性（为什么高低层分离）、LLM 作为参数调节器而非控制器的角色定位（安全-智能分工）、Human-in-the-Loop 在安全关键场景中的闭环校正。</p>
+
+  <h3>7.1 Bi-Level 优化的解耦原理 —— 为什么分两层</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 -- Bi-Level 优化的数学结构</span>
+    $$ \text{上层（任务分配）: } \max_{a_{ij}} \sum_{i,j} U(a_{ij}, x_i, \tau_j) \quad \text{s.t. } \sum_j a_{ij} \le C_i $$
+    $$ \text{下层（轨迹规划）: } \min_{u_i(t)} \int_{0}^{T} c(x_i(t), u_i(t)) dt \quad \text{s.t. } \dot{x}_i = f(x_i, u_i) $$
+    <div class="eq-note">
+      <strong>上层</strong> = 任务分配层（离散组合优化）：决定哪个机器人追踪哪个目标，涉及 NP-hard 的组合分配问题。&nbsp;|&nbsp;
+      <strong>下层</strong> = 轨迹规划层（连续最优控制）：给定分配后，为每个机器人规划满足动力学约束的安全轨迹。&nbsp;|&nbsp;
+      <strong>为什么分离</strong>：两个问题的时间尺度和数学性质完全不同——分配问题变化缓慢（秒级），轨迹规划需要高频更新（毫秒级）。Mix 在一起会导致维度灾难且无法实时求解。
+    </div>
+  </div>
+
+  <p><strong>Bi-Level 的核心工程意义</strong>：上层解空间是离散的、LLM 擅长的高层推理（"这个目标危险，换一个机器人"），下层解空间是连续的、优化器擅长的数值计算（"加速度 0.5 m/s^2，转向 15 度"）。将 LLM 放在上层允许它用自然语言推理影响离散决策，同时下层的优化器保证每条轨迹都满足硬安全约束。</p>
+
+  <h3>7.2 LLM 的角色定位 -- Parameter Tuner, NOT Controller</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 -- LLM 影响优化而非替代优化</span>
+    $$ \theta_{\text{new}} = \text{LLM}(\text{observation}, \text{team\_status}, \theta_{\text{old}}) $$
+    $$ a^*, u^* = \text{BiLevelOptimizer}(\theta_{\text{new}}, \text{env\_state}) $$
+    <div class="eq-note">
+      <strong>$\theta$</strong> = 优化参数（包括目标权重、约束松弛量、危险区域惩罚系数）&nbsp;|&nbsp;
+      <strong>LLM 的角色</strong>：观察环境（视觉/语义信息）和机器人队伍状态 → 推理哪些参数需要调整 → 输出新的参数配置 &nbsp;|&nbsp;
+      <strong>Optimizer 的角色</strong>：接收参数 → 求解优化问题 → 输出安全可执行的动作序列。LLM <strong>永远不直接输出控制指令</strong>——这是本框架与直接用 LLM 做 planner 的方法的根本区别。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>LLM as Parameter Tuner (本文)</h4>
+      <ul>
+        <li>LLM 输出：<strong>参数配置</strong>（权重、惩罚系数）</li>
+        <li>安全保证：由优化器（硬约束）<strong>保证</strong></li>
+        <li>LLM 错误的影响：<strong>次优但不危险</strong>——参数偏离最优只会导致效率下降，不会违反安全约束</li>
+        <li>适应能力：LLM 可理解"前方有浓烟"并调整相关区域的代价权重</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>LLM as Planner (对比方案)</h4>
+      <ul>
+        <li>LLM 输出：<strong>动作序列 / 控制指令</strong></li>
+        <li>安全保证：<strong>无</strong>——LLM 可能幻觉出危险动作</li>
+        <li>LLM 错误的影响：<strong>灾难性</strong>——一个错误的动作可能导致碰撞或坠毁</li>
+        <li>适应能力：LLM 直接生成动作，但可靠性随场景复杂度下降</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>7.3 Human-in-the-Loop -- 安全关键场景的最后防线</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 -- Human Feedback 的闭环校正回路</span>
+    $$ \theta_{t+1} = \begin{cases} \text{LLM}(\text{obs}_t, \theta_t) & \text{if no human intervention} \\ \text{HumanFeedback}(\text{obs}_t, \theta_t) & \text{if human overrides} \end{cases} $$
+    <div class="eq-note">
+      <strong>Human Supervisor</strong> 可以：(1) 提供 broad guidance（如"避开东北区域"、"优先追踪目标 3"）；(2) 发现 LLM 推理错误并纠正（如 LLM 误判了危险程度）；(3) 在模型 mismatch 或局部极小值时给出跳出指令。&nbsp;|&nbsp;
+      <strong>实验数据</strong>：加入 Human Feedback 后，累计追踪误差从 116.86 降至 100.98（降低 13.6%），感知攻击次数从 23 降至 19（降低 17.4%），通信攻击次数从 10 降至 7（降低 30%）。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    Bi-Level 解耦保证计算可行性（大问题分解为两个可解的子问题）→ LLM 作为 Parameter Tuner 保证安全性（LLM 错误不会导致危险动作）→ Human-in-the-Loop 提供兜底（处理 LLM 无法理解的极端场景）→ <strong>三层保护环环相扣</strong>，使得 LLM 可以安全地参与实时多机器人协调——这是此前无人实现的关键突破。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. 实验结果 ═══════════════ -->
+<section id="figures">
+  <h2>8. 实验结果 —— 关键数据与消融分析</h2>
+
+  <h3>8.1 仿真结果 —— 整体性能对比</h3>
+  <table>
+    <tr><th>方法</th><th>累计跟踪误差</th><th>感知攻击次数</th><th>通信攻击次数</th><th>轨迹长度（m）</th></tr>
+    <tr><td>无 LLM（纯优化）</td><td>120.08</td><td>31</td><td>11</td><td>17.53</td></tr>
+    <tr class="highlight"><td><strong>有 LLM（本文）</strong></td><td><strong>116.86</strong></td><td><strong>23</strong></td><td><strong>10</strong></td><td>17.69</td></tr>
+    <tr class="highlight"><td><strong>有 LLM + Human Feedback</strong></td><td><strong>100.98</strong></td><td><strong>19</strong></td><td><strong>7</strong></td><td>18.55</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">场景：2 架 UAV 跟踪 4 个目标，2 个感知危险区 + 1 个通信危险区。LLM 在环将跟踪误差降低 2.7%，攻击次数降低 25.8%（感知）和 9.1%（通信）。加入人类反馈后，跟踪误差总计降低 15.9%，攻击次数降低 38.7% 和 36.4%。人类引导下轨迹长度略有增加，因为机器人采取了更保守、绕行但更安全的路径绕过危险区。</p>
+
+  <h3>8.2 LLM 推理能力评估</h3>
+  <table>
+    <tr><th>LLM 模型</th><th>Task LLM 成功率</th><th>Action LLM 成功率</th><th>平均推理时间（s）</th></tr>
+    <tr class="highlight"><td><strong>GPT-4o</strong></td><td>98.5%</td><td>100%</td><td>1.36</td></tr>
+    <tr><td>GPT-4.1-mini</td><td>96.2%</td><td>100%</td><td>0.82</td></tr>
+    <tr><td>LLaMA-3-70B</td><td>94.8%</td><td>100%</td><td>2.15</td></tr>
+    <tr><td>DeepSeek-V3</td><td>95.1%</td><td>100%</td><td>1.78</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">所有模型在 Action LLM 上达到 100% 成功率，因为权重输出格式简单且经验界过滤鲁棒。Task LLM 成功率因模型而异，但所有模型在测试场景中均超过 94%（不同负载：4:2, 4:4, 4:8 的机器人:目标比；不同复杂度：2, 4, 8 个危险区）。即使没有先验分配示例，所有 LLM 都能生成有效分配——展示了向未见分配模式的强泛化能力。</p>
+
+  <h3>8.3 消融研究 —— LLM 配置组件</h3>
+  <table>
+    <tr><th>配置</th><th>跟踪误差</th><th>感知攻击</th><th>通信攻击</th><th>适应质量</th></tr>
+    <tr class="highlight"><td><strong>完整（Task LLM + Action LLM）</strong></td><td>116.86</td><td>23</td><td>10</td><td>高</td></tr>
+    <tr><td>仅 Task LLM（无 Action LLM 权重调节）</td><td>124.31</td><td>28</td><td>12</td><td>中</td></tr>
+    <tr><td>仅 Action LLM（无 Task LLM 重分配）</td><td>130.15</td><td>25</td><td>9</td><td>低-中</td></tr>
+    <tr><td>无 LLM（静态配置）</td><td>120.08</td><td>31</td><td>11</td><td>无</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">消融实验揭示了协同效应：仅 Task LLM 改善分配但无法微调安全权衡；仅 Action LLM 调整权重但无法修复根本上的次优分配。完整系统中两个 LLM 协作达到最佳平衡。有趣的是，"无 LLM"在跟踪误差上优于"仅 Action LLM"，因为静态权重配合良好分配可以工作得不错，但遭受更多攻击——无法将安全权重适应新发现的危险。</p>
+
+  <h3>8.4 真实硬件实验</h3>
+  <table>
+    <tr><th>模块</th><th>频率（Hz）</th><th>平均运行时间（s）</th><th>成功率</th></tr>
+    <tr><td>Task LLM（GPT-4o）</td><td>0.05</td><td>1.3639</td><td>100%</td></tr>
+    <tr><td>Action LLM（GPT-4o）</td><td>0.2</td><td>0.8911</td><td>100%</td></tr>
+    <tr><td>MPC 求解器（FORCES Pro）</td><td>10</td><td>0.0034</td><td>100%</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">真实世界实验：2 架 UAV，配备 VGA 下视相机 + 无迹卡尔曼滤波 + AprilTag 定位，跟踪 2 个地面机器人。频率比例约 200:4:1（MPC : Action LLM : Task LLM）。FORCES Pro MPC 在 3.4ms 内求解，远在 10Hz 操作的 100ms 预算内。LLM 推理时间（0.89-1.36s）与其目标频率（分别为 5s 和 20s 周期）兼容。硬件实验验证了该分层架构可部署在真实机器人平台上并实时运行。</p>
+
+  <h3>8.5 人机交互案例研究</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">System Architecture: Hierarchical LLM-in-the-Loop Optimization Framework</span>
+      <span class="fig-source">Source: Paper Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Hierarchical LLM-in-the-Loop framework architecture"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图示解读</div>
+      <p><strong>本图展示了</strong>完整的分层框架。两个 LLM 以不同频率运行：Task LLM（外环，0.05Hz）管理离散任务分配，Action LLM（内环，0.2Hz）管理连续权重调节。可选的人类监督者提供自然语言反馈，注入两个 LLM 的提示中。MPC 求解器以 10Hz 运行，生成安全控制指令并在机器人团队上执行。</p>
+      <ul>
+        <li><strong>关键设计 —— 验证作为安全屏障</strong>：两个 LLM 的输出在到达 MPC 求解器之前经过约束验证器（分配用 beta(A)，权重用经验界）。这确保即使是错误的 LLM 输出也不会产生不安全的控制指令。</li>
+        <li><strong>人类交互示例</strong>：初始分配中两架无人机都在跟踪两个目标（重复分配），导致跟踪模糊。人类："The robots don't seem to be tracking the targets." Task LLM 响应：重新分配——无人机 21 跟踪目标 122，无人机 26 跟踪目标 124。反馈："New tracking assignments optimized based on UAV capabilities, ensuring each target is tracked by at least one UAV."</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">Simulation Results: Multi-Robot Tracking with Hazard Adaptation</span>
+      <span class="fig-source">Source: Paper Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Simulation results with hazard adaptation"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图示解读</div>
+      <p><strong>本图展示了</strong>具有不同任务负载和危险复杂度的代表性仿真场景。三个关键观察：(1) 随着机器人和目标数量增加，Task LLM 消耗的令牌也增加——反映了分配问题复杂度的增长。(2) Action LLM 的令牌使用量在不同场景规模下保持相对稳定，因为其输出（4 个权重）具有固定复杂度。(3) LLM 在环系统始终优于纯优化，在更复杂的场景中（更多危险、更受约束的分配）差距扩大。</p>
+      <ul>
+        <li><strong>对攻击的适应</strong>：当机器人进入感知危险区并受到攻击（传感器退化），Task LLM 迅速将受损机器人从关键跟踪分配中移除，并将其目标重新分配给健康的机器人。Action LLM 同时增大感知安全权重 (w3)，使所有机器人在接近感知区时更加保守。</li>
+        <li><strong>恢复行为</strong>：当受损机器人恢复后，Task LLM 将其重新整合到分配池中，Action LLM 在危险情况改善时逐渐降低 w3——展示了平滑、无迟滞的适应。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. 缺陷与扩展 ═══════════════ -->
+<section id="flaw">
+  <h2>9. 缺陷与扩展</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>假设约束</strong>：(1) 优化模型需要<strong>已知动力学方程</strong>——在模型存在显著不确定性的场景中，即使 LLM 参数调节正确，MPC 求解器也可能产生不可靠的控制。(2) 危险区必须由机器人<strong>先发现</strong>，安全约束才能被激活——机器人在发现阶段可能进入危险区，保护机制尚未介入。(3) 假设人类监督者提供正确引导——人类错误（不正确的危险评估、认知偏差）可能降低而非改善性能。</li>
+    <li><strong>适用范围</strong>：(1) LLM 推理延迟（0.9-1.4s）限制了在<strong>极高速动态场景</strong>中的适用性——如果目标移动非常快，LLM 推理期间目标已发生显著位移。(2) 该框架是<strong>部分集中式的</strong>——一个中心站运行 LLM 推理和优化求解，可扩展性受通信带宽和中心计算限制。(3) 目前仅在目标跟踪任务上验证——扩展到其他多机器人任务（探索、覆盖、操作）需要重新设计优化公式和 LLM 提示。</li>
+    <li><strong>可扩展性</strong>：(1) 随着机器人数量增加，Task LLM 令牌使用量增长——更大的团队意味着更长的提示和更复杂的分配推理，可能超出上下文窗口限制。(2) 部分集中式架构的通信需求随团队规模缩放——在大规模部署（20+ 架 UAV）中，中心站成为瓶颈。(3) LLM 提示是<strong>精心手工制作的</strong>——对于新任务类型，系统提示和输出格式必须手动重新设计，无自动适应机制。</li>
+  </ul>
+
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：(1) 从部分集中式到<strong>完全分布式</strong>——每个机器人运行自己的轻量 LLM（通过蒸馏）进行本地参数调节，配备协调协议防止跨机器人的冲突调整。(2) 扩展到<strong>更广泛的机器人任务</strong>——"LLM 参数化、求解器保证"的架构可通过重新表述内层优化问题应用于探索、搜索救援、覆盖和编队控制。</li>
+    <li><strong>条件放宽</strong>：(1) 降低对精确动力学模型的依赖——引入<strong>鲁棒优化</strong>或<strong>学习残差补偿</strong>来处理模型不准确性。(2) 通过<strong>来自历史交互的 RLHF</strong> 微调 LLM——让 LLM 从历史部署数据中学习哪种参数调整方向最有效，提高适应速度并减少人类干预频率。</li>
+    <li><strong>约束增加</strong>：(1) 添加<strong>能量/电池约束</strong>——在真实 UAV 部署中，剩余飞行时间是任务分配和路径选择的关键因素。(2) 添加<strong>视觉遮挡约束</strong>——UAV 之间的相互遮挡可能降低目标跟踪性能，需要协调视角。(3) 添加<strong>通信拓扑约束</strong>——确保团队在避开通信危险区的同时维持连通的通信图。</li>
+  </ul>
+
+  <h3>9.3 数据敏感性</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>LLM 推理延迟（0.9-1.4s）</td><td>在高动态场景中，1 秒延迟意味着 LLM 的参数调整基于过时信息。10Hz MPC 通过连续重规划进行补偿，但配置本身可能滞后于真实环境状态。通过分层频率设计得到缓解——关键内环无论 LLM 状态如何都以 10Hz 运行。</td><td>★★★★</td></tr>
+    <tr><td>提示设计脆弱性</td><td>系统提示质量直接影响 LLM 输出质量。设计不当的提示可能导致 LLM 遗漏危险含义、生成不可行分配或误解人类反馈。输出验证层（beta(A)、经验界）是关键的捕获提示引发错误的安全网。</td><td>★★★★</td></tr>
+    <tr><td>人类反馈歧义性</td><td>"更积极一些"、"更保守一些"——这些需要上下文解释和量化映射。LLM 必须从当前情境中推断真实意图。错误解释可能导致不适当的参数调整（如人类本意是"换个更好的跟踪算法"，却被解读为降低安全裕度）。</td><td>★★★</td></tr>
+    <tr><td>令牌消耗可扩展性</td><td>Task LLM 令牌使用量随机器人和目标数量增长。对于大团队（20+ 机器人，50+ 目标），提示可能超出令牌限制，需要对状态信息进行分层摘要，但可能丢失最优分配所需的关键细节。</td><td>★★★</td></tr>
+    <tr><td>危险发现滞后</td><td>机器人必须实际遇到或观测到危险区后，LLM 才能对其进行推理。在发现阶段，优化在危险信息不完整的情况下运行，可能引导机器人穿越尚未发现的危险区。</td><td>★★</td></tr>
+  </table>
+
+  <h3>9.4 值得深入研究的课题</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深入研究</div>
+    <strong>LLM 在环优化 + 多机器人安全的分布式学习</strong>——当前框架使用集中式、手工提示的 LLM。一个有前景的扩展方向：每个机器人搭载一个<strong>微调的轻量 LLM</strong>，该 LLM 从历史部署数据中学会了如何为不同情境调整优化参数。这需要：(1) 从仿真和真实部署中收集大规模"上下文-最优参数"配对数据集；(2) 将大 LLM 蒸馏到可在嵌入式平台上运行的尺寸；(3) 设计分布式共识机制防止机器人间参数调整冲突。如果成功，这将创造首个<strong>完全自主学习参数调节策略的多机器人协调</strong>系统。这也与更广泛的 Kumar 实验室方向相连：CORE（Ravichandran et al., 2026）用于单机器人上下文安全 + 本文用于多机器人优化配置——共同定义了一个"LLM 引导、形式化验证的多机器人系统"研究计划。对 UAV-Survey 应用：LLM 推理调查优先级、天气危险和空域限制；形式化优化确保安全、动力学可行的轨迹；多 UAV 协调从 LLM 配置的双层优化中涌现。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. 动机推导 ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机推导 —— 第一性原理推导</h2>
+
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>未知危险环境中的多机器人协调需要同时满足三个需求：快速响应（实时控制）、智能决策（对危险的语义理解）和安全保证（约束满足）。这三个需求之间存在张力——快速优化需要简化模型，无法捕捉语义层面的变化；LLM 理解语义但速度慢且对直接控制不安全；人类监督提供智能但规模扩大时面临认知过载。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三种主要方法：(i) 纯优化假设已知危险模型——在开放世界部署中不现实，危险是在线发现的且可能有未建模的影响。(ii) LLM 直接控制缺乏安全保证——LLM 幻觉出违反动力学或穿越危险区的轨迹。(iii) 人类监督面临认知过载——监控多架 UAV 的数值状态超出人类能力。每种方法只解决三个需求的一个维度。</li>
+    <li><strong>如果 LLM 不控制，而是配置优化呢？</strong><br>关键洞察：分离<strong>优先做什么</strong>（LLM 的工作，基于对危险和任务上下文的语义理解）和<strong>如何安全执行</strong>（求解器的工作，具有形式化约束保证）。LLM 充当"优化架构师"——它基于对环境的理解设计优化问题结构（分配矩阵 A）和目标偏好（权重向量 w），然后将配置好的问题交给数值求解器，由求解器产生保证安全的轨迹。这种清晰分离确保即使 LLM 出错，求解器也能防止不安全执行。</li>
+    <li><strong>为什么用双层分解加两个 LLM？</strong><br>任务分配（离散决策、全局范围、长时间域）和权重调节（连续调整、局部范围、短时间域）是根本不同的推理任务。单个 LLM 需要同时处理两者——导致上下文混淆、更新频率不当、短期目标与长期目标的冲突。两个专门的 LLM 以各自自然的频率（0.05Hz 和 0.2Hz）运行，各自专注于自己擅长的推理类型，10Hz MPC 求解器通过连续重优化桥接两者。</li>
+    <li><strong>最简单的完整方案是什么？</strong><br>Task LLM 输出分配 A（由 beta(A) 验证）→ Action LLM 输出权重 w（由经验界过滤）→ MPC 求解器生成轨迹 → 机器人执行 → 反馈 → 循环重复。人类可选注入自然语言 → LLM 翻译为参数变化。本质：<strong>LLM 提供智能（优先做什么）；求解器提供安全（如何安全执行）；人类提供监督（当 LLM 推理不足时）。</strong></li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    多机器人协调需要快、聪明、安全——但优化器又快又安全却"笨"（无法推理危险语义），LLM "聪明"却又慢又不安全——所以把 LLM 放在外环决定<strong>优先做什么</strong>，把优化器放在内环保证<strong>如何安全执行</strong>，让人类在 LLM 卡住时提供自然语言引导。
+  </div>
+
+  <h3>10.3 你如何自己想到这个想法</h3>
+  <ul>
+    <li><strong>步骤 1 —— 观察自然层级</strong>：多机器人协调本质上具有层级结构——任务分配（哪个机器人做什么）和运动控制（每个机器人如何移动）。这种层级无处不在：生物学（大脑指挥，肌肉执行）、工程学（规划器决策，控制器执行）、军事（指挥官分配，士兵机动）。这种结构不是任意的——它反映了时标和信息范围的根本分离。</li>
+    <li><strong>步骤 2 —— 确定 LLM 适合的位置</strong>：LLM 不适合底层控制（太慢、无安全保证、有幻觉风险），但擅长高层推理（理解上下文、权衡取舍、解释自然语言）。自然的问题：在多机器人协调的层级结构中，LLM 应该位于哪里？答案：配置层——在优化器之上，调整其参数，但不在控制回路内。</li>
+    <li><strong>步骤 3 —— 设计 LLM-优化器接口</strong>：LLM 的输出到达优化器前必须是<strong>可验证的</strong>。分配矩阵 A（离散，由约束函数 beta(A) 验证）和权重向量 w（连续，由经验界过滤）。这些输出<strong>参数化</strong>优化而不直接决定机器人动作。接口是关键工程贡献——使 LLM 输出安全地供数值求解器消费。</li>
+    <li><strong>步骤 4 —— 添加人类反馈作为安全网</strong>：认识到 LLM 与人类专家一样可能卡住或出错。添加可选的人类引导通道：自然语言输入 → LLM 解析 → 与自主配置融合。这创建了一个安全网，人类直觉可以重定向系统而无需理解优化内部。关键设计原则：人类提供<strong>意图</strong>，LLM 提供<strong>到参数的翻译</strong>，求解器提供<strong>安全执行</strong>。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. 核心收获 ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+
+  <h3>11.1 学到的教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：<strong>"LLM 参数化、求解器保证"</strong>是一个可广泛应用的范式——不限于多机器人跟踪，适用于任何需要智能参数适应和硬约束满足的优化问题。LLM 提供<strong>语义推理</strong>（理解环境变化、权衡多目标取舍），求解器提供<strong>形式化保证</strong>（约束满足、动力学可行性、最优性）。对 UAV 控制：LLM 可调整 MPC 权重、约束松弛参数和参考轨迹生成策略——而不直接生成控制指令。此范式很可能成为 LLM 集成机器人系统的标准模式。</li>
+    <li><strong>技术技巧层面</strong>：(1) <strong>输出验证是关键安全屏障</strong>——Task LLM 的 beta(A) 验证和 Action LLM 的经验界过滤确保错误的 LLM 输出永不到达控制系统。该验证层使 LLM-优化器集成变得可信。(2) <strong>分层频率设计</strong>——10Hz:0.2Hz:0.05Hz 的比例（200:4:1）使每个模块在其自然时标上运行，同时维持整体一致性。关键洞察：时序分离防止 LLM 的慢速成为系统瓶颈。(3) <strong>灵活的人类反馈粒度</strong>——支持从战略级（"更积极一些"）到具体指令（"无人机 21 应跟踪目标 122"），LLM 处理到参数的翻译。这大幅降低了人类监督多机器人团队的专业门槛。</li>
+    <li><strong>实验/写作层面</strong>：论文围绕<strong>四个假设</strong>（H1-H4）组织评估：H1（LLM 可重配置任务分配），H2（LLM 可调整目标权重），H3（LLM 在环改善跟踪并降低风险），H4（框架在真实硬件上实时运行）。每个假设均通过仿真和硬件实验验证。这种假设驱动的结构使研究贡献清晰且可评估。消融研究通过仅运行一个 LLM 来干净地分离每个 LLM 的贡献，揭示了它们的互补角色。</li>
+  </ul>
+
+  <h3>11.2 直接适用于我的研究</h3>
+  <ul>
+    <li><strong>对 UAV 编队控制与 LLM 引导</strong>：与其让 LLM 直接生成编队参数或航点（可能产生动力学不可行的编队），不如让 LLM 配置一个编队优化：根据任务语义调整编队形状权重（"狭窄走廊用紧密编队，开阔区域用松散编队"），根据危险类型修改机器人间距约束，并从编队控制器库中选择适当的控制器。编队优化保留动力学可行性和机器人间安全。</li>
+    <li><strong>对 UAV 基于图像的视觉伺服（IBVS）</strong>：特征选择和视觉约束公式可由 LLM 配置。LLM 观察视觉场景（如"目标部分遮挡，左侧强光"），推理哪些视觉特征可靠、哪些 IBVS 约束应放宽或收紧，并输出 IBVS 优化的配置参数。IBVS 求解器基于 LLM 配置的特征集计算控制，同时维持视觉约束。</li>
+    <li><strong>对多 UAV 调查规划</strong>：双层 LLM 在环框架直接映射到调查任务：外环将调查区域分配给 UAV（LLM 基于对地形、危险和任务目标的语义理解调整优先级），内环规划覆盖路径（LLM 基于区域特征调整路径模式、重叠裕度、飞行高度）。人类监督者可在新信息到来时用自然语言重新设定区域优先级（"4 号区域的倒塌建筑需要立即详细检查"）。</li>
+  </ul>
+
+  <h3>11.3 需跟进的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Liu et al. (2024) -- Multi-robot target tracking with sensing and communication danger zones. <em>DARS</em></td><td>同组前驱工作——首次形式化了多机器人跟踪的感知和通信危险区问题。本文在此基础上增加 LLM 在环优化层以实现智能适应。</td></tr>
+    <tr><td>Li et al. (2024) -- Resilient multi-robot target tracking with sensing and communication danger zones</td><td>同组工作——研究了传感器/通信故障后的恢复机制。本文的 LLM 在环框架提供了比预编程恢复策略更灵活、更具语义感知的韧性方法。</td></tr>
+    <tr><td>Ma et al. (2024) -- Eureka: Human-level reward design via coding large language models. <em>NeurIPS</em></td><td>LLM 用于奖励函数设计的开创性工作。本文将 LLM 的角色从"奖励设计者"扩展到"优化参数化器"——LLM 为优化研究方向上的自然递进。</td></tr>
+    <tr><td>Ravichandran et al. (2026) -- CORE: Contextual Safety Reasoning for Open-World Robots. <em>arXiv</em></td><td>同实验室（Kumar 组），互补的哲学：LLM 用于语义推理 + 形式化方法用于安全保证。CORE 聚焦单机器人上下文安全；本文聚焦多机器人优化配置。二者共同构成一个连贯的研究计划。</td></tr>
+    <tr><td>Nie et al. (2024) -- The importance of directional feedback for LLM-based optimizers</td><td>研究了反馈方向性如何影响 LLM 优化性能——与 Action LLM 的设计直接相关，Action LLM 接收性能趋势反馈来引导权重调整。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Wu et al. · 2025 · Hierarchical LLMs In-the-Loop Optimization for Real-Time Multi-Robot Target Tracking under Unknown Hazards · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Generating Realistic In Silico Gene Networks (Marbach, Floreano et al., 2009)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Dario Floreano · 12-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10104/index.html">current state future</a>
+<a href="../10106/index.html">Soft biomimetic fish</a>
+<a href="../10096/index.html">Soft robotic grippers</a>
+<a href="../10095/index.html">Evolutionary robotics</a>
+<a href="../10105/index.html">Miniature curved artifici</a>
+<a href="../10101/index.html">Swarmanoid novel concept</a>
+<a href="../10097/index.html">Revealing strengths weakn</a>
+<a class="active" href="../10100/index.html">Generating realistic sili</a>
+<a href="../10099/index.html">Neuroevolution architectu</a>
+<a href="../10098/index.html">Bio-inspired artificial</a>
+<a href="../10103/index.html">Evolving self-organizing </a>
+<a href="../10102/index.html">Swarm-bot new distributed</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Generating Realistic In Silico Gene Networks for Performance Assessment of Reverse Engineering Methods（生成逼真的计算机模拟基因网络用于反向工程方法的性能评估）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Daniel Marbach</strong>、<strong>Thomas Schaffter</strong>、Claudio Mattiussi、<strong>Dario Floreano</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">EPFL</strong>（瑞士洛桑联邦理工学院），Laboratory of Intelligent Systems（智能系统实验室）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">Journal of Computational Biology</strong>，<strong>2009年</strong>，Vol. 16, No. 2, pp. 229–239</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://doi.org/10.1089/cmb.2008.09TT" target="_blank">10.1089/cmb.2008.09TT</a> | 基金：Swiss National Science Foundation (200021-112060) + SystemsX.ch (WingX)</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出一种从已知生物调控网络（酵母转录调控网络）中<strong>提取拓扑模块</strong>来生成计算机模拟基因网络的方法，替代传统随机图模型，使反向工程算法（reverse engineering）的基准测试更加逼真。该方法被选为 <strong>DREAM3</strong> 国际基因网络反向工程挑战赛的 gold-standard 网络生成方法。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Gene Regulatory Networks</span>
+    <span class="tag tag-green">Module Extraction</span>
+    <span class="tag tag-amber">DREAM Challenge</span>
+    <span class="tag tag-purple">Network Motifs</span>
+    <span class="tag tag-red">Modularity Q</span>
+    <span class="tag tag-cyan">Benchmark Design</span>
+    <span class="tag tag-gray">Reverse Engineering</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么基因网络反向工程算法的性能评估不可靠？</strong><br>
+    答：因为现有基准测试使用的随机图模型（Erdos-Renyi 或 scale-free）仅部分捕获了真实生物网络的拓扑特性，导致算法排名高度依赖于测试图的生成方式。随机图缺少真实网络的关键特征如 modularity（模块化）、network motifs（网络模体）和功能性聚类。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>从真实生物网络中提取拓扑模块</strong>——而非从随机图采样——来生成基准网络。提取的模块同时保留了原网络的功能属性（GO term 富集）和结构属性（度分布、network motif significance profile），使得基准测试的结果更能反映算法在真实生物学场景中的表现。这一方法被 DREAM3 挑战赛选用，成为当时最广泛使用的基因网络推理基准。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>随机图模型的局限性（Erdos-Renyi / Scale-free 无法建模 modularity 和 network motifs）</td><td>→ 不应继续构造更复杂的随机图模型（会引入不易论证的偏差），而应直接从真实生物网络结构出发，保留其完整拓扑特征</td><td>策略</td></tr>
+    <tr><td>网络模块化理论（Newman, 2006 的 modularity Q）与生物学中"拓扑模块 = 功能模块"的假说</td><td>→ 使用 modularity Q 作为提取子网络的贪心准则，确保提取出的子网络具有高模块度，且与真实功能模块高度相关</td><td>数学</td></tr>
+    <tr><td>DREAM 挑战赛的基准设计需求——需要多个不同规模但同等生物真实的 gold-standard 网络</td><td>→ 通过随机选择种子节点 + 迭代贪心扩展，可以在同一个 source network 上生成多样化（非重复）的子网络</td><td>架构</td></tr>
+    <tr><td>酵母（S. cerevisiae）转录调控网络是当时最完整的真核生物调控网络（4441 genes, 12873 interactions, Balaji et al. 2006）</td><td>→ 选择酵母网络作为 source network，因为它规模足够大、注释完善（SGD GO annotation），且代表性广泛</td><td>数据</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 基于模块提取（Module Extraction）的网络生成方法</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>随机图模型生成的基准网络缺少真实基因调控网络的关键特征（modularity、network motifs、功能聚类），导致算法排名高度依赖随机图的具体选择，无法准确反映在真实生物学问题上的表现。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>复杂网络理论中的 modularity 概念——模块是内部连接密集、与外部连接稀疏的节点集合。真实基因网络具有显著的模块化结构，且拓扑模块与功能模块高度相关。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>从 source network 随机选择种子节点，迭代添加邻居节点，每一步选择使 modularity Q 最大化的邻居加入子网络，直到达到预设大小。Q = (1/4m) * s^T * B * s，其中 B 是 modularity matrix（B_ij = A_ij - k_i*k_j/2m）。此方法生成大小 25/100/400 的子网络用于基准测试。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 功能与结构双重验证框架</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>仅凭直觉声称"模块提取比随机采样更逼真"是不够的——需要定量证明提取出的网络在功能和结构两个层面都确实保留了真实网络的属性。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Gene Ontology (GO) 富集分析 + network motif significance profile (SP) 方法</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）功能验证：使用 GO::TermFinder 检验模块中是否富集特定功能注释，模块提取产生的 GO term 数量远超随机采样（大小100时：282 vs 9），且 p-value 更显著；（2）结构验证：triad significance profile (SP) 显示模块提取保留了原网络的 motif 特征（SP 落入 1 个标准差内），而随机采样的 SP 与原网络完全相反。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 实战验证——DREAM3 挑战赛的 gold-standard</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>基准测试方法不能只停留在论文中，需要在真实竞赛环境中证明其有效性——即能区分好的算法和差的算法，且不会对特定类型的算法产生系统性偏差。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>DREAM2 中使用随机图的经验教训——获胜算法在 Erdos-Renyi 网络上远优于 scale-free 网络，说明基准网络结构对排名有决定性影响</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>为 DREAM3 生成 5 个 gold-standard 网络（来自 E. coli 转录调控网络 ×2 + 酵母遗传互作网络 ×3），大小覆盖 10、50、100 三个尺度。三个挑战的参与者分别为 29、27、22 人，成为迄今为止最广泛使用的基因网络反向工程基准。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — 从真实生物网络到基准测试的完整管线</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Source Selection <span>数据层</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>已知生物网络数据库</strong>
+          <small>酵母转录调控网络 (4441 genes, 12873 edges) — Balaji et al. 2006</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>功能注释数据库</strong>
+          <small>SGD Gene Ontology annotations (Hong et al. 2008)</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Module Extraction <span>算法层</span></h4>
+        <div class="arch-card arch-power">
+          <strong>Seed → Greedy Expansion</strong>
+          <small>随机种子节点 + 迭代选择 max modularity Q 的邻居</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>Q = s^T B s / 4m</strong>
+          <small>Newman modularity matrix; k% randomness controls diversity</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Validation <span>统计层</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>Functional: GO Enrichment</strong>
+          <small>GO::TermFinder + Bonferroni correction for multiple testing</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>Structural: Motif SP</strong>
+          <small>Triad significance profile Z_i = (N_real - mean(N_rand)) / std(N_rand)</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Benchmark Deployment <span>应用层</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>DREAM3 Gold Standards</strong>
+          <small>5 networks × 3 sizes (10, 50, 100) — hidden from participants</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>Dynamics + Noise</strong>
+          <small>Add kinetic models + experimental noise for final benchmark</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>known networks → template</span>
+      <span>greedy modularity → subgraphs</span>
+      <span>function + structure checks</span>
+      <span>fair algorithm comparison</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>Source network completeness; missing edges bias benchmarks</small></div>
+      <div class="arch-metric"><strong>Main invention</strong><small>Modularity-guided subnetwork extraction from real biological networks</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>Topological modules = functional modules in gene regulatory networks</small></div>
+      <div class="arch-metric"><strong>Current limitation</strong><small>Single-organism source; no chromatin/post-translational layers</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 Method Pipeline</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["输入: 生物先验知识"]
+      SOURCE["Source Network: 酵母转录调控网络 · 4441 genes · 12873 interactions"]
+      GO["GO Annotations: SGD 功能注释数据库"]
+    end
+
+    subgraph EXTRACT["模块提取: Greedy Modularity Expansion"]
+      SEED["随机种子节点选择"]
+      GROW["迭代扩展: 每一步选择使 Q 最大化的邻居节点"]
+      STOP["终止条件: 子网络达到预设大小 M (25/100/400)"]
+    end
+
+    subgraph VALIDATE["双重验证"]
+      FUNC["功能验证: GO term 富集分析 · p-value with Bonferroni correction"]
+      STRUC["结构验证: Degree distribution · Triad significance profile (SP)"]
+    end
+
+    subgraph DEPLOY["部署: DREAM3 基准"]
+      GOLD["5 个 gold-standard 网络 · 大小 10/50/100"]
+      HIDE["隐藏边集: 参与者不可见 · 仅用于最终评估"]
+      EVAL["评估: 精确率-召回率曲线 · ROC · 算法排名"]
+    end
+
+    SOURCE --> SEED
+    SEED --> GROW --> STOP
+    STOP --> FUNC
+    STOP --> STRUC
+    FUNC --> GOLD
+    STRUC --> GOLD
+    GOLD --> HIDE --> EVAL
+
+    GO -.->|"提供功能真值"| FUNC
+    SOURCE -.->|"提供拓扑真值"| STRUC
+    EVAL -.->|"反馈: 不同算法对模块结构敏感"| STOP
+
+    classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef extract fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef validate fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef deploy fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class SOURCE,GO input
+    class SEED,GROW,STOP extract
+    class FUNC,STRUC validate
+    class GOLD,HIDE,EVAL deploy
+    </pre>
+  </div>
+
+  <h3>3.2 模块提取 vs 随机采样 — 核心对比流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph MOD["Module Extraction (本文)"]
+      direction TB
+      M1["种子节点: 全局网络中随机选取"]
+      M2["贪心扩展: 每次选Q最大的邻居"]
+      M3["子网络: 高模块度 · 保留原网络功能模块 · 保留motif"]
+    end
+
+    subgraph RND["Random Extraction (Van den Bulcke et al.)"]
+      direction TB
+      R1["种子节点: 全局网络中随机选取"]
+      R2["随机扩展: 从邻居中随机选择"]
+      R3["子网络: 低模块度 · 丧失功能模块 · motif特征相反"]
+    end
+
+    subgraph COMPARE["对比维度"]
+      direction TB
+      C1["Modularity Q: 正且显著高 vs 接近零"]
+      C2["GO terms 数量: 282 vs 9 (size=100)"]
+      C3["Degree dist: 相似 (r=0.92 vs r=0.93)"]
+      C4["Motif SP: 落入1σ vs 完全相反"]
+    end
+
+    MOD --> COMPARE
+    RND --> COMPARE
+
+    classDef mod fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef rnd fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef compare fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class M1,M2,M3 mod
+    class R1,R2,R3 rnd
+    class C1,C2,C3,C4 compare
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \text{Generate } G_{\text{bench}} \sim P_{\text{real}}(G) \quad \text{s.t.} \quad G_{\text{bench}} \text{ preserves both functional and structural properties of real gene networks} $$
+    <div class="eq-note">
+      <strong>$G_{\text{bench}}$</strong> = 用于基准测试的 in silico 基因网络 &nbsp;|&nbsp;
+      <strong>$P_{\text{real}}(G)$</strong> = 真实生物网络的拓扑分布（未知，无法直接采样）&nbsp;|&nbsp;
+      <strong>核心目标</strong>：生成结构已知（方便计算 precision/recall）、但统计特性与真实基因网络一致的 benchmark 网络。这类似于域适应中的"源域-目标域分布对齐"问题，但在网络拓扑空间。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>已知的全局基因调控网络（source network）+ 基因功能注释数据库（GO）</td><td>有向图：N nodes × E edges；GO：层次化术语树</td></tr>
+    <tr><td><strong>输出</strong></td><td>具有已知真值结构的 benchmark 子网络 + 功能与结构验证报告</td><td>子网大小可配（10/25/50/100/400）、可重复生成多个不同子网</td></tr>
+    <tr><td><strong>目标</strong></td><td>生成的子网络必须同时满足：（1）拓扑模块性（高 Q），（2）功能一致性（GO 富集），（3）结构保真度（度分布 + motif SP 与原网络一致）</td><td>对比基线 = 随机子网络采样（Van den Bulcke et al. 2006）</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>数据生成方法学</strong>研究——不是设计新的反向工程算法，而是设计<strong>更公平、更逼真的算法评测基准</strong>。核心贡献在于认识到"基准的分布决定了排名的意义"这一元方法论问题。类比于机器学习领域 ImageNet 替代 MNIST 的范式升级：更接近真实数据分布的基准才能选出在真实任务中表现最好的模型。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：基准测试的"不可能三角"——（1）真实网络的真值不完整（不能直接当 gold standard），（2）随机图缺少生物真实性（使算法排名不可靠），（3）手工设计网络太小且主观（缺乏统计意义）。<br><br>
+    （1）<strong>真实网络的困境</strong>：即使是研究最透彻的酵母网络，其完整的转录调控拓扑仍是未知的。现有数据库（如 SGD）只是 partial knowledge——边缘缺失（false negatives）和虚假边（false positives）都存在。直接使用已知网络做基准会系统性偏袒那些"学到数据库已有知识"的算法。<br><br>
+    （2）<strong>随机图的缺陷</strong>：scale-free 随机图能近似度分布，但完全缺失 modularity（生物网络的核心组织原则）和 network motifs（统计上过表达的调控回路，如 feed-forward loop）。用这种网络评测，获胜的可能是"对 scale-free 特性过拟合"的算法，而非真正理解生物调控逻辑的算法。<br><br>
+    （3）<strong>两难困境的出路</strong>：不生成"全新"的网络，而是从真实网络中"采样"——但采样方式必须保留功能与结构属性。这意味着采样策略本身需要基于对网络组织原理的深刻理解（modularity、motif、度分布），这正是本文的核心贡献。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Erdos-Renyi Random Graph（均匀随机图）</td>
+      <td>以固定概率 p 随机创建每条边，生成同质网络</td>
+      <td>度分布为泊松分布——与真实基因网络的幂律分布完全不同。无 module、无 motif、无 hub 结构。DREAM2 中获胜算法在此类图上表现远优于 scale-free 图，说明算法排名被基准结构绑架。</td>
+    </tr>
+    <tr>
+      <td>Scale-Free Random Graph（Albert-Barabasi 模型）</td>
+      <td>通过优先连接机制生成"富者愈富"的度分布，近似真实网络的无标度特性</td>
+      <td>仅近似度分布，<strong>不建模 modularity</strong>（Ravasz et al. 2002 证明生物网络是层次化模块结构的，非单纯幂律）、<strong>不产生 network motifs</strong>（统计上过表达的调控回路）。本质上只匹配一阶统计量，遗漏了高阶结构。</td>
+    </tr>
+    <tr>
+      <td>Random Subnetwork Extraction（Van den Bulcke et al. 2006）</td>
+      <td>从全局生物网络中随机抽取连通子网络作为基准</td>
+      <td>随机采样破坏了原网络的模块结构——采样出的子网络虽然度分布与原网络相似，但 modularity 接近零，motif significance profile 与原网络<strong>完全相反</strong>。功能注释富集也极少（size=100 时仅 9 个 GO terms vs 模块提取的 282 个）。</td>
+    </tr>
+    <tr>
+      <td>Single-Network Extraction（Rice et al. 2005）</td>
+      <td>从 E. coli 全局转录网络中提取一个完整的 in silico 网络</td>
+      <td>只生成<strong>一个</strong>网络——无法收集统计量以评估算法的平均性能和方差。reverse engineering 方法在不同网络上表现差异极大（如 DREAM2 中的跨网络差距），单一网络无法给出可靠的性能估计。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 如何定义"逼真"？</strong>：没有单一的度量能完整描述基因网络的复杂性。需要在多个维度（度分布、motif 组成、模块结构、功能富集）同时验证，且每个维度的验证方法都需要仔细设计——例如 motif significance profile 需要与 1000 个随机化网络的 ensemble 对比计算 Z-score。</li>
+    <li><strong>挑战 2 — 如何保证生成多样化？</strong>：种子节点选择不同可能导致收敛到相同模块——如果相邻种子产生高度重叠的子网络，基准测试就变成了"对一个网络反复测试"，失去统计意义。需要通过 top-k% 随机选择（tunable randomness parameter）来控制多样性。</li>
+    <li><strong>挑战 3 — 如何避免过度依赖单一物种网络？</strong>：酵母是研究最透彻的真核模式生物，但其调控网络架构可能不代表其他物种（如哺乳动物的长程增强子调控）。使用单一 source network 生成的基准可能系统性地偏袒"类酵母网络"的推断方法。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心方法是<strong>基于模块度（modularity Q）的贪心子网络扩展算法</strong>。算法从 source network 中随机选择一个种子节点，然后迭代地将使 modularity Q 最大化的邻居节点加入子网络，直到达到预设大小 M。关键在于 modularity Q 的定义和计算——它是子网络内部边密度与随机期望的差值。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。符号解释用中文。</p>
+
+  <!-- Formula Group A: Modularity Q -->
+  <h4>Group A: 模块度（Modularity）— 核心优化目标</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — Modularity Q 定义</span>
+    $$ Q = \frac{1}{4m} \mathbf{s}^T \mathbf{B} \mathbf{s} $$
+    $$ B_{ij} = A_{ij} - P_{ij} = A_{ij} - \frac{k_i k_j}{2m} $$
+    <div class="eq-note">
+      <strong>$m$</strong> = 网络中的总边数 &nbsp;|&nbsp;
+      <strong>$\mathbf{s}$</strong> = 子网络指示向量（$s_i = +1$ 表示节点 $i$ 在子网络内，$s_i = -1$ 表示不在）&nbsp;|&nbsp;
+      <strong>$\mathbf{B}$</strong> = modularity matrix &nbsp;|&nbsp;
+      <strong>$A_{ij}$</strong> = 邻接矩阵中 $i$ 和 $j$ 之间的实际边数 &nbsp;|&nbsp;
+      <strong>$P_{ij} = k_i k_j / 2m$</strong> = 在随机化网络中（保持相同度序列）$i$ 和 $j$ 之间期望的边数 &nbsp;|&nbsp;
+      <strong>$k_i$</strong> = 节点 $i$ 的度 &nbsp;|&nbsp;
+      <strong>直观含义</strong>：$Q > 0$ 表示子网络内部连接比随机期望更密集（即拓扑模块）。$Q$ 越高，模块性越强。算法每一步选择使 $Q$ 最大化的邻居加入。
+    </div>
+  </div>
+
+  <h4>Group B: Network Motif Significance Profile — 结构保真度验证</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — Triad Significance Profile (SP) 的 Z-score</span>
+    $$ Z_i = \frac{N_i^{\text{real}} - \langle N_i^{\text{rand}} \rangle}{\text{std}(N_i^{\text{rand}})} $$
+    $$ \text{SP}_i = \frac{Z_i}{\sqrt{\sum_j Z_j^2}} \quad \text{（归一化显著性剖面）} $$
+    <div class="eq-note">
+      <strong>$N_i^{\text{real}}$</strong> = 网络中第 $i$ 种三节点子图（triad）的出现次数 &nbsp;|&nbsp;
+      <strong>$\langle N_i^{\text{rand}} \rangle$</strong> = 度序列相同的随机化网络 ensemble 中 triad $i$ 的平均出现次数 &nbsp;|&nbsp;
+      <strong>$\text{std}(N_i^{\text{rand}})$</strong> = 标准差 &nbsp;|&nbsp;
+      <strong>SP</strong> = 将所有 triads 的 Z-score 归一化为单位向量，表示每种 motif 相对随机网络的过表达/欠表达程度 &nbsp;|&nbsp;
+      <strong>关键发现</strong>：模块提取的子网络 SP 与原网络一致（落入 1 个标准差区间），而随机采样子网络的 SP 与原网络<strong>完全相反</strong>——这是本文最有力的论证。
+    </div>
+  </div>
+
+  <h4>Group C: Degree Distribution — 度分布一致性</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — Degree Distribution Correlation</span>
+    $$ P(k) = \frac{|\{i : \deg(i) = k\}|}{N} $$
+    $$ r = \frac{\text{Cov}(P_{\text{source}}(k), P_{\text{subnet}}(k))}{\sigma_{P_{\text{source}}} \cdot \sigma_{P_{\text{subnet}}}} $$
+    <div class="eq-note">
+      <strong>$P(k)$</strong> = 度为 $k$ 的节点比例（度分布）&nbsp;|&nbsp;
+      <strong>$r$</strong> = Pearson 相关系数：模块提取 r = 0.92，随机采样 r = 0.93（两者都保留度分布，说明度分布是一个较弱的约束——两个方法都能满足）&nbsp;|&nbsp;
+      <strong>核心启示</strong>：度分布是必要的但<strong>不充分</strong>的结构度量——很多不同结构的网络可以有相同的度分布。这就是为什么仅靠 scale-free 随机图不足以生成逼真基准：它只匹配了一阶统计量。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>子网络大小 $M$</td><td><strong>25, 100, 400</strong></td><td>子网络包含的基因数</td><td>覆盖从小（可手动验证）到大（接近实际反向工程任务）的范围。DREAM3 额外提供 size 10 和 50 的黄金标准</td></tr>
+    <tr><td>Source network</td><td><strong>酵母转录调控网络（Balaji et al. 2006）</strong></td><td>已知全局调控网络，4441 genes, 12873 interactions</td><td>酵母是当时最完整的真核调控网络，有高质量的功能注释（SGD GO），网络规模足够大</td></tr>
+    <tr><td>多样性参数 $k\%$</td><td><strong>0%（纯贪心）至 100%（纯随机）</strong></td><td>在选择邻居时，从 top $k\%$ 的候选中随机选择</td><td>$k=0$ 是纯粹的模块提取，$k=100$ 退化为随机采样。通过调节 $k$ 可以在模块纯度和样本多样性之间权衡</td></tr>
+    <tr><td>随机化网络 Ensemble 大小</td><td><strong>~1000</strong></td><td>用于计算 motif Z-score 的参考分布所需的随机网络数量</td><td>遵循 Milo et al. (2004) 的标准做法，1000 个随机网络足以给出稳定的 Z-score 估计</td></tr>
+    <tr><td>GO 富集的 significance 阈值</td><td><strong>Bonferroni 校正后 p < 0.05</strong></td><td>判断 GO term 是否在子网络中显著富集</td><td>基因网络涉及大量 GO terms（数千个），需要多重检验校正以避免假阳性</td></tr>
+  </table>
+
+  <h3>6.4 模块提取 vs 随机采样的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🧬 模块提取（Module Extraction）— 本文方法</h4>
+      <ul>
+        <li>选择准则：<strong>$Q = s^T B s / 4m$</strong> — 最大化模块度</li>
+        <li>倾向于先填满种子所在的功能模块，再扩展到相邻模块</li>
+        <li>保留 motif significance profile — 与原网络一致</li>
+        <li>功能富集：size=100 时 282 个显著 GO terms</li>
+        <li>度分布：与原网络高度相关（r = 0.92）</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🎲 随机子网络提取 — Van den Bulcke et al. 2006</h4>
+      <ul>
+        <li>选择准则：<strong>纯随机</strong> — 从邻居中随机选择</li>
+        <li>采样结果不尊重任何模块边界，打散了功能组织</li>
+        <li>motif significance profile <strong>与原网络完全相反</strong></li>
+        <li>功能富集：size=100 时仅 9 个显著 GO terms</li>
+        <li>度分布：与原网络也高度相关（r = 0.93）— 但仅此而已</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个核心概念：模块度（为什么 $Q > 0$ 意味着模块结构）、network motifs（为什么它们是功能的建筑块）、以及这些概念如何共同支撑"拓扑模块 = 功能模块"的核心假说。</p>
+
+  <h3>7.1 模块度（Modularity）原理 — 为什么贪心最大化 Q 能提取功能模块？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — Modularity 的物理直觉</span>
+    $$ Q = \frac{1}{4m} \sum_{ij} \left( A_{ij} - \frac{k_i k_j}{2m} \right) s_i s_j $$
+    <div class="eq-note">
+      <strong>$A_{ij}$</strong> = 实际存在的边（观测值）&nbsp;|&nbsp;
+      <strong>$k_i k_j / 2m$</strong> = 在保持度序列不变的前提下随机重连边时期望的边数（null model）&nbsp;|&nbsp;
+      <strong>$s_i s_j = +1$</strong> 当 $i$ 和 $j$ 都在子网络内或都不在，<strong>$s_i s_j = -1$</strong> 当一个在内一个在外 &nbsp;|&nbsp;
+      <strong>直觉</strong>：$Q$ 衡量的是"子网络内部的实际边数"减去"随机期望边数"——正 $Q$ 意味着子网络内部比随机更密集，即拓扑模块。算法贪心选择使 $Q$ 最大的邻居，等价于"优先吸纳那些与已有子网络连接最密集（相对于随机期望）的节点"。
+    </div>
+  </div>
+
+  <p><strong>为什么 Q-maximization 能提取功能模块？</strong>这涉及网络生物学的一个核心假说：功能相关的基因倾向于在转录调控网络中形成密集互连的模块（Hartwell et al., 1999; Ravasz et al., 2002）。如果这个假说成立，那么贪心最大化 Q（拓扑标准）自然会产生功能富集的子网络（功能标准）——本文的实验正是通过 GO 富集分析验证了这一假说。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🧬 模块提取的层次化行为</h4>
+      <p><strong>阶段 1 — 局部填充</strong>：从种子节点出发，首先填满种子所在的四节点 motif（如 Fig. 2 的层次化网络示例）</p>
+      <p><strong>阶段 2 — 模块扩展</strong>：扩展到同一 cluster 内的其他 motif</p>
+      <p><strong>阶段 3 — 跨模块扩展</strong>：仅在预设大小未达到时才扩展到相邻 cluster</p>
+      <p><strong>结果</strong>：子网络在不同尺度上保留了层次化模块组织——这是随机采样完全做不到的。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>🎲 随机采样的无结构行为</h4>
+      <p><strong>阶段 1</strong>：随机选择邻居——不考虑对方是否与子网络功能相关</p>
+      <p><strong>阶段 2</strong>：继续随机选择——子网络可能跨越多个不相干的功能模块</p>
+      <p><strong>阶段 3</strong>：生成的子网络是多个模块碎片的随机拼接</p>
+      <p><strong>结果</strong>：度分布虽然对上了（因为度是节点自身属性），但 motif 结构和功能组织完全丢失。</p>
+    </div>
+  </div>
+
+  <h3>7.2 Network Motifs — 基因调控的功能建筑块</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — Network Motif 的生物学意义</span>
+    $$ \text{Motif} = \text{在真实网络中统计上显著过表达的子图模式} $$
+    <div class="eq-note">
+      <strong>Network motifs</strong>（网络模体）= 在真实基因调控网络中出现的频率远超随机网络期望的特定调控回路模式。例如：feed-forward loop（X 调控 Y，X 和 Y 共同调控 Z）是细菌和酵母中最常见的 motif——它能实现噪声过滤、响应加速等特定功能。&nbsp;|&nbsp;
+      <strong>Alon 假说（2007）</strong>：每个 network motif 都对应一个特定的信息处理功能——它们是基因调控网络的功能"建筑块"，就像电子电路中的标准元件（放大器、滤波器等）。&nbsp;|&nbsp;
+      <strong>本文的贡献</strong>：证明模块提取的子网络保留了原网络的 motif 特征（SP 一致），而随机采样彻底丢失了 motif 结构——强有力地支持了"motif 是模块功能建筑块"的假说，并反过来证明了模块提取作为基准生成方法的合理性。
+    </div>
+  </div>
+
+  <h3>7.3 基准测试的方法论原则 — 分布匹配</h3>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    <strong>分布匹配</strong>：基准测试的核心原则是"测试集的分布 = 部署时的分布"——这恰如机器学习中的 i.i.d. 假设。对于基因网络反向工程，"部署分布"就是真实基因网络的拓扑分布。模块提取通过对真实网络的功能-结构保真采样来逼近这一分布。&nbsp;|&nbsp;
+    <strong>多维度验证</strong>：单一度量（如度分布）不足以表征网络结构——需要同时在功能（GO 富集）和结构（modularity、motif SP、degree distribution）多个维度验证，因为"度分布相似但 motif 相反"是完全可能出现的（如本文中随机采样的结果）。&nbsp;|&nbsp;
+    <strong>可调节的随机性</strong>：纯贪心（k=0%）和纯随机（k=100%）是两个极端——前者产生高度模块化但多样性有限的子网络，后者产生多样化但无结构的子网络。通过 top-k% 参数调节，可以在基准测试中平衡"结构的生物真实性"和"样本的统计独立性"。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">基因网络推断的两种验证策略对比</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Validation strategies for network inference methods"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(A) 真实生物基因网络——其完整拓扑结构未知或仅部分已知，因此无法系统性验证反向工程算法的预测结果（"你不知道你不知道的那些边"）。(B) In silico 网络——结构完全已知（实验者设计的），因此可以精确计算每条预测边的真假，给出精确率-召回率曲线和 ROC 分析。本文解决的问题正是如何让 (B) 中的 in silico 网络尽可能地像 (A) 中的真实网络——即最小化两个分布之间的差异。</p>
+      <ul>
+        <li><strong>核心矛盾</strong>：In silico 网络的真值已知性 vs 生物逼真性之间存在根本性的权衡——越逼真越难获得完整真值，越可控越不像真实网络</li>
+        <li><strong>模块提取的定位</strong>：从真实网络的"部分已知真值"出发，提取模块作为"完全已知真值 + 高度逼真"的折中方案</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">模块提取 vs 随机采样 在层次化 scale-free 网络上的对比</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Module extraction versus random sampling"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：在层次化 scale-free 网络（Ravasz et al. 2002 模型）上，从中心 hub 出发提取大小为 10 和 25 的子网络。模块提取（左列）产生的子网络保持了原网络的四节点 motif 和层次化模块组织。随机采样（右列）则完全丧失了这些结构——子网络是没有组织原则的随机节点集合。</p>
+      <ul>
+        <li><strong>层次化行为</strong>：模块提取先填满种子所在的四节点 motif，再扩展到同 cluster 的其他 motif，最后才跨 cluster——这是一个天然的"功能单位优先"策略</li>
+        <li><strong>Toy example 的价值</strong>：这个可控的 synthetic 网络清晰地展示了算法的行为模式——因为该网络的"功能模块"可以人工识别（四节点 motif 和 cluster），所以能直观验证模块提取确实在提取功能相关结构</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">酵母基因调控网络上模块提取的 Q 值分布与 GO 富集分析结果</span>
+      <span class="fig-source">来源：论文 Fig. 3 + Fig. 4 + Fig. 7</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Validation results on yeast gene network"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>关键验证结果</strong>：在酵母网络上，模块提取的子网络具有（Figs. 3-7）：</p>
+      <ul>
+        <li><strong>Q 值分布</strong>：模块提取的 modularity Q 为正且显著高于随机采样（p < 10^-6），确认了提取出的是真正的拓扑模块</li>
+        <li><strong>GO 富集</strong>：size=100 时总计 282 个显著 GO terms vs 随机采样仅 9 个——功能富集度高出 30 倍</li>
+        <li><strong>度分布</strong>：两者都与原网络相似（r=0.92 vs r=0.93）——度分布是最容易保留的属性，不是区分标准</li>
+        <li><strong>Motif SP</strong>：模块提取的 SP 与原网络一致（落入 1σ 区间），随机采样的 SP 与原网络相反——这是最关键的差异化证据</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 拓扑模块 = 功能模块（Hartwell et al. 假说）——虽然本文的 GO 富集分析支持这一假说，但哺乳动物基因组的远距离调控（enhancer-promoter loops）可能打破这种简单的拓扑-功能对应；(2) 已知 source network 是完备且无偏的——实际上酵母网络也包含大量未发现的调控关系和研究偏差（对热门基因研究更多）；(3) 度分布 + motif SP + modularity 三者足以表征网络结构——可能有其他重要的高阶结构（如 clique、bipartite motifs）未被捕获。</li>
+    <li><strong>适用场景</strong>：方法仅覆盖了"生成网络结构"这一步——生成逼真的表达动力学数据（添加合适的噪声模型和非线性调控函数）是同等重要且待解决的另一半问题。论文提到"manuscript in preparation"，说明动力学部分的框架尚未完成。</li>
+    <li><strong>可扩展性</strong>：仅在酵母转录调控网络和 E. coli 上进行验证——不同物种（原核 vs 真核）、不同调控层级（转录 vs 翻译后修饰）和不同网络类型（调控 vs 信号传导 vs 代谢）的结构-功能关系可能完全不同。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：（1）从转录调控扩展到多层生物网络（转录 + 翻译后 + 代谢），每层有不同的拓扑特征和动力学；（2）从静态网络结构扩展到动态网络——如在不同条件下（细胞周期、应激响应）的调控网络重编程，基准网络也应反映这种条件特异性；（3）加入染色质结构信息（3D genome organization）——Hi-C 数据显示基因组的三维折叠决定了哪些增强子-启动子对可以物理接触，这引入了超越图论拓扑的空间约束。</li>
+    <li><strong>条件放松</strong>：允许多源网络融合——结合多个数据库的互补信息来减少单个数据库的缺失边偏差</li>
+    <li><strong>约束加入</strong>：（1）加入动力学模型（如 ODE、Boolean、或 SDE 模型）与实验噪声模型（microarray 的技术噪声 vs 生物学噪声），使基准从纯结构扩展到"结构 + 动力学 + 噪声"全栈；（2）设计针对特定生物问题的子挑战——如仅推断 master regulators、仅推断 feed-forward loops 等</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>Source network 的不完整性（missing edges）</td><td>从已知网络提取模块 → 基准网络继承所有未知边作为"真负"——这系统性地低估了推断算法的假阳性率（算法预测了真边但被误标为假阳性）。这是所有基于已知网络做 benchmark 的固有缺陷</td><td>★★★★★</td></tr>
+    <tr><td>研究偏差（study bias）</td><td>热门基因（如 p53、MYC）在数据库中连接更多，模块提取倾向于产生以这些基因为中心的子网络——导致基准测试可能系统性地偏袒"擅长发现 hub 周边连接"的算法</td><td>★★★★</td></tr>
+    <tr><td>单一物种的代表性</td><td>酵母是单细胞真核生物，其调控逻辑（以直接 TF-promoter 结合为主）与哺乳动物（长程增强子、绝缘子、3D 染色质折叠）显著不同。仅在酵母上验证的算法迁移到人类数据时可能表现不佳</td><td>★★★★</td></tr>
+    <tr><td>模块提取的参数敏感性</td><td>Q 最大化的贪心算法是确定性的（给定种子 → 给定结果），虽然可以通过 k% 随机性调节多样性，但最优 k% 值依赖于具体 source network 和子网络大小——没有理论指导如何选择</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>跨物种网络结构迁移的基准测试</strong>——当前方法在单一物种（酵母）的网络上验证，但反向工程算法的终极目标是应用于人类疾病网络。可以设计一个"cross-species benchmark"：用模块提取生成酵母基准和一个已知的人类子网络测试集，评估算法在不同物种间迁移的表现。如果某算法的性能从酵母到人显著衰减，说明它过拟合了低等真核生物的特定调控模式。这对 UAV 群体的启发：在不同地形/环境中测试群体算法的 cross-domain generalization。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>基因网络反向工程算法需要基准测试——但真实网络的真值不完整（不能直接当 label），而随机图又不够逼真（使排名失去意义）。这是一个"鸡生蛋"问题：你需要知道真值来评估算法，但获得真值的唯一方式是运行更好的算法。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>两条路线：（i）随机图（ER / scale-free）: 真值已知（因为是生成的）但分布不匹配——缺乏 modularity、motifs 等生物网络核心特征；（ii）直接使用部分已知的真实网络: 分布匹配但真值不完整——无法区分"算法预测了真边"和"数据库没收录这条边"。两者都没能同时满足"分布匹配"和"真值已知"。</li>
+    <li><strong>如果从真实网络中采样，但采样方式保留拓扑属性呢？</strong><br>这是本文的核心思想：不生成全新的随机图，也不直接用不完整的真值——而是从已知的全局网络中<strong>有指导地提取子模块</strong>。关键在于"有指导地"：不是随机采样（那会丢失结构），而是基于 modularity Q 的贪心扩展——它自然地倾向于提取功能模块。</li>
+    <li><strong>如何证明提取的确实是功能模块？</strong><br>用 GO 功能注释独立验证——如果拓扑模块提取出的基因群在 GO 中显著富集特定功能术语，那么拓扑模块 = 功能模块的假说就得到支持。同时用 motif significance profile 验证结构保真度——这是一个双维度（功能 + 结构）的验证策略。</li>
+    <li><strong>最终方案是什么？</strong><br>从已知全局网络 → 模块提取（贪心最大化 Q） → 功能 + 结构双重验证 → 部署为 DREAM3 基准的 gold-standard 网络。全管线可重复、可调节（k% 参数控制多样性）、可扩展到不同物种和网络大小。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    基因网络反向工程算法的评测基准应该尽可能接近真实基因网络的结构分布——但真实网络的真值不完整，随机图又缺少生物模块化和 network motifs——那为什么不<strong>直接从已知生物网络中提取拓扑模块</strong>，在保留功能属性与结构特征的同时，获得完全已知的 gold-standard 真值？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：DREAM2 中获胜算法在 Erdos-Renyi 网络上的性能远好于 scale-free 网络——算法排名被基准网络结构绑架。同时，已知酵母转录调控网络的数据库已经相当成熟（Balaji et al. 2006, 4441 genes）。</li>
+    <li><strong>Step 2 — 分解问题</strong>：基准生成 = 结构生成 + 功能验证。结构生成需要从真实网络采样但保留拓扑特征；功能验证需要独立于拓扑的数据（GO annotations）。两者解耦设计，互相印证。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）Modularity Q（Newman 2006）——已有的复杂网络理论工具，用于量化子网络的模块度；（2）GO::TermFinder（Boyle et al. 2004）——已有的功能富集分析工具；（3）Motif significance profile（Milo et al. 2004）——已有的 motif 统计检验框架。</li>
+    <li><strong>Step 4 — 组装方案</strong>：将三个已有工具串联成一个完整的基准生成 pipeline：模块提取生成结构 → GO 富集验证功能 → motif SP 验证结构保真度 → 交付 DREAM3 挑战赛。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个<strong>"元方法论"</strong>的经典案例——不去设计更好的反向工程算法，而是设计更公平、更逼真的评测基准。这种"解决评测问题来推动领域发展"的策略在 UAV 研究中同样适用——例如设计更逼真的仿真环境（风场、传感器噪声、通信延迟）来减少 sim-to-real gap，或者设计更全面的 benchmark task suite 来推动自主导航算法的发展。</li>
+    <li><strong>技术技巧层面</strong>：(1) 分布匹配优于随机采样——在有限资源下，有指导的采样（guided sampling）总是优于无指导的采样（random sampling），这在任何需要生成代表性样本的场景都适用；(2) 多维度验证——单一指标不足以说明问题，需要从多个互补的角度（本文的功能 + 结构）交叉验证，这也适用于 UAV 算法评估（不仅看成功率，还要看能耗、时间、鲁棒性等）；(3) 已有工具的新组合——本文没有发明全新的数学工具，而是将 modularity Q、GO 分析和 motif SP 三个已有方法巧妙组合，形成新 pipeline。</li>
+    <li><strong>实验/写作层面</strong>：论文使用"层次化 scale-free toy network"作为 pedagogical example（Fig. 2），清晰展示了模块提取的层次化行为——先填 motif、再填 cluster、最后跨 cluster。这种"先 toy 后 real"的双层验证结构非常经典且有效。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 群体智能方向</strong>：本文的核心思想——从真实系统中提取具有代表性的子结构作为 benchmark——可以直接迁移到 UAV 群体算法的评测中。例如：从真实鸟群/鱼群的运动轨迹中提取具有典型群体模式的片段，作为群体导航或编队算法的 benchmark，而非使用纯数学生成的轨迹。</li>
+    <li><strong>对于 UAV 仿真方向</strong>：模块提取 = 分布匹配采样的思想可以用于设计更具代表性的仿真场景——不是随机生成障碍物布局，而是从真实城市/自然环境的 3D 地图中"模块化提取"具有典型拓扑特征的子场景（如交叉路口、窄巷、林间空地等）。</li>
+    <li><strong>对于算法评测方法论</strong>：本文提醒我们关注"benchmark 偏差"问题——在 UAV 研究中，不同算法在不同的仿真环境或真实场景中排名可能完全不同。设计统一的、分布匹配的 benchmark 对于推动领域公平竞争至关重要。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Stolovitzky et al. (2007) — Dialogue on Reverse Engineering Assessment and Methods (DREAM). <em>Ann. N. Y. Acad. Sci.</em> 1115, 1–22</td><td>DREAM 挑战赛的原始论文——理解本文方法的应用场景和评测框架。DREAM 是系统生物学领域最具影响力的算法竞赛，类比于 ImageNet 之于计算机视觉。</td></tr>
+    <tr><td>Ravasz et al. (2002) — Hierarchical organization of modularity in metabolic networks. <em>Science</em> 297, 1551–1555</td><td>证明了生物网络具有层次化模块结构——这是本文"模块提取"的生物学基础。如果网络没有模块，module extraction 就没有意义。</td></tr>
+    <tr><td>Alon (2007) — Network motifs: theory and experimental approaches. <em>Nat. Rev. Genet.</em> 8, 450–461</td><td>Network motif 理论的经典综述——motif 是基因调控网络的功能建筑块假说。本文用 motif SP 作为结构保真度的关键验证指标。</td></tr>
+    <tr><td>Newman (2006) — Modularity and community structure in networks. <em>Proc. Natl. Acad. Sci.</em> 103, 8577–8582</td><td>Modularity Q 的经典论文——本文算法每一步的优化目标。理解 Q 的数学定义和物理含义对于理解整个方法至关重要。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Marbach, Floreano et al. · Journal of Computational Biology 2009 · Generating Realistic In Silico Gene Networks · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

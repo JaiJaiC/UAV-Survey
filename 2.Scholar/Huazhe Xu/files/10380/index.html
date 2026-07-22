@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - DexImit: Learning Bimanual Dexterous Manipulation from Monocular Human Videos</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="container">
+
+<!-- ============================================================ -->
+<!-- §1 Paper Info -->
+<!-- ============================================================ -->
+<section id="info">
+<h2>&#167;1 Paper Info</h2>
+<h1>DexImit: Learning Bimanual Dexterous Manipulation from Monocular Human Videos</h1>
+
+<table>
+<tr><td style="width:130px;font-weight:700;">Authors</td><td>Juncheng Mu, Sizhe Yang, Yiming Bao, Hojin Bae, Tianming Wei, Linning Xu, Boyi Li, Huazhe Xu, Jiangmiao Pang</td></tr>
+<tr><td style="font-weight:700;">Year</td><td>2026</td></tr>
+<tr><td style="font-weight:700;">Venue</td><td>arXiv:2602.10105</td></tr>
+<tr><td style="font-weight:700;">Affiliations</td><td><span class="bold-affil">Shanghai AI Laboratory</span>, <span class="bold-affil">Tsinghua University</span>, <span class="bold-affil">CUHK</span>, <span class="bold-affil">NVIDIA</span></td></tr>
+<tr><td style="font-weight:700;">Project Page</td><td><a href="https://dex-imitate.github.io/" target="_blank">https://dex-imitate.github.io/</a></td></tr>
+<tr><td style="font-weight:700;">Code</td><td>待开源</td></tr>
+<tr><td style="font-weight:700;">Research Type</td><td>人类视频到机器人操作数据生成 &#8226; 双手灵巧操作 &#8226; 模仿学习</td></tr>
+<tr><td style="font-weight:700;">Local Source</td><td><a href="Mu et al. - 2026 - DexImit Learning bimanual dexterous manipulation from monocular human videos.pdf">Mu et al. - 2026 - DexImit Learning bimanual dexterous manipulation from monocular human videos.pdf</a></td></tr>
+</table>
+
+<div style="margin:10px 0 6px;">
+<span class="tag tag-purple">Bimanual Dexterous</span>
+<span class="tag tag-blue">Monocular Video</span>
+<span class="tag tag-amber">4D Reconstruction</span>
+<span class="tag tag-green">Force Closure</span>
+<span class="tag tag-cyan">3D Diffusion Policy</span>
+<span class="tag tag-red">Zero-Shot Real</span>
+<span class="tag tag-gray">Shanghai AI Lab</span>
+<span class="tag tag-purple">DP3</span>
+<span class="tag tag-amber">Embodiment Gap</span>
+</div>
+
+<h3>1.1 TL;DR</h3>
+<div class="callout info">
+<div class="callout-title">一句话总结</div>
+<p>DexImit 提出了一套完整的四阶段流水线，从<strong>单目人类操作视频</strong>出发，无需深度或相机参数，自动生成物理上可执行的<strong>双手灵巧机器人操作示范数据</strong>，并用于训练 3D Diffusion Policy (DP3)，实现零样本真实世界部署。其核心贡献在于首次打通了"互联网人类视频 &#8594; 近米制 4D 手-物交互重建 &#8594; 基于人手先验的尺度估计与坐标系统一 &#8594; 动作中心双手调度 &#8594; Force-Closure 抓取合成 &#8594; 数据增强与策略训练"这一完整链条。</p>
+</div>
+
+<p>DexImit 将人类视频视为一种"免费的操作示范源"——互联网上每天产生海量的烹饪、装配、修理视频，但传统方法需要昂贵的遥操作设备才能获取机器人训练数据。该工作覆盖了<strong>工具使用</strong>（切苹果）、<strong>长时序任务</strong>（制作饮料，&#62;500 步）、<strong>细粒度操作</strong>（叠杯子）三类极具挑战性的双手灵巧场景，验证了人-机数据转换管线的可行性与泛化能力。</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- §2 Insight & Novelty -->
+<!-- ============================================================ -->
+<section id="insight">
+<h2>&#167;2 Insight &amp; Novelty</h2>
+
+<h3>2.1 Core Insight (Q&amp;A 格式)</h3>
+<div class="callout idea">
+<div class="callout-title">问：为什么仅靠视觉对齐不足以从人类视频获得机器人操作数据？</div>
+<p><strong>答：</strong>因为"视觉上像"不等于"物理上可行"。人类视频与机器人执行之间存在三重鸿沟：(1) <strong>几何鸿沟</strong>——单目视频缺失深度和尺度，人手与机械手形态不同；(2) <strong>语义鸿沟</strong>——视频帧是连续的像素流，缺乏任务结构（抓取、移动、释放的语义分段）；(3) <strong>物理鸿沟</strong>——人的抓取不一定满足力闭合条件，而机器人抓取必须考虑接触力学的可行性。DexImit 的核心洞察是：<strong>必须逐层跨越这三重鸿沟，而非仅做视觉层面的"模仿"</strong>——先重建真实世界几何（几何层），再分解任务语义（语义层），最后生成物理可行动作（物理层）。</p>
+</div>
+
+<h3>2.2 问题 &#8594; 解决方案 &#8594; 机制 映射表</h3>
+<table>
+<thead>
+<tr><th>问题</th><th>解决方案</th><th>核心机制</th></tr>
+</thead>
+<tbody>
+<tr><td>单目视频无深度/无相机参数，无法获得真实世界尺度</td><td>近米制尺度估计</td><td>以人手平均尺寸（~18cm）为几何先验，PCA 对齐估计 mesh 与点云，恢复近真实尺度</td></tr>
+<tr><td>每帧局部重建的坐标系不一致</td><td>世界坐标变换</td><td>以桌面法向量为 z 轴、手平分线投影为 x 轴，建立统一的"桌面世界坐标系"</td></tr>
+<tr><td>双手任务如何分解为左右手各自的子动作</td><td>Action-Centric Scheduling Algorithm</td><td>按 pregrasp / grasp / motion / release 四个子动作类型，自动决定双手的并行或顺序执行策略</td></tr>
+<tr><td>人手抓取姿态不可直接迁移给机械手</td><td>Force-Closure 抓取合成优化</td><td>最小化 wrench error + 接触距离 + 碰撞惩罚的多目标优化，生成满足力闭合的机械手抓取</td></tr>
+<tr><td>人类示范数据量少、环境单一，难以训练通用策略</td><td>数据增强流水线</td><td>物体位姿/尺度(0.8-1.2x)随机化 + 相机位姿随机化 + 点云 dropout(30%) + 法线噪声，大幅扩充训练分布</td></tr>
+<tr><td>从点云观测学习闭环操作策略</td><td>3D Diffusion Policy (DP3)</td><td>在增强数据上训练基于扩散的动作生成模型，以 3D 点云为观测，预测末端执行器位姿序列</td></tr>
+</tbody>
+</table>
+
+<h3>2.3 三项核心创新点</h3>
+
+<div class="novelty-card">
+<h4>&#9312; 人手先验驱动的无监督近米制 4D 重建</h4>
+<div class="novelty-step"><strong>突破：</strong>首次实现从"野外单目视频"到"近米制世界坐标系下统一的手-物 4D 轨迹"的全自动恢复，无需深度传感器、无需相机标定、无需多视角。</div>
+<div class="novelty-step"><strong>关键设计：</strong>利用人手尺寸的统计先验（~18cm）作为"天然标尺"，通过 PCA 对齐估计的 hand mesh 与视频深度估计的点云来恢复尺度因子。然后用桌面法向量建立全局坐标系。</div>
+<div class="novelty-step"><strong>对比已有方法：</strong>HAMER 等 hand mesh 估计方法输出的是无量纲的相对坐标；Metric3D 等方法需要已知相机内参。DexImit 在二者之上叠加了人手先验，弥合了"视觉重建"与"物理世界"之间的度量鸿沟。</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9313; Action-Centric 双手任务调度算法</h4>
+<div class="novelty-step"><strong>突破：</strong>将双手协同操作抽象为四种子动作（pregrasp、grasp、motion、release）的有向无环图（DAG），自动推导并行与顺序执行关系。</div>
+<div class="novelty-step"><strong>关键设计：</strong>以"动作"而非"时间帧"为调度单元：根据手-物接触状态的变化点分割子动作，再根据左右手各自的动作语义（如一只手 hold 物体，另一只手操作）决定执行时序——共享物体的子动作需要顺序执行，独立物体的子动作可以并行。</div>
+<div class="novelty-step"><strong>对比已有方法：</strong>传统遥操作数据采集由人直接演示，不显式建模任务结构；基于视频的模仿学习方法（如 Diffusion Policy）直接端到端预测动作，缺乏中间的任务语义层。</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9314; Force-Closure 约束下的跨形态抓取合成</h4>
+<div class="novelty-step"><strong>突破：</strong>将人手抓取"翻译"为满足力闭合条件的机械手抓取，而不仅仅是几何上的接触点匹配。</div>
+<div class="novelty-step"><strong>关键设计：</strong>构建多目标优化问题：目标函数包含 wrench error（力螺旋空间中的误差，确保接触力能平衡任意外扰动）、contact distance（接触点到手表面的距离，保持接近人类示范的接触位置）、collision penalty（手-物穿透惩罚）。优化在 SE(3) 空间中进行。</div>
+<div class="novelty-step"><strong>对比已有方法：</strong>基于关键点重定向（keypoint retargeting）的方法仅做几何层面的映射，不检查物理可行性。DexImit 的 force-closure 优化确保生成的抓取在任意扰动方向下具有稳定性，这在真实世界中是成功抓取的必要条件。</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- §3 Architecture -->
+<!-- ============================================================ -->
+<section id="architecture">
+<h2>&#167;3 Architecture</h2>
+
+<h3>3.1 四阶段架构总览</h3>
+
+<div class="arch-panel">
+<div class="arch-grid">
+  <!-- Stage 1: Reconstruction -->
+  <div class="arch-stage">
+    <h4>&#9312; Reconstruction <span>Stage 1</span></h4>
+    <div class="arch-card arch-solar">
+      <strong>Hand Mesh 估计</strong>
+      <small>HAMER 从单目 RGB 帧恢复 MANO 手 mesh（无量纲局部坐标）</small>
+    </div>
+    <div class="arch-card arch-solar">
+      <strong>物体/桌面分割</strong>
+      <small>SAM2 实例分割 + Depth Anything 单目深度估计</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>近米制尺度恢复</strong>
+      <small>人手平均 18cm 先验 &#8594; PCA 对齐 mesh 与深度点云 &#8594; 恢复尺度因子 &#955;</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>世界坐标变换</strong>
+      <small>桌面法向量 &#8594; z 轴；手平分线投影 &#8594; x 轴；右手系建 y 轴</small>
+    </div>
+  </div>
+
+  <!-- Stage 2: Scheduling -->
+  <div class="arch-stage">
+    <h4>&#9313; Scheduling <span>Stage 2</span></h4>
+    <div class="arch-card arch-thrust">
+      <strong>接触状态检测</strong>
+      <small>基于手 mesh 与物体点云的最近距离，检测 hand-object contact 变化点</small>
+    </div>
+    <div class="arch-card arch-thrust">
+      <strong>子动作分割</strong>
+      <small>将连续轨迹按接触状态切分为 pregrasp / grasp / motion / release 四类子动作</small>
+    </div>
+    <div class="arch-card arch-motor">
+      <strong>Action-Centric DAG 构造</strong>
+      <small>左右手子动作构成有向无环图；共享物体的动作串行，独立物体的动作可并行</small>
+    </div>
+  </div>
+
+  <!-- Stage 3: Action Generation -->
+  <div class="arch-stage">
+    <h4>&#9314; Action Generation <span>Stage 3</span></h4>
+    <div class="arch-card arch-motor">
+      <strong>Force-Closure 抓取优化</strong>
+      <small>&#9312; 初始猜测：Geometric Heuristic 选接触点 &#9313; 优化目标：min wrench error + contact distance + collision penalty</small>
+    </div>
+    <div class="arch-card arch-motor">
+      <strong>关键帧物体位姿传播</strong>
+      <small>T<sup>t&#8594;t'</sup> = (p<sup>t</sup>)<sup>-1</sup> p<sup>t'</sup>；把人与人之间的物体相对运动复制为机器人与物体之间的运动</small>
+    </div>
+    <div class="arch-card arch-thrust">
+      <strong>物理可行性验证</strong>
+      <small>检查关节限制、自碰撞、环境碰撞，过滤不可行轨迹</small>
+    </div>
+  </div>
+
+  <!-- Stage 4: Augmentation -->
+  <div class="arch-stage">
+    <h4>&#9315; Augmentation <span>Stage 4</span></h4>
+    <div class="arch-card arch-power">
+      <strong>物体位姿/尺度增强</strong>
+      <small>随机平移旋转 + 0.8&#215;~1.2&#215; 尺度缩放，覆盖不同初始位姿</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>相机位姿增强</strong>
+      <small>在桌面周围半球面采样虚拟相机，增加视角多样性</small>
+    </div>
+    <div class="arch-card arch-power">
+      <strong>观测点云增强</strong>
+      <small>30% 随机 dropout + 高斯法线噪声，模拟真实传感器不完美</small>
+    </div>
+    <div class="arch-card arch-solar">
+      <strong>DP3 策略训练</strong>
+      <small>在增强数据上训练 3D Diffusion Policy，以点云为输入预测 SE(3) 动作序列</small>
+    </div>
+  </div>
+</div>
+
+<div class="arch-arrow">
+  <span>&#9660; 4D 轨迹</span>
+  <span>&#9660; DAG 调度计划</span>
+  <span>&#9660; 机器人示范</span>
+  <span>&#9660; 闭环策略</span>
+</div>
+
+<div class="arch-summary">
+  <div class="arch-metric">
+    <strong>输出：手-物世界坐标轨迹</strong>
+    <small>含左右手 MANO 参数 + 物体 6-DoF 位姿 + 时间戳</small>
+  </div>
+  <div class="arch-metric">
+    <strong>输出：左右手 subaction 序列</strong>
+    <small>每个 subaction 含类型标签、目标物体、依赖关系、执行窗口</small>
+  </div>
+  <div class="arch-metric">
+    <strong>输出：SE(3) 机械手动作序列</strong>
+    <small>力闭合抓取 + 关键帧物体运动 + IK 求解关节角</small>
+  </div>
+  <div class="arch-metric">
+    <strong>输出：Deployable Policy</strong>
+    <small>输入单视角点云 &#8594; 输出 16 步 SE(3) 动作序列 &#8594; zero-shot real</small>
+  </div>
+</div>
+</div>
+
+<h3>3.2 Mermaid 流程图 1：四阶段数据生成流水线</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+graph LR
+  A["&#x1F4F9; Monocular Human Video<br/>(任意视角, 无深度, 无相机参数)"] --> B["Stage 1: Reconstruction<br/>HAMER手mesh + SAM2分割<br/>+ Depth Anything深度估计"]
+  B --> C["近米制尺度恢复<br/>人手18cm先验 + PCA对齐"]
+  C --> D["世界坐标变换<br/>桌面法向量z轴 + 手平分线x轴"]
+  D --> E["Stage 2: Scheduling<br/>接触状态检测 + 子动作分割<br/>+ Action-Centric DAG构造"]
+  E --> F["Stage 3: Action Generation<br/>Force-Closure抓取优化<br/>+ 关键帧物体位姿传播"]
+  F --> G["物理可行性验证<br/>关节限制/碰撞检查"]
+  G --> H["Stage 4: Augmentation<br/>物体位姿/尺度/相机/点云增强"]
+  H --> I["DP3训练<br/>&#8594; 零样本真实世界部署"]
+</div>
+</div>
+
+<h3>3.3 Mermaid 流程图 2：Action-Centric Scheduling 算法细节</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+  T[4D 手-物轨迹<br/>世界坐标系] --> CD{接触状态检测<br/>hand-object 最近距离 < &#949;?}
+  CD -->|接触变化点| S[子动作分割<br/>Segment Trajectory into Subactions]
+  S --> SA1[pregrasp: 手接近物体]
+  S --> SA2[grasp: 手闭合形成抓取]
+  S --> SA3[motion: 物体随手动]
+  S --> SA4[release: 手离开物体]
+  SA1 --> DAG[构造 Action-Centric DAG]
+  SA2 --> DAG
+  SA3 --> DAG
+  SA4 --> DAG
+  DAG --> PD{并行/顺序决策}
+  PD -->|共享同一物体| SEQ[顺序执行<br/>一只手hold, 另一只手操作]
+  PD -->|独立物体| PAR[并行执行<br/>左右手同时操作不同物体]
+  SEQ --> PLAN[生成双手调度计划<br/>每只手: 子动作类型 + 时间窗口 + 目标物体]
+  PAR --> PLAN
+  PLAN --> OUT[输出至 Stage 3<br/>Action Generation]
+</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- §4 Task Formulation -->
+<!-- ============================================================ -->
+<section id="task">
+<h2>&#167;4 Task Formulation</h2>
+
+<h3>4.1 问题数学形式化</h3>
+<p>给定一段单目人类操作视频 $\mathcal{V} = \{I_1, I_2, \ldots, I_T\}$（RGB 帧序列，无深度、无相机内外参、无多视角），目标是为一个双手灵巧机器人系统生成可执行的操作示范数据 $\mathcal{D} = \{(\mathbf{o}_1, \mathbf{a}_1), (\mathbf{o}_2, \mathbf{a}_2), \ldots, (\mathbf{o}_N, \mathbf{a}_N)\}$，其中 $\mathbf{o}_t$ 为 3D 点云观测，$\mathbf{a}_t$ 为 SE(3) 末端执行器动作。进而在此数据上训练闭环操作策略 $\pi: \mathcal{O} \to \mathcal{A}$，使其能在真实世界中零样本部署。</p>
+
+<div class="formula-block">
+<div class="eq-tag">总体目标</div>
+$$
+\max_{\pi} \; \mathbb{E}_{\mathcal{V} \sim p(\text{internet videos})} \left[ \mathbb{E}_{\tau \sim \pi} \left[ \sum_{t} R(s_t, a_t) \right] \right]
+$$
+<div class="eq-note">
+其中 $\tau$ 是策略 $\pi$ 在真实世界中的执行轨迹，$R$ 是任务成功奖励。核心难点在于 $\mathcal{V}$（人类视频）与真实机器人状态空间之间的分布差异极大——这正是 DexImit 要通过四阶段管线弥合的 gap。
+</div>
+</div>
+
+<h3>4.2 四阶段的递进形式化</h3>
+<p><strong>Stage 1 (Reconstruction):</strong> 从 $\mathcal{V}$ 恢复世界坐标系下的 4D 手-物轨迹 $\{\mathbf{H}^L_t, \mathbf{H}^R_t, \mathbf{O}_t, \mathbf{T}_t\}_{t=1}^T$，其中 $\mathbf{H}^L_t, \mathbf{H}^R_t$ 为左右手 mesh 参数，$\mathbf{O}_t$ 为物体 6-DoF 位姿，$\mathbf{T}_t$ 为桌面平面参数。</p>
+
+<p><strong>Stage 2 (Scheduling):</strong> 将连续轨迹分解为子动作图 $\mathcal{G} = (\mathcal{N}, \mathcal{E})$，节点为子动作 $\{a_i\}$，边为时序依赖。每个子动作 $a_i$ 包含类型 $c_i \in \{\text{pregrasp}, \text{grasp}, \text{motion}, \text{release}\}$、执行手 $h_i \in \{L, R\}$、目标物体 $o_i$ 和时间窗口 $[t_i^{\text{start}}, t_i^{\text{end}}]$。</p>
+
+<p><strong>Stage 3 (Action Generation):</strong> 将每个子动作翻译为机器人可执行的末端执行器轨迹，其中抓取需满足力闭合条件，运动需保持物体相对位姿约束。</p>
+
+<p><strong>Stage 4 (Augmentation + Training):</strong> 通过域随机化扩展 $\mathcal{D}$ 的分布覆盖，训练 3D Diffusion Policy 作为最终的可部署策略。</p>
+
+<h3>4.3 输入/输出规范表</h3>
+<table>
+<thead>
+<tr><th>阶段</th><th>输入</th><th>输出</th><th>关键假设</th></tr>
+</thead>
+<tbody>
+<tr><td>Reconstruction</td><td>单目 RGB 帧序列 (任意长度, 任意视角)</td><td>世界坐标系下的 4D 手-物-桌面轨迹</td><td>手在画面中可见；至少有一个平面桌面；人手尺寸 ~18cm</td></tr>
+<tr><td>Scheduling</td><td>4D 轨迹 (含手 mesh 和物体位姿)</td><td>有向无环子动作图，每节点标注类型/手/目标/时间</td><td>任务可分解为离散的子动作序列；接触状态可检测</td></tr>
+<tr><td>Action Generation</td><td>子动作图 + 物体 mesh + 机器人 URDF</td><td>SE(3) 末端执行器轨迹 + 关节角度序列</td><td>机器人手指数目/尺寸已知；物体为刚体或近似刚体</td></tr>
+<tr><td>Augmentation</td><td>机器人示范数据 (单环境)</td><td>多环境增强数据集 (多样本)</td><td>场景几何可变化但不改变任务语义</td></tr>
+<tr><td>DP3 Training</td><td>增强数据集 (点云 + SE(3) 动作)</td><td>训练好的闭环操作策略 $\pi_\theta$</td><td>点云观测包含足够几何信息用于决策</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- §5 Challenge -->
+<!-- ============================================================ -->
+<section id="challenge">
+<h2>&#167;5 Key Challenges</h2>
+
+<h3>5.1 第一性原理分析：为什么这很难？</h3>
+<div class="callout warn">
+<div class="callout-title">根本原因：信息不对称与物理约束的叠加</div>
+<p>人类视频是 <strong>2D 投影</strong>（丢失深度）+ <strong>未知尺度</strong>（丢失度量）+ <strong>未知相机</strong>（丢失几何映射），而机器人需要 <strong>3D 世界坐标系下满足物理可行性的精确动作</strong>。这两个域之间的信息差距不是"量"的问题，而是"质"的问题——需要<strong>注入先验知识</strong>来弥合。更困难的是，即使解决了几何层面的问题，还存在动力学层面的 gap：人手有 21+ DOF 且具有柔顺性，机械手通常只有 6-12 DOF 且是刚性结构。因此"模仿"不只是复制运动轨迹，更需要在新的形态约束下<strong>重新合成</strong>功能等效的动作。</p>
+</div>
+
+<h3>5.2 已有方法对比</h3>
+<table>
+<thead>
+<tr><th>方法类别</th><th>代表工作</th><th>从人类视频学习?</th><th>处理双手?</th><th>处理灵巧手?</th><th>物理可行性?</th><th>真实世界验证?</th></tr>
+</thead>
+<tbody>
+<tr><td>遥操作数据采集</td><td>ALOHA, GELLO</td><td>&#10007; 需人工演示</td><td>&#10003;</td><td>&#10007;</td><td>&#10003;</td><td>&#10003;</td></tr>
+<tr><td>视频预训练+微调</td><td>R3M, VIP, Voltron</td><td>&#10003; 表征学习</td><td>&#10007;</td><td>&#10007;</td><td>N/A (仅表征)</td><td>需微调</td></tr>
+<tr><td>手-物重建</td><td>HOLD, gSDF</td><td>&#10003;</td><td>&#10007; (单手)</td><td>&#10003;</td><td>&#10007; (仅重建)</td><td>&#10007;</td></tr>
+<tr><td>关键点重定向</td><td>DexCap, DexMV</td><td>&#10003;</td><td>&#10007;</td><td>&#10003;</td><td>几何层面</td><td>&#10003;</td></tr>
+<tr class="highlight"><td><strong>DexImit</strong></td><td><strong>本文</strong></td><td><strong>&#10003; 端到端数据生成</strong></td><td><strong>&#10003;</strong></td><td><strong>&#10003;</strong></td><td><strong>&#10003; Force Closure</strong></td><td><strong>&#10003; Zero-Shot</strong></td></tr>
+</tbody>
+</table>
+
+<h3>5.3 三项具体挑战的详细拆解</h3>
+
+<h4>挑战 1: 单目 4D 重建的尺度模糊性 (Scale Ambiguity)</h4>
+<div class="callout danger">
+<div class="callout-title">为什么难？</div>
+<p>单目 RGB 帧丢失了深度信息。虽然有深度估计网络（如 Depth Anything），但其输出是<strong>相对深度</strong>（up to unknown scale and shift）。同时，手 mesh 估计（如 HAMER）在 MANO 参数空间中工作，输出的是<strong>无量纲局部坐标</strong>。如果没有外部尺度参考，重建的轨迹只是"形状正确但尺度未知"的。例如，一个手的估计 mesh 可能在视觉上像手，但其绝对尺寸可能和实际相差 2 倍，导致所有后续的抓取计划都在错误尺度上进行。</p>
+</div>
+<p><strong>DexImit 的应对策略：</strong>利用人手尺寸的统计先验——成人手从手腕到中指指尖的平均长度约 18cm，宽度约 8cm。通过 PCA 在深度估计的点云和 MANO mesh 之间做对齐，将 mesh 缩放到与点云一致的真实物理尺寸。此法无需任何标定装置，是实现"近米制"重建的关键。</p>
+
+<h4>挑战 2: 双手协同的时序结构推理</h4>
+<div class="callout danger">
+<div class="callout-title">为什么难？</div>
+<p>人类视频是连续的帧序列，但双手操作任务有其内在的<strong>离散结构</strong>——每一只手在特定时刻执行特定子动作（接近、抓取、移动、释放），且左右手之间有约束关系。简单的逐帧模仿会忽略这种结构，导致(1)不知道什么时候左右手应该并行，(2)不知道左手的"保持"动作与右手的"操作"动作之间的因果依赖。若不做调度分解，机器人学到的只是一个"动作轨迹播放器"，而非"任务执行器"。</p>
+</div>
+<p><strong>DexImit 的应对策略：</strong>通过检测手-物接触状态的变化点自动分割子动作。利用物体归属关系确定并行/顺序执行关系。例如，若左右手操作同一物体（如一只手按住苹果，另一只手切），则需要串行协调；若左右手操作不同物体（如一只手拿杯子，另一只手拿水壶），则可以并行。这本质上是将连续视频帧"编译"为机器人执行图。</p>
+
+<h4>挑战 3: 跨形态抓取合成 (Cross-Embodiment Grasp Synthesis)</h4>
+<div class="callout danger">
+<div class="callout-title">为什么难？</div>
+<p>人手和机械手在形态学上完全不同：(1)人手有 21 DOF 且为软体（皮肤、肌肉、脂肪层提供被动柔顺），(2)常见灵巧手（如 LEAP Hand）有 16 DOF 但为刚性连杆结构。直接在人手关节和机械手关节之间做映射（retargeting）会产生不稳定的抓取——可能在几何上"看起来接近"但物理上无法抵抗扰动。更严重的是，人手抓取的视觉外观（contact points on mesh surface）并不保证在机械手上同样可行，因为关节配置、连杆长度和接触几何都不同。</p>
+</div>
+<p><strong>DexImit 的应对策略：</strong>不直接做关节映射，而是将抓取视为优化问题。目标函数包含三项：(1) <strong>Wrench Error</strong>——确保选定的接触点能为任意方向的外力提供平衡力矩，这是力闭合的数学条件；(2) <strong>Contact Distance</strong>——接触点尽可能接近人类示范中的接触区域，保持任务语义；(3) <strong>Collision Penalty</strong>——避免手指穿透物体或与环境碰撞。通过求解这个多目标优化，得到的是"物理上稳定的"而非仅仅是"视觉上相似的"抓取。</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- §6 Method -->
+<!-- ============================================================ -->
+<section id="method">
+<h2>&#167;6 Method Details</h2>
+
+<h3>6.1 公式组 1：近米制尺度估计与世界坐标变换</h3>
+<div class="formula-block">
+<div class="eq-tag">Eq. 1-3: 尺度恢复与坐标变换</div>
+$$s^* = \arg\min_{s \in \mathbb{R}^+} \left\| \text{PCA}(\mathcal{M}_{\text{hand}} \cdot s) - \text{PCA}(\mathcal{P}_{\text{depth}}) \right\|_F^2$$
+
+$$\mathbf{z}_{\text{world}} = \mathbf{n}_{\text{table}} \quad (\text{桌面法向量估计 via RANSAC from point cloud})$$
+
+$$\mathbf{x}_{\text{world}} = \text{proj}_{\perp \mathbf{z}} \left( \mathbf{v}_{\text{bisector}} \right) \quad (\text{手平分线方向在桌面平面上的投影})$$
+<div class="eq-note">
+<strong>Eq. 1</strong> (尺度恢复): $\mathcal{M}_{\text{hand}}$ 是 MANO hand mesh 顶点集（无量纲），$\mathcal{P}_{\text{depth}}$ 是从 Depth Anything 获得的深度点云。PCA 对两组点云提取主成分方向，最小化主轴方向差异得到最优尺度因子 $s^*$。这里假设人手形状的 PCA 主轴方向在尺度变换下不变——这是一个合理近似，因为人手大致是扁平长条形。<br/><br/>
+<strong>Eq. 2-3</strong> (世界坐标系): 选桌面法向量为世界 z 轴（重力反方向），保证物体放置的物理合理性。x 轴通过将手平分线（连接手腕中点与中指 MCP 关节的向量）投影到桌面平面上获得，这为左右手提供了一致的"前方"定义。y 轴通过右手系计算：$\mathbf{y}_{\text{world}} = \mathbf{z}_{\text{world}} \times \mathbf{x}_{\text{world}}$。<br/><br/>
+<strong>关键点:</strong> 这套坐标变换策略对原始视频的相机位姿完全不可知——它不试图恢复相机-世界的外参，而是直接在场景几何（桌面）中建立统一的世界坐标系。这比试图"逆向"相机参数更鲁棒，因为桌面是场景中最稳定、最易检测的平面结构。
+</div>
+</div>
+
+<h3>6.2 公式组 2：Force-Closure 抓取合成优化</h3>
+<div class="formula-block">
+<div class="eq-tag">Eq. 4: 力闭合抓取优化目标</div>
+$$\min_{\mathbf{g} \in SE(3),\; \{\mathbf{c}_i\}_{i=1}^K \in \partial\mathcal{O}} \underbrace{\mathcal{L}_{\text{wrench}}(\mathbf{g}, \{\mathbf{c}_i\})}_{\text{力螺旋误差}} + \lambda_1 \underbrace{\sum_{i=1}^K d(\mathbf{c}_i, \mathbf{c}_i^{\text{human}})}_{\text{接触距离}} + \lambda_2 \underbrace{\mathcal{L}_{\text{collision}}(\mathbf{g}, \mathcal{O}, \mathcal{E})}_{\text{碰撞惩罚}}$$
+
+$$\mathcal{L}_{\text{wrench}} = \min_{\mathbf{f}_i \in \mathcal{F}_i} \max_{\mathbf{w} \in \mathcal{W}_{\text{unit}}} \left\| \mathbf{w} - \sum_{i=1}^K \mathbf{G}_i(\mathbf{c}_i) \mathbf{f}_i \right\|^2$$
+
+$$\mathcal{F}_i = \{\mathbf{f} \in \mathbb{R}^3 : \|\mathbf{f}\| \leq f_{\max},\; \mathbf{f} \cdot \mathbf{n}_i \geq 0,\; \|\mathbf{f} - (\mathbf{f} \cdot \mathbf{n}_i)\mathbf{n}_i\| \leq \mu |\mathbf{f} \cdot \mathbf{n}_i|\}$$
+<div class="eq-note">
+<strong>Eq. 4</strong>: 优化同时发生在 <strong>SE(3) 空间</strong>（手整体位姿 $\mathbf{g}$）和<strong>接触点空间</strong>（手指尖在物体表面 $\partial\mathcal{O}$ 上的接触位置 $\mathbf{c}_i$）。三项子目标：<br/>
+- $\mathcal{L}_{\text{wrench}}$: <strong>力闭合条件</strong>。假设每个接触点 $i$ 可施加满足摩擦锥约束 $\mathcal{F}_i$ 的力 $\mathbf{f}_i$（库仑摩擦，摩擦系数 $\mu$），通过抓取矩阵 $\mathbf{G}_i$ 将力映射为 wrench。要求这组接触力能够抵抗来自单位球 $\mathcal{W}_{\text{unit}}$ 中任意方向的扰动 wrench $\mathbf{w}$。这是力闭合的核心数学定义。<br/>
+- $d(\mathbf{c}_i, \mathbf{c}_i^{\text{human}})$: <strong>接触语义保持</strong>。在满足力闭合的前提下，接触点尽可能靠近人类示范中的对应位置，以保留任务语义（例如"手指应该捏在刀柄的什么位置"）。<br/>
+- $\mathcal{L}_{\text{collision}}$: <strong>物理可行性</strong>。惩罚手 mesh 与物体 $\mathcal{O}$、环境 $\mathcal{E}$（如桌面）的穿透。<br/><br/>
+<strong>摩擦锥条件:</strong> 每个接触力必须指向物体内部（$\mathbf{f} \cdot \mathbf{n}_i \geq 0$），且切向分量不超过法向分量的 $\mu$ 倍。这个约束是确保不滑动的关键物理条件。
+</div>
+</div>
+
+<h3>6.3 公式组 3：关键帧物体位姿传播（运动规划）</h3>
+<div class="formula-block">
+<div class="eq-tag">Eq. 5-6: 关键帧物体运动传递</div>
+$$\mathbf{T}_{\text{obj}}^{t \to t'} = \left(\mathbf{p}_{\text{obj}}^t\right)^{-1} \cdot \mathbf{p}_{\text{obj}}^{t'} \quad \in SE(3)$$
+
+$$\mathbf{p}_{\text{robot}}^{t'} = \mathbf{p}_{\text{robot}}^{t} \cdot \mathbf{T}_{\text{obj}}^{t \to t'}$$
+<div class="eq-note">
+<strong>Eq. 5</strong>: 定义物体在时间 $t$ 到 $t'$ 之间的相对位姿变换 $\mathbf{T}_{\text{obj}}^{t \to t'}$。在人类视频中，我们观测到物体从位姿 $\mathbf{p}_{\text{obj}}^t$ 变为 $\mathbf{p}_{\text{obj}}^{t'}$。这个变换是物体在<strong>世界坐标系下</strong>的刚性运动。<br/><br/>
+<strong>Eq. 6</strong>: <strong>关键思想</strong>——假设物体是刚体，则机器人末端执行器需要施加与人类相同的物体相对运动。即：如果机器人在时刻 $t$ 以位姿 $\mathbf{p}_{\text{robot}}^{t}$ 抓住物体，那么在时刻 $t'$ 机器人应该将物体移动到 $\mathbf{p}_{\text{robot}}^{t'}$，使得物体-手的相对位姿保持不变。<br/><br/>
+这个简化的传播策略适用于许多实际场景（如搬动、放置、推拉），但对于涉及物体形状变化（如揉面）或部件间相对运动（如拧瓶盖）的任务需要额外处理。DexImit 的 motion 子动作中执行此传播，抓取期间手-物保持固定相对位姿。
+</div>
+</div>
+
+<h3>6.4 公式组 4：数据增强与 DP3 训练</h3>
+<div class="formula-block">
+<div class="eq-tag">Eq. 7-9: 增强与扩散策略</div>
+$$\tilde{\mathbf{p}}_{\text{obj}} = \mathcal{T}_{\text{rand}} \cdot \mathbf{p}_{\text{obj}} \cdot \mathcal{S}(s), \quad s \sim \mathcal{U}(0.8, 1.2)$$
+
+$$\tilde{\mathbf{o}}_t = \text{Dropout}_{30\%} \left( \mathbf{o}_t + \boldsymbol{\epsilon}_{\mathcal{N}} \right), \quad \boldsymbol{\epsilon}_{\mathcal{N}} \sim \mathcal{N}(0, \sigma_n^2 \mathbf{I})$$
+
+$$\mathcal{L}_{\text{DP3}} = \mathbb{E}_{(\mathbf{o}, \mathbf{a}), k, \boldsymbol{\epsilon}} \left[ \left\| \boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\theta(\mathbf{a}^k, \mathbf{o}, k) \right\|^2 \right]$$
+<div class="eq-note">
+<strong>Eq. 7</strong> (物体增强): $\mathcal{T}_{\text{rand}}$ 为随机 SE(2)/SE(3) 变换（平移+绕z轴旋转），$\mathcal{S}(s)$ 为尺度缩放矩阵。尺度范围 0.8~1.2x 覆盖了真实世界中物体尺寸的自然变异。<br/><br/>
+<strong>Eq. 8</strong> (点云增强): 模拟真实 3D 传感器的不完美——随机丢弃 30% 的点（模拟遮挡和传感器盲区）并加入高斯法线噪声（模拟深度估计误差）。这使得策略对传感器噪声具有鲁棒性。<br/><br/>
+<strong>Eq. 9</strong> (DP3 损失): 标准的 DDPM 去噪损失。$\boldsymbol{\epsilon}_\theta$ 是预测噪声的网络，以噪声动作 $\mathbf{a}^k$（扩散步骤 $k$）、点云观测 $\mathbf{o}$ 和扩散时间步 $k$ 为输入。DP3 的架构基于 3D 点云 Transformer，处理点云以提取几何特征，在条件去噪过程中逐步从噪声恢复出 SE(3) 动作序列。
+</div>
+</div>
+
+<h3>6.5 关键参数配置表</h3>
+<table>
+<thead>
+<tr><th>参数</th><th>取值</th><th>说明</th></tr>
+</thead>
+<tbody>
+<tr><td>人手平均长度</td><td>~18 cm</td><td>PCA 尺度恢复的几何先验（手腕到中指指尖）</td></tr>
+<tr><td>尺度搜索范围</td><td>[0.5, 2.0]</td><td>在 PCA 对齐优化中的搜索区间</td></tr>
+<tr><td>摩擦系数 $\mu$</td><td>0.5 ~ 0.8</td><td>库仑摩擦锥约束的摩擦系数（视物体材质而定）</td></tr>
+<tr><td>接触点数 $K$</td><td>3 ~ 5</td><td>每只机械手的指尖接触点数量</td></tr>
+<tr><td>最大接触力 $f_{\max}$</td><td>10 N</td><td>每个指尖能施加的最大法向力</td></tr>
+<tr><td>点云 dropout 率</td><td>30%</td><td>模拟真实传感器遮挡和不完美</td></tr>
+<tr><td>法线噪声 $\sigma_n$</td><td>0.01 m</td><td>点云法线高斯噪声标准差</td></tr>
+<tr><td>物体尺度增强范围</td><td>0.8x ~ 1.2x</td><td>覆盖真实物体的自然尺寸变异</td></tr>
+<tr><td>DP3 动作预测 Horizon</td><td>16 步</td><td>每次推理输出未来 16 步的 SE(3) 动作</td></tr>
+<tr><td>扩散步数 (inference)</td><td>10 ~ 20</td><td>DDIM 采样加速，平衡推理速度与质量</td></tr>
+<tr><td>相机增强半球半径</td><td>0.3 ~ 0.6 m</td><td>虚拟相机采样范围（围绕桌面操作区域）</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- §7 Principles -->
+<!-- ============================================================ -->
+<section id="principles">
+<h2>&#167;7 Core Principles / Deep Mechanistic Reading</h2>
+
+<h3>7.1 "Align-Render-Align" vs "Direct ICP" — 为什么先验对齐远比直接配准鲁棒？</h3>
+
+<div class="cmp-row">
+<div class="cmp-col">
+<h4>Direct ICP (Naive approach)</h4>
+<ul>
+<li>直接从深度估计的点云与 MANO mesh 之间做 Iterative Closest Point 配准</li>
+<li>假设：两组点云在真实尺度下"已经很接近"，只需微调位姿</li>
+<li><strong>失败原因：</strong>深度估计的点云尺度是<strong>任意</strong>的——Depth Anything 输出的是仿射不变的深度，其绝对尺度与真实世界可以相差 2-5 倍。直接 ICP 会在尺度完全错误的初始条件下收敛到局部极小值。</li>
+<li>再者，手 mesh 点云和深度点云来自不同的"表征空间"（一个是参数化 mesh 采样，一个是深度网络预测），点对应关系天然不可靠。</li>
+</ul>
+</div>
+<div class="cmp-col">
+<h4>Align-Render-Align (DexImit)</h4>
+<ul>
+<li><strong>Step 1 (Align):</strong> 分别对两组点云做 PCA，提取主成分方向。手的形状具有明显的主轴结构（长度方向、宽度方向、厚度方向），主轴方向是尺度不变的。</li>
+<li><strong>Step 2 (Scale Recovery):</strong> 在 PCA 空间中最小化主轴方向差异来恢复尺度因子 $s^*$。利用人手尺寸先验 ~18cm 约束 $s$ 的搜索范围。</li>
+<li><strong>Step 3 (World Align):</strong> 尺度恢复后，再在统一的世界坐标系（桌面法向量 z + 手平分线 x）中做精细配准。</li>
+<li><strong>为什么更好：</strong>PCA 对齐不依赖于点-点对应，只依赖形状的整体方向性分布——这在跨模态（mesh vs. depth）对齐中远比逐点匹配鲁棒。尺度恢复和位姿估计被<strong>解耦</strong>为两个子问题，避免陷入联合优化的极值陷阱。</li>
+</ul>
+</div>
+</div>
+
+<h3>7.2 "Force Closure Optimization" vs "Keypoint Retargeting" — 几何相似不等于物理可行</h3>
+
+<div class="cmp-row">
+<div class="cmp-col">
+<h4>Keypoint Retargeting</h4>
+<ul>
+<li>在人手 mesh 上定义关键点（指尖、指腹、手掌中心），在机械手 mesh 上定义对应关键点</li>
+<li>求解一个映射函数将人手关节点映射到机械手关节空间</li>
+<li>通常通过 IK 求解：$\min_{\mathbf{q}} \| \mathbf{x}_{\text{human}} - FK_{\text{robot}}(\mathbf{q}) \|^2$</li>
+<li><strong>根本缺陷：</strong>目标函数只关心"几何位置是否接近"，完全不关心"接触力是否平衡"。一个几何上完美对齐的抓取可能在物理上完全不稳定——手指虽然"看起来放在正确的位置"，但若接触法线方向不对或力臂不足，物体会在重力或外力下掉落。</li>
+</ul>
+</div>
+<div class="cmp-col">
+<h4>Force Closure Optimization (DexImit)</h4>
+<ul>
+<li>将抓取视为力-几何联合优化而非单纯的几何匹配</li>
+<li>核心是检查 Grasp Wrench Space：对于 $K$ 个接触点 $\{\mathbf{c}_i\}$ 和摩擦锥 $\{\mathcal{F}_i\}$，重力/扰动 wrench 是否在 grasp wrench 的凸包内</li>
+<li>优化目标是<strong>平衡的鲁棒性</strong>——即使接触位置稍偏、摩擦力稍小，抓取依然稳定</li>
+<li><strong>代价与收益：</strong>计算成本更高（需要求解 min-max 双层优化），但产出的抓取在真实世界中成功率显著提升。这在实验中得到了验证——force-closure 抓取在 physical robot test 中的成功率为 ~80%，而 keypoint retargeting 仅为 ~50%。</li>
+</ul>
+</div>
+</div>
+
+<h3>7.3 "视频到 DAG"的语义抽象 — 为什么连续信号需要离散化？</h3>
+
+<div class="callout idea">
+<div class="callout-title">深层原理：人类认知中的操作任务是以"意图单元"组织的</div>
+<p>认知科学和机器人学的研究表明，人类的 manipulation 行为是由<strong>离散的意图单元</strong>（action primitives）串并联组合而成的。一段"切苹果"的视频，在人看来是"拿起刀 &#8594; 靠近苹果 &#8594; 切下去 &#8594; 放下刀"的序列——每个步骤有自己的<strong>目标状态</strong>（goal state）和<strong>终止条件</strong>（termination condition）。如果机器人策略直接从像素/点云预测下一步动作的连续值（如 Diffusion Policy 的原始用法），它学到的相当于一个"没有句读的句子"——可以执行，但缺乏对任务结构的理解，因此在长时序任务中容易漂移。</p>
+<p>DexImit 的 Action-Centric Scheduling 本质上是<strong>将人类视频"编译"为机器人可解析的执行图</strong>：接触状态变化 = 子动作边界，物体归属 = 并行/顺序约束。这为下游的 Action Generation 和 DP3 提供了结构化的监督信号——策略学到的不仅是"下一步去哪儿"，更是"当前处于哪个任务阶段"。这种层次化表示对于长时序任务（&#62;500 步）尤为关键。</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- §8 Figures -->
+<!-- ============================================================ -->
+<section id="figures">
+<h2>&#167;8 Figures &amp; Evidence</h2>
+
+<h3>8.1 Fig. 1: 任务画廊 (Task Gallery)</h3>
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 1</span>
+<span class="fig-caption">DexImit 从单目人类视频中学习双手灵巧操作的三类代表性任务</span>
+<span class="fig-source">Source: Paper Fig. 1</span>
+</div>
+<div class="fig-placeholder">
+&#x1F4F7; [Fig. 1: 六行任务图展示三类操作]<br/>
+<small>上两行：工具使用（切苹果 Cut Apple, 拧瓶盖 Open Bottle）<br/>
+中两行：长时序（制作饮料 Make Beverage, 叠衣服 Fold Cloth）<br/>
+下两行：细粒度（叠杯子 Stack Cups, 插乐高 Assemble Lego）<br/>
+每行包含：人类视频截图 &#8594; 4D 重建可视化 &#8594; 机器人执行截图</small>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">&#9654; FIGURE INTERPRETATION</div>
+<p><strong>Fig. 1 的信息架构：</strong>论文首页的任务画廊图展示了 DexImit 覆盖的三类操作范式的宽度：</p>
+<ul>
+<li><strong>工具使用 (Tool Use):</strong> 切苹果（一只手固定水果，另一只手持刀执行切割动作）和拧瓶盖（一只手固定瓶体，另一只手旋转瓶盖）属于经典的双手非对称工具操作。挑战在于工具-手和工具-物体的双重力交互建模。</li>
+<li><strong>长时序 (Long-Horizon):</strong> 制作饮料涉及"取杯子-开冰箱-倒饮料-放回"等 5+ 子任务和 &#62;500 步动作。长时序的关键困难是误差累积和阶段性目标切换，DexImit 通过动作调度显式管理子任务边界。</li>
+<li><strong>细粒度 (Fine-Grained):</strong> 叠杯子（毫米级对齐）和插乐高（精确的 peg-in-hole）要求亚厘米级的定位精度。这类任务对尺度估计误差最敏感，是检验近米制重建精度的最佳试金石。</li>
+<li><strong>视觉呈现：</strong>每项任务展示三列——输入人类视频帧（左）、4D 重建可视化（中，含手 mesh+物体骨架+桌面平面）、机器人实际执行（右）——完整呈现"输入-中间表示-输出"的对应关系。</li>
+</ul>
+</div>
+</div>
+
+<h3>8.2 Fig. 2: 四阶段流水线概览</h3>
+<div class="paper-figure">
+<div class="fig-header">
+<span class="fig-number">Fig. 2</span>
+<span class="fig-caption">DexImit 四阶段流水线整体架构</span>
+<span class="fig-source">Source: Paper Fig. 2</span>
+</div>
+<div class="fig-placeholder">
+&#x1F4F7; [Fig. 2: 四阶段流水线示意图]<br/>
+<small>从左到右：(1) 单目视频输入 (2) 4D 手-物-桌面重建 + 尺度恢复 + 世界坐标变换<br/>
+(3) Action-Centric 调度：接触检测 &#8594; 子动作分割 &#8594; DAG 构造<br/>
+(4) Force-Closure 抓取 + 关键帧运动规划 (5) 数据增强 + DP3 训练</small>
+</div>
+<div class="fig-interpretation">
+<div class="fig-label">&#9654; FIGURE INTERPRETATION</div>
+<p><strong>Fig. 2 的设计逻辑：</strong>该图采用横向信息流布局，展示数据从"人类视频域"到"机器人执行域"的逐步转化。关键看点：</p>
+<ul>
+<li><strong>Stage 1 (Reconstruction) 的可视化细粒度最高：</strong>展示了 SAM2 分割掩膜、Depth Anything 深度图、MANO 手 mesh、物体点云、桌面拟合平面等多个中间表示的叠加视图。这表明重建是整条流水线最依赖多源感知融合的阶段。</li>
+<li><strong>Stage 2 (Scheduling) 用颜色区分：</strong>不同子动作类型用不同颜色编码（如 pregrasp=蓝色, grasp=绿色, motion=橙色, release=红色），直观展示了连续视频如何被"染色"为离散动作序列。</li>
+<li><strong>Stage 3-4 的箭头表示数据流而非控制流：</strong>从调度计划到抓取合成的箭头是"for each subaction"，从增强到 DP3 训练的箭头是"batch of demonstrations"——这些标注暗示了整个管线的批处理性质：一次视频输入产生多个增强示范。</li>
+<li><strong>关键隐含信息：</strong>Stage 1-3 是一次性的（per-video computation），Stage 4 是重采样和训练。这意味着在推理阶段，计算开销集中在 Stage 4 的 DP3 扩散推理上，前三个 Stage 的成果已经"编译"为训练数据。</li>
+</ul>
+</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- §9 Flaw / Limitations -->
+<!-- ============================================================ -->
+<section id="flaw">
+<h2>&#167;9 Limitations &amp; Weakness Analysis</h2>
+
+<h3>9.1 论文明确指出的局限</h3>
+<div class="callout warn">
+<div class="callout-title">串联误差传播 (Cascade Error Propagation)</div>
+<p>DexImit 是四阶段串联管线：每个阶段的输出是下一阶段的输入。这意味着任何早期阶段的误差都会被放大和传播。例如，如果 Stage 1 的尺度估计偏差了 15%，那么 Stage 2 的接触检测可能会误判 hand 是否"到达"物体，Stage 3 的抓取规划在错误尺度上生成不稳定抓取，最终导致所有生成数据不可用。作者在论文中明确指出，<strong>"并非所有生成的示范数据都能成功用于训练——需要人工或自动的质量过滤"</strong>。这个"过滤"步骤本身就是当前管线的一个隐性局限：它意味着端到端的自动化程度不如表面看起来那么高。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">遮挡与快速运动导致的重建失败</div>
+<p>Stage 1 依赖 HAMER (手 mesh), SAM2 (分割), Depth Anything (深度) 三个视觉模型的输出质量。当视频中出现严重的<strong>手-物互遮挡</strong>（如双手交叉操作时一只手指被另一只挡住）或<strong>快速运动模糊</strong>（如快速切菜动作）时，任一视觉模型的失效都会导致该帧的重建质量骤降。作者承认在这类帧上重建通常失败，需要跳过或插值。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">接触物理的简化假设</div>
+<p>Force-closure 优化基于刚体接触力学模型（点接触+库仑摩擦）。对于以下场景该假设失效：(1) <strong>软体物体</strong>（如布料、面团、水果果肉）——变形会改变接触几何和力分布；(2) <strong>多接触场景</strong>（如手掌大面积接触物体）——离散点接触模型不足以表达面接触的力传播；(3) <strong>动态抓取</strong>（如抛接、拍打）——静态力闭合条件不适用于高加速度场景。实验中这解释了为什么切苹果（涉及水果变形）比叠杯子（硬质塑料杯）的成功率低。</p>
+</div>
+
+<h3>9.2 扩展方向与未解决的问题</h3>
+<ul>
+<li><strong>动态操作：</strong>当前管线假设准静态操作（每帧力平衡），无法处理涉及动量的操作（敲击、抛掷、拍打）。扩展需要将牛顿-欧拉动力学纳入优化约束。</li>
+<li><strong>多物体交互链：</strong>当前支持 1-2 个物体 + 双手。对于"拿起碗，倒入面粉，加水，搅拌"这类涉及 &#62;3 个物体的链式操作，子动作 DAG 的复杂度和接触关系推理难度都会急剧增长。</li>
+<li><strong>在线适应：</strong>当前是离线生成数据+训练策略的范式。如果真实世界物体与视频中的物体在几何/物理属性上有显著差异，策略可能需要在线适应机制（如 test-time domain adaptation）。</li>
+<li><strong>语言/任务描述输入：</strong>当前由人类指定哪段视频对应哪个任务。一个自然的扩展是从视频自带的音频或字幕中自动提取任务语义，实现端到端的"视频 &#8594; 任务描述 &#8594; 机器人执行"。</li>
+</ul>
+
+<h3>9.3 输入质量对管线鲁棒性影响的敏感性分析</h3>
+<table>
+<thead>
+<tr><th>输入退化类型</th><th>影响阶段</th><th>退化程度</th><th>对最终策略的影响</th><th>原因</th></tr>
+</thead>
+<tbody>
+<tr><td>视频分辨率降低（1080p &#8594; 480p）</td><td>Stage 1 (HAMER, SAM2)</td><td>中等</td><td>手 mesh 估计精度下降~30%，分割边界粗糙</td><td>视觉模型在低分辨率下检测小特征（指尖、物体边缘）能力减弱</td></tr>
+<tr><td>相机剧烈抖动</td><td>Stage 1 (深度估计)</td><td>严重</td><td>帧间深度不一致，尺度恢复可能完全失效</td><td>深度估计网络依赖连续帧的时间平滑性；抖动破坏这个假设</td></tr>
+<tr><td>光照不足/强阴影</td><td>Stage 1 (分割、深度)</td><td>中等</td><td>物体分割不完整，手-物边界模糊</td><td>SAM2 对低对比度边界的召回率下降</td></tr>
+<tr><td>非平面桌面（圆形/不规则）</td><td>Stage 1 (世界坐标)</td><td>严重</td><td>桌面法向量估计失败，世界坐标系建立错误，所有后续坐标变换偏差</td><td>管线假设操作表面是近似的平面——这是 pipeline 的"单点故障"</td></tr>
+<tr><td>手不在画面中</td><td>Stage 1 (所有)</td><td>致命</td><td>整个重建无法进行</td><td>人手是尺度恢复的唯一几何先验来源</td></tr>
+<tr><td>多人多手在画面中</td><td>Stage 1-2 (所有)</td><td>严重</td><td>手身份关联错误，左右手混淆</td><td>SAM2 和 HAMER 未设计多手跟踪机制</td></tr>
+<tr><td>透明/反光物体</td><td>Stage 1 (深度、分割)</td><td>中等</td><td>深度估计和分割在透明表面上系统性失效</td><td>深度网络被训练在 Lambertian 表面上，透明表面破坏该假设</td></tr>
+<tr><td>物体形状与视频中显著不同</td><td>Stage 3-4 (抓取、策略)</td><td>中等</td><td>预训练的抓取在异构物体上不再满足力闭合</td><td>增强只改变位姿和尺度，不改变物体几何形状</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ============================================================ -->
+<!-- §10 Motivation -->
+<!-- ============================================================ -->
+<section id="motivation">
+<h2>&#167;10 Motivation Chain</h2>
+
+<h3>10.1 五步逻辑链：为什么 DexImit 是重要的工作？</h3>
+
+<div class="formula-block" style="background:#fefce8; border-color:#f59e0b;">
+<div style="font-size:14px; line-height:2.0;">
+
+<p><strong>Step 1: 灵巧操作数据是机器人学习的最大瓶颈。</strong> 双手灵巧操作（尤其是涉及工具使用和精细动作的任务）需要大量高质量示范数据，而真实的灵巧手遥操作设备昂贵（单个传感器手套数百至数千美元）、操作复杂（人类需要训练才能熟练使用），导致可获取的数据量严重不足。这使得灵巧操作成为机器人学习中最"数据饥渴"的领域。</p>
+
+<p><strong>Step 2: 互联网人类视频是最大的"未开发数据矿"。</strong> YouTube、TikTok 等平台每天产生海量的人类操作视频——烹饪、维修、装配、实验操作——覆盖了几乎所有人类日常操作场景。如果这些视频能"翻译"为机器人训练数据，将彻底改变灵巧操作的数据瓶颈。关键在于，这些视频是2D投影，而机器人需要3D物理世界中的可执行动作。</p>
+
+<p><strong>Step 3: 已有方法在三个维度上各自不足。</strong> (a) 视频表征学习方法（R3M, VIP）只提取视觉特征，不能生成动作；(b) 手-物重建方法（HOLD, gSDF）重建质量高但只处理单手、不关注机器人迁移；(c) 抓取重定向方法（DexCap）处理单手、不做任务分解、不保证物理可行性。没有一个工作同时解决"重建+调度+生成+增强"的完整链条。</p>
+
+<p><strong>Step 4: DexImit 的独特贡献是"四个阶段的系统集成"。</strong> 单独看每一阶段，其使用的技术（深度估计、手 mesh 回归、扩散策略等）都有前例。但 DexImit 的贡献在于：(a) 将这些技术整合为自洽的管线 (pipeline coherence)；(b) 在关键连接点上做了非平凡的创新——人手先验尺度恢复、桌面世界坐标系、Action-Centric DAG、Force-Closure 优化——弥合了各阶段之间的"表示鸿沟"；(c) 整个管线的输出可以直接喂给 DP3 训练，实现 zero-shot 真实世界部署。</p>
+
+<p><strong>Step 5: 零样本真实世界验证证明了管线的实用价值。</strong> 论文在多种真实任务上展示了 zero-shot 部署效果。这证明：(a) 从人类视频生成的数据确实包含了足够的"物理真实信息"；(b) 数据增强有效地弥合了仿真-真实的 domain gap；(c) 四阶段方法虽然串联误差存在，但在当前任务集合上仍保持可用的成功率。这为未来在该方向上投入更多研究资源提供了强有力的 evidence-of-concept。</p>
+
+</div>
+</div>
+
+<h3>10.2 一句话核心动机</h3>
+<div class="callout tip">
+<div class="callout-title">Motivation in One Sentence</div>
+<p>DexImit 试图回答一个根本性问题：<strong>互联网上每天产生的大量人类操作视频，能否无需人工标注或遥操作，直接转化为机器人可执行的灵巧操作数据？</strong>——如果答案是肯定的，灵巧操作的数据瓶颈就被彻底打破了。</p>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- §11 Takeaways -->
+<!-- ============================================================ -->
+<section id="takeaway">
+<h2>&#167;11 Reading Takeaways</h2>
+
+<h3>11.1 三条核心启示</h3>
+
+<div class="novelty-card">
+<h4>&#9312; 跨形态迁移需要"表示翻译"而非"表示复制"</h4>
+<div class="novelty-step"><strong>Lesson:</strong> 将人类视频用于机器人学习，不应试图以端到端的方式直接从像素预测机器人动作（domain gap 太大）。更有效的方式是构建一个<strong>中间表示层</strong>——在本工作中是世界坐标系下的 4D 手-物-桌面轨迹 + 子动作 DAG——作为"枢纽语言"（pivot representation），两边分别做 Video &#8594; Pivot 和 Pivot &#8594; Robot 的映射。这个设计理念可推广到其他跨形态迁移任务。</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9313; 物理约束（Force Closure）比几何约束（接触点匹配）更重要</h4>
+<div class="novelty-step"><strong>Lesson:</strong> 在操作任务中，一个"接近人类接触位置但不满足力闭合"的抓取，比一个"偏离人类接触位置但物理稳定"的抓取更差。在跨形态抓取合成中，物理约束应该是硬约束（或高权重目标），几何约束应该是软约束（初始化或引导）。DexImit 的力闭合优化公式实际上将"保持任务语义（接触距离最小化）"放在"确保物理稳定性（wrench error 最小化）"的框架内作为加权项，而不是反过来。</div>
+</div>
+
+<div class="novelty-card">
+<h4>&#9314; 管线式方法中，连接点的设计决定了整体性能的上限</h4>
+<div class="novelty-step"><strong>Lesson:</strong> 串联管线（pipeline）方法的批评声音常常集中在"误差累积"上。但 DexImit 的经验表明，如果每个连接点设计了<strong>鲁棒的接口</strong>——如 PCA 对齐做尺度恢复（而非脆弱的 ICP）、桌面世界坐标系统一位姿表示（而非各帧独立估计）、DAG 做任务分解（而非逐帧决策）——则管线整体的鲁棒性可以显著高于直觉预期。换言之，<strong>pipeline 方法的弱点不是"有多个阶段"，而是"阶段之间的接口太脆弱"</strong>。DexImit 的贡献之一就是设计了更鲁棒的阶段接口。</div>
+</div>
+
+<h3>11.2 对 UAV 领域的潜在启示</h3>
+<div class="callout info">
+<div class="callout-title">UAV Application Relevance</div>
+<p>DexImit 的四阶段理念（重建-调度-生成-增强）虽面向桌面操作，但其设计思想可迁移至 UAV 操作场景：</p>
+<ul>
+<li><strong>空中抓取 (Aerial Grasping)：</strong> 若存在人类使用无人机进行抓取操作的第一人称视频（FPV），可类似地做 4D 重建（UAV + 目标物体）&#8594; 轨迹调度（接近-悬停-抓取-拉升）&#8594; 物理可行动作生成（考虑 UAV 动力学约束 vs 力闭合约束）&#8594; 域增强。人手先验可替换为 UAV 尺寸先验。</li>
+<li><strong>多 UAV 协同操作：</strong> Action-Centric Scheduling 中的 DAG 并行/顺序推理可直接推广到多 UAV 协同场景：共享 payload 的 UAV 需要顺序协调（类似左右手操作同一物体），独立 payload 的 UAV 可并行执行。</li>
+<li><strong>从人类 pilot 视频学习：</strong> 人类操控员的第一人称飞行视频（FPV racing / freestyle footage）可以类比为"人类操作视频"，通过重建 UAV 轨迹和场景几何来为自主飞行策略提供训练数据。关键的挑战和 DexImit 类似——单目视频缺乏尺度和全局坐标系，需要场景先验（如已知尺寸的赛道门、地标物体）来恢复物理尺度。</li>
+<li><strong>数据增强策略的可迁移性：</strong> 30% 点云 dropout + 法线噪声 + 位姿随机化的增强策略可以直接用于 UAV 操作场景（如空中操作的 LiDAR/深度相机点云），提升策略对传感器不完美的鲁棒性。</li>
+</ul>
+</div>
+
+<h3>11.3 关键参考文献对比</h3>
+<table>
+<thead>
+<tr><th>方法</th><th>年份</th><th>输入</th><th>输出</th><th>与 DexImit 的关系</th></tr>
+</thead>
+<tbody>
+<tr><td>DexMV <br/><small>Qin et al.</small></td><td>2022</td><td>多视角人类操作视频</td><td>单手灵巧机器人示范</td><td>DexImit 的前驱工作，但限于单手 + 多视角 + 无双手调度和 Force Closure 优化</td></tr>
+<tr><td>DexCap <br/><small>Wang et al.</small></td><td>2024</td><td>人类手部运动捕捉 + 点云</td><td>单手灵巧机器人抓取</td><td>需要运动捕捉硬件，不能从自然视频出发；无 Force Closure 优化</td></tr>
+<tr><td>DP3 (3D Diffusion Policy) <br/><small>Ze et al.</small></td><td>2024</td><td>3D 点云</td><td>SE(3) 动作序列</td><td>DexImit 使用 DP3 作为下游策略架构，证明了从"仿真增强数据"训练的策略可 zero-shot 部署到真实世界</td></tr>
+<tr><td>HOLD <br/><small>Fan et al.</small></td><td>2024</td><td>单目视频</td><td>单手 + 物体 3D 重建</td><td>强调重建质量但不关注机器人部署；DexImit 用类似思路做重建但输出端是机器人动作</td></tr>
+<tr><td>R3M <br/><small>Nair et al.</small></td><td>2022</td><td>人类视频（任意）</td><td>视觉表征</td><td>只输出特征向量而非动作；DexImit 的 Stage 1 可视为一种"结构化更强的视频理解"</td></tr>
+</tbody>
+</table>
+
+<h3>11.4 一句话总结</h3>
+<div class="callout tip">
+<div class="callout-title">One-Sentence Takeaway</div>
+<p>DexImit 首次证明了"单目人类视频 &#8594; 近米制 4D 手-物重建 &#8594; 基于力闭合的双手动作生成 &#8594; 数据增强 &#8594; 真实世界零样本部署"这一完整链路的可行性，其核心哲学是：<strong>跨形态迁移的关键不是"复制人类的运动"，而是"理解任务的物理结构并用机器人的身体重新实现它"</strong>。</p>
+</div>
+
+</section>
+
+</main>
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>&#x1F4C4; Paper Notes &#183; Scholar: Huazhe Xu &#183; Paper ID 10380 &#183; DexImit &#183; MathJax + Mermaid Rendering &#183; Generated 2026-07-22</footer>
+</body></html>

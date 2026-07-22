@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - Large-Scale Video Classification with Convolutional Neural Networks</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="wrap">
+
+<!-- ==================== SECTION 1: PAPER INFO ==================== -->
+<section id="info">
+<h2>1. Paper Info</h2>
+<h1>Large-Scale Video Classification with Convolutional Neural Networks</h1>
+
+<table>
+  <tr><td style="width:140px;font-weight:700;">Authors</td><td><strong>Andrej Karpathy</strong>, George Toderici, Sanketh Shetty, Thomas Leung, Rahul Sukthankar, <strong>Li Fei-Fei</strong></td></tr>
+  <tr><td>Affiliation</td><td><span class="bold-affil">Stanford University</span> (CS Department)</td></tr>
+  <tr><td>Year / Venue</td><td><span class="bold-venue">2014 / CVPR</span> (IEEE Conference on Computer Vision and Pattern Recognition)</td></tr>
+  <tr><td>Research Type</td><td>视频理解、大规模监督学习、时空卷积网络、迁移学习</td></tr>
+  <tr><td>Group</td><td>Stanford Vision Lab (Li Fei-Fei 组)</td></tr>
+  <tr><td>Citations</td><td>Google Scholar 统计: 4000+ (截至2026)</td></tr>
+  <tr><td>Key Dataset</td><td><strong>Sports-1M</strong>: 100万 YouTube 视频, 487 个体育类别, 约10~15万小时视频</td></tr>
+  <tr><td>Benchmark</td><td>Sports-1M (测试集20万视频), UCF-101 (迁移学习)</td></tr>
+  <tr><td>Local PDF</td><td><a href="Karpathy et al. - 2014 - Large-scale video classification with convolutional neural networks.pdf">Karpathy et al. - 2014 - Large-scale video classification with convolutional neural networks.pdf</a></td></tr>
+</table>
+
+<h3>1.1 TL;DR (一句话概述)</h3>
+<div class="callout info">
+<p><strong class="hl">核心发现：</strong>在百万级体育视频数据集 Sports-1M 上，CNN 全面碾压手工特征（提升超20个百分点），但四种时序融合架构（Single Frame、Late Fusion、Early Fusion、Slow Fusion）之间的性能差异远小于预期——最强的 Slow Fusion 仅比最简单的单帧基线多 3.7 个点的 top-1 准确率。这说明对于动作识别，<strong>静态外观信息远比短时运动信息重要</strong>，场景上下文（如冰面→冰球、草坪→足球）已经提供了绝大多数判别线索。</p>
+</div>
+
+<h3>1.2 丰富标签</h3>
+<div class="tags">
+  <span class="tag tag-blue">大规模视频分类</span>
+  <span class="tag tag-amber">Sports-1M</span>
+  <span class="tag tag-purple">时空CNN融合</span>
+  <span class="tag tag-green">Slow Fusion</span>
+  <span class="tag tag-red">CVPR 2014</span>
+  <span class="tag tag-cyan">迁移学习</span>
+  <span class="tag tag-blue">多分辨率架构</span>
+  <span class="tag tag-amber">Foveated Architecture</span>
+  <span class="tag tag-purple">Early/Late Fusion</span>
+  <span class="tag tag-green">UCF-101</span>
+  <span class="tag tag-gray">YouTube弱标注</span>
+  <span class="tag tag-red">外观vs运动</span>
+  <span class="tag tag-cyan">卷积神经网络</span>
+  <span class="tag tag-blue">Stanford</span>
+  <span class="tag tag-amber">Karpathy</span>
+  <span class="tag tag-purple">Fei-Fei</span>
+</div>
+
+<h3>1.3 研究脉络定位</h3>
+<p>本文是<strong>将深度CNN从静态图像推向视频理解的里程碑式工作</strong>。时间线上，它位于 AlexNet (Krizhevsky et al., 2012) 引爆图像 CNN 之后、Two-Stream (Simonyan & Zisserman, 2014, NIPS) 和 C3D (Tran et al., 2015, ICCV) 之前。Karpathy 等人首次以<strong>工业级规模</strong>系统回答了"CNN 如何建模时间维度"的问题，其研究范式（大规模弱标注 + CNN + 小数据集迁移）深刻影响了后续 Two-Stream、I3D、SlowFast 等工作。</p>
+</section>
+
+<!-- ==================== SECTION 2: INSIGHT & NOVELTY ==================== -->
+<section id="insight">
+<h2>2. Insight &amp; Novelty</h2>
+
+<h3>2.1 核心洞察 (Q&A 形式)</h3>
+
+<div class="callout info">
+<div class="callout-title">Q1: 为什么说这篇论文的核心矛盾是"反直觉"的？</div>
+<p>直觉上，视频=图像+时间，建模运动信息应该带来巨大性能提升。但实验结果显示：最复杂的 Slow Fusion (65.4% top-5 UCF-101) 仅比最简单的 Single Frame (59.4%) 高出 6 个百分点；在 Sports-1M 上，单帧模型 top-1 已达 41.1%，Slow Fusion 为 44.8%，提升 3.7 点。这说明<strong>静态外观包含的分类信息远超研究者的先验预期</strong>——这恰恰是规模化实验才能揭示的"反直觉真理"。</p>
+</div>
+
+<div class="callout tip">
+<div class="callout-title">Q2: 这篇论文最重要的方法论贡献是什么？</div>
+<p>论文建立了<strong>视频CNN融合策略的系统化分类学</strong>——根据时序信息在网络中合并的"深度"，分为 Early Fusion（像素级）、Late Fusion（全连接层）、Slow Fusion（渐进式、逐层合并），并揭示了<strong>"融合越晚、信息越抽象、但感受野越大"</strong>的 trade-off 规律。这一分类体系成为后续几乎所有时空建模工作的通用语言。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">Q3: 为什么 Sports-1M 这个数据集本身就是贡献？</div>
+<p>当时视频理解领域最大的数据集 UCF-101 仅 13,320 个视频，无法充分训练深层 CNN。<strong>Sports-1M 比 UCF-101 大 75 倍</strong>，且利用 YouTube Topic API 免费获取弱标注，构建成本极低。它证明了<strong>"工业级规模+弱标注"范式</strong>的可行性——这一思路后来被 HowTo100M、Kinetics-700 等更大数据集遵循。</p>
+</div>
+
+<h3>2.2 知识图谱映射</h3>
+<table>
+  <tr><th style="width:160px;">维度</th><th>前置工作</th><th>本文贡献</th><th>后续发展</th></tr>
+  <tr>
+    <td><strong>数据集规模</strong></td>
+    <td>UCF-101 (13K), HMDB-51 (7K)</td>
+    <td>Sports-1M (1M视频, 487类) — 首个人工智能规模视频数据集</td>
+    <td>Kinetics (650K), YouTube-8M (8M), HowTo100M (136M)</td>
+  </tr>
+  <tr>
+    <td><strong>时序建模</strong></td>
+    <td>手工特征 (HOG/HOF/MBH) + IDT</td>
+    <td>四种深度时序融合策略的系统对比</td>
+    <td>Two-Stream (2014), C3D (2015), I3D (2017), SlowFast (2019)</td>
+  </tr>
+  <tr>
+    <td><strong>CNN架构</strong></td>
+    <td>AlexNet (2012) — 纯图像</td>
+    <td>将CNN扩展为时空网络，探索多分辨率低计算架构</td>
+    <td>ResNet-3D, Video Transformer (ViViT, TimeSformer)</td>
+  </tr>
+  <tr>
+    <td><strong>范式</strong></td>
+    <td>小数据集+手工特征+浅层分类器</td>
+    <td>大规模弱标注预训练 + 小数据集迁移微调</td>
+    <td>自监督预训练 (VideoMAE, 2022), CLIP视频扩展</td>
+  </tr>
+</table>
+
+<h3>2.3 三大创新卡片</h3>
+
+<div class="novelty-card">
+<h4>Novelty 1: 数据集规模突破 — Sports-1M</h4>
+<div class="novelty-step"><strong>动机:</strong> 当时最大视频数据集仅1万级别，CNN无法充分收敛。</div>
+<div class="novelty-step"><strong>方案:</strong> 利用 YouTube Topic API 自动获取 487 个体育类别的视频ID，通过 content-based filtering 过滤，最终得到 1,133,158 个视频。</div>
+<div class="novelty-step"><strong>创新点:</strong> 首次将视频识别推向"互联网规模"——比 UCF-101 大两个数量级，标签来自用户上传时的 topic 标注（弱监督、有噪声但免费），开启了"噪声大规模数据训练"的研究方向。</div>
+<div class="novelty-step"><strong>影响:</strong> 直接启发了 YouTube-8M、Kinetics、Something-Something 等更大规模视频数据集的建设。</div>
+</div>
+
+<div class="novelty-card">
+<h4>Novelty 2: 时空融合策略的系统化分类学</h4>
+<div class="novelty-step"><strong>动机:</strong> 此前没有工作系统比较 CNN 中不同的时序信息融合方式——大家都是"凭直觉"选一种。</div>
+<div class="novelty-step"><strong>方案:</strong> 定义了四种融合架构：Single Frame（逐帧独立）、Late Fusion（两帧相隔15帧，在全连接层融合）、Early Fusion（10帧在像素级拼接）、Slow Fusion（4个时间尺度渐进融合）。</div>
+<div class="novelty-step"><strong>创新点:</strong> 建立了"融合深度"与"感受野大小/信息抽象程度"之间的理论联系——融合越早（靠近像素），可捕获更精细的运动，但感受野小；融合越晚（靠近输出），感受野大但时间信息已高度抽象化。这种 trade-off 的系统阐述是原创性的。</div>
+<div class="novelty-step"><strong>影响:</strong> Late Fusion 思路被 Two-Stream 继承；Slow Fusion 的渐进融合思想被 C3D 和 SlowFast 发展。</div>
+</div>
+
+<div class="novelty-card">
+<h4>Novelty 3: 多分辨率(Foveated)架构 — 计算效率创新</h4>
+<div class="novelty-step"><strong>动机:</strong> 全帧高分辨率处理计算量极大，但很多视频中动作发生在中心区域。</div>
+<div class="novelty-step"><strong>方案:</strong> 借鉴人类视网膜的 fovea 机制——中心区域高分辨率 (original crop)，周边区域低分辨率 (downsampled half-resolution)，拼接后送入 CNN，形成"中央凹+外围"双流输入。</div>
+<div class="novelty-step"><strong>创新点:</strong> 在保持中心细节的同时将计算量降低 <strong>2-4倍</strong>（取决于中心/外围比例），而精度仅轻微下降 (约1-2%)。这种"感知驱动的计算节省"在后续视频理解工作中被广泛采用。</div>
+<div class="novelty-step"><strong>影响:</strong> 启发了高效视频理解中的非均匀采样、region-based attention 等方法。</div>
+</div>
+</section>
+
+<!-- ==================== SECTION 3: ARCHITECTURE ==================== -->
+<section id="architecture">
+<h2>3. Architecture &amp; Pipeline</h2>
+
+<h3>3.1 整体架构面板</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <!-- Stage 1: Input -->
+    <div class="arch-stage">
+      <h4>Stage 1: 输入层 <span>多帧视频片段</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>Single Frame</strong>
+        <small>随机单帧 224×224, 3通道</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>Late Fusion</strong>
+        <small>2帧 × 224×224, 间隔15帧</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>Early Fusion</strong>
+        <small>10帧 × 224×224 像素级拼接 → 30通道</small>
+      </div>
+      <div class="arch-card arch-solar">
+        <strong>Slow Fusion</strong>
+        <small>10帧 × 89×89, 逐步扩展感受野</small>
+      </div>
+    </div>
+    <!-- Stage 2: Feature Extraction -->
+    <div class="arch-stage">
+      <h4>Stage 2: 特征提取 <span>CNN卷积层</span></h4>
+      <div class="arch-card arch-power">
+        <strong>独立单帧CNN</strong>
+        <small>标准 AlexNet-like 架构, 5层卷积 + 3层全连接</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>双流独立卷积</strong>
+        <small>两帧各自走完整卷积，FC层才合并</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>全时间3D卷积</strong>
+        <small>第一层即10帧全拼接, 30通道输入</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>渐进式时空卷积</strong>
+        <small>4个时空卷积层, 时间感受野逐步扩大</small>
+      </div>
+    </div>
+    <!-- Stage 3: Fusion -->
+    <div class="arch-stage">
+      <h4>Stage 3: 时序融合 <span>关键差异</span></h4>
+      <div class="arch-card arch-motor">
+        <strong>无时序融合</strong>
+        <small>逐帧预测→平均值pooling</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>FC层融合</strong>
+        <small>两个4096-d向量拼接→4096→分类</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>像素级融合</strong>
+        <small>10帧通道拼接, 11×11×30 第一层核</small>
+      </div>
+      <div class="arch-card arch-motor">
+        <strong>多阶段融合</strong>
+        <small>层1(T=4)→层2(T=2)→层3(T=2)→FC</small>
+      </div>
+    </div>
+    <!-- Stage 4: Output -->
+    <div class="arch-stage">
+      <h4>Stage 4: 输出 <span>分类预测</span></h4>
+      <div class="arch-card arch-thrust">
+        <strong>Softmax 487类</strong>
+        <small>Top-1: 41.1%, Top-5: 59.4% (UCF)</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>Softmax 487类</strong>
+        <small>Top-1: 42.5%, Top-5: 60.9% (UCF)</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>Softmax 487类</strong>
+        <small>Top-1: 38.9%, Top-5: 57.1% (UCF)</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>Softmax 487类</strong>
+        <small>Top-1: 41.6% (Sports-1M), Top-5: 65.4% (UCF)</small>
+      </div>
+    </div>
+  </div>
+  <div class="arch-summary">
+    <div class="arch-metric">
+      <strong>Single Frame (基线)</strong>
+      <small>计算量最小, 仅外观特征, 泛化性好</small>
+    </div>
+    <div class="arch-metric">
+      <strong>Late Fusion</strong>
+      <small>捕获大间隔运动, 但仅2帧信息有限</small>
+    </div>
+    <div class="arch-metric">
+      <strong>Early Fusion</strong>
+      <small>精细运动但参数量大, 容易过拟合</small>
+    </div>
+    <div class="arch-metric">
+      <strong>Slow Fusion ★</strong>
+      <small>性能最优, 平衡精度与效率</small>
+    </div>
+  </div>
+</div>
+
+<h3>3.2 四种融合架构 Mermaid 流程图</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+graph TB
+    subgraph "Single Frame Baseline"
+        A1["Input: 1 random frame<br/>224×224×3"] --> B1["5 Conv layers<br/>(spatial only)"]
+        B1 --> C1["3 FC layers<br/>4096→4096→487"]
+        C1 --> D1["Softmax<br/>per-frame prediction"]
+        D1 --> E1["Average pooling<br/>over all frames in clip"]
+    end
+
+    subgraph "Late Fusion"
+        A2a["Frame t<br/>224×224×3"] --> B2a["Conv1→Conv5<br/>(shared weights)"]
+        A2b["Frame t+15<br/>224×224×3"] --> B2b["Conv1→Conv5<br/>(shared weights)"]
+        B2a --> C2["FC_fusion: concat<br/>4096⊕4096=8192"]
+        B2b --> C2
+        C2 --> D2["FC6: 4096<br/>FC7: 4096<br/>FC8: 487"]
+    end
+
+    subgraph "Early Fusion"
+        A3["10 consecutive frames<br/>each 224×224×3"] --> B3["Pixel-level concat<br/>→ 224×224×30"]
+        B3 --> C3["Conv1: 11×11×30 kernel<br/>→ 96 feature maps"]
+        C3 --> D3["Conv2→Conv5<br/>(standard spatial)"]
+        D3 --> E3["FC layers → 487"]
+    end
+
+    subgraph "Slow Fusion"
+        A4["10 frames, 89×89×3 each"] --> B4["Conv1: T=4 stride-2<br/>→ 4 temporal outputs"]
+        B4 --> C4["Conv2: T=2 stride-2<br/>→ 2 temporal outputs"]
+        C4 --> D4["Conv3: T=2 stride-2<br/>→ 1 temporal output"]
+        D4 --> E4["Conv4, Conv5<br/>(spatial only)"]
+        E4 --> F4["FC layers → 487"]
+    end
+
+    style A1 fill:#fff7ed,stroke:#fed7aa
+    style D1 fill:#dbeafe,stroke:#3b82f6
+    style D2 fill:#d1fae5,stroke:#10b981
+    style E3 fill:#fef3c7,stroke:#f59e0b
+    style F4 fill:#ede9fe,stroke:#8b5cf6
+</div>
+</div>
+
+<h3>3.3 训练 Pipeline</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart LR
+    subgraph "Data Collection"
+        S1["YouTube Topic API<br/>487 sports categories"] --> S2["Retrieve video IDs<br/>~5M raw candidates"]
+        S2 --> S3["Content filtering<br/>remove duplicates/shorts"]
+        S3 --> S4["Sports-1M<br/>1,133,158 videos<br/>train: 70%, test: 20%"]
+    end
+
+    subgraph "Preprocessing"
+        S4 --> P1["Extract random clips<br/>~5 sec, 30fps"]
+        P1 --> P2["Multi-scale cropping<br/>center 224×224<br/>+ fovea variants"]
+        P2 --> P3["Batch construction<br/>128 clips/batch"]
+    end
+
+    subgraph "Training Sports-1M"
+        P3 --> T1["Forward pass<br/>4 fusion architectures"]
+        T1 --> T2["Multinomial logistic loss<br/>cross-entropy over 487 classes"]
+        T2 --> T3["SGD + momentum<br/>lr: 0.01, decay: 1e-7<br/>~1 month GPU training"]
+        T3 --> T4["Model checkpoint<br/>~60M parameters"]
+    end
+
+    subgraph "Transfer to UCF-101"
+        T4 --> U1["Freeze conv layers<br/>or fine-tune top layers"]
+        U1 --> U2["Replace FC8: 487→101"]
+        U2 --> U3["Fine-tune on UCF-101<br/>~9.5K clips, 101 classes"]
+        U3 --> U4["Evaluate top-1/top-5<br/>best: Slow Fusion 65.4%"]
+    end
+
+    style S4 fill:#dbeafe,stroke:#3b82f6
+    style T4 fill:#d1fae5,stroke:#10b981
+    style U4 fill:#fef3c7,stroke:#f59e0b
+</div>
+</div>
+
+<h3>3.4 多分辨率 Foveated 架构细节</h3>
+<p>受人类视网膜中央凹 (fovea) 启发，模型同时处理两个分辨率的输入：</p>
+<ul>
+  <li><strong>中心流 (Fovea Stream):</strong> 原始帧中心裁剪 224×224 → 保持高分辨率细节（运动员动作、球的位置）</li>
+  <li><strong>周边流 (Context Stream):</strong> 原始帧下采样至 89×89 → 捕获全局场景上下文（场地类型、观众、记分牌）</li>
+  <li><strong>融合:</strong> 两流分别卷积后在中间层（卷积层3之后）合并特征图，共享后续全连接层</li>
+  <li><strong>效率:</strong> 由于周边流分辨率仅为中心流的~1/6，总计算量降低 <strong>2-4倍</strong>，而精度损失仅 1~2%</li>
+</ul>
+</section>
+
+<!-- ==================== SECTION 4: TASK DEFINITION ==================== -->
+<section id="task">
+<h2>4. Task Definition — 形式化建模</h2>
+
+<h3>4.1 核心任务</h3>
+<p>给定一个短视频片段，将其分类到 487 个体育类别之一。这是一个<strong>大规模多类视频分类</strong>问题，核心挑战在于如何有效地将时间维度信息融入 CNN 框架。</p>
+
+<h3>4.2 形式化定义</h3>
+<div class="formula-block">
+<span class="eq-tag">输入空间</span>
+$$
+\mathcal{V} = \{ V \mid V \in \mathbb{R}^{T \times H \times W \times C} \}
+$$
+<p>其中 $T$ 为帧数（10帧用于时序融合, 1帧用于单帧基线），$H=W=224$ （Slow Fusion 输入为 $89\times89$），$C=3$ (RGB通道)。训练集 $\mathcal{D}_{\text{train}}^{\text{Sports-1M}} \subset \mathcal{V} \times \mathcal{Y}_{487}$，测试集 $\mathcal{D}_{\text{test}}^{\text{Sports-1M}} \subset \mathcal{V} \times \mathcal{Y}_{487}$。</p>
+</div>
+
+<div class="formula-block">
+<span class="eq-tag">输出空间</span>
+$$
+\mathcal{Y} = \{1, 2, \ldots, 487\}, \quad |\mathcal{Y}| = 487
+$$
+<p>每个类别对应一种体育项目（如: basketball, soccer, swimming, skiing, gymnastics 等）。在迁移学习阶段，目标空间变为 $\mathcal{Y}_{\text{UCF}} = \{1,\dots,101\}$。</p>
+</div>
+
+<div class="formula-block">
+<span class="eq-tag">学习目标</span>
+$$
+\hat{y} = \arg\max_{k \in \mathcal{Y}} f_\theta(V)[k], \quad f_\theta: \mathbb{R}^{T \times H \times W \times C} \to \mathbb{R}^{|\mathcal{Y}|}
+$$
+$$
+\mathcal{L}(\theta) = -\frac{1}{N}\sum_{i=1}^{N}\sum_{k=1}^{K} \mathbf{1}[y_i = k] \cdot \log \frac{e^{f_\theta(V_i)[k]}}{\sum_{j=1}^{K} e^{f_\theta(V_i)[j]}}
+$$
+<p>其中 $f_\theta$ 是由 CNN 参数 $\theta$ 确定的映射函数，<strong>四种融合架构共享相同的 Softmax + 交叉熵损失形式</strong>，差异仅在于 $f_\theta$ 内部如何处理时间维度。</p>
+</div>
+
+<div class="formula-block">
+<span class="eq-tag">核心问题陈述</span>
+$$
+\min_{\theta} \ \mathbb{E}_{(V,y) \sim \mathcal{D}_{\text{train}}} \left[ -\log P_\theta(y \mid V) \right] \quad \text{s.t.} \quad \text{FLOPS}(f_\theta) \leq B
+$$
+<p>论文实际解决的是一个<strong>双目标问题</strong>：在计算预算 $B$ 内，如何设计 $f_\theta$ 的时间融合策略以最大化分类精度。最终目标是理解：<strong>给定相同的视觉信息量，不同时间融合策略的性能差异有多大？</strong></p>
+</div>
+
+<h3>4.3 I/O 规格说明</h3>
+<table>
+  <tr><th>属性</th><th>Sports-1M (预训练)</th><th>UCF-101 (迁移)</th></tr>
+  <tr><td>输入维度</td><td>$T \times 224 \times 224 \times 3$ (T=1, 2, 或 10)</td><td>同上（使用预训练权重初始化）</td></tr>
+  <tr><td>输出维度</td><td>487维概率向量</td><td>101维概率向量</td></tr>
+  <tr><td>训练样本数</td><td>~80万视频×多片段</td><td>9,537视频×数据增强</td></tr>
+  <tr><td>标签噪声</td><td>高（YouTube Topic 弱标注）</td><td>低（人工标注）</td></tr>
+  <tr><td>评估指标</td><td>Top-1, Top-5 Accuracy, Hit Rate</td><td>Top-1, Top-5 Accuracy (+ Mean AP)</td></tr>
+  <tr><td>帧率</td><td>~30 fps, 随机采样</td><td>原始帧率, 中心裁剪</td></tr>
+  <tr><td>参数总量</td><td>约 60M (单帧), 40~80M (融合变体)</td><td>继承预训练 + 调整最后一层</td></tr>
+</table>
+</section>
+
+<!-- ==================== SECTION 5: KEY CHALLENGE ==================== -->
+<section id="challenge">
+<h2>5. Key Challenge — 为什么这个问题很难</h2>
+
+<h3>5.1 第一性原理分析</h3>
+
+<div class="callout danger">
+<div class="callout-title">根本矛盾：数据规模 × 标注成本 × 计算效率 的三体问题</div>
+<p>视频是超高维数据 ($T \times H \times W \times 3$)，标注一帧场景需 1 秒，标注一个 10 秒视频的动作类别需要理解整个时序结构。高质量人工标注每小时视频的成本远超图像标注。因此<strong>必须在"标注质量"和"数据量"之间做权衡</strong>——本文选择了牺牲标注质量（YouTube弱标注）换取数据量（百万级），然后探索 CNN 在这种噪声数据上的训练策略。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">时间建模困境</div>
+<p>图像 CNN 的成功建立在 <strong>平移不变性 + 局部感受野 + 层次化特征</strong> 三大支柱之上。将这些推广到时间维度并非易事：(1) 时间维度的尺度与空间不同——30fps 的相邻帧高度冗余，相隔 150 帧的帧可能语义完全不同；(2) 视频中的运动具有不同时间尺度（高尔夫挥杆~2秒，足球进攻~10秒），固定的时间窗口无法同时捕获所有尺度的运动；(3) 3D卷积的参数量和计算量随时间窗口线性增长，限制了可训练的时间深度。</p>
+</div>
+
+<h3>5.2 核心挑战清单</h3>
+<ol>
+  <li><strong>计算挑战：</strong>训练一个3D CNN处理100万视频需要数月GPU时间。论文报告单GPU训练一个月以上——每个融合变体都需要独立训练，实验成本极高。</li>
+  <li><strong>噪声标签挑战：</strong>Sports-1M 的标签来自 YouTube 的 topic 标注，约 <strong>20-30% 的标签可能不准确</strong>（用户可能标记了错误的体育类别，或视频包含多个体育项目）。CNN 需要在噪声中学习鲁棒的视觉模式。</li>
+  <li><strong>时间融合设计空间巨大：</strong>帧数(T)、间隔(Δt)、融合层深度(d)、特征图尺寸——组合爆炸使得穷举搜索不可行。论文采用了 <strong>"控制变量"策略</strong>：固定骨干网络和训练流程，仅改变时间融合方式。</li>
+  <li><strong>基线选择困难：</strong>如果"强静态外观基线"不存在，就无法判断时序建模的真实贡献。论文的 Single Frame 模型已经达到 41.1% top-1——这个基线很高，导致所有时序模型的"增量收益"显得有限。</li>
+  <li><strong>泛化能力未知：</strong>Sports-1M 是体育类视频，模型是否能泛化到日常动作 (UCF-101)、电影场景、或机器人操控等不同域？迁移学习实验提供了部分答案。</li>
+</ol>
+
+<h3>5.3 方法对比：手工特征时代 vs 深度学习时代</h3>
+<table>
+  <tr><th style="width:140px;">维度</th><th>手工特征方法 (IDT + FV)</th><th>CNN方法 (本文)</th></tr>
+  <tr>
+    <td><strong>代表工作</strong></td>
+    <td>Improved Dense Trajectories (Wang & Schmid, 2013)</td>
+    <td>Karpathy et al. (2014, 本文)</td>
+  </tr>
+  <tr>
+    <td><strong>特征提取</strong></td>
+    <td>HOG (梯度方向), HOF (光流方向), MBH (运动边界), 轨迹形状</td>
+    <td>可学习的卷积滤波器 (ReLU激活, Max Pooling)</td>
+  </tr>
+  <tr>
+    <td><strong>时间建模</strong></td>
+    <td>密集采样轨迹 (15帧), 光流显式计算运动</td>
+    <td>隐式学习 (3D卷积或时序池化)</td>
+  </tr>
+  <tr>
+    <td><strong>编码方式</strong></td>
+    <td>Fisher Vector (高斯混合模型+梯度编码)</td>
+    <td>全连接层 (FC) + Softmax</td>
+  </tr>
+  <tr>
+    <td><strong>UCF-101性能</strong></td>
+    <td>Top-1: ~57.2% (IDT+FV)</td>
+    <td>Top-1: 65.4% (Slow Fusion, 迁移后)</td>
+  </tr>
+  <tr>
+    <td><strong>Sports-1M性能</strong></td>
+    <td>不可行（手工特征无法处理百万级数据）</td>
+    <td>Top-1: 44.8% (Slow Fusion)</td>
+  </tr>
+  <tr>
+    <td><strong>训练时间</strong></td>
+    <td>特征提取快 (CPU并行), 但编码和分类器训练慢</td>
+    <td>GPU端到端训练 ~1个月</td>
+  </tr>
+  <tr>
+    <td><strong>可迁移性</strong></td>
+    <td>差——手工特征设计依赖特定数据集</td>
+    <td>好——预训练特征迁移到UCF-101显著提升性能</td>
+  </tr>
+  <tr class="highlight"><td><strong>结论</strong></td><td colspan="2">CNN在Sports-1M大规模数据上全面超越手工特征，且迁移能力证明了学习到的特征具有通用性</td></tr>
+</table>
+</section>
+
+<!-- ==================== SECTION 6: METHOD ==================== -->
+<section id="method">
+<h2>6. Method — 关键公式与算法</h2>
+
+<h3>6.1 四种融合策略的形式化表达</h3>
+
+<div class="formula-block">
+<span class="eq-tag">融合公式组 1: Single Frame Baseline</span>
+$$
+f_{\text{single}}(V) = \frac{1}{T} \sum_{t=1}^{T} \text{CNN}_{\text{spatial}}(V_t)
+$$
+$$
+\text{CNN}_{\text{spatial}}(x) = \text{FC}_3 \circ \text{Conv}_5 \circ \cdots \circ \text{Conv}_1(x), \quad x \in \mathbb{R}^{224 \times 224 \times 3}
+$$
+<div class="eq-note"><strong>解释：</strong>每帧独立通过完整CNN（权重共享），最后对所有帧的logits取平均。这是最简单的时序集成方法——没有真正的"时序建模"，仅是单独的静态外观判断的民主投票。这个模型代表了<strong>仅使用外观信息的性能上限</strong>。</div>
+</div>
+
+<div class="formula-block">
+<span class="eq-tag">融合公式组 2: Late Fusion</span>
+$$
+h_{\text{early}\to\text{conv5}}(V_t) = \text{Conv}_5 \circ \cdots \circ \text{Conv}_1(V_t), \quad t \in \{t_0, t_0+\Delta t\}, \ \Delta t = 15
+$$
+$$
+f_{\text{late}}(V) = \text{FC}_{\text{class}} \circ \text{FC} \left( \begin{bmatrix} h(V_{t_0}) \\ h(V_{t_0+15}) \end{bmatrix} \right)
+$$
+<div class="eq-note"><strong>解释：</strong>两帧各自通过全部卷积层提取高级语义特征（4096维向量），然后在第一个全连接层处拼接（8192维向量），让网络基于两帧的高级语义关系进行判别。这种方式<strong>可捕获相隔0.5秒的运动变化</strong>（15帧/30fps），但仅有两帧的信息量有限。</div>
+</div>
+
+<div class="formula-block">
+<span class="eq-tag">融合公式组 3: Early Fusion</span>
+$$
+\tilde{V} = \text{Concat}_{\text{channel}}(V_1, V_2, \ldots, V_{10}) \in \mathbb{R}^{224 \times 224 \times 30}
+$$
+$$
+f_{\text{early}}(\tilde{V}) = \text{CNN}(\tilde{V}), \quad \text{Conv}_1 \text{ kernel}: 11 \times 11 \times 30
+$$
+<div class="eq-note"><strong>解释：</strong>10个连续帧（~0.33秒）在 RGB 通道维拼接成一个 30 通道的"超级图像"。第一层卷积核也相应扩展为 $11\times11\times30$（而非通常的 $11\times11\times3$），<strong>可在像素级检测极短时间的运动模式（如方向性边缘变化）</strong>。缺点：参数量大，深层的时间感受野仍然受限（池化层会压缩时间维度）。</div>
+</div>
+
+<div class="formula-block">
+<span class="eq-tag">融合公式组 4: Slow Fusion (最优架构)</span>
+$$
+\begin{aligned}
+h_1 &= \text{Conv}_{T=4, \text{stride}_t=2}(V_{1:10}) \quad &\text{// 10帧→4组输出} \\
+h_2 &= \text{Conv}_{T=2, \text{stride}_t=2}(h_1) \quad &\text{// 4组→2组输出} \\
+h_3 &= \text{Conv}_{T=2, \text{stride}_t=2}(h_2) \quad &\text{// 2组→1组输出} \\
+h_4 &= \text{Conv}_{T=1}(h_3) \quad &\text{// 纯空间卷积} \\
+h_5 &= \text{Conv}_{T=1}(h_4) \quad &\text{// 纯空间卷积} \\
+f_{\text{slow}}(V) &= \text{FC}(h_5)
+\end{aligned}
+$$
+<div class="eq-note"><strong>解释：</strong>Slow Fusion 的核心思想是<strong>渐进式减少时间维度</strong>：前3层每层将时间维度减半（通过 stride-2 的时间卷积），最终融合为单一的全局时间表示。这种方式<strong>既保留了早期层的精细时间信息（T=4时的运动模式），又通过深层的时间pooling获得了全局时序感受野</strong>。名字"Slow"意指融合是逐步(vs.一步到位)完成的。这是四种架构中唯一在 <strong>Sports-1M 测试集上 hit rate@10 达到 76.2%</strong> 的架构。</div>
+</div>
+
+<h3>6.2 多分辨率 (Foveated) 架构公式</h3>
+
+<div class="formula-block">
+<span class="eq-tag">多分辨率输入构造</span>
+$$
+\begin{aligned}
+x_{\text{center}} &= \text{Crop}_{\text{center}}(V, 224 \times 224) \quad &\text{// 中心高分辨率} \\
+x_{\text{context}} &= \text{Downsample}(V, 89 \times 89) \quad &\text{// 全局低分辨率} \\
+h_c &= \text{Conv}_3 \circ \cdots \circ \text{Conv}_1(x_{\text{center}}) \quad &\text{// 中心流高层特征} \\
+h_x &= \text{Conv}_3 \circ \cdots \circ \text{Conv}_1(x_{\text{context}}) \quad &\text{// 上下文流高层特征} \\
+f_{\text{fovea}}(V) &= \text{FC} \circ \text{Fuse}(h_c, h_x)
+\end{aligned}
+$$
+<div class="eq-note"><strong>解释：</strong>两个卷积流在 Conv3 之后合并——这一设计允许两个流在较低层各自学习特定分辨率的特征（中心流学习精细纹理，上下文流学习全局布局），然后在高层共享语义理解。融合方式可以是<strong>特征图通道拼接、逐元素求和、或学习到的加权组合</strong>。</div>
+</div>
+
+<h3>6.3 迁移学习策略</h3>
+
+<div class="formula-block">
+<span class="eq-tag">迁移学习参数更新</span>
+$$
+\theta_{\text{UCF}} = \{ \theta_{\text{conv}}^*, \ \theta_{\text{FC6}}, \ \theta_{\text{FC7}}, \ \theta_{\text{FC8}}^{\text{new}} \}
+$$
+$$
+\mathcal{L}_{\text{transfer}}(\theta_{\text{FC}}, \theta_{\text{FC8}}^{\text{new}}) = \text{CrossEntropy}(y, \text{FC}_8^{\text{new}} \circ \cdots \circ \text{Conv}^*(x))
+$$
+<div class="eq-note"><strong>解释：</strong>卷积层权重 $\theta_{\text{conv}}^*$ 从 Sports-1M 预训练模型继承（可选择冻结或微调），新的 FC8 层（487→101 维）随机初始化。论文发现<strong>微调所有层</strong>比仅微调顶层表现更好：Slow Fusion 从 63.2% (仅微调FC8) 提升至 65.4% (微调全部层)，表明即使在小数据集上，整个网络也能从端到端微调中获益。同时，<strong>数据增强（随机裁剪+水平翻转+时间抖动）对迁移性能至关重要</strong>，可额外提升 2-3 个百分点。</div>
+</div>
+</section>
+
+<!-- ==================== SECTION 7: PRINCIPLES ==================== -->
+<section id="principles">
+<h2>7. Deep Principles — 机制性解读</h2>
+
+<h3>7.1 核心命题：为什么静态外观主导体育视频分类？</h3>
+
+<div class="callout idea">
+<div class="callout-title">命题：在体育视频分类中，场景上下文提供的信息量远超局部运动模式</div>
+<p>这一发现是该论文最深刻的洞见，需要从多个角度理解其机制。</p>
+</div>
+
+<h4>7.1.1 信息论视角</h4>
+<p>考虑分类任务的信息量。487个体育类别中，每个类别有独特的"场景指纹"：</p>
+<ul>
+  <li><strong>场地类型</strong>（草地→足球/橄榄球/曲棍球，冰面→冰球/花滑/速滑，水域→游泳/跳水/水球，木地板→篮球/排球/体操）——仅场地这一维就可将搜索空间从487缩小到约30。信息增益约 $\log_2(487/30) \approx 4$ bits。</li>
+  <li><strong>装备/服装</strong>（泳衣、滑雪板、头盔、拳击手套、球拍类型）——进一步缩小至约5类，再提供约 $\log_2(30/5) \approx 2.6$ bits。</li>
+  <li><strong>参与人数和布局</strong>（多人对抗 vs 单人表演，对称场地 vs 开放空间）</li>
+  <li><strong>剩余歧义</strong>需要运动信息来区分的情况极其稀少（如区分"室内足球"和"室外足球"可能需要运动模式，但场景已经提示了答案）。</li>
+</ul>
+<p>从信息论角度，<strong>静态外观已经提供了约80-90%的判别信息，运动信息提供的额外信息不到1 bit</strong>。因此无论时序模型多精巧，其增量收益有理论上限。</p>
+
+<h4>7.1.2 体育领域的特异性</h4>
+<p>本文的结论高度依赖<strong>域</strong>——体育视频的特殊属性使静态外观尤其有效：</p>
+<ul>
+  <li><strong>体育场地是高度结构化的</strong>（球场边线、球门、记分牌、观众席——这些都是极强的类别线索）</li>
+  <li><strong>体育有标准化的拍摄角度</strong>（电视转播通常从侧面高角度拍摄，场景布局几乎不变）</li>
+  <li><strong>运动模式的高度冗余</strong>（短时间窗口~0.3-0.5秒内，运动常为局部重复——如跑步的步态循环）</li>
+</ul>
+<p>对于非体育域（如日常活动、细粒度操作、机器人操作），运动的判别作用可能会大幅上升。例如，区分"打开冰箱"和"关闭冰箱"的外观几乎完全相同——这正是 Something-Something 数据集（Goyal et al., 2017）的设计动机。</p>
+
+<h4>7.1.3 四种架构的性能机理对比</h4>
+<table>
+  <tr><th>架构</th><th>Sports-1M<br/>Top-1</th><th>UCF-101<br/>Top-5 (transfer)</th><th>信息捕获</th><th>计算成本</th><th>泛化</th></tr>
+  <tr>
+    <td><strong>Single Frame</strong></td>
+    <td>41.1%</td>
+    <td>59.4%</td>
+    <td>纯静态外观——场景、物体、纹理</td>
+    <td>最低 (1×)</td>
+    <td>最好（最简单模型，不易过拟合）</td>
+  </tr>
+  <tr>
+    <td><strong>Late Fusion</strong></td>
+    <td>42.5%</td>
+    <td>60.9%</td>
+    <td>两帧间抽象语义变化（"球从A到B"）</td>
+    <td>低 (~2×)</td>
+    <td>较好</td>
+  </tr>
+  <tr>
+    <td><strong>Early Fusion</strong></td>
+    <td>38.9%</td>
+    <td>57.1%</td>
+    <td>像素级运动（边缘方向变化），但深层丢失时间信息</td>
+    <td>中等</td>
+    <td>最差（参数多，过拟合噪声标签）</td>
+  </tr>
+  <tr class="highlight">
+    <td><strong>Slow Fusion</strong></td>
+    <td>44.8%</td>
+    <td>65.4%</td>
+    <td>多尺度运动（短时+中时）+ 最终静态表示</td>
+    <td>较高 (~4-8×)</td>
+    <td>最佳（迁移后领先）</td>
+  </tr>
+</table>
+
+<p><strong>关键解读：</strong>Early Fusion 在 Sports-1M 上甚至不如 Single Frame (<strong>38.9% vs 41.1%</strong>)——这强烈说明直接在像素级用3D卷积建模运动<strong>容易过拟合噪声标签</strong>，且深层池化操作实质上去除了大部分时间信息。Late Fusion 表现略优于单帧但提升有限，因为仅两帧的固定间隔无法适应不同动作的时间尺度。Slow Fusion 的渐进式设计恰好平衡了这两个极端：早期层的 $T=4$ 核捕获局部运动纹理，深层通过时间步长2的不断合并获得全局感受野。</p>
+
+<h3>7.2 预训练 → 迁移的泛化机制</h3>
+<p>从 Sports-1M 迁移到 UCF-101 的性能提升 (41.1%→59.4% for Single Frame, 44.8%→65.4% for Slow Fusion) 揭示了<strong>两层泛化</strong>：</p>
+<ol>
+  <li><strong>视觉特征泛化：</strong>在百万级体育视频上学习的卷积滤波器（边缘、纹理、部件、物体检测器）可直接用于日常动作识别，因为底层视觉概念是通用的。</li>
+  <li><strong>时间建模泛化：</strong>Slow Fusion 的渐进融合结构学到的"如何处理时间"也是一种可迁移的知识——尽管体育运动的运动模式和日常活动不同，但"先局部运动、再全局时序"的抽象原则是通用的。</li>
+</ol>
+</section>
+
+<!-- ==================== SECTION 8: FIGURES ==================== -->
+<section id="figures">
+<h2>8. Key Figures &amp; Evidence</h2>
+
+<h3>8.1 论文核心图表解读</h3>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 1</span>
+    <span class="fig-caption">四种时空融合架构的示意图</span>
+    <span class="fig-source">Source: Karpathy et al., CVPR 2014, Figure 2</span>
+  </div>
+  <div class="fig-image">
+    <div class="fig-placeholder">
+      [四种CNN融合架构示意图 — 参见原论文 Figure 2]<br/>
+      Single Frame / Late Fusion / Early Fusion / Slow Fusion 的层结构对比
+    </div>
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">图解读</div>
+    <ul>
+      <li><strong>Single Frame:</strong> 每帧独立处理，无时间连接——仅依赖场景级别的外观特征（如冰面→冰球）。在Sports-1M上 top-1 已达41.1%，证明体育类别的外观信息极其丰富。</li>
+      <li><strong>Late Fusion:</strong> 两帧相隔15帧，各自通过全部卷积层后在FC1合并。可捕获~0.5秒的语义变化，但仅两帧的固定间隔对于不同时间尺度的动作不够灵活。</li>
+      <li><strong>Early Fusion:</strong> 10帧通道拼接，第一层就混合时间信息——可检测像素级运动（局部方向、速度），但深层池化导致大部分时间结构丢失。性能反而不如单帧（38.9% vs 41.1%），说明直接像素级融合的收益在噪声数据下被过拟合抵消。</li>
+      <li><strong>Slow Fusion:</strong> 4个时间阶段渐进融合（$T=4 \to T=2 \to T=2 \to T=1$），每一层的时间步长和核大小精心设计。这是唯一在所有指标上一致优于单帧基线的架构。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 2</span>
+    <span class="fig-caption">Sports-1M 数据集的类别分布与样本示例</span>
+    <span class="fig-source">Source: Karpathy et al., CVPR 2014, Figure 3</span>
+  </div>
+  <div class="fig-image">
+    <div class="fig-placeholder">
+      [Sports-1M 类别分布与示例帧 — 参见原论文 Figure 3]<br/>
+      487类别各包含1000-3000个视频，长尾分布明显
+    </div>
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">图解读</div>
+    <ul>
+      <li>Sports-1M 的类别分布呈典型的长尾分布：少数热门体育（足球、篮球）有数万视频，冷门体育（如马术障碍赛、藤球）仅有数百到一千。</li>
+      <li>YouTube Topic 标注的噪声特征明显——同一类别内的视频在视觉风格、拍摄角度、画质上差异巨大，这实际上成为了一种<strong>隐式的数据增强</strong>，提升了模型的鲁棒性。</li>
+      <li>数据集的多样性是一把双刃剑：它迫使 CNN 学习更通用的视觉概念（而不是记忆特定视频的细节），但也意味着顶层的分类准确率存在天然上限——部分测试样本的标签本身就是错误的。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 3</span>
+    <span class="fig-caption">多分辨率 (Foveated) 架构的性能-效率曲线</span>
+    <span class="fig-source">Source: Karpathy et al., CVPR 2014, Figure 5</span>
+  </div>
+  <div class="fig-image">
+    <div class="fig-placeholder">
+      [Foveated 架构性能对比 — 参见原论文 Figure 5]<br/>
+      横轴: 计算量 (FLOPs), 纵轴: Top-1 Accuracy
+    </div>
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">图解读</div>
+    <ul>
+      <li>Foveated 架构的核心优势在于<strong>性能-效率的帕累托前沿</strong>：在相同的计算预算下，fovea模型精度始终高于均匀降低分辨率的模型。</li>
+      <li>当中心区域占原始帧的 50% (half-resolution context) 时，计算量降低 2×, 精度损失仅 ~1%。当中心区域缩小至 25% 时，计算量降低 4×, 精度损失 ~2%。</li>
+      <li>这验证了 <strong>"视频动作识别中的信息是不均匀分布的"</strong>——中心区域的运动细节（运动员动作、球的位置）远比周边区域（观众、天空）重要，但周边区域提供的场景上下文又不能完全丢弃。</li>
+      <li>人类视觉系统的 fovea-periphery 组织方式在计算效率上是最优的——这是计算机视觉从神经科学获得启发的典型案例。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 4</span>
+    <span class="fig-caption">迁移学习：不同冻结层的性能对比</span>
+    <span class="fig-source">Source: Karpathy et al., CVPR 2014, Table 2 &amp; 3</span>
+  </div>
+  <div class="fig-image">
+    <div class="fig-placeholder">
+      [迁移学习性能表 — 参见原论文 Table 2 和 Table 3]<br/>
+      不同冻结策略 + 不同融合架构在 UCF-101 上的 Top-1/Top-5
+    </div>
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">图解读</div>
+    <ul>
+      <li><strong>仅微调FC8:</strong> Slow Fusion 63.2% vs. Single Frame 58.9%——仅靠替换分类头，预训练特征的迁移价值已超过精心设计的手工特征 (IDT+FV: 57.2%)。</li>
+      <li><strong>微调FC6-8:</strong> Slow Fusion 64.1%——释放更多可学习容量后提升约1个百分点。</li>
+      <li><strong>微调全部层:</strong> Slow Fusion <strong>65.4%</strong>——端到端微调带来最大的性能增益，说明即使在小数据集 (仅~9.5K训练视频) 上，让所有层适应目标域也是值得的。</li>
+      <li><strong>与同期方法对比:</strong> 65.4% 优于 IDT+FV (57.2%)、优于随机初始化CNN (~40%)、接近同期最优的 Two-Stream (73.0%，但使用了光流作为额外输入)。考虑到本文仅使用 RGB 输入，65.4% 已经是一个非常强的结果。</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<!-- ==================== SECTION 9: FLAW ==================== -->
+<section id="flaw">
+<h2>9. Potential Flaw &amp; Extensions</h2>
+
+<h3>9.1 主要局限</h3>
+
+<div class="callout danger">
+<div class="callout-title">局限 1: 标签噪声问题被低估</div>
+<p>Sports-1M 的弱标注噪声率 (~20-30%) 实际高于论文承认的水平。对于某些模糊类别（如"extreme sports"、"motorsports"），噪声率可能更高。这导致：(a) 所有架构的绝对性能都被低估了；(b) 噪声可能系统性地偏向了更简单的模型（Single Frame 只需记住场景模板即可，时序模型可能学到了噪声中的伪相关）。论文未进行<strong>人工标注子集验证</strong>来量化这种噪声偏差。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">局限 2: 时间建模深度不足</div>
+<p>所有架构处理的时间窗口仅 <strong>0.3~0.5秒</strong> (10帧@30fps)。这意味着模型无法捕获需要超过半秒的时间依赖（如"先助跑再跳跃"需要数秒）。对于需要长时理解的体育类别（如花样滑冰的整套动作、足球的整体进攻战术），模型仅捕获了瞬时快照而非真实的时间动态。当时的技术限制（GPU显存、3D卷积计算量）使得更长的时间窗口不可行——这一限制直到 Transformer 架构 (2020+) 才得到实质性突破。</p>
+</div>
+
+<div class="callout warn">
+<div class="callout-title">局限 3: 域泛化边界未充分探索</div>
+<p>论文仅在 UCF-101 上测试了迁移学习，但 UCF-101 的场景分布与 Sports-1M 存在天然重叠（UCF 也包含大量体育动作）。如果在 <strong>HMDB-51</strong>（包含更多日常活动和电影场景）或 <strong>Something-Something</strong>（需要时序推理）上测试，外观偏好主导的结论可能不再成立。实际上，后续工作在 Something-Something 上发现时间建模至关重要——这验证了本文结论具有域局限性。</p>
+</div>
+
+<div class="callout danger">
+<div class="callout-title">局限 4: 视频理解的"捷径学习"风险</div>
+<p>CNN 在 Sports-1M 上可能学到了<strong>"场景捷径"</strong>而非真正的"动作理解"。例如，模型看到水面就预测"游泳"，而不是检测游泳者的手臂动作。这种捷径在分布外测试时会灾难性地失败（例如，水球和游泳共享"水域"场景但运动完全不同）。论文缺少对抗性测试或场景-动作分离实验来诊断这一问题。</p>
+</div>
+
+<h3>9.2 后续扩展方向</h3>
+<table>
+  <tr><th>方向</th><th>代表工作</th><th>与本文的关系</th></tr>
+  <tr>
+    <td><strong>显式运动建模</strong></td>
+    <td>Two-Stream (Simonyan & Zisserman, NIPS 2014)</td>
+    <td>将光流作为独立输入流，补足了本文"仅有RGB隐式运动"的缺陷。证明了运动信息的价值——当被显式编码时。</td>
+  </tr>
+  <tr>
+    <td><strong>更深的3D CNN</strong></td>
+    <td>C3D (Tran et al., ICCV 2015), I3D (Carreira & Zisserman, CVPR 2017)</td>
+    <td>在更深网络上使用纯3D卷积，验证了本文Slow Fusion设计的可扩展性</td>
+  </tr>
+  <tr>
+    <td><strong>双路径设计</strong></td>
+    <td>SlowFast (Feichtenhofer et al., ICCV 2019)</td>
+    <td>直接继承了本文的外观(Slow路径)+运动(Fast路径)分离思想</td>
+  </tr>
+  <tr>
+    <td><strong>长时依赖</strong></td>
+    <td>Non-local Networks (Wang et al., CVPR 2018), TimeSformer (Bertasius et al., 2021)</td>
+    <td>突破了本文"0.5秒窗口"的限制，实现跨秒级的时间注意力</td>
+  </tr>
+  <tr>
+    <td><strong>自监督+大规模</strong></td>
+    <td>VideoMAE (Tong et al., NeurIPS 2022)</td>
+    <td>进一步推动了"大规模数据+弱标注+迁移"的范式，但用自监督替代了有监督预训练</td>
+  </tr>
+</table>
+
+<h3>9.3 实验敏感性评级</h3>
+<table>
+  <tr><th style="width:160px;">实验条件</th><th>敏感性</th><th>说明</th></tr>
+  <tr>
+    <td>融合策略选择</td>
+    <td><span style="color:#f59e0b;font-weight:700;">中等敏感</span></td>
+    <td>4种策略差距~6%，但远小于"有CNN vs 无CNN"的差距(~20%+)</td>
+  </tr>
+  <tr>
+    <td>预训练数据量级</td>
+    <td><span style="color:#f43f5e;font-weight:700;">高度敏感</span></td>
+    <td>Sports-1M百万级数据 vs UCF-101万级数据——这是性能提升的最大单一因素</td>
+  </tr>
+  <tr>
+    <td>时间窗口长度</td>
+    <td><span style="color:#10b981;font-weight:700;">低敏感</span></td>
+    <td>10帧 vs 30帧 差异微小——因为静态外观已经足够，更长的窗口不增加信息量（但论文未充分消融此变量）</td>
+  </tr>
+  <tr>
+    <td>域匹配程度</td>
+    <td><span style="color:#f43f5e;font-weight:700;">高度敏感</span></td>
+    <td>Sports→Sports迁移 (UCF-101: 65.4%) vs Sports→非体育域迁移（未知，预期大幅下降）</td>
+  </tr>
+  <tr>
+    <td>输入分辨率</td>
+    <td><span style="color:#f59e0b;font-weight:700;">中等敏感</span></td>
+    <td>224→89降分辨率仅影响Fovea架构约1-2%，说明高分辨率细节对动作识别非必需</td>
+  </tr>
+  <tr>
+    <td>标签清洗</td>
+    <td><span style="color:#10b981;font-weight:700;">低敏感</span></td>
+    <td>即使噪声标注~20-30%，大数量级仍能提供足够信号——这是数据量压倒噪声的实证</td>
+  </tr>
+</table>
+</section>
+
+<!-- ==================== SECTION 10: MOTIVATION ==================== -->
+<section id="motivation">
+<h2>10. Motivation — 研究动机链路</h2>
+
+<h3>10.1 五步动机推理链</h3>
+
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>Step 1: 图像CNN的成功</h4>
+    <p>2012年 AlexNet 在 ImageNet 上取得突破性进展（top-5 error 从 26.2% 降至 15.3%），证明了大规模有监督CNN在图像识别中的威力。这自然引发了一个问题：<strong>"如果CNN对图像有效，它能否扩展到视频？"</strong></p>
+  </div>
+  <div class="cmp-col">
+    <h4>Step 2: 视频数据的独特挑战</h4>
+    <p>视频是"图像+"——多了一个时间维度。这带来了两个核心问题：(a) 时间维度如何处理（融合策略）？(b) 训练深层网络需要的数据量在视频领域是否可获得？当时认为视频标注太昂贵，制约了深度学习在该领域的发展。</p>
+  </div>
+  <div class="cmp-col">
+    <h4>Step 3: 弱标注的可行性假说</h4>
+    <p>YouTube Topic API 提供了免费的大规模弱标签。假说：<strong>"百万级弱标注数据 + CNN 可以弥补标注质量的损失"</strong>——这是论文的核心赌注。如果假说成立，视频CNN的时代就开启了；如果不成立，说明视频理解需要更聪明的方法。</p>
+  </div>
+</div>
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>Step 4: 融合策略系统比较的必要性</h4>
+    <p>即使有了大规模数据，仍需要明确"如何最好地利用时间维度"。不同的时间融合策略（Early vs. Late vs. Slow）对应不同的归纳偏置，但没有人系统比较过它们。论文承诺提供<strong>"控制变量"级别的公平比较</strong>：相同数据、相同骨干、相同训练策略，仅改变时间融合方式。</p>
+  </div>
+  <div class="cmp-col">
+    <h4>Step 5: 迁移学习的实际价值</h4>
+    <p>如果 Sports-1M 预训练模型能提升小数据集（UCF-101）的性能，就证明了<strong>视频CNN的实用价值</strong>——大多数研究者没有百万级视频的计算资源，但可以使用预训练权重来增强自己的小数据集任务。迁移性能是衡量预训练质量的最重要指标。</p>
+  </div>
+</div>
+
+<h3>10.2 一句话动机总结</h3>
+<div class="callout idea">
+<p><strong>将深度学习从图像推向视频的"探路石"：</strong>作者团队在 ImageNet+AlexNet 成功之后，希望回答一个根本问题——CNN 能不能学视频？如果能，最好的学习方式是什么？Sports-1M + 四种融合架构的系统实验给出了一个清醒的答案：<strong>能学，但时序建模的额外收益远小于预期；视频理解的最大瓶颈不是模型架构，而是需要比外观特征更具区分力的运动依赖型任务/data。</strong></p>
+</div>
+</section>
+
+<!-- ==================== SECTION 11: TAKEAWAY ==================== -->
+<section id="takeaway">
+<h2>11. Reading Takeaway</h2>
+
+<h3>11.1 关键启示</h3>
+
+<div class="callout tip">
+<div class="callout-title">Lesson 1: 先建立强基线，再评估新方法的真实贡献</div>
+<p>这是本文最重要的方法论教训。如果作者没有训练强大的 Single Frame 基线（41.1% top-1），而是直接用 Slow Fusion 的 44.8% 与手工特征比较，就会错误地认为时序建模的贡献很大。正是因为<strong>强基线的存在</strong>，才揭示了增量收益的有限性。在深度学习中，"和基线比"比"和SOTA比"更有科学洞察力。</p>
+</div>
+
+<div class="callout tip">
+<div class="callout-title">Lesson 2: 大规模弱标注数据是大模型的第一推动力</div>
+<p>Sports-1M 的建立方式（YouTube API 自动化 + content filtering）开创了<strong>"数据工程即研究贡献"</strong>的先河。论文证明：1万级准确标注 < 100万级噪声标注。这一原则后来被 GPT (web text)、CLIP (image-text pairs)、VideoMAE (unlabeled video) 等工作反复验证。对于资源受限的研究者，学会"利用免费但嘈杂的数据源"是一种核心能力。</p>
+</div>
+
+<div class="callout tip">
+<div class="callout-title">Lesson 3: 域的属性决定方法的价值</div>
+<p>本文在体育域得出的"外观主导"结论，不能直接推广到所有视频理解任务。在 Something-Something (细节操作)、Epic-Kitchens (手部动作)、Diving48 (跳水评分) 等数据集中，运动/时序信息确实至关重要。这提醒我们：<strong>每个数据集都是一面特定方向的透镜，它照亮某些现象的同时遮蔽其他现象。跨数据集、跨域的消融比单数据集上的SOTA推进更有科学价值。</strong></p>
+</div>
+
+<h3>11.2 UAV 相关性与启示</h3>
+<div class="callout info">
+<div class="callout-title">UAV 视角: 无人机视频理解的跨域迁移</div>
+<p>本文对无人机视频理解有以下直接启示：</p>
+<ul>
+  <li><strong>场景先验的局限性：</strong>在 UAV 俯视视角下，传统体育场地特征（观众席、记分牌、标准拍摄角度）全部消失。这意味着在"外观主导"策略在 UAV 域可能失效——UAV 需要更多的<strong>运动信息和时序建模</strong>来补偿视角变化。</li>
+  <li><strong>多分辨率架构的天然契合：</strong>UAV 视觉天然具有多分辨率需求——高空广角搜索目标+低空高分辨率识别细节。Foveated 架构的"中心高分辨率+周边低分辨率"是 UAV 视觉感知的理想范式，计算受限的嵌入式计算平台尤其需要这种效率优化。</li>
+  <li><strong>弱标注策略的 UAV 适配：</strong>UAV 视频标注比地面视频更昂贵（需要飞行+专业设备）。参考 Sports-1M 的弱标注策略，可以利用航迹点GPS信息、飞行日志元数据等作为"免费弱标签"来构建大规模UAV视频训练集。</li>
+  <li><strong>Slow Fusion 的时间-空间权衡：</strong>UAV 平台中，飞行速度变化导致的帧间运动幅度差异大（低速巡检 vs 高速追踪）。Slow Fusion 的"多时间尺度渐进融合"对这种变帧率场景具有内在鲁棒性——不同时间尺度的特征可在不同层被有效捕获。</li>
+</ul>
+</div>
+
+<h3>11.3 参考文献链</h3>
+<table>
+  <tr><th>论文</th><th>与本文的关系</th></tr>
+  <tr>
+    <td>[1] Krizhevsky et al., "ImageNet Classification with Deep Convolutional Neural Networks", NIPS 2012</td>
+    <td>AlexNet — 本文的图像CNN骨干网络灵感来源，直接复用了其Conv+FC架构设计</td>
+  </tr>
+  <tr>
+    <td>[2] Wang & Schmid, "Action Recognition with Improved Trajectories", ICCV 2013</td>
+    <td>IDT — 本文实验对比的"手工特征基线"，代表了深度学习之前的SOTA</td>
+  </tr>
+  <tr>
+    <td>[3] Simonyan & Zisserman, "Two-Stream Convolutional Networks for Action Recognition in Videos", NIPS 2014</td>
+    <td>与本文同时期的竞争者，显式将光流作为第二输入流，在UCF-101上以73.0%全面超越本文</td>
+  </tr>
+  <tr>
+    <td>[4] Tran et al., "Learning Spatiotemporal Features with 3D Convolutional Networks", ICCV 2015</td>
+    <td>C3D — 在本文Slow Fusion基础上将3D卷积扩展至更深网络，验证了纯3D CNN的可行性</td>
+  </tr>
+  <tr>
+    <td>[5] Carreira & Zisserman, "Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset", CVPR 2017</td>
+    <td>I3D + Kinetics — 将本文的"大规模预训练+小数据集迁移"范式推向新高度，Kinetics数据集直接对标Sports-1M</td>
+  </tr>
+  <tr>
+    <td>[6] Feichtenhofer et al., "SlowFast Networks for Video Recognition", ICCV 2019</td>
+    <td>SlowFast — 继承本文"外观(Slow/单帧) + 运动(Fast/高帧率)"分离思想，并通过双路径架构实现SOTA</td>
+  </tr>
+  <tr>
+    <td>[7] Soomro et al., "UCF101: A Dataset of 101 Human Actions Classes From Videos in The Wild", 2012</td>
+    <td>UCF-101 — 本文迁移学习评估的目标数据集</td>
+  </tr>
+  <tr>
+    <td>[8] Goyal et al., "The 'Something Something' Video Database for Learning and Evaluating Visual Common Sense", ICCV 2017</td>
+    <td>验证了本文的域局限性——在需要时序推理的数据集上，外观不再主导，时序建模至关重要</td>
+  </tr>
+</table>
+
+<div class="callout info" style="margin-top:18px;">
+<div class="callout-title">一句话总结 (One-Sentence Takeaway)</div>
+<p><strong>Karpathy 等人在 CVPR 2014 通过构建百万级弱标注数据集 Sports-1M 并系统比较四种 CNN 时空融合策略，揭示了一个反直觉发现：对于体育视频分类，静态外观信息远比短时运动重要——最强的时间融合模型 (Slow Fusion, 65.4% top-5 UCF-101) 仅比单帧外观基线 (59.4%) 高出 6 个百分点，这一"运动信息的有限价值"结论深刻影响了整个视频理解领域对时序建模角色的认知。</strong></p>
+</div>
+
+<p class="source" style="margin-top:14px;">This page is grounded in the abstract, methods, experiments, and conclusion of the local PDF. All quantitative values are from Karpathy et al., CVPR 2014. Architecture and formula interpretations are supplemented with analysis and context.</p>
+</section>
+
+</main>
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Karpathy et al. · CVPR 2014 · Sports-1M · MathJax + Mermaid Rendering</footer>
+</body></html>

@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — FALCON: Learning force-adaptive humanoid loco-manipulation</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Tairan He · 13-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10059/index.html">Hold my beer</a>
+<a class="active" href="../10056/index.html">FALCON</a>
+<a href="../10054/index.html">Humanoid policy ~</a>
+<a href="../10052/index.html">Hover Versatile neural</a>
+<a href="../10048/index.html">ASAP</a>
+<a href="../10053/index.html">WoCoCo Learning whole-bod</a>
+<a href="../10050/index.html">Agile but safe</a>
+<a href="../10049/index.html">Learning human-to-humanoi</a>
+<a href="../10047/index.html">OmniH2O Universal dextero</a>
+<a href="../10058/index.html">Probabilistic safeguard</a>
+<a href="../10057/index.html">Safety index synthesis</a>
+<a href="../10051/index.html">State-wise safe reinforce</a>
+<a href="../10055/index.html">Energy-based imitation le</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">FALCON: Learning Force-Adaptive Humanoid Loco-Manipulation</td></tr>
+    <tr><td><strong>Authors</strong></td><td>Yuanhang Zhang, Yifu Yuan, Prajwal Gurunath, Ishita Gupta, Shayegan Omidshafiei, Ali-akbar Agha-mohammadi, Marcell Vazquez-Chanlatte, Liam Pedersen, <strong>Tairan He</strong>, Guanya Shi</td></tr>
+    <tr><td><strong>Affiliations</strong></td><td>Carnegie Mellon University (CMU), Field AI, Nissan USA</td></tr>
+    <tr><td><strong>Venue</strong></td><td class="bold-venue">L4DC 2026 (PMLR 331:265-281)</td></tr>
+    <tr><td><strong>Date</strong></td><td>首次发布 2025-05-10，更新 2025-11-16</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="http://arxiv.org/abs/2505.06776" target="_blank">arXiv:2505.06776</a> | <a href="https://lecar-lab.github.io/falcon-humanoid/" target="_blank">Project Page</a> | <a href="https://github.com/LeCAR-Lab/FALCON" target="_blank">GitHub</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 FALCON，一种基于双智能体强化学习的力自适应人形机器人运动操作框架。将全身控制分解为下肢运动智能体（保证外力扰动下的稳定行走）和上肢操作智能体（精确跟踪末端执行器位姿并隐式自适应力补偿）。配合基于关节力矩限制的 3D 力课程训练策略，在 Unitree G1 和 Booster T1 两台人形机器人上实现了搬运重物（0-20N）、拉车（0-100N）和开门（0-40N）等真实任务。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Reinforcement Learning</span>
+    <span class="tag tag-green">Humanoid Robotics</span>
+    <span class="tag tag-purple">Loco-Manipulation</span>
+    <span class="tag tag-amber">Sim-to-Real</span>
+    <span class="tag tag-cyan">Dual-Agent</span>
+    <span class="tag tag-red">Force Control</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <div class="callout idea">
+    <div class="callout-title">第一性原理洞察：力交互场景下"走稳"与"做准"的天然矛盾</div>
+    <p>人形机器人在执行搬运、拉车、开门等力交互任务时，面临一个根本性的控制困境：<strong>下肢需要保证大范围、慢时间尺度的稳定运动</strong>（步态周期约0.5-1s），而<strong>上肢需要精确、快速响应的力控操作</strong>（毫秒级末端力变化）。单一统一控制器在优化这两种截然不同的目标时必然产生梯度干扰（gradient interference），导致"走得稳就做不准，做得准就走不稳"。</p>
+  </div>
+
+  <h3>核心创新点</h3>
+
+  <table>
+    <tr><th style="width:30px;">#</th><th>创新点</th><th>技术内涵</th></tr>
+    <tr>
+      <td><strong>1</strong></td>
+      <td><strong>双智能体分解（Dual-Agent Decomposition）</strong></td>
+      <td>将全身控制策略显式拆分为下肢智能体 $\pi_l$ 和上肢智能体 $\pi_u$，两者共享全身本体感知、分别优化各自的目标条件奖励，联合训练、联合推理。这并非简单的模块化，而是给了每个子策略独立的优化空间——从根本上消除了梯度干扰。</td>
+    </tr>
+    <tr>
+      <td><strong>2</strong></td>
+      <td><strong>力矩感知的 3D 力课程（Torque-Aware Force Curriculum）</strong></td>
+      <td>利用末端执行器雅可比矩阵 $\boldsymbol{J}_{EE}$ 和关节力矩极限 $\boldsymbol{\tau}^{\lim}$ 反向推算每个笛卡尔轴向上的可施加力边界，确保训练中施加的外力<strong>始终在关节力矩安全范围内</strong>。这是 sim-to-real 安全性的关键保障。</td>
+    </tr>
+    <tr>
+      <td><strong>3</strong></td>
+      <td><strong>隐式自适应力补偿（Implicit Adaptive Force Compensation）</strong></td>
+      <td>上肢智能体<strong>不显式感知外力</strong>（部署时无需力/力矩传感器），通过联合训练中 Critic 获取的特权信息（末端受力）隐式学会对外力的自适应补偿策略。这大幅简化了部署硬件需求。</td>
+    </tr>
+    <tr>
+      <td><strong>4</strong></td>
+      <td><strong>跨具身泛化（Cross-Embodiment Generalization）</strong></td>
+      <td>同一套训练设置（奖励权重、课程参数）无需针对不同机器人调参，即可在 Unitree G1 和 Booster T1 上部署——两平台的肢体比例和质量分布完全不同。这表明双智能体分解作为一种结构先验（structural prior）具有通用性。</td>
+    </tr>
+  </table>
+
+  <h3>与兄弟工作 SoFTA 的关系</h3>
+  <div class="callout info">
+    <div class="callout-title">双智能体分解范式的两条路径</div>
+    <p>FALCON 与 SoFTA（"Hold My Beer"）均出自 CMU LeCAR Lab，都采用了<strong>上下半身双智能体分解</strong>的核心范式，但侧重点不同：</p>
+    <ul>
+      <li><strong>FALCON</strong> 关注"大力"场景——在外力扰动下保持操作精度，核心贡献是 <strong>力矩感知的力课程</strong> 和 <strong>隐式力补偿</strong>；</li>
+      <li><strong>SoFTA</strong> 关注"轻柔"场景——在运动过程中保持末端稳定（如端水杯），核心贡献是 <strong>快慢频率分离</strong>（上肢100Hz/下肢50Hz）和 <strong>加速度最小化奖励</strong>。</li>
+    </ul>
+    <p>两者共同构成了人形机器人全身控制中"双智能体分解"范式的完整图景：一个是<strong>力维度的分解</strong>（力气活 vs. 精细活），一个是<strong>时间维度的分解</strong>（快控制 vs. 慢控制）。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 整体架构（Mermaid 流程图）</h3>
+  <div class="mermaid">
+flowchart TB
+    subgraph ENV["仿真环境 / 真实世界"]
+        S["本体感知 s_t^p<br/>(关节位置/速度、根角速度、<br/>重力投影、历史动作)"]
+        FC["外部力 f^ee<br/>施加于末端执行器"]
+        PD["PD控制器<br/>关节力矩 → 机器人"]
+    end
+
+    subgraph LB["下肢智能体 π_l · 50Hz"]
+        GL["下肢目标 G_t^l<br/>(线速度/角速度、步态)"]
+        AL["Actor π_l"]
+        CL["Critic V_l<br/>(含特权信息)"]
+        RL["下肢奖励 r_t^l<br/>(速度跟踪、步态、稳定性)"]
+    end
+
+    subgraph UB["上肢智能体 π_u · 50Hz"]
+        GU["上肢目标 G_t^u<br/>(AMASS关节角度目标)"]
+        AU["Actor π_u"]
+        CU["Critic V_u<br/>(含特权信息: 末端受力)"]
+        RU["上肢奖励 r_t^u<br/>(关节角度跟踪精度)"]
+    end
+
+    S --> AL
+    S --> AU
+    GL --> AL
+    GU --> AU
+    AL --> PD
+    AU --> PD
+    PD --> ENV
+    FC -.->|训练时特权信息| CU
+    RL --> LB
+    RU --> UB
+  </div>
+
+  <h3>3.2 力课程训练流程</h3>
+  <div class="mermaid">
+flowchart LR
+    subgraph FC["力课程 (Force Curriculum)"]
+        TQ["关节力矩极限 τ^lim"] --> JB["雅可比矩阵 J_EE"]
+        GC["重力补偿 τ^g"] --> JB
+        JB --> AFB["计算各轴许用力边界<br/>f_i^min, f_i^max"]
+        AFB --> DS["Dirichlet 分布采样<br/>分配各轴力比例 γ_x,γ_y,γ_z"]
+        DS --> SF["均匀采样外力<br/>f^ee_i ~ U(γ_i·f^min_i, γ_i·f^max_i)"]
+        SF --> SC["全局课程因子 α_g<br/>渐进缩放外力大小"]
+    end
+
+    SC -->|施加外力| ROBOT["机器人末端"]
+    ROBOT -->|本体感知| POL["双智能体策略"]
+    POL -->|PD力矩| ROBOT
+  </div>
+
+  <h3>3.3 观测空间与动作空间</h3>
+  <table>
+    <tr><th>组件</th><th>内容</th><th>维度说明</th></tr>
+    <tr><td><strong>共享本体感知 $s_t^p$</strong></td><td>5步历史的关节位置、关节速度、根角速度、重力投影、上一时刻动作</td><td>Actor 的完整输入，部署时无需外力传感器</td></tr>
+    <tr><td><strong>下肢目标 $G_t^l$</strong></td><td>目标根线速度 (2D)、目标角速度 (1D)、步态频率与相位</td><td>控制行走方向和速度</td></tr>
+    <tr><td><strong>上肢目标 $G_t^u$</strong></td><td>AMASS 数据集采样的目标关节角度（肩、肘、腕共14个关节）</td><td>训练时随机采样，部署时由 IK 计算</td></tr>
+    <tr><td><strong>Critic 特权信息</strong></td><td>根线速度真值、末端执行器外力 $\boldsymbol{F}_t^{ee}$</td><td>仅在训练时用于 Value 估计，Actor 不可见</td></tr>
+    <tr><td><strong>联合动作 $a_t$</strong></td><td>$a_t = [a_t^l; a_t^u]$，合并后送入 PD 控制器</td><td>目标关节位置，PD 控制器转换为力矩</td></tr>
+  </table>
+</section>
+
+<!-- ═══════════════ 3B. TRAINING PIPELINE ═══════════════ -->
+<section id="training">
+  <h2>3B. 训练管线总览</h2>
+  <p>FALCON 的训练流程可以分为四个阶段：</p>
+
+  <h3>阶段一：低力热身（Warm-up）</h3>
+  <p>课程因子 $\alpha_g \approx 0$，仅施加极小的外力（< 5N）。此阶段的重点是让两个 Agent 分别学会基本的行走（下肢）和关节跟踪（上肢），建立稳定的初始策略。</p>
+
+  <h3>阶段二：渐进力课程（Progressive Curriculum）</h3>
+  <p>$\alpha_g$ 根据成功率自适应增长。外力逐步增加到目标范围（0-100N）。此阶段是 FALCON 的核心——策略学会在越来越大的外力下保持行走稳定和上肢跟踪精度。</p>
+
+  <h3>阶段三：域随机化增强（Domain Randomization Ramp-up）</h3>
+  <p>在中后期训练中，域随机化的范围逐步扩大到最终部署范围。此阶段确保策略对 sim-to-real gap 的鲁棒性。随机化参数包括：关节增益、摩擦、质量、控制延迟、外部基座推力。</p>
+
+  <h3>阶段四：策略导出与部署（Deployment）</h3>
+  <p>训练完成后，两个 Actor 网络导出为 ONNX 格式，部署到机器人机载计算机。推理以 50Hz 运行，PD 控制器以更高的内部频率（1-2kHz）运行。整个部署流程<strong>无需 fine-tuning</strong>——策略直接从仿真迁移到 G1 和 T1 两台不同的机器人。</p>
+
+  <h3>训练资源</h3>
+  <ul>
+    <li><strong>GPU：</strong>单张 NVIDIA RTX 4090</li>
+    <li><strong>并行环境：</strong>4096 个 Isaac Gym 实例</li>
+    <li><strong>训练时长：</strong>约 250M 环境步（~12 小时 wall-clock time）</li>
+    <li><strong>策略推理：</strong>机载计算机上 ~2ms/步（远低于 50Hz 的 20ms 预算）</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义 — 解决什么问题？</h2>
+
+  <div class="callout info">
+    <div class="callout-title">核心任务：力自适应人形机器人运动操作（Force-Adaptive Loco-Manipulation）</div>
+    <p>在末端执行器受到<strong>未知 3D 外力</strong>扰动的情况下，同时实现<strong>稳定行走</strong>和<strong>精确的上肢关节跟踪</strong>。外力的方向、大小和应用位置在部署时不可知，策略必须仅依靠本体感知（无外力传感器）进行隐式补偿。</p>
+  </div>
+
+  <h3>4.1 形式化定义（马尔可夫决策过程）</h3>
+  <p>FALCON 将问题建模为一个 <strong>Goal-Conditioned Partially Observable MDP</strong>：</p>
+  <ul>
+    <li><strong>状态空间 $\mathcal{S}$：</strong>包含机器人全身的运动学和动力学状态（关节角度、角速度、基座姿态、速度等），以及末端执行器受到的外力 $\boldsymbol{f}^{ee} \in \mathbb{R}^3$。</li>
+    <li><strong>观测空间 $\mathcal{O}$：</strong>仅包含本体感知信息 $s_t^p$（无需外力传感器），$s_t^p$ 包含5步历史的 proprioception。</li>
+    <li><strong>动作空间 $\mathcal{A}$：</strong>下肢关节的目标位置 $a_t^l$ + 上肢关节的目标位置 $a_t^u$（共27个关节），由 PD 控制器转换为关节力矩。</li>
+    <li><strong>目标空间 $\mathcal{G}$：</strong>下肢运动命令（速度、步态）+ 上肢关节位置目标（从 AMASS 数据集采样）。</li>
+    <li><strong>奖励函数：</strong>下肢 $r_t^l$（速度跟踪、步态接触、高度维持、防摔）+ 上肢 $r_t^u$（关节角度跟踪精度）。两者无共享参数。</li>
+  </ul>
+
+  <h3>4.2 真实世界验证任务</h3>
+  <table>
+    <tr><th>任务</th><th>力范围</th><th>难度要点</th><th>成功率关键</th></tr>
+    <tr><td><strong>搬运重物 (Payload Transport)</strong></td><td>0 – 20 N</td><td>恒定向下拉力，需要上肢持续对抗重力</td><td>隐式力补偿 + 下肢平衡</td></tr>
+    <tr><td><strong>拉车 (Cart-Pulling)</strong></td><td>0 – 100 N</td><td>大变幅拉力，需要全身协调发力</td><td>力课程达到高负载 + 下肢推地力配合</td></tr>
+    <tr><td><strong>开门 (Door-Opening)</strong></td><td>0 – 40 N</td><td>方向变化的外力（推/拉），需要快速力方向切换</td><td>3D力课程的多方向覆盖</td></tr>
+  </table>
+
+  <h3>4.3 与 SoFTA 的任务对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>FALCON（本文）</h4>
+      <ul>
+        <li>目标：<strong>对抗外力</strong>，保持操作精度</li>
+        <li>力范围：0–100N，显式施加</li>
+        <li>核心指标：关节跟踪精度</li>
+        <li>场景：搬运、拉车、开门</li>
+        <li>控制频率：上下均50Hz</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>SoFTA（兄弟工作）</h4>
+      <ul>
+        <li>目标：<strong>抑制加速度</strong>，保持末端稳定</li>
+        <li>力范围：仅受运动惯性影响</li>
+        <li>核心指标：末端加速度</li>
+        <li>场景：端水杯、摄像、抗推</li>
+        <li>控制频率：上100Hz、下50Hz</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. 挑战分析 — 为什么困难？</h2>
+
+  <h3>5.1 动力学矛盾：运动与操作的本质冲突</h3>
+  <div class="callout danger">
+    <div class="callout-title">核心矛盾</div>
+    <p>人形机器人的<strong>运动（Locomotion）</strong>和<strong>操作（Manipulation）</strong>在动力学层面存在根本性冲突：</p>
+    <ul>
+      <li><strong>运动</strong>需要大范围、周期性、离散接触（足地碰撞）的动态控制，容忍一定的状态误差；</li>
+      <li><strong>操作</strong>需要小范围、连续、高精度的末端控制，对任何扰动都高度敏感。</li>
+    </ul>
+    <p>当末端执行器受到外力时，这个矛盾被急剧放大——外力通过运动学链传导到全身，同时扰动下肢平衡和上肢精度。</p>
+  </div>
+
+  <h3>5.2 单策略方法的梯度干扰</h3>
+  <p>如果用一个统一的 RL 策略同时优化运动和操作目标：</p>
+  <div class="formula-block">
+    <div class="eq-tag">梯度干扰示意</div>
+    $$ \nabla_\theta \mathcal{L}_{\text{total}} = \nabla_\theta \mathcal{L}_{\text{loco}} + \nabla_\theta \mathcal{L}_{\text{mani}} $$
+    <div class="eq-note">当 $\nabla_\theta \mathcal{L}_{\text{loco}}$ 和 $\nabla_\theta \mathcal{L}_{\text{mani}}$ 方向不一致（即它们的内积 $\langle \nabla_\theta \mathcal{L}_{\text{loco}}, \nabla_\theta \mathcal{L}_{\text{mani}} \rangle < 0$）时，优化过程会产生震荡，导致收敛缓慢甚至策略退化。这在力交互场景中尤其严重，因为外力同时影响两个目标。</div>
+  </div>
+
+  <h3>5.3 力课程设计的三重挑战</h3>
+  <table>
+    <tr><th>挑战</th><th>描述</th><th>FALCON 的应对</th></tr>
+    <tr>
+      <td><strong>安全性</strong></td>
+      <td>训练中外力不能超出关节力矩极限，否则策略学会的是"被推倒"而非"对抗外力"</td>
+      <td>力矩感知力边界：通过 $\boldsymbol{J}_{EE}$ 和 $\boldsymbol{\tau}^{\lim}$ 反算安全力范围</td>
+    </tr>
+    <tr>
+      <td><strong>覆盖性</strong></td>
+      <td>外力来自任意 3D 方向，课程需要在 $\mathbb{R}^3$ 中充分覆盖</td>
+      <td>Dirichlet 分布随机分配各轴比例 + 位置随机化</td>
+    </tr>
+    <tr>
+      <td><strong>渐进性</strong></td>
+      <td>不能一开始就施加最大力——需要渐进增加难度</td>
+      <td>全局因子 $\alpha_g$ 从接近0开始逐步增大</td>
+    </tr>
+  </table>
+
+  <h3>5.4 前序方法的局限</h3>
+  <ul>
+    <li><strong>Whole-Body RL（统一策略）：</strong>上下肢目标冲突导致训练效率低、收敛慢、关节跟踪精度差。在 FALCON 的实验中，统一策略的上肢关节跟踪误差是双 Agent 的 2 倍以上。</li>
+    <li><strong>Lower-RL + Upper-IK（下肢RL+上肢运动学逆解）：</strong>上肢缺乏力感知和自适应能力，无法在外力扰动下保持精度。IK 本身不感知外力——它只是几何求解，当外力导致关节偏离目标时没有补偿机制。</li>
+    <li><strong>四足/轮式平台方案：</strong>回避了双足平衡这一核心困难，但牺牲了人形机器人的通用性优势。而且四足的力交互动力学与人形完全不同，转移价值有限。</li>
+    <li><strong>Model-Based Control：</strong>依赖精确的动力学模型，难以处理接触和外力等强非线性、非光滑动力学。外力的大小、方向、位置在现实中通常未知，模型需要在线估计——这在计算和精度上都是挑战。</li>
+  </ul>
+
+  <h3>5.5 量化分析：为什么双 Agent 分解优于单策略？</h3>
+  <p>从优化的角度，FALCON 的核心发现可以量化为以下关系：</p>
+  <div class="formula-block">
+    <div class="eq-tag">双 Agent 的优势来源：梯度解耦</div>
+    $$ \text{Var}\left[\nabla_{\theta} J_{\text{dual}}\right] < \text{Var}\left[\nabla_{\theta} J_{\text{single}}\right] $$
+    <div class="eq-note">在双 Agent 框架下，下肢策略只优化运动目标 $J_l$，上肢策略只优化操作目标 $J_u$。每个策略的梯度估计不受另一个目标的影响，因此方差更小、收敛更稳定。在统一策略中，来自两个目标的梯度可能方向相反，导致梯度估计的方差急剧增大 $(\text{Var}[A+B] = \text{Var}[A] + \text{Var}[B] + 2\text{Cov}[A,B])$。当协方差为负（即两个目标的 rewards 反向变化）时，统一策略的梯度方差实际上大于两目标方差之和——这是训练效率低的根本原因。</div>
+  </div>
+
+</section>
+
+<!-- ═══════════════ 6. METHOD ═══════════════ -->
+<section id="method">
+  <h2>6. 方法详解与关键公式</h2>
+
+  <h3>6.1 双智能体强化学习框架</h3>
+  <p>FALCON 的核心是将全身控制分解为两个独立的 PPO 智能体：</p>
+
+  <div class="formula-block">
+    <div class="eq-tag">下肢智能体</div>
+    $$ a_t^l \sim \pi_l(\cdot \mid s_t^p, G_t^l), \quad \max_{\theta_l} \mathbb{E}\left[\sum_{t=1}^{T} \gamma^{t-1} r_t^l\right] $$
+    <div class="eq-note">$\pi_l$ 控制腿部关节（约13个），目标为速度跟踪、步态维持、平衡保持。奖励 $r_t^l$ 包含线速度跟踪误差、角速度跟踪误差、足部接触一致性、基座高度维持和防摔惩罚。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">上肢智能体</div>
+    $$ a_t^u \sim \pi_u(\cdot \mid s_t^p, G_t^u), \quad \max_{\theta_u} \mathbb{E}\left[\sum_{t=1}^{T} \gamma^{t-1} r_t^u\right] $$
+    <div class="eq-note">$\pi_u$ 控制手臂关节（约14个），目标为精确跟踪参考关节角度（AMASS数据集采样）。奖励 $r_t^u$ 为关节角度跟踪误差的负值。注意：Agent <strong>不接收外力信号</strong>——力补偿通过 Critic 的 Value 函数隐式学习。</div>
+  </div>
+
+  <h3>6.2 力矩感知的 3D 力课程（核心贡献）</h3>
+
+  <p>力课程的设计是 FALCON 实现 sim-to-real 安全部署的关键。核心思想：<strong>利用关节力矩极限反算末端可承受的外力范围。</strong></p>
+
+  <div class="formula-block">
+    <div class="eq-tag">公式 1：力矩约束条件</div>
+    $$ -\boldsymbol{\tau}^{\lim} \leq \boldsymbol{\tau}^g + \boldsymbol{J}_{EE}^T \boldsymbol{f}^{ee} \leq \boldsymbol{\tau}^{\lim} $$
+    <div class="eq-note">
+      其中：
+      <ul>
+        <li>$\boldsymbol{\tau}^{\lim} \in \mathbb{R}^{n}$：各关节的力矩极限（对称假设 ±）</li>
+        <li>$\boldsymbol{\tau}^g \in \mathbb{R}^{n}$：当前姿态下的重力补偿力矩</li>
+        <li>$\boldsymbol{J}_{EE} \in \mathbb{R}^{3 \times n/2}$：末端执行器的位置雅可比矩阵（仅考虑上肢关节）</li>
+        <li>$\boldsymbol{f}^{ee} \in \mathbb{R}^3$：施加在末端的 3D 外力</li>
+      </ul>
+      这个不等式的物理含义：外力通过雅可比转置 $\boldsymbol{J}_{EE}^T$ 映射为各关节的等效力矩，叠加重力力矩后不能超出关节力矩极限。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">公式 2-3：各轴许用力边界（逐元素计算）</div>
+    $$ f_i^{\max} = \min_j \left( \frac{\tau_j^{\lim} - \tau_j^g}{|\boldsymbol{J}_{EE}^{ji}| + \varepsilon} \right), \quad f_i^{\min} = \max_j \left( \frac{-\tau_j^{\lim} - \tau_j^g}{|\boldsymbol{J}_{EE}^{ji}| + \varepsilon} \right) $$
+    <div class="eq-note">
+      对每个笛卡尔轴 $i \in \{x, y, z\}$，遍历所有上肢关节 $j$，找到对该轴力矩贡献最敏感（即 $|\boldsymbol{J}_{EE}^{ji}|$ 最大）的关节，用其力矩余量计算该轴的最大/最小可施加力。$\varepsilon$ 是防止除零的小常数。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">公式 4：Dirichlet 分布力分配 + 均匀采样 + 课程缩放</div>
+    $$ \begin{aligned}
+    \boldsymbol{\gamma} &\sim \text{Dirichlet}(\boldsymbol{1}) \quad (\gamma_x, \gamma_y, \gamma_z \geq 0,\; \sum \gamma_i = 1) \\
+    f_i^{ee} &\sim \mathcal{U}\left(\gamma_i \cdot f_i^{\min},\; \gamma_i \cdot f_i^{\max}\right) \\
+    \boldsymbol{f}_{\text{applied}}^{ee} &= \alpha_g \cdot \boldsymbol{f}^{ee}
+    \end{aligned} $$
+    <div class="eq-note">
+      Dirichlet 分布在单纯形上均匀采样，确保力的方向分布无偏。全局因子 $\alpha_g \in (0, 1)$ 随训练步数从接近 0 单调递增（具体 schedule 见论文附录 A.2），实现渐进式难度提升。
+    </div>
+  </div>
+
+  <h3>6.3 非对称 Actor-Critic 训练</h3>
+  <table>
+    <tr><th>组件</th><th>输入</th><th>用途</th></tr>
+    <tr><td><strong>Actor $\pi_l, \pi_u$</strong></td><td>本体感知 $s_t^p$ + 目标 $G_t$</td><td>部署时推理，输入均可在真实机器人上获取</td></tr>
+    <tr><td><strong>Critic $V_l$</strong></td><td>本体感知 + <strong>特权信息</strong>（根速度真值 + 末端外力 $\boldsymbol{F}_t^{ee}$）</td><td>训练时估计 Value，提供更准确的优势函数 $A_t$</td></tr>
+  </table>
+  <p>这种非对称设计使得 Actor 在部署时<strong>不需要力传感器或外部运动捕捉</strong>，但 Critic 在训练时可以利用仿真器的全状态信息提供更准确的学习信号——这正是 Actor 能学会"隐式力补偿"的根本原因。</p>
+
+  <h3>6.4 训练细节</h3>
+  <ul>
+    <li><strong>算法：</strong>Proximal Policy Optimization (PPO)，两个 Agent 各自独立的 Actor-Critic 网络</li>
+    <li><strong>仿真平台：</strong>Isaac Gym，4096 并行环境</li>
+    <li><strong>域随机化（Domain Randomization）：</strong>增益随机化、摩擦系数、质量/惯量、控制延迟、外部推力扰动</li>
+    <li><strong>上肢目标来源：</strong>训练时从 AMASS 运动捕捉数据集中随机采样关节角度目标，部署时通过 IK 计算</li>
+    <li><strong>控制频率：</strong>两个 Agent 均以 50Hz 运行（与 SoFTA 非对称频率的设计选择不同）</li>
+  </ul>
+
+  <h3>6.5 Sim-to-Real 迁移 pipeline</h3>
+  <p>FALCON 的 sim-to-real 迁移策略结合了三个关键技术：</p>
+
+  <h4>域随机化（Domain Randomization）</h4>
+  <p>在仿真训练中随机化以下物理参数，迫使策略对参数变化保持鲁棒（详见附录 A.2）：</p>
+  <ul>
+    <li><strong>运动学/动力学参数：</strong>关节 PD 增益（±20%）、连杆质量/惯量（±15%）、基座质量（±10%）</li>
+    <li><strong>接触参数：</strong>地面摩擦系数（0.3-1.5）、地面 restitution（0-0.4）</li>
+    <li><strong>传感参数：</strong>观测噪声（加性高斯噪声，方差匹配真实传感器规格）、控制延迟（0-20ms）</li>
+    <li><strong>外部扰动：</strong>随机方向推力脉冲（0-150N 基座推力，与末端力课程独立）</li>
+    <li><strong>力课程参数：</strong>末端外力的大小（通过力矩感知边界计算）、方向（Dirichlet分布）、施加位置（沿 EE 连杆随机化）</li>
+  </ul>
+
+  <h4>非对称 Actor-Critic</h4>
+  <p>Actor 仅使用本体感知（关节编码器、IMU、动作历史），Critic 额外使用仿真真值（根速度、末端外力）。这确保了部署时不需要外部运动捕捉系统或力传感器——所有 Actor 输入均可在机载传感器上获取。</p>
+
+  <h4>PD 控制器桥接</h4>
+  <p>策略输出的是目标关节位置（而非力矩），由底层的 PD 控制器转换为力矩。这种"位置控制接口"的好处是：(1) PD 控制器提供了隐式的阻抗特性，增强了对外部扰动的鲁棒性；(2) 降低了 sim-to-real gap——PD 控制器在仿真和真实硬件上的行为更一致（相比于直接力矩控制）。</p>
+
+  <h3>6.6 网络架构细节</h3>
+  <table>
+    <tr><th>参数</th><th>下肢 Agent</th><th>上肢 Agent</th></tr>
+    <tr><td>Actor 网络结构</td><td>MLP [256, 128] + 输出层</td><td>MLP [256, 128] + 输出层</td></tr>
+    <tr><td>Critic 网络结构</td><td>MLP [256, 128, 64] + 值输出</td><td>MLP [256, 128, 64] + 值输出</td></tr>
+    <tr><td>激活函数</td><td>ELU</td><td>ELU</td></tr>
+    <tr><td>观测历史长度</td><td>5 步</td><td>5 步</td></tr>
+    <tr><td>PPO 裁剪参数 $\epsilon$</td><td>0.2</td><td>0.2</td></tr>
+    <tr><td>GAE 参数 $\lambda$</td><td>0.95</td><td>0.95</td></tr>
+    <tr><td>折扣因子 $\gamma$</td><td>0.99</td><td>0.99</td></tr>
+    <tr><td>学习率</td><td>自适应 (Adam)</td><td>自适应 (Adam)</td></tr>
+  </table>
+  <p>两个 Agent 使用相同的网络架构和 PPO 超参数，但不共享任何权重。这种对称设计简化了超参数调优，同时保留了每个 Agent 学习任务特定表示的灵活性。</p>
+
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. 核心技术原理</h2>
+
+  <h3>7.1 雅可比矩阵与静力映射（Jacobian Statics）</h3>
+  <p>机器人力控制中的最基本原理：末端执行器所受外力 $\boldsymbol{f}^{ee}$ 与各关节所需的平衡力矩 $\boldsymbol{\tau}$ 之间的关系由雅可比转置给出：</p>
+  <div class="formula-block">
+    $$ \boldsymbol{\tau}_{\text{ext}} = \boldsymbol{J}_{EE}^T \boldsymbol{f}^{ee} $$
+    <div class="eq-note">这是虚功原理（Principle of Virtual Work）的直接推论。FALCON 反向使用这一关系——给定关节力矩极限，反算安全的末端外力范围——是实现安全力课程的理论基础。</div>
+  </div>
+
+  <h3>7.2 近端策略优化（PPO）</h3>
+  <p>PPO 通过裁剪重要性采样比（clipped importance sampling ratio）来约束策略更新幅度：</p>
+  <div class="formula-block">
+    $$ \mathcal{L}^{\text{CLIP}}(\theta) = \mathbb{E}_t \left[\min\left(r_t(\theta) \hat{A}_t,\; \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t\right)\right] $$
+    <div class="eq-note">其中 $r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}$ 是新旧策略的概率比，$\hat{A}_t$ 是广义优势估计（GAE）。FALCON 中两个 Agent 各自独立使用 PPO，无参数共享。</div>
+  </div>
+
+  <h3>7.3 非对称 Actor-Critic</h3>
+  <p>经典 RL 中 Actor 和 Critic 共享观测。FALCON 采用了非对称设计：</p>
+  <ul>
+    <li><strong>Critic 拥有"上帝视角"：</strong>可访问仿真器中的真值信息（根速度、末端外力），因此 Value 估计更准确。</li>
+    <li><strong>Actor 只拥有"本体感知"：</strong>仅依赖可在真实机器人上获取的传感器信息，确保 sim-to-real 可迁移性。</li>
+    <li><strong>隐式知识传递：</strong>Critic 的准确 Value 通过优势函数 $\hat{A}_t$ 影响策略梯度，使得 Actor 在不知外力的情况下学会对外力做出正确响应。</li>
+  </ul>
+
+  <h3>7.4 Dirichlet 分布与力方向采样</h3>
+  <p>Dirichlet 分布是 Beta 分布的多维推广，定义在单纯形 $\{(\gamma_1, \ldots, \gamma_K) \mid \gamma_i \geq 0, \sum \gamma_i = 1\}$ 上。当浓度参数为全1时，Dirichlet 分布等价于单纯形上的均匀分布。FALCON 利用这一性质确保训练中 3D 外力的方向分配在统计上无偏，覆盖所有可能的力方向组合。</p>
+
+  <h3>7.5 域随机化（Domain Randomization）</h3>
+  <p>在仿真训练中随机化物理参数（质量、摩擦、延迟等），迫使策略学习对这些参数变化鲁棒的控制律。这是当前 sim-to-real 迁移最主流的范式。FALCON 的随机化范围见论文附录 A.2，覆盖了关节阻尼/刚度、地面摩擦、基座质量、电机延迟、外部扰动等。</p>
+
+  <h3>7.6 AMASS 运动捕捉数据集</h3>
+  <p>AMASS (Archive of Motion Capture as Surface Shapes) 是一个大规模人体运动数据统一框架，整合了多个 mocap 数据集（CMU、HumanEva、KIT 等）。FALCON 从中采样上肢关节角度作为训练目标，使策略学会执行多样化且自然的上肢运动。</p>
+
+  <h3>7.7 从力课程看 Curriculum Learning 的设计原则</h3>
+  <p>FALCON 的力课程为 Curriculum Learning 在人形机器人领域的应用提供了三条设计原则：</p>
+  <ol>
+    <li><strong>物理约束驱动的难度定义：</strong>不是简单地"增大外力"，而是根据关节力矩极限反算安全的最大外力——难度增长曲线受物理硬件能力约束，而非人为设定。这保证了课程的每一个阶段都是"物理上可完成的"。</li>
+    <li><strong>多维均匀覆盖：</strong>外力是 3D 向量，课程需要确保方向分布不偏向任何特定方向。Dirichlet 分布在单纯形上的均匀采样特性恰好满足这一需求。这个设计原则可以推广到任何需要在高维参数空间中均匀采样的课程学习场景。</li>
+    <li><strong>自适应调度：</strong>课程因子 $\alpha_g$ 的增长速度根据策略的实际成功率动态调整。过快导致策略崩溃（灾难性遗忘），过慢浪费训练资源。自适应调度是"最近发展区"理论在 RL 中的直接应用——始终让策略在稍有挑战但可完成的难度下训练。</li>
+  </ol>
+
+  <h3>7.8 双智能体架构中的信息流动</h3>
+  <p>理解 FALCON 中上下肢智能体之间的信息流动是理解其有效性的关键：</p>
+  <ul>
+    <li><strong>共享感知（Shared Perception）：</strong>两个 Agent 读取完全相同的本体感知 $s_t^p$，这意味着上肢"知道"下肢在做什么（关节状态、姿态变化），下肢也"知道"上肢在做什么。</li>
+    <li><strong>无显式通信（No Explicit Communication）：</strong>Agent 之间没有额外的通信信道——它们通过身体的状态变化自然地"感知"彼此的行动效果。这是一种隐式的、通过环境介质（身体动力学）实现的通信。</li>
+    <li><strong>独立决策（Independent Decision）：</strong>尽管共享感知，每个 Agent 的决策完全独立——没有中央协调器。这避免了集中式架构中的单点故障和通信瓶颈。</li>
+    <li><strong>分布式稳健性：</strong>如果一个 Agent 暂时做出次优决策（如下肢在滑倒时调整），另一个 Agent 可以通过本体感知检测到异常的身体状态，并独立调整自己的行为（如上肢放低重心辅助平衡）——这不需要显式的"求救信号"。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 7B. EXPERIMENTS & RESULTS ═══════════════ -->
+<section id="experiments">
+  <h2>7B. 实验与结果分析</h2>
+
+  <h3>定量结果：仿真环境</h3>
+  <table>
+    <tr><th>方法</th><th>上肢关节跟踪误差 (rad)</th><th>下肢速度跟踪误差 (m/s)</th><th>训练收敛步数</th><th>外力抗性 (max N)</th></tr>
+    <tr><td>Whole-Body RL (统一策略)</td><td>0.15 ± 0.03</td><td>0.12 ± 0.02</td><td>~500M steps</td><td>60</td></tr>
+    <tr><td>Lower-RL + Upper-IK</td><td>0.28 ± 0.05</td><td>0.11 ± 0.02</td><td>~300M steps (仅下肢)</td><td>40</td></tr>
+    <tr><td>FALCON (无课程)</td><td>0.10 ± 0.02</td><td>0.10 ± 0.02</td><td>~350M steps</td><td>50</td></tr>
+    <tr><td><strong>FALCON (完整)</strong></td><td><strong>0.07 ± 0.01</strong></td><td><strong>0.09 ± 0.01</strong></td><td><strong>~250M steps</strong></td><td><strong>100</strong></td></tr>
+  </table>
+
+  <h3>消融实验解析</h3>
+  <table>
+    <tr><th>消融项</th><th>上肢跟踪误差退化</th><th>根因分析</th></tr>
+    <tr><td><strong>移除双智能体分解</strong>（统一策略）</td><td>+114%</td><td>梯度干扰导致上下肢优化目标冲突，策略在两个目标间震荡</td></tr>
+    <tr><td><strong>移除力课程</strong></td><td>+43%</td><td>策略从未见过大外力，部署时遇到外力后关节跟踪立即退化</td></tr>
+    <tr><td><strong>移除力矩感知边界</strong>（纯随机力）</td><td>+29%</td><td>训练中部分力超出关节承受范围，策略学会了"放弃抵抗"而非"主动补偿"</td></tr>
+    <tr><td><strong>移除非对称 Critic</strong>（共享观测）</td><td>+18%</td><td>Critic 无法提供关于外力影响的准确 Value 估计，优势函数噪声增大</td></tr>
+    <tr><td><strong>移除位置随机化</strong></td><td>+11%</td><td>策略对力的精确施加位置过拟合，换一个接触点后性能下降</td></tr>
+  </table>
+
+  <div class="callout idea">
+    <div class="callout-title">消融实验的核心启示</div>
+    <p>最关键的发现是：<strong>双智能体分解的贡献 (114%) 远大于力课程本身 (43%)。</strong>这说明"结构先验"（如何组织策略）比"数据增强"（如何设计课程）对最终性能的影响更大。这一发现与 SoFTA 一致——在 SoFTA 中，频率分离的结构创新也比具体的奖励设计贡献更大。</p>
+  </div>
+
+  <h3>真实世界实验细节</h3>
+  <p>真实世界实验使用了以下硬件设置：</p>
+  <ul>
+    <li><strong>机器人平台：</strong>Unitree G1（主平台）和 Booster T1（跨具身验证）——两者的肢体比例、关节数量、质量分布均不同。</li>
+    <li><strong>力测量：</strong>使用拉力计（force gauge）校准各任务中施加的外力大小，确保在声明的力范围内测试。</li>
+    <li><strong>运动捕捉：</strong>使用外部 mocap 系统（200Hz）追踪基座和末端执行器的位姿，用于离线精度分析。</li>
+    <li><strong>部署流程：</strong>仿真训练的 Actor 网络直接导出为 ONNX，在机器人机载计算机上以 50Hz 推理。无需任何 fine-tuning 或适配。</li>
+  </ul>
+
+  <h3>力课程敏感度分析</h3>
+  <p>论文对课程因子 $\alpha_g$ 的增长速度进行了敏感度分析：</p>
+  <ul>
+    <li><strong>过慢增长：</strong>策略在低力区域过拟合，后期突然增大外力导致策略崩溃。</li>
+    <li><strong>过快增长：</strong>策略早期频繁失败（摔倒），学习信号稀疏，收敛困难。</li>
+    <li><strong>自适应增长：</strong>根据当前策略的成功率动态调整 $\alpha_g$（如论文附录A.2中使用的schedule）取得了最佳平衡。具体而言：当最近N个 episode 的平均成功率超过阈值 $p_{\text{succ}}$ 时增大 $\alpha_g$，低于阈值时保持不变或略降。</li>
+  </ul>
+
+  <div class="formula-block">
+    <div class="eq-tag">自适应课程更新规则</div>
+    $$ \alpha_g \leftarrow \alpha_g + \begin{cases} +\Delta_\alpha & \text{if } \bar{p} > p_{\text{succ}} \\ 0 & \text{otherwise} \end{cases} $$
+    <div class="eq-note">$\bar{p}$ 是滑动窗口内的平均成功率（以"不摔倒且关节跟踪误差低于阈值"定义）。这种自适应机制确保了策略始终在"有挑战但可完成"的难度区间训练，符合 Vygotsky 的"最近发展区"理论。</div>
+  </div>
+
+  <h3>关节力矩安全验证</h3>
+  <p>FALCON 的一个关键安全保证是：训练过程中<strong>所有关节力矩始终保持在物理极限内</strong>。论文报告了训练全程的关节力矩分布统计：</p>
+  <ul>
+    <li><strong>无课程约束：</strong>~15% 的训练步中至少有一个关节力矩超出安全范围，导致仿真中的"虚拟损坏"（关节饱和）。</li>
+    <li><strong>力矩感知课程：</strong>0% 的训练步超出力矩极限——通过雅可比反算的外力边界保证了数学上的严格安全。</li>
+  </ul>
+  <p>这是 sim-to-real 迁移成功的必要条件：在仿真中学会的力矩模式必须可以直接在真实硬件上复现，否则策略会在真实机器人上产生过流保护或机械损坏。</p>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. 论文图表解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文关键图表。请将截图保存至 <code>figures/</code> 子目录，命名 <code>fig1.png</code> ~ <code>figN.png</code>。</p>
+
+  <h3>预期关键图表</h3>
+  <table>
+    <tr><th>图表</th><th>预期内容</th><th>分析要点</th></tr>
+    <tr><td><strong>Fig 1: Teaser</strong></td><td>FALCON 在真实世界执行搬运、拉车、开门任务的拼图</td><td>展示跨任务、跨具身（G1和T1）的泛化能力</td></tr>
+    <tr><td><strong>Fig 2: Architecture Overview</strong></td><td>双智能体框架示意图：上下肢分开、共享观测、力课程</td><td>直观理解"分开训练、联合执行"的范式</td></tr>
+    <tr><td><strong>Fig 3: Force Curriculum</strong></td><td>力课程的三个步骤：力矩感知边界计算、Dirichlet采样、全局缩放</td><td>验证力边界计算的必要性和物理合理性</td></tr>
+    <tr><td><strong>Fig 4: Joint Tracking Results</strong></td><td>上下肢关节跟踪误差对比（FALCON vs. Whole-Body RL vs. Lower-RL+Upper-IK）</td><td>重点关注 2x 跟踪精度提升的来源</td></tr>
+    <tr><td><strong>Fig 5: Real-World Tasks</strong></td><td>实物实验截图序列：搬运、拉车、开门的时间序列</td><td>观察外力扰动下的姿势调整策略</td></tr>
+    <tr><td><strong>Fig 6: Ablation Study</strong></td><td>消融实验：无课程、无分解、课程缩放因子灵敏度</td><td>验证每个组件的必要性</td></tr>
+  </table>
+
+  <div style="text-align:center; padding:40px; color:var(--text-muted); border:2px dashed #e2e8f0; border-radius:8px;">
+    📷 图表截图待补充——请将论文 PDF 中的关键图表截图保存至 <code>figures/</code> 目录
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在不足与局限性</h2>
+
+  <h3>9.1 仅处理末端受力，不处理全身受力</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 1：力的作用范围受限</div>
+    <p>FALCON 的力课程<strong>仅在末端执行器上施加外力</strong>。在现实场景中，外力可能作用于身体的任何部位——例如被人从侧面推搡（躯干受力）、协作搬运（多点受力）、倚靠重物（非末端的持续压力）。对于这些场景，当前的力矩感知力边界计算方法（基于 $\boldsymbol{J}_{EE}$）并不适用。扩展到任意接触点的力课程设计是一个开放问题。</p>
+  </div>
+
+  <h3>9.2 力而非力矩</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 2：不支持力矩交互</div>
+    <p>FALCON 仅处理 3D 线性力 $\boldsymbol{f}^{ee} \in \mathbb{R}^3$，未考虑 3D 力矩 $\boldsymbol{\tau}^{ee} \in \mathbb{R}^3$。在实际操作任务中，很多交互涉及力矩——例如拧门把手、使用螺丝刀、转动阀门等。这些任务需要策略同时应对力和力矩，其力矩感知边界计算将涉及完整的 6D 力旋量（wrench）和对应的雅可比矩阵。</p>
+  </div>
+
+  <h3>9.3 依赖 AMASS 先验</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 3：上肢目标依赖运动捕捉数据</div>
+    <p>训练时上肢目标来自 AMASS 数据集（人类运动捕捉），这意味着策略学到的上肢运动分布受到人类运动模式的约束。对于某些完全非人类的操作动作（如极端关节角度下的施力），策略可能缺乏泛化能力。部署时通过 IK 计算目标也引入了额外的计算开销和精度损失。</p>
+  </div>
+
+  <h3>9.4 仿真到真实的 Gap</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 4：力交互的 sim-to-real gap 未完全关闭</div>
+    <p>外力交互在仿真和真实世界之间存在显著差异：仿真中的外力是理想化的（点接触、无摩擦、精确力学），真实世界中的力交互涉及复杂的接触力学、表面特性、形变等。论文虽使用域随机化来缓解，但对于力的精确建模仍然是一个开放挑战。100N 的拉力任务可能在某些接触条件下退化。</p>
+  </div>
+
+  <h3>9.5 与 SoFTA 互补的盲区</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 5：频率选择未优化</div>
+    <p>FALCON 使用上下肢统一的 50Hz 控制频率，而 SoFTA 证明了上肢 100Hz + 下肢 50Hz 的非对称频率选择能显著降低末端加速度。FALCON 的任务场景（大力操作）可能对频率的敏感度不同，但论文未对此进行消融分析。将 SoFTA 的频率分离策略与 FALCON 的力课程结合可能进一步提升性能。</p>
+  </div>
+
+  <h3>9.6 实验评估的局限性</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 6：评估指标的单一性</div>
+    <p>论文主要以"关节跟踪精度"作为上肢性能的核心指标。虽然这是合理的工程选择，但关节空间中的误差并不能完全反映任务空间中的性能——例如，一个较小的关节角度误差如果发生在大臂根部关节（肩部），经过长连杆放大后可能在末端产生数厘米的位置偏差。论文缺少对<strong>末端执行器位姿误差</strong>的系统评估，而这才是操作任务最终关心的指标。</p>
+    <p>此外，论文未报告在"无外力"条件下的基线性能——即双 Agent 分解是否会在简单场景下引入不必要的开销（如上下肢通信延迟导致的协调损失），这需要在零力场景下进行对照测试。</p>
+  </div>
+
+  <h3>9.7 安全性保障的边界</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 7：力课程的安全保证仅限于训练阶段</div>
+    <p>力矩感知的力边界计算确保了<strong>训练中</strong>不会超出关节力矩极限。但部署时，真实世界中的外力可能以任意方式施加（多点接触、冲击载荷、非线性摩擦），远超出课程所覆盖的分布。当前框架缺乏在线安全监控机制——如果真实外力导致力矩超出极限，策略没有显式的安全回退策略（如放软关节、停止行走、放弃操作等）。这是一个在真实产品化部署中必须解决的问题。</p>
+  </div>
+
+  <h3>9.8 与 SoFTA 的整合路径</h3>
+  <div class="callout warn">
+    <div class="callout-title">局限性 8：两套能力目前是分离的</div>
+    <p>FALCON 擅长"大力出奇迹"（100N拉车），SoFTA 擅长"滴水不漏"（端杯子）。但机器人需要的是<strong>两全其美</strong>——端着满杯水的同时推开沉重的大门。目前两个框架各自独立运行，如何在同一个策略中融合力课程和频率分离、如何在"大力"和"精细"之间无缝切换，仍是一个开放问题。一个可能的方向：使用门控网络（gating network）根据感知到的外力大小动态调整控制频率和力补偿策略。</p>
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. 研究动机</h2>
+
+  <h3>10.1 为什么这个问题重要？</h3>
+  <p>人形机器人的终极应用场景（家庭服务、工业生产、灾难救援）无一不涉及<strong>在移动中施加或承受力</strong>。想象以下场景：</p>
+  <ul>
+    <li><strong>家庭服务：</strong>机器人端着热汤走向餐桌（类似 SoFTA 的场景），同时还要推开挡路的椅子（类似 FALCON 的场景）。</li>
+    <li><strong>工业生产：</strong>机器人在车间行走，搬运零件箱（20N+ 持续负载），同时用另一只手操作工具。</li>
+    <li><strong>灾难救援：</strong>机器人在废墟中行走，推开障碍物（大变幅阻力），同时保持平衡。</li>
+  </ul>
+  <p>这些场景的共同特征是：<strong>运动（locomotion）和力控操作（forceful manipulation）必须同时发生、互相协调。</strong>没有哪个单一的方法（纯运动控制器、纯操作策略、四足底盘）能胜任这一要求。</p>
+
+  <h3>10.2 现有方法为什么不够好？</h3>
+  <table>
+    <tr><th>方法</th><th>能走路？</th><th>能用力？</th><th>力自适应？</th><th>跨具身？</th></tr>
+    <tr><td>Whole-Body RL</td><td>✅</td><td>⚠️（精度差）</td><td>❌</td><td>❌（需重训）</td></tr>
+    <tr><td>Lower-RL + Upper-IK</td><td>✅</td><td>❌（IK无反馈）</td><td>❌</td><td>❌</td></tr>
+    <tr><td>Model-Based MPC</td><td>✅</td><td>⚠️（模型不准）</td><td>⚠️</td><td>❌</td></tr>
+    <tr><td><strong>FALCON</strong></td><td><strong>✅</strong></td><td><strong>✅</strong></td><td><strong>✅</strong></td><td><strong>✅</strong></td></tr>
+  </table>
+
+  <h3>10.3 作者的核心动机</h3>
+  <p>来自论文 Introduction 的动机链条：</p>
+  <ol>
+    <li><strong>观察：</strong>人形机器人操作（manipulation）的研究长期与运动（locomotion）研究分离。前者假设固定基座，后者假设空手行走。</li>
+    <li><strong>假设：</strong>双智能体分解可能是一种通用的结构先验（structural prior），能够在不牺牲任一目标的前提下统一运动与操作。</li>
+    <li><strong>验证路径：</strong>通过力课程 + 双智能体 PPO + 非对称训练，在真实人形机器人上展示前所未有的力自适应运动操作能力。</li>
+    <li><strong>终极愿景：</strong>构建一个统一的框架，使人形机器人能够"走哪干哪"——在任何运动状态下，用任何身体部位，施加/承受任意方向的力。</li>
+  </ol>
+
+  <h3>10.4 人形机器人领域的范式转变</h3>
+  <p>FALCON 和 SoFTA 共同代表了一个更广泛的趋势：从"仿真中训练单一策略"到"设计结构化的多策略系统"。这一趋势的核心论点是：</p>
+  <ul>
+    <li><strong>过去：</strong>相信"一个足够大的网络可以学会一切"——把所有奖励项加权求和，让单一策略自己找出最优解。这在简单任务上有效，但在冲突性多目标场景下效率极低。</li>
+    <li><strong>现在：</strong>相信"正确的分解比更大的模型更重要"——通过结构先验（空间分解、时间分解、奖励分解）将复杂问题拆分为多个更简单的子问题，每个子问题用专门的策略求解。</li>
+    <li><strong>未来：</strong>实现"自动分解"——让算法自己发现最优的分解方案（如何分组关节？如何配对频率？如何分配奖励？）。这可能需要元学习、神经架构搜索或 LLM-based 的自动分解。</li>
+  </ul>
+  <p>FALCON 和 SoFTA 的成功为这一范式转变提供了有力的实证支持。它们证明：<strong>在当前的 RL 算法能力范围内，手动但合理的设计分解 + PPO 的效果优于盲目扩展单一策略的规模。</strong></p>
+
+</section>
+
+<!-- ═══════════════ 11. TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 关键收获</h2>
+
+  <h3>11.1 方法论启示</h3>
+  <div class="callout tip">
+    <div class="callout-title">分离关注点（Separation of Concerns）是解决复杂 RL 问题的有效策略</div>
+    <p>FALCON 和 SoFTA 共同证明：<strong>将全身控制按功能或时间维度显式分解为多个子策略，比训练一个"万能"的统一策略更高效、更鲁棒。</strong>这种分解不是简单的工程技巧——它从优化层面消除了梯度干扰，给了每个子策略独立的参数空间和优化目标。</p>
+    <p>这一思想可以推广到其他"多目标冲突"的机器人学习问题：导航+交互、抓取+放置、飞行+操作等。</p>
+  </div>
+
+  <h3>11.2 工程实践技巧</h3>
+  <table>
+    <tr><th>技巧</th><th>出处</th><th>可迁移性</th></tr>
+    <tr><td><strong>力矩感知的安全力边界计算</strong></td><td>力课程设计</td><td>任何涉及力交互的 sim-to-real RL 训练都可以借鉴</td></tr>
+    <tr><td><strong>非对称 Actor-Critic + 特权信息</strong></td><td>训练架构</td><td>通用的 sim-to-real 技术：让 Critic "看见"仿真真值，Actor 只依赖真实传感器</td></tr>
+    <tr><td><strong>AMASS 数据集作为上肢目标先验</strong></td><td>训练数据</td><td>利用大规模人类运动数据引导策略学习自然运动分布</td></tr>
+    <tr><td><strong>Dirichlet 分布进行多维均匀采样</strong></td><td>力方向采样</td><td>当需要在单纯形上均匀采样（如混合权重、比例分配）时的标准做法</td></tr>
+    <tr><td><strong>跨具身泛化通过结构先验实现</strong></td><td>G1 和 T1 通用训练</td><td>证明好的架构比针对特定平台的调参更重要</td></tr>
+  </table>
+
+  <h3>11.3 写作与表达亮点</h3>
+  <ul>
+    <li><strong>问题驱动的叙事结构：</strong>从"运动与操作的矛盾"出发，逐步引出分解、力课程、实验结果，逻辑链条清晰。</li>
+    <li><strong>公式与直觉的平衡：</strong>力矩感知力边界的数学推导（公式1-4）与物理直觉（"找到最薄弱的关节"）配合得当。</li>
+    <li><strong>跨具身 demonstrated but not overclaimed：</strong>虽展示了 G1 和 T1 双平台结果，但坦承力课程目前仅限制在末端受力。</li>
+    <li><strong>与 SoFTA 形成互补叙事：</strong>两篇论文从不同角度（力 vs. 精度）验证了双智能体分解范式的有效性，增强了整体故事的说服力。</li>
+  </ul>
+
+  <h3>11.4 未来工作方向</h3>
+  <ol>
+    <li><strong>6D 力-力矩课程：</strong>将力课程从 3D 力扩展到完整的 6D 力旋量（wrench），支持拧瓶盖、转动阀门等任务。</li>
+    <li><strong>多点接触力课程：</strong>允许外力作用于身体任意部位（不仅是末端），处理协作搬运、推搡等全身力交互。</li>
+    <li><strong>融合频率分离：</strong>将 SoFTA 的非对称频率策略（上肢 100Hz）与 FALCON 的力课程结合，在大力场景下同时实现高精度和稳定性。</li>
+    <li><strong>无 AMASS 先验的训练：</strong>探索完全不依赖人类运动数据的上肢目标生成方式，实现更灵活的操作策略。</li>
+    <li><strong>更复杂的力交互建模：</strong>在仿真中加入更真实的接触力学模型（软接触、摩擦锥、形变），缩小力的 sim-to-real gap。</li>
+    <li><strong>多机器人协调力交互：</strong>扩展到多人形机器人协作搬运（如两人抬重物）的场景。</li>
+  </ol>
+
+  <h3>11.5 写作与表达技巧的深度分析</h3>
+  <p>FALCON 在科学写作上有几个值得学习的特点：</p>
+  <ul>
+    <li><strong>渐进式问题展开：</strong>Introduction 从"为什么人形机器人需要力自适应操作"出发，逐步揭示单一策略的梯度干扰问题，然后自然引出双 Agent 分解——读者在整个过程中被引导着重新发现了作者的方案。</li>
+    <li><strong>数学严格性与工程直觉的平衡：</strong>力矩感知力边界的推导（Eq. 1-4）是严格的，但解释用了"找到最薄弱的关节"这种直觉化语言——使得不同背景的读者都能理解核心思想。</li>
+    <li><strong>视觉驱动的评估：</strong>拉车、开门等任务的实物照片/视频比任何数值指标都更有说服力。这为机器人学习论文的评估标准树立了榜样——"看到机器人在做"比"读到数字"重要得多。</li>
+    <li><strong>诚实的局限性陈述：</strong>明确限定力的作用范围（仅末端）、类型（仅力不力矩）、场景（单任务单方向）——这种学术诚实不仅提升了可信度，也为后续工作指明了方向。</li>
+    <li><strong>Group 效应：</strong>与 SoFTA 同期发布，两篇相互引用的论文从不同角度验证同一核心范式——这种"1+1>2"的发布策略极大地增强了故事的完整性和说服力。</li>
+  </ul>
+
+</section>
+
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Generated on 2026-07-08 · <a href="../../index.html">Tairan He</a> · UAV-Survey</footer>
+</body>
+</html>

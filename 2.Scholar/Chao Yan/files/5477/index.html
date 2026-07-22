@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  .series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+  .series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+  .series-links { display:flex; gap:7px; flex-wrap:wrap; }
+  .series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+  .series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+    <div class="series-nav">
+    <div class="series-nav-title">📖 Chao Yan · 11-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../5805/index.html">UAV</a>
+<a href="../5804/index.html">MADRL</a>
+<a href="../5802/index.html">UAV</a>
+<a href="../5478/index.html">Learning adaptive cross-e</a>
+<a href="../5476/index.html">3D</a>
+<a href="../5806/index.html">UAV</a>
+<a href="../5800/index.html">Emergent cooperative stra</a>
+<a class="active" href="../5477/index.html">Oracle-guided masked cont</a>
+<a href="../2918/index.html">Flexible multi-UAV format</a>
+<a href="../10112/index.html">Selective imitation enhan</a>
+<a href="../10111/index.html">Real-time avoidance obsta</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Oracle-Guided Masked Contrastive Reinforcement Learning for Visuomotor Policies（Oracle引导的掩码对比强化学习用于视觉运动策略）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yuhang Zhang</strong>、<strong>Jiaping Xiao</strong>（南洋理工大学），<strong>Chao Yan</strong>（corresponding，南京航空航天大学），<strong>Mir Feroskhan</strong>（corresponding，南洋理工大学）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">南洋理工大学</strong>（NTU）机械与航空航天工程学院 / <strong class="bold-affil">南京航空航天大学</strong>（NUAA）自动化学院</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">arXiv preprint</strong>，<strong>2025年10月</strong>，arXiv:2510.05692v1 [cs.RO]</td></tr>
+      <div class="journal-meta"><span class="jif-name">arXiv</span> <span class="jif-badge if-preprint">📄 Preprint</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://arxiv.org/abs/2510.05692" target="_blank">arXiv:2510.05692</a> | Project: <a href="https://zzzzzyh111.github.io/OMC-RL-Website/" target="_blank">OMC-RL Website</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>OMC-RL</strong>——将视觉运动策略学习解耦为<strong>上游掩码对比表征学习 + 下游Oracle引导策略学习</strong>的两阶段框架。上游：用Masked Transformer + 时序对比学习从连续RGB帧中提取时序感知的紧凑表征；下游：用具有全局状态特权访问的Oracle教师策略通过KL散度监督学生策略，引导系数线性衰减。在4种仿真环境和真实DJI Tello飞行中均显著超越所有baseline，同时提升了样本效率和泛化性能。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Masked Contrastive Learning</span>
+    <span class="tag tag-green">Visuomotor Policy</span>
+    <span class="tag tag-amber">Oracle-Guided RL</span>
+    <span class="tag tag-purple">Learning-by-Cheating</span>
+    <span class="tag tag-red">Transformer Encoder</span>
+    <span class="tag tag-cyan">Sample-Efficient RL</span>
+    <span class="tag tag-gray">Sim-to-Real Transfer</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>视觉运动策略学习为什么样本效率低、sim-to-real差距大？</strong><br>
+    答：因为策略网络被两个目标同时拉扯——"从高维像素中提取有用信息"和"基于这些信息做出决策"。两个任务共享同一梯度信号，互相干扰：（1）高维RGB（84x84x3=21K维）直接映射到3维动作 → 维度灾难；（2）RL试错在视觉空间中极其低效 → 需要海量rollout；（3）编码器与策略耦合训练 → 表征学习受奖励信号噪声污染。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>将"看"和"动"解耦</strong>——上游用自监督掩码对比学习独立训练视觉编码器（不需要奖励信号），使其从连续帧中学习时序因果推理；下游用具有特权信息的Oracle教师策略（深度图+全状态）通过KL散度监督学生策略（纯RGB），提供密集训练信号。两个阶段各司其职、互不干扰。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>Masked Autoencoder（MAE, He et al. 2022）— CV掩码图像重建</td><td>→ 将MAE的掩码重建思想迁移到时序视觉RL：随机mask某些帧的<strong>特征</strong>（非像素），用Transformer从上下文重建被mask的表征。迫使编码器学习帧间的全局因果模式——而非帧级别的表面纹理</td><td>跨域迁移</td></tr>
+    <tr><td>CURL（Srinivas et al. 2020）— 对比学习用于RL</td><td>→ CURL证明对比学习可使像素级RL接近状态级RL——但CURL逐帧独立处理，忽略时序。本文在此基础上加入时序masking：正样本对来自同一序列的masked/original特征，强制模型学习"时序一致性"的归纳偏置</td><td>方法改进</td></tr>
+    <tr><td>Learning-by-Cheating（Chen et al. 2020）— 从特权教师学习</td><td>→ 训练时使用有全局状态特权访问的Oracle教师。关键改进：用<strong>KL散度对齐动作分布</strong>而非行为克隆（模仿具体动作）。引导系数$\lambda$从1线性衰减到0——从"完全跟随Oracle"平滑过渡到"完全自主探索"</td><td>策略</td></tr>
+    <tr><td>Transformer（Vaswani et al. 2017）— 序列建模</td><td>→ 用Transformer替代CNN处理连续帧的时序依赖——使编码器能显式建模帧间因果关系。<strong>训练时用、推理时丢</strong>：Transformer仅作为上游训练的辅助模块，推理时仅用轻量CNN编码器，零额外开销</td><td>架构</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 掩码对比表征学习——将MAE范式首次引入视觉运动RL</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统视觉RL中编码器与策略耦合训练 → 梯度混杂 → 表征受奖励噪声污染 → 泛化性差、sim-to-real gap大。CURL等对比学习方法忽略时序依赖 → 单帧信息不足以推断运动状态</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>CV领域MAE——随机mask图像patch后重建，学会强大视觉表征。但本文mask在<strong>特征层</strong>（CNN编码后），而非像素层——更高效、更聚焦语义</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）连续L帧RGB → CNN编码器 → d维特征向量；（2）以概率m随机mask某些帧的特征（80%置零/10%随机替换/10%保持）；（3）被mask特征 → 投影层MLP → Transformer自注意力重建；（4）InfoNCE损失将重建特征与原始特征拉近、其他batch推远；（5）训练后丢弃Transformer，冻结CNN编码器用于下游RL</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: Oracle引导的Learning-by-Cheating策略学习（KL散度+衰减）</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>纯RL从视觉输入学习需海量探索样本 → 样本效率低。行为克隆加速但只会模仿具体动作 → 泛化差、上限受限于专家</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Learning-by-Cheating + KL散度正则化——让学生"理解老师的决策逻辑"而不仅是"复制老师的动作"</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）Oracle教师用深度图+全状态向量（速度/姿态/障碍物-目标相对位置）训练PPO；（2）学生策略仅用冻结视觉表征+速度+目标位置；（3）KL散度$\mathcal{L}_{KL} = D_{KL}(\pi_o \| \pi_\theta)$对齐分布而非动作；（4）引导系数$\lambda_t$从1线性衰减到0——训练早期完全跟随Oracle，后期完全自主探索</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 端到端两阶段管线 + 理论泛化保证</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>表征学习和策略学习如何在一个框架内协同而不互相干扰？如何保证解耦训练后的表征有泛化理论保障？</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>阶段一（上游）——离线收集飞行轨迹 → 掩码对比学习训练视觉编码器（自监督、无需奖励）；阶段二（下游）——冻结编码器 + Oracle预训练 + 学生PPO + KL衰减引导。理论分析：泛化误差受学习表征与最优表征的距离$d_Z = \frac{1}{n}\sum\|z_i - z_i^*\|^2$约束——两阶段解耦独立优化表征目标，能更有效逼近$Z^*$</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame — 整体框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph UPSTREAM["上游：掩码对比表征学习（自监督）"]
+      direction LR
+      RGB["连续L帧RGB观测<br/>h_t = (o_{t-L+1}, ..., o_t)"]
+      MASK["随机掩码<br/>M_i ~ Bernoulli(m)<br/>80%置零/10%替换/10%保持"]
+      CNN["CNN编码器 f_θ<br/>2层Conv+FC+LayerNorm+tanh<br/>输出d维特征 z_t"]
+      PROJ["投影层 φ<br/>2层MLP+ReLU"]
+      TRANS["辅助Transformer ψ<br/>单头自注意力+L层<br/>从上下文重建被mask特征"]
+      CL_LOSS["对比损失 L_cl (InfoNCE)<br/>重建特征↔原始特征拉近<br/>其他batch负样本推远"]
+    end
+
+    subgraph DOWNSTREAM["下游：Oracle引导策略学习（有监督+RL）"]
+      direction LR
+      FROZEN["冻结CNN编码器+投影层<br/>输出视觉表征 z_t"]
+      ORACLE["Oracle教师 π_o<br/>特权输入: 深度图+全状态<br/>(v_t,ω_t,Θ_t,p_t)<br/>PPO预训练→速度命令"]
+      STUDENT["学生Agent π_θ<br/>输入: 视觉表征+速度+目标位置<br/>(z_t, v_t, ω_t, p_t^(g))<br/>PPO优化"]
+      KL["KL散度引导<br/>D_KL(π_o || π_θ)<br/>λ_t: 1 → 0 线性衰减<br/>早期密集监督 → 后期自主探索"]
+    end
+
+    subgraph DEPLOY["部署：纯视觉推理（零额外开销）"]
+      direction LR
+      DEP_IN["单目RGB相机"]
+      DEP_OUT["速度控制 (vx, vy, ωz)<br/>无需深度图/全局状态"]
+    end
+
+    RGB --> MASK --> CNN --> PROJ --> TRANS --> CL_LOSS
+    CL_LOSS -.->|"梯度更新"| CNN
+    CL_LOSS -.->|"梯度更新"| TRANS
+
+    CNN -.->|"训练后冻结<br/>丢弃Transformer"| FROZEN
+    FROZEN --> STUDENT
+    ORACLE --> KL --> STUDENT
+    STUDENT --> DEPLOY
+    ORACLE -.->|"仅训练时可用<br/>特权信息"| KL
+
+    classDef upstream fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef downstream fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef deploy fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef loss fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class RGB,MASK,CNN,PROJ,TRANS upstream
+    class FROZEN,ORACLE,STUDENT,KL downstream
+    class DEP_IN,DEP_OUT deploy
+    class CL_LOSS loss
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 数据流与信号流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph DATA["数据收集（离线）"]
+      direction LR
+      D1["人工操控飞行"] --> DB["时序数据集<br/>H = (h_1,...,h_T)"]
+      D2["随机探索"] --> DB
+      D3["预训练策略"] --> DB
+    end
+
+    subgraph S1["阶段1: 掩码对比学习"]
+      direction LR
+      S1A["采样序列 H ∼ Dataset"]
+      S1B["生成掩码序列 H_m"]
+      S1C["Query编码: H_m → q_i（重建）"]
+      S1D["Key编码: H → k_i（原始·动量更新）"]
+      S1E["InfoNCE: 正对拉近·负对推远"]
+      S1A --> S1B --> S1C --> S1E
+      S1B --> S1D --> S1E
+    end
+
+    subgraph S2["阶段2: Oracle引导策略学习"]
+      direction LR
+      S2A["冻结编码器: h_t → z_t"]
+      S2B["学生PPO: (z_t, v_t, ω_t, p_t^(g)) → a_t"]
+      S2C["Oracle教师: (depth, 全状态) → a_t^o"]
+      S2D["KL散度: D_KL(π_o || π_θ)"]
+      S2E["总损失: L = (1-λ)·L_PPO + λ·β·D_KL<br/>λ: 1 → 0"]
+      S2A --> S2B --> S2D
+      S2C --> S2D
+      S2D --> S2E
+    end
+
+    DATA --> S1 --> S2
+    S2 --> EVAL["评估: 4种仿真环境 + 真实DJI Tello飞行"]
+    EVAL --> GOAL["样本效率↑ · 渐近性能↑ · sim-to-real泛化↑"]
+
+    classDef data fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef s1 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef s2 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef result fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    class D1,D2,D3,DB,S1A,S1B data
+    class S1C,S1D,S1E s1
+    class S2A,S2B,S2C,S2D,S2E s2
+    class EVAL,GOAL result
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 从数据收集到部署的完整管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1: 数据收集与编码器预训练"]
+      direction LR
+      P1A["收集时序飞行数据<br/>人工+随机+预训练策略"] --> P1B["离线训练视觉编码器<br/>掩码对比学习"]
+      P1B --> P1C["冻结编码器+丢弃Transformer<br/>推理零额外开销"]
+    end
+
+    subgraph PHASE2["阶段2: Oracle教师预训练"]
+      direction LR
+      P2A["Oracle教师 π_o<br/>特权输入: 深度图+全状态"] --> P2B["PPO训练 π_o<br/>收敛后作为监督信号"]
+      P2B --> P2C["Oracle冻结<br/>仅在训练时可用"]
+    end
+
+    subgraph PHASE3["阶段3: 学生策略学习"]
+      direction LR
+      P3A["学生Agent π_θ<br/>输入: 视觉表征+速度+目标位置"] --> P3B["PPO + KL散度引导<br/>λ: 1→0 线性衰减"]
+      P3B --> P3C["学生策略收敛<br/>纯视觉→敏捷控制"]
+    end
+
+    subgraph PHASE4["阶段4: 部署与泛化"]
+      direction LR
+      P4A["纯视觉部署<br/>单目RGB+速度+目标位置"] --> P4B["仿真: Box→Furniture→Barrier→Tree<br/>4种递增复杂度"]
+      P4B --> P4C["真实飞行: DJI Tello+VICON<br/>光照/纹理/遮挡干扰测试"]
+    end
+
+    PHASE1 --> PHASE2 --> PHASE3 --> PHASE4
+    P4C -.->|"反馈: 泛化→改进掩码策略"| P1B
+    P3C -.->|"反馈: 策略效果→调λ衰减"| P2C
+
+    classDef p1 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p2 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p3 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef p4 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    class P1A,P1B,P1C p1
+    class P2A,P2B,P2C p2
+    class P3A,P3B,P3C p3
+    class P4A,P4B,P4C p4
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 — POMDP下的视觉运动策略学习</span>
+    $$ \max_{\pi_\theta} \; \mathbb{E}_{\pi_\theta} \left[ \sum_{t=0}^{\infty} \gamma^t r_t \right] \quad \text{s.t.} \quad o_t \sim \mathcal{O},\; a_t = \pi_\theta(f_{\theta^*}(h_t)),\; h_t = (o_{t-L+1}, \ldots, o_t) $$
+    <div class="eq-note">
+      <strong>$\pi_\theta$</strong> = 视觉运动策略（待优化） &nbsp;|&nbsp;
+      <strong>$o_t$</strong> = 高维RGB观测（单目相机、部分可观测） &nbsp;|&nbsp;
+      <strong>$f_{\theta^*}$</strong> = 冻结的视觉编码器（上游预训练） &nbsp;|&nbsp;
+      <strong>$h_t$</strong> = L帧观测历史 &nbsp;|&nbsp;
+      <strong>核心要求</strong>：从21K维像素直接映射到3维动作，同时满足（1）样本效率——有限交互内收敛；（2）泛化性——sim-to-real可迁移、对视觉干扰鲁棒。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入（训练-上游）</strong></td><td>连续L帧RGB图像序列，离线收集的飞行轨迹</td><td>L × H × W × 3</td></tr>
+    <tr><td><strong>输入（训练-Oracle教师）</strong></td><td>深度图序列 + 速度/角速度 + 姿态 + 障碍物/目标相对位置</td><td>深度: L×H×W + 状态: 15维</td></tr>
+    <tr><td><strong>输入（训练-学生）</strong></td><td>冻结编码器d维表征 + 速度/角速度 + 目标相对位置</td><td>d + 9维</td></tr>
+    <tr><td><strong>输入（部署）</strong></td><td>单目RGB历史帧 + IMU速度 + 目标位置</td><td>仅RGB+速度+目标（无需深度/全局状态）</td></tr>
+    <tr><td><strong>输出</strong></td><td>速度控制命令：$(v_x, v_y, \omega_z)$</td><td>3维连续控制</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>视觉运动策略学习</strong>问题，属于<strong>深度强化学习 + 表征学习</strong>交叉领域。具体场景：无人机第一视角导航避障到达目标——单目RGB直接输出速度命令。平台：DJI Tello + VICON定位。关键特点：<strong>部分可观测</strong>（单目视野有限）、<strong>高维输入</strong>（21K→3）、<strong>时序依赖</strong>（需多帧推断运动）、<strong>sim-to-real</strong>（仿真→真机）。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：视觉运动策略学习的"维度灾难 × 样本效率 × 泛化能力"三重困境。<br><br>
+    （1）<strong>维度灾难</strong>：单目RGB是21K维张量，控制输出仅3维。策略网络需同时学会"看什么"和"怎么动"——两个任务共享梯度 → 训练不稳定、收敛缓慢。<br><br>
+    （2）<strong>样本效率</strong>：RL试错 + 视觉高维 = 需百万级交互。无人机物理rollout时间成本极高。仿真加速但sim-to-real gap（光照/纹理/动力学差异）限制迁移。<br><br>
+    （3）<strong>部分可观测性</strong>：单帧图像无法判断自身运动——需从连续帧推断。传统CNN逐帧独立处理，丢失帧间动态信息。<br><br>
+    <strong>本文解法</strong>：两阶段解耦——上游用掩码对比学习独立训练时序感知编码器（不依赖奖励）；下游用Oracle特权信息引导策略（不浪费样本探索视觉空间）。结构决定效率。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Deep Learning (Behavioral Cloning)</td>
+      <td>用大规模人工标注数据训练DNN直接从像素映射到动作</td>
+      <td>需要<strong>大量专家标注数据</strong>（昂贵难获取）；对未见场景的<strong>泛化能力极差</strong>——测试环境视觉分布不同时性能崩溃；无法通过试错自我改进</td>
+    </tr>
+    <tr>
+      <td>CURL（Contrastive Unsupervised RL）</td>
+      <td>用SimCLR风格对比学习作为辅助损失训练编码器，使像素RL接近状态RL性能</td>
+      <td>逐帧独立处理，<strong>完全忽略时序依赖</strong>——单帧信息不足以推断运动状态；编码器与策略<strong>耦合训练</strong>——表征受奖励波动污染</td>
+    </tr>
+    <tr>
+      <td>World Model（Dreamer系列）</td>
+      <td>学习环境的隐空间动力学模型，在隐空间中规划或优化策略</td>
+      <td>学习准确的world model本身<strong>需要大量样本</strong>——不样本高效；动力学误差累积传播；对高动态敏捷飞行任务的长期预测精度不足</td>
+    </tr>
+    <tr>
+      <td>Data Augmentation（RAD, DrQ）</td>
+      <td>对观测做数据增强（裁剪/颜色抖动/平移）增加数据多样性</td>
+      <td>增强是对<strong>已有数据的变换</strong>，不能替代<strong>新状态空间的探索</strong>；增强强度是敏感超参——过度增强破坏任务信息；仍无法解决时序建模</td>
+    </tr>
+    <tr>
+      <td>DQfD / Demonstration-Guided RL</td>
+      <td>用专家演示预填充replay buffer或作为辅助监督加速早期训练</td>
+      <td>固定演示覆盖有限——<strong>无法覆盖训练后期新状态</strong>；agent探索到演示外区域即失去引导；<strong>上限受限于专家水平</strong></td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 时序感知表征学习</strong>：单帧RGB信息不足（无法判断运动方向/速度），必须在连续帧中提取时序上下文。如何设计自监督目标来捕捉"帧间因果"——不依赖标签、不依赖奖励、不增加推理开销？</li>
+    <li><strong>挑战 2 — Oracle引导的衰减时机</strong>：Oracle教师（深度图+全状态）精度远高于学生。始终依赖Oracle → 学生学不会独立；过早放弃 → 学生陷局部最优。引导系数衰减策略（线性/指数/自适应）是核心调参问题。</li>
+    <li><strong>挑战 3 — 仿真到真实迁移</strong>：仿真RGB与真实相机图像有本质差异（纹理/光照/运动模糊/噪声）。掩码对比学习的"时序因果推理"能力能否天然提供domain randomization效果，防止特征坍塌？</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>OMC-RL的核心是<strong>两阶段训练管线</strong>的协同设计。关键理论支柱：（1）InfoNCE对比损失——上游表征学习；（2）KL散度引导——下游策略学习；（3）PPO——基础RL优化器。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A -->
+  <h4>Group A: InfoNCE对比损失（掩码增强版）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 掩码对比损失 L_cl</span>
+    $$ \mathcal{L}_{cl}(H; \theta, \phi, \psi) = -\mathbb{E}_{q_i} \left[ M_i \cdot \log \frac{\exp(\text{sim}(q_i, k_i) / \tau)}{\sum_{j=1}^{T} \exp(\text{sim}(q_i, k_j) / \tau)} \right] $$
+    $$ q_i = z_i^{(L)} = \psi(\phi(f_\theta(\tilde{H}_m))), \quad k_i = \phi_k(f_k(h_i)) $$
+    <div class="eq-note">
+      <strong>$H$</strong> = 连续T帧原始序列 &nbsp;|&nbsp;
+      <strong>$\tilde{H}_m$</strong> = 随机掩码后的序列 &nbsp;|&nbsp;
+      <strong>$f_\theta$</strong> = CNN编码器 &nbsp;|&nbsp;
+      <strong>$\phi$</strong> = 非线性投影层 &nbsp;|&nbsp;
+      <strong>$\psi$</strong> = Transformer编码器（从被破坏序列重建完整表征） &nbsp;|&nbsp;
+      <strong>$M_i$</strong> = 掩码指示器——仅在被mask位置计算损失，迫使从上下文推理补全 &nbsp;|&nbsp;
+      <strong>$\tau$</strong> = 温度参数（0.07~0.10）
+    </div>
+  </div>
+
+  <!-- Formula Group B -->
+  <h4>Group B: Oracle引导的PPO + KL散度衰减</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 完整RL损失函数</span>
+    $$ \mathcal{L}_\pi(\mathcal{T}; \theta_a, \theta_c) = (1 - \lambda_t) \mathcal{L}_{PPO} + \lambda_t \cdot \beta \cdot D_{KL}(\pi_o \| \pi_\theta) $$
+    $$ D_{KL}(\pi_o \| \pi_\theta) = \mathbb{E}_{a \sim \pi_o} \left[ \log \frac{\pi_o(a|s_t)}{\pi_\theta(a|o_t)} \right], \quad \lambda_t = \lambda_0 \cdot \left(1 - \frac{t}{T}\right) $$
+    <div class="eq-note">
+      <strong>$\mathcal{L}_{PPO}$</strong> = PPO Clip + Value损失 &nbsp;|&nbsp;
+      <strong>$\pi_o$</strong> = Oracle教师（输入：深度图+全状态） &nbsp;|&nbsp;
+      <strong>$\pi_\theta$</strong> = 学生Agent（输入：RGB表征+部分状态） &nbsp;|&nbsp;
+      <strong>$\lambda_t$</strong> = 引导系数：从1线性衰减到0——早期完全跟随Oracle，后期完全自主探索 &nbsp;|&nbsp;
+      <strong>$\beta$</strong> = 固定缩放常数 &nbsp;|&nbsp;
+      <strong>关键</strong>：KL散度对齐<strong>动作概率分布</strong>而非具体动作——比行为克隆更鲁棒，信息量更大
+    </div>
+  </div>
+
+  <!-- Formula Group C -->
+  <h4>Group C: 表征空间距离与泛化误差界</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 理论保证</span>
+    $$ d_Z = \frac{1}{n} \sum_{i=1}^{n} \left\| z_i - z_i^* \right\|^2 $$
+    <div class="eq-note">
+      <strong>$d_Z$</strong> = 学习表征与最优表征之间的平均平方距离 &nbsp;|&nbsp;
+      <strong>$z_i$</strong> = 掩码对比学习的输出表征 &nbsp;|&nbsp;
+      <strong>$z_i^*$</strong> = 最优表征 &nbsp;|&nbsp;
+      <strong>结论</strong>：掩码对比学习的泛化误差受$d_Z$约束——两阶段解耦独立优化表征目标，能更逼近最优表征空间
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>掩码概率 $m$</td><td><strong>0.15~0.30</strong></td><td>序列中每位置被mask的概率</td><td>太高→上下文不足，无法重建；太低→学习信号弱。类似MAE 75%对短序列过于激进</td></tr>
+    <tr><td>Transformer层数 $L$</td><td><strong>2~4层</strong></td><td>辅助Transformer的注意力层数</td><td>过多→计算大+过拟合；过少→时序建模不足。训练后丢弃不影响推理</td></tr>
+    <tr><td>温度参数 $\tau$</td><td><strong>0.07~0.10</strong></td><td>InfoNCE损失温度</td><td>小$\tau$→分布尖锐、难负样本惩罚重。0.07-0.10是SimCLR经验最优范围</td></tr>
+    <tr><td>衰减系数 $\lambda_t$</td><td><strong>线性衰减 1→0</strong></td><td>Oracle引导权重</td><td>简单稳定——初期完全跟随Oracle快速进入好区域，后期完全自主超越Oracle</td></tr>
+    <tr><td>观测历史 $L_{obs}$</td><td><strong>3~5帧</strong></td><td>连续堆叠RGB帧数</td><td>太少→速度信息不足；太多→维度膨胀。3~5帧是推断运动方向的最小有效窗口</td></tr>
+    <tr><td>表征维度 $d$</td><td><strong>64~128维</strong></td><td>冻结编码器输出维度</td><td>21K→64~128（约200:1压缩），保留任务信息同时大幅降低下游输入维度</td></tr>
+  </table>
+
+  <h3>6.4 掩码对比学习 vs 传统对比学习 vs 行为克隆</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🔮 掩码对比学习（本文）</h4>
+      <ul>
+        <li>随机mask部分帧的<strong>特征</strong></li>
+        <li>Transformer从上下文<strong>推理重建</strong></li>
+        <li>对比损失：重建↔原始</li>
+        <li>学到的表征有<strong>时序推理能力</strong></li>
+        <li>训练后丢弃Transformer，推理零开销</li>
+        <li>自监督——无标签/奖励</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>📊 传统对比学习（CURL）</h4>
+      <ul>
+        <li>每帧独立数据增强</li>
+        <li>对比损失：增强视图1↔增强视图2</li>
+        <li>学到的表征有<strong>实例判别力</strong></li>
+        <li>但<strong>完全忽略帧间时序</strong></li>
+        <li>无需额外模块，端到端</li>
+        <li>自监督——无标签/奖励</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>📋 行为克隆（BC）</h4>
+      <ul>
+        <li>收集专家动作作为监督</li>
+        <li>MSE: $\|a_{student} - a_{expert}\|^2$</li>
+        <li>直接<strong>模仿具体动作值</strong></li>
+        <li>泛化性差——未见状态崩溃</li>
+        <li>上限受限于专家水平</li>
+        <li>全监督——需昂贵人工标注</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解OMC-RL需要掌握三个关键基础原理：掩码对比学习（如何用自监督从时序数据中提取鲁棒表征）、Oracle引导策略学习（如何用特权信息高效训练学生策略）、两阶段解耦设计（为什么"先学看、再学动"优于端到端）。</p>
+
+  <h3>7.1 掩码对比学习原理 — 为什么"破坏-重建"能学到更好的表征</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 掩码重建 vs 传统增强对比</span>
+    $$ \text{传统: } \mathcal{L} = -\log \frac{\exp(\text{sim}(\text{aug}_1(I), \text{aug}_2(I))/\tau)}{\sum \exp(\cdots)} \qquad \text{掩码: } \mathcal{L} = -\log \frac{\exp(\text{sim}(\text{reconstruct}(I_m), I)/\tau)}{\sum \exp(\cdots)} $$
+    <div class="eq-note">
+      <strong>传统对比</strong>：正样本对由<strong>数据增强</strong>产生——编码器学的是"对低级像素变换的不变性"（颜色/裁剪/亮度），对高级语义（运动方向/深度关系）不敏感。&nbsp;|&nbsp;
+      <strong>掩码对比</strong>：正样本对由<strong>上下文推理重建</strong>产生——编码器必须从相邻未被mask的帧推断被mask帧的内容。这迫使学习帧间<strong>因果结构</strong>（"前两帧物体右移2像素→这一帧应在右边"），正是视觉运动策略最需要的时序推理能力。
+    </div>
+  </div>
+
+  <p><strong>掩码对比的三个工程巧思</strong>：（1）<strong>特征层mask</strong>而非像素层——先CNN压缩到d维再mask，比MAE的像素重建高效得多；（2）<strong>仅在被mask位置计算损失</strong>——聚焦"真正缺失"的推理训练；（3）<strong>训练后丢弃Transformer</strong>——强大模型仅用于训练，推理仅用轻量CNN，零额外开销。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🔮 掩码对比学习（本文上游）</h4>
+      <p><strong>步骤 1</strong>：采样T帧连续观测 $H$。</p>
+      <p><strong>步骤 2</strong>：以概率m随机mask（80%置零/10%替换/10%保持）。</p>
+      <p><strong>步骤 3</strong>：被mask序列→CNN→投影层→Transformer重建→$q_i$。原始序列→动量Key编码器→$k_i$。</p>
+      <p><strong>步骤 4</strong>：InfoNCE将$q_i$与$k_i$拉近，推远其他。</p>
+      <p><strong>关键</strong>：Transformer必须从<strong>周围未mask帧的上下文</strong>推断被mask帧——强制学习时序因果推理。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>📊 传统对比学习（CURL）</h4>
+      <p><strong>步骤 1</strong>：随机采样batch图像（打乱顺序、忽略时序）。</p>
+      <p><strong>步骤 2</strong>：每图做随机增强（裁剪/颜色抖动）。</p>
+      <p><strong>步骤 3</strong>：两视图→Query/Key编码器。</p>
+      <p><strong>步骤 4</strong>：InfoNCE将同图两视图拉近，推远其他。</p>
+      <p><strong>问题</strong>：增强只改变<strong>表面外观</strong>——编码器学到"不管怎么变还是同一张图"——对视觉导航的<strong>时序推理毫无帮助</strong>。</p>
+    </div>
+  </div>
+
+  <h3>7.2 Oracle引导策略学习 — 从"扶"到"放"的渐进式训练</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — KL散度分布对齐 vs 行为克隆动作对齐</span>
+    $$ \text{行为克隆(BC): } \mathcal{L}_{BC} = \|a_\theta - a_o\|^2 \qquad \text{KL散度引导: } \mathcal{L}_{KL} = D_{KL}(\pi_o \| \pi_\theta) $$
+    <div class="eq-note">
+      <strong>BC</strong>：直接模仿具体动作值——但学生观测不完整时，最优动作可能不同于Oracle，强行模仿引入偏差。只有"正确动作"的信息，无"分布宽度"信息。&nbsp;|&nbsp;
+      <strong>KL散度</strong>：对齐整个<strong>动作概率分布</strong>——学生不仅学"好的动作是什么"，还学"动作的不确定性/方差多大"。在部分可观测场景中，Oracle分布提示"这个方向范围都合理"，提供更丰富训练信号。
+    </div>
+  </div>
+
+  <p><strong>引导系数线性衰减的深意</strong>：训练早期（$\lambda \approx 1$）策略完全跟随Oracle → 快速热启动、避免纯RL的漫长随机探索。训练后期（$\lambda \approx 0$）策略完全自主 → 允许（1）<strong>超越Oracle</strong>——Oracle虽输入丰富但在某些场景非最优；（2）<strong>适应部署条件</strong>——学会仅有部分观测时做出最优决策。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 Oracle教师的关键设计：用深度图而非RGB</div>
+    Oracle输入包含<strong>深度图(depth)</strong>而非RGB——被低估的设计决策。三大优势：（1）<strong>几何信息明确</strong>——像素值直接编码距离；（2）<strong>跨域不变</strong>——深度图不受光照/纹理/颜色影响，sim-to-real几乎无损；（3）<strong>训练更简单</strong>——信息密度高（每个像素有明确物理意义）。但深度图在真机部署难获取（需深度相机或双目），所以仅在训练时使用——正是Learning-by-Cheating的精髓。
+  </div>
+
+  <h3>7.3 两阶段解耦设计 — 为什么"分开学"优于"一起学"</h3>
+
+  <p><strong>端到端训练的困境</strong>：视觉编码器和策略网络共享RL奖励信号——编码器梯度方向由"当前策略需要什么特征增大奖励"决定，而非"什么特征最能表征环境状态"。当策略随机探索时，编码器收到的梯度几乎是无意义噪声 → 表征学习缓慢甚至方向错误。</p>
+
+  <p><strong>解耦的优势</strong>：阶段一完全脱离RL奖励——用自监督对比损失优化，目标是"准确表征环境状态"非"最大化奖励" → 学到<strong>通用、任务无关</strong>的视觉表征。阶段二中编码器冻结 → 策略只需学习"如何利用好表征做决策"，输入从21K维压缩到64~128维，优化难度骤降。</p>
+
+  <table>
+    <tr><th>对比维度</th><th>端到端视觉RL</th><th>两阶段解耦（OMC-RL）</th></tr>
+    <tr><td>编码器优化信号</td><td>RL奖励（稀疏、噪声大、非平稳）</td><td>InfoNCE对比损失（密集、稳定、自监督）</td></tr>
+    <tr><td>编码器学习目标</td><td>"什么特征能增大奖励"（任务偏见）</td><td>"什么特征能表征环境"（任务无关）</td></tr>
+    <tr><td>策略输入维度</td><td>原始像素（21K维）</td><td>冻结表征（64~128维，约200:1压缩）</td></tr>
+    <tr><td>表征可迁移性</td><td>差——与新任务耦合</td><td>好——通用表征可复用</td></tr>
+    <tr><td>sim-to-real泛化</td><td>差——过拟合仿真纹理</td><td>好——时序因果推理对纹理鲁棒</td></tr>
+  </table>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    掩码对比学习（学到时序感知的通用视觉表征）→ Oracle引导策略学习（用KL散度高效将表征转化为敏捷控制）→ 两阶段解耦（让表征和策略各自由最合适的损失独立优化）→ <strong>三个原理形成闭环</strong>：好表征降低策略学习难度，Oracle引导降低样本需求，解耦保证表征质量不因策略波动退化。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures"><h2>Representative Figure</h2><p>下图由本地 PDF <code>Zhang et al. - 2025 - Oracle-guided masked contrastive reinforcement learning for visuomotor policies.pdf</code> 第 1 页直接渲染，用于核对论文的框架或首个主要实验图。</p><div class="fig-card"><img src="figures/overview.png" alt="Representative PDF page" style="display:block;width:100%;max-height:780px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;"><p style="font-size:12px;color:#64748b;margin-top:8px;">Local PDF page 1; no external or fabricated asset.</p></div></section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 需离线收集足够多样化轨迹数据用于上游预训练——数据分布狭窄→表征能力受限；(2) 训练需VICON提供真实位姿——实际场景难获取；(3) Oracle需深度图→限制可用仿真平台。</li>
+    <li><strong>适用场景</strong>：仅验证<strong>静态环境</strong>目标导航——未涉及动态障碍物（行人/车辆），也未测试多智能体交互或更高自由度控制。</li>
+    <li><strong>可扩展性</strong>：两阶段管线中编码器<strong>不可在线更新</strong>——部署环境出现新视觉分布时（室内→室外），冻结编码器可能失效。虽可重新收集数据训练但破坏在线学习灵活性。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>动态障碍物</strong>：扩展到动态场景需编码器学习<strong>运动预测</strong>——不仅建模"过去几帧发生了什么"，还要预测"未来可能会发生什么"。VideoMAE或预测编码是自然扩展方向。</li>
+    <li><strong>自适应引导衰减</strong>：当前$\lambda$按固定线性衰减——改进为<strong>自适应衰减</strong>：当学生平均回报超过Oracle的80%时才开始衰减，确保每阶段都"准备好"。或元学习自动学习最优衰减曲线。</li>
+    <li><strong>多模态Oracle</strong>：当前Oracle用深度图——可扩展到LiDAR点云+高精地图+多视角相机（富模态），学生仅用单目前视（贫模态）。这是Learning-by-Cheating的通用范式。</li>
+    <li><strong>在线表征更新</strong>：部署中逐步微调编码器——用无监督对比损失持续适应新视觉分布，需设计安全机制防灾难性遗忘。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>掩码概率选择</td><td>m太高→上下文不足无法重建；太低→学习信号弱。不同任务/环境最优m不同，需per-task tuning</td><td>★★★★</td></tr>
+    <tr><td>Oracle教师质量</td><td>学生策略性能受Oracle天花板限制——Oracle在某些场景次优→KL散度将次优行为传递给学生</td><td>★★★★</td></tr>
+    <tr><td>训练数据分布</td><td>上游数据集覆盖有限→编码器在分布外无法泛化→下游策略探索到新状态时表征质量差→崩溃</td><td>★★★★</td></tr>
+    <tr><td>真机定位精度</td><td>依赖VICON→信号丢失或精度波动→目标位置$p_t^{(g)}$估计错误→策略输入质量受影响</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>OMC-RL能否拓展到多机协同视觉导航？</strong>当前OMC-RL仅处理单机目标导航——但多无人机协同（编队/协同搜索）天然需要"处理视野中其他无人机运动"。OMC-RL的两阶段范式天然适合：（1）上游掩码对比可扩展为<strong>多视角时序对比</strong>——不仅学习单机帧间关系，还学习跨视角一致性（"我视角中它在右移→它视角中我在左移"）；（2）下游Oracle可扩展为<strong>集中式Critic</strong>——训练时用全局状态（所有无人机位置/速度/意图）作为Critic输入，部署时每机仅用局部观测+视觉表征。这是Multi-Agent RL + Learning-by-Cheating的交叉地带，理论空间巨大。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>无人机第一视角视觉导航的核心瓶颈不是"缺好的控制算法"（PPO已足够好），而是"视觉输入太复杂"——84x84的RGB有21,168个数字，控制只需3个数字（vx, vy, ωz）。信息压缩比超过7000:1。策略网络在这巨大差距中需自学"看什么"——维度灾难的本质。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>（i）CURL——对比学习辅助编码器但忽视时序；（ii）World Model——学环境动力学但不样本高效；（iii）数据增强——变换已有数据不替代探索。共同缺陷：编码器与策略<strong>耦合</strong>，表征受RL噪声污染。</li>
+    <li><strong>如果把"看"和"动"分开训练呢？</strong><br>先独立训练只"看视频"的视觉编码器（不需要控制目标）——类似婴儿先学会看懂世界再学会操作世界。然后用冻结编码器将视觉压缩到64维，策略只需64→3的映射——比21K→3简单300倍。</li>
+    <li><strong>如何训练编码器学到对"飞行"有用的东西？</strong><br>不能让编码器只看单张图——那学到的只是静态纹理。必须让它看<strong>连续帧序列</strong>，通过"掩码-重建"迫使推断帧间<strong>运动信息</strong>。破坏部分帧特征→Transformer从上下文推理被破坏内容→恰好是"从连续图像推断自身运动"所需的推理能力。</li>
+    <li><strong>策略阶段如何加速？</strong><br>即使编码器很好，纯RL仍需大量探索。引入"能看到全部真相"的Oracle教师（深度图+全局位置）→学生通过KL散度对齐Oracle策略分布（非模仿动作）→引导系数线性衰减，最终完全自主。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    视觉运动策略学习之所以难，是因为策略网络同时被"从像素提取信息"和"基于信息做决策"两个目标拉扯——那为什么不把这两个目标分开：先用<strong>掩码对比学习</strong>独立训练"会看视频"的编码器，再用<strong>有上帝视角的Oracle教师</strong>引导策略学会"怎么做"，最后让策略独自飞、只用单目相机就能敏捷避障导航？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：SOTA视觉RL（CURL/RAD/DrQ）训练初期极慢（前几十万步几乎随机），后期曲线抖动（表征和策略互相干扰）。同时CV领域MAE——随机mask 75%图像patch后重建，学到极好的迁移表征——但从未用于RL。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将视觉RL分解为（1）如何从连续RGB提取紧凑时序感知特征？（2）如何高效将特征映射为控制命令？子问题1与奖励无关——可独立用自监督学习。子问题2难度随特征质量提升而下降。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）Masked Autoencoding——mask特征后用Transformer重建，强迫时序推理；（2）对比学习InfoNCE——用重建vs原始相似度作自监督信号；（3）Learning-by-Cheating——KL散度对齐学生与Oracle分布。</li>
+    <li><strong>Step 4 — 组装方案</strong>：阶段一掩码对比学习训练编码器→冻结+丢弃Transformer→阶段二Oracle引导PPO训练策略（KL系数线性衰减）。关键洞察：<strong>编码器不需要关心控制目标，策略不需要关心像素处理</strong>——各自在最擅长的事上做到最好。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：OMC-RL展示了一种<strong>"解耦+协同"</strong>的系统设计范式——先识别复杂问题中的独立维度（视觉表征 vs 控制决策），解耦为独立优化子问题，再用精心设计的接口（冻结编码器+KL散度衰减）重新组装。这种"分而治之"思路不仅适用于视觉RL——对任何"高维感知+低维控制"问题（自动驾驶感知-规划、机器人操作视觉-运动）都可采用类似设计。</li>
+    <li><strong>技术技巧层面</strong>：（1）mask在<strong>特征层</strong>非像素层——降计算、聚焦语义；（2）Transformer<strong>训练时用、推理时丢</strong>——解决"强模型vs实时推理"矛盾的通用技巧；（3）KL散度对齐<strong>分布</strong>非动作——更鲁棒、信息更多；（4）引导系数<strong>线性衰减</strong>——最简单但最有效的扶→放过渡；（5）Oracle用<strong>深度图</strong>非RGB——几何明确、跨域不变、训练简单。</li>
+    <li><strong>实验/写作层面</strong>：在<strong>4种递增复杂度环境</strong>上评估，递进式设计清晰定位方法优势。同时做了<strong>真实飞行验证</strong>（DJI Tello+VICON）——对视觉RL论文来说，真实实验是区分"sim-only"与"真能飞"的最硬指标。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于视觉伺服 / IBVS方向</strong>：掩码对比学习可直接借鉴——IBVS核心是从图像特征推断相机-目标相对位姿，本质是"从连续图像序列推断运动"。可用掩码对比预训练IBVS专用编码器，学习从帧间运动推断位姿变化，冻结用于下游视觉伺服控制——有望提升高速飞行时IBVS鲁棒性（时序推理比逐帧特征匹配更稳定）。</li>
+    <li><strong>对于RL训练效率</strong>：Oracle引导+KL衰减在训练效率上远超纯RL。若研究中有"仿真可获取但现实不可获取"的信息（精确深度图、全局位置等），均可封装为Oracle教师，用OMC-RL范式训练学生策略——learning-by-cheating是通用方法论。</li>
+    <li><strong>对于多机协同</strong>：OMC-RL框架可扩展至多机场景——将其他无人机视觉观测纳入时序序列，学习"他机运动与我机运动的关系"。Oracle可访问所有飞机全局状态，每机仅依赖单目视觉表征做协同决策。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>He et al. (2022) — Masked Autoencoders Are Scalable Vision Learners. <em>CVPR</em></td><td>MAE是掩码重建思想的直接来源——OMC-RL将在其基础上将mask从像素级改为特征级并加入时序维度</td></tr>
+    <tr><td>Laskin et al. (2020) — CURL: Contrastive Unsupervised Representations for RL. <em>ICML</em></td><td>OMC-RL的对比学习基线——首次证明对比学习可使像素RL接近状态RL。OMC-RL在此基础上加入时序建模和Oracle引导</td></tr>
+    <tr><td>Chen et al. (2020) — Learning by Cheating. <em>CoRL</em></td><td>Learning-by-Cheating范式的原始论文——OMC-RL将其从行为克隆升级为KL散度分布对齐+引导衰减</td></tr>
+    <tr><td>Chen et al. (2020) — SimCLR. <em>ICML</em></td><td>现代对比学习的基本框架（增强+投影头+InfoNCE+大batch）——OMC-RL上游对比组件继承其设计哲学</td></tr>
+    <tr><td>Vaswani et al. (2017) — Attention Is All You Need. <em>NeurIPS</em></td><td>Transformer架构原始论文——OMC-RL辅助模块使用单头自注意力进行时序建模</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5804/index.html">5804</a></td><td>GDMAAC (Yan, Jiang, Chen et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Zhang, Xiao, Yan, Feroskhan · arXiv 2025 · Oracle-Guided Masked Contrastive Reinforcement Learning for Visuomotor Policies · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

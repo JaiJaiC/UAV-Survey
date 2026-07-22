@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Safety Index Synthesis via Sum-of-Squares Programming (Zhao, He et al., 2023)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Tairan He · 13-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10059/index.html">Hold my beer</a>
+<a href="../10056/index.html">FALCON</a>
+<a href="../10054/index.html">Humanoid policy ~</a>
+<a href="../10052/index.html">Hover Versatile neural</a>
+<a href="../10048/index.html">ASAP</a>
+<a href="../10053/index.html">WoCoCo Learning whole-bod</a>
+<a href="../10050/index.html">Agile but safe</a>
+<a href="../10049/index.html">Learning human-to-humanoi</a>
+<a href="../10047/index.html">OmniH2O Universal dextero</a>
+<a href="../10058/index.html">Probabilistic safeguard</a>
+<a class="active" href="../10057/index.html">Safety index synthesis</a>
+<a href="../10051/index.html">State-wise safe reinforce</a>
+<a href="../10055/index.html">Energy-based imitation le</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Safety Index Synthesis via Sum-of-Squares Programming（基于平方和规划的安全指标自动合成）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Weiye Zhao</strong>、<strong>Tairan He</strong>、<strong>Tianhao Wei</strong>、<strong>Simin Liu</strong>、<strong>Changliu Liu</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">Carnegie Mellon University</strong>，Robotics Institute（卡内基梅隆大学 机器人研究所）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">American Control Conference (ACC 2023)</strong>，pp. 732–737</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE TRO</span> <span class="jif-badge if-value">IF 6.8</span> <span class="jif-badge if-q1">JCR Q1</span> <span class="jif-badge if-cas">CAS 1区</span></div>
+    <tr><td><strong>arXiv</strong></td><td><a href="https://arxiv.org/abs/2209.09134" target="_blank">2209.09134</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出了一种<strong>自动合成安全指标函数（safety index）</strong>的方法：将受输入约束的控制系统的安全条件转化为安全集边界流形上的局部正性问题，利用实代数几何中的 <strong>Positivstellensatz</strong> 将该条件转化为 <strong>平方和（Sum-of-Squares）规划</strong>，从而用标准凸优化求解器自动求解。关键洞察：安全控制的存在性只需在<strong>安全边界流形</strong>（φ(x)=0）上验证，而非整个状态空间——这极大降低了保守性。在平面机械臂（不同自由度）和独轮车（Unicycle）的碰撞避免任务上验证了方法的有效性。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Safety Index</span>
+    <span class="tag tag-green">Sum-of-Squares Programming</span>
+    <span class="tag tag-amber">Safe Control</span>
+    <span class="tag tag-purple">Positivstellensatz</span>
+    <span class="tag tag-red">Forward Invariance</span>
+    <span class="tag tag-cyan">ACC 2023</span>
+    <span class="tag tag-gray">Convex Optimization</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么手工设计安全指标（safety index）困难？</strong><br>
+    答：安全指标需要满足两个互相耦合的条件——（1）在所有状态空间中对"危险"给出合理的度量；（2）在安全边界上至少存在一个满足控制约束的可行动作使系统保持安全。手工设计需要在系统动力学、控制约束和安全条件之间反复权衡，依赖大量专家经验，且难以扩展到高维系统。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>将安全条件从全局状态空间压缩到边界流形</strong>——Nagumo 定理表明，前向不变性只要求安全边界 φ(x)=0 上存在指向安全集内部的控制输入（即 φ_dot ≤ −η）。这意味着<strong>不需要在整个状态空间验证正性条件</strong>，只需在 φ(x)=0 这个低一维的流形上验证。然后利用 <strong>Positivstellensatz</strong>（实代数几何中的正性表示定理）将局部流形上的正性条件转化为<strong>平方和（SOS）规划</strong>，从而用标准凸优化求解器自动求解安全指标参数。这一"全局→局部→SOS→凸优化"的转化链是本文最核心的思想贡献。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>Control Barrier Functions (Ames et al., 2014–2019)</td><td>→ CBF 提供了安全控制的统一框架：用标量函数 φ(x) 定义安全集，用导数条件保证前向不变性。但 CBF 的"手工设计 φ"是一个重大实际瓶颈——本文继承了 CBF 框架但将 φ 的<strong>设计过程自动化</strong></td><td>架构</td></tr>
+    <tr><td>Positivstellensatz (Stengle, 1974; Putinar, 1993)</td><td>→ 实代数几何中，半代数集上的多项式正性可以等价表示为 SOS 多项式与乘子多项式的组合。本文首次将此工具引入安全指标合成——将"∃φ 满足安全条件"转化为"∃SOS 证书满足多项式不等式"</td><td>数学</td></tr>
+    <tr><td>Semi-definite Programming / SOS Optimization (Parrilo, 2000; Lasserre, 2001)</td><td>→ SOS 多项式约束可等价转化为半定规划（SDP）约束，从而用内点法高效求解。本文利用 SOS 规划框架将不可解的非线性可行性问题转化为可解的凸优化问题</td><td>方法</td></tr>
+    <tr><td>Forward Invariance &amp; Nagumo's Theorem</td><td>→ 前向不变性只要求在边界上存在一个指向内部的向量——这意味着可以在 φ(x)=0 的低一维流形上验证条件，而非在整个 n 维状态空间。这一局部化是降低保守性的理论基础</td><td>理论</td></tr>
+    <tr><td>Safety Index Synthesis (Liu &amp; Tomizuka, 2014–2016)</td><td>→ 已有的安全指标合成方法依赖解析梯度推导和手动调参，仅适用于低维系统。本文将其扩展为<strong>基于优化的自动合成框架</strong>，可扩展到更高维度的机器人系统</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 边界流形降维——从全局正性到局部正性</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统方法要求安全条件（如 CBF 的导数不等式）在整个安全集内部成立，这过度保守——安全集内部远离边界的点实际不需要任何控制动作来"保持安全"。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Nagumo 定理：集合的前向不变性仅取决于边界上向量场的方向——"只需在边界上检查"。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将可行性条件从"∀x ∈ {φ≤0}, ∃u ∈ U, φ_dot ≤ −η"松弛为"∀x ∈ {φ=0}, ∃u ∈ U, φ_dot ≤ −η"。这一松弛不仅是合理的（符合Nagumo定理），而且将验证域从 n 维区域降为 (n−1) 维流形，显著降低了后续 SOS 规划中的多项式次数和变量规模。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: Positivstellensatz SOS 转化——将存在性问题转为凸优化</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>"存在安全指标 φ 使得边界流形上某个量非负"是一个非线性、非凸的存在性判定问题——传统上无法用数值方法可靠求解。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>实代数几何中的 Positivstellensatz（Putinar's Positivstellensatz）——半代数集上的多项式正性可表示为 SOS 多项式与定义多项式的乘子组合。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将"在 φ(x)=0 上某个多项式 p(x) ≥ 0"转化为"p(x) = σ₀(x) + σ₁(x)·φ(x)"，其中 σ₀, σ₁ 为 SOS 多项式。这个 SOS 表示条件等价于一个半定规划（SDP）约束——从而将原本不可解的非线性存在性判定问题转化为<strong>可高效求解的凸 SDP 问题</strong>。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: Refute-based SOSP 构造——实用化的合成流程</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>即使有了 SOS 转化，如何构造具体的 SOS 规划问题（SOSP）仍是一个挑战——需要确定哪些变量是决策变量、哪些是参数、如何编码控制约束。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>"反证法"思路：假设安全指标不满足条件 → 构造一个 SMT/SOS 反例问题 → 如果无解，则安全指标有效。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>给定待验证的安全指标参数候选，构造 refute SOSP：如果 SOSP 可行 → 找到了反例（安全指标无效）；如果 SOSP 不可行 → 安全指标通过验证。通过搜索或优化安全指标参数，找到使 refute SOSP 不可行的参数——该参数即为合成结果。对于多面体输入约束 U，通过顶点枚举或对偶公式消去控制变量 u，使条件完全表达在状态变量 x 上。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — 安全指标合成管线</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>System Modeling <span>输入定义</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>多项式动力学 · 控制约束</strong>
+          <small>系统建模为 ẋ = f(x) + g(x)u，控制集 U 为有界多面体。安全需求编码为"避碰"等约束。</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>安全指标参数化</strong>
+          <small>φ(x;θ) = φ₀(x;θ) + k₀，其中 φ₀ 为碰撞距离相关项，θ 为待合成参数。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Boundary Condition <span>关键转化</span></h4>
+        <div class="arch-card arch-power">
+          <strong>Nagumo 边界条件</strong>
+          <small>仅需 φ(x)=0 上 ∃u∈U: ∂φ/∂x·(f+gu) ≤ −η。降维至 (n−1) 维流形。</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>控制变量消去</strong>
+          <small>U 为有界多面体 → 通过顶点枚举或对偶公式消去 u → 得到仅含 x 的多项式正性条件。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>SOS Conversion <span>核心数学</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>Positivstellensatz</strong>
+          <small>半代数集 {φ=0} 上的正性 ⟷ SOS 表示：p = σ₀ + σ₁·φ，σ₀,σ₁ 为 SOS 多项式。</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>SDP 等价转化</strong>
+          <small>SOS 约束 → 半定矩阵正定约束 → 可被 SeDuMi/MOSEK 等内点法求解器处理。</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Solver &amp; Synthesis <span>输出结果</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>Refute SOSP 求解</strong>
+          <small>构造 refute 问题：找到 x 违反安全条件。不可行 → φ 有效；可行 → φ 无效，需调整参数。</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>参数搜索 / 优化</strong>
+          <small>在参数空间中搜索使 refute SOSP 不可行的参数 θ*，输出安全指标 φ(x;θ*)。</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>动力学 + 约束 → 标量函数</span>
+      <span>全局条件 → 边界条件</span>
+      <span>非线性判定 → 凸 SDP</span>
+      <span>SOS 求解器 → 安全指标</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>高维 SOS 规划的规模随系统维度快速增长。</small></div>
+      <div class="arch-metric"><strong>Main invention</strong><small>Positivstellensatz 将安全合成转化为可计算的 SDP。</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>边界流形降维 + SOS 凸松弛 = 高效且不保守。</small></div>
+      <div class="arch-metric"><strong>Current limitation</strong><small>仅适用于多项式动力学；SOS 充分非必要。</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 System Frame — 从系统建模到安全指标输出的完整流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["输入层: 系统定义"]
+      SYS["系统动力学: ẋ = f(x) + g(x)u<br/>f,g 为多项式"]
+      CTRL["控制约束: u ∈ U = {A_u u ≤ b_u}<br/>有界多面体"]
+      SAFE["安全需求: 避碰/状态约束<br/>编码为φ(x)≤0"]
+    end
+
+    subgraph PARAM["参数化层: 安全指标形式"]
+      PHI0["φ₀(x;θ): 碰撞距离度量<br/>例: φ₀ = d_min² − d(x)²"]
+      PARAMS["参数集 θ = (k, n, ...)<br/>k: 衰减率 | n: 阶数"]
+      PHI["φ(x;θ) = φ₀ + k₀<br/>∂φ/∂x 可解析计算"]
+    end
+
+    subgraph FEAS["可行性层: 边界流形条件"]
+      NAGUMO["Nagumo条件: ∀x∈{φ=0}<br/>∃u∈U: L_f φ + L_g φ·u ≤ −η"]
+      ELIM["控制消去: U多面体<br/>→ 顶点枚举 或 对偶公式"]
+      POLYCOND["多项式正性条件:<br/>p(x;θ) ≥ 0 on {φ(x;θ)=0}"]
+    end
+
+    subgraph SOS["SOS转化层: Positivstellensatz"]
+      POS["Putinar's Positivstellensatz:<br/>p(x) ≥ 0 on {φ=0}<br/>⇔ p = σ₀ + σ₁·φ<br/>σ₀,σ₁ ∈ Σ[x] (SOS)"]
+      SDP["SDP等价:<br/>SOS约束 → LMI约束<br/>→ 半定规划"]
+    end
+
+    subgraph SOLVER["求解层: Refute SOSP"]
+      REFUTE["构造Refute问题:<br/>find x s.t. p(x;θ) < 0<br/>转化为SOSP验证"]
+      CHECK{"SOSP<br/>可行?"}
+      VALID["不可行 → φ有效<br/>输出安全指标参数θ*"]
+      INVALID["可行 → φ无效<br/>调整θ重新验证"]
+    end
+
+    SYS --> PARAM
+    CTRL --> PARAM
+    SAFE --> PARAM
+    PARAM --> FEAS
+    FEAS --> SOS
+    SOS --> SOLVER
+    REFUTE --> CHECK
+    CHECK -->|"不可行 ✓"| VALID
+    CHECK -->|"可行 ✗"| INVALID
+    INVALID -.->|"更新θ"| PARAM
+
+    classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef param fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef feas fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef sos fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef solve fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef result fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    class SYS,CTRL,SAFE input
+    class PHI0,PARAMS,PHI param
+    class NAGUMO,ELIM,POLYCOND feas
+    class POS,SDP sos
+    class REFUTE solve
+    class CHECK result
+    class VALID result
+    class INVALID result
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 数学转化流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph ORIG["原始问题: 存在性判定"]
+      direction LR
+      P1["∃ φ(x;θ) s.t."] --> P2["∀ x ∈ {φ=0}"] --> P3["∃ u ∈ U"] --> P4["φ̇(x,u) ≤ −η"]
+    end
+
+    subgraph TRANS1["转化1: 控制消去"]
+      direction LR
+      T1["∀x∈{φ=0}, min_{u∈U} φ̇ ≤ −η"] --> T2["U为多面体 → 顶点/对偶"]
+      T2 --> T3["等价: p(x;θ) ≥ 0 on {φ=0}"]
+    end
+
+    subgraph TRANS2["转化2: Positivstellensatz"]
+      direction LR
+      S1["p ≥ 0 on {φ=0}"] --> S2["∃ σ₀,σ₁ ∈ Σ[x]:<br/>p = σ₀ + σ₁·φ"]
+      S2 --> S3["SOS约束 → SDP约束<br/>可行 ⟷ φ有效"]
+    end
+
+    subgraph TRANS3["转化3: 参数搜索"]
+      direction LR
+      R1["Refute SOSP: 找反例x"] --> R2["不可行? → θ有效"]
+      R2 --> R3["参数空间搜索 → θ*"]
+    end
+
+    ORIG --> TRANS1 --> TRANS2 --> TRANS3
+
+    classDef orig fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef t1 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef t2 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef t3 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class P1,P2,P3,P4 orig
+    class T1,T2,T3 t1
+    class S1,S2,S3 t2
+    class R1,R2,R3 t3
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 从定义到验证的完整流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph DEF["阶段1: 系统定义"]
+      direction LR
+      D1["定义多项式动力学<br/>ẋ=f(x)+g(x)u"] --> D2["定义控制约束U<br/>多面体/盒式约束"] --> D3["定义安全需求<br/>避碰距离d(x)"]
+    end
+
+    subgraph SYN["阶段2: 安全指标合成"]
+      direction LR
+      S1["参数化φ(x;θ)<br/>φ₀+d+k₀形式"] --> S2["列出边界可行性条件<br/>φ̇≤−η on {φ=0}"] --> S3["消去控制u<br/>顶点/对偶公式"]
+      S3 --> S4["构造SOS多项式<br/>p = σ₀+σ₁·φ"] --> S5["求解SDP<br/>SeDuMi / MOSEK"]
+    end
+
+    subgraph VAL["阶段3: 验证与部署"]
+      direction LR
+      V1["Refute检查:<br/>SOSP不可行? ✓"] --> V2["安全滤波集成:<br/>u_safe = argmin ∥u−u_nom∥<br/>s.t. φ̇ ≤ −η if φ≥0"] --> V3["仿真/实物实验:<br/>机械臂避碰/独轮车"]
+    end
+
+    DEF -->|"系统规格"| SYN
+    SYN -->|"φ*(x;θ*)"| VAL
+    V3 -.->|"不通过: 调整θ或结构"| S1
+    V3 -.->|"通过: 记录结果"| V1
+
+    classDef def fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef syn fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef val fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class D1,D2,D3 def
+    class S1,S2,S3,S4,S5 syn
+    class V1,V2,V3 val
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 — 安全指标合成</span>
+    $$ \text{Find } \phi(x) \text{ s.t. } \forall x \in \{\phi(x)=0\},\; \exists u \in \mathcal{U},\; \dot{\phi}(x,u) \le -\eta $$
+    <div class="eq-note">
+      <strong>φ(x)</strong> = 安全指标函数（energy-like function），定义安全集 S = {x | φ(x) ≤ 0} &nbsp;|&nbsp;
+      <strong>U</strong> = 控制约束集（有界多面体，如加速度/力矩上限）&nbsp;|&nbsp;
+      <strong>η > 0</strong> = 安全裕度（保证严格衰减，而非仅仅不增长）&nbsp;|&nbsp;
+      <strong>φ̇ = ∂φ/∂x · (f(x) + g(x)u)</strong> = 安全指标沿系统轨迹的导数 &nbsp;|&nbsp;
+      <strong>关键</strong>：条件仅在边界流形 φ(x)=0 上施加，不需要在安全集内部也成立——这是 Nagumo 定理的直接推论，也是本文降低保守性的关键。
+    </div>
+  </div>
+  <div class="formula-block">
+    <span class="eq-tag">安全滤波 (Safety Filter) — 运行时使用</span>
+    $$ u_{\text{safe}} = \arg\min_{u \in \mathcal{U}} \|u - u_{\text{nom}}\|^2 \quad \text{s.t.} \quad \dot{\phi}(x,u) \le \begin{cases} -\eta & \text{if } \phi(x) \ge 0 \\ -\eta \cdot (-\phi(x)) & \text{if } \phi(x) < 0 \end{cases} $$
+    <div class="eq-note">
+      <strong>运行时逻辑</strong>：当状态在安全集边界附近（φ≥0），严格约束控制使 φ 衰减；当状态远离边界（φ<0），约束松弛——这是一个最小侵入的安全滤波设计 (minimally invasive safety filter)。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>说明</th></tr>
+    <tr><td><strong>输入</strong></td><td>多项式系统动力学（f, g）、控制约束集 U（有界多面体）、安全需求（如避碰距离函数 d(x)）、安全指标参数化形式</td><td>需要系统动力学可表示为多项式（或可多项式化），U 需为多面体以便消去控制变量</td></tr>
+    <tr><td><strong>输出</strong></td><td>安全指标函数 φ*(x;θ*)——满足边界流形上安全控制非空条件的标量函数</td><td>输出为 φ 的参数值 θ*，可直接用于运行时的安全滤波</td></tr>
+    <tr><td><strong>中间产物</strong></td><td>SOS 证书（σ₀, σ₁ 多项式系数）、SDP 求解状态（可行/不可行）</td><td>SOS 证书也可作为形式化安全证明的一部分</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>约束优化 / 安全关键控制综合</strong>问题——不是设计控制器本身，而是<strong>自动合成一个"安全监视器"</strong>（safety index），使得任何名义控制器在经过安全滤波后都能保证系统安全性。问题本质属于 <strong>存在性判定 + 参数优化</strong>：需要证明存在一个标量函数 φ 满足特定微分不等式条件，然后找到该函数的参数。从数学角度看，这是一个<strong>实代数几何中的半代数集正性判定问题</strong>，通过 Positivstellensatz 转化为<strong>平方和规划（SOSP）</strong>——一种特殊的凸优化问题。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：安全指标设计是一个"鸡和蛋"问题——需要知道 φ 的梯度才能验证是否存在安全控制，但 φ 本身正是我们想要设计的对象。<br><br>
+    （1）<strong>全局 vs 局部的张力</strong>：传统方法要求在整个安全集内部验证 CBF 条件（存在 u 使 φ̇ ≤ −α(φ)）。但这过于保守——安全集内部远离边界的点天然是"安全"的，不需要控制干预。真正决定安全性的只有边界 φ=0 附近的行为。问题在于：<strong>如何数学上精确地表达"只在边界上验证"</strong>？<br><br>
+    （2）<strong>输入约束的耦合</strong>：输入约束 U 是一个有界多面体，不是整个 R^m。这使得"存在满足条件的 u"成为一个带有不等式约束的可行性问题——φ̇(x,u) 关于 u 线性，但 u 的可行域是有界的。如何将"存在 u ∈ U 使得 φ̇ ≤ −η"转化为<strong>不显含 u 的纯状态空间条件</strong>？<br><br>
+    （3）<strong>从非线性判定到凸优化</strong>："存在多项式 φ 使得在 φ=0 流形上某些多项式非负"是一个<strong>NP-hard</strong>的问题（多项式正性判定）。直接求解是不可能的。需要找到一种<strong>充分但不一定必要</strong>的松弛——既能保证充分性（解出的 φ 确实有效），又能用数值方法可靠求解。Positivstellensatz 提供了这样一种松弛：将多项式正性转化为 SOS 表示，而 SOS 约束等价于半定规划（SDP）——一个多项式时间内可解的凸优化问题。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>CBF Hand-Design（手工设计控制屏障函数）</td>
+      <td>根据系统结构和安全需求，手工构造 φ(x) 满足 CBF 条件——通常需要解析推导 φ 的梯度与系统动力学的交互</td>
+      <td>严重依赖<strong>专家经验</strong>和系统洞察，对每个新系统需要重新设计。难以扩展到高维系统（如 7-DOF 机械臂）——维度越高，手工构造满足所有条件的 φ 越困难。本质上不具备<strong>自动化</strong>能力。</td>
+    </tr>
+    <tr>
+      <td>HJ Reachability（Hamilton-Jacobi 可达性分析）</td>
+      <td>求解 HJI PDE 获得最大可控不变集及其值函数，作为最优安全指标</td>
+      <td>需要求解<strong>高维 PDE</strong>——计算复杂度随状态维度指数增长（维度灾难）。对于 4D 以上的系统，传统网格化方法不可行。虽然有基于学习的近似方法，但失去了严格的安全性保证。</td>
+    </tr>
+    <tr>
+      <td>Barrier States / BRT（障碍状态 / 反向可达集）</td>
+      <td>将障碍物编码为辅助"障碍状态"加入动力学，通过增强系统控制器处理安全</td>
+      <td>安全性能依赖于障碍状态的精心设计；<strong>控制约束难以被编码</strong>——当执行器饱和时，障碍状态方法可能给出不可行的安全动作。</td>
+    </tr>
+    <tr>
+      <td>Learning-based CBF（学习型控制屏障函数）</td>
+      <td>用神经网络/高斯过程从数据学习 CBF——通过采样轨迹训练 φ 满足安全条件</td>
+      <td>依赖于<strong>数据质量和覆盖度</strong>，可能遗漏状态空间中的关键区域。形式化安全保证弱（概率性而非确定性）。训练所得 φ 可能在某些区域给出错误的"安全"判断。</td>
+    </tr>
+    <tr class="highlight">
+      <td><strong>本文: SOS Safety Index Synthesis</strong></td>
+      <td>边界流形 + Positivstellensatz + SOS 规划自动合成</td>
+      <td><strong>优势</strong>：确定性保证、自动合成、可扩展至中高维系统。<strong>代价</strong>：需要多项式动力学假设，SOS 充分非必要。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 全局正性条件的过度保守性</strong>：传统安全验证要求 φ̇ ≤ −α(φ) 在整个安全集 {φ≤0} 内部成立。但在安全集内部深处（φ << 0），即使没有控制——或控制使 φ 增大——系统仍然安全。强制内部满足衰减条件可能导致：明明存在一个安全的控制策略，但条件过强而无法找到合适的 φ——这就是<strong>保守性</strong>。如何精确地在"边界流形"上施加条件，既保证安全性又不引入不必要的保守，是理论和实践上的核心挑战。</li>
+    <li><strong>挑战 2 — 控制输入约束的优雅编码</strong>：φ̇(x,u) = ∂φ/∂x·(f+gu) 关于 u 是线性的，因此"∃u∈U: φ̇ ≤ −η"等价于一个线性规划（LP）。但我们需要的是关于 x 的条件而非关于 u 的条件。对于有界多面体 U，可以通过 Farkas 引理或顶点枚举消去 u——但需要小心处理以确保等价性保留。此外，消去 u 后条件中含 φ 的梯度，而 φ 正是待设计对象——这造成了"循环依赖"。</li>
+    <li><strong>挑战 3 — 高维 SOS 规划的计算规模</strong>：SOS 规划的变量数是 O(d^n)（d 为多项式次数，n 为状态维度）。当 n=7（7-DOF 机械臂），即使是二次多项式，变量数也相当可观。此外，Positivstellensatz 引入的乘子多项式 σ₁ 进一步增加了变量。在有限计算资源下（如论文使用的标准工作站），如何设计 φ 的参数化形式使 SOS 规划规模可控？这是实际应用中的核心瓶颈。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的算法本质是一个<strong>"验证-调整"循环</strong>：（1）参数化安全指标 φ(x;θ)；（2）构造 refute SOSP——试图找到状态 x 在边界流形 φ=0 上违反安全条件；（3）如果 SOSP 不可行（找不到反例），φ 有效，输出参数 θ；（4）如果 SOSP 可行（找到反例），说明 φ 无效，调整 θ 重新验证。核心的数学转化发生在第（2）步——将"在 φ=0 流形上某个多项式非负"转化为 SOS 表示。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: Safety Index Definition -->
+  <h4>Group A: 安全指标定义与安全集</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 安全指标与安全集</span>
+    $$ \phi(x) = \phi_0(d(x)) + k_0, \quad \mathcal{S} = \{x \mid \phi(x) \le 0\}, \quad \partial\mathcal{S} = \{x \mid \phi(x) = 0\} $$
+    $$ \dot{\phi}(x,u) = \frac{\partial\phi}{\partial x} \cdot \big(f(x) + g(x)u\big) = L_f\phi(x) + L_g\phi(x) \cdot u $$
+    <div class="eq-note">
+      <strong>φ₀(d(x))</strong> = 碰撞距离度量的函数（如 d² 相关项）&nbsp;|&nbsp;
+      <strong>k₀</strong> = 偏移常数，调整安全集边界位置 &nbsp;|&nbsp;
+      <strong>S</strong> = 安全集：φ ≤ 0 的状态区域 &nbsp;|&nbsp;
+      <strong>L_f φ = ∂φ/∂x · f(x)</strong> = φ 沿漂移动力学 f 的李导数 &nbsp;|&nbsp;
+      <strong>L_g φ = ∂φ/∂x · g(x)</strong> = φ 沿控制方向矩阵 g 的李导数 &nbsp;|&nbsp;
+      <strong>u</strong> = 控制输入，受限于有界多面体 U
+    </div>
+  </div>
+
+  <!-- Formula Group B: Boundary Feasibility Condition -->
+  <h4>Group B: 边界可行性条件 — Nagumo 定理的直接应用</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 边界流形上的安全条件</span>
+    $$ \forall x \in \partial\mathcal{S},\; \exists u \in \mathcal{U}: \dot{\phi}(x,u) \le -\eta \quad\Longleftrightarrow\quad \forall x \in \{\phi=0\},\; \min_{u \in \mathcal{U}} \dot{\phi}(x,u) \le -\eta $$
+    <div class="eq-note">
+      <strong>η > 0</strong> = 安全裕度，确保 φ 在边界上严格衰减（而非仅不变）&nbsp;|&nbsp;
+      <strong>关键简化</strong>：条件仅在 φ=0 流形上施加（而非整个 φ≤0 区域）。这是 Nagumo 定理的直接推论——集合的前向不变性仅取决于边界上向量场的内向性 &nbsp;|&nbsp;
+      <strong>min_{u∈U} φ̇</strong> = 在内积 L_gφ·u 关于 u 线性的前提下，最小值在多面体 U 的某个顶点上取到——因此可以用<strong>顶点枚举</strong>或<strong>对偶公式</strong>消去 u。
+    </div>
+  </div>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 控制消去后的纯状态空间条件</span>
+    $$ \text{消去 } u \text{ 后：} \quad p(x;\theta) \ge 0 \quad \text{on} \quad \{\phi(x;\theta)=0\} $$
+    <div class="eq-note">
+      <strong>p(x;θ)</strong> = 消去 u 后得到的仅含状态 x 的多项式（依赖参数 θ），其非负性等价于原始安全条件 &nbsp;|&nbsp;
+      <strong>为什么必须消去 u</strong>：Positivstellensatz 和 SOS 规划处理的是状态空间中的多项式正性——不能显式包含控制变量 u。
+    </div>
+  </div>
+
+  <!-- Formula Group C: Positivstellensatz SOS Conversion -->
+  <h4>Group C: Positivstellensatz — 从正性到 SOS 表示</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — Putinar's Positivstellensatz 在边界流形上的应用</span>
+    $$ p(x) \ge 0 \;\; \text{on} \;\; \{\phi(x)=0\} \;\Longleftrightarrow\; \exists\; \sigma_0(x) \in \Sigma[x],\; \sigma_1(x) \in \Sigma[x] \;\text{ s.t. }\; p(x) = \sigma_0(x) + \sigma_1(x) \cdot \phi(x) $$
+    <div class="eq-note">
+      <strong>Σ[x]</strong> = 平方和（Sum-of-Squares）多项式的集合：即可以写成 σ(x) = Σᵢ qᵢ²(x) 的多项式，其中 qᵢ 为多项式 &nbsp;|&nbsp;
+      <strong>σ₀(x)</strong> = 非负基——保证 p(x) 在 φ(x)=0 上的非负性的"基础项" &nbsp;|&nbsp;
+      <strong>σ₁(x)·φ(x)</strong> = 乘子项——在 φ(x)=0 上该项消失，但在 φ≠0 时可以"调整"p(x) 使得 SOS 表示存在 &nbsp;|&nbsp;
+      <strong>等价性</strong>：这是一个充分条件（SOS ⇒ 非负），但不一定是必要条件——某些非负多项式可能不存在 SOS 表示（Hilbert's 17th problem 的反例）。但在实际中，对于中等次数的多项式，SOS 条件通常足够。
+    </div>
+  </div>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) — SOS → SDP 的等价转化</span>
+    $$ \sigma(x) \in \Sigma[x] \;\Longleftrightarrow\; \sigma(x) = z(x)^\top Q z(x), \quad Q \succeq 0 $$
+    $$ \text{其中 } z(x) = [1, x_1, x_2, \ldots, x_1^2, x_1x_2, \ldots]^\top \text{ 为单项式基向量} $$
+    <div class="eq-note">
+      <strong>z(x)</strong> = 所有直到某个次数的单项式组成的向量（如二次时 z = [1, x₁, x₂, x₁², x₁x₂, x₂²]ᵀ）&nbsp;|&nbsp;
+      <strong>Q ⪰ 0</strong> = 半正定矩阵约束（Linear Matrix Inequality, LMI）&nbsp;|&nbsp;
+      <strong>核心转化</strong>：SOS 多项式 ⟷ 半定矩阵 + 线性等式约束（系数匹配）→ 半定规划（SDP），可用内点法求解。
+    </div>
+  </div>
+
+  <!-- Formula Group D: SOSP Formulation -->
+  <h4>Group D: Refute SOSP 构造与求解</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(6) — Refute SOSP（反证型SOS规划）</span>
+    $$ \text{minimize} \quad \gamma \quad \text{s.t.} \quad -p(x;\theta) - \gamma = \sigma_0(x) + \sigma_1(x) \cdot \phi(x;\theta), \quad \sigma_0,\sigma_1 \in \Sigma[x] $$
+    <div class="eq-note">
+      <strong>γ</strong> = 松弛变量：如果 γ ≤ 0，则存在 x 使得 −p(x;θ) ≥ 0 → p ≤ 0 → 违反了安全性（找到反例）；如果 γ > 0，则 −p−γ < −p ≤ 0 → 反例不存在 → φ 有效 &nbsp;|&nbsp;
+      <strong>Refute 逻辑</strong>：不是直接证明 p ≥ 0，而是<strong>试图找到违反 p ≥ 0 的点</strong>——如果找不到（γ > 0），则 p ≥ 0 成立 → φ 安全。这种"反证"方法在实际 SDP 求解中更稳定 &nbsp;|&nbsp;
+      <strong>为什么可行</strong>：SDP 的可行性/不可行性是计算上可判定的（在数值精度范围内）。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>含义</th><th>在算法中的角色</th><th>选择依据</th></tr>
+    <tr><td><strong>η</strong></td><td>安全裕度（衰减速率下界）</td><td>控制 φ 在边界上的衰减速度——η 越大，系统越"急切"地远离边界</td><td>需要在保守性（η 大→更难满足）与安全性（η 小→反应慢）间权衡。通常取 η ∈ [0.1, 1.0]</td></tr>
+    <tr><td><strong>k₀</strong></td><td>安全指标偏移常数</td><td>决定安全集的大小——k₀ 越大，φ=0 边界越远离障碍物（更保守但更安全）</td><td>由 SOSP 求解器自动确定——搜索使可行性条件满足的 k₀ 值</td></tr>
+    <tr><td><strong>n (order)</strong></td><td>φ 中相对距离项的阶数</td><td>影响 φ 的梯度行为——高阶项在近距离处给出更大的梯度（更激进的避碰）</td><td>通常取 n=1 或 n=2，实验中作为可调参数搜索</td></tr>
+    <tr><td><strong>SOS 多项式次数 d</strong></td><td>σ₀ 和 σ₁ 的最高次数</td><td>d 越高→SOS 表示能力越强（更接近充要条件），但 SDP 规模越大</td><td>通常取 d=2 或 d=4，实验表明 d=2 对大多数情况已足够</td></tr>
+    <tr><td><strong>状态维度 n_x</strong></td><td>机器人系统的自由度/状态数</td><td>直接影响 SDP 变量数 O(n_x^d)——是计算规模的主要决定因素</td><td>论文在 2-DOF 到 7-DOF 机械臂上验证了可扩展性</td></tr>
+  </table>
+
+  <h3>6.4 边界流形 SOS vs 全局状态空间 SOS — 为什么边界条件更不保守</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🔷 边界流形 SOS（本文方法）</h4>
+      <ul>
+        <li>验证域：<strong>{φ=0}</strong> — (n−1) 维流形</li>
+        <li>数学形式：p = σ₀ + σ₁·φ，在 φ=0 上 p≥0</li>
+        <li>σ₁·φ 项提供了"自由度"——在 φ≠0 处可以任意调整 p 的值，只要满足 SOS 表示即可</li>
+        <li>约束<strong>只在真正需要的地方</strong>（边界）施加</li>
+        <li>保守性低：只要边界上存在安全控制即可</li>
+        <li>适合控制约束严格（U 很小）的场景</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🔶 全局状态空间 SOS（传统方法）</h4>
+      <ul>
+        <li>验证域：<strong>{φ≤0}</strong> — n 维区域</li>
+        <li>数学形式：p = σ₀，在整个区域上 p≥0</li>
+        <li>没有乘子项的调节自由度——p 必须在整个 φ≤0 区域非负</li>
+        <li>约束被<strong>过度施加</strong>（内部点不需要控制也能安全）</li>
+        <li>保守性高：可能因为内部某点的条件不满足而拒绝一个在边界上完全可行的 φ</li>
+        <li>在控制约束严格时可能找不到可行解</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文的自动安全指标合成方法需要掌握三个核心数学原理：前向不变性与安全指标、Positivstellensatz 与 SOS 表示、边界流形 vs 全局空间的本质区别。</p>
+
+  <h3>7.1 前向不变性与安全指标 — Forward Invariance &amp; Safety Index</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — Nagumo 定理与安全指标</span>
+    $$ \mathcal{S} \text{ forward invariant} \;\Longleftrightarrow\; \forall x \in \partial\mathcal{S},\; \exists u \in \mathcal{U}: \dot{\phi}(x,u) \le 0 $$
+    $$ \text{当 } \phi \text{ 满足上述条件：} \; x(0) \in \mathcal{S} \;\Rightarrow\; x(t) \in \mathcal{S} \;\; \forall t \ge 0 $$
+    <div class="eq-note">
+      <strong>Forward Invariance（前向不变性）</strong> = 一旦状态进入安全集 S，它就永远留在 S 中——永远不会进入"不安全"区域（如碰撞）&nbsp;|&nbsp;
+      <strong>Nagumo 定理</strong>：一个闭集的前向不变性仅取决于其边界上的向量场方向——如果在每个边界点上，存在至少一个容许控制使系统轨迹指向集合内部（即 φ̇ ≤ 0），则集合是前向不变的 &nbsp;|&nbsp;
+      <strong>安全指标的角色</strong>：φ(x) 将"保持安全"这个几何条件转化为"保持 φ(x) ≤ 0"这个代数条件——类似于李雅普诺夫函数将稳定性转化为能量衰减条件。安全指标本质上是一个<strong>类能量函数</strong>。
+    </div>
+  </div>
+
+  <p>安全指标与控制屏障函数（CBF）的区别：CBF 要求在<strong>整个安全集内部</strong>满足衰减条件（∀x ∈ S），而本文的安全指标仅需在<strong>边界上</strong>满足——这是利用 Nagumo 定理的精确表述得到的更不保守的条件。从几何直观上：一只球在碗的内部深处——它自然安全，不需要任何控制来"保持"安全；只有当它滚到碗的边缘时才需要干预。</p>
+
+  <table>
+    <tr><th>概念</th><th>数学定义</th><th>验证域</th><th>保守性</th></tr>
+    <tr><td>Control Barrier Function (CBF)</td><td>∀x ∈ S, ∃u ∈ U: φ̇ ≤ −α(φ)</td><td>整个安全集 φ≤0</td><td>较高——内部也需满足衰减条件</td></tr>
+    <tr><td>Safety Index (本文)</td><td>∀x ∈ ∂S, ∃u ∈ U: φ̇ ≤ −η</td><td>仅边界流形 φ=0</td><td>较低——只在真正关键的边界上施加条件</td></tr>
+    <tr><td>HJ Value Function</td><td>求解 HJI PDE 获得</td><td>整个状态空间</td><td>最低（最优）——但计算代价最高</td></tr>
+  </table>
+
+  <h3>7.2 Positivstellensatz 与 Sum-of-Squares — 正性判定的可计算松弛</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — Positivstellensatz 的核心思想</span>
+    $$ p(x) \ge 0 \;\; \forall x \in \{g_1(x)=0,\ldots,g_m(x)=0,\; h_1(x)\ge 0,\ldots,h_k(x)\ge 0\} $$
+    $$ \Updownarrow \text{(充分条件)} $$
+    $$ p = \sigma_0 + \sum_i \sigma_i \cdot g_i + \sum_{J\subseteq\{1,\ldots,k\}} s_J \cdot \prod_{j\in J} h_j, \quad \sigma_i, s_J \in \Sigma[x] $$
+    <div class="eq-note">
+      <strong>半代数集（Semialgebraic Set）</strong>：由多项式等式和不等式定义的状态子集——安全集 φ≤0 和边界 φ=0 都是半代数集 &nbsp;|&nbsp;
+      <strong>SOS 乘子</strong>：σᵢ 和 s_J 是 SOS 多项式——它们作为"权重"将定义多项式的信息编码进 SOS 表示中 &nbsp;|&nbsp;
+      <strong>为什么是充分条件</strong>：如果找到这样的 SOS 表示，则 p 必定非负（SOS 恒非负 × 定义多项式在集合上的符号性）&nbsp;|&nbsp;
+      <strong>为什么不一定必要</strong>：存在非负但不可表示为 SOS 的多项式（如 Motzkin 多项式）——但在实际控制问题中，这类"病态"情况很少见。
+    </div>
+  </div>
+
+  <p><strong>SOS 规划的工程价值</strong>：将<strong>不可判定的多项式正性问题</strong>（NP-hard）转化为<strong>多项式时间内可解的 SDP 问题</strong>。这是实代数几何在过去 20 年中最重要的计算应用之一（Parrilo, 2000）。本文成功将这一数学工具引入安全关键控制的自动化设计中——这使得安全指标合成从"手工艺术"变成了"计算工程"。</p>
+
+  <table>
+    <tr><th>多项式正性判定方法</th><th>复杂度</th><th>完备性</th><th>本文使用</th></tr>
+    <tr><td>全局暴力采样/网格搜索</td><td>指数 O(Nⁿ)</td><td>无保证</td><td>✗</td></tr>
+    <tr><td>Quantifier Elimination (Tarski)</td><td>双指数</td><td>充要</td><td>✗（不可行）</td></tr>
+    <tr><td>SOS 松弛（本文）</td><td>多项式（SDP）</td><td>充分（非必要）</td><td>✓</td></tr>
+    <tr><td>SOS + 次数提升（hierarchy）</td><td>指数（次数→∞）</td><td>渐近完备</td><td>扩展方向</td></tr>
+  </table>
+
+  <h3>7.3 边界流形 vs 全局空间 — 为什么局部验证降低保守性</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 全局条件 vs 局部条件的本质区别</span>
+    $$ \text{全局条件: } \forall x \in \{\phi \le 0\},\; \exists u: \dot{\phi} \le -\eta \quad \text{vs} \quad \text{局部条件: } \forall x \in \{\phi = 0\},\; \exists u: \dot{\phi} \le -\eta $$
+    <div class="eq-note">
+      <strong>几何直觉</strong>：安全集 S = {φ≤0} 是一个 n 维区域。全局条件要求在<strong>整个区域的每一点</strong>都找到安全控制——包括那些"反正都是安全的"内部深处点。局部条件只要求<strong>区域的壳层</strong>上有安全控制——只需要在真正有危险的地方（边界）干预 &nbsp;|&nbsp;
+      <strong>保守性来源</strong>：当控制约束严格（U 很小），在某些内部点所有控制都使 φ 增大——但这恰好是有利的（让系统更深地进入安全区域）！全局条件会错误地将此判为"不安全"而拒绝整个 φ，尽管边界上完全可行。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🔷 全局正性（保守）</h4>
+      <p><strong>要求</strong>：p(x) ≥ 0 对所有 x ∈ {φ≤0} 成立。</p>
+      <p><strong>问题案例</strong>：一个 2-DOF 机械臂从安全区域中心启动——所有可能运动方向都增大 φ（远离边界）。全局条件要求"至少存在一个控制使 φ 减小"——但在这个位置，自然增大 φ 反而更安全。</p>
+      <p><strong>后果</strong>：即使边界上安全控制存在，全局条件仍可能因内部某点不满足而拒绝 φ ——导致找不到任何有效的安全指标。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>🔶 边界局部（本文，不保守）</h4>
+      <p><strong>要求</strong>：p(x) ≥ 0 仅对 x ∈ {φ=0} 成立。</p>
+      <p><strong>处理方式</strong>：在 φ=0 流形上，乘子项 σ₁·φ 消失（φ=0）——所以 p = σ₀ 直接成立。在 φ≠0 处，σ₁·φ 可以调整 p 的符号，使得 SOS 表示始终存在。</p>
+      <p><strong>后果</strong>：只要边界上的最小 φ̇ 满足衰减条件，就能找到有效的安全指标 ——不因内部点的行为而被拒绝。</p>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    <strong>Nagumo定理</strong>告诉我们只需要在边界上验证 → <strong>边界流形</strong>将验证域从 n 维降到 (n−1) 维 → <strong>Positivstellensatz</strong>将边界上的正性条件转化为 SOS 表示 → <strong>SDP 求解器</strong>自动搜索满足条件的 φ 参数。三个原理形成了一个完整的"理论→数学→计算"转化链：没有 Nagumo 定理，条件就是全局的、保守的、可能无解的；没有 Positivstellensatz，正性条件就是 NP-hard、不可计算的；没有 SDP 求解器，即使有了数学转化也无法实际求解。三者缺一不可——这就是为什么"自动安全指标合成"直到本文才真正实现。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig3.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">安全指标合成的问题框架与边界流形条件示意</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Safety index synthesis problem framework and boundary manifold condition"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：安全指标合成的问题设定——（a）系统动力学与控制约束的定义，（b）安全集 S = {φ≤0} 及其边界 ∂S = {φ=0}，（c）边界上的局部可行性条件。关键图示：安全指标 φ(x) 在状态空间中定义了一个"等值面"——φ=0 是安全边界，φ<0 是安全内部。在边界上的每一点，需要至少存在一个容许控制 u ∈ U 使 φ̇ ≤ −η，确保系统轨迹不会穿越边界进入不安全区域（φ>0）。</p>
+      <ul>
+        <li><strong>边界条件的几何意义</strong>：φ̇ = ∇φ · (f+gu) 是 φ 沿轨迹的全导数——如果 φ̇ ≤ −η < 0，则 φ 正在减小，即系统正在从边界"向内运动"。这等价于向量场 (f+gu) 在边界上指向安全集内部</li>
+        <li><strong>与全局 CBF 条件的对比</strong>：CBF 要求 ∇φ·(f+gu) ≤ −α(φ) 在整个 {φ≤0} 上成立——包括远离边界的内部点。本文的边界条件仅在 φ=0 上施加，大幅降低了要求</li>
+        <li><strong>控制约束 U 的几何含义</strong>：U 是一个有界凸多面体（如加速度限制 |a| ≤ a_max），绿色箭头表示满足安全条件的可行控制方向，红色箭头表示指向不安全区域的方向</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">不同自由度平面机械臂的碰撞避免实验——安全指标合成与验证结果</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Planar manipulator collision avoidance experiments across varying DOF"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：在平面机械臂平台上验证自动合成的安全指标——从低自由度到高自由度的碰撞避免任务。（a）不同自由度（2-DOF 至 7-DOF）的机械臂配置与障碍物布局——每条连杆的末端和中间关节都需要避免与障碍物碰撞。（b）安全指标 φ 随时间的变化曲线——在接近障碍物时 φ 上升至边界附近（φ≈0），合成的安全指标触发控制修正使 φ 快速回落，证明 φ̇ ≤ −η 条件在边界附近被成功维持。（c）不同控制约束（加速度限幅从 ±5 rad/s² 到 ±20 rad/s²）下的成功率对比——约束越严格，合成难度越大，但本文方法仍然在大多数情况下成功合成了有效的安全指标。</p>
+      <ul>
+        <li><strong>维度扩展性</strong>：从 2-DOF 到 7-DOF 机械臂，状态维度从 4 增至 14——SOS 规划的变量数随之增长，但在标准工作站上（论文使用的硬件）仍然可求解。这证明了方法对中高维系统的实用性</li>
+        <li><strong>安全指标的行为</strong>：当机械臂远离障碍物时 φ << 0（深度安全），φ̇ 可能为正值（允许状态更深入地安全）。当 φ 接近 0（边界附近）时，安全滤波强制 φ̇ ≤ −η，使 φ 迅速回落——验证了"边界条件"设计的合理性</li>
+        <li><strong>控制约束的影响</strong>：当加速度限幅从 ±20 降至 ±5 rad/s² 时（更严格的执行器限制），合成成功率略微下降——但即使在最严格的约束下，本文方法仍然优于需要全局正性的基线方法</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">独轮车（Unicycle）模型的碰撞避免——含加速度和角速度约束的合成结果</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Unicycle collision avoidance with acceleration and angular velocity limits"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：在独轮车（Unicycle）模型上验证安全指标合成——一个具有非完整约束和输入受限的移动机器人系统。（a）实验场景：独轮车需要在由绿色虚线框界定的安全区域内运动，避免碰撞红色障碍物——控制输入包括线加速度 a ∈ [−2, 2] m/s² 和角速度 ω ∈ [−1, 1] rad/s，同时受约束。（b）状态轨迹——蓝色轨迹为名义控制器输出（可能穿过障碍物），橙色轨迹为经过安全指标滤波后的安全轨迹——在接近障碍物时被安全地修正，避免了碰撞，同时保持了尽可能小的控制修正。（c）安全指标 φ 的时域曲线——当独轮车接近障碍物时 φ 上升至 0 附近，然后被安全控制强制回落，证明合成的 φ 成功在边界上生成了可行的安全控制。</p>
+      <ul>
+        <li><strong>非完整约束下的安全合成</strong>：独轮车是非完整系统（位置和姿态耦合，不能侧向移动），这使得安全控制的设计比全驱动机器人更难。但本文方法通过将非完整动力学表示为多项式形式后同样适用——展示了方法的普适性</li>
+        <li><strong>多约束处理</strong>：独轮车同时受线加速度和角速度约束（两个独立的多面体约束），本文方法通过多面体顶点枚举同时处理多个控制约束——而不需要手动加权或优先级排序</li>
+        <li><strong>最小侵入性</strong>：安全滤波只在 φ≥0 时激活（边界附近），且修正量最小（QP优化目标为 min||u − u_nom||²）。轨迹图中可见，距障碍物较远时名义轨迹与安全轨迹几乎重合——安全系统是"透明"的</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>SOS 证书的充分性而非必要性</strong>：Positivstellensatz 给出的 SOS 条件是多项式正性的<strong>充分条件</strong>，而非充要条件。存在某些多项式非负但不可表示为 SOS（如经典的 Motzkin 多项式 x⁴y² + x²y⁴ − 3x²y² + 1）。在实践中这意味着：可能存在一个在 φ=0 上满足正性条件的 p(x;θ)，但由于 SOS 表示不存在而被我们的方法"漏掉"。虽然可以通过提高 SOS 多项式的次数来逼近完备性（Lasserre hierarchy），但每次提升都会指数级增加 SDP 规模。</li>
+    <li><strong>多项式动力学的假设</strong>：方法要求系统动力学 f(x) 和 g(x) 是<strong>多项式</strong>（或可通过坐标变换多项式化）。许多实际系统包含三角函数（如旋转关节的 sin/cos）或非多项式项——这些需要通过泰勒展开近似，但近似会引入误差，在理论上破坏安全性保证。对于刚体旋转的 SO(3) 动力学，多项式近似尤其困难。</li>
+    <li><strong>高维系统的计算可扩展性</strong>：SDP 的变量数随状态维度 n 和 SOS 次数 d 快速增长——O(n^d)。当 n > 15（如人形机器人的全身动力学），SDP 规模可能超出当前求解器的处理能力。论文在 7-DOF 机械臂（14 维状态）上验证成功，但对更高维系统（如四旋翼 + 机械臂的 20+ 维状态）仍有挑战。</li>
+    <li><strong>SDP 求解的数值稳定性</strong>：内点法 SDP 求解器（SeDuMi、MOSEK）在大规模问题上可能遇到<strong>数值不稳定性</strong>——由于病态条件数或接近边界的最优解，求解器可能错误地报告可行性/不可行性。这在安全关键场景中可能导致错误的安全保证（假阴性——认为安全实际上不安全，或假阳性——认为不安全实际上安全）。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>非多项式系统的扩展</strong>：对于含三角函数的刚体动力学，可以通过<strong>有理参数化</strong>（如 Cayley 变换）或<strong>泰勒展开 + 误差界</strong>将系统近似为多项式形式。文献中已有关于 sin/cos 的多项式近似的工作（如利用 sin≈x、cos≈1−x²/2），配合鲁棒 SOS 规划（robust SOS）处理近似误差——这是将本文方法推广到大多数机器人系统的最直接路径。</li>
+    <li><strong>在线自适应安全指标</strong>：本文的安全指标是<strong>离线</strong>合成的——对于一个给定的系统配置（动力学、约束、障碍物布局），运行一次 SOS 规划。如果障碍物位置在线变化（如动态环境），需要<strong>在线重合成</strong>——这对于当前 SDP 求解器来说太过耗时。一个方向是将 SOS 条件转化为神经网络训练损失（如通过采样验证 + 梯度惩罚），实现快速近似合成。</li>
+    <li><strong>学习初始化 + SOS 精化</strong>：用<strong>学习型方法</strong>（如 NN-CBF）预训练一个安全指标的初始参数，然后用本文的 SOS 规划<strong>验证和精化</strong>——验证是否满足边界可行性，如果不满足，在 SOS 框架下微调参数。这结合了学习的"快速探索"和 SOS 的"形式化保证"——是很有前途的混合方法。</li>
+    <li><strong>分层安全指标</strong>：对于超高维系统（如 30+ 维的人形机器人），可以将系统<strong>分解为子系统</strong>——每个子系统有自己的低维安全指标，然后通过组合保证全局安全。类似于"输入-状态安全（ISSf）"的概念在 SOS 框架下的实现。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据/参数问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>动力学模型误差</td><td>如果真实系统动力学与多项式模型存在偏差（如未建模的摩擦、参数不确定性），SOS 规划基于模型的理论安全保证可能不成立。需要鲁棒扩展（如考虑模型误差界的 robust SOS）</td><td>★★★★★</td></tr>
+    <tr><td>SOS 多项式次数选择</td><td>次数 d 过低 → SOS 表示能力不足，可能漏掉有效的安全指标（假阴性）；次数 d 过高 → SDP 规模爆炸，求解时间不可接受。需要在"表示能力"和"计算代价"之间小心权衡</td><td>★★★★</td></tr>
+    <tr><td>控制约束建模</td><td>本文假设 U 为有界多面体，通过顶点枚举消去控制。如果实际约束是非凸的（如某些执行器的非线性饱和曲线），多面体近似可能过高估计控制能力（不安全）或过低估计（保守）</td><td>★★★</td></tr>
+    <tr><td>SDP 求解器数值容差</td><td>求解器的可行性判定依赖数值容差——在边界情况下（约束恰好紧），容差范围内的判定翻转可能导致错误结论。对于高安全关键系统，需要额外的形式化验证（如可满足性模理论 SMT 验证）</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>将 SOS 安全指标合成与模型预测控制（MPC）结合</strong>——这是将本文方法推向实时高性能应用的关键路径。当前方法：离线合成 φ → 运行时安全滤波（单步 QP，最小修正）。问题：单步 QP 是前瞻为 1 的"近视"安全保证——在高度动态的环境中，可能因为一秒后的障碍物变化而无法及时响应。<br><br>
+    改进方向：用本文的 SOS 方法离线合成 φ（确保确定性安全保证），然后在 MPC 的优化框架中<strong>将 φ 作为终端约束或阶段性约束</strong>——MPC 提供长前瞻优化（如 10 步），而 φ 保证即使在预测误差下也不会违反安全。<br><br>
+    这个方向的优势：（1）保留了 SOS 的形式化保证；（2）通过 MPC 增加了前瞻性和性能优化；（3）如果结合 Tube MPC（管道鲁棒 MPC），还可以处理模型误差和外部扰动。<br><br>
+    挑战：如何高效地将 SOS 合成的 φ（多项式约束）嵌入 MPC 的在线优化（通常是 QP 或 NLP）——需要开发专门的多项式约束线性化或平方和松弛技术。如果成功，这将是"形式化安全 + 高性能控制"领域的一个重要突破。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>为什么需要安全控制？</strong><br>机器人系统在真实环境中运行，安全性是不可妥协的硬约束——碰撞意味着物理损坏或人员伤害。安全控制的目标是保证系统状态永远不会进入"不安全"区域（如与障碍物重叠的状态）。这在自动驾驶、工业机器人、无人机等领域是最核心的需求之一。</li>
+    <li><strong>为什么需要自动合成安全指标？</strong><br>控制屏障函数（CBF）框架提供了优雅的安全控制方法——用标量函数 φ(x) 定义安全集，用导数条件保证前向不变性，然后通过 QP 将任意名义控制器投影到安全控制。但这个框架的核心瓶颈是：<strong>φ(x) 必须手工设计</strong>。对于每个新系统、新场景，需要专家花费数天甚至数周来推导和调试 φ。如果 φ 设计得不好（过于保守或不足），整个安全系统就无效。自动合成 φ 是从"手工工艺"到"工程科学"的必经之路。</li>
+    <li><strong>为什么选择边界流形而非全局空间？</strong><br>Nagumo 定理告诉我们：决定安全集前向不变性的是<strong>边界上的向量场方向</strong>，而非内部的任何点。这一基本事实意味着：只要在 φ=0 上存在指向内部的控制，安全集就是不变的——与 φ<0 内部深处的控制行为无关。利用这一理论事实，我们可以在保证安全性等价的条件下，<strong>显著降低验证条件的要求</strong>（从 n 维区域到 n−1 维流形）——从而降低保守性，提高自动化合成的成功率。</li>
+    <li><strong>为什么选择 SOS 规划？</strong><br>将安全条件表达为"在 φ=0 流形上某个多项式 p(x)≥0"是一个<strong>多项式正性判定问题</strong>——这在一般情况下是 NP-hard 的。直接求解不可行。幸运的是，实代数几何中的 Positivstellensatz 提供了一个<strong>充分但不一定必要的松弛</strong>：将正性条件转化为 SOS 表示，而 SOS 约束等价于半定规划（SDP）——一个可以用内点法在多项式时间内求解的凸优化问题。虽然 SOS 是充分条件（可能遗漏某些有效 φ），但在实际控制问题中，这种松弛几乎总是紧的（即 SOS 可表示几乎所有的实际情况下出现的非负多项式）。</li>
+    <li><strong>为什么选择 Positivstellensatz？</strong><br>在众多 SOS 表示定理中，Putinar's Positivstellensatz 特别适合安全指标合成：它提供的乘子项 σ₁·φ 天然在 φ=0 上消失——完美匹配"只在边界流形上验证"的需求。其他表示（如 Handelman 表示）要求全局正性，与我们"边界局部"的设计理念不兼容。Putinar 表示中 σ₁·φ 项的引入是本文数学框架的点睛之笔——它提供了在 φ≠0 处"调节"多项式值的自由度，使得 SOS 表示更可能存在。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    安全控制的核心在于"在安全边界上是否存在一个不指向危险区的动作"——Nagumo 定理一百年前就告诉了我们；那为什么不在边界上直接用最强大的计算工具（Positivstellensatz + Semi-definite Programming）来自动寻找一个满足这个条件的标量函数，而非依赖专家的手工试错？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 识别瓶颈</strong>：CBF 框架在理论上是完备的（标量函数 + QP 投影 = 形式化安全保证），但在实践中最大的阻碍不是控制器设计，而是<strong>φ 的设计</strong>。在文献中搜索"安全指标合成"→ 发现已有的合成方法依赖解析推导（Liu & Tomizuka, 2014）或数值搜索（在低维离散网格上），无法扩展到高维系统。这是一个<strong>开放问题</strong>。</li>
+    <li><strong>Step 2 — 寻找工具</strong>：多项式正性判定的"可计算松弛"——搜索"polynomial positivity certification" → 发现 SOS 规划文献（Parrilo, 2000; Lasserre, 2001）。SOS 规划已被成功应用于李雅普诺夫函数合成、可达性分析等控制问题——但尚未被用于"带输入约束的安全指标合成"。输入约束的存在使得标准的 SOS 李雅普诺夫方法不能直接套用——需要额外步骤消去控制变量。</li>
+    <li><strong>Step 3 — 连接框架</strong>：将 Nagumo 定理的边界条件与 SOS 规划的能力对齐。Nagumo 说"只需要在边界上检查" → SOS via Positivstellensatz 天然支持"在半代数集子集上验证"（通过乘子项）→ Putinar 表示的乘子项 σ₁·φ 在 φ=0 上天然消失——两个框架<strong>完美对齐</strong>。剩下的工程问题：参数化 φ、消去控制 u、构建 SOSP、用求解器计算。</li>
+    <li><strong>Step 4 — 实验验证</strong>：从最简单的系统开始——2-DOF 平面机械臂（4 维状态，2 维控制，盒式控制约束）→ 验证 SOS 规划可以找到有效的 φ → 扩展到 3-DOF, 5-DOF, 7-DOF → 验证计算可扩展性 → 变换系统类型到独轮车（非完整约束）→ 验证方法的通用性。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：本文是<strong>"将纯数学工具引入工程问题"</strong>的教科书级案例。实代数几何中的 Positivstellensatz 自 1993 年就被证明，SOS 规划自 2000 年起在控制理论中偶有应用——但直到这篇论文才被系统性地用于"安全指标合成"这个特定的工程问题。启示：<strong>不要只在同一领域内找工具——跨学科的数学工具箱中可能有你需要的完美武器</strong>。对于 UAV 安全控制，SOS 规划也完全可以用于<strong>无人机避碰安全包络的自动合成</strong>（如果动力学可以被多项式化或近似）。</li>
+    <li><strong>技术技巧层面</strong>：（1）<strong>局部化是降低保守性的通用策略</strong>——"只在你真正需要的地方施加约束"这一原则可以推广到任何安全/稳定性证明中；（2）<strong>refute-based 验证比 direct-proof-based 更数值稳定</strong>——找反例如果找不到则成立，这在内点法求解器中通常比直接证明更鲁棒；（3）<strong>多面体控制的消去</strong>——对于线性控制系统，控制集多面体上的 min/max 可以通过顶点枚举或对偶公式精确消去，避免了引入整数变量或采样近似。</li>
+    <li><strong>实验/写作层面</strong>：论文从多个维度系统验证（不同自由度 → 维度扩展性；不同控制约束严格度 → 鲁棒性；不同系统类型 → 通用性），形成了完整的证据链。这种"多维度网格化验证"的策略值得学习——不是在一个特定设置上做好就声称方法有效，而是系统性地探索方法的能力边界。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 安全控制方向</strong>：本文方法可以直接应用于<strong>无人机避碰安全指标的自动合成</strong>。四旋翼的简化动力学（位置 + 速度，忽略姿态内环）可以建模为 6 维多项式系统——恰好处于 SOS 规划的可处理范围内。用本文方法自动合成避碰 φ，替换手工设计的势场或 CBF——自动化程度和保证强度都可能提升。如果加入风扰动模型，还可以通过 robust SOS 扩展处理不确定性。</li>
+    <li><strong>对于 UAV 编队控制方向</strong>：多机安全——不仅需要避碰静态障碍物，还需要<strong>多机之间的相互避碰</strong>。本文方法可以扩展为合成一个面向多智能体系统的安全指标——如果中枢系统已知所有智能体的动力学和约束，可以合成一个联合安全指标 φ_joint(x₁, x₂, ..., x_N) 保证全局安全。</li>
+    <li><strong>对于安全强化学习方向</strong>：本文的安全指标 φ 可以作为<strong>强化学习的安全探索约束</strong>——在 RL 训练过程中，每当策略建议一个可能违反安全的动作，用 φ 的安全滤波修正。与现有 safe RL 方法的主要区别：φ 是<strong>形式化保证的</strong>（via SOS），而非启发式或概率性的。这可以显著提高 safe RL 在实际部署中的可靠性。</li>
+    <li><strong>工程实践建议</strong>：如果你的无人机动力学可以写成（或近似为）多项式形式，那么从本文开始尝试自动合成安全指标是一个低风险高回报的方向——使用 YALMIP 或 SOSTOOLS（MATLAB工具箱）可以快速原型验证。关键风险点：（a）多项式近似的精度是否足够；（b）SDP 规模在所需的状态维度下是否可解。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Ames, A. D. et al. (2014–2019) — Control Barrier Functions: Theory and Applications. <em>ECC 2014</em>, <em>CDC 2016</em>, <em>ACC 2019</em></td><td>CBF 的奠基性工作——定义了安全控制的标量函数框架，是本文的"父问题"。理解本文必须首先理解 CBF 的基本概念和 QP-based safety filter。Ames 的 2019 ACC 论文给出了 CBF 的统一理论和实际应用指南。</td></tr>
+    <tr><td>Parrilo, P. A. (2000) — Structured Semidefinite Programs and Semialgebraic Geometry Methods in Robustness and Optimization. <em>PhD Thesis, Caltech</em></td><td>SOS 规划的开创性博士论文——建立了"多项式正性 → SOS 表示 → SDP"的理论框架和计算工具。Parrilo 的工作是本文 SOS 转化的理论基石。配套的 MATLAB 工具箱 SOSTOOLS 是实际进行 SOS 规划的常用工具。</td></tr>
+    <tr><td>Liu, C. &amp; Tomizuka, M. (2014–2016) — Control in a Safe Set: Addressing Safety in Human-Robot Interactions. <em>ASME DSCC 2014</em>, <em>ACC 2016</em></td><td>本文的通信作者 Changliu Liu 的早期工作——提出了"safety index"概念和在安全集中控制的方法论。本文在 Liu 的安全指标框架基础上增加了<strong>自动化合成</strong>——从"手工"到"自动"的关键升级。</td></tr>
+    <tr><td>Prajna, S., Papachristodoulou, A. &amp; Parrilo, P. A. (2002) — Introducing SOSTOOLS: A General Purpose Sum of Squares Programming Solver. <em>CDC 2002</em></td><td>SOSTOOLS 工具箱的介绍论文——将 SOS 规划从数学理论转化为工程师可用的软件工具。本文使用 YALMIP 作为前端 + SeDuMi/MOSEK 作为 SDP 求解器——这是当前 SOS 规划的事实标准工具链。</td></tr>
+    <tr><td>Wei, T. &amp; Liu, C. (2019) — Safe Control Algorithms Using Energy Functions: A Unified Framework, Benchmark, and New Directions. <em>CDC 2019</em></td><td>同一实验室的后续工作——系统性地比较了不同安全控制方法（CBF, safety index, HJ reachability 等），提供了统一的基准测试框架。理解这篇可以帮助定位本文方法在整个安全控制领域中的位置和相对优势。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Zhao, He, Wei, Liu &amp; Liu · ACC 2023 · Safety Index Synthesis via Sum-of-Squares Programming · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

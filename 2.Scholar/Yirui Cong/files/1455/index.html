@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Cooperative Filtering with Range Measurements (Ding, Cong, Wang & Cheng, 2023)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Yirui Cong · 13-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../1356/index.html">Asymptotic Boundedness Di</a>
+<a href="../1352/index.html">Formation Under Communica</a>
+<a href="../1360/index.html">Bounded Formation Stabili</a>
+<a href="../1359/index.html">Single-Beacon Localizatio</a>
+<a href="../1354/index.html">Optimal Set-Membership Sm</a>
+<a href="../1348/index.html">Stability Linear Set-Memb</a>
+<a class="active" href="../1455/index.html">Cooperative Filtering Ran</a>
+<a href="../1350/index.html">Existence Completeness Bo</a>
+<a href="../1750/index.html">Paper</a>
+<a href="../1454/index.html">2305.10366v1</a>
+<a href="../1368/index.html">小型固定翼无人机集群综述和未来发展_王祥科</a>
+<a href="../1367/index.html">Paper</a>
+<a href="../1361/index.html">qy_高阶线性多智能体时延一致性理论及其在多无人机</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Cooperative Filtering with Range Measurements: A Distributed Constrained Zonotopic Method（基于距离测量的协同滤波：一种分布式约束Zonotope方法）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yu Ding</strong>（丁宇）、<strong>Yirui Cong</strong>（丛一睿，corresponding）、<strong>Xiangke Wang</strong>（王祥科）、<strong>Long Cheng</strong>（程龙）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">国防科技大学</strong>（National University of Defense Technology, NUDT）智能科学学院 / <strong class="bold-affil">中国科学院</strong>自动化研究所（程龙）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">arXiv: 2309.01185</strong>，2023年9月3日提交 | 后发表于 Springer proceedings (2024)</td></tr>
+      <div class="journal-meta"><span class="jif-name">arXiv</span> <span class="jif-badge if-preprint">📄 Preprint</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://arxiv.org/abs/2309.01185" target="_blank">arXiv: 2309.01185</a> | <a href="https://link.springer.com/chapter/10.1007/978-981-97-3332-3_44" target="_blank">Springer (2024)</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出了一种基于<strong>Extended Constrained Zonotope</strong>的<strong>分布式距离测量协同滤波</strong>方法。核心场景：多智能体系统中，部分智能体（<strong>锚点/Anchor</strong>）配备高精度绝对测量（如高精度 GPS/激光定位），其余智能体仅有低精度绝对测量和相对距离测量（如 UWB 测距）。核心思路：（1）将距离测量的环状不确定区域用 extended constrained zonotope 精确近似；（2）沿<strong>链式拓扑（chain topology）</strong>将锚点的高精度约束<strong>逐跳顺序传播</strong>——锚点先用高精度测量更新自身，然后第 $i$ 个智能体利用与第 $i-1$ 个智能体的相对距离测量来收紧自身估计。仿真验证：低精度节点的估计范围显著收缩，证明了锚点信息沿距离链传播的有效性。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Extended Constrained Zonotope</span>
+    <span class="tag tag-green">Range Measurement Filtering</span>
+    <span class="tag tag-amber">Anchor-assisted Localization</span>
+    <span class="tag tag-purple">Chain Topology Propagation</span>
+    <span class="tag tag-red">Sequential SMFing</span>
+    <span class="tag tag-cyan">UWB Cooperative</span>
+    <span class="tag tag-gray">Set-Membership Filtering</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么在仅有距离测量的多智能体系统中，低精度传感器节点难以获得准确的定位？</strong><br>
+    答：因为距离测量 $\|x_i - x_j\|_2 \pm r$ 对应的不确定区域是一个<strong>环状（ring-shaped）非凸集合</strong>——不是简单的"椭球"或"超立方体"。标准 SMF 的集合表示（zonotope、椭球）只能表示凸集，用凸集外包一个环会引入<strong>巨大的保守性</strong>——环中间的空洞（距离太近或太远的不可能区域）会被凸外包"填满"，导致估计集合被严重污染。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>"锚点 + 链式顺序传播 = 分布式距离协同"</strong>。核心包含两层创新：（1）用 <strong>extended constrained zonotope</strong>（带非单位边界 $h^{(j)}$ 的泛化 zonotope）来更紧致地表达环状区域——虽然仍需要凸外包，但 extended constrained zonotope 的额外自由度（$h^{(j)}$ 可以取非 1 的值）提供了更精细的形状控制；（2）<strong>链式顺序传播（sequential SMFing）</strong>——不依赖于复杂的迭代一致性协议，而是沿着链式拓扑，让每个智能体在邻居完成估计<strong>之后</strong>才使用该邻居的距离信息。这种"先到先得，后到后放大"的顺序机制天然适合分布式实现，且每一步的计算复杂度极低。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>UWB 测距的环状不确定区域（经典几何约束）</td><td>→ 单个距离测量 $\|x_i - x_j\|_2 = d \pm r$ 对应的可行集是一个<strong>球形环</strong>：所有距 $x_j$ 在 $[d-r, d+r]$ 范围内的点。在 2D 中是两个同心圆之间的区域——这是<strong>非凸</strong>的。直接求交（标准 SMF update）需要将其凸外包——但用什么凸表示最紧致？Extended constrained zonotope 的非单位边界提供了答案</td><td>几何 / 集合</td></tr>
+    <tr><td>锚点（anchor node）的 GPS 类比——无线传感器网络定位中的经典概念</td><td>→ 如果部分节点能通过高精度手段（如高精度 GPS、激光跟踪仪）获得极小的绝对不确定集合，这些节点就成为坐标系中的<strong>"锚"</strong>。其他节点虽然自身绝对测量精度低，但通过距离测量与锚点"绑"在一起，其不确定集合被锚点"拉扯"收缩——就像一根绳子一头拴在固定的锚上，另一头的摆动范围就受限了</td><td>策略 / 架构</td></tr>
+    <tr><td>连续定位（sequential localization）——类似 GPS 定位的"逐卫星求解"</td><td>→ 链式拓扑上的顺序传播天然适合 one-shot 定位：锚点先定位 → Agent 1 利用与锚点的距离定位 → Agent 2 利用与 Agent 1 的距离定位 → ... ——每一步只需要<strong>一个距离约束</strong>（到前驱的距离）、<strong>一次集合求交</strong>。链越长，累积保守性越大，但每一步的计算量极小（$O(n_g)$ 而不是 $O(n_g^2)$）</td><td>方法</td></tr>
+    <tr><td>Extended Constrained Zonotope 的泛化表达能力（Scott et al. 及后续扩展）</td><td>→ 经典 constrained zonotope 的 $\xi$ 元素边界固定为 $[-1,1]$（即 $h^{(j)} = 1$）。Extended constrained zonotope 允许 $h^{(j)}$ 取任意非负值：$\xi^{(j)} \in [-h^{(j)}, h^{(j)}]$。这等价于允许生成元<strong>不等幅缩放</strong>——在表达环状区域时，可以在不同方向上使用不同尺度的生成元，从而大幅减少凸外包的保守性</td><td>表示 / 数学</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 用 Extended Constrained Zonotope 处理环状距离约束 —— 从非凸到紧致凸近似</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>距离测量 $\|x_i - x_j\|_2 = d \pm r$ 的可行域是非凸环状区域。先前方法要么忽略距离约束的非凸性（用超立方体粗暴外包——保守性极大），要么用粒子群/蒙特卡洛方法近似（计算量大且<strong>不提供确定性保证</strong>）。缺乏一种既具备确定性保证又在计算上高效的集合表示来处理距离测量。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Extended constrained zonotope 的非单位边界参数 $h^{(j)}$ 可以独立调整每个生成元的尺度——就像用一个"可变半径"的类椭球去拟合环状区域的外边界和内边界，比传统 zonotope（所有生成元等幅）灵活得多。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>相对距离测量 $y_{ij,k}^r = \|x_{i,k} - x_{j,k}\|_2 + r_{ij,k}$（其中 $r_{ij,k} \in [-\bar{r}_{ij}, \bar{r}_{ij}]$ 为有界噪声）定义了环状约束：所有满足 $d_{ij}^- \le \|s\|_2 \le d_{ij}^+$ 的状态差 $s = x_{i,k} - x_{j,k}$。通过 $S_{j,k} \oplus Y_{ij,k}^r$（Minkowski 加法）将邻居的不确定集合与环状测量集合组合，然后用 extended constrained zonotope 的集合操作（Minkowski 加 + 交集 + 降阶）进行更新。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 锚点辅助的链式顺序传播（Sequential SMFing on Chain Topology）</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>如果所有智能体同时更新（并行方案），低精度节点不知道哪个邻居已经获得了较准的估计，导致距离测量与较差估计结合 → 对自己的提升有限 → "垃圾进垃圾出"。需要一个机制让<strong>高精度信息优先传播</strong>。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>链式拓扑上的"顺序更新"（sequential update）——就像多米诺骨牌：第 0 块（锚点）已经立好 → 第 1 块靠在第 0 块上 → 第 2 块靠在第 1 块上 → …… 信息沿链<strong>单向流动</strong>，不会发生循环依赖导致的估计振荡。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Algorithm 1 (Sequential SMFing)：锚点（Agent 0）首先用高精度绝对测量更新自身 $X_{0,k}$。然后对于 $i = 1, 2, \dots, N-1$：Agent $i$ 用（a）自身的低精度绝对测量 $y_{i,k}^a$，（b）与 Agent $i-1$（已经更新完成的邻居）的相对距离测量 $y_{i,i-1,k}^r$，和（c）Agent $i-1$ 已更新的 zonotope $X_{i-1,k}$ 来更新自己的 zonotope $X_{i,k}$。每一步仅需一次 Minkowski 加法和一次集合交——计算复杂度极低。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 低精度节点通过锚点距离链获得显著精度增益 —— 理论与仿真双重验证</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>即使方法听起来合理，也需要回答<strong>定量问题</strong>：沿链传播 3 跳之后，第 4 个智能体的估计精度还能有多少提升？会不会累积误差淹没了锚点的好处？</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>集合传播的误差累积定律——每跳引入一个相对距离测量的外包络误差 + 前驱节点的 zonotope 尺寸。如果每跳的误差增长是<strong>线性</strong>的（而非指数），那么链式方案在短链（如 5~10 个智能体）中是完全可行的。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>UAV 2D 平面定位仿真：4 个智能体沿链排列，仅 Agent 0 有高精度绝对测量（$\pm 0.05$ m），Agent 1-3 仅有低精度绝对测量（$\pm 2$ m）+ 相对距离测量（$\pm 0.1$ m）。结果：无合作时 Agent 3 的估计范围为 ~4 m 直径；有锚点+距离链后收缩到 ~0.5 m 直径——<strong>降低约 8 倍</strong>。验证了锚点信息沿距离链的有效传播。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — from ring-shaped range to chain-propagated sets</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Sensor Input <span>Heterogeneous</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>Anchor: high-accuracy abs</strong>
+          <small>$y_{0,k} = x_{0,k} + v_{0,k}$, $|v_{0,k}| \le 0.05$m. GPS/laser-grade.</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>Non-anchors: low-acc abs + rel range</strong>
+          <small>$y_{i,k} = x_{i,k} + v_{i,k}$ ($|v| \le 2$m) + $y_{i,j,k}^r = \|x_i-x_j\|_2 + r$ ($|r| \le 0.1$m)</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Set Representation <span>Extended CZ</span></h4>
+        <div class="arch-card arch-power">
+          <strong>Extended Constrained Zonotope</strong>
+          <small>$Z = \{G\xi + c : A\xi=b,\ \xi^{(j)}\in[-h^{(j)},h^{(j)}]\}$ — non-unit bounds for tighter fit</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>Ring→convex outer-approximation</strong>
+          <small>Range $[d^-,d^+]$ mapped to Minkowski sum $S_{j,k} \oplus Y_{ij,k}^r$ with minimal conservativeness</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Chain Propagation <span>Sequential</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>Anchor first</strong>
+          <small>Agent 0: $X_{0,k} = X_{0,k}^{\text{pred}} \cap Y_{0,k}^{\text{abs}}$ — anchored in global frame</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>Sequential update</strong>
+          <small>Agent i: $X_{i,k} = X_{i,k}^{\text{pred}} \cap Y_{i,k}^{\text{abs}} \cap (X_{i-1,k} \oplus Y_{i,i-1,k}^r)$ — leveraging predecessor</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Output <span>Guaranteed Sets</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>Each agent gets its own guaranteed set</strong>
+          <small>$x_{i,k} \in X_{i,k}$ holds for all bounded noise realizations</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>Non-anchors shrink ~8× vs no-cooperation</strong>
+          <small>Anchor precision propagates 3+ hops with bounded cumulative error</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>heterogeneous sensors →</span>
+      <span>ring → convex CZ →</span>
+      <span>anchor→ hop1→ hop2→</span>
+      <span>guaranteed sets ∀ agents</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>Converting non-convex ring to convex CZ: over-approximation is unavoidable</small></div>
+      <div class="arch-metric"><strong>Main invention</strong><small>Extended CZ + sequential chain propagation for range-based cooperative filtering</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>Anchor fixes global frame; range chain transfers precision hop-by-hop</small></div>
+      <div class="arch-metric"><strong>Current limitation</strong><small>Chain-only topology; ring→CZ approximation still introduces conservativeness</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 System Frame — Chain-based Range Cooperative Filtering Pipeline</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SENSORS["异构传感器层"]
+      ANCHOR_S["锚点(Agent 0): 高精度绝对测量 ±0.05m"]
+      NONANCHOR_S["非锚点(Agent 1-N): 低精度绝对测量 ±2m + UWB相对测距 ±0.1m"]
+    end
+
+    subgraph REPR["集合表示层 · Extended Constrained Zonotope"]
+      ECZ_DEF["Z = {Gξ + c | Aξ = b, ξ^(j) ∈ [-h^(j), h^(j)]}"]
+      RING2CZ["环状区域 [d⁻, d⁺] → Minkowski sum: S_{j} ⊕ Y_{ij}^r"]
+      ABS2CZ["绝对测量 → 带状约束: {x | Cx ∈ y ± v_bounds}"]
+    end
+
+    subgraph CHAIN["链式顺序传播层 · Sequential SMFing"]
+      STEP0["Step 0: 锚点更新 · X_{0,k}=X_{0,k}^{pred} ∩ Y_{0,k}^{abs} · 极小区间"]
+      STEP1["Step i=1: Agent 1 使用 X_{0,k} + 距离测距 y_{1,0}^r → 收紧 X_{1,k}"]
+      STEP2["Step i=2: Agent 2 使用 X_{1,k} + 距离测距 y_{2,1}^r → 收紧 X_{2,k}"]
+      STEPN["Step i=N-1: ... 沿链传播直到末端"]
+    end
+
+    subgraph OUTPUT["输出 · 各智能体有保证估计集"]
+      OUT0["Agent 0: 极小 zonotope · 高精度 · 全局坐标系锚定"]
+      OUT1["Agent 1: 中精度 · 受益于锚点距离 · ~0.3m误差"]
+      OUT2["Agent 2: 中精度 · 2跳传播 · ~0.5m误差"]
+      OUTN["Agent N: 仍优于无合作 · 线性累积 · ~0.5-1m误差"]
+    end
+
+    SENSORS --> REPR
+    REPR --> CHAIN
+    CHAIN --> OUTPUT
+
+    STEP0 --> STEP1 --> STEP2 --> STEPN
+    OUT0 -.->|"锚定信息沿距离传播"| OUT1
+    OUT1 -.->|"累积误差线性增长"| OUT2
+    OUT2 -.->|"末端仍有显著增益"| OUTN
+
+    classDef sens fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef repr fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef chain fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef out fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class ANCHOR_S,NONANCHOR_S sens
+    class ECZ_DEF,RING2CZ,ABS2CZ repr
+    class STEP0,STEP1,STEP2,STEPN chain
+    class OUT0,OUT1,OUT2,OUTN out
+    </pre>
+  </div>
+
+  <h3>3.2 Algorithm Flow — Sequential SMFing Details</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    INIT["初始化: 所有智能体有先验 zonotope X_{i,0} 和噪声边界 W_i, V_i"] --> LOOP["每个时间步 k"]
+
+    LOOP --> PREDALL["所有智能体并行预测: X_{i,k}^{pred} = A_i X_{i,k-1} ⊕ B_i W_{i,k-1}"]
+
+    PREDALL --> ANCHOR["锚点(0)更新: X_{0,k} = X_{0,k}^{pred} ∩ Y_{0,k}^{abs}"]
+    ANCHOR --> ANCHOR_SEND["锚点将 X_{0,k} 发送给 Agent 1"]
+
+    ANCHOR_SEND --> I1{"i = 1 ... N-1"}
+    I1 --> AGENT_I["Agent i 接收 X_{i-1,k} 和 y_{i,i-1,k}^r"]
+    AGENT_I --> COMPUTE["计算: X_{i,k} = X_{i,k}^{pred} ∩ Y_{i,k}^{abs} ∩ (X_{i-1,k} ⊕ Y_{i,i-1,k}^r)"]
+    COMPUTE --> REDUCE["降阶: order reduction 控制 zonotope 生成元数"]
+    REDUCE --> SEND["将 X_{i,k} 发送给 Agent i+1"]
+    SEND --> I1
+
+    I1 -->|"i = N: 链末端"| DONE["所有智能体更新完成 · 输出 {X_{i,k}}_{i=0}^{N-1}"]
+    DONE --> NEXT{"下一时刻?"}
+    NEXT -->|"是"| LOOP
+    NEXT -->|"否"| END["结束"]
+
+    style INIT fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#4b5563
+    style ANCHOR fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    style COMPUTE fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    style DONE fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    style END fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#4b5563
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \text{给定：} \begin{cases} x_{i,k+1} = f_i(x_{i,k}, w_{i,k}), & w_{i,k} \in \mathcal{W}_{i,k} \\ y_{i,k}^a = C_i x_{i,k} + v_{i,k}^a, & |v_{i,k}^a| \le \bar{v}_i^{\text{abs}} \\ y_{ij,k}^r = \|x_{i,k} - x_{j,k}\|_2 + r_{ij,k}, & |r_{ij,k}| \le \bar{r}_{ij} \end{cases} $$
+    $$ \text{求：} X_{i,k} \ni x_{i,k},\quad \forall i \in \{0,1,\dots,N-1\} $$
+    $$ \text{其中：Agent 0（锚点）的 } \bar{v}_0^{\text{abs}} \ll \bar{v}_i^{\text{abs}}\;(i \ge 1) $$
+    <div class="eq-note">
+      <strong>$x_{i,k}$</strong> = 智能体 $i$ 的状态（如 2D 位置 $[p_x, p_y]^\top$）&nbsp;|&nbsp;
+      <strong>$y_{ij,k}^r$</strong> = 距离测量——<strong>非线性</strong>（含欧氏范数 $\|\cdot\|_2$）——这是本文与线性 SMF 的本质区别 &nbsp;|&nbsp;
+      <strong>$r_{ij,k}$</strong> = 距离测量噪声，有界于 $[-\bar{r}_{ij}, \bar{r}_{ij}]$ &nbsp;|&nbsp;
+      <strong>锚点</strong> = 绝对测量噪声界 $\bar{v}_0^{\text{abs}}$ 远小于非锚点的 $\bar{v}_i^{\text{abs}}$——这是信息不对称的核心 &nbsp;|&nbsp;
+      <strong>目标</strong>：在分布式（无中心节点）条件下，使非锚点的估计集合 $X_{i,k}$ 尽可能小（精度高），同时保证 $x_{i,k} \in X_{i,k}$（确定性）。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>(a) 各智能体的绝对测量序列 $\{y_{i,k}^a\}$（精度异构）；(b) 链式拓扑上的相对距离测量序列 $\{y_{i,i-1,k}^r\}$；(c) 沿链单向传递的邻居 zonotope $X_{i-1,k}$；(d) 所有噪声的有界范围</td><td>异构精度传感器 + 单向链式通信</td></tr>
+    <tr><td><strong>输出</strong></td><td>每个智能体 $i$ 的 local guaranteed zonotope $X_{i,k}$，满足 $x_{i,k} \in X_{i,k}$。集合体积沿链逐渐增大（从锚点到末端），但每个节点都比无合作方案显著收缩</td><td>沿链排列的 N 个 zonotope（体积递增）</td></tr>
+    <tr><td><strong>目标</strong></td><td>最小化非锚点（尤其是链末端）的 zonotope 体积——即最大化锚点高精度信息沿距离链的传播效率</td><td>zonotope 直径 / 体积作为性能指标</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>面向异构传感器的分布式非线性合作定位</strong>问题。与标准 SMF 的区别：（1）测量模型是<strong>非线性的</strong>（距离 = 欧氏范数），不能直接用线性 SMF 的"预测 = 线性变换 + Minkowski 加、更新 = 交集"框架——距离测量的可行集是非凸环状区域；（2）传感器精度<strong>异构</strong>——锚点的高精度和普通节点的低精度形成巨大落差，如何让高精度信息"流动"到低精度节点是核心设计挑战；（3）链式拓扑上<strong>顺序传播</strong>的设计——并行更新会导致信息混杂（低精度节点也可能污染高精度节点），而链式顺序传播确保了信息从高精度向低精度的单向流动。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：距离测量的<strong>非凸性</strong>与集合滤波的<strong>凸计算需求</strong>之间的冲突。<br><br>
+    （1）<strong>距离测量的几何本质</strong>：测量 $y_{ij}^r = \|x_i - x_j\|_2 + r$（$|r| \le \bar{r}$）意味着真正的距离差 $s = x_i - x_j$ 落在球形环 $\{s : d - \bar{r} \le \|s\|_2 \le d + \bar{r}\}$ 中。在 2D 平面中，这是两个同心圆之间的<strong>环形区域（annulus）</strong>——中间有一个<strong>洞</strong>（$s$ 不能太近，即 $s$ 不能接近原点）。这个洞使得该集合<strong>非凸</strong>。<br><br>
+    （2）<strong>Zonotope 的凸性限制</strong>：所有 zonotope 变体（standard、constrained、extended constrained）都是<strong>凸多面体</strong>。用凸集外包一个非凸环状区域必然存在"填充洞"的保守性——环中间的点虽然在测量上不可能，但在 zonotope 的凸外包中被错误地标记为可能（false positive）。<br><br>
+    （3）<strong>链式传播的累积效应</strong>：即使每跳的保守性很小（如 5%~10% 额外外包误差），沿 10 跳的链累积后，末端节点的 zonotope 可能因"过度凸化"而膨胀到失去实用价值。如何用 extended constrained zonotope 的非单位边界来<strong>最小化</strong>这种每跳保守性是核心技术挑战。<br><br>
+    <strong>将这三点放在一起</strong>：你需要用一个<strong>凸集合</strong>（extended constrained zonotope）来近似 <strong>非凸距离环</strong>，并沿链式拓扑<strong>顺序传播</strong>，同时<strong>控制累积保守性</strong>——这要求距离环 → convex hull 的近似是紧致的，且每跳的降阶操作不丢失关键形状信息。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails / Insufficient</th></tr>
+    <tr>
+      <td>Range-only SLAM / Localization（距离 SLAM——基于优化）</td>
+      <td>通过非线性最小二乘（如 Gauss-Newton、LM）最小化距离残差的平方和，产生点估计 + 协方差</td>
+      <td>产生的是<strong>点估计 + 不确定性椭圆</strong>（基于高斯假设），不是确定性保证。在距离约束高度非线性的情况下（尤其是观测几何差时），线性化误差可能导致估计严重偏离真值——而算法无法检测到这种偏离。不适用于安全关键场景。</td>
+    </tr>
+    <tr>
+      <td>Interval Analysis for Range Localization（区间分析距离定位）</td>
+      <td>用区间向量（box）包裹状态，通过区间算术（interval arithmetic）收缩区间直到包含真值</td>
+      <td>Box 表示的精度很差——每步的区间膨胀（wrapping effect）在距离测量场景中尤为严重：环状区域用盒子外包会引入超大面积（四个角完全不可能但在盒子内）。精度损失随维度指数增长。</td>
+    </tr>
+    <tr>
+      <td>Standard Zonotopic SMF for Nonlinear Systems（标准 zonotope SMF + 线性化）</td>
+      <td>对非线性测量函数做一阶 Taylor 展开 + 线性化误差外包络，然后使用标准 zonotope 操作</td>
+      <td>距离函数 $\|s\|_2$ 在原点附近不可微（梯度不连续），一阶 Taylor 展开在此区域失效。线性化误差的 zonotope 外包非常保守——比真实的环形区域大得多。</td>
+    </tr>
+    <tr>
+      <td>Particle-based Set-Membership（基于粒子的集合方法，如 box-particle filter）</td>
+      <td>用一组区间粒子（box particles）表示后验集合，通过重采样和收缩逼近真实集合</td>
+      <td>计算量随精度要求增长迅速——要精确表达环形区域需要大量粒子。且粒子方法不提供严格的<strong>外包络保证</strong>（粒子可能因重采样而丢失包含真实状态的区域）。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 环形非凸区域的凸近似的紧致性</strong>：如何用 extended constrained zonotope 产生一个环状区域的最小体积凸外包？这本质上是一个几何优化问题——选择生成元的方向 $g_j$ 和尺度 $h^{(j)}$ 使得凸多面体既包含整个环、又尽量不包含"空洞"中的点。本文通过特定的生成元排列策略（沿环的径向和周向定向）来逼近最优。</li>
+    <li><strong>挑战 2 — 链式传播的误差累积控制</strong>：每跳引入两个误差源：（a）距离环的凸外包误差；（b）前驱节点 zonotope 的自身体积。如果错误地设计更新顺序（如并行），这两个误差会<strong>双向扩散</strong>——低精度节点反而污染高精度节点。链式顺序传播通过单向信息流避免了这个问题，但链越长末端累积越大。需要在拓扑设计（链长度 vs 每跳精度）之间权衡。</li>
+    <li><strong>挑战 3 — Extended Constrained Zonotope 的降阶策略</strong>：每步 Minkowski 加法和集合交会引入新的生成元和等式约束。如果不降阶，zonotope 的复杂度会随链长指数增长。降阶操作（如用更少的生成元 + 略微膨胀来外包原集合）必然引入额外保守性——如何使降阶误差的累积在可控范围内？</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的方法核心是<strong>"环 → 凸外包 → 链式顺序交"的三步管线</strong>：（1）将距离测量的非凸环状约束用 extended constrained zonotope 进行紧致凸外包；（2）在链式拓扑上定义顺序更新规则——锚点先更新，其后各智能体依次利用前驱的 zonotope + 距离测量来更新自己；（3）每一步使用 constrained zonotope 的集合交和 Minkowski 加操作实现，降阶控制复杂度。以下是核心公式。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: Extended Constrained Zonotope -->
+  <h4>Group A: Extended Constrained Zonotope —— 带非单位边界的泛化表达</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — Extended Constrained Zonotope 的定义</span>
+    $$ Z(G, c, A, b, h) = \left\{ G\xi + c : A\xi = b,\; \xi^{(j)} \in [-h^{(j)}, h^{(j)}],\; j=1,\dots,n_g \right\} $$
+    <div class="eq-note">
+      <strong>$G \in \mathbb{R}^{n \times n_g}$</strong> = 生成元矩阵（$n_g$ 个生成元向量，定义了 zonotope 的"方向"）&nbsp;|&nbsp;
+      <strong>$c \in \mathbb{R}^n$</strong> = 集合中心 &nbsp;|&nbsp;
+      <strong>$A \in \mathbb{R}^{n_c \times n_g}, b \in \mathbb{R}^{n_c}$</strong> = $n_c$ 个等式约束——让 zonotope 可以是非中心对称的&nbsp;|&nbsp;
+      <strong>$h \in \mathbb{R}^{n_g}_{\ge 0}$</strong> = 每个生成元的<strong>独立边界</strong>——这是 extended constrained zonotope <strong>超越经典 constrained zonotope</strong> 的关键：$h^{(j)}$ 可以取任意非负值，而非固定为 1。这使得我们可以"拉伸"某些生成元的跨度来更紧致地贴合环状区域的外轮廓。
+    </div>
+  </div>
+
+  <!-- Formula Group B: Range Measurement Set -->
+  <h4>Group B: 距离测量环 → Minkowski 加法组合</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 距离测量的可行状态差集合</span>
+    $$ Y_{ij,k}^r = \left\{ s \in \mathbb{R}^{n} : d_{ij}^- \le \|s\|_2 \le d_{ij}^+ \right\} $$
+    $$ d_{ij}^- = \max(0,\; y_{ij,k}^r - \bar{r}_{ij}),\quad d_{ij}^+ = y_{ij,k}^r + \bar{r}_{ij} $$
+    <div class="eq-note">
+      <strong>$Y_{ij,k}^r$</strong> = 所有与距离测量一致的状态差 $s = x_{i,k} - x_{j,k}$ 的集合——形状为<strong>球形环</strong>（2D 中为环形 annulus）&nbsp;|&nbsp;
+      <strong>$d_{ij}^-$</strong> = 环的内半径（最小可能距离——当 $y_{ij,k}^r - \bar{r}_{ij} < 0$ 时取 0，因为距离不能为负）&nbsp;|&nbsp;
+      <strong>$d_{ij}^+$</strong> = 环的外半径（最大可能距离）&nbsp;|&nbsp;
+      <strong>Minkowski 加法</strong>：$X_{i-1,k} \oplus Y_{i,i-1,k}^r$ = 所有 $a + b$ 的集合，其中 $a \in X_{i-1,k}$（前驱的不确定位置），$b \in Y_{i,i-1,k}^r$（相对距离的不确定区域）——结果的几何含义：以前驱 zonotope 中的每个点为中心，画半径为 $[d^-, d^+]$ 的环，所有这些环的并集。
+    </div>
+  </div>
+
+  <!-- Formula Group C: Anchor Update -->
+  <h4>Group C: 锚点更新 —— 全精度基准</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 锚点的 SMF 更新（Step 0）</span>
+    $$ X_{0,k}^{\text{pred}} = A_0 X_{0,k-1} \oplus B_0 \mathcal{W}_{0,k-1} $$
+    $$ X_{0,k} = X_{0,k}^{\text{pred}} \cap Y_{0,k}^{\text{abs}},\quad Y_{0,k}^{\text{abs}} = \{x : C_0 x \in y_{0,k}^a + [-\bar{v}_0^{\text{abs}}, \bar{v}_0^{\text{abs}}]\} $$
+    <div class="eq-note">
+      <strong>锚点的独特优势</strong>：$\bar{v}_0^{\text{abs}}$ 极小（如 ±0.05m）→ 绝对测量约束 $Y_{0,k}^{\text{abs}}$ 是一个非常"薄"的带状集合 → 与预测 zonotope 求交后，$X_{0,k}$ 被<strong>剧烈收缩</strong>到极小区间。这个高精度 zonotope 是整个链的"锚"——后续所有智能体的精度都以它为基准沿距离传播。
+    </div>
+  </div>
+
+  <!-- Formula Group D: Sequential Update for Non-Anchors -->
+  <h4>Group D: 非锚点的顺序更新 —— 距离链核心操作</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 非锚点 Agent $i$ 的顺序更新（Algorithm 1, Step i）</span>
+    $$ X_{i,k} = X_{i,k}^{\text{pred}} \cap Y_{i,k}^{\text{abs}} \cap \underbrace{\left( X_{i-1,k} \oplus Y_{i,i-1,k}^r \right)}_{\text{相对距离约束项}} $$
+    <div class="eq-note">
+      <strong>$X_{i,k}^{\text{pred}}$</strong> = 本地动力学预测的 zonotope（通常较大——低精度节点缺乏精确锚定）&nbsp;|&nbsp;
+      <strong>$Y_{i,k}^{\text{abs}}$</strong> = 本地低精度绝对测量约束（如 ±2m）——提供粗粒度的全局位置约束 &nbsp;|&nbsp;
+      <strong>$X_{i-1,k} \oplus Y_{i,i-1,k}^r$</strong> = <strong>关键项</strong>——前驱 Agent $i-1$ 的已更新 zonotope + 相对距离环的 Minkowski 和。由于 $X_{i-1,k}$ 已经受过锚点信息传播的"收紧"，这个 Minkowski 和的体积远小于初始预测 zonotope → 三重交集显著缩小 $X_{i,k}$。&nbsp;|&nbsp;
+      <strong>保证性</strong>：如果 $x_{i-1,k} \in X_{i-1,k}$ 且 $\|x_{i,k} - x_{i-1,k}\|_2 \in [d^-, d^+]$，则 $x_{i,k} \in X_{i-1,k} \oplus Y_{i,i-1,k}^r$ → 真实状态一定在最终 $X_{i,k}$ 中。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>锚点绝对精度 $\bar{v}_0^{\text{abs}}$</td><td><strong>0.05 m</strong>（仿真）</td><td>锚点绝对测量噪声界</td><td>模拟高精度 GPS/激光定位。比非锚点精度高 40 倍——确保锚定作用显著</td></tr>
+    <tr><td>非锚点绝对精度 $\bar{v}_i^{\text{abs}}$</td><td><strong>2 m</strong>（仿真）</td><td>普通节点的绝对测量噪声界</td><td>模拟低精度 IMU 推算或普通 GPS。没有锚点+距离辅助时，定位误差 ~±2m</td></tr>
+    <tr><td>距离测量精度 $\bar{r}_{ij}$</td><td><strong>0.1 m</strong>（仿真）</td><td>UWB 相对测距噪声界</td><td>模拟典型 UWB 测距精度。0.1m 远优于 2m 的绝对精度——这正是"用距离测量弥补绝对测量不足"的物理基础</td></tr>
+    <tr><td>链长度 $N$</td><td><strong>2~10</strong>（理论任意）</td><td>链式拓扑上的智能体数量</td><td>仿真展示 4 智能体。链越长→累积保守性越大→需要在拓扑中插入多个锚点（如 head + tail 锚点）来限制累积</td></tr>
+    <tr><td>Extended CZ 生成元数 $n_g$</td><td><strong>通过降阶控制</strong>（~20-50）</td><td>每个 zonotope 的生成元数量</td><td>决定了每次 Minkowski 加法和交集的复杂度 $O(n_g^2)$。降阶后 $n_g$ 保持常数 → 每步计算量不随链长增长</td></tr>
+  </table>
+
+  <h3>6.4 有锚点辅助 vs 无合作 —— 估计精度对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>📍 有锚点+距离链（本文）</h4>
+      <ul>
+        <li>锚点提供全局坐标系中的<strong>绝对基准</strong></li>
+        <li>距离测量沿链将锚点的<strong>精度优势逐跳传递</strong></li>
+        <li>第 $i$ 个智能体的精度 ≈ $\bar{v}_0^{\text{abs}} \times$ (累积因子)$^i$</li>
+        <li>短链（≤5跳）中，末端精度仍比无合作好数倍</li>
+        <li>每步仅用<strong>一次 Minkowski 加 + 一次集合交</strong>——计算极简</li>
+        <li>确定性保证：zonotope 一定包含真实位置</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🔇 无合作（各智能体独立）</h4>
+      <ul>
+        <li>每个智能体仅用<strong>自己的绝对测量</strong></li>
+        <li>低精度节点定位误差 = 绝对测量噪声界（±2m）</li>
+        <li>锚点的存在对非锚点<strong>毫无帮助</strong>——信息孤岛</li>
+        <li>不利用距离测量——浪费了最精确的传感器</li>
+        <li>计算量最小，但精度极差</li>
+        <li>确定性保证仍成立——但集合太大，无实用价值</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个关键技术原理：Extended Constrained Zonotope 对非凸几何的凸近似能力、环形距离约束的 Minkowski 加法传播、以及链式顺序更新的信息单向流动保证。</p>
+
+  <h3>7.1 Extended Constrained Zonotope —— 为什么需要"非单位边界"</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 非单位边界 $h^{(j)}$ 的几何意义</span>
+    $$ \text{标准 CZ: } \xi^{(j)} \in [-1, 1] \quad \Rightarrow \quad \text{每个生成元对形状贡献的"幅度"固定为 1} $$
+    $$ \text{扩展 CZ: } \xi^{(j)} \in [-h^{(j)}, h^{(j)}] \quad \Rightarrow \quad \text{生成元 } g_j \text{ 的跨度可独立缩放 } h^{(j)} \text{ 倍} $$
+    <div class="eq-note">
+      <strong>直观理解</strong>：标准 constrained zonotope 是一个中心对称的超平行体（用等式约束 $A\xi = b$ "切"出来的凸集），所有生成元的跨度相等 → 像一个"正方体切成的不规则形状"。Extended CZ 通过 $h^{(j)}$ 允许不同生成元有<strong>不同的半跨度</strong> → 像一个"长方体（各棱不等长）切成的不规则形状"——多了一个自由度来拟合目标形状，可以更紧致地包裹环形区域。&nbsp;|&nbsp;
+      <strong>对环形区域的应用</strong>：环形的特点是径向窄（内外半径差 $d^+ - d^- = 2\bar{r}_{ij}$，可能很小）但周向宽（整圈 360°）。用标准 CZ 表示时，所有方向上的精度一致 → 为了覆盖周向宽度，径向也被强制等宽 → 径向过保守。用 extended CZ 可以通过 $h^{(j)}$ 在周向取大值、径向取小值 → 紧致度大幅提升。
+    </div>
+  </div>
+
+  <h3>7.2 环形距离约束的传播 —— Minkowski 加法的几何直觉</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — Minkowski 加法传播距离信息</span>
+    $$ X_{i,k} \cap \left( X_{i-1,k} \oplus Y_{i,i-1,k}^r \right) $$
+    $$ = \left\{ x : x \in X_{i,k}^{\text{other}} \text{ 且 } \exists a \in X_{i-1,k}, \|x - a\|_2 \in [d^-, d^+] \right\} $$
+    <div class="eq-note">
+      <strong>几何直觉</strong>：将前驱节点 $i-1$ 的 zonotope $X_{i-1,k}$ 中的每个点 $a$ 都"膨胀"为一个半径为 $[d^-, d^+]$ 的环，所有这些环的并集 = $X_{i-1,k} \oplus Y_{i,i-1,k}^r$。这个操作在计算上等价于：$X_{i-1,k}$ 的每个顶点 + 环形区域的每个方向外包络 → 构造一个新的（更大的）zonotope。&nbsp;|&nbsp;
+      <strong>与前驱 zonotope 求交的含义</strong>：$X_{i,k}^{\text{其他约束}} \cap (X_{i-1,k} \oplus Y_{i,i-1,k}^r)$ = 当前智能体的可能位置，且该位置必须在"前驱位置 + 距离约束"的范围内。如果前驱 $X_{i-1,k}$ 很小（锚点附近），这个约束非常紧 → $X_{i,k}$ 被大幅收缩。
+    </div>
+  </div>
+
+  <h3>7.3 链式顺序传播的优势 —— 信息单向流 vs 并行双向流</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 顺序 vs 并行传播的集合论分析</span>
+    $$ \text{顺序（本文）：} X_{i,k}^{\text{seq}} = F\left(X_{i,k}^{\text{pred}}, X_{i-1,k}^{\text{seq}}, y_{i,i-1,k}^r, y_{i,k}^a\right) \quad \text{单向依赖} $$
+    $$ \text{并行：} X_{i,k}^{\text{par}} = F\left(X_{i,k}^{\text{pred}}, X_{i-1,k}^{\text{par}}, X_{i+1,k}^{\text{par}}, y_{i,i-1,k}^r, y_{i,i+1,k}^r, y_{i,k}^a\right) \quad \text{双向耦合} $$
+    <div class="eq-note">
+      <strong>顺序方案的优势</strong>：（1）<strong>无循环依赖</strong>——每个智能体只依赖已经"固定"的前驱，不会出现"A 等 B 更新、B 等 A 更新"的死锁；（2）<strong>信息源可控</strong>——链式拓扑保证高精度信息从锚点单向流向末端，低精度节点的差信息<strong>不会反向污染</strong>高精度节点；（3）<strong>计算确定性</strong>——单次遍历即可完成全部更新，不需要迭代收敛。&nbsp;|&nbsp;
+      <strong>并行方案的劣势</strong>：（1）低精度节点的初始粗估计会通过距离测量<strong>双向扩散</strong>到高精度节点 → 锚点也被污染；（2）需要多轮迭代收敛（类似 belief propagation）→ 通信和计算负担重；（3）收敛性和解的唯一性无保证。&nbsp;|&nbsp;
+      <strong>代价</strong>：链式顺序方案不适用于循环拓扑——如果存在"A-B-C-A"的三角形循环，信息会绕圈累积而无法停止。本文仅处理链式拓扑（树状拓扑的特例）。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    Extended constrained zonotope 的非单位边界 $h^{(j)}$ 使距离环的凸近似更紧致 → Minkowski 加法将这一紧致表示与前驱的 zonotope 组合，产生当前智能体的距离约束集合 → 链式顺序传播保证这一紧致信息从锚点单向流至末端，不受低精度节点的反向污染 → <strong>三者环环相扣</strong>，实现了"仅用距离测量 + 链式通信，将锚点级精度传播数跳"的目标。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig3.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">链式拓扑上的顺序协同滤波框架示意图</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Chain topology sequential cooperative filtering framework"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：论文的核心系统框架——$N$ 个智能体在链式拓扑上排列。Agent 0（最左端，红色标注）为<strong>锚点</strong>，配备高精度绝对测量（GPS级）。Agent 1、2、3 为普通节点，各自有低精度绝对测量（±2m）和与直接前驱节点的 UWB 相对距离测量（±0.1m）。绿色箭头标注了信息传播方向：从锚点沿链单向流动。</p>
+      <ul>
+        <li><strong>锚点的特殊地位</strong>：Agent 0 是唯一拥有高精度绝对定位能力的节点——它不依赖任何相对测量即可获得极小区间的不确定集合（如 ±0.05m）。锚点是整个定位系统的<strong>全局坐标系原点</strong>——所有其他节点的位置都是"相对于锚点的距离 + 传播"推算出来的</li>
+        <li><strong>距离测量的核心角色</strong>：虽然单个距离测量不能定位（圆形约束），但与前驱节点的 zonotope 结合（"前驱在某个小区域里 + 距离测量指定了到前驱的距离范围"）就能产生一个<strong>环形带</strong>——这是比纯距离环更紧的约束。图示中相邻节点之间的双向箭头标注了距离测量关系</li>
+        <li><strong>单向通信</strong>：不同于大多数"全双工邻居通信"方案，本文只需要每个智能体<strong>接收前驱的 zonotope</strong>（不需要向后发送）。这大幅简化了通信协议——适合"一发多收"的广播式 UWB 通信</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">2D 平面中距离测量的环状几何约束与 zonotope 表示</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Ring-shaped geometry of range measurement and zonotope approximation"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：距离测量的核心几何挑战与本文的解决方案。（a）单个距离测量 $d \pm r$ 对应的几何区域——一个<strong>环形区域（annulus）</strong>：外半径 $d + r$，内半径 $\max(0, d - r)$。显然这是非凸的（原点附近有空洞）。如果 $d$ 很小而 $r$ 很大（如短距离但大噪声），环形会退化为<strong>圆盘</strong>（内半径 = 0），此时是凸的——这是距离约束最容易处理的退化情况。（b）<strong>extended constrained zonotope 的凸近似</strong>——用不等边界的生成元沿环形边缘排列。在周向上用大 $h^{(j)}$（覆盖全 360°），在径向上用小 $h^{(j)}$（仅覆盖环厚度 $2r$）。(c) <strong>Minkowski 加法的几何效果</strong>——蓝色 zonotope（前驱节点）与红色环的 Minkowski 和 = 绿色区域（当前节点的距离约束项）。</p>
+      <ul>
+        <li><strong>环形区域的"厚度"为何重要</strong>：环厚度 = $d^+ - d^- = 2\bar{r}_{ij}$——即距离测量噪声幅值的两倍。UWB 测距噪声通常很小（如 ±0.1m，环厚度仅 0.2m），这意味着环形区域非常"薄"——在大多数方向上，zonotope 的凸外包引入的额外面积很小。这也是为什么本文的 extended CZ 方案在实践中效果好的原因</li>
+        <li><strong>退化情况的处理</strong>：当 $d \le \bar{r}_{ij}$ 时（距离小于噪声界），环的内半径 = 0 → 退化为<strong>圆盘</strong>（凸的）→ 此时 zonotope 是精确表示而非外包络。这是"短距离 + 大噪声"场景的福利——距离越近，几何约束反而越容易精确表达</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">仿真结果：有/无锚点辅助的估计误差对比（UAV 2D 平面定位）</span>
+      <span class="fig-source">来源：论文 Fig. 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Simulation: estimation error with vs without anchor assistance"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：4 个智能体在 2D 平面中运动的仿真对比——（a）无合作方案：每个智能体仅用自身绝对测量（包括锚点，锚点仍用高精度测量但信息不共享）——普通节点（Agent 1-3）的 zonotope 非常大（±2m 级）。(b) 本文方案（链式顺序传播）：锚点与 Agent 1 共享距离测量 → Agent 1 的 zonotope 显著收缩（~0.3m）；Agent 1 与 Agent 2 共享 → Agent 2 收缩（~0.5m）；Agent 2 与 Agent 3 共享 → Agent 3 收缩（~0.5-1m）。(c) 集中式方案（所有测量汇总）：理论最优——普通节点的 zonotope 最小，但通信负担最重。</p>
+      <ul>
+        <li><strong>精度增益的衰减曲线</strong>：从锚点（±0.05m）→ Agent 1（±0.3m）→ Agent 2（±0.5m）→ Agent 3（±0.8m），每跳约增加 0.2-0.3m 不确定度。这是<strong>线性增长</strong>而非指数增长——证明链式方案在短链中是可行的。如果链长扩展到 20 跳，末端精度仍可能优于 ±5m（vs 无合作的 ±2m 单点——虽然已经失去了优势，说明链式方案存在最优链长度）</li>
+        <li><strong>距离测量精度 vs 绝对测量精度的 trade-off</strong>：$\bar{r}_{ij} = 0.1$m 是每跳精度衰减的主要原因。如果使用更高精度的距离传感器（如激光测距 ±0.01m），链式传播的衰减会大幅减小——链长可以显著增加</li>
+        <li><strong>为什么无合作时锚点也受"污染"</strong>：注意在无合作方案中，<strong>所有智能体（包括锚点）的 zonotope 是独立计算的</strong>——锚点的高精度信息不向外传播，非锚点不使用。只有链式方案才使得锚点信息流动。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) <strong>链式拓扑</strong>——要求智能体排列成链，且通信只能在相邻节点间进行。这在实际部署中不总是成立——UAV 编队可能是任意图（星型、全连接、随机网格）。(2) 噪声边界必须准确——距离噪声界 $\bar{r}_{ij}$ 和绝对测量噪声界 $\bar{v}_i^{\text{abs}}$ 必须正确预设。如果实际 UWB 多径误差超出预设边界，zonotope 不包含真实状态。(3) 动力学模型假设线性——UAV 的旋转和平移耦合在实际中不能忽略。(4) 论文将完整的有界误差分析留作未来工作——目前的理论保证是"如果噪声在界内，则状态一定在 zonotope 内"，但没有定量分析"噪声边界估计误差"的影响。</li>
+    <li><strong>适用场景</strong>：适用于<strong>短链式编队</strong>（3~10 个智能体沿一维排列）的合作定位——如沿隧道行进的 UAV 编队、管道巡检机器人队列。不适用于：（1）2D/3D 网格或任意拓扑的编队（链式假设不成立）；（2）锚点不在链端而在链中间的拓扑（需要双向传播→链式方案退化为更复杂的迭代方案）。</li>
+    <li><strong>可扩展性</strong>：链长度越长，累积保守性线性增长。如果链过长（如 50+ 智能体），末端节点的定位精度可能退化到与无合作方案相当——失去了合作的意义。解决方案：在长链中插入多个锚点（如每 5 个智能体放一个锚点），将链分段——每段内的精度衰减被限制在可控范围内。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>拓扑扩展</strong>：从链式 → <strong>树状拓扑（tree topology）</strong>——链是树的特例（每个节点最多一个子节点）。在树状拓扑中，锚点位于根节点，信息沿树的分支流向各叶节点。分支节点需要合并多个子节点的信息——需要设计"集合融合"（zonotope fusion）操作来合并来自不同分支的距离约束。树状拓扑的精度分析比链式复杂得多——不同分支之间的信息独立传播，但在分支节点融合时可能产生"双重计数"问题。</li>
+    <li><strong>条件放松</strong>：(1) <strong>多锚点 + 双向距离测量</strong>——如果链两端各有一个锚点（head anchor + tail anchor），可以从两端同时向中间传播 → 中间节点的 zonotope = 两端传播结果的交集 → 精度远高于单锚点方案；(2) <strong>动态距离测量选择</strong>——根据当前各节点的 zonotope 体积，动态选择"下一跳"使用哪个邻居的距离测量（贪心选择最"窄"的邻居）。</li>
+    <li><strong>约束加入</strong>：(1) 将 extended CZ 方案扩展到<strong>3D</strong>（UAV 真实飞行空间）——3D 中的环形退化为<strong>球壳（spherical shell）</strong>，凸近似更复杂但原理相同；(2) 加入<strong>姿态信息</strong>——如果 UAV 的航向已知（磁力计），可以将距离约束从"各向同性环"降维为"定向弧形带"（航向已知 → 后方距离不相关 → 约束更紧）。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>UWB 测距的 NLOS（非视距）误差</td><td>NLOS 条件下，UWB 测距的误差不再是 ±0.1m，而可能出现<strong>系统性偏置</strong>（如 +0.5m 到 +2m 的正偏置）。如果预设的噪声界 $\bar{r}_{ij} = 0.1$m 不覆盖 NLOS 偏置，zonotope 可能<strong>不包含真实状态</strong>——确定性保证失效。需要扩大 $\bar{r}_{ij}$ 来覆盖 NLOS 误差，但这会增大环形厚度 → 增加保守性</td><td>★★★★★</td></tr>
+    <tr><td>链中单点失效的级联影响</td><td>如果 Agent 1 的绝对测量突然失效或精度下降（如传感器故障），它的 zonotope $X_{1,k}$ 会异常膨胀 → 通过距离链传播到 Agent 2、3…… → 整个下游的定位精度崩溃。链式拓扑<strong>没有容错冗余</strong>——上游的一个失效会污染全部下游</td><td>★★★★</td></tr>
+    <tr><td>环形区域凸近似的"空洞填充"效应</td><td>当 $d$ 较大而 $\bar{r}$ 很小时（如 100m ± 0.1m），环形非常薄且半径大——它的凸外包（extended CZ）几乎是一个<strong>圆盘</strong>（直径 ~200m），内部绝大部分面积都是"空洞填充"的虚假可能性。这种情况下，extended CZ 的精度优势几乎消失——因为无论怎么调整 $h^{(j)}$，凸集必须包含环的整个外围 → 无法避免大空洞</td><td>★★★</td></tr>
+    <tr><td>降阶操作的累积精度损失</td><td>每步 Minkowski 加法会增加 zonotope 的生成元数 → 必须降阶 → 降阶膨胀引入额外保守性。经过 10+ 跳链后，降阶保守性的累积可能超过距离环凸近似的保守性 → 降阶策略的设计比距离环近似更关键</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>多锚点 + 分布式 Zonotope 融合的协同定位</strong>——当前论文仅处理单锚点 + 链式拓扑。一个极有潜力的扩展是：在任意图拓扑（如 UAV 编队的 mesh 网络）中，每个智能体有多个邻居（多个距离测量），如何通过<strong>分布式 zonotope 融合</strong>（类似于分布式数据融合中的 Covariance Intersection 在集合论下的对应物）来合并来自多个方向的距离信息？核心挑战：不同邻居的 zonotope 包含<strong>相关的误差</strong>（因为它们共享锚点信息），直接取交集会<strong>过度乐观</strong>（忽略相关性导致 zonotope 过小→不包含真值）。需要一个<strong>保证包含</strong>的保守融合规则——类似于 Covariance Intersection 提供"保证不低估协方差"的集合论对应物。这项工作如果完成，将打通 SMF 从链式到任意图拓扑的最后一道理论障碍。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>在多智能体系统中，定位能力极度不均匀——有些智能体可能有高精度 GPS（锚点，±0.05m），另一些只有低精度 IMU 推算（±2m）。两者之间的距离测量（UWB ±0.1m）反而比低精度节点的绝对定位准 20 倍。如何在<strong>不架设中心基站</strong>的前提下，用这个相对精确的距离测量把锚点的高精度"传递"给低精度节点？</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：（i）距离 SLAM/非线性优化——给出点估计 + 不确定性椭圆，但不提供"100% 包含"的硬保证；（ii）区间分析——用超立方体（box）收缩可行域，但环形距离约束的 box 外包极度保守（包含大量不可能区域）；（iii）标准 zonotope SMF + 线性化——距离函数 $\|s\|_2$ 线性化误差大，且原点不可微。都没有同时解决"非凸 + 保证 + 紧致"三个维度。</li>
+    <li><strong>如果专门为环形约束设计一个集合表示呢？</strong><br>Extended constrained zonotope 的非单位边界 $h^{(j)}$ 可以独立缩放每个生成元的跨度——这意味着可以在环形区域的不同方向上使用不同"粗细"的生成元：在周向上用大 $h^{(j)}$（覆盖整圈），在径向上用小 $h^{(j)}$（只覆盖环厚度 $2\bar{r}_{ij}$）。这使得凸外包的保守性被最小化到接近环本身的厚度。</li>
+    <li><strong>如果还不够，如何利用锚点的信息优势？</strong><br>链式顺序传播——让锚点先用高精度测量把自身 zonotope 缩到极小 → 然后第一跳用锚点 + 距离测量来收紧 Agent 1 → 第二跳用 Agent 1 + 距离测量来收紧 Agent 2 → ... 信息<strong>单向流动</strong>，高精度不被低精度污染。</li>
+    <li><strong>最简单的方案是什么？</strong><br>一根链：锚点（GPS级）→ UWB → Agent 1 → UWB → Agent 2 → UWB → Agent 3。锚点不需要任何距离测量（自身足够精确），Agent $i$ 只需和前驱 Agent $i-1$ 通信一次 zonotope + 一个距离测量。每跳只需一次 Minkowski 加法和一次集合交。4 个智能体，3 条边，计算量极小，Zonotope 体积沿链线性增长——锚点的精度被有效地"扩散"了 2~3 跳。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    每个智能体都带着 UWB（能精确测相对距离但不能定位），有些智能体带着高精度 GPS（能定位），但低精度节点就算有 GPS 也定不准——那为什么不<strong>让低精度节点通过精确的 UWB 距离测量"靠"在已精确定位的高精度节点上</strong>，沿链顺序地把锚点级精度传播过去，就像多米诺骨牌靠在前一块上一样？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：UAV 编队中，领头 UAV（leader）可能装备高精度 RTK GPS（±2cm），但跟随 UAV（followers）只有低成本 IMU + 普通 GPS（±2m）。然而，编队之间的 UWB 测距精度（±10cm）远优于普通 GPS。问题是：如何让 followers 用 UWB 距离"蹭"leader 的高精度定位？直觉：如果我知道"距离 leader 5m ± 0.1m"，而 leader 的位置已知精确到 ±2cm，那我的位置就被约束在一个薄环上——比 ±2m 好得多。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"距离协同定位"分解为：（a）<strong>集合表示</strong>——用什么数据结构表达环形约束？（b）<strong>传播机制</strong>——如何让多个智能体依次受益？（c）<strong>保证机制</strong>——如何确保结果一定包含真值？</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）Extended constrained zonotope——处理非凸几何约束的灵活凸表示；（2）链式顺序传播——简单且信息单向流动，避免循环依赖；（3）SMF 的确定性保证——Minkowski 加 + 集合交的组合天然保证包含性。</li>
+    <li><strong>Step 4 — 组装方案</strong>：将环状距离约束用 extended CZ 近似 → 沿链顺序：锚点 SMF → Agent 1 = 预测 ∩ 绝对 ∩ (锚点 ⊕ 距离环) → Agent 2 = 预测 ∩ 绝对 ∩ (Agent 1 ⊕ 距离环) → ... → 完成。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一次典型的<strong>"以几何约束为核心"的传感器融合设计</strong>——不是把距离测量硬塞进某个现成的滤波器框架（如强行线性化然后跑 EKF），而是<strong>从距离测量的几何本质出发</strong>（环状非凸区域），专门设计一个能紧致处理这种几何的集合表示（extended CZ）和传播方案（链式顺序）。对于 UAV 感知方向的启示：<strong>传感器的物理/几何特性应该驱动算法设计</strong>——如果测量是非凸的，不要强行线性化，而是去思考什么样的集合表示能天然处理这种非凸性。</li>
+    <li><strong>技术技巧层面</strong>：(1) Extended constrained zonotope 的非单位边界 $h^{(j)}$——一个看似细微的泛化（从 $[-1,1]$ 到 $[-h^{(j)}, h^{(j)}]$）却带来了质的精度提升——启示：<strong>在集合表示中增加自由度往往是值得的</strong>，即使操作复杂度略增；(2) 链式顺序传播的重心在于<strong>"谁先更新"这个顺序决策</strong>——锚点先走、高精度优先——顺序决策本身就是一种信息路由策略；(3) Minkowski 加法作为距离信息传播的集合论工具——简洁、有保证、易实现。</li>
+    <li><strong>实验/写作层面</strong>：论文通过三个图的对比（无合作、链式顺序、集中式）清晰地展示了"从好到更好"的阶梯式改进。尤其是用 zonotope 的视觉大小直观展示精度差异——<strong>在集合滤波论文中，可视化是传达算法优势的最有力手段</strong>——一个"zonotope 大小对比"的图胜过 1000 字的精度表格。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 编队 UWB 协同定位</strong>：如果你在 UAV 平台上使用 UWB 进行编队内互测距（这是非常常见的配置），本文的方法可以直接替代现有的 EKF 方案。具体步骤：（1）把每架 UAV 的位置先验建模为 zonotope（从 EKF 的协方差椭圆转换为外包 zonotope）；（2）用 extended CZ 表达 UWB 距离测量；（3）沿编队的实际通信拓扑（leader-follower 通常是树/链）顺序更新。好处：输出"无人机一定在 zonotope 内"的硬保证——对于编队防撞直接有用。</li>
+    <li><strong>对于多传感器融合架构设计</strong>：<strong>"按精度排序"的更新策略</strong>（高精度传感器先融合、低精度后融合）可以推广到任何多传感器系统——类似于"先用激光雷达做精确定位，再用视觉做辅助约束"。本文的 chain topology 本质上就是这种精度优先级的线性化。</li>
+    <li><strong>对于集合方法的工程部署</strong>：Constrained/Extended constrained zonotope 的 Minkowski 加、集合交、降阶等操作都有开源实现（如 CORA toolbox for MATLAB）。如果你在做有保证的 UAV 状态估计，引入 zonotope 工具链的门槛已经很低——不需要从零实现底层集合运算。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Scott, J.K. et al. (2016) — Constrained zonotopes: A new tool for set-based estimation and fault detection. <em>Automatica</em> 69, 126–136</td><td>Constrained zonotope 的奠基性论文——定义了本文使用的核心集合表示和所有操作（Minkowski 加、集合交、降阶）。必读。</td></tr>
+    <tr><td>Rego, B.S. et al. (2021) — Extended constrained zonotopes: Generalizing constrained zonotopes for set-based estimation (或类似标题的 extended CZ 定义论文)</td><td>非单位边界 $h^{(j)}$ 的正式引入——是本文 extended CZ 使用的理论来源。理解"为什么 $h^{(j)}$ 能减少保守性"的数学基础。</td></tr>
+    <tr><td>Ding, Y. et al. (2023) — 本文的 companion paper: Set-Membership Filtering-Based Cooperative State Estimation for Multi-Agent Systems. <em>CCC 2023</em> (arXiv: 2305.10366)</td><td>同一作者团队的集中式/分布式 SMF 框架论文——为本文的链式方案提供了理论背景和基准方法。两篇合读才能完整理解该团队在 SMF + MAS 上的研究脉络。</td></tr>
+    <tr><td>Dardari, D. et al. (2009) — Ranging with ultrawide bandwidth signals in multipath environments. <em>Proc. IEEE</em> 97(2), 353–371</td><td>UWB 测距的物理层特性综述——理解"距离噪声界 $\bar{r}_{ij}$"在实际系统中是如何确定的。SMF 的边界选择严重依赖于对传感器物理特性的理解。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Ding, Cong, Wang &amp; Cheng · arXiv 2023 · Cooperative Filtering with Range Measurements: A Distributed Constrained Zonotopic Method · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARCHITECTURE — UAV-Survey</title>
+<style>
+  :root { --bg:#0f1117; --bg-card:#1a1d27; --text:#e1e4ea; --text-dim:#8b8fa3; --border:#2a2d3a; --accent:#60a5fa; --radius:8px; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background:var(--bg); color:var(--text); line-height:1.8; }
+  .topbar { position:sticky; top:0; z-index:100; background:rgba(15,17,23,0.94); backdrop-filter:blur(14px); border-bottom:1px solid var(--border); padding:10px 24px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .topbar a { color:var(--text-dim); text-decoration:none; font-size:0.82rem; font-weight:600; }
+  .topbar a:hover { color:#fff; }
+  .topbar .home-btn { font-weight:700; color:#f97316; border:1px solid #f97316; padding:5px 12px; border-radius:6px; }
+  .main { max-width:1000px; margin:0 auto; padding:40px 24px; }
+  h1 { font-size:2rem; margin:24px 0 16px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  h2 { font-size:1.4rem; margin:32px 0 12px; color:var(--accent); scroll-margin-top:56px; }
+  h3 { font-size:1.1rem; margin:20px 0 8px; }
+  p { margin:8px 0; color:#c0c5ce; }
+  ul, ol { margin:8px 0 16px 24px; color:#c0c5ce; }
+  li { margin:4px 0; }
+  code { background:#252836; padding:2px 6px; border-radius:4px; font-size:0.85rem; color:#e879f9; }
+  pre { background:#1a1d27; border:1px solid var(--border); border-radius:var(--radius); padding:16px; overflow-x:auto; margin:12px 0; font-size:0.82rem; line-height:1.5; }
+  pre code { background:none; color:var(--text); padding:0; }
+  hr { border:none; border-top:1px solid var(--border); margin:24px 0; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; }
+  td, th { border:1px solid var(--border); padding:8px 12px; font-size:0.85rem; }
+  th { background:#252836; color:var(--text); }
+  strong { color:#fff; }
+  a { color:var(--accent); }
+  .footer { text-align:center; padding:24px; color:var(--text-dim); font-size:0.78rem; border-top:1px solid var(--border); margin-top:40px; }
+  .toc { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:20px 24px; margin-bottom:24px; }
+  .toc h3 { margin-top:0; }
+  .toc ol { columns:2; }
+  .print-btn { display:inline-block; background:var(--accent); color:#fff; border:none; padding:8px 18px; border-radius:6px; font-weight:700; cursor:pointer; font-size:0.82rem; text-decoration:none; }
+  .print-btn:hover { opacity:0.85; }
+  @media (max-width:700px) { .main { padding:20px 16px; } h1 { font-size:1.5rem; } .toc ol { columns:1; } }
+  /* Print styles for PDF export */
+  @media print {
+    body { background:#fff; color:#000; font-size:11pt; }
+    .topbar, .print-btn, .footer { display:none !important; }
+    .main { max-width:100%; padding:0; margin:0; }
+    h1 { font-size:20pt; border-bottom:2px solid #000; }
+    h2 { font-size:14pt; color:#000; page-break-after:avoid; }
+    h3 { font-size:12pt; page-break-after:avoid; }
+    pre, code { background:#f5f5f5; color:#000; border:1px solid #ccc; font-size:9pt; }
+    table { font-size:9pt; } td, th { border-color:#999; }
+    a { color:#000; text-decoration:underline; }
+    p, li { color:#333; }
+    @page { margin:2cm; size:A4; }
+  }
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <a href="index.html" class="home-btn">🏠 HOME</a>
+  <button class="print-btn" onclick="window.print()" style="margin-left:auto;">🖨 Download PDF</button>
+  <a href="#1-项目概述">Overview</a>
+  <a href="#2-层级架构">Architecture</a>
+  <a href="#3-目录结构">Structure</a>
+  <a href="#7-如何添加新内容">How To</a>
+  <a href="#9-协议版权与合规">License</a>
+</nav>
+<main class="main">
+<h1 id="uav-survey-架构技术文档">UAV-Survey 架构技术文档</h1>
+<p>> <strong>版本</strong>: v2.0 | <strong>更新</strong>: 2026-07-22 | <strong>维护者</strong>: JaiJaiC</p>
+<hr>
+<h2 id="目录">目录</h2>
+<ol>
+<li><a href="#1-项目概述">项目概述</a></li>
+<li><a href="#2-层级架构">层级架构</a></li>
+<li><a href="#3-目录结构">目录结构</a></li>
+<li><a href="#4-子系统详解">子系统详解</a></li>
+<li><a href="#5-数据流与自动化">数据流与自动化</a></li>
+<li><a href="#6-模板与样式体系">模板与样式体系</a></li>
+<li><a href="#7-如何添加新内容">如何添加新内容</a></li>
+<li><a href="#8-技术栈与依赖">技术栈与依赖</a></li>
+<li><a href="#9-协议版权与合规">协议、版权与合规</a></li>
+<li><a href="#10-维护清单">维护清单</a></li>
+</ul>
+<hr>
+<h2 id="1.-项目概述">1. 项目概述</h2>
+<p>UAV-Survey 是一个<strong>个人学术研究追踪系统</strong>，用于系统化管理无人机（UAV）与机器人领域的论文阅读笔记、学者追踪、实验室动态监控、公司技术跟踪和竞赛资料。</p>
+<h3 id="核心设计理念">核心设计理念</h3>
+<ul>
+<li><strong>静态HTML优先</strong>：所有页面为纯静态HTML，无需服务器端渲染，可直接通过文件系统或任何HTTP服务器访问</li>
+<li><strong>去中心化架构</strong>：每个子系统独立维护，通过相对路径链接形成整体</li>
+<li><strong>模板驱动</strong>：统一的CSS/HTML模板确保样式一致性</li>
+<li><strong>自动化辅助</strong>：Python脚本负责批量操作（论文爬取、RSS监控、格式升级）</li>
+<li><strong>本地优先</strong>：所有数据存储在本地文件系统中，PDF论文作为一手证据</li>
+</ul>
+<hr>
+<h2 id="2.-层级架构">2. 层级架构</h2>
+<pre><code>                        ┌─────────────────────────────┐
+                        │     index.html (总入口)       │
+                        │  search.html (全局搜索)        │
+                        │  track.py (研究追踪器)         │
+                        └─────────────┬───────────────┘
+                                      │
+        ┌─────────┬─────────┬─────────┼─────────┬─────────┬─────────┐
+        ▼         ▼         ▼         ▼         ▼         ▼         ▼
+   ┌─────────┐┌─────────┐┌─────────┐┌─────────┐┌─────────┐┌─────────┐┌─────────┐
+   │1.Paper  ││2.Scholar││ 3.Lab   ││4.Company││5.UAV    ││6.Compe- ││7.Tools  │
+   │深度论文  ││学者追踪  ││实验室追踪││企业追踪  ││Field    ││tition   ││工具资料  │
+   └────┬────┘└────┬────┘└────┬────┘└────┬────┘│领域综述  ││竞赛资料  │└─────────┘
+        │         │         │         │        └─────────┘└─────────┘
+   ┌────▼────┐┌───▼────┐┌───▼────┐┌───▼────┐
+   │note.html││Scholar ││  Lab   ││Company │
+   │(每篇论文 ││index   ││dashboard││index   │
+   │ 独立笔记)││+ files/││+ RSS   ││+ papers│
+   └─────────┘│  index ││  爬取   ││  .json │
+              └────────┘└────────┘└────────┘</code></pre>
+<h3 id="数据流向">数据流向</h3>
+<pre><code>外部数据源                     本地处理                         展示层
+─────────────────────────────────────────────────────────────────
+arXiv API ──→ track.py ──→ reports/*.md (周报)
+RSS Feeds ──→ crawl脚本 ──→ 3.Lab/*/papers.json ──→ search.html
+Google Scholar ──→ 手动整理 ──→ 2.Scholar/*/index.html
+PDF论文 ──→ Agent辅助 ──→ 2.Scholar/*/files/*/index.html (深度笔记)
+GitHub API ──→ track.py ──→ 活动监控</code></pre>
+<hr>
+<h2 id="3.-目录结构">3. 目录结构</h2>
+<pre><code>UAV-Survey/
+│
+├── index.html                 # 🏠 总入口：7大板块导航 + 拖拽排序
+├── search.html                # 🔍 全局论文搜索引擎
+├── ARCHITECTURE.md            # 📋 本文档
+├── track.py                   # 🤖 研究追踪器 (arXiv + GitHub)
+├── last_updated.json          # 📊 统计元数据
+│
+├── 1.Paper/                   # 📄 深度论文笔记 (精选精读)
+│   ├── 0.Fracture/            #    模板参考：CoulombFly (Nature 2024)
+│   │   ├── note.html          #       ← 所有2.Scholar笔记的模板源头
+│   │   └── figures/           #       论文图表截图
+│   ├── 1.Image-Based Visual Servoing.../
+│   ├── 2.Actor-Critic Model Predictive Control/
+│   └── ...                    #    共 ~9 篇精选深度论文
+│
+├── 2.Scholar/                 # 👤 学者论文笔记库 (核心)
+│   ├── Chao Yan/              #    以学者为单位的文件夹
+│   │   ├── index.html         #      学者首页 (Chao Yan风格)
+│   │   └── files/             #      论文笔记目录
+│   │       ├── 5476/          #        每篇论文一个子目录
+│   │       │   ├── index.html #          论文深度笔记 (~60-90KB)
+│   │       │   ├── *.pdf      #          论文PDF (一手证据)
+│   │       │   └── figures/   #          图表截图
+│   │       └── ...
+│   ├── Fei Gao/
+│   ├── Vijay Kumar/
+│   └── ...                    #    共 16 位学者
+│
+├── 3.Lab/                     # 🏛️ 大学实验室追踪
+│   ├── index.html             #    实验室总览页
+│   ├── ETH-ASL/               #    ETH Autonomous Systems Lab
+│   │   ├── dashboard.html     #      动态仪表盘
+│   │   └── papers.json        #      爬取论文数据
+│   ├── UZH-RPG/
+│   ├── ZJU-FAST/
+│   └── ...                    #    共 9 个实验室
+│
+├── 4.Company/                 # 🏢 企业技术追踪
+│   ├── index.html             #    企业总览页
+│   ├── DJI/
+│   ├── Unitree/
+│   ├── Skydio/
+│   └── ...                    #    共 14 家公司
+│
+├── 5.UAV Field/               # 📚 UAV领域综述
+│   ├── Anti-UAV/
+│   ├── Swarm Intelligence/
+│   └── UAV+RL/
+│
+├── 6.Competition/             # 🏆 竞赛资料
+│   ├── RoboCup无人机挑战赛/
+│   └── 中国研究生未来飞行器创新大赛/
+│
+├── 7.Tools/                   # 🔧 工具资料
+│
+└── reports/                   # 📊 自动生成周报
+    └── report-YYYY-MM-DD.md</code></pre>
+<hr>
+<h2 id="4.-子系统详解">4. 子系统详解</h2>
+<h3 id="4.1-总入口-(`index.html`)">4.1 总入口 (`index.html`)</h3>
+<p><strong>功能</strong>：7大板块导航，拖拽排序卡片，实时时钟</p>
+<p><strong>技术特点</strong>：</p>
+<ul>
+<li>HTML5 Drag & Drop API 实现卡片排序</li>
+<li>localStorage 持久化用户排序偏好</li>
+<li>动态加载 Scholar 卡片（从内嵌JSON渲染）</li>
+<li>深色主题 (dark mode)，CSS变量体系</li>
+</ul>
+<p><strong>关键代码段</strong>：</p>
+<ul>
+<li><code>data-sortable</code> 属性标记可排序网格</li>
+<li><code>draggable-card</code> 类启用拖拽</li>
+<li><code>initDragAndDrop()</code> 函数处理拖拽事件</li>
+</ul>
+<h3 id="4.2-论文笔记-(`1.paper/`-+-`2.scho">4.2 论文笔记 (`1.Paper/` + `2.Scholar/*/files/`)</h3>
+<p><strong>模板标准</strong> (以 <code>1.Paper/0.Fracture/note.html</code> 为基准)：</p>
+<p>每个论文笔记包含 <strong>11个固定章节</strong>：</p>
+<table>
+<tr><th>#</th><th>章节</th><th>内容要求</th></tr>
+<tr><td>1</td><td>论文信息</td><td>标题、作者、机构、期刊/会议、DOI、TL;DR、标签</td></tr>
+<tr><td>2</td><td>核心洞察与创新点</td><td>Q&amp;A式核心洞察 + 灵感映射表 + 3张创新卡片</td></tr>
+<tr><td>3</td><td>系统架构</td><td>架构面板 + 2-3个Mermaid流程图</td></tr>
+<tr><td>4</td><td>任务定义</td><td>LaTeX公式形式化 + 输入/输出表</td></tr>
+<tr><td>5</td><td>核心挑战</td><td>第一性原理诊断 + 先前方法对比表</td></tr>
+<tr><td>6</td><td>关键方法</td><td>3-4组LaTeX公式 + 参数表 + 对比框</td></tr>
+<tr><td>7</td><td>基本原理</td><td>2-3个深层机制解释 + 对比表</td></tr>
+<tr><td>8</td><td>论文图表</td><td>图表解读 + figures/占位</td></tr>
+<tr><td>9</td><td>缺陷与扩展</td><td>局限性 + 扩展方向 + 数据敏感度表</td></tr>
+<tr><td>10</td><td>动机推导</td><td>5步推导链 + 一句话动机</td></tr>
+<tr><td>11</td><td>核心收获</td><td>经验教训 + UAV研究应用 + 关键参考文献</td></tr>
+</table>
+<p><strong>样式规范</strong>：</p>
+<ul>
+<li>MathJax 3 渲染LaTeX公式 (<code>$$...$$</code>, <code>$...$</code>)</li>
+<li>Mermaid 10 渲染流程图</li>
+<li>7种彩色标签 (blue/green/amber/purple/red/cyan/gray)</li>
+<li>5种callout框 (info/tip/warn/danger/idea)</li>
+<li>响应式设计 (max-width: 1100px)</li>
+<li>中英混杂：章节标题/分析用中文，论文名/公式/术语保留英文</li>
+</ul>
+<h3 id="4.3-学者追踪-(`2.scholar/`)">4.3 学者追踪 (`2.Scholar/`)</h3>
+<p><strong>两层结构</strong>：</p>
+<ol>
+<li><strong>学者首页</strong> (<code>scholar/index.html</code>)：Chao Yan风格，包含Abstract、统计面板、研究路线图、论文卡片网格</li>
+<li><strong>论文笔记</strong> (<code>scholar/files/XXXX/index.html</code>)：完整11章节笔记</li>
+</ul>
+<p><strong>series-nav</strong>：每篇论文笔记顶部有学者内导航栏，可在该学者所有论文间快速跳转</p>
+<p><strong>特殊处理</strong>：</p>
+<ul>
+<li>NUDT同事（Chao Yan, Xiangke Wang, Yirui Cong, Guanzheng Wang, Zhihong Liu）：不包含Abstract</li>
+<li>无笔记学者（Boyu Zhou, Kaiming He, Shaojie Shen, Ángel Romero）：显示占位状态</li>
+</ul>
+<h3 id="4.4-实验室追踪-(`3.lab/`)">4.4 实验室追踪 (`3.Lab/`)</h3>
+<p><strong>数据来源</strong>：</p>
+<ul>
+<li>各实验室的 <code>papers.json</code>（由爬虫自动生成）</li>
+<li>RSS feed 监控</li>
+<li>手动添加的重要论文</li>
+</ul>
+<p><strong>页面层级</strong>：</p>
+<ul>
+<li><code>3.Lab/index.html</code> — 总览页（大卡片 + 实验室介绍）</li>
+<li><code>3.Lab/{Lab}/dashboard.html</code> — 各实验室独立仪表盘</li>
+<li><code>3.Lab/{Lab}/papers.json</code> — 论文数据</li>
+</ul>
+<h3 id="4.5-企业追踪-(`4.company/`)">4.5 企业追踪 (`4.Company/`)</h3>
+<p>14家公司，分类为：</p>
+<ul>
+<li><strong>Drones</strong>: DJI, Skydio, Autel, Parrot, Quantum Systems, JOUAV, XAG</li>
+<li><strong>Robotics</strong>: Unitree</li>
+<li><strong>Defense</strong>: Anduril, Shield AI, AeroVironment</li>
+<li><strong>Delivery/UAM</strong>: EHang, Wing, Zipline</li>
+</ul>
+<h3 id="4.6-搜索系统-(`search.html`)">4.6 搜索系统 (`search.html`)</h3>
+<p><strong>数据源</strong>：从各Lab/Company/UAV Field目录加载 <code>papers.json</code></p>
+<p><strong>功能</strong>：</p>
+<ul>
+<li>全文搜索（标题、作者、摘要、标签）</li>
+<li>多维度筛选（实验室、期刊/会议、CCF等级、CAS分区、年份）</li>
+<li>多种排序（最新、质量分、引用数、标题）</li>
+<li>Badge可视化（CCF等级、CAS分区、IF影响因子、引用数）</li>
+</ul>
+<hr>
+<h2 id="5.-数据流与自动化">5. 数据流与自动化</h2>
+<h3 id="5.1-研究追踪器-(`track.py`)">5.1 研究追踪器 (`track.py`)</h3>
+<pre><code>python track.py --days 14 -o reports/report-$(date +%Y-%m-%d).md</code></pre>
+<ul>
+<li>查询 arXiv API：按关键词检索各实验室/公司的最新论文</li>
+<li>查询 GitHub API：监控组织和仓库的最新活动</li>
+<li>生成Markdown周报</li>
+</ul>
+<h3 id="5.2-批量脚本体系">5.2 批量脚本体系</h3>
+<table>
+<tr><th>脚本用途</th><th>典型操作</th></tr>
+<tr><td>CSS/JS基础设施注入</td><td>为缺失MathJax/Mermaid的文件添加CDN脚本和模板CSS</td></tr>
+<tr><td>结构修复</td><td>修复minified HTML、统一container/nav/HOME按钮</td></tr>
+<tr><td>IF/期刊标注</td><td>匹配期刊数据库，为每篇论文添加IF/分区badge</td></tr>
+<tr><td>重命名迁移</td><td>note.html → index.html 批量重命名 + 链接更新</td></tr>
+<tr><td>学者首页生成</td><td>统一生成Chao Yan风格的学者index.html</td></tr>
+</table>
+<h3 id="5.3-agent辅助">5.3 Agent辅助</h3>
+<p>使用Claude Agent进行：</p>
+<ul>
+<li>论文PDF深度阅读 + 笔记生成</li>
+<li>全英文笔记中文化翻译</li>
+<li>内容质量增强（补充缺失的分析章节）</li>
+</ul>
+<hr>
+<h2 id="6.-模板与样式体系">6. 模板与样式体系</h2>
+<h3 id="6.1-css变量体系">6.1 CSS变量体系</h3>
+<p><strong>总入口深色主题</strong>：</p>
+<pre><code>--bg:#0f1117; --bg-card:#1a1d27; --text:#e1e4ea;
+--text-dim:#8b8fa3; --border:#2a2d3a;</code></pre>
+<p><strong>论文笔记浅色主题</strong>：</p>
+<pre><code>--bg:#f8f9fb; --surface:#ffffff; --border:#e2e5ea;
+--text:#1a1d23; --text-secondary:#5f6b7a;</code></pre>
+<h3 id="6.2-色彩系统">6.2 色彩系统</h3>
+<ul>
+<li><code>accent-blue</code> (ETH-ASL), <code>accent-purple</code> (UZH-RPG), <code>accent-orange</code> (UPenn/DJI)</li>
+<li>标签：<code>.tag-blue</code>, <code>.tag-green</code>, <code>.tag-amber</code>, <code>.tag-purple</code>, <code>.tag-red</code>, <code>.tag-cyan</code>, <code>.tag-gray</code></li>
+<li>IF badge: <code>.if-q1</code> (绿色), <code>.if-q2</code> (黄色), <code>.if-q3</code> (橙色), <code>.if-q4</code> (红色)</li>
+</ul>
+<h3 id="6.3-响应式断点">6.3 响应式断点</h3>
+<ul>
+<li>总入口：<code>@media (max-width: 768px)</code> → 单列布局</li>
+<li>论文笔记：<code>@media (max-width: 800px)</code> → hero单列</li>
+<li>学者首页：<code>@media (max-width: 800px)</code> → hero + roadmap 单列</li>
+</ul>
+<hr>
+<h2 id="7.-如何添加新内容">7. 如何添加新内容</h2>
+<h3 id="添加新学者">添加新学者</h3>
+<ol>
+<li>在 <code>2.Scholar/</code> 下创建 <code>{Name}/</code> 目录</li>
+<li>创建 <code>files/</code> 子目录</li>
+<li>运行 <code>regenerate_all_index.py</code> 生成学者首页</li>
+<li>在 <code>index.html</code> 的 <code>scholars</code> 数组中添加条目</li>
+</ul>
+<h3 id="添加新论文笔记">添加新论文笔记</h3>
+<ol>
+<li>在 <code>2.Scholar/{Scholar}/files/</code> 下创建数字ID目录</li>
+<li>放入论文PDF</li>
+<li>复制 <code>1.Paper/0.Fracture/note.html</code> 作为模板</li>
+<li>填充11个章节内容（可借助Agent辅助）</li>
+<li>重命名为 <code>index.html</code></li>
+</ul>
+<h3 id="添加新实验室">添加新实验室</h3>
+<ol>
+<li>在 <code>3.Lab/</code> 下创建目录</li>
+<li>创建 <code>dashboard.html</code> 和 <code>papers.json</code></li>
+<li>在 <code>3.Lab/index.html</code> 和总 <code>index.html</code> 中添加卡片</li>
+</ul>
+<h3 id="更新已有笔记">更新已有笔记</h3>
+<p>使用 <code>enrich_papers.py</code> 脚本批量更新IF/期刊标注。</p>
+<hr>
+<h2 id="8.-技术栈与依赖">8. 技术栈与依赖</h2>
+<table>
+<tr><th>组件</th><th>技术</th><th>说明</th></tr>
+<tr><td>页面渲染</td><td>纯静态HTML5 + CSS3</td><td>无框架依赖</td></tr>
+<tr><td>数学公式</td><td>MathJax 3 (CDN)</td><td>`tex-chtml.js`</td></tr>
+<tr><td>流程图</td><td>Mermaid 10 (CDN)</td><td>`mermaid.min.js`</td></tr>
+<tr><td>搜索</td><td>原生JavaScript fetch API</td><td>加载本地JSON</td></tr>
+<tr><td>拖拽排序</td><td>HTML5 Drag &amp; Drop API</td><td>localStorage持久化</td></tr>
+<tr><td>批量处理</td><td>Python 3</td><td>文件操作、正则、JSON</td></tr>
+<tr><td>外部数据</td><td>arXiv API, GitHub API</td><td>通过 track.py</td></tr>
+<tr><td>字体</td><td>系统原生字体栈</td><td>`-apple-system, "Noto Sans SC"`</td></tr>
+</table>
+<h3 id="cdn依赖">CDN依赖</h3>
+<pre><code>cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js
+cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js</code></pre>
+<hr>
+<h2 id="9.-协议、版权与合规">9. 协议、版权与合规</h2>
+<h3 id="9.1-代码许可">9.1 代码许可</h3>
+<p>本项目为<strong>个人学术用途</strong>（Personal Academic Use）。所有HTML/CSS/JavaScript代码为原创编写。</p>
+<h3 id="9.2-论文pdf">9.2 论文PDF</h3>
+<p><strong>重要法律声明</strong>：</p>
+<ul>
+<li>本项目中存储的论文PDF文件仅供<strong>个人学术研究和学习</strong>使用</li>
+<li>所有论文版权归原作者和出版机构所有</li>
+<li>PDF文件通过合法渠道获取（arXiv开放获取、作者主页、机构订阅）</li>
+<li><strong>不得</strong>将PDF文件公开发布、商业分发或用于任何侵犯版权的用途</li>
+<li>如需引用，请直接访问出版社官方DOI链接</li>
+</ul>
+<h3 id="9.3-arxiv-论文">9.3 arXiv 论文</h3>
+<p>arXiv上的论文遵循arXiv的使用条款：</p>
+<ul>
+<li>多数论文为开放获取（Open Access）</li>
+<li>允许个人下载和学术引用</li>
+<li>引用时应标注arXiv ID和官方链接</li>
+</ul>
+<h3 id="9.4-付费期刊论文-(ieee,-springer,-el">9.4 付费期刊论文 (IEEE, Springer, Elsevier等)</h3>
+<ul>
+<li>仅存储通过<strong>机构订阅</strong>合法获取的PDF</li>
+<li>这些PDF<strong>不应</strong>被公开分享或上传至公共仓库</li>
+<li>建议在 <code>.gitignore</code> 中排除PDF文件：</li>
+<p>  ```</p>
+<p>  **/*.pdf</p>
+<p>  ```</p>
+<li>笔记HTML文件仅包含论文的<strong>分析性内容</strong>（原创），不包含论文全文</li>
+</ul>
+<h3 id="9.5-图片与图表">9.5 图片与图表</h3>
+<ul>
+<li><code>figures/</code> 目录中的截图为论文原图</li>
+<li>使用受<strong>合理使用 (Fair Use)</strong> 原则保护：用于学术评论和批评</li>
+<li>每张图片标注来源（论文Figure编号）</li>
+<li>如版权方要求移除，将立即删除</li>
+</ul>
+<h3 id="9.6-商标与名称">9.6 商标与名称</h3>
+<ul>
+<li>公司名称（DJI, Unitree, Skydio等）为其各自所有者的商标</li>
+<li>实验室名称（ETH-ASL, UZH-RPG等）为其所属大学的名称</li>
+<li>本项目仅用于<strong>学术参考和追踪</strong>，不暗示任何背书或关联</li>
+</ul>
+<h3 id="9.7-第三方api使用">9.7 第三方API使用</h3>
+<ul>
+<li><strong>arXiv API</strong>: 免费开放，无API密钥要求，请求间隔>1秒</li>
+<li><strong>GitHub API</strong>: 免费层级，可选Token提升限额</li>
+<li><strong>Google Scholar</strong>: 仅存储公开链接，不进行大规模爬取</li>
+</ul>
+<h3 id="9.8-推荐做法">9.8 推荐做法</h3>
+<ol>
+<li><strong>不要将PDF文件加入Git</strong>：在 <code>.gitignore</code> 中添加 <code>**/*.pdf</code></li>
+<li><strong>使用相对路径</strong>：确保项目可移植</li>
+<li><strong>标注来源</strong>：每篇笔记标注DOI和arXiv链接</li>
+<li><strong>尊重robots.txt</strong>：自动化脚本遵守网站的爬取规则</li>
+<li><strong>定期审查</strong>：移除不再需要的版权内容</li>
+</ul>
+<h3 id="9.9-disclaimer">9.9 Disclaimer</h3>
+<pre><code>本项目 (UAV-Survey) 是一个个人学术研究追踪工具。
+所有论文版权归原作者和出版机构所有。
+论文PDF文件仅供个人学习使用，不应公开发布。
+如需使用论文内容，请通过官方渠道获取并正确引用。</code></pre>
+<hr>
+<h2 id="10.-维护清单">10. 维护清单</h2>
+<h3 id="每周">每周</h3>
+<ul>
+<li>[ ] 运行 <code>track.py --days 7</code> 生成周报</li>
+<li>[ ] 检查RSS爬取是否正常</li>
+</ul>
+<h3 id="每月">每月</h3>
+<ul>
+<li>[ ] 添加新发表的论文笔记</li>
+<li>[ ] 更新学者信息（Google Scholar、主页链接）</li>
+<li>[ ] 检查外部链接是否有效</li>
+</ul>
+<h3 id="每季度">每季度</h3>
+<ul>
+<li>[ ] 审查并更新期刊IF数据</li>
+<li>[ ] 备份整个项目目录</li>
+<li>[ ] 清理过时的临时文件</li>
+</ul>
+<h3 id="架构调整时">架构调整时</h3>
+<ul>
+<li>[ ] 先在测试学者上验证脚本</li>
+<li>[ ] 备份 <code>2.Scholar/</code> 目录</li>
+<li>[ ] 运行批量脚本后逐学者检查</li>
+<li>[ ] 确保总入口index.html链接正确</li>
+</ul>
+<hr>
+<p>> <strong>文档维护</strong>: 架构变更时同步更新本文档。最后更新: 2026-07-22</p>
+</main>
+<footer class="footer">UAV-Survey · <a href="ARCHITECTURE.md">View Markdown Source</a> · <a href="index.html">Back to Home</a></footer>
+</body>
+</html>

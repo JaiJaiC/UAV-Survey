@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — SlideSLAM (Liu, Lei, Prabhu et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">核心挑战</a>
+  <a href="#method">关键方法</a>
+  <a href="#principles">基本原理</a>
+  <a href="#figures">实验结果</a>
+  <a href="#flaw">缺陷与扩展</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Vijay Kumar · 17-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10002/index.html">Safety guardrails llm-ena</a>
+<a href="../10001/index.html">Contextual safety reasoni</a>
+<a href="../10017/index.html">Jailbreaking llm-controll</a>
+<a href="../10016/index.html">Deploying foundation mode</a>
+<a href="../10015/index.html">Spine Online semantic</a>
+<a href="../10014/index.html">Vision transformers end-t</a>
+<a href="../10013/index.html">EvMAPPER High-altitude or</a>
+<a href="../10012/index.html">Constrained learning dece</a>
+<a href="../10011/index.html">Air-ground collaboration</a>
+<a href="../10010/index.html">Distilling on-device lang</a>
+<a href="../10009/index.html">Compositional coordinatio</a>
+<a href="../10008/index.html">Rt-guide Real-time gaussi</a>
+<a href="../10007/index.html">SPAR</a>
+<a href="../10006/index.html">PIP-LLM</a>
+<a class="active" href="../10005/index.html">Slideslam Sparse, lightwe</a>
+<a href="../10004/index.html">Heterogeneous robot colla</a>
+<a href="../10003/index.html">Hierarchical llms in-the-</a>
+    </div>
+  </div>
+
+
+<!-- ========== 1. PAPER INFO ========== -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">SlideSLAM: Sparse, Lightweight, Decentralized Metric-Semantic SLAM for Multi-Robot Navigation（稀疏、轻量、去中心化的度量-语义 SLAM，面向多机器人导航）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Xu Liu</strong><sup>*</sup>（corresponding）、<strong>Jiuzhou Lei</strong><sup>*</sup>、<strong>Ankit Prabhu</strong><sup>*</sup>（共同一作），Yuezhan Tao，Igor Spasojevic，Pratik Chaudhari，<strong>Nikolay Atanasov</strong>，<strong>Vijay Kumar</strong></td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">GRASP Laboratory, University of Pennsylvania</strong>（宾夕法尼亚大学 GRASP 实验室）；Nikolay Atanasov additionally with <strong>UC San Diego</strong>（加州大学圣地亚哥分校，ECE 系）；Xu Liu now at Microsoft</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Transactions on Robotics (T-RO)</strong>，<strong>2025年</strong>，Received: 2025-01-09 | Accepted: 2025-09-02</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE TRO</span> <span class="jif-badge if-value">IF 6.8</span> <span class="jif-badge if-q1">JCR Q1</span> <span class="jif-badge if-cas">CAS 1区</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td>Code: <a href="https://github.com/KumarRobotics/SLIDE_SLAM" target="_blank">github.com/KumarRobotics/SLIDE_SLAM</a> | Project Page: <a href="https://xurobotics.github.io/slideslam/" target="_blank">xurobotics.github.io/slideslam/</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>SlideSLAM</strong>——一个实时、去中心化的度量-语义 SLAM 框架，支持<strong>异构机器人团队</strong>（空中 + 地面、LiDAR + RGBD）在 SWaP 受限平台上<strong>协同构建稀疏物体级语义地图</strong>。核心创新包括：(1) 基于立方体/圆柱体/椭球体的<strong>稀疏物体级地图表示</strong>；(2) 两种语义驱动的<strong>地点识别算法</strong>（SlideMatch 穷举搜索 + SlideGraph 描述子匹配）；(3) <strong>去中心化多机器人协作</strong>模块，支持间歇性通信下的轻量信息共享。在室内/室外城市、森林环境中实现位置误差 0.13~0.24 m、偏航误差 0.5~1.6 度。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Metric-Semantic SLAM</span>
+    <span class="tag tag-green">Multi-Robot Systems</span>
+    <span class="tag tag-amber">Factor Graph Optimization</span>
+    <span class="tag tag-purple">Decentralized SLAM</span>
+    <span class="tag tag-red">Place Recognition</span>
+    <span class="tag tag-cyan">T-RO 2025</span>
+    <span class="tag tag-gray">Heterogeneous Robot Teams</span>
+  </div>
+</section>
+
+<!-- ========== 2. INSIGHT & NOVELTY ========== -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>为什么传统 SLAM 方法在"大规模多机器人、SWaP 受限、需要语义理解"的场景下全面失效？</strong><br>
+    答：因为传统几何 SLAM（基于点/线/面特征）存在四个不可调和的矛盾：(1) 地图存储和通信开销巨大——点云/体素地图动辄数百 MB，在带宽受限条件下无法共享；(2) 缺乏语义信息——机器人无法理解环境中"物体"的含义，无法执行语义驱动的任务（如"检查第三个路灯杆"）；(3) 传感器异构性——激光雷达和 RGBD 相机提取的几何特征完全不同，传统基于几何特征的地点识别无法跨传感器工作；(4) 增量优化中频繁的边缘化（marginalization）导致信息不可逆地丢失。<br><br>
+    问：<strong>SlideSLAM 的核心洞察是什么？</strong><br>
+    答：<strong>用稀疏的物体级语义地图替代稠密几何地图</strong>——每个物体用一个简单的几何基元（立方体/圆柱体/椭球体）+ 语义标签来表示。这带来了五个关键优势：(1) <strong>稀疏性</strong>：环境中的物体数量远少于几何特征点，地图仅占数 KB，通信和存储开销极低；(2) <strong>信息丰富性</strong>：语义标签 + 几何形状提供了比纯几何特征更丰富的信息，使地点识别更鲁棒；(3) <strong>视点不变性</strong>：物体模型（如"一辆车"）无论从哪个角度观察都具有相同的语义和形状属性，天然支持跨视角、跨传感器的地点识别和地图融合；(4) <strong>通用性</strong>：无论 LiDAR 还是 RGBD，最终都抽象为同一套物体模型，天然支持异构机器人团队；(5) <strong>长程信息保持</strong>：在因子图中保留物体路标节点，而不像传统方法那样边缘化掉。
+  </div>
+
+  <h3>2.2 灵感到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>启发了什么洞察</th><th>类型</th></tr>
+    <tr><td>CubeSLAM (Yang & Scherer, 2019)、QuadricSLAM (Nicholson et al., 2019)</td><td>物体可以用简单几何基元（立方体、椭球体）作为 SLAM 路标——但此前仅限于单机器人、单传感器。SlideSLAM 将这个想法从单机器人扩展到<strong>异构多机器人 + 去中心化</strong>场景，且同时支持三种形状模型（立方体 + 圆柱体 + 椭球体）</td><td>架构</td></tr>
+    <tr><td>CLIPPER (Lusk et al., 2021) —— 图论一致性数据关联</td><td>CLIPPER 将数据关联建模为一致性图上的最大团搜索——但它是 all-to-all 的，在物体数量多时内存爆炸。SlideGraph 用 <strong>Delaunay 三角化 + 描述子匹配</strong>先做粗关联，大幅剪枝假设空间（森林场景从 240,000 条候选减少到 3,000 条，降低 2 个数量级），再喂给 CLIPPER 精细优化</td><td>方法</td></tr>
+    <tr><td>iSAM2 (Kaess et al., 2012) —— 增量平滑与建图</td><td>iSAM2 提供高效的因子图增量优化框架——SlideSLAM 在其基础上实现了<strong>自定义的立方体/圆柱体/椭球体因子</strong>，并兼容 GTSAM 库的标准相对位姿因子和 range-bearing 因子</td><td>数学/算法</td></tr>
+    <tr><td>ConceptGraphs (Gu et al., 2024) —— 开放词汇 3D 场景图</td><td>ConceptGraphs 展示了开放词汇物体建图的威力，但不支持实时机载运行。SlideSLAM 提供了一个<strong>实时、机载、SWaP 友好</strong>的替代方案，同时通过 YOLO-World 保留了开放词汇能力</td><td>策略</td></tr>
+    <tr><td>DDF-SAM (Cunningham et al., 2010/2013) —— 分布式因子图</td><td>DDF-SAM 通过共享边缘化因子图实现分布式 SLAM——但边缘化会导致信息丢失。SlideSLAM 利用<strong>物体级地图的天然稀疏性</strong>，直接共享原始观测（物体模型 + 里程计），避免了边缘化信息损失，同时通信开销仍然很低</td><td>架构</td></tr>
+  </table>
+
+  <h3>2.3 创新点拆解</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 稀疏物体级度量-语义地图 —— 通用、稀疏、信息丰富的统一表示</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统 SLAM 使用点/线/面等密集几何特征，导致 (a) 存储和通信开销大（数百 MB），(b) 缺乏语义信息，(c) 无法跨传感器使用，(d) 频繁边缘化导致信息丢失。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>CubeSLAM 和 QuadricSLAM 证明物体可以作为 SLAM 路标——但仅限单机器人。本文将物体级表示推广到异构多机器人 + 去中心化场景。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>三种物体模型：(1) <strong>立方体</strong>（9 自由度：位置 3 + 姿态 3 + 尺寸 3）——用于车辆等规则物体；(2) <strong>圆柱体</strong>（7 自由度：基点 3 + 轴向 3 + 半径 1）——用于树干、灯柱； (3) <strong>椭球体</strong>（5 自由度：位置 3 + 半径 1 + 高度 1）——用于椅子、桌子、显示器等不规则物体。地图大小仅 7~16 KB（含数百个物体），通信开销 1.65~5.13 KB/m。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 语义驱动的地点识别 —— SlideMatch + SlideGraph 双算法</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统基于几何特征的地点识别（如 DBoW2、ScanContext）要么依赖传感器特定特征（无法跨传感器），要么需要大量训练数据（如 LCDNet），且无法利用语义信息消除感知歧义。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>CLIPPER 的一致性图框架 + Urquhart tessellation 描述子（Nardari et al., 2020）</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>(1) <strong>SlideMatch</strong>：穷举搜索策略——在 X/Y/yaw 搜索空间内离散采样候选变换，对变换后的两张物体地图做数据关联，按匹配分数选最优。支持 anytime 模式（逐步扩大搜索区域直到计算预算耗尽）。适合噪声大但物体少的场景。(2) <strong>SlideGraph</strong>：描述子匹配——用 Delaunay 三角化构建物体间的空间拓扑描述子（三角形顶点到质心距离排序），按语义标签过滤误匹配，产生初始关联后再用 CLIPPER 做一致性图优化。适合物体多但噪声小的场景（特别是 LiDAR）。森林场景中，SlideGraph 将假设空间从 240,000 条缩减到 3,000 条。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 去中心化多机器人协作 —— 轻量通信 + 任意时间同步</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>多机器人 SLAM 通常需要中心基站（集中式）或持续通信（分布式），不适用于通信受限/间歇性的实际场景。且传统方法共享密集几何特征，带宽需求大。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>物体级地图的天然稀疏性——共享"物体模型 + 里程计"就够了，不需要共享原始传感器数据</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>每个机器人维护自己的因子图。当与其他机器人建立通信时，共享轻量观测（物体模型 + 相对里程计）+ 物体级地图摘要。地点识别模块持续检测 inter-robot loop closure。一旦发现回环，用估计的相对变换将所有来自其他机器人的观测变换到当前机器人参考系，添加到因子图中。整个过程<strong>完全去中心化</strong>——每个机器人独立运行，不需要中心节点。平均每次通信仅 ~0.3 MB（室内），每个路标仅 3.96 KB。</div>
+  </div>
+</section>
+
+<!-- ========== 3. SYSTEM ARCHITECTURE ========== -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 系统框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SENSING["感知层 —— 传感器数据采集"]
+      direction LR
+      LIDAR["LiDAR 点云 · Falcon 4 UAV"]
+      RGBD["RGBD 图像+深度 · Falcon 250 UAV / Scarab UGV"]
+      IMU["IMU 惯性测量 · 所有平台共用"]
+    end
+
+    subgraph FRONTEND["前端 —— 语义感知与物体建模"]
+      direction LR
+      LIDAR_SEG["LiDAR 语义分割 · RangeNet++ · darknet-13 骨干"]
+      RGBD_SEG["RGB 实例分割 · YOLOv8 / YOLO-World 开放词汇"]
+      DEPTH_FILTER["深度过滤 · 深度百分位阈值"]
+      TRACK["物体跟踪 · Hungarian 算法 · 多视角累积"]
+      MODEL_FIT["形状拟合 · 立方体 / 圆柱体 / 椭球体"]
+      ODOM["低层级里程计 · VIO 或 LIO"]
+    end
+
+    subgraph BACKEND["后端 —— 因子图优化 (iSAM2/GTSAM)"]
+      direction LR
+      FACTOR["因子构建 · 自定义立方体/圆柱体/椭球体因子 + 里程计因子"]
+      ISAM2["iSAM2 增量平滑与建图 · 贝叶斯树"]
+      MAP_DB["物体级语义地图数据库"]
+    end
+
+    subgraph PLACE_REC["地点识别与回环检测"]
+      direction LR
+      SLIDEMATCH["SlideMatch · 穷举搜索 · Anytime 机制"]
+      SLIDEGRAPH["SlideGraph · Delaunay 描述子 + CLIPPER"]
+      LOOP_CLOSE["回环检测 · 最小二乘位姿估计"]
+    end
+
+    subgraph COMM["通信层 —— 去中心化多机器人协作"]
+      direction LR
+      LIGHTWEIGHT["轻量观测共享 · 物体模型 + 里程计"]
+      INTER_ROBOT["机器人间通信 · 间歇性 WiFi"]
+      MAP_MERGE["地图融合 · 坐标变换 + 因子图合并"]
+    end
+
+    subgraph PLAN["规划与控制层 —— 自主导航与探索"]
+      direction LR
+      EXPLORE["自主探索 · 前沿探测 + 语义不确定性感知"]
+      NAV["导航 · 障碍物避障 · 语义目标导航"]
+    end
+
+    LIDAR --> LIDAR_SEG
+    RGBD --> RGBD_SEG
+    IMU --> ODOM
+    LIDAR_SEG --> TRACK
+    RGBD_SEG --> DEPTH_FILTER --> TRACK
+    TRACK --> MODEL_FIT
+    MODEL_FIT --> FACTOR
+    ODOM --> FACTOR
+    FACTOR --> ISAM2 --> MAP_DB
+
+    MAP_DB --> SLIDEMATCH
+    MAP_DB --> SLIDEGRAPH
+    SLIDEMATCH --> LOOP_CLOSE
+    SLIDEGRAPH --> LOOP_CLOSE
+    LOOP_CLOSE --> ISAM2
+
+    MAP_DB --> LIGHTWEIGHT --> INTER_ROBOT --> LOOP_CLOSE
+    INTER_ROBOT --> MAP_MERGE --> ISAM2
+
+    MAP_DB --> EXPLORE --> NAV
+
+    classDef sensing fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef front fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef back fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef place fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef comm fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef plan fill:#cffafe,stroke:#14b8a6,stroke-width:2px,color:#0f766e
+    class LIDAR,RGBD,IMU sensing
+    class LIDAR_SEG,RGBD_SEG,DEPTH_FILTER,TRACK,MODEL_FIT,ODOM front
+    class FACTOR,ISAM2,MAP_DB back
+    class SLIDEMATCH,SLIDEGRAPH,LOOP_CLOSE place
+    class LIGHTWEIGHT,INTER_ROBOT,MAP_MERGE comm
+    class EXPLORE,NAV plan
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow —— 传感器到语义地图的完整数据流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph INPUT["输入: 异构传感器流"]
+      direction TB
+      S1["LiDAR 点云 · 10 Hz"]
+      S2["RGBD 图像 · 30 Hz"]
+      S3["IMU · 200 Hz"]
+      S4["其他机器人消息 · 间歇性"]
+    end
+
+    subgraph PROC["处理: 前端物体检测 + 跟踪"]
+      direction TB
+      P1["LiDAR: RangeNet++ @ 1.5 Hz CPU<br/>每帧 64 线 → 语义掩码"]
+      P2["RGBD: YOLOv8 @ 1-3 Hz CPU<br/>每帧 → 实例分割 + 深度反投影"]
+      P3["物体跟踪: Hungarian 算法<br/>多帧关联 → 累积点云 → 形状拟合"]
+    end
+
+    subgraph SLAM["SLAM: 因子图优化 + 地点识别"]
+      direction TB
+      G1["因子图: 每关键帧添加<br/>· 物体因子 (cuboid/cylinder/ellipsoid)<br/>· 里程计因子 (SE(3) relative)"]
+      G2["iSAM2 优化: O(1) 增量添加<br/>O(F^1.5) 回环时"]
+      G3["地点识别: SlideMatch/SlideGraph<br/>检测 inter-robot 回环"]
+    end
+
+    subgraph OUTPUT["输出: 度量-语义地图 + 位姿"]
+      direction TB
+      O1["物体级地图: {label, pose, shape}<br/>· 车辆 → 蓝色立方体<br/>· 树干/灯柱 → 品红圆柱体<br/>· 桌椅/显示器 → CAD替椭球体"]
+      O2["机器人轨迹: 全局一致优化<br/>· 位置误差 0.13~0.24 m<br/>· 偏航误差 0.5~1.6°"]
+      O3["通信: ~0.3 MB/次 · 3.96 KB/路标<br/>1.65~5.13 KB/m"]
+    end
+
+    S1 --> P1
+    S2 --> P2
+    S3 --> P1
+    S3 --> P2
+    S4 --> G3
+    P1 --> P3
+    P2 --> P3
+    P3 --> G1
+    G1 --> G2
+    G2 --> O1
+    G2 --> O2
+    G2 --> G3
+    G3 --> G2
+    O1 --> O3
+
+    classDef inClass fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef procClass fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef slamClass fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef outClass fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class S1,S2,S3,S4 inClass
+    class P1,P2,P3 procClass
+    class G1,G2,G3 slamClass
+    class O1,O2,O3 outClass
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow —— 多机器人协同探索与语义建图全流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph INIT["阶段 1: 系统启动与初始化"]
+      direction LR
+      I1["机器人部署: Falcon 4 (LiDAR) + Falcon 250 (RGBD) + Scarab (RGBD)"] --> I2["传感器校准 · 初始位姿设定 · 通信建立"]
+    end
+
+    subgraph SINGLE["阶段 2: 单机器人自主探索"]
+      direction LR
+      S1["环境感知: 传感器采集 → 语义分割"] --> S2["物体建模: Hungarian跟踪 → Cuboid/Cylinder/Ellipsoid拟合"] --> S3["因子图更新: 新因子添加 + iSAM2优化"] --> S4["探索规划: 前沿探测 + 语义回环主动建立"]
+    end
+
+    subgraph COMM_PHASE["阶段 3: 多机器人通信与协作"]
+      direction LR
+      C1["共享轻量观测: 物体模型 + 里程计 · ~0.3 MB"] --> C2["地点识别: SlideMatch / SlideGraph 检测 inter-robot 回环"] --> C3["回环成功? → 估计相对变换 · 最小二乘"]
+    end
+
+    subgraph MERGE["阶段 4: 地图融合与全局优化"]
+      direction LR
+      M1["坐标变换: 他机观测 → 本机参考系"] --> M2["因子图合并: 他机位姿节点 + 物体节点 → 本机因子图"] --> M3["iSAM2 全局优化: 联合优化多机器人轨迹 + 统一语义地图"]
+    end
+
+    subgraph VERIFY["阶段 5: 验证与分析"]
+      direction LR
+      V1["定性评估: 重叠点云 + CAD模型可视化"] --> V2["定量评估: 位置误差 0.13~0.24m · 物体检测 F1 0.922~0.927"] --> V3["效率分析: 运行时间 2~52ms · 通信 1.65~5.13 KB/m"]
+    end
+
+    INIT --> SINGLE
+    SINGLE -->|"持续探索 + 到达通信窗口"| COMM_PHASE
+    COMM_PHASE -->|"回环成功"| MERGE
+    COMM_PHASE -->|"未发现回环 · 继续探索"| SINGLE
+    MERGE -->|"地图融合完成"| SINGLE
+    MERGE -->|"任务结束"| VERIFY
+
+    S4 -.->|"主动语义回环: 减小状态估计不确定性"| S1
+    V2 -.->|"反馈: 改进物体检测精度"| S2
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef single fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef comm fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef merge fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef verify fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class I1,I2 init
+    class S1,S2,S3,S4 single
+    class C1,C2,C3 comm
+    class M1,M2,M3 merge
+    class V1,V2,V3 verify
+    </pre>
+  </div>
+</section>
+
+<!-- ========== 4. TASK ========== -->
+<section id="task">
+  <h2>4. 任务定义 —— 解决什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">Dec-Metric-Semantic SLAM 问题定义</span>
+    $$ \max_{\mu_t^{(k)}} \; \mathbb{E}\left[\sum_{k=1}^{K}\sum_{t=1}^{T} U_t\left(x_t^{(k)}, \mathcal{M}; \mathcal{I}_t^{(k)}\right)\right] $$
+    $$ \text{s.t.} \quad \mathcal{I}_t^{(k)} = \bigcup_{j \in [K]\setminus\{k\}} \mathcal{I}_{L_t^{(k,j)}}^{(j)} \cup \bigcup_{s \in [t]} \left(\{h_s^{(k)}\} \cup \{m_s^{(k)}\}\right) $$
+    <div class="eq-note">
+      <strong>$K$</strong> = 机器人数量（本文 2~3 台）&nbsp;|&nbsp;
+      <strong>$x_t^{(k)}$</strong> = 机器人 k 在时刻 t 的位姿 &nbsp;|&nbsp;
+      <strong>$\mathcal{M}$</strong> = 环境的（静态）度量-语义地图 &nbsp;|&nbsp;
+      <strong>$\mathcal{I}_t^{(k)}$</strong> = 机器人 k 在时刻 t 的信息状态（自身观测 + 收到的其他机器人消息）&nbsp;|&nbsp;
+      <strong>$h_t^{(k)}$</strong> = 里程计观测（相对位姿）&nbsp;|&nbsp;
+      <strong>$m_t^{(k)}$</strong> = 地图观测（物体检测）&nbsp;|&nbsp;
+      <strong>$C_t$</strong> = 时变通信邻接矩阵（0/1）&nbsp;|&nbsp;
+      <strong>$L_t^{(i,j)}$</strong> = 机器人 i 和 j 上次通信的时间 &nbsp;|&nbsp;
+      <strong>核心目标</strong>：在未知环境中，异构机器人团队在无基础设施依赖、间歇性通信条件下，通过主动探索最大化累积信息效用，同时构建全局一致的度量-语义地图。
+    </div>
+  </div>
+
+  <h3>4.2 输入 / 输出</h3>
+  <table>
+    <tr><th>Category</th><th>Content</th><th>Dimension</th></tr>
+    <tr><td><strong>Input (LiDAR)</strong></td><td>Ouster OS1-64 三维点云 (64线) + IMU</td><td>每帧 ~65,536 点，10 Hz</td></tr>
+    <tr><td><strong>Input (RGBD)</strong></td><td>Intel RealSense D435i/D455 RGB 图像 + 深度图 + IMU</td><td>640x480 RGB + Depth，30 Hz</td></tr>
+    <tr><td><strong>Input (通信)</strong></td><td>其他机器人的轻量语义观测（物体模型 + 相对里程计）</td><td>~0.3 MB/次，间歇性 WiFi</td></tr>
+    <tr><td><strong>Output</strong></td><td>物体级度量-语义地图 + 机器人轨迹 + 物体检测列表</td><td>地图 7~16 KB，轨迹长度 > 1 km</td></tr>
+    <tr><td><strong>Performance</strong></td><td>位置误差 0.13~0.24 m，偏航误差 0.1~1.6°，物体 F1 0.922~0.927</td><td>因子图优化 2~52 ms/帧，通信 1.65~5.13 KB/m</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>系统级 SLAM 算法与工程框架创新</strong>——不是单一算法改进，而是构建了一个<strong>从传感器到自主探索的完整度量-语义 SLAM 流水线</strong>。核心任务类型是<strong>去中心化多机器人 active metric-semantic SLAM</strong>：在 SWaP 受限的异构机器人平台上，实时机载运行（无 GPU 加速），支持自主探索、地点识别、地图融合。覆盖场景：室内办公室/实验室（椅子、桌子、显示器）、室外城市停车场（车辆、树干、灯柱）、森林（树干密集、大面积）。本质是在<strong>计算-存储-通信"极度受限"三角约束</strong>下实现"语义理解 + 精确定位 + 多机协作"三项能力的同时满足。</p>
+</section>
+
+<!-- ========== 5. CHALLENGE ========== -->
+<section id="challenge">
+  <h2>5. 核心挑战 —— 为什么困难？</h2>
+
+  <h3>5.1 本质（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：多机器人度量-语义 SLAM 面临"精度-效率-通用性"的三体困境。<br><br>
+    <strong>(1) 语义理解 vs 实时性</strong>：深度学习语义分割/检测（RangeNet++、YOLOv8）本身就是计算密集型——在无 GPU 的机载计算平台（Intel i7 CPU）上，RangeNet++ 仅 1.5 Hz，YOLOv8 仅 1~3 Hz。如何在如此低的感知速率下维持 SLAM 的实时性？<br><br>
+    <strong>(2) 稀疏性 vs 信息完整性</strong>：物体级地图极度稀疏（数百个物体 vs 数十万个点特征）——这种稀疏性既是优势也是风险。稀疏意味着信息量少，在地点识别时一旦物体检测错误或缺失，可能导致回环检测失败。如何在信息稀疏的条件下保持地点识别的鲁棒性？<br><br>
+    <strong>(3) 通用性 vs 精度</strong>：支持 LiDAR 和 RGBD 两种完全不同的传感器——LiDAR 精度高（厘米级测距）、范围远；RGBD 精度低（毫米级噪声随距离平方增长）、范围近。如何在同一个框架内处理两种传感器的巨大精度差异，尤其是在跨传感器的地点识别中？<br><br>
+    <strong>(4) 去中心化 vs 一致性</strong>：机器人间歇性通信——可能在任意时刻建立或断开连接，每次通信窗口有限。每个机器人独立优化自己的因子图，如何保证多个独立因子图在融合后仍能保持全局一致性？<br><br>
+    <strong>将这四点放在一起</strong>：你需要在计算受限（CPU only）、存储极小（KB 级地图）、通信间歇（WiFi 不可靠）的条件下，融合两种精度差异巨大的传感器，在稀疏物体级地图上进行鲁棒的地点识别，并以去中心化方式维持多机器人地图的一致性。这些约束彼此冲突——增加信息量意味着牺牲稀疏性，增加鲁棒性意味着增加计算量。
+  </div>
+
+  <h3>5.2 先前方法及其局限</h3>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>ORB-SLAM3 / LIO-SAM（传统几何 SLAM）</td>
+      <td>基于点/线/面特征的位姿估计与稀疏/稠密建图</td>
+      <td>缺乏语义信息——无法区分物体、无法执行语义任务。存储和通信开销大（点云地图数百 MB）。不同传感器的几何特征不兼容，无法支持异构团队。</td>
+    </tr>
+    <tr>
+      <td>Kimera-Multi (Tian et al., 2022)</td>
+      <td>分布式稠密语义网格 SLAM，支持多机器人</td>
+      <td>产生<strong>稠密 3D 语义网格</strong>——计算和通信开销极大（每个网格需要传输），不适合 SWaP 受限的空中平台。且需要分布式鲁棒位姿图优化（Riemannian BCD），计算复杂度高。</td>
+    </tr>
+    <tr>
+      <td>CubeSLAM / QuadricSLAM（单机器人物体 SLAM）</td>
+      <td>用立方体或椭球体表示物体，作为 SLAM 路标</td>
+      <td>仅支持<strong>单机器人</strong>、<strong>单一传感器</strong>（单目或双目相机）。没有地点识别和回环检测能力。不支持多机器人协作和地图融合。</td>
+    </tr>
+    <tr>
+      <td>ConceptGraphs (Gu et al., 2024)</td>
+      <td>开放词汇 3D 场景图，丰富的语义建图</td>
+      <td>需要<strong>大量计算资源</strong>（GPU 加速），无法在 SWaP 受限平台上实时运行。设计目标是离线语义建图而非实时自主导航。</td>
+    </tr>
+    <tr>
+      <td>LCDNet (Cattaneo et al., 2022)</td>
+      <td>基于深度学习的 LiDAR 地点识别 + 点云配准</td>
+      <td>需要 <strong>GPU</strong> 运行，且需要在新环境中<strong>微调网络</strong>（数据需求大）。仅支持 LiDAR，不支持 RGBD。每帧存储开销 0.84 MB~10 MB，远超 SlideSLAM 的 7~16 KB。森林场景中精度低于 SlideSLAM。</td>
+    </tr>
+    <tr>
+      <td>DDF-SAM (Cunningham et al., 2013)</td>
+      <td>分布式因子图 SLAM——共享边缘化的因子图而非原始观测</td>
+      <td>边缘化操作导致<strong>信息不可逆丢失</strong>（线性化误差）——多次边缘化后地图一致性下降。且需要共享边缘化后的马尔可夫毯（Markov blanket），当因子图稠密时通信开销仍然很大。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键技术挑战</h3>
+  <ul>
+    <li><strong>Challenge 1 —— 物体级地图的稀疏性与信息丰富性的平衡</strong>：物体模型（立方体/圆柱体/椭球体）远少于几何特征点（数百 vs 数十万），但地点识别需要足够的信息来区分不同位置。如何从稀疏物体布局中提取足够区分性的空间描述子？Simultaneously，三种物体形状对应不同的自由度（9/7/5）和不同的测量模型——如何在统一因子图中联合优化？</li>
+    <li><strong>Challenge 2 —— 跨传感器地点识别</strong>：LiDAR 和 RGBD 在 FOV、精度、噪声模型上有本质差异——LiDAR 精度 ~2 cm（360 度）、RGBD 精度 ~1-5 cm 且随距离退化（窄 FOV）。从两个传感器看同一个物体可能建模出不同尺寸和位置——如何在存在显著建模差异的情况下找到正确的数据关联？</li>
+    <li><strong>Challenge 3 —— 去中心化因子图优化的统计一致性</strong>：当机器人间歇性通信时，每个机器人独立优化自己的轨迹。当收到其他机器人的观测后合并因子图——但其他机器人的轨迹已经被他们自己的 iSAM2 优化过，可能存在不一致。如何在合并时保持全局统计一致性而不重新线性化整个问题？</li>
+  </ul>
+</section>
+
+<!-- ========== 6. METHOD ========== -->
+<section id="method">
+  <h2>6. 关键方法与公式</h2>
+
+  <h3>6.1 核心算法概述</h3>
+  <p>SlideSLAM 的方法论核心是<strong>"前端深度学习 + 后端因子图优化"</strong>的经典 SLAM 范式，但有三项关键定制：(1) 三种物体形状的自定义因子；(2) 语义驱动的双算法地点识别；(3) 去中心化轻量通信。以下按模块详解。</p>
+
+  <h3>6.2 关键公式</h3>
+
+  <!-- Formula Group A: Cuboid Factor -->
+  <h4>Group A: 立方体因子 —— 9 自由度物体建模与约束</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) —— 立方体因子的误差函数</span>
+    $$ \ell_g = [\mathbf{r}; \mathbf{t}; \mathbf{d}], \quad \mathbf{r} \in \mathbb{R}^3, \mathbf{t} \in \mathbb{R}^3, \mathbf{d} = [d_x, d_y, d_z]^\top $$
+    $$ \mathbf{e}_{\text{cub}} = \begin{bmatrix} \log\left((H_w^{\text{cub}}(z))^{-1} \cdot H_w^{\text{cub}}\right)^\vee \\ \mathbf{d} - \mathbf{d}(z) \end{bmatrix} $$
+    <div class="eq-note">
+      <strong>$\mathbf{r}$</strong> = 旋转向量 (rotation vector)，3 自由度 &nbsp;|&nbsp;
+      <strong>$\mathbf{t}$</strong> = 平移向量，3 自由度 &nbsp;|&nbsp;
+      <strong>$\mathbf{d}$</strong> = 尺寸向量 (width, length, height)，3 自由度 &nbsp;|&nbsp;
+      <strong>$H_w^{\text{cub}}$</strong> = 立方体在世界坐标系中的 SE(3) 位姿 &nbsp;|&nbsp;
+      <strong>$H_w^{\text{cub}}(z)$</strong> = 立方体的测量位姿 &nbsp;|&nbsp;
+      <strong>$\log(\cdot)^\vee$</strong> = SE(3) 对数映射（将变换矩阵转为 6x1 twist 向量）&nbsp;|&nbsp;
+      <strong>误差函数含义</strong>：同时考虑<strong>位姿误差</strong>（前 6 维，通过 SE(3) 对数映射计算）和<strong>尺寸误差</strong>（后 3 维）。这是一个 9 维误差向量，在 GTSAM 中实现为自定义因子，与 iSAM2 完全兼容。
+    </div>
+  </div>
+
+  <!-- Formula Group B: Cylinder Factor -->
+  <h4>Group B: 圆柱体因子 —— 7 自由度无界轴线建模</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) —— 圆柱体因子的误差函数</span>
+    $$ \ell_g = [\mathbf{b}; \mathbf{n}; r], \quad \mathbf{b} \in \mathbb{R}^3, \mathbf{n} \in \mathbb{R}^3, r \in \mathbb{R} $$
+    $$ \mathbf{e}_{\text{cyl}} = \begin{bmatrix} (R_w^s \mathbf{b} + \mathbf{t}_w^s) - \mathbf{b}(z) \\ R_w^s \mathbf{n} - \mathbf{n}(z) \\ r - r(z) \end{bmatrix} $$
+    <div class="eq-note">
+      <strong>$\mathbf{b}$</strong> = 轴线基点坐标，3 自由度 &nbsp;|&nbsp;
+      <strong>$\mathbf{n}$</strong> = 轴线方向向量，3 自由度（实际仅 2 自由度，冗余参数化）&nbsp;|&nbsp;
+      <strong>$r$</strong> = 半径，1 自由度 &nbsp;|&nbsp;
+      <strong>$R_w^s, \mathbf{t}_w^s$</strong> = 从世界坐标系到传感器坐标系的旋转和平移 &nbsp;|&nbsp;
+      <strong>圆柱体高度不估计</strong>：因为传感器 FOV 通常看不到树干/灯柱的顶部——高度不可观。误差函数包含：<strong>基点位置误差</strong>（3 维）+ <strong>轴线方向误差</strong>（3 维）+ <strong>半径误差</strong>（1 维）= 7 维。
+    </div>
+  </div>
+
+  <!-- Formula Group C: Ellipsoid Factor -->
+  <h4>Group C: 椭球体因子 —— 5 自由度简化为 range-bearing 观测</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) —— 椭球体因子的误差函数</span>
+    $$ \ell_g = [\mathbf{c}; d_e]^\top, \quad \mathbf{c} \in \mathbb{R}^3, d_e = [d_r, d_h]^\top $$
+    $$ \mathbf{e}_{\text{ellip}} = \begin{bmatrix} r_g^{\text{exp}} - r_g(z) \\ \theta^{\text{exp}} - \theta(z) \\ \phi^{\text{exp}} - \phi(z) \end{bmatrix} $$
+    <div class="eq-note">
+      <strong>$\mathbf{c}$</strong> = 椭球体质心位置，3 自由度 &nbsp;|&nbsp;
+      <strong>$d_r, d_h$</strong> = 半径和高度，2 自由度（假设圆形截面 + 单位方向）&nbsp;|&nbsp;
+      <strong>$r_g^{\text{exp}}, \theta^{\text{exp}}, \phi^{\text{exp}}$</strong> = 期望的 range, azimuth, elevation 测量值（从状态向量计算）&nbsp;|&nbsp;
+      <strong>$r_g(z), \theta(z), \phi(z)$</strong> = 实际的传感器 range-bearing 测量 &nbsp;|&nbsp;
+      <strong>质心位置</strong>通过 GTSAM 内置的 range-bearing 因子优化；<strong>尺寸</strong>采用滑动平均更新：$d_{\text{updated}} = (1-\alpha) \cdot d + \alpha \cdot d(z)$。这是一个简化——椭球体不做完整 SE(3) 优化，因为不规则的室内物体（椅子/桌子）难以精确估计完整姿态。
+    </div>
+  </div>
+
+  <!-- Formula Group D: Information State Recursion -->
+  <h4>Group D: 去中心化信息状态递归 —— 多机器人通信的数学定义</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) —— 信息状态的递归定义</span>
+    $$ \mathcal{I}_t^{(k)} = \bigcup_{j \in [K]\setminus\{k\}} \mathcal{I}_{L_t^{(k,j)}}^{(j)} \cup \bigcup_{s \in [t]} \left(\{h_s^{(k)}\} \cup \{m_s^{(k)}\}\right) $$
+    $$ \Pi(\mathcal{I}_t^{(k)}) = (\hat{x}_{1:t}^{(k)}, \hat{\mathcal{M}}_t^{(k)}) = \arg\max_{x_{1:t}^{(k)}, \mathcal{M}} P(x_{1:t}^{(k)}, \mathcal{M} \mid \mathcal{I}_t^{(k)}) $$
+    $$ r_{(i \to j)}(t) = (\mathcal{I}_t^{(i)}, \hat{\mathcal{M}}_t^{(i)}) $$
+    <div class="eq-note">
+      <strong>$\mathcal{I}_t^{(k)}$</strong> = 机器人 k 在时刻 t 的全部信息——包括：(1) 自己从开始到 t 的所有里程计观测 $\{h_s^{(k)}\}$ 和地图观测 $\{m_s^{(k)}\}$；(2) 所有其他机器人 j 在最近一次通信 $L_t^{(k,j)}$ 时的信息状态 $\mathcal{I}_{L_t^{(k,j)}}^{(j)}$ &nbsp;|&nbsp;
+      <strong>$\Pi$</strong> = 信息投影算子——从信息状态中提取机器人轨迹和地图的 MAP 估计（通过 iSAM2 实现）&nbsp;|&nbsp;
+      <strong>$r_{(i \to j)}(t)$</strong> = 机器人 i 发给 j 的消息——包含 i 的信息状态和当前地图估计。SLideSLAM 还额外共享 $\hat{\mathcal{M}}_t^{(i)}$（物体地图摘要）以避免接收方重复建图。一旦发现 inter-robot 回环，$\mathcal{I}_t^{(i)}$ 中的原始观测被合并到 $\mathcal{I}_t^{(j)}$ 中。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>Parameter</th><th>Value</th><th>Meaning</th><th>Why This Value</th></tr>
+    <tr><td>Cuboid DOF</td><td><strong>9</strong></td><td>位置 3 + 姿态 3 + 尺寸 3</td><td>车辆等规则物体需要完整的 6D 位姿和 3D 尺寸来描述</td></tr>
+    <tr><td>Cylinder DOF</td><td><strong>7</strong></td><td>基点 3 + 轴向 3 + 半径 1</td><td>树干/灯柱高度不可观（FOV有限），因此不估计高度</td></tr>
+    <tr><td>Ellipsoid DOF</td><td><strong>5</strong></td><td>质心 3 + 半径 1 + 高度 1</td><td>简化模型：假设圆形截面 + 单位方向——室内物体难以精确估计完整姿态</td></tr>
+    <tr><td>keyframe 采样间隔</td><td><strong>固定行进距离</strong></td><td>每行进一定距离（如 1~2 m）创建一个关键帧</td><td>避免在静止或低速时堆积冗余关键帧；距离间隔保证观测覆盖的均匀性</td></tr>
+    <tr><td>物体关联阈值</td><td><strong>语义标签一致 + 距离/模型差异阈值</strong></td><td>两条件同时满足才算合法关联</td><td>语义标签是强约束（大幅降低误关联），几何距离做精细判别</td></tr>
+    <tr><td>SlideMatch 搜索分辨率</td><td><strong>用户自定义</strong></td><td>X/Y/yaw 离散化步长</td><td>分辨率越高 → 搜索越精细 → 计算量越大。需权衡精度与速度</td></tr>
+    <tr><td>通信内容</td><td><strong>物体模型 + 相对里程计 + 地图摘要</strong></td><td>每帧检测到的所有物体 + 到前一关键帧的 odometry</td><td>仅 3.96 KB/路标——利用稀疏表示的巨大压缩比（vs 点云 ~0.84 MB/帧）</td></tr>
+  </table>
+
+  <h3>6.4 SlideMatch vs SlideGraph 对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>SlideMatch (穷举搜索)</h4>
+      <ul>
+        <li><strong>策略</strong>：在 X/Y/yaw 搜索空间离散采样，<br/>对每个候选变换做全地图数据关联</li>
+        <li><strong>优势</strong>：对噪声鲁棒——全地图匹配，<br/>不依赖局部 pairwise 一致性</li>
+        <li><strong>劣势</strong>：计算量随搜索范围线性增长</li>
+        <li><strong>Anytime</strong>：逐步扩大搜索范围，<br/>在计算预算内返回最优结果</li>
+        <li><strong>适用场景</strong>：RGBD 物体建模噪声大、<br/>物体数量少的室内环境</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>SlideGraph (描述子匹配)</h4>
+      <ul>
+        <li><strong>策略</strong>：Delaunay 三角化 → 描述子匹配<br/>→ CLIPPER 一致图优化</li>
+        <li><strong>优势</strong>：计算高效——仅依赖物体数量<br/>而非环境大小；参数调优少</li>
+        <li><strong>劣势</strong>：依赖 pairwise 距离一致性，<br/>噪声大时易失效</li>
+        <li><strong>压缩比</strong>：森林场景假设空间从<br/>240,000 降至 3,000（2 个数量级）</li>
+        <li><strong>适用场景</strong>：LiDAR 物体建模精度高、<br/>物体数量多的大规模场景</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 7. FUNDAMENTAL PRINCIPLES ========== -->
+<section id="principles">
+  <h2>7. 基本原理</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 SlideSLAM 需要掌握四个深层原理：稀疏物体级表示的合理性、SE(3) 流形上的因子图优化、去中心化信息共享的信息论基础、以及语义一致性地标关联的概率解释。以下逐一深度剖析。</p>
+
+  <h3>7.1 稀疏物体级表示为什么可行 —— 信息论视角</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 物体作为自然的信息瓶颈</span>
+    $$ \mathcal{M}_{\text{object}} = \{(\ell_i, \mathcal{G}_i, \theta_i)\}_{i=1}^{M}, \quad M \ll N_{\text{points}} $$
+    $$ I(\mathcal{M}_{\text{object}}; \text{Task}) \approx I(\mathcal{M}_{\text{dense}}; \text{Task}), \quad \text{dim}(\mathcal{M}_{\text{object}}) \ll \text{dim}(\mathcal{M}_{\text{dense}}) $$
+    <div class="eq-note">
+      <strong>$M$</strong> = 物体数量（数百）vs <strong>$N_{\text{points}}$</strong> = 几何特征点数量（数十万）&nbsp;|&nbsp;
+      <strong>核心论据</strong>：对于导航和语义理解任务，物体级地图的信息量（互信息）与稠密地图相近——因为任务关心的正是"哪里有车"、"哪里有树"这类语义信息，而非每个点的三维坐标。物体表示本质上是一个<strong>信息瓶颈</strong>（Information Bottleneck）：在保留任务相关信息的前提下，极大压缩地图维度。这就是稀疏表示可行的信息论基础。
+    </div>
+  </div>
+  <p><strong>为什么是立方体/圆柱体/椭球体这三种形状？</strong>这三个基元覆盖了结构化环境中的绝大多数物体类别——车辆是立方体（规则六面体）、树干和灯柱是圆柱体（旋转对称轴线）、桌椅等不规则物体用椭球体近似（仅需质心和大致尺寸）。选择这三个基元而非更复杂的形状（如超二次曲面或神经隐式表示）是<strong>工程实用性</strong>和<strong>表示能力</strong>之间的精心平衡——更复杂的形状虽然拟合更精确，但会引入更多自由度，破坏稀疏性优势。</p>
+
+  <h3>7.2 物体作为因子图路标 —— SE(3) 流形优化原理</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 物体路标的因子图形式化</span>
+    $$ \mathcal{F} = \{f_{\text{odom}}(x_t, x_{t+1})\} \cup \bigcup_{\ell \in \mathcal{M}} \{f_{\text{obj}}(x_t, \ell_g)\} $$
+    $$ \hat{X}, \hat{\mathcal{M}} = \arg\min_{X, \mathcal{M}} \sum_{f \in \mathcal{F}} \|e_f(X, \mathcal{M})\|_{\Sigma_f}^2 $$
+    <div class="eq-note">
+      <strong>因子图结构</strong>：SlideSLAM 的因子图包含两类节点——机器人位姿节点 $x_t \in SE(3)$ 和物体路标节点 $\ell_g$（每个物体一个）。两类因子——里程计因子连接连续位姿，物体观测因子连接位姿和路标。&nbsp;|&nbsp;
+      <strong>SE(3) 流形上的优化</strong>：立方体因子的位姿误差通过 SE(3) 对数映射 $\log(\cdot)^\vee$ 计算——这是李群上的测地线距离，比欧氏空间中的向量差更准确地捕捉了旋转和平移的耦合关系。iSAM2 在每次迭代中使用一阶泰勒展开（在切空间上线性化），然后通过指数映射回到流形——这就是标准的"lift-solve-retract"策略。&nbsp;|&nbsp;
+      <strong>增量特性</strong>：iSAM2 的贝叶斯树结构使得添加新因子仅影响树中的局部分支——复杂度为 $O(1)$ per step（无回环时），而回环时通过流体重线性化（fluid relinearization）逐步更新受影响的变量，复杂度约 $O(F^{1.5})$。
+    </div>
+  </div>
+
+  <h3>7.3 去中心化信息共享 —— 为什么共享原始观测优于共享边缘化因子图</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 信息论对比：原始观测 vs 边缘化因子图</span>
+    $$ \text{DDF-SAM: } \quad \mathcal{I}_t^{(i)} \to \mathcal{I}_{\text{marg}}^{(i)} \to \text{share} \quad \Rightarrow \quad I(\mathcal{I}_{\text{marg}}^{(i)}; X) < I(\mathcal{I}_t^{(i)}; X) $$
+    $$ \text{SlideSLAM: } \quad \mathcal{I}_t^{(i)} \to \text{share directly} \quad \Rightarrow \quad I_{\text{SlideSLAM}} = I_{\text{full}} $$
+    <div class="eq-note">
+      <strong>边缘化的问题</strong>：DDF-SAM 在共享前边缘化掉机器人自身的旧位姿节点，产生一个关于剩余变量的联合高斯近似。这个边缘化操作有两个代价：(1) <strong>线性化误差</strong>——边缘化在当前线性化点进行，当后续优化改变线性化点后，边缘化信息变得不一致，且该误差不可逆；(2) <strong>填充效应</strong>（fill-in）——边缘化在马尔可夫毯中引入稠密连接，使得共享的消息不再是稀疏的。&nbsp;|&nbsp;
+      <strong>SlideSLAM 的策略</strong>：因为物体级地图极度稀疏（数百个路标 vs 数万个位姿节点），直接共享原始观测（物体模型 + 里程计）的通信开销仍然很小（~KB）。接收方在自己的线性化点上重新构建因子——避免了边缘化引入的线性化误差。这是在"信息完整性"和"通信效率"之间利用稀疏性实现的巧妙 trade-off——稀疏性使得"最朴素"的方案变得可行。
+    </div>
+  </div>
+
+  <h3>7.4 语义驱动地点识别的概率原理</h3>
+  <div class="formula-block">
+    <span class="eq-tag">原理 4 — 语义标签作为强先验</span>
+    $$ P(\text{match} \mid \text{label}_i = \text{label}_j) \gg P(\text{match} \mid \text{label}_i \neq \text{label}_j) \approx 0 $$
+    $$ P(\text{loop} \mid \text{labels}, \text{geometry}) \propto P(\text{geometry} \mid \text{loop}, \text{labels}) \cdot P(\text{loop} \mid \text{labels}) $$
+    <div class="eq-note">
+      <strong>语义标签作为硬约束</strong>：两个物体如果语义标签不同（如"车" vs "树"），几乎不可能对应同一个物理实体。这个简单的观察极大地缩小了数据关联的搜索空间——给定 M 个物体，如果不使用语义标签，潜在关联数是 $O(M!)$（排列）；使用语义标签过滤后，仅在相同标签的物体之间搜索关联，复杂度降至 $\prod_{c} O(M_c!)$，其中 $M_c$ 是标签 c 的物体数（通常远小于 M）。&nbsp;|&nbsp;
+      <strong>SlideGraph 的几何验证</strong>：在语义标签过滤后的候选关联上，通过 Delaunay 三角化描述子验证几何一致性——三角形顶点到质心的排序距离对刚体变换不变（仅依赖相对位置）。CLIPPER 在一致性图上找最大团——保证找到的关联集合内部两两一致。这个两阶段过滤（标签 → 几何）是语义 SLAM 中"粗到精"数据关联的经典范式。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">四个原理的系统级协同</div>
+    稀疏物体表示（原理 1）降低了因子图规模 → SE(3) 流形优化（原理 2）提供了精确的位姿-路标联合估计 → 稀疏性使得"共享原始观测"成为可能（原理 3），避免了边缘化信息损失 → 语义标签提供强先验（原理 4），大幅简化数据关联。这四个原理构成一个自洽的逻辑链条：<strong>稀疏性是总钥匙</strong>——它同时解锁了计算效率、通信效率和语义关联三个维度的优势。这正是 SlideSLAM 相比传统方法"稀疏 30-100 倍但性能不降"的深层原因。
+  </div>
+</section>
+
+<!-- ========== 8. FIGURES ========== -->
+<section id="figures">
+  <h2>8. 实验结果 —— 关键可视化</h2>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">Robot Platforms: Falcon 250 UAV (RGBD), Falcon 4 UAV (LiDAR), Scarab UGV (RGBD)</span>
+      <span class="fig-source">来源：论文图 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Robot platforms used in SlideSLAM experiments"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot as <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图示解读</div>
+      <p><strong>本图展示了</strong>三种异构机器人平台：（左）<strong>Falcon 250 无人机</strong>——轻量级视觉驱动空中平台，搭载 Intel RealSense D435i RGBD 相机 + VOXL 板载 VIO，飞行时间约 7 分钟；（中）<strong>Falcon 4 无人机</strong>——LiDAR 平台，搭载 Ouster OS1-64 + VectorNav VN-100 IMU + Pixhawk 4，飞行时间约 30 分钟；（右）<strong>Scarab 地面机器人</strong>——轮式地面平台，搭载 Intel RealSense D455 RGBD 相机 + 2D Hokuyo LiDAR，续航约 45 分钟。三台机器人都具备 GPS 拒止环境下的自主导航能力。关键设计决策：LiDAR（Falcon 4）主要用于室外（感知范围大），RGBD 平台（Falcon 250、Scarab）用于室内密集环境（体积更小）。</p>
+      <ul>
+        <li><strong>异构性是 SlideSLAM 的核心主张</strong>：系统同时支持空中+地面、LiDAR+RGBD——这是此前工作（CubeSLAM、Kimera-Multi）无法做到的</li>
+        <li><strong>SWaP 约束</strong>：所有处理均在 Intel i7 CPU 上运行（无 GPU）——在此计算预算下实现实时 SLAM 必须依赖稀疏物体级表示</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">Metric-Semantic SLAM results: 7 data sequences from heterogeneous robots merged into a unified object-level map</span>
+      <span class="fig-source">来源：论文图 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Metric-semantic SLAM results across indoor and outdoor environments"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot as <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图示解读</div>
+      <p><strong>本图展示了</strong>宾大 Pennovation 园区的融合度量-语义地图 -- 7 组数据序列，覆盖 3 个停车场和 2 座实验楼。(a) 园区三维重建；(b) 叠加在累积 LiDAR 点云上的物体级地图；(c) 俯视正射影像与融合地图；(d) 斜视图；(e) 室外近景：车辆为蓝色立方体，树干和灯柱为粉色圆柱体；(f) 停车场近景；(g) 实验楼近景；(h) 室内近景：椅子、桌子、显示器以 CAD 模型替代后的椭球体显示（按类别着蓝/绿/红色）。</p>
+      <ul>
+        <li><strong>跨传感器统一表示</strong>：同一张地图同时包含 LiDAR 检测的物体（室外车辆、树木）和 RGBD 检测的物体（室内椅子、显示器）——通过立方体/圆柱体/椭球体抽象统一表达</li>
+        <li><strong>CAD 模型替换仅用于可视化</strong>：椭球体模型替换为 CAD 模型纯粹是为了在密集室内场景中提升视觉清晰度——实际 SLAM 优化仍使用简化的椭球体参数</li>
+        <li><strong>此处未使用机器人间回环</strong>：该图展示的是单机器人建图离线融合的基础能力——机器人间回环检测另行展示</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">System Diagram: the complete perception-action loop from sensors to navigation</span>
+      <span class="fig-source">来源：论文图 3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="System diagram of SlideSLAM"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot as <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图示解读</div>
+      <p><strong>本图展示了</strong>SlideSLAM 的系统总览——完整的感知-行动闭环。输入：LiDAR 点云或 RGBD 图像 + IMU。前端：语义分割（LiDAR 用 RangeNet++，RGBD 用 YOLOv8/YOLO-World）+ VIO/LIO 里程计。后端：包含机器人位姿节点和物体路标节点的因子图，由 iSAM2 优化。多机器人通信模块：机会性地共享轻量语义观测。地点识别：SlideMatch/SlideGraph 检测机器人间回环。一旦检测到回环，估计的相对变换将所有外来观测变换到本机参考系并添加到因子图中。规划：不同平台采用不同策略，以适应感知模态和移动模式的差异。</p>
+      <ul>
+        <li><strong>去中心化运行</strong>：整个感知-行动环在每个机器人上独立机载运行——无中心服务器。机器人仅在通信链路可用时共享数据</li>
+        <li><strong>模块化前端设计</strong>：核心 SLAM 框架独立于具体的物体检测器——未来可轻松替换为更优的检测器</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">Multi-Robot Collaboration Module: lightweight observation sharing and decentralized graph optimization</span>
+      <span class="fig-source">来源：论文图 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Multi-robot collaboration module"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot as <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图示解读</div>
+      <p><strong>本图展示了</strong>去中心化多机器人协作流程。机器人共享轻量观测（物体模型 + 每关键帧里程计）。这些观测被缓存直到发现机器人间回环。一旦相对变换被估计（SlideMatch/SlideGraph），所有缓存的外来观测被变换到本机参考系并添加到其因子图中。<strong>为什么共享原始观测而非边缘化因子图？</strong>(1) 物体级地图稀疏（数百个物体 vs 数百万个点）——共享原始观测开销仍然很小；(2) 边缘化（如 DDF-SAM）会引入线性化误差和不可逆的信息丢失；(3) 接收原始观测允许本机在自己的线性化点上从头构建因子——统计一致性更好。</p>
+      <ul>
+        <li><strong>通信的是物体模型而非原始传感器数据</strong>：物体抽象将丰富的传感器数据压缩为 KB 级消息——适用于间歇性 WiFi</li>
+        <li><strong>额外共享地图摘要</strong>：使接收方无需从观测中重建完整地图即可执行机器人间回环检测</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 5 / Table IV -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 5 + Table IV</span>
+      <span class="fig-caption">Inter-Robot Localization Quantitative Results</span>
+      <span class="fig-source">来源：论文图 5 与 表 IV</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig5.png" alt="Inter-robot localization results"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot as <code>figures/fig5.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图示解读</div>
+      <p>机器人间定位的<strong>关键定量结果</strong>：</p>
+      <ul>
+        <li><strong>室外城市 LiDAR</strong>: SlideMatch 平均位置误差 <strong>0.176 m</strong>，偏航误差 <strong>0.47 度</strong>；SlideGraph 平均 0.387 m，0.63 度</li>
+        <li><strong>森林 LiDAR</strong>: SlideMatch 平均位置误差 <strong>0.084 m</strong>，偏航误差 <strong>1.83 度</strong>；SlideGraph 平均 0.092 m，<strong>0.37 度</strong></li>
+        <li><strong>室内 RGBD（UGV）</strong>: SlideMatch 平均位置误差 <strong>0.282 m</strong>，偏航误差 <strong>0.10 度</strong></li>
+        <li><strong>跨传感器（LiDAR-RGBD）</strong>: SlideMatch 位置误差 <strong>0.542 m</strong>，偏航误差 <strong>4.0 度</strong> —— 因传感器差异偏大；SlideGraph 0.578 m，2.0 度</li>
+        <li><strong>空-地（RGBD）</strong>: SlideMatch 位置误差 <strong>0.245 m</strong>，偏航误差 <strong>2.35 度</strong> —— Z 轴误差更大，因为空中机器人看到物体上部而地面机器人看到物体下部</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 9. POTENTIAL FLAW ========== -->
+<section id="flaw">
+  <h2>9. 缺陷与扩展</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>前提假设</strong>：(1) 物体能够被三种简单形状（立方体/圆柱体/椭球体）之一充分建模——复杂或非标准物体的表示效果较差；(2) 语义标签正确——误分类会在数据关联和地点识别中造成级联失败；(3) 环境基本是静态的——动态物体（如移动车辆）违反 pairwise 距离一致性假设；(4) 物体之间的 pairwise 距离具有足够的区分性以消除位置的歧义——重复布局中的语义混淆（如相同的会议室）仍是一个挑战。</li>
+    <li><strong>适用范围</strong>：(1) 在没有预定义物体类别的环境中失效——开放词汇（YOLO-World）部分缓解但引入了 prompt 工程复杂度；(2) 跨传感器（LiDAR-RGBD）定位精度显著更差（0.54 m vs LiDAR-only 的 0.18 m），原因在于传感器的 FOV、噪声模型和物体建模保真度差异；(3) 空-地 RGBD 定位仅适用于 SlideMatch（SlideGraph 因 pairwise 一致性不足而失败）。</li>
+    <li><strong>可扩展性</strong>：(1) 回环时因子图优化复杂度为 O((K*F)^1.5)——当机器人数量多（K 大）和轨迹长（F 大）时可能成为瓶颈；(2) SlideMatch 运行时间随搜索区域大小线性增长——初始位姿不确定性大意味着搜索空间大、运行时间长（报告最大 3638 ms）；(3) 基于 CLIPPER 的 SlideGraph 在路标数量大时，若无描述子预过滤步骤，可能存在内存溢出问题。</li>
+  </ul>
+
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：(1) 支持更多物体形状——超二次曲面或神经隐式表示可以在保持适当稀疏性的同时建模通用物体；(2) 引入实例级网格模型（如 Feng et al. 2019）以支持需要精细几何的操控任务；(3) 增加动态物体处理——利用语义知识（如"汽车可移动"）结合 LLM 推理，在地点识别中过滤动态物体。</li>
+    <li><strong>条件放宽</strong>：(1) 提升跨传感器精度——联合标定和不确定性感知的数据关联可缩小 LiDAR-RGBD 差距；(2) 基于过滤的回环检测——建立多个候选回环并形成共识（类似 RANSAC）以选择最佳结果，而非当前的"一次决策"方式；(3) 层级式地点识别——将 SlideGraph（快速、几何一致）与 SlideMatch（对噪声鲁棒）结合为粗到精的流水线。</li>
+    <li><strong>约束增加</strong>：(1) 增加 GPS 拒止室外导航，通过语义路标补偿视觉-惯性里程计漂移；(2) 多层场景——扩展圆柱体和立方体模型以处理楼梯和电梯过渡；(3) 专门针对降低物体路标不确定性（而非仅是探索前沿）的主动视角规划。</li>
+  </ul>
+
+  <h3>9.3 数据敏感性</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>语义标签错误（误分类）</td><td>错误标签破坏数据关联（标签匹配失败）和地点识别（描述子匹配使用标签）。在密集环境中，对常见物体的单次误分类可能导致一系列错误的回环拒绝</td><td>5/5</td></tr>
+    <tr><td>物体检测失败（假阴性）</td><td>召回率为 0.881（车辆）和 0.909（树木）——意味着约 10-12% 的真实物体被遗漏。对于地点识别，缺失路标会削弱空间模式的区分性，可能导致回环检测的假阴性</td><td>4/5</td></tr>
+    <tr><td>RGBD 深度噪声（尤其是远距离）</td><td>RealSense D435i 深度噪声随距离呈二次增长。SlideGraph 在空-地 RGBD 场景失败，因为物体位置估计噪声太大，pairwise 距离一致性无法保证。SlideMatch 对此容忍度更高（基于投票）但仍然退化</td><td>4/5</td></tr>
+    <tr><td>动态物体（移动车辆）</td><td>观测间位置变化的车辆违反静态地图假设。在因子图优化中，这会产生不一致的因子。在地点识别中，被移动的物体会产生错误的空间模式。目前未处理</td><td>3/5</td></tr>
+    <tr><td>通信延迟和丢包</td><td>SlideSLAM 假设机器人在通信可用时共享最新观测。延迟或丢失的消息意味着因子图中存在过时信息——但只要观测带有时间戳，iSAM2 可以处理。丢包问题不太严重，因为每条消息是自包含的</td><td>2/5</td></tr>
+  </table>
+
+  <h3>9.4 值得深入的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深入研究</div>
+    <strong>语义感知的动态物体过滤用于鲁棒地点识别</strong>——这是最有影响力的改进方向。SlideSLAM 的物体级地点识别假设世界是静态的，但真实环境中存在移动的汽车、行人和被重新摆放的家具。一个有前景的方向是：(1) 使用 LLM 或常识知识库标记哪些语义类别是"可能动态的"（汽车、人、椅子）vs "确定静态的"（建筑、树木、灯柱）；(2) 在地点识别中按物体的"静态程度"得分加权物体匹配——静态物体对匹配得分的贡献更大；(3) 在因子图优化中，为物体路标添加"动态"标志——如果某物体随时间无法一致关联，将其标记为动态并从回环检测中排除。这将使 SlideSLAM 在停车场（汽车移动）、办公室（椅子被移动）和城市街道（行人）等场景下保持鲁棒。语义类别标签已经提供了所需信息——只需要添加推理层即可。
+  </div>
+</section>
+
+<!-- ========== 10. MOTIVATION ========== -->
+<section id="motivation">
+  <h2>10. 动机推导 —— 第一性原理推导</h2>
+
+  <h3>10.1 思路推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>机器人需要以语义上有意义的方式理解环境，才能执行人类级别的指令（"检查第三个灯柱是否腐蚀"，"统计停车场 A 的车辆数量"）。传统几何 SLAM 给机器人一张"点"的地图，而非"物体"的地图。对于受 SWaP 约束的异构机器人团队（空中+地面、LiDAR+RGBD）要在大规模场景下协作，地图必须同时满足：(a) 稀疏（KB 而非 GB，便于通过 WiFi 共享），(b) 语义丰富（带标签和几何信息的物体），(c) 传感器无关（LiDAR 和 RGBD 使用同一表示）。</li>
+    <li><strong>先前工作如何处理？为何不够？</strong><br>四条路线：(i) 稠密度量-语义 SLAM（Kimera、Fusion++）——生成漂亮的三维语义网格，但对 SWaP 受限机器人计算代价过高，且稠密地图无法在有限带宽下共享；(ii) 单机器人 object SLAM（CubeSLAM、QuadricSLAM）——使用物体作为路标，但仅适用于单机器人、单传感器、无地点识别；(iii) 多机器人几何 SLAM（DDF-SAM、Kimera-Multi）——支持多机器人但使用几何特征，无语义物体理解；(iv) 地点识别（LCDNet、ScanContext）——传感器特定、计算量大、无语义理解。没有方法满足全部约束。</li>
+    <li><strong>如果用物体级地图作为通用表示会怎样？</strong><br>物体具有视点不变性——从任何角度、被任何传感器检测，一辆车看起来都是一辆车。物体具有语义意义——可直接用于任务规划。物体具有稀疏性——包含数百个物体的环境仅 KB 级大小。核心洞察：使地图"人类可理解"的那套物体抽象，同样使其"机器可共享"——语义信息不是奢侈，而是高效多机器人协作的使能器。</li>
+    <li><strong>这解锁了哪些此前不可能的基础能力？</strong><br>(a) <strong>跨传感器地点识别</strong>——因为物体表示抽象掉了传感器，LiDAR 检测的车和 RGBD 检测的车是同一类路标，使得传感器完全不同的机器人之间也能建立回环。(b) <strong>语义驱动的主动探索</strong>——机器人可以不仅针对自身位姿，还可以针对感兴趣的特定物体来规划降低不确定性（"我对东北角那棵树干的位置不确定——让我飞过去获取更好的视角"）。(c) <strong>真正的去中心化协作</strong>——因为共享信息如此轻量（~KB），机器人即使在连接质量差的情况下也能频繁共享，实现持续而非批量的协作。</li>
+    <li><strong>这个想法的最简可行版本是什么？</strong><br>取任意物体检测器（RangeNet++ 或 YOLOv8），跨帧跟踪物体（Hungarian 算法），拟合简单形状（基于类别选择立方体/圆柱体/椭球体），作为因子添加到 iSAM2 中，运行 SlideGraph 做回环检测，通过 WiFi 与其他机器人共享物体模型加相对里程计。就这些——不需要中心服务器，不需要 GPU，不需要在新环境中预训练。而且确实能工作：机器人间定位位置误差 0.13-0.24 m，物体检测 F1 0.92，全部在笔记本级 CPU 上实时运行。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    传统 SLAM 使用数百万个几何点来表示世界——优化计算代价高、在机器人之间共享代价大、且对任务规划无语义意义——那么为什么不将这数百万个点替换为数百个语义物体（车辆→立方体，树木→圆柱体，椅子→椭球体）？这些物体稀疏到足以在间歇性 WiFi 上共享，信息丰富到足以支持跨传感器的鲁棒地点识别，且能直接用于机器人规划语义上有意义的行动。
+  </div>
+
+  <h3>10.3 如何推导出这个思路</h3>
+  <ul>
+    <li><strong>Step 1 —— 观察瓶颈</strong>：在多机器人实验中，通信始终是瓶颈——原始点云太大，无法实时共享。但如果你根本不需要共享原始数据——只需要共享高层次的语义理解呢？</li>
+    <li><strong>Step 2 —— 分解问题</strong>：(a) 如何用物体表示世界？(b) 如何针对物体路标优化机器人位姿？(c) 如何利用物体级地图查找回环？(d) 如何在机器人之间共享物体信息？每个子问题可独立解决。</li>
+    <li><strong>Step 3 —— 匹配工具到子问题</strong>：(a) 已有的物体检测器（RangeNet++、YOLOv8）+ Hungarian 跟踪 + 简单形状拟合；(b) GTSAM/iSAM2 因子图框架 + 自定义立方体/圆柱体/椭球体测量模型；(c) CLIPPER 一致性图框架 + Delaunay 三角化描述子；(d) ROS 发布/订阅 + 轻量自定义消息。</li>
+    <li><strong>Step 4 —— 组装和测试</strong>：关键的工程洞察是四个子问题形成协同效应：物体地图的稀疏性 (a) 使因子图优化变快 (b)，使基于描述子的地点识别高效可行 (c)，使通信保持轻量 (d)。每个组件相互增强——这正是系统作为一个集成整体而非模块集合能成功运行的原因。</li>
+  </ul>
+</section>
+
+<!-- ========== 11. KEY TAKEAWAYS ========== -->
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+
+  <h3>11.1 经验总结</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这篇论文是<strong>"以表示为中心的系统设计"</strong>的大师级示范——核心洞察不是更好的算法，而是更好的表示（稀疏物体级地图）。一旦选对了表示，所有下游问题（优化、地点识别、通信、任务规划）都变得容易得多。对无人机社区的启示：<strong>不要只改进优化器——重新思考你在表示什么信息</strong>。一个同时满足稀疏（高效）、信息丰富（鲁棒）和通用（跨平台）的表示，比任何单一算法改进都更有价值。</li>
+    <li><strong>技术层面</strong>：(1) <strong>Delaunay 三角化 + CLIPPER</strong> 用于物体级地点识别很巧妙，但不是核心贡献——核心是物体级地图使基于描述子的匹配本身变得可行（因为物体稀疏，三角化图很小）。(2) <strong>自定义 GTSAM 因子</strong>（立方体/圆柱体/椭球体）工程实现精良，但真正的价值在于提供接口，使其他人可以在此基础上构建。(3) <strong>共享原始观测而非边缘化因子</strong>（vs DDF-SAM）是由稀疏性使能的刻意设计选择——教训是"如果你的表示足够高效，有时朴素的方法反而更好"。</li>
+    <li><strong>实验层面</strong>：论文的实验设计堪称典范：(1) <strong>多样化环境</strong>（室内城市、室外森林、公开数据集）证明了泛化能力；(2) <strong>异构平台</strong>（3 种类型、2 种传感器模态、空中+地面）验证了跨平台声明；(3) <strong>全面的基准对比</strong>（对 LCDNet 和 CLIPPER）提供了严格的比较；(4) <strong>运行时间和通信分析</strong>（Table VI）证明系统不仅精确而且实用——在受 SWaP 约束的硬件上实时运行。</li>
+  </ul>
+
+  <h3>11.2 对无人机研究的直接启示</h3>
+  <ul>
+    <li><strong>对无人机状态估计</strong>：物体级路标思想可直接迁移到任何无人机 SLAM 系统。即使你不需要语义来做任务规划，仅稀疏性本身就足以证明切换的价值——跟踪 100 个物体（每个 9 DOF = 900 变量）vs 10,000 个特征点（每个 3 DOF = 30,000 变量），状态维度减少了 30 倍。这直接转化为更快的优化和更低的内存消耗。</li>
+    <li><strong>对多无人机协作</strong>：SlideSLAM 的通信模式——仅共享高层次观测，缓存直到发现回环，然后融合——可直接适用于任何多无人机系统。核心洞察（稀疏表示使通信廉价）无论表示是基于物体还是其他形式都适用。</li>
+    <li><strong>对主动感知</strong>：SlideSLAM 已与主动探索框架集成（Tao et al. 3D Active, 2024），其中物体路标的不确定性驱动探索规划。这种"语义闭环"范式——语义理解主动引导数据采集——在无人机社区中尚未充分探索，是重要的研究方向。</li>
+    <li><strong>对林业/农业无人机应用</strong>：森林实验（860 棵树建图、约 160,000 m²、每机器人 1 km 轨迹）与精准林业、果园监测和碳汇估算直接相关。SlideSLAM 提供了开源代码和经过验证的林下无人机飞行树木级清查流水线。</li>
+  </ul>
+
+  <h3>11.3 推荐跟踪的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>推荐理由</th></tr>
+    <tr><td>Liu et al. (2023) -- Active Metric-Semantic SLAM by Multiple Aerial Robots. <em>ICRA 2023</em></td><td>SlideSLAM 主动探索模块的直接前身。使用相同的物体表示但仅适用于 LiDAR 无人机。阅读此文有助于理解度量-语义地图如何输入到探索规划中。</td></tr>
+    <tr><td>Tao et al. (2024) -- 3D Active Metric-Semantic SLAM. <em>IEEE RA-L 2024</em></td><td>将主动 SLAM 框架扩展到 RGBD 平台。与 SlideSLAM 属于同一研究线程——展示了如何主动追求语义回环以降低状态估计不确定性。</td></tr>
+    <tr><td>Lusk et al. (2021) -- CLIPPER: A Graph-Theoretic Framework for Robust Data Association. <em>ICRA 2021</em></td><td>SlideGraph 的数据关联骨干。理解 CLIPPER 的一致性图形式化对于从事基于路标的地点识别研究至关重要。</td></tr>
+    <tr><td>Kaess et al. (2012) -- iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree. <em>IJRR 2012</em></td><td>SlideSLAM 的优化引擎。该论文解释了 iSAM2 如何通过周期性重线性化实现高效增量优化——对理解 O(1) 增量复杂度声明至关重要。</td></tr>
+    <tr><td>Cunningham et al. (2013) -- DDF-SAM 2.0: Consistent Distributed Smoothing and Mapping. <em>ICRA 2013</em></td><td>SlideSLAM 明确拒绝的替代方案（共享边缘化因子图），转而支持共享原始观测。同时阅读两篇论文可以对两种设计哲学进行原则性比较。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>
+Paper Notes -- Liu, Lei, Prabhu et al. -- IEEE T-RO 2025 -- SlideSLAM: Sparse, Lightweight, Decentralized Metric-Semantic SLAM for Multi-Robot Navigation -- MathJax + Mermaid Rendering
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — DA2RL (Zhang, Lin, Zhao et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  .series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+  .series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+  .series-links { display:flex; gap:7px; flex-wrap:wrap; }
+  .series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+  .series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">1. 论文信息</a>
+  <a href="#insight">2. 核心洞察</a>
+  <a href="#architecture">3. 系统架构</a>
+  <a href="#task">4. 任务定义</a>
+  <a href="#challenge">5. 挑战分析</a>
+  <a href="#method">6. 方法公式</a>
+  <a href="#principles">7. 基础原理</a>
+  <a href="#figures">8. 图表解读</a>
+  <a href="#flaw">9. 不足扩展</a>
+  <a href="#motivation">10. 动机推导</a>
+  <a href="#takeaway">11. 关键启示</a>
+</nav>
+
+<div class="container">
+    <div class="series-nav">
+    <div class="series-nav-title">📖 Chao Yan · 11-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../5805/index.html">UAV</a>
+<a href="../5804/index.html">MADRL</a>
+<a class="active" href="../5802/index.html">UAV</a>
+<a href="../5478/index.html">Learning adaptive cross-e</a>
+<a href="../5476/index.html">3D</a>
+<a href="../5806/index.html">UAV</a>
+<a href="../5800/index.html">Emergent cooperative stra</a>
+<a href="../5477/index.html">Oracle-guided masked cont</a>
+<a href="../2918/index.html">Flexible multi-UAV format</a>
+<a href="../10112/index.html">Selective imitation enhan</a>
+<a href="../10111/index.html">Real-time avoidance obsta</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Distance-Attention Augmented Reinforcement Learning: A Robust Approach for 3D Cooperative UAV Navigation in Dense Urban Environments（距离注意力增强强化学习：密集城市环境下三维协同无人机导航的鲁棒方法）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Lijuan Zhang</strong>（张丽娟，副教授）、<strong>Hang Lin</strong>（林航，硕士生）、<strong>Shihong Zhao</strong>（赵世宏，硕士生）、<strong>Fei Wang</strong>（王飞，硕士生）、<strong>Chao Yan</strong>（闫超，副教授，corresponding）、<strong>Pan Gao</strong>（高攀，副教授）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">南京航空航天大学</strong>（NUAA）——电子信息工程学院（张丽娟/林航/赵世宏/王飞）；自动化学院（闫超）；计算机科学与技术学院（高攀）。闫超曾为国防科技大学控制科学与工程博士（2019-2023），新加坡南洋理工大学访问博士生（2021-2022）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Transactions on Mobile Computing（TMC）</strong>，<strong>2026年</strong>，CCF-A / SCI一区，DOI: 10.1109/TMC.2026.3668827</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE TMC</span> <span class="jif-badge if-value">IF 7.9</span> <span class="jif-badge if-q1">JCR Q1</span> <span class="jif-badge if-cas">CAS 1区</span></div>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>DA2RL</strong>（距离注意力增强强化学习）算法，解决密集城市环境中多无人机（3~12架）三维协同导航问题。核心创新：<strong>距离注意力 Actor 网络</strong>——用注意力权重（w_t = Softmax(Tanh(FC(V_t)) + W·h_{t-1})）将 48 维 LiDAR 感知压缩为 16 维语义向量，大幅降低网络复杂度并加速收敛；<strong>历史特征流 Critic 网络</strong>——双路径架构（当前观测-动作流 + LSTM 历史观测序列流）融合后评估 Q 值，消除部分可观测性导致的估值偏差；<strong>五类非稀疏奖励函数</strong>（目标逼近 + 连续避障 + 防撞 + 通信保持 + 时间步）提供密集梯度信号。在训练环境成功率 94.6%（比 MADDPG/MARDPG/RL-CN 高 3.6%~17.9%），碰撞率仅 5.17%。泛化测试覆盖环境尺寸 4 倍、障碍密度变化、动态环境和集群规模 12 架。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Distance-Attention</span>
+    <span class="tag tag-green">Multi-UAV Cooperative Navigation</span>
+    <span class="tag tag-amber">3D Dense Urban</span>
+    <span class="tag tag-purple">POMDP</span>
+    <span class="tag tag-red">Historical Feature Flow</span>
+    <span class="tag tag-cyan">IEEE TMC 2026</span>
+    <span class="tag tag-gray">MADRL</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么现有多 UAV 三维协同导航算法在密集城市环境中表现不佳？</strong><br>
+    答：三个根本原因——（1）<strong>高维观测的维度灾难</strong>：16 方向 × 3 垂直层 = 48 维 LiDAR 距离向量直接送入 Actor 网络，参数爆炸、训练难以收敛；（2）<strong>部分可观测性导致 Critic 估值偏差</strong>：单时刻 LiDAR 无法区分"前方是墙壁"还是"前方是另一架 UAV"——两者在距离传感器上完全一致，Critic 将不同场景混为一谈；（3）<strong>稀疏奖励</strong>：仅用到达/碰撞二元信号，在 1500×1500×200m 的 3D 空间中随机探索几乎不可能成功。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>用距离注意力机制对高维 LiDAR 进行语义压缩，同时在 Critic 中引入历史观测序列的特征流来消除部分可观测性偏差。</strong>——不是让网络无差别地处理 48 维向量，而是学习每一垂直层的注意力权重（哪层在当前场景下更重要——窄通道中上层/下层更重要，巡航时中层最重要）。同时 Critic 融合过去 L 步的观测序列，从时序变化中推断环境动态（距离在缩小=靠近危险，距离在增大=远离安全）。两个增强都在 MADDPG CTDE 框架上<strong>模块化叠加</strong>，每个可独立验证。
+  </div>
+
+  <h3>2.2 启发来源到洞察的映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>→ 启发了什么洞察</th><th>类型</th></tr>
+    <tr><td>注意力机制在 NLP/CV 中的成功（Transformer, Bahdanau 2015）</td><td>→ 注意力天然适合"选择性关注"高维信息中的重要部分——48 维 LiDAR 是空间序列，用注意力学习各层权重，压缩观测维度（48→16），减少网络参数</td><td>架构</td></tr>
+    <tr><td>DRQN（Hausknecht & Stone 2015）——LSTM 处理 POMDP</td><td>→ 将 LSTM 集成到 Critic（非 Actor），处理过去 L 步的历史观测序列——从"当前发生了<strong>什么</strong>"扩展到"过去几帧中<strong>如何变化</strong>"，消除单时刻观测的语义混淆</td><td>方法</td></tr>
+    <tr><td>MADDPG 的 CTDE 范式（Lowe et al. 2017）</td><td>→ 集中 Critic 能获取所有 UAV 的全局历史——为 Critic 注入历史特征流提供了天然架构。但 Actor 不应获取完整历史（实时决策只需当前精炼观测）——信息非对称是关键</td><td>架构</td></tr>
+    <tr><td>Boids 模型的速度一致性（Vicsek et al. 1995）</td><td>→ $C_v = \|\mathbf{v}_i + \sum \mathbf{v}_j\|^2 / (\|\mathbf{v}_i\|^2 + \sum \|\mathbf{v}_j\|^2)$ 量化编队协调质量——启发通信保持奖励 $r_{con}$ 的设计</td><td>策略 / 指标</td></tr>
+  </table>
+
+  <h3>2.3 创新点拆解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1: 距离注意力 Actor 网络——用注意力权重替代高维原始观测</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>多层环向感知（16×3=48维 LiDAR）直接作为 Actor 输入 → 参数量过大、训练难收敛。同时 LSTM 的加入进一步复杂化 Actor 结构。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>注意力机制天然适合对序列元素进行重要性加权——不同方向/高度层的距离信息对决策的重要性不同</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将 $\mathbf{O}_{env}$ reshape 为 3 层每层 16 维的矩阵 $\mathbf{V}_t$ → 两层 FC（Tanh）+ 上一时刻 LSTM 隐藏状态 $\mathbf{h}_{t-1}$ 的投影上下文 → Softmax 生成 3 个注意力权重 → 加权求和 $\mathbf{O}_z = \sum w_t^j \mathbf{v}_t^j$，维度 48→16。$\mathbf{O}_z$ 与 UAV 内部/邻居/目标状态拼接后送入 LSTM → 2×FC → 3 维动作。注意：$\mathbf{W} \cdot \mathbf{h}_{t-1}$ 使注意力权重受<strong>历史上下文调制</strong>（经历过窄通道后自动增加侧方注意）</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2: 历史特征流 Critic 网络——双路径融合消除部分可观测性偏差</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>单时刻观测-动作对无法区分静态障碍物和动态 UAV——Critic 估值存在系统性偏差，策略陷入局部最优</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>历史观测序列包含运动趋势信息——过去的距离变化能揭示"靠近还是远离"</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Critic 采用双路径——<strong>路径一（当前流）</strong>：当前所有 UAV 的观测-动作对 $[o_t^1,...,o_t^N,A_t^1,...,A_t^N]$ → FC → $\mathbf{o}_t^{s,a}$；<strong>路径二（历史流）</strong>：过去 L 步历史观测序列 $\mathbf{x}_{t-1}$ → FC(32) → LSTM → $\mathbf{o}_t^h$。拼接 $[\mathbf{o}_t^{s,a} \oplus \mathbf{o}_t^h]$ → 2×FC → Q 值。仅 Critic 用历史流（非 Actor）——避免了 MARDPG 双端 RNN 的训练不稳定</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3: 五类非稀疏奖励函数——加速训练的密集梯度信号</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>稀疏二元奖励（到达/碰撞）在复杂 3D 环境中几乎不提供有效探索梯度</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）$r_1$：距离缩短时指数奖励；（2）$r_2 = d_i/D_r - 1$：<strong>连续</strong>函数（非离散阈值），距离越近惩罚越重——提供平滑梯度；（3）$r_3$：邻居距离 &lt; 安全阈时惩罚；（4）$r_4$：最近邻居 &gt; 通信范围（150m）时惩罚——确保集群连通；（5）$r_5 = -1$：每步固定惩罚推动尽快到达</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 系统框架图</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph ENV["任务环境层——密集城市"]
+      SCENE["1500×1500m² · 圆柱障碍物R=65m · 高度40~200m"]
+      SENSOR["多层环向感知 · 16方向×3垂直层 · LiDAR Dr=100m"]
+      DYN["动态障碍物 · 位置周期性刷新 · 20~50步间隔"]
+    end
+
+    subgraph OBS["感知与观测层——57维"]
+      OENV["环境观测 O_env · 48维 LiDAR 距离"]
+      OINT["内部状态 O_int · 航向ψ/速度v/高度变化率φ"]
+      ONEI["邻居状态 O_nei · 最近2架距离 · ADS-B交换"]
+      OTAR["目标状态 O_tar · 水平/垂直距离+角度"]
+    end
+
+    subgraph ACTOR["Actor网络 · 距离注意力机制"]
+      RESHAPE["观测reshape · V_t = {v_t^j} · j=1,2,3"]
+      ATT["距离注意力 · 2FC+Tanh+Softmax · 融合W·h_{t-1}"]
+      OZ["注意力输出 · O_z = Σw_t^j·v_t^j · 48→16维"]
+      LSTM_A["LSTM编码 · 隐藏层64 · 时序依赖建模"]
+      POLICY["策略输出 · FC 400→300→3 · 归一化动作"]
+    end
+
+    subgraph CRITIC["Critic网络 · 历史特征流双路径"]
+      PATH1["路径1 · 当前观测-动作流 · [o_t,A_t]→FC→o_t^{s,a}"]
+      PATH2["路径2 · 历史观测序列流 · x_{t-1}→FC→LSTM→o_t^h"]
+      FUSE["特征融合 · [o_t^{s,a}⊕o_t^h]→FC 400→300→1"]
+      QVAL["Q值输出 · 集中评估联合动作价值"]
+    end
+
+    subgraph REWARD["奖励函数层 · 五类非稀疏"]
+      R1["r1: 目标逼近 · 距离缩短指数奖励"]
+      R2["r2: 避障连续惩罚 · d_i/D_r-1"]
+      R3["r3: UAV防撞 · 邻居距离<安全阈惩罚"]
+      R4["r4: 通信保持 · 最近邻居>150m惩罚"]
+      R5["r5: 时间步惩罚 · 每步固定-1"]
+    end
+
+    subgraph EXEC["执行层"]
+      DECODE["动作解码 · [-1,1]³→物理量 a/ω/φ"]
+      PHYSICS["3D运动学 · 位置/姿态更新"]
+      FLIGHT["协同飞行 · 3~12架UAV · 最大速度20m/s"]
+    end
+
+    SCENE --> SENSOR --> OENV
+    DYN --> OENV
+    OENV --> RESHAPE
+    OINT --> LSTM_A
+    ONEI --> LSTM_A
+    OTAR --> LSTM_A
+    RESHAPE --> ATT --> OZ --> LSTM_A --> POLICY
+    POLICY --> PATH1
+    OENV -.-> PATH2
+    PATH1 --> FUSE
+    PATH2 --> FUSE
+    FUSE --> QVAL
+    QVAL -.->|"TD误差更新"| POLICY
+    POLICY --> DECODE --> PHYSICS --> FLIGHT
+    PHYSICS --> R1
+    PHYSICS --> R2
+    PHYSICS --> R3
+    PHYSICS --> R4
+    R1 --> REWARD
+    R2 --> REWARD
+    R3 --> REWARD
+    R4 --> REWARD
+    R5 --> REWARD
+    REWARD -.->|"总奖励R=Σr_i"| QVAL
+    FLIGHT -.->|"集中训练: 全局信息+历史"| CRITIC
+    FLIGHT -.->|"分散执行: 仅本地观测+本地Actor"| ACTOR
+
+    classDef env fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef percept fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef actor fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef critic fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef reward fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef exec fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
+    class SCENE,SENSOR,DYN env
+    class OENV,OINT,ONEI,OTAR percept
+    class RESHAPE,ATT,OZ,LSTM_A,POLICY actor
+    class PATH1,PATH2,FUSE,QVAL critic
+    class R1,R2,R3,R4,R5 reward
+    class DECODE,PHYSICS,FLIGHT exec
+    </pre>
+  </div>
+
+  <h3>3.2 数据流图——观测-动作-奖励-更新完整循环</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph OBS["感知阶段: 环境→观测向量"]
+      direction LR
+      LIDAR["LiDAR 16×3扫描"] --> DMAT["距离矩阵 3×16"] --> ATTOUT["注意力融合 48→16维"]
+      OTHER["自身/邻居/目标状态 9维"] --> CONCAT["拼接 25维"]
+      ATTOUT --> CONCAT --> LSTM_IN["LSTM编码+策略输出"]
+    end
+
+    subgraph DEC["决策阶段: 网络推理→物理指令"]
+      direction LR
+      ACTOR_NET["Actor: LSTM+FC → 归一化动作 u∈[-1,1]³"] --> LINEAR["线性映射: u→a(m/s²)/ω(rad/s)/φ(m/s²)"]
+    end
+
+    subgraph TRANS["转移阶段: 环境交互"]
+      direction LR
+      LINEAR --> KINEMATICS["3D运动学: p_{t+1}=f(p_t,v_t,a_t,ω_t,φ_t)"]
+      KINEMATICS --> COLL["碰撞检测: 障碍物 ∩ UAV 距离"]
+      KINEMATICS --> NEIGHBOR["邻居测距: ADS-B 定期广播位置"]
+    end
+
+    subgraph RLOOP["学习循环: 奖励→回放→更新"]
+      direction LR
+      COLL --> RC["五类非稀疏奖励计算"]
+      NEIGHBOR --> RC
+      RC --> BUFFER["经验回放池 D · 容量10⁶ · L=3历史队列"]
+      BUFFER --> SAMPLE["随机采样K条: (x,A,R,x_next)"]
+      SAMPLE --> C_UP["Critic更新: min E[(Q-y)²]"]
+      SAMPLE --> A_UP["Actor更新: ∇J=∇_aQ·∇_θμ"]
+      C_UP --> SOFT["软更新: θ'←τθ+(1-τ)θ' · τ=0.001"]
+      A_UP --> SOFT
+    end
+
+    OBS --> DEC --> TRANS --> RLOOP
+    RLOOP -.->|"梯度更新"| ACTOR_NET
+    KINEMATICS -.->|"新观测 o_{t+1}"| LIDAR
+
+    classDef obs fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef dec fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef trans fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef loop fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class LIDAR,DMAT,ATTOUT,OTHER,CONCAT,LSTM_IN obs
+    class ACTOR_NET,LINEAR dec
+    class KINEMATICS,COLL,NEIGHBOR trans
+    class RC,BUFFER,SAMPLE,C_UP,A_UP,SOFT loop
+    </pre>
+  </div>
+
+  <h3>3.3 工作流——从训练到部署的完整管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1: 环境建模与POMDP形式化"]
+      direction LR
+      P1A["场景定义: 1500×1500m² · R=65m圆柱障碍 · H=40~200m"] --> P1B["感知建模: 多层环向LiDAR 16×3 · 3D动力学"] --> P1C["POMDP 7元组: (S,{A_i},{O_i},P,Z,γ,R)"]
+    end
+
+    subgraph PHASE2["阶段2: 网络架构设计"]
+      direction LR
+      P2A["Actor: 距离注意力(48→16)+历史队列LSTM+策略MLP"] --> P2B["Critic: 双路径·当前流FC+历史流LSTM+融合MLP"] --> P2C["奖励: 5类非稀疏·r1目标+r2避障+r3防撞+r4通信+r5时间"]
+    end
+
+    subgraph PHASE3["阶段3: 集中训练"]
+      direction LR
+      P3A["超参确定: α_a=2e-4/α_c=1e-3·γ=0.95·batch=256·τ=0.001"] --> P3B["2000episodes×300步·3UAVs训练 · L=3历史队列"] --> P3C["经验回放: 容量10⁶·随机采样K条·TD误差+策略梯度更新"]
+    end
+
+    subgraph PHASE4["阶段4: 评估与消融验证"]
+      direction LR
+      P4A["对比: MADDPG/MARDPG/RL-CN·指标: 成功率/碰撞率/Cv/路径长度"] --> P4B["消融: Actor单独/Critic单独/奖励逐级叠加"] --> P4C["泛化: 环境×4倍/密度α=0.35~0.5/动态刷新/集群3→12架"]
+    end
+
+    subgraph PHASE5["阶段5: 部署与能耗"]
+      direction LR
+      P5A["分散执行: 每UAV仅本地Actor·无集中通信需求"] --> P5B["能耗: 计算+LiDAR+推进·DA2RL总148.16kJ·优于MADDPG/MARDPG"] --> P5C["展望: 物理四旋翼验证·通信延迟/丢包·异构UAV系统"]
+    end
+
+    PHASE1 -->|"规格参数"| PHASE2
+    PHASE2 -->|"网络+奖励"| PHASE3
+    PHASE3 -->|"模型收敛"| PHASE4
+    PHASE4 -->|"验证通过"| PHASE5
+
+    P4A -.->|"反馈: MADDPG+Act成功率高但路径长"| P2A
+    P4A -.->|"反馈: MARDPG奖励高但性能差"| P2B
+    P5B -.->|"反馈: LiDAR能耗优化空间大"| P1B
+
+    classDef phase1 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef phase2 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef phase3 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef phase4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef phase5 fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class P1A,P1B,P1C phase1
+    class P2A,P2B,P2C phase2
+    class P3A,P3B,P3C phase3
+    class P4A,P4B,P4C phase4
+    class P5A,P5B,P5C phase5
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. 任务定义——解决什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题——POMDP 七元组建模</span>
+    $$ \langle \mathcal{S}, \{\mathcal{A}_i\}_{i=1}^N, \{\mathcal{O}_i\}_{i=1}^N, \mathcal{P}, \mathcal{Z}, \gamma, \mathcal{R} \rangle $$
+    $$ \max_{\mu_i} \mathbb{E}\left[ \sum_{t=0}^T \gamma^t R_i(s_t, \mathbf{a}_t) \right] \quad \text{s.t.} \quad \forall i: \text{安全到达、无碰撞、通信连通} $$
+    <div class="eq-note">
+      <strong>$\mathcal{S}$</strong> = 全局状态空间（所有 UAV 位姿/速度 + 障碍物位置/尺寸 + 目标位置）&nbsp;|&nbsp;
+      <strong>$\mathcal{A}_i$</strong> = UAV i 的连续动作空间 $[a, \omega, \phi]$（水平加速度/偏航角速率/垂直加速度），归一化到 $[-1,1]^3$ 后线性映射 &nbsp;|&nbsp;
+      <strong>$\mathcal{O}_i = [\mathbf{O}_{env}, \mathbf{O}_{int}, \mathbf{O}_{nei}, \mathbf{O}_{tar}]$</strong> = 57 维局部观测（48 维 LiDAR + 3 维内部状态 + 2 维邻居距离 + 4 维目标信息）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：N 架 UAV 在密集城市环境中从随机起点协同飞往目标区域。每架仅依赖本地观测（LiDAR + ADS-B 邻居 + 目标相对位置），不得碰撞。这是<strong>连续动作空间的分散式部分可观测多智能体决策问题</strong>，训练时 Critic 获取全局历史，执行时 Actor 仅用本地观测。
+    </div>
+  </div>
+
+  <h3>4.2 输入 / 输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度/范围</th></tr>
+    <tr><td><strong>输入（观测）</strong></td><td>$\mathbf{O}_{env}$: 多层环向 LiDAR 距离（16 方向 × 3 垂直层 = 48 维）；$\mathbf{O}_{int}$: 自身航向 $\psi$/速度 $v$/高度变化率 $\phi$；$\mathbf{O}_{nei}$: 最近 2 架邻居 UAV 距离；$\mathbf{O}_{tar}$: 目标水平/垂直距离+角度</td><td>57 维向量</td></tr>
+    <tr><td><strong>输出（动作）</strong></td><td>归一化动作 $u \in [-1,1]^3$ → 线性映射为：水平加速度 $a \in [-3, 3]$ m/s²、偏航角速率 $\omega \in [-1, 1]$ rad/s、垂直加速度 $\phi \in [-2, 2]$ m/s²</td><td>3 维连续动作</td></tr>
+    <tr><td><strong>目标</strong></td><td>所有 UAV 从随机起点协同飞抵目标区域（距离 ≤ 阈值即成功），全程零碰撞（建筑 + UAV 间），最大化累计折扣奖励</td><td>成功率 94.6%（训练环境，3 UAVs）</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>多智能体深度强化学习（MADRL）框架下的 3D 协同导航问题</strong>——本质是连续动作空间的分散式部分可观测马尔可夫决策过程（Dec-POMDP）。场景设定为密集城市环境（1500×1500×200m，建筑半径 65m，窄通道最小宽度仅 50m，动态障碍物周期性刷新），3~12 架 UAV 协同从随机起点飞往目标区域。与一般路径规划不同，本文同时优化<strong>飞行轨迹平滑性、集群速度一致性、通信连通保持</strong>等多重目标，是复杂约束下的多目标决策问题。平台场景：模拟四旋翼 UAV（参考 DJI Matrice 350 RTK 规格参数），训练环境障碍密度参数 $\alpha = 0.4$, $\beta = 30$ obstacles/km²。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. 挑战分析——为什么困难？</h2>
+
+  <h3>5.1 本质分析（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：三维协同导航的<strong>"维度-信息-协调"三重困境</strong>。<br><br>
+    （1）<strong>高维观测的维度诅咒</strong>：16 方向 × 3 垂直层 = 48 维纯 LiDAR 观测，加上自身/邻居/目标信息后总维度达 57。在 3 维连续动作空间下，Actor 的输入-输出映射极其复杂，传统全连接层处理 48 维数据时参数爆炸、训练极慢。<br><br>
+    （2）<strong>部分可观测性的语义混淆</strong>：单架 UAV 的 LiDAR 仅返回距离值——"前方 30m 是建筑墙壁"和"前方 30m 是另一架 UAV"在距离传感器上完全一致。这种"语义缺失"导致 Critic 对不同场景给出相同 Q 值估计——系统性偏差导致危险决策（把动态友机当成静止障碍物试图"钻过去"）。<br><br>
+    （3）<strong>多智能体协调的指数复杂性</strong>：N 架 UAV 的联合动作空间为 $|\mathcal{A}|^N = 3^N$（连续空间则无限）。在 3D 窄通道（仅 50m 宽）中，UAV 需协调通过顺序和高度——一架先过、另一架等待或调节高度从上方通过。这种时序协调对仅处理单帧信息的 Critic 几乎无法习得。<br><br>
+    （4）<strong>稀疏奖励的探索困境</strong>：目标几百米外，随机探索几乎不可能偶然到达。仅用二元奖励信号（到达=+1/碰撞=-1）在 1500×1500×200m 的 3D 空间中训练可能永远不会收敛。<br><br>
+    <strong>将四点放在一起</strong>：需要一个框架——同时压缩 57 维观测、利用历史信息弥补部分可观测性、提供密集奖励信号、并支持多智能体协调——四个子问题中任何一个没处理好，系统都无法正常工作。
+  </div>
+
+  <h3>5.2 现有方法及其局限性</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>MADDPG（Multi-Agent DDPG, Lowe et al. 2017）</td>
+      <td>集中训练/分散执行的经典多智能体 Actor-Critic 框架。Critic 用全局信息评估联合动作价值，Actor 仅依赖本地观测输出连续动作。CTDE 范式解决了多智能体环境的非平稳性问题</td>
+      <td>在部分可观测 3D 环境中，Critic 仅基于<strong>单时刻</strong>全局观测-动作对评估 Q 值——无法区分动态 UAV vs 静态建筑。57 维原始观测直接送入全连接网络，参数过多。训练收敛慢（~1750 episodes），轨迹发散、缺乏有效协同。成功率仅 91.3%，碰撞率 8.61%</td>
+    </tr>
+    <tr>
+      <td>MARDPG（RNN-enhanced MADDPG）</td>
+      <td>在 MADDPG 的 Actor 和 Critic 中<strong>同时</strong>集成 RNN，以捕捉历史状态-动作之间的时序依赖关系。理论上能更好地建模 POMDP 中的长期依赖</td>
+      <td>双端 RNN<strong>引入严重训练不稳定</strong>——虽然奖励收敛曲线最高，但实际导航性能在所有算法中最差（成功率仅 80.2%，碰撞率 19.80%）。原因是 RNN 在 Actor 和 Critic 中同时存在导致了过度的时序依赖学习，策略"过度关注奖励最大化"而非实际导航能力。梯度沿时间轴反向传播加剧了发散</td>
+    </tr>
+    <tr>
+      <td>RL-CN（Zhang et al. 2024, IEEE TII）</td>
+      <td>基于分段调优（staged-tuning）的协同导航算法——两个子 Actor 网络 + 增强优先经验回放，此前在 2D 协同导航中表现最优。同一通讯作者前序工作</td>
+      <td><strong>仅适用于 2D 环境</strong>——观测和动作空间均为二维（无高度维）。在 3D 窄通道中 UAV 无法通过调节高度来平滑轨迹，只能选择绕行。窄通道中各 UAV <strong>倾向于分道扬镳</strong>（各走各的通道），损害了路径最优性和协同效率。成功率仅 85.5%，碰撞率 14.42%</td>
+    </tr>
+    <tr>
+      <td>PG-ITD3（Ren et al. 2025, IEEE TASE）</td>
+      <td>将人工势场法（APF）与改进 TD3 结合，引力和斥力梯度引导 3D 避障导航，虚拟障碍物机制增强安全性</td>
+      <td>势场法存在<strong>局部极小值陷阱</strong>——引力/斥力平衡点导致 UAV 卡住。且<strong>仅针对单 UAV</strong>——扩展到多 UAV 时，势场间的耦合导致不可预见的振荡和冲突</td>
+    </tr>
+  </table>
+
+  <h3>5.3 关键挑战总结</h3>
+  <ul>
+    <li><strong>挑战 1 — 高维观测空间的维度灾难</strong>：57 维输入（48 LiDAR + 9 状态）→ 3 维连续动作。直接全连接 → 参数爆炸、训练难以收敛。注意力机制是解决路径——但如何设计一个既轻量又能捕获空间语义（哪个方向/高度层在特定场景下最重要）且受历史上下文调制的注意力？</li>
+    <li><strong>挑战 2 — 部分可观测性下的 Q 值估计偏差</strong>：单时刻 LiDAR 无法区分障碍物类型。Critic 需整合历史观测以推断环境动态——但如何在不引入训练不稳定（如 MARDPG 双端 RNN）的前提下高效融合时序信息？</li>
+    <li><strong>挑战 3 — 3D 窄通道（50m）的协同通过</strong>：多架 UAV 需协调通过顺序和高度。这要求 Critic 能理解时空因果逻辑（"如果 A 先过，B 等待，整体最优"）——仅处理单帧信息的 Critic 无法习得这种时序协调。</li>
+    <li><strong>挑战 4 — 奖励稀疏导致探索困难</strong>：仅用到达/碰撞的离散奖励，在 1500×1500×200m 空间中随机探索几乎永远无法成功。需要每步可计算的密集奖励信号。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. 方法与核心公式</h2>
+
+  <h3>6.1 算法概述</h3>
+  <p>DA2RL 基于 <strong>MADDPG 集中训练/分散执行框架</strong>，在三个关键维度进行增强：(1) <strong>距离注意力 Actor</strong>——将 48 维 LiDAR 观测压缩为 16 维语义注意力向量；(2) <strong>历史特征流 Critic</strong>——双路径融合当前观测-动作流与 LSTM 历史观测序列流以消除部分可观测性偏差；(3) <strong>五类非稀疏奖励</strong>——提供连续密集梯度信号加速训练。以下逐一展开核心公式。</p>
+
+  <h3>6.2 核心公式</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。符号解释用中文。</p>
+
+  <!-- Group A: POMDP + 策略梯度 -->
+  <h4>Group A: POMDP 观测空间与策略梯度</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — POMDP 观测空间与历史队列定义</span>
+    $$ \mathbf{O}_i = [\mathbf{O}_{env}, \mathbf{O}_{int}, \mathbf{O}_{nei}, \mathbf{O}_{tar}] \quad \text{（57维局部观测）}$$
+    $$ \mathbf{o}_i^t = [O_i^{t-L+1}, O_i^{t-L+2}, ..., O_i^{t-1}, O_i^t] \quad \text{（历史队列，L=3）}$$
+    <div class="eq-note">
+      <strong>$\mathbf{O}_{env}$</strong> = $[d_{j,k}^i]$, j=1..16（水平方向），k=1..3（垂直层 -10°/0°/+10°），共 48 维距离值 &nbsp;|&nbsp;
+      <strong>$\mathbf{O}_{int}$</strong> = $[\psi_i, v_i, \dot{h}_i]$ ——航向/速度/高度变化率 &nbsp;|&nbsp;
+      <strong>$\mathbf{O}_{nei}$</strong> = $[d_{17}^i, d_{18}^i]$ ——最近两架邻居 UAV 的距离（ADS-B 定期广播）&nbsp;|&nbsp;
+      <strong>$\mathbf{O}_{tar}$</strong> = $[d_{iv}, d_{ih}, \phi_v, \phi_h]$ ——目标水平/垂直距离与角度 &nbsp;|&nbsp;
+      <strong>$L=3$</strong> 步历史队列——为 Actor 的 LSTM 和 Critic 的历史特征流提供时序上下文
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 策略梯度与 Critic 损失函数（MADDPG 基础）</span>
+    $$ \nabla_{\theta_i} J(\mu_i) = \mathbb{E}_{\mathbf{x}, a \sim \mathcal{D}} \left[ \nabla_{\theta_i} \mu_i(a_i | o_i) \cdot \nabla_{a_i} Q_i^{\mu}(\mathbf{x}, a_1, ..., a_N) \big|_{a_i = \mu_i(o_i)} \right] $$
+    $$ \mathcal{L}(\theta_i^Q) = \mathbb{E} \left[ \left( Q_i^{\mu}(\mathbf{x}, a_1, ..., a_N) - y \right)^2 \right], \quad y = R_i + \gamma \cdot Q_i^{\mu'}(\mathbf{x}', a_1', ..., a_N') \big|_{a_j' = \mu_j'(o_j)} $$
+    <div class="eq-note">
+      <strong>$\mu_i$</strong> = UAV i 的确定性策略（Actor 网络）&nbsp;|&nbsp;
+      <strong>$Q_i^{\mu}$</strong> = 集中式动作价值函数（Critic 网络——DA2RL 中为历史特征流增强版）&nbsp;|&nbsp;
+      <strong>$\mathcal{D}$</strong> = 经验回放池（容量 $10^6$，存储 $(\mathbf{x}, a_1,...,a_N, R_1,...,R_N, \mathbf{x}_{next})$）&nbsp;|&nbsp;
+      <strong>$y$</strong> = TD 目标值 &nbsp;|&nbsp;
+      <strong>$\gamma=0.95$</strong> = 折扣因子 &nbsp;|&nbsp;
+      <strong>软更新</strong>：$\theta_i' \leftarrow 0.001\theta_i + 0.999\theta_i'$（极度缓慢的目标网络更新确保稳定性）
+    </div>
+  </div>
+
+  <!-- Group B: Distance-Attention -->
+  <h4>Group B: 距离注意力机制——高维观测的语义压缩</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 距离注意力权重计算与特征融合</span>
+    $$ \mathbf{V}_t = \{\mathbf{v}_t^j \mid j \in [1, L_v]\}, \quad \mathbf{v}_t^j = [d_{1,j}^t, d_{2,j}^t, ..., d_{16,j}^t] \in \mathbb{R}^{16} $$
+    $$ \mathbf{W}_t = \text{Softmax}\left( \text{Linear}\left( \text{Tanh}\left( \text{Linear}(\mathbf{V}_t) + \mathbf{W} \cdot \mathbf{h}_{t-1} \right) \right) \right) $$
+    $$ \mathbf{O}_z = \sum_{j=1}^{L_v} w_t^j \cdot \mathbf{v}_t^j, \quad \mathbf{W}_t = \{w_t^j \mid j \in [1, L_v]\} $$
+    <div class="eq-note">
+      <strong>$\mathbf{V}_t$</strong> = 每层 16 维距离向量集合（3 层 × 16 方向 = 48 维结构化输入）&nbsp;|&nbsp;
+      <strong>$\mathbf{h}_{t-1}$</strong> = LSTM 上一时刻隐藏状态（为注意力提供<strong>时序上下文调制</strong>）&nbsp;|&nbsp;
+      <strong>$\mathbf{W}$</strong> = 权重矩阵——将 LSTM 隐藏状态映射为注意力上下文向量，使得注意力权重不仅依赖当前观测 $\mathbf{V}_t$，还受历史运动模式影响 &nbsp;|&nbsp;
+      <strong>$w_t^j$</strong> = 第 j 垂直层的注意力权重（3 个值，和为 1）——表示上/中/下层的相对重要性 &nbsp;|&nbsp;
+      <strong>$\mathbf{O}_z$</strong> = 注意力融合后 16 维语义向量（48→16，压缩 67%）&nbsp;|&nbsp;
+      <strong>核心设计巧思</strong>：$\mathbf{W} \cdot \mathbf{h}_{t-1}$ 使得 UAV 能根据"之前经历的场景"动态调整注意力——经历过窄通道后自动增加侧方权值，巡航时增加前方权值
+    </div>
+  </div>
+
+  <!-- Group C: Reward Functions -->
+  <h4>Group C: 五类非稀疏奖励函数</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 目标逼近奖励（连续指数函数）</span>
+    $$ r_1^i = \begin{cases} -C_1, & d_g^i(t) > D_0 \\ e^{-0.05|d_g^i(t-1)-d_g^i(t)|} \cdot (d_g^i(t-1) - d_g^i(t)), & \text{otherwise} \end{cases} $$
+    <div class="eq-note">
+      <strong>$d_g^i(t)$</strong> = UAV i 时刻 t 与目标的距离 &nbsp;|&nbsp;
+      <strong>$D_0$</strong> = 防止偏离过远的阈值 &nbsp;|&nbsp;
+      <strong>$C_1 = -30$</strong>（偏离超阈时的固定惩罚）&nbsp;|&nbsp;
+      <strong>设计理念</strong>：距离缩短越多 → 奖励越大（指数级）。距离增加 → 负奖励。偏离过大 → 固定重罚
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) — 避障/防撞/通信/时间步四项奖励</span>
+    $$ r_2^i = \frac{d^i}{D_r} - 1, \quad d^i = \min(d_{j,1}^i, ..., d_{j,L_v}^i), \quad D_r = 100\text{m} $$
+    $$ r_3^i = \begin{cases} -C_2, & \min(d_{17}^i, d_{18}^i) < d_{nei} \\ 0, & \text{otherwise} \end{cases} $$
+    $$ r_4^i = \begin{cases} -C_3, & \min(d_{17}^i, d_{18}^i) > r_{com} \\ 0, & \text{otherwise} \end{cases}, \quad r_{com} = 150\text{m} $$
+    $$ r_5^i = -1 \quad \text{（每步固定惩罚）}$$
+    $$ R_i = r_1^i + r_2^i + r_3^i + r_4^i + r_5^i $$
+    <div class="eq-note">
+      <strong>$r_2^i$（避障）</strong>：<strong>连续函数</strong>（非离散阈值）——距离越近越负，提供平滑梯度信号 &nbsp;|&nbsp;
+      <strong>$r_3^i$（防撞）</strong>：邻居距离 < $d_{nei}$ 时固定罚 $C_2 = -30$ &nbsp;|&nbsp;
+      <strong>$r_4^i$（通信保持）</strong>：最近邻居 > $r_{com}=150\text{m}$ 时固定罚 $C_3 = -30$——确保集群连通性 &nbsp;|&nbsp;
+      <strong>$r_5^i$（时间步）</strong>：每步 -1 推动 UAV 尽快到达目标 &nbsp;|&nbsp;
+      <strong>$r_2$ 的巧妙之处</strong>：$d/D_r - 1$ 提供了 [-1, 0) 范围的连续梯度——比"碰到才惩罚"好得多，训练初期就能提供有意义的避障信号
+    </div>
+  </div>
+
+  <h3>6.3 关键参数速查</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>学习率（Actor / Critic）</td><td><strong>α_a = 0.0002, α_c = 0.001</strong></td><td>网络权重更新步长</td><td>通过 S1~S5 五组系统对比确定。S3(0.0002/0.001) 成功率 94.6%、碰撞率 5.17%——平衡了训练速度与稳定性。S4 奖励收敛快但波动大</td></tr>
+    <tr><td>历史队列长度</td><td><strong>L = 3</strong></td><td>保留的历史观测步数</td><td>L=1 无法捕捉时序动态；L>5 增加训练复杂度和内存。L=3 提供了足够的运动趋势信息</td></tr>
+    <tr><td>垂直感知层数</td><td><strong>Lv = 3</strong></td><td>每水平方向的垂直传感器数</td><td>-10°/0°/+10°，单束宽度 10°，总垂直 FOV 20°——在感知充分性与学习效率间平衡。3 层恰好覆盖注意力机制的层数维度</td></tr>
+    <tr><td>LiDAR 检测范围</td><td><strong>Dr = 100 m</strong></td><td>单束 LiDAR 最大测距</td><td>配合 UAV 最大速度 20 m/s，提供约 5 秒的提前避障时间——在 3D 机动中足够做出决策</td></tr>
+    <tr><td>通信距离</td><td><strong>rcom = 150 m</strong></td><td>UAV 间最大通信范围</td><td>基于 A2A 视距信道模型，大于 LiDAR 范围——UAV 能感知到传感器视野外的邻居</td></tr>
+    <tr><td>训练/测试 UAV 数量</td><td><strong>N = 3 / 最高 12</strong></td><td>集群规模</td><td>用 3 架训练（平衡状态复杂度和协调难度），泛化测试扩展到 5/7/10/12 架验证扩展性</td></tr>
+    <tr><td>软更新因子</td><td><strong>τ = 0.001</strong></td><td>目标网络软更新系数</td><td>极低的值确保目标网络参数变化极度缓慢——防止 Critic 训练中的目标值振荡</td></tr>
+  </table>
+
+  <h3>6.4 DA2RL vs MADDPG 架构对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>DA2RL（本文）</h4>
+      <ul>
+        <li>Actor：<strong>距离注意力</strong> 48→16 维压缩 + LSTM + FC(400→300→3)</li>
+        <li>Critic：<strong>双路径</strong>——当前流 FC + 历史流 LSTM，拼接融合输出 Q</li>
+        <li>奖励：<strong>五类非稀疏</strong>连续函数，密集梯度信号</li>
+        <li>训练收敛：~400 episodes</li>
+        <li>成功率：94.6%（训练环境），碰撞率：5.17%</li>
+        <li>3D 轨迹平滑，窄通道内先来后到协调通过</li>
+        <li>泛化：环境扩大 4 倍仍保持 78.6% 成功率</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>传统 MADDPG</h4>
+      <ul>
+        <li>Actor：<strong>原始 57 维观测直接入网</strong>，无注意力压缩</li>
+        <li>Critic：<strong>单路径</strong>——仅当前时刻观测-动作对，无历史流</li>
+        <li>奖励：依赖基础环境奖励，梯度稀疏</li>
+        <li>训练收敛：~1750 episodes</li>
+        <li>成功率：91.3%（训练环境），碰撞率：8.61%</li>
+        <li>3D 轨迹发散，速度抖动明显，缺乏有效协同</li>
+        <li>泛化：环境扩大 4 倍成功率降至 74.3%</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. 基础原理——核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 DA2RL 需要掌握三个关键基础原理：CTDE 框架（为什么集中训练/分散执行是必须的）、注意力机制（如何压缩高维观测）、LSTM 时序建模（如何消除部分可观测性偏差）。以下逐一深入拆解。</p>
+
+  <h3>7.1 集中训练/分散执行（CTDE）——多智能体强化学习的标准范式</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — CTDE 解决非平稳性的数学本质</span>
+    $$ \text{训练时：} Q(\mathbf{x}, a_1, a_2, ..., a_N) \quad \text{——Critic 获取全局观测和联合动作}$$
+    $$ \text{执行时：} a_i = \mu_i(o_i) \quad \text{——Actor 仅依赖本地局部观测}$$
+    <div class="eq-note">
+      <strong>为什么需要 CTDE？</strong>在独立学习中，每架 UAV 将其他 UAV 视为环境的一部分——但其他 UAV 的策略<strong>也在变化</strong>，导致环境转移概率 $\mathcal{P}(s'|s,a)$ 非常平稳——违反了 MDP 的基本假设。集中 Critic 利用全局信息 $\mathbf{x}$（所有 UAV 的历史观测）评估联合动作的 Q 值，为每个 Actor 提供一个<strong>稳态的学习信号</strong>。执行时 Actor 不依赖全局信息——因为实际部署中 UAV 之间不可能实时共享所有观测数据。
+    </div>
+  </div>
+
+  <p><strong>对 DA2RL 的关键意义</strong>：CTDE 框架为"在 Critic 中注入所有 UAV 的历史观测序列"提供了天然的架构基础——集中 Critic 可以获取全局历史 $\mathbf{x}$，而分散 Actor 仅需要本地当前观测和自身历史。这就是 DA2RL "Critic 重量级 + Actor 轻量级"非对称设计的理论依据。</p>
+
+  <h3>7.2 距离注意力机制——从"平等对待"到"选择性关注"</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 注意力机制的数学本质与 DA2RL 中的简化实现</span>
+    $$ \text{标准自注意力：} \text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{Softmax}\left( \frac{\mathbf{Q}\mathbf{K}^T}{\sqrt{d_k}} \right) \mathbf{V} $$
+    $$ \text{DA2RL 轻量注意力：} \mathbf{W}_t = \text{Softmax}(\text{FC}(\text{Tanh}(\text{FC}(\mathbf{V}_t) + \mathbf{W} \cdot \mathbf{h}_{t-1}))) $$
+    <div class="eq-note">
+      <strong>为什么不直接用标准自注意力？</strong>标准自注意力需要学习 $\mathbf{Q}, \mathbf{K}, \mathbf{V}$ 三组投影矩阵——在输入仅 48 维的 Actor 中引入过多参数，违背了"轻量压缩"的设计目标。DA2RL 仅用<strong>两层 FC + Softmax</strong>，输出 3 个标量权重——参数极少，专注于"哪一层在当前场景下最重要"这一核心问题。&nbsp;|&nbsp;
+      <strong>$\mathbf{W} \cdot \mathbf{h}_{t-1}$ 的巧妙之处</strong>：使注意力权重同时依赖<strong>当前观测</strong>（$\mathbf{V}_t$）和<strong>LSTM 隐藏状态</strong>（$\mathbf{h}_{t-1}$）——这意味着 UAV 能根据"之前在窄通道中飞过"的经历来动态增加侧方注意权重。纯前馈注意力做不到这一点。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>DA2RL 距离注意力——层间加权</h4>
+      <p><strong>步骤 1</strong>：48 维 LiDAR reshape 为 3×16 矩阵 $\mathbf{V}_t$（3 垂直层，每层 16 水平方向）。</p>
+      <p><strong>步骤 2</strong>：两层 FC（Tanh）+ LSTM $\mathbf{h}_{t-1}$ 的投影上下文 → Softmax → 3 个权重 $\{w_t^1, w_t^2, w_t^3\}$。</p>
+      <p><strong>步骤 3</strong>：加权求和 $\mathbf{O}_z = \sum_{j=1}^3 w_t^j \mathbf{v}_t^j$，48 维压缩为 16 维。</p>
+      <p><strong>效果</strong>：窄通道中上方/下层权重大（检测建筑侧面）；巡航时中层权重大（检测前方障碍）。同时提供了可解释性——可视化注意力权重即可理解 UAV 的"关注策略"。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>传统全连接处理——无空间语义</h4>
+      <p><strong>步骤 1</strong>：48 维 LiDAR 直接展开为 1×48 向量——丢失了"3 层 × 16 方向"的结构信息。</p>
+      <p><strong>步骤 2</strong>：送入全连接层（48×H 参数）→ 激活 → 更多全连接层 → ...。</p>
+      <p><strong>问题</strong>：（1）方向/层空间结构被破坏——"前方 30m 下方"和"下方 30m 前方"在向量中仅位置不同，网络需要大量参数来重新学习空间语义；（2）参数量与 48 成正比，训练慢；（3）无法根据历史上下文动态调整关注重点——"现在进入窄通道了，应该多关注两侧"这种策略无法被纯全连接网络表达。</p>
+    </div>
+  </div>
+
+  <h3>7.3 历史特征流——用 LSTM 从时序观测中推断环境动态</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 为什么单时刻观测不足以准确评估 Q 值</span>
+    $$ \text{单时刻：} o_t \text{ → 仅知道"当前位置周围有什么"——不知道是静止还是运动}$$
+    $$ \text{历史序列：} \{o_{t-L+1}, ..., o_t\} \text{ → 可从距离变化推断速度、运动方向、接近/远离趋势}$$
+    <div class="eq-note">
+      <strong>核心矛盾</strong>：在 POMDP 中，$o_t$ 不是状态的充分统计量。同一个观测 $o_t$ 可能对应多个不同真实状态——例如 LiDAR 返回"前方 30m 有物体"，这个物体可能是静止建筑也可能是以 5m/s 靠近的 UAV。<strong>仅基于 $o_t$ 评估 Q 值会将这些不同的真实场景混为一谈</strong>——导致系统性估值偏差（对靠近的 UAV 给出"安全"的乐观估值，或对静止建筑给出"危险"的过度悲观估值）。&nbsp;|&nbsp;
+      <strong>历史特征流的解决方式</strong>：Critic 观察序列 $\{o_{t-2}, o_{t-1}, o_t\}$ = {前方 30m, 前方 25m, 前方 20m} → 从中推断"物体以 5m/s 靠近" → 更准确地评估当前动作的<strong>危险程度</strong>。
+    </div>
+  </div>
+
+  <p><strong>为什么仅在 Critic 中使用 LSTM（非 Actor）？</strong>这是 DA2RL 区别于 MARDPG（双端 RNN）的最关键设计决策。Actor 的任务是"根据当前观测快速输出最佳动作"——它需要<strong>反应速度</strong>而非<strong>长期记忆</strong>。给 Actor 加 LSTM 会引入不必要的时序依赖，使策略对历史数据过度敏感（经历过碰撞后会变得过度保守）。而 Critic 的任务是"评估动作的长期价值"——它确实需要理解环境动态的时序演变来输出准确的 Q 值估计。这种<strong>非对称架构</strong>（Actor 仅轻量 LSTM 处理精炼特征、Critic 专用 LSTM 处理原始历史序列）在时序能力与训练稳定性之间取得了更好的平衡。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    CTDE 框架为 Critic 提供全局历史访问权限 → 注意力机制将 48 维压缩为 16 维语义向量，降低 Actor/Critic 的输入复杂度 → 历史特征流在压缩后的低维特征上运行 Critic 侧的 LSTM，以可控的计算成本消除部分可观测性偏差 → <strong>三个原理环环相扣</strong>，共同使 DA2RL 在约 400 episodes 收敛（MADDPG 需要 1750），成功率 94.6%（MADDPG 91.3%），泛化到 4 倍环境时成功率 78.6%（MADDPG 74.3%）。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures"><h2>Representative Figure</h2><p>下图由本地 PDF <code>Zhang et al. - 2026 - Distance-attention augmented reinforcement learning A robust approach for 3D cooperative UAV naviga.pdf</code> 第 3 页直接渲染，用于核对论文的框架或首个主要实验图。</p><div class="fig-card"><img src="figures/overview.png" alt="Representative PDF page" style="display:block;width:100%;max-height:780px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;"><p style="font-size:12px;color:#64748b;margin-top:8px;">Local PDF page 3; no external or fabricated asset.</p></div></section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. 潜在不足与扩展方向</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 障碍物为规则圆柱体——真实城市建筑形状复杂（L 形、弧形、挑空结构），圆柱体简化可能导致模型在真实环境中误判可通过空间；(2) ADS-B 通信无延迟无丢包——实际低空城市环境中 A2A 通信受多径效应和遮挡影响严重，邻居位置信息可能有延迟（>200ms）或丢失；(3) 训练和测试环境几何形状相似（均为矩形区域 + 圆柱障碍物随机分布）——模型对新几何形态（狭长通道、圆形广场、不规则建筑群）的泛化能力未验证；(4) 仅用 3 架训练，Critic 输入维度固定——扩展到更多 UAV 时的具体技术未详述（论文 Table IV 脚注 2 提到可训练更多 UAV 但观测空间爆炸）。</li>
+    <li><strong>适用场景</strong>：仅针对<strong>从起点飞往固定目标区域</strong>的单程导航——不涉及路径点序列、区域覆盖搜索、持续巡逻等更复杂任务类型。目标位置在共享坐标系中已知——未考虑 GPS 拒止/视觉定位环境。</li>
+    <li><strong>可扩展性</strong>：未验证异构 UAV（不同速度/载荷/传感器配置）场景。通信保持奖励 $r_4$ 仅考虑最近邻居——对于大集群（>10 架），维持全连通图需要更复杂的通信拓扑管理。</li>
+  </ul>
+
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：(1) 动态集群规模——设计不依赖固定 UAV 数量的 Critic 架构（如 GNN-Critic，以 UAV 为节点、邻居关系为边），使训练后模型泛化到任意集群规模；(2) 异构 UAV 协同——不同 UAV 有不同动力学限制和传感器配置，Actor 需自适应异构建模</li>
+    <li><strong>条件放松</strong>：(1) <strong>通信退化适应</strong>——模拟随机延迟（10~500ms）和丢包（5%~30%）对邻居信息的影响，设计通信鲁棒奖励函数；(2) Sim-to-Real——论文提出搭建物理四旋翼测试平台，但未讨论域随机化（Domain Randomization）的具体方案，这是实际部署的关键挑战</li>
+    <li><strong>约束加入</strong>：(1) 能耗约束——将推进功耗纳入奖励函数，引导 UAV 学习节能轨迹（当前 Table V 的能耗分析仅为事后评估，未参与训练优化）；(2) 多任务泛化——扩展到区域覆盖、持续巡逻、编队保持等任务</li>
+  </ul>
+
+  <h3>9.3 数据敏感性分析</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>LiDAR 感知噪声</td><td>真实 LiDAR 受阳光/反射/雨雾影响存在 ±5~20cm 测距噪声——噪声会破坏注意力权重的准确性，尤其在窄通道中一个错误的高权重方向可能导致碰撞</td><td>★★★★</td></tr>
+    <tr><td>ADS-B 通信延迟与丢包</td><td>邻居位置信息延迟（>200ms）时 Critic 评估的联合 Q 值基于过时状态——实际执行时可能碰撞。通信完全中断时 $r_3$ 和 $r_4$ 同时失效，UAV 只能依赖 LiDAR</td><td>★★★★</td></tr>
+    <tr><td>环境几何的分布外泛化</td><td>模型仅在一种几何（矩形区域 + 圆柱障碍）上训练——对 L 形建筑、不规则形状、不同长宽比的泛化能力完全未知。注意力机制可能对训练中未见过的几何分布产生意外偏置</td><td>★★★★★</td></tr>
+    <tr><td>学习率敏感性</td><td>Table II 显示成功率对学习率高度敏感——S3(α_a=0.0002) vs S4(α_a=0.0004) 导致性能退化。在新环境部署时可能需要重新调参——增加了实际部署成本</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 值得深挖写成论文的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>基于图神经网络的动态集群 Critic + 跨任务注意力迁移</strong>——这是将 DA2RL 从"固定场景/固定规模"推向"开放场景/任意规模"最关键的一步。核心问题：(1) 如何用 GNN 替代当前固定维度的 Critic 输入——将每架 UAV 作为图节点，邻居关系作为边，Critic 自然处理任意 N 的图结构；(2) 注意力机制在不同任务间的迁移——"窄通道导航"侧重两侧、"开阔区巡航"侧重前方——能否学习任务编码器来动态调节注意力偏好？(3) 如果这两个方向成功，DA2RL 将成为通用的多 UAV 协同决策框架——适用于导航、编队、搜索、围捕等广泛任务。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. 动机推导——第一性原理推导</h2>
+
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>多 UAV 在密集城市环境中的 3D 协同导航本质是一个<strong>高维连续动作空间下的分散式部分可观测多智能体决策问题</strong>。核心挑战：观测高维（57 维）、动作连续（3 维 × N）、部分可观测（LiDAR 仅返回距离）、多目标（安全 + 效率 + 协同 + 通信）。现有端到端 RL 方法（MADDPG）直接处理原始高维观测——训练慢、协同差。加入 RNN 的方法（MARDPG）反而引入不稳定——双端 RNN 梯度爆炸/消失是根本原因。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线各有致命缺陷：（i）MADDPG——未针对部分可观测性做特殊处理，Critic 仅用单时刻观测，57 维直接入网；（ii）MARDPG——Actor+Critic 双端加 RNN，奖励曲线好但实际导航最差（过度关注奖励最大化）；（iii）RL-CN——性能不错但限于 2D，无高度维。共同缺失：<strong>没有对高维观测做结构性压缩</strong>，且<strong>没有区分式地处理历史信息</strong>。</li>
+    <li><strong>如果用注意力机制压缩观测呢？</strong><br>48 维 LiDAR 本质是空间序列——16 方向 × 3 高度层。不同方向/层的重要性不等。注意力天然适合这种"选择性关注"——用两层 FC + Softmax 学习 3 个层权重，将 48 维压缩为 16 维语义向量。关键增强：用 LSTM 的 $\mathbf{h}_{t-1}$ 调制注意力——使得注意力权重同时依赖当前观测和历史上下文。</li>
+    <li><strong>如果只在 Critic 中融入历史信息呢？</strong><br>为什么 MARDPG 双端 RNN 失败了？因为 Actor 的职责是<strong>反应</strong>（根据当前观测快速决策），Critic 的职责是<strong>评估</strong>（理解长期后果）。给 Actor 加 RNN 会引入不必要的时序依赖——策略对历史过度敏感。而 Critic <strong>确实需要</strong>时序上下文来准确评估 Q 值——这就是"非对称架构"的动机。Critic 用双路径（当前流 FC + 历史流 LSTM），Actor 仅处理注意力压缩后的轻量特征。</li>
+    <li><strong>最简单的方案是什么？</strong><br>MADDPG 基础框架 + 三个模块化增强——(1) Actor 前加距离注意力；(2) Critic 中加历史特征流 LSTM 路径；(3) 五类连续非稀疏奖励。每个增强都可<strong>独立消融验证</strong>——Table VI 验证了注意力 (+3.0% 成功率) 和历史流 (+2.8% 成功率) 的独立贡献，Table VII 验证了五类奖励的逐级叠加效果。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    传统多 UAV 协同导航用 MADDPG 处理 57 维原始观测——参数爆炸、训练慢（1750 episodes）、部分可观测性导致 Critic 估值偏差——那为什么不试试<strong>用注意力机制将 48 维 LiDAR 压缩为 16 维语义向量（解决维度诅咒）</strong>，同时在 Critic 中融入 LSTM 历史特征流（消除可观测性偏差），再用五类连续非稀疏奖励提供密集梯度信号——三个增强在 MADDPG 上<strong>模块化叠加、逐级消融验证</strong>——最终在 400 episodes 收敛到 94.6% 成功率，泛化到 4 倍环境/12 架 UAV 时性能仅轻微下降？
+  </div>
+
+  <h3>10.3 如何自己想到这个想法</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：看 MADDPG 的训练过程——1750 episodes 收敛，3D 轨迹发散，速度一致性差。问自己：<strong>是 CTDE 框架本身的问题，还是它对高维观测的处理方式有问题？</strong>——答案更可能是后者，因为 CTDE 在多智能体领域被广泛验证有效。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将失败分解为三个独立维度——(1) 输入 57 维太高 → Actor 训练难；(2) 部分可观测 → Critic 估值不准；(3) 奖励稀疏 → 探索效率低。三个子问题互相独立，可分别优化。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：(1) 维度压缩 → 注意力机制（NLP 已验证的序列压缩，48 维 LiDAR 天然是空间序列）；(2) 时序建模 → LSTM（POMDP 经典工具，但<strong>关键是用对地方</strong>——Critic 而非 Actor）；(3) 密集奖励 → 连续函数（$d/D_r-1$ 比二元阈值提供更平滑梯度）。</li>
+    <li><strong>Step 4 — 组装方案</strong>：在 MADDPG 上模块化插拔三个增强 → 消融实验验证每个贡献（Table VI: +Actor 注意力→成功率+3.0%, +Critic 历史流→路径缩短 2.3%, 完整 DA2RL→成功率+3.3%, 碰撞率-3.4%）→ 奖励消融（Table VII）验证五类奖励逐级叠加效果。这种"模块化设计 + 逐级验证"既严谨又实用。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. 关键启示</h2>
+
+  <h3>11.1 方法论启示</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个教科书级的<strong>模块化增强</strong>案例——不是推翻基础框架（MADDPG），而是精准识别框架在特定场景下的<strong>三个独立瓶颈</strong>（输入维度、部分可观测性、奖励稀疏），为每个瓶颈设计独立可验证的增强模块，再通过消融实验逐级验证。对 UAV 研究者的启示：<strong>不要急于推翻整个框架，先诊断框架在特定场景下的"阿喀琉斯之踵"</strong>——通常只需一个针对性增强就能大幅提升性能。</li>
+    <li><strong>技术技巧层面</strong>：(1) <strong>空间结构保留</strong>——将 48 维 reshape 为 3×16 而非展平为 1×48，保留了"层"的语义结构——这是注意力能学习到"上层/中层/下层"不同策略的前提；(2) <strong>非对称架构</strong>——Actor 轻量（仅注意力 + 轻量 LSTM）、Critic 重量（双路径 + 独立 LSTM），避免了 MARDPG 双端 RNN 的不稳定；(3) <strong>连续奖励函数</strong>——$r_2 = d/D_r - 1$ 虽简单但"连续"属性为梯度优化提供了平滑信号——这是易被忽视但至关重要的实验细节；(4) <strong>学习率 S1~S5 系统对比</strong>——注意到了 S4（高奖励波动大）vs S3（稍低奖励更稳定）的权衡，选了更稳定的方案</li>
+    <li><strong>实验/写作层面</strong>：(1) 消融设计精良——网络消融（Table VI: +Act, +Cri, 完整）和奖励消融（Table VII: r_tar → +r_time → +r_obs → +r_int → +r_con）分别量化了每个模块和每个奖励项的贡献；(2) 泛化测试覆盖四个维度——环境尺寸/密度/动态性/集群规模——比大多数只在一个固定环境测试的 RL 论文充分得多；(3) 能耗分析（Table V）提供了实践部署的参考价值</li>
+  </ul>
+
+  <h3>11.2 直接可迁移到我的课题</h3>
+  <ul>
+    <li><strong>对于 UAV 协同导航/编队控制方向</strong>：DA2RL 的注意力机制提供了一种<strong>通用的"高维感知 → 低维语义"压缩范式</strong>——不仅适用于 LiDAR 距离，也可应用于视觉特征图（CNN 特征 → 注意力池化 → 低维策略输入）。空间结构保留（reshape 为结构化矩阵而非展平）是该范式可迁移的关键前提。</li>
+    <li><strong>对于视觉伺服/IBVS 方向</strong>："历史特征流 Critic"思路可直接迁移——视觉伺服中图像特征帧间存在时序连贯性（特征点位移、目标尺度变化），在 Critic 中加入 LSTM 处理历史图像特征序列，可消除视觉传感中的"观测歧义"（同样特征位置对应不同相机-目标相对姿态）。</li>
+    <li><strong>对于强化学习训练技巧</strong>：五元组奖励结构具有普适性——<strong>目标逼近（连续指数）+ 避障（连续距离惩罚）+ 协同惩罚（邻居防撞 + 通信保持）+ 效率惩罚（时间步）</strong>——这几乎是任何 UAV RL 任务的通用奖励模板，修改"目标逼近"定义即可适配。</li>
+    <li><strong>对于仿真到现实迁移</strong>：DA2RL 的分散执行架构（每 UAV 仅用本地 Actor）天然适合物理部署——Actor 计算量小（注意力 + LSTM(64) + FC(400→300→3)），可在嵌入式处理器上实时运行。Table V 能耗分析为硬件选型提供了量化的参考基线。</li>
+  </ul>
+
+  <h3>11.3 值得追踪的参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Lowe et al. (2017) — Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environments. <em>NeurIPS</em></td><td>MADDPG 原始论文——DA2RL 的基础框架。理解 CTDE 范式和确定性策略梯度在多智能体场景下的推导（本文 Eq.2~3）是理解 DA2RL 增强动机的前提</td></tr>
+    <tr><td>Zhang et al. (2024) — An Efficient RL-Based Cooperative Navigation Algorithm for Multiple UAVs. <em>IEEE TII</em></td><td>RL-CN——本文的主要对比算法，同一通讯作者张丽娟的前序工作。理解 RL-CN 在 2D 中的成功（分段调优 + 双 Actor + 优先经验回放）vs 在 3D 中的局限（无高度维），才能深刻体会 DA2RL 的 3D 增强动机</td></tr>
+    <tr><td>Yan et al. (2025) — Multi-Agent RL With Spatial-Temporal Attention for Flocking With Collision Avoidance. <em>IEEE TITS</em></td><td>本文作者闫超的前序工作——将时空注意力引入多智能体集群避撞。DA2RL 的注意力设计（距离注意力 vs 时空注意力）更轻量、更适合 LiDAR 感知——对比两文可看出注意力设计的演进脉络</td></tr>
+    <tr><td>Zhang et al. (2024) — A State-Decomposition DDPG Algorithm for UAV Autonomous Navigation in 3D. <em>IEEE IoT-J</em></td><td>同一团队的单 UAV 3D 导航前序工作——将感知状态和目标状态分解为两个子网络。DA2RL 将单 UAV 扩展到多 UAV，并引入注意力 + 历史流 + 新奖励的完整增强方案</td></tr>
+    <tr><td>Hausknecht & Stone (2015) — Deep Recurrent Q-Learning for Partially Observable MDPs. <em>AAAI Fall Symposium</em></td><td>DRQN——在 DQN 中加 LSTM 处理 POMDP 的经典工作。DA2RL 的"历史特征流 Critic"本质上是将 DRQN 思路从单智能体 DQN 迁移到多智能体 Actor-Critic——且<strong>巧妙地将 LSTM 仅放在 Critic 中</strong>（非 Actor），避免了 RNN 梯度爆炸</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5804/index.html">5804</a></td><td>GDMAAC (Yan, Jiang, Chen et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Zhang, Lin, Zhao et al. · IEEE TMC 2026 · DA2RL — Distance-Attention Augmented RL for 3D Cooperative UAV Navigation · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

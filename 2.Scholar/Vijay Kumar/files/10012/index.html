@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes -- Constrained Coverage Control (Cervino et al., 2025)</title>
+<script>
+MathJax = { tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], tags: 'ams' }, options: { enableMenu: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script><style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 论文笔记</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">核心挑战</a>
+  <a href="#method">关键方法</a>
+  <a href="#principles">基本原理</a>
+  <a href="#figures">实验结果</a>
+  <a href="#flaw">缺陷与扩展</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Vijay Kumar · 17篇论文阅读路径</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10002/index.html">Safety guardrails llm-ena</a>
+<a href="../10001/index.html">Contextual safety reasoni</a>
+<a href="../10017/index.html">Jailbreaking llm-controll</a>
+<a href="../10016/index.html">Deploying foundation mode</a>
+<a href="../10015/index.html">Spine Online semantic</a>
+<a href="../10014/index.html">Vision transformers end-t</a>
+<a href="../10013/index.html">EvMAPPER High-altitude or</a>
+<a class="active" href="../10012/index.html">Constrained learning dece</a>
+<a href="../10011/index.html">Air-ground collaboration</a>
+<a href="../10010/index.html">Distilling on-device lang</a>
+<a href="../10009/index.html">Compositional coordinatio</a>
+<a href="../10008/index.html">Rt-guide Real-time gaussi</a>
+<a href="../10007/index.html">SPAR</a>
+<a href="../10006/index.html">PIP-LLM</a>
+<a href="../10005/index.html">Slideslam Sparse, lightwe</a>
+<a href="../10004/index.html">Heterogeneous robot colla</a>
+<a href="../10003/index.html">Hierarchical llms in-the-</a>
+    </div>
+  </div>
+
+
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Constrained Learning for Decentralized Multi-Objective Coverage Control</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Juan Cervino</strong><sup>*</sup>, <strong>Saurav Agarwal</strong><sup>*</sup> (共同一作), <strong>Vijay Kumar</strong>, <strong>Alejandro Ribeiro</strong></td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">University of Pennsylvania</strong>, GRASP Laboratory / ESE Department。Juan Cervino 已加入 MIT。</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">IEEE Transactions on Robotics (T-RO)</strong>, <strong>2025</strong>, arXiv:2411.19042</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE TRO</span> <span class="jif-badge if-value">IF 6.8</span> <span class="jif-badge if-q1">JCR Q1</span> <span class="jif-badge if-cas">CAS 1区</span></div>
+    <tr><td><strong>DOI / 链接</strong></td><td>arXiv: <a href="https://arxiv.org/abs/2411.19042" target="_blank">2411.19042</a> | 代码: <a href="https://github.com/KumarRobotics/CoverageControl" target="_blank">github.com/KumarRobotics/CoverageControl</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>通过 Lagrangian 对偶将<strong>多目标覆盖控制</strong>重新表述为<strong>动态重加权的单目标问题</strong>。结合<strong>原始-对偶优化</strong>与<strong>LPAC 神经架构</strong>（CNN+GNN+MLP）。在公平覆盖和约束覆盖两种设定下，平均<strong>超越集中式 CVT 约30%</strong>，并具备强大的可扩展性和零样本迁移能力。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Coverage Control</span><span class="tag tag-green">Primal-Dual Optimization</span>
+    <span class="tag tag-amber">Graph Neural Networks</span><span class="tag tag-purple">Multi-Robot Systems</span>
+    <span class="tag tag-red">Constrained Learning</span><span class="tag tag-cyan">Decentralized Control</span><span class="tag tag-gray">Imitation Learning</span>
+  </div>
+</section>
+
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    <strong>关键洞察：</strong>多目标覆盖控制的 Lagrangian 对偶等价于在 IDF 线性组合上的单目标覆盖问题。这意味着任何单目标覆盖策略都可以通过原始-对偶框架适配到多目标场景——无需重新训练。对偶变量充当动态"影子价格"：覆盖成本较高的 IDF 获得更大的权重，引导机器人向覆盖不足的区域移动。LPAC 架构（CNN 用于局部感知 + GNN 用于机器人间通信 + MLP 用于速度动作）作为原始求解器。
+  </div>
+
+  <h3>2.2 创新点分解</h3>
+  <div class="novelty-card">
+    <h4>创新点1：对偶重构——将多目标转化为动态加权单目标</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统的 CVT/Lloyd 算法只能处理单一 IDF。多 IDF 需要手动设定权重或设计复杂的联合目标，无法保证公平性。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>约束学习理论：Lagrangian 对偶将有约束的原始问题转化为无约束的 min-max 问题。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>证明了 Proposition 1（积分线性性）：sum_m lambda_m J_m(X) = J_{sum lambda_m phi_m}(X)。FMCP 和 CMCP 的 Lagrangian 都归结为带动态 IDF 加权的单目标覆盖问题。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点2：LPAC 架构——可学习的感知-动作-通信闭环</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>去中心化设定：每个机器人只有局部 64x64 传感器窗口和有限的通信半径。集中式 CVT 需要全局信息。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>GNN 在图结构数据上表现出色，具有排列等变性（与机器人 ID 无关）。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>CNN（3层，3x3卷积核）将 256x256 局部 IDF 编码为 32 维特征。5层 GNN（K=3 跳，512 隐藏单元）在通信图上传递消息。2层 MLP 输出 2D 速度指令。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点3：零样本迁移——单目标训练，任意多目标部署</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>IDF 配置空间无限；为每种配置训练独立策略不可行。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>对偶重构将策略（学习"如何覆盖"）与多目标权衡（由对偶变量处理）解耦。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>LPAC 通过模仿学习在单目标覆盖上训练，然后无需任何微调即可应用于多目标。在 32 机器人、4-IDF 公平覆盖场景下，相比集中式 CVT 提升约 50%。</div>
+  </div>
+</section>
+
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+  <h3>3.1 原始-对偶双时间尺度框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph DUAL["Dual Layer (Slow: every T steps)"]
+      LAMBDA["Dual variables lambda"]
+      REWEIGHT["Reweight IDFs"]
+      UPDATE["lambda_tilde = [lambda_k + eta*s(k)]_plus"]
+      PROJ["Project to simplex (FMCP)"]
+    end
+    subgraph PRIMAL["Primal Layer (Fast: every step)"]
+      CNN["CNN Perception"]
+      GNN["GNN Communication"]
+      MLP["MLP Action"]
+    end
+    subgraph ENV["Environment"]
+      SENSOR["Local obs 64x64"]
+      ROBOT["Robot dynamics"]
+      COST["Coverage costs J_m"]
+    end
+    LAMBDA --> REWEIGHT --> CNN --> GNN --> MLP --> ROBOT
+    ROBOT --> SENSOR --> CNN
+    SENSOR --> COST --> UPDATE --> LAMBDA
+    PROJ --> LAMBDA
+    classDef dual fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    classDef primal fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef env fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class LAMBDA,REWEIGHT,UPDATE,PROJ dual
+    class CNN,GNN,MLP primal
+    class SENSOR,ROBOT,COST env
+    </pre>
+  </div>
+
+  <h3>3.2 LPAC 内部数据流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    IDF["IDF 256x256"] --> C1["Conv 3x3/32ch"] --> C2["Conv 3x3/32ch"] --> C3["Conv 3x3/32ch"] --> FLAT["Flatten+Linear 32d"]
+    BOUND["Boundary map"] --> C1
+    RELPOS["Neighbor coords"] --> C1
+    FLAT --> GNN["5-layer GNN K=3, 512h"] --> GAGG["Aggregate"]
+    GAGG --> M1["FC 32"] --> M2["FC 32"] --> OUT["Linear -> vx,vy"]
+    classDef in fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    classDef cnn fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef gnn fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    classDef mlp fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class IDF,BOUND,RELPOS in
+    class C1,C2,C3,FLAT cnn
+    class GNN,GAGG gnn
+    class M1,M2,OUT mlp
+    </pre>
+  </div>
+
+  <h3>3.3 算法工作流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    INIT["Init lambda_0, T, eta"] --> LOOP["For k=1..K"]
+    LOOP --> PRIM["Run policy pi for T steps with lambda_k"]
+    PRIM --> COLLECT["Collect J_m(X) costs"]
+    COLLECT --> SLACK["Compute slackness s(k)"]
+    SLACK --> UPDATE_D["lambda = [lambda + eta*s]_plus"]
+    UPDATE_D --> PROJ_D["Project if FMCP"]
+    PROJ_D --> LOOP
+    classDef fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    class INIT,LOOP,PRIM,COLLECT,SLACK,UPDATE_D,PROJ_D fill
+    </pre>
+  </div>
+</section>
+
+<section id="task">
+  <h2>4. 任务定义 —— 解决了什么问题？</h2>
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">公平多目标覆盖 (FMCP)</span>
+    $$ P_f = \min_{X(t),\rho} \rho \quad \text{s.t.} \quad J_m(X(t)) \le \rho \quad \forall m=1,\ldots,M $$
+    <span class="eq-tag">约束多目标覆盖 (CMCP)</span>
+    $$ P_c = \min_{X(t)} J_0(X(t)) \quad \text{s.t.} \quad J_m(X(t)) \le \alpha_m \quad \forall m=1,\ldots,M $$
+    <div class="eq-note">
+      <strong>J_m(X(t))</strong> = IDF m 的覆盖代价，J_m = sum_{i=1}^N int_{P_i} f(||p_i - q||) Phi_m(q) dq，在 Voronoi 划分上计算。FMCP 最小化所有 IDF 中最差的覆盖代价。CMCP 在保持其他 IDF 低于阈值的前提下最小化主 IDF 代价。
+    </div>
+  </div>
+  <h3>4.2 输入与输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>M 个 IDF，每个为 1024x1024 的 2D 高斯混合网格。机器人观测 64x64 局部窗口。</td><td>M x 1024x1024 像素</td></tr>
+    <tr><td><strong>输出</strong></td><td>每个机器人的 2D 速度指令，最大速度 1 m/s</td><td>N x 2</td></tr>
+    <tr><td><strong>目标</strong></td><td>FMCP：最小化 max J_m；CMCP：最小化 J_0 且满足 J_m <= alpha_m</td><td>标量代价</td></tr>
+  </table>
+  <h3>4.3 任务类型</h3>
+  <p><strong>去中心化多机器人覆盖控制</strong>，具有有限感知（0.39% 局部视野）和通信（192-320m 半径）能力。N 个具有单积分器动力学的机器人必须协同覆盖 M 个异构 IDF。两种变体：公平覆盖（所有 IDF 同等重要——例如洪水监测中城区与郊区同等对待）和约束覆盖（主目标 + 每 IDF 阈值——例如野火监测：植被密度为主要目标，温度/湿度必须满足最低要求）。</p>
+</section>
+
+<section id="challenge">
+  <h2>5. 核心挑战 —— 为什么困难？</h2>
+  <h3>5.1 本质分析（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>三层难度：</strong><br><br>
+    (1) <strong>多目标 NP-hardness：</strong>FMCP 是 min-max 上境图问题；CMCP 是无限连续机器人位置空间上的约束非线性优化。CVT 仅适用于单 IDF。<br><br>
+    (2) <strong>去中心化信息贫乏：</strong>每个机器人通过 64x64 窗口仅观测 0.39% 的环境。无全局 IDF 知识。超出通信半径则不知道其他机器人的位置。<br><br>
+    (3) <strong>交叉放大效应：</strong>多目标 + 去中心化意味着机器人必须从纯局部观测和稀疏通信中实现全局公平覆盖。
+  </div>
+  <h3>5.2 先前方法及其局限</h3>
+  <table>
+    <tr><th>先前方法</th><th>核心思想</th><th>为何在多 IDF 上失败</th></tr>
+    <tr><td>CVT / Lloyd Algorithm</td><td>Voronoi 划分 -> 计算质心 -> 移动机器人 -> 迭代</td><td>仅适用于单 IDF。没有自然的多 IDF 组合规则。集中式版本需要全局信息。</td></tr>
+    <tr><td>SFCC (Malencia et al. 2023)</td><td>LogSumExp 松弛 min-max；集中式梯度控制</td><td>需要集中式架构。LogSumExp 误差随 M 增大。覆盖代价比 LPAC 高 258%。</td></tr>
+    <tr><td>去中心化 CVT</td><td>每个机器人在局部 IDF 观测上独立运行 CVT</td><td>信息严重不完整——在公平覆盖实验中比 LPAC 差 250%。</td></tr>
+  </table>
+  <h3>5.3 关键技术挑战</h3>
+  <ul>
+    <li><strong>挑战1 —— 在线对偶变量调参：</strong>步长 eta 和周期 T 对性能影响至关重要。过大 -> 振荡；过小 -> 适应缓慢。缺乏系统性的调参方法。</li>
+    <li><strong>挑战2 —— 零样本迁移保真度：</strong>在单 IDF 上训练的 LPAC 必须在 lambda 加权的多 IDF 上工作。极端 lambda 值可能使加权 IDF 超出训练分布。</li>
+    <li><strong>挑战3 —— GNN 消息表示学习：</strong>通信带宽有限。GNN 必须在无直接监督的情况下学习紧凑消息——隐式表示学习。</li>
+  </ul>
+</section>
+
+<section id="method">
+  <h2>6. 关键方法与公式</h2>
+  <h3>6.1 核心算法</h3>
+  <p><strong>原始-对偶优化 + LPAC 神经策略</strong>，采用双时间尺度框架。Lagrangian 对偶将有约束多目标转化为无约束 min-max；对偶问题等价于线性组合 IDF 上的单目标覆盖（Proposition 1）。LPAC 作为原始求解器，通过模仿学习从全知 CVT 专家训练（MSE 损失，Adam，lr=1e-4，batch=100，100 epochs）。对偶变量根据约束松弛度周期性更新。</p>
+
+  <h3>6.2 核心公式</h3>
+  <h4>带 Voronoi 分解的覆盖代价</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) -- Coverage cost</span>
+    $$ J(X(t)) = \int_{q \in \mathcal{W}} \min_{i \in V} f(\|p_i - q\|) \Phi(q) dq = \sum_{i=1}^{N} \int_{q \in \mathcal{P}_i} f(\|p_i - q\|) \Phi(q) dq $$
+    <div class="eq-note">f(x)=x^2。P_i = 机器人 i 的 Voronoi 单元。每个单元的代价随机器人与点的距离平方增长。</div>
+  </div>
+
+  <h4>Lagrangian 对偶——核心定理</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) -- 公平覆盖 Lagrangian</span>
+    $$ L_f(X_t, \lambda) := \sum_{m=1}^{M} \lambda_m J_m(X_t), \quad \sum_i \lambda_i = 1 $$
+    <span class="eq-tag">Eq.(3) -- 约束覆盖 Lagrangian</span>
+    $$ L_c(X_t, \lambda) := J_0(X_t) + \sum_{m=1}^{M} \lambda_m (J_m(X_t) - \alpha_m) $$
+    <span class="eq-tag">Eq.(4) -- 对偶问题</span>
+    $$ D_* = \max_{\lambda \ge 0} \min_{X_t} L_*(X_t, \lambda) $$
+    <div class="eq-note">
+      <strong>Proposition 1:</strong> sum_m lambda_m J_m(X) = J_{sum lambda_m phi_m}(X)（积分的线性性）。<strong>Corollary 2:</strong> 对偶函数 d_*(lambda) 等价于在 phi_lambda = sum lambda_m phi_m 上的无约束单目标覆盖。任何单目标覆盖策略可以直接应用于多目标问题。
+    </div>
+  </div>
+
+  <h4>对偶变量更新规则</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) -- 对偶更新</span>
+    $$ \tilde{\lambda}_{k+1} = [\lambda_k + \eta \cdot s(k)]_+ $$
+    <span class="eq-tag">Eq.(6) -- 松弛度定义</span>
+    $$ s_i^c(k) = \frac{1}{T} \sum_{t=kT}^{(k+1)T} (J_i(X(t)) - \alpha_i) \quad \text{(CMCP)} $$
+    $$ s_i^f(k) = \frac{1}{T} \sum_{t=kT}^{(k+1)T} J_i(X(t)) \quad \text{(FMCP)} $$
+    $$ \lambda = \arg\min_{\lambda} \|\lambda - \tilde{\lambda}\|_2 \; \text{s.t.} \; \sum \lambda_m = 1 \quad \text{(FMCP projection)} $$
+    <div class="eq-note">eta: 步长。T: 周期。J_m 越高 -> 下一轮 lambda_m 越大 -> 对被忽视的 IDF 给予更多关注。</div>
+  </div>
+
+  <h4>GNN 图卷积</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(7) -- 图卷积层</span>
+    $$ Z_l = \sum_{k=0}^{K} (\mathbf{S})^{k} X_{l-1} H_{lk}, \quad X_l = \sigma(Z_l) $$
+    <div class="eq-note">S = D^{-1/2} A D^{-1/2}：归一化邻接矩阵。每层 K=3 跳，5 层 -> 可达 15 跳感受野。每层 512 隐藏单元，ReLU 激活。S^k X 将信息沿图传播 k 步。</div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>数值</th><th>含义</th></tr>
+    <tr><td>环境</td><td><strong>1024x1024 m^2</strong>, 1 m/px</td><td>方形网格世界</td></tr>
+    <tr><td>机器人数量 N</td><td><strong>8-64</strong> (默认 32)</td><td>稀疏覆盖场景</td></tr>
+    <tr><td>通信半径</td><td><strong>192-320 m</strong></td><td>边长的 18.75-31.25%</td></tr>
+    <tr><td>传感器窗口</td><td><strong>64x64 像素</strong></td><td>约总面积的 0.39%</td></tr>
+    <tr><td>GNN 架构</td><td><strong>5 层, K=3 跳, 512h</strong></td><td>可达 15 跳感受野</td></tr>
+    <tr><td>训练</td><td><strong>batch=100, 100 epochs, lr=1e-4</strong></td><td>模仿学习, MSE 损失, Adam</td></tr>
+  </table>
+
+  <h3>6.4 公平覆盖 vs. 约束覆盖</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>公平覆盖 (FMCP)</h4>
+      <ul><li>目标：最小化最差 IDF 代价</li><li>Lambda 约束：sum=1（单纯形）</li><li>对偶更新：lambda 正比于 J_m</li><li>需要投影</li><li>应用：洪水监测</li></ul>
+    </div>
+    <div class="cmp-col">
+      <h4>约束覆盖 (CMCP)</h4>
+      <ul><li>目标：min J_0 s.t. J_m <= alpha_m</li><li>Lambda 约束：lambda_m >= 0</li><li>对偶更新：仅在 J_m > alpha_m 时 lambda 上升</li><li>无需投影</li><li>应用：野火监测</li></ul>
+    </div>
+  </div>
+</section>
+
+<section id="principles">
+  <h2>7. 基本原理</h2>
+  <h3>7.1 Lagrangian 对偶——"影子价格"机制</h3>
+  <div class="formula-block">
+    <span class="eq-tag">Principle 1 -- 弱对偶性</span>
+    $$ D_* \le P_* $$
+    <div class="eq-note">D_* 是原始最优值 P_* 的下界。在凸性条件下，强对偶性成立。对于非凸损失，Chamon & Ribeiro (2020) 证明了对偶间隙是 PAC 可控的。</div>
+  </div>
+  <p><strong>直觉理解：</strong>Lagrangian 乘子 lambda_m 是每个 IDF 的"影子价格"。当某个 IDF 覆盖不足（代价高）时，其价格上涨 -> 优化分配更多资源 -> 代价趋于均衡。这种市场机制无需手动调整权重即可实现自适应多目标平衡。</p>
+
+  <h3>7.2 Proposition 1 —— 积分线性性</h3>
+  <p>证明仅用到积分的线性性：</p>
+  $$ \sum_{m=1}^M \lambda_m J_m(X) = \sum_m \lambda_m \int \text{dist}(q) \phi_m(q) dq = \int \text{dist}(q) (\sum_m \lambda_m \phi_m(q)) dq = J_{\phi_\lambda}(X) $$
+  <p>这一恒等式将 M 个独立的覆盖问题转化为线性组合 IDF 上的单个问题。策略只需知道如何覆盖任意单一 IDF；对偶层通过动态重加权处理多目标权衡。</p>
+
+  <h3>7.3 GNN 特性：排列等变性与可迁移性</h3>
+  <ul>
+    <li><strong>排列等变性 = 机器人 ID 无关性：</strong>GNN 输出仅依赖于图结构，与机器人的任意编号无关——这正是去中心化控制所需的。</li>
+    <li><strong>可迁移性：</strong>GNN 参数 H 与节点数无关。32 机器人训练的 GNN 可零样本部署到 64 机器人。</li>
+    <li><strong>稳定性：</strong>对小的图扰动（临时链路故障）具有稳定性——对真实场景中 UAV 通信不可靠性至关重要。</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="callout-title">系统级协同</div>
+    Lagrangian 对偶（数学）-> Proposition 1（简化）-> GNN+LPAC（可扩展求解器）-> 原始-对偶框架（集成）。CVT 仅有原始求解器而无对偶层——那 30% 的差距正是没有动态调整多目标权衡的代价。
+  </div>
+</section>
+
+<section id="figures">
+  <h2>8. 实验结果与图表</h2>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 1</span><span class="fig-caption">4 个 IDF 的多目标覆盖：观测、覆盖、通信图</span><span class="fig-source">来源：论文 Fig. 1</span></div>
+    <div class="fig-image"><img src="figures/fig1.png" alt="Figure 1" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig1.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p><strong>展示：</strong>4 个异构 IDF（不同颜色）、机器人局部观测、以及带有通信图叠加的最终覆盖。IDF 峰值位于不同位置，构成了多目标冲突。通信图稀疏——仅邻近机器人交换消息。</p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 2</span><span class="fig-caption">公平覆盖：归一化最大代价随时间变化，32 机器人，4 IDF，100 个环境</span><span class="fig-source">来源：论文 Fig. 2</span></div>
+    <div class="fig-image"><img src="figures/fig2.png" alt="Figure 2" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig2.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p><strong>LPAC:</strong> 约 1.8 代价（比全知方案高 81%）。<strong>集中式 CVT:</strong> 约 3.5（高 246%）。<strong>去中心化 CVT:</strong> 约 3.6（高 250%）。<strong>SFCC:</strong> 约 3.7（高 258%）。LPAC 的标准差区间低于集中式 CVT 均值——<strong>LPAC 的最差情况优于 CVT 的平均表现。</strong></p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 3</span><span class="fig-caption">泛化性：覆盖代价比 LPAC/CVT 随通信半径和传感器尺寸变化</span><span class="fig-source">来源：论文 Fig. 3</span></div>
+    <div class="fig-image"><img src="figures/fig3.png" alt="Figure 3" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig3.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p>在所有 9 种参数组合下，LPAC/CVT 比率始终 < 1。在通信/感知能力越弱时优势越大——信息最受限时优势最强。LPAC 有效利用了稀疏信息。</p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 4</span><span class="fig-caption">对偶变量动态：每个 IDF 的代价（上）vs. 对偶变量（下）</span><span class="fig-source">来源：论文 Fig. 4</span></div>
+    <div class="fig-image"><img src="figures/fig4.png" alt="Figure 4" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig4.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p>全知方案和 LPAC 在 t=180s 时将主导对偶变量从蓝色切换到红色——自适应优先级重分配。集中式 CVT 将所有对偶权重保持在 0.25 附近——无法区分覆盖紧急程度。</p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 5</span><span class="fig-caption">可扩展性：机器人数量（8-64）、IDF 数量（4-10）、环境尺寸</span><span class="fig-source">来源：论文 Fig. 5</span></div>
+    <div class="fig-image"><img src="figures/fig5.png" alt="Figure 5" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig5.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p>LPAC/CVT 比率从约 1.03（8 机器人）下降到约 0.61（64 机器人）。在 IDF 数量 4-10 和环境尺寸变化范围内保持 35%+ 的稳定提升。<strong>机器人越多 = LPAC 优势越大。</strong></p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 6</span><span class="fig-caption">约束覆盖：不可行率百分比 vs. 约束水平 mu</span><span class="fig-source">来源：论文 Fig. 6</span></div>
+    <div class="fig-image"><img src="figures/fig6.png" alt="Figure 6" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig6.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p>在所有 mu 值下，LPAC 的不可行率显著低于 CVT。跨 mu 平均，LPAC 不可行问题减少 <strong>26%</strong>。在野火监测场景中，这意味着任何指标被监测不足的风险降低 26%。</p></div>
+  </div>
+</section>
+
+<section id="flaw">
+  <h2>9. 潜在缺陷与扩展方向</h2>
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>假设条件：</strong>(1) 理想单积分器动力学——无加速度限制、障碍物或扰动。(2) 无向、可靠的通信——无丢包或延迟。(3) 静态 IDF——真实任务涉及时变场（如火势蔓延）。(4) 仅仿真验证——无真实机器人验证；sim-to-real 差距未评估。</li>
+    <li><strong>适用范围：</strong>仅限 2D 平面。3D 扩展需要 3D Voronoi 划分。训练依赖全知 CVT 专家——若专家在某些环境中次优，则传播该次优性。</li>
+    <li><strong>收敛性：</strong>高度非凸的多机器人覆盖缺乏原始-对偶方法的严格收敛保证。</li>
+  </ul>
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>2D -> 3D：</strong>用于城市峡谷或森林冠层中 UAV 集群的体积覆盖。</li>
+    <li><strong>时变 IDF：</strong>为 LPAC 添加时序建模（LSTM/Transformer）以进行动态场跟踪。</li>
+    <li><strong>额外约束：</strong>碰撞避免、通信连通性保持、能量预算。</li>
+    <li><strong>IL -> RL：</strong>用约束 RL 替代模仿学习——消除对专家的依赖。</li>
+  </ul>
+  <h3>9.3 数据敏感性</h3>
+  <table>
+    <tr><th>问题</th><th>难度</th><th>严重性</th></tr>
+    <tr><td>对偶步长 eta</td><td>过大 -> 振荡；过小 -> 缓慢。无系统性调参方法。</td><td>****</td></tr>
+    <tr><td>图稀疏性</td><td>8 机器人可能使通信图断开 -> LPAC 性能退化。</td><td>****</td></tr>
+    <tr><td>IDF 重叠</td><td>IDF 峰值共位 -> 公平覆盖退化为单 IDF。</td><td>***</td></tr>
+    <tr><td>分布偏移</td><td>极端 lambda 可能使加权 IDF 超出 LPAC 训练分布。</td><td>***</td></tr>
+  </table>
+
+  <h3>9.4 值得深入的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深入的方向</div>
+    <strong>LPAC + 约束 RL：</strong>用约束强化学习替代模仿学习（后者需要专家）。挑战：(1) 多智能体 GNN 策略中的信用分配，(2) 多目标奖励平衡与标准 RL 不兼容，(3) RL 训练期间的对偶更新。解决这些问题将开辟"约束 MARL + GNN + 覆盖控制"方向。
+  </div>
+</section>
+
+<section id="motivation">
+  <h2>10. 动机推导（第一性原理）</h2>
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>核心问题：</strong>机器人集群必须以去中心化方式传感器覆盖 M 个异构 IDF。不能只覆盖一个而忽略其他，但不同 IDF 的高重要性区域不重叠。</li>
+    <li><strong>已有工作不足：</strong>CVT 仅适用于单 IDF。SFCC 使用 LogSumExp 但为集中式。固定权重组合无法动态适应哪个 IDF 正被忽视。</li>
+    <li><strong>市场机制洞察：</strong>引入"影子价格"——每个 IDF 获得一个随覆盖代价上涨的价格 lambda_m -> 优化自动聚焦于代价高的 IDF -> 达到均衡。这就是 Lagrangian 对偶。</li>
+    <li><strong>完美解耦：</strong>Proposition 1 证明了 sum lambda_m J_m = J_{sum lambda_m phi_m}。策略只需学习"如何覆盖一个 IDF"；对偶层通过 IDF 重加权处理多目标权衡。</li>
+    <li><strong>最简完整方案：</strong>在单 IDF 覆盖上训练 LPAC -> 以原始-对偶外循环部署 -> lambda 每 T 步更新 -> lambda 加权 IDFs -> LPAC 在其上运行。"学会覆盖一次，处理所有多目标场景。"</li>
+  </ol>
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip"><div class="callout-title">一句话动机</div>多目标覆盖看似复杂——但如果 Lagrangian 对偶等价于线性组合 IDF 上的单目标覆盖，那么任何单目标策略都可以通过动态对偶重加权工作：训练 LPAC 一次，通过调整 IDF 权重处理所有多目标场景。</div>
+  <h3>10.3 如何想到这个想法</h3>
+  <ul>
+    <li><strong>第1步 —— 观察：</strong>CVT 在多 IDF 上失败，因为最优 Voronoi 划分因 IDF 而异。</li>
+    <li><strong>第2步 —— 发现结构：</strong>J(X) = int dist(q) Phi(q) dq 关于 Phi 是线性的。因此 sum lambda_m J_m(X) = J_{sum lambda_m phi_m}(X)。</li>
+    <li><strong>第3步 —— 建立桥梁：</strong>FMCP 和 CMCP 的 Lagrangian 是各 IDF 代价的线性组合。对偶问题 = 动态加权的单目标覆盖。</li>
+    <li><strong>第4步 —— 实现：</strong>LPAC（去中心化、排列等变、可迁移）作为原始求解器。对偶更新作为外循环。两个超参数：eta 和 T。</li>
+  </ul>
+</section>
+
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+  <h3>11.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论：</strong>利用数学结构（积分线性性）进行架构简化。在设计复杂多目标控制器之前，检查是否有隐藏的等价性将问题归约为已知的简单问题。</li>
+    <li><strong>技术：</strong>(1) 策略-权衡解耦实现了零样本迁移。(2) GNN 排列等变性天然适合去中心化多机器人控制。(3) IL+原始-对偶组合：稳定训练 + 有理论支撑的多目标处理。</li>
+    <li><strong>实验：</strong>全面：两种问题设定、四种基线、消融实验、三个可扩展性维度。Table I 的"最佳环境百分比"适合评估去中心化方法的一致性。</li>
+  </ul>
+  <h3>11.2 直接应用于我的研究</h3>
+  <ul>
+    <li><strong>多机器人任务分配：</strong>原始-对偶框架是多目标约束优化的通用工具。适用于巡逻、搜索救援、传感器部署。模式：对偶变量作为"价格" -> 自适应分配。</li>
+    <li><strong>GNN 用于机器人控制：</strong>LPAC 模板：CNN（局部特征）-> GNN（通信）-> MLP（动作）。可复用于编队控制、协同运输、分布式 SLAM。</li>
+    <li><strong>感知集成：</strong>用直接 RGB/深度到特征的 CNN 替换预构建 IDF 地图输入 -> 端到端感知到覆盖。</li>
+  </ul>
+  <h3>11.3 关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>重要性</th></tr>
+    <tr><td>Agarwal et al. (2024) -- LPAC. arXiv:2401.04855</td><td>原始 LPAC -- CNN+GNN+MLP 设计和单目标训练。</td></tr>
+    <tr><td>Chamon & Ribeiro (2020) -- PAC Constrained Learning. NeurIPS</td><td>理论基础：非凸损失下对偶间隙是 PAC 可控的。</td></tr>
+    <tr><td>Malencia et al. (2023) -- Socially Fair Coverage. ICRA</td><td>直接基线——集中式公平覆盖的局限性。</td></tr>
+    <tr><td>Cortes et al. (2005) -- Distributed Coverage. ESAIM: COCV</td><td>基础性去中心化覆盖——基于 Voronoi 的分布式 Lloyd。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes | Cervino, Agarwal et al. | IEEE T-RO 2025 | Constrained Learning for Decentralized Multi-Objective Coverage Control | MathJax + Mermaid</footer>
+
+</div>
+</body>
+</html>

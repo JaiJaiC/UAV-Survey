@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - A Forget-and-Grow Strategy for Deep Reinforcement Learning Scaling</title>
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root { --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea; --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8; --blue-fill: #e8f0fe; --blue-stroke: #3b82f6; --blue-strong: #1d4ed8; --green-fill: #e6f7ee; --green-stroke: #10b981; --green-strong: #047857; --amber-fill: #fef7ed; --amber-stroke: #f59e0b; --amber-strong: #b45309; --purple-fill: #f0ebfd; --purple-stroke: #8b5cf6; --purple-strong: #6d28d9; --rose-fill: #ffeaf0; --rose-stroke: #f43f5e; --rose-strong: #be123c; --gray-fill: #f3f4f6; --gray-stroke: #9ca3af; --gray-strong: #4b5563; --cyan-fill: #e6faf8; --cyan-stroke: #14b8a6; --cyan-strong: #0f766e; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif; line-height: 1.72; }
+  nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,.94); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  nav a { text-decoration: none; font-size: 12px; font-weight: 500; color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s; }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px 28px; margin-bottom: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code { background: #f1f5f9; color: #1e293b; font-family: "JetBrains Mono","Fira Code",Consolas,monospace; font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 4px; margin-right: 5px; margin-bottom: 4px; }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout { border-left: 4px solid; border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 12px 0; font-size: 13.5px; }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 22px; margin: 12px 0; overflow-x: auto; }
+  .formula-block .eq-tag { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong); background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 12.5px; color: #64748b; line-height: 1.65; }
+  .mermaid-box { background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center; }
+  .arch-panel { background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px; padding: 16px; margin: 14px 0 18px; overflow-x: auto; }
+  .arch-grid { min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr; gap: 12px; align-items: stretch; }
+  .arch-stage { border: 1px solid #d8e0ea; border-radius: 8px; background: #fff; padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+  .arch-stage h4 { margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .arch-stage h4 span { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; }
+  .arch-card { border-radius: 7px; padding: 9px 10px; border: 1px solid; min-height: 58px; display: flex; flex-direction: column; justify-content: center; }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow { min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr); color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px; }
+  .arch-arrow span { text-align: center; }
+  .arch-summary { min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .arch-metric { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: 8px 10px; }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure { background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0; margin: 16px 0; overflow: hidden; }
+  .paper-figure .fig-header { background: #f1f5f9; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .paper-figure .fig-header .fig-number { font-weight: 700; font-size: 12.5px; color: var(--blue-strong); background: #dbeafe; padding: 3px 10px; border-radius: 4px; }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img { max-width: 100%; height: auto; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .paper-figure .fig-interpretation { padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8; }
+  .paper-figure .fig-interpretation .fig-label { font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px; }
+  .paper-figure .fig-interpretation p, .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .novelty-card { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin: 12px 0; background: #fafbfc; }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step { font-size: 13px; margin-bottom: 8px; padding-left: 12px; border-left: 3px solid var(--purple-stroke); }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+<main class="wrap">
+
+<section id="info">
+<h2>1. Paper Info</h2>
+<h1>A Forget-and-Grow Strategy for Deep Reinforcement Learning Scaling in Continuous Control</h1>
+<table>
+<tr><td>Authors</td><td>Kang et al. (Huazhe Xu 为通讯作者)</td></tr>
+<tr><td>Year</td><td>2025</td></tr>
+<tr><td>Type</td><td>连续控制强化学习 / 训练策略优化</td></tr>
+<tr><td>Source</td><td><a href="Kang et al. - 2025 - A forget-and-grow strategy for deep reinforcement learning scaling in continuous control.pdf">Kang et al. - 2025 - A forget-and-grow strategy for deep reinforcement learning scaling in continuous control.pdf</a></td></tr>
+</table>
+<div class="tags">
+  <span class="tag-blue">连续控制RL</span><span class="tag-green">Primacy Bias</span><span class="tag-purple">Experience Replay</span>
+  <span class="tag-amber">Network Expansion</span><span class="tag-red">训练策略</span><span class="tag-cyan">2025</span><span class="tag-gray">Huazhe Xu</span>
+</div>
+</section>
+
+<section id="insight">
+<h2>2. Insight &amp; Novelty</h2>
+
+<h3>2.1 Q&amp;A 核心洞察</h3>
+<div class="callout idea">
+  <div class="callout-title">Q: 为什么深度RL在连续控制中经常训练失败，即使有更多环境交互？</div>
+  <p>核心罪魁祸首是<strong>primacy bias（首因偏差）</strong>——训练最早阶段收集的低质量数据通过两个渠道永久性地限制了最终性能：(1) Uniform experience replay让这些早期经验长期主导梯度更新（数据层面）；(2) 固定大小的网络容量被早期简单模式占据后，难以吸收后来更精细的知识（模型层面）。</p>
+</div>
+<div class="callout tip">
+  <div class="callout-title">A: Forget-and-Grow — 双重机制对抗首因偏差</div>
+  <p><strong>Forget (Experience Replay Decay, ERD):</strong> 随训练进展，系统性地降低回放缓冲区中早期样本的被采样权重或学习影响，让策略从近期更优的数据中学习。</p>
+  <p><strong>Grow (Network Expansion, NE):</strong> 在训练关键阶段动态增加网络层宽度（新神经元），用参数复制+噪声初始化将已有功能迁移到更大网络，为新知识释放参数容量。</p>
+  <p>灵感直接来源于人类认知中的<strong>婴儿期遗忘(infantile amnesia)</strong>——婴幼儿无法记住早期经历，这一"遗忘"实际上使大脑能重新组织对世界的理解。</p>
+</div>
+
+<h3>2.2 灵感→洞察映射</h3>
+<table>
+<tr><th>灵感</th><th>对应核心洞察</th></tr>
+<tr><td>婴儿期遗忘(infantile amnesia) — 人类遗忘早期不可靠经验以更新认知模型</td><td>Forget: 衰减早期低质量数据的训练信号——"遗忘为学习释放空间"</td></tr>
+<tr><td>大脑发育中的突触生成与修剪 — 神经网络随发育成长并重组织</td><td>Grow: 动态增加参数容量——"生长为新模式提供表达空间"</td></tr>
+<tr><td>课程学习 — 从简单到困难的渐进训练</td><td>ERD自然形成一种隐式课程：先学基础模式，遗忘后学精细模式</td></tr>
+</table>
+
+<h3>2.3 三大新意卡片</h3>
+
+<div class="novelty-card">
+  <h4>新意1: Experience Replay Decay (ERD)</h4>
+  <div class="novelty-step"><strong>【问题】</strong>Uniform replay使早期低质量经验长期主导梯度更新——新数据不断涌入但gradient被旧数据稀释。</div>
+  <div class="novelty-step"><strong>【灵感】</strong>认知科学中的遗忘曲线(Ebbinghaus)——记忆强度随时间指数衰减。</div>
+  <div class="novelty-step"><strong>【设计】</strong>为replay中的每个样本赋予采样权重w(t_age) = exp(-lambda * t_age)，或直接在loss中对旧样本加权衰减。衰减速率与训练总步数的关系通过调度器控制。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>新意2: Network Expansion (NE)</h4>
+  <div class="novelty-step"><strong>【问题】</strong>固定容量的网络被早期数据训练后，表示空间中大部分容量已被"用掉"——新知识只能被挤压进剩余的小子空间。</div>
+  <div class="novelty-step"><strong>【灵感】</strong>Net2Net——保持功能的网络扩展——新增神经元时复制已有参数并加小噪声。</div>
+  <div class="novelty-step"><strong>【设计】</strong>在训练的预设阶段，对所有隐藏层做宽度扩展：W_new = [W_old; W_old] + noise（宽扩展）。actor和critic网络的扩展时机可以独立调度——通常critic先扩展（价值函数更复杂），actor后扩展。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>新意3: Forget + Grow的协同互补效应</h4>
+  <div class="novelty-step"><strong>【问题】</strong>单独遗忘可能丢失稀有但重要的经验；单独扩展可能只是给旧模式更多参数。</div>
+  <div class="novelty-step"><strong>【灵感】</strong>免疫系统中的"遗忘→重建"——忘记旧抗体模板后，B细胞用新模板重新学习。</div>
+  <div class="novelty-step"><strong>【设计】</strong>ERD先释放梯度空间（遗忘旧的），NE再提供参数空间（生长新的）。两者在时序上互补：遗忘为新数据提供信号权重，扩展为新数据提供表示容量。</div>
+</div>
+</section>
+
+<section id="architecture">
+<h2>3. Architecture</h2>
+
+<h3>3.1 架构面板</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <div class="arch-stage">
+      <h4>基础框架 <span>标准RL</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>Off-Policy Actor-Critic</strong>
+        <small>SAC/TD3等标准actor-critic + replay buffer作为基础结构</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>Replay Buffer D</strong>
+        <small>FIFO循环缓冲区; 容量N=10^6; 每步添加新transition</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>遗忘机制: ERD <span>数据层</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>时间衰减采样</strong>
+        <small>sample_prob(s) ∝ exp(-λ * age_s); age_s = t_current - t_collected</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>衰减调度器</strong>
+        <small>λ(t): 随训练步数从0递增; 控制遗忘速度曲线</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>生长机制: NE <span>模型层</span></h4>
+      <div class="arch-card arch-solar">
+        <strong>Net2Net扩展</strong>
+        <small>W_new = [W_old; W_old_copy] + ε·N(0,σ²); 功能保持初始化</small>
+      </div>
+      <div class="arch-card arch-power">
+        <strong>扩展调度器</strong>
+        <small>在训练进度p%处触发; actor和critic可不同步扩展</small>
+      </div>
+    </div>
+    <div class="arch-stage">
+      <h4>联合训练 <span>协同</span></h4>
+      <div class="arch-card arch-thrust">
+        <strong>Forget→Grow序列</strong>
+        <small>ERD先释放梯度空间 → NE扩展参数空间 → 新数据填充新容量</small>
+      </div>
+      <div class="arch-card arch-thrust">
+        <strong>消融验证</strong>
+        <small>ERD-only / NE-only / FoG(full)对比; 4 benchmark 40+ tasks</small>
+      </div>
+    </div>
+  </div>
+  <div class="arch-arrow"><span>基础</span><span>数据层</span><span>模型层</span><span>协同</span></div>
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>基础算法</strong><small>SAC/TD3/BRO/SimBa</small></div>
+    <div class="arch-metric"><strong>ERD衰减</strong><small>exp(-λ·t_age)</small></div>
+    <div class="arch-metric"><strong>NE扩展</strong><small>Net2Net+noise</small></div>
+    <div class="arch-metric"><strong>40+任务</strong><small>4类benchmark</small></div>
+  </div>
+</div>
+
+<h3>3.2 流程图1: FoG训练循环</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart LR
+  A["环境交互收集transition"] --> B["存入Replay Buffer<br/>(带时间戳)"]
+  B --> C["ERD: 按age衰减采样<br/>P(s) ∝ exp(-λ·age)"]
+  C --> D["从buffer采样minibatch"]
+  D --> E["计算actor/critic loss"]
+  E --> F{"到达扩展时机?"}
+  F -->|是| G["NE: Net2Net扩展<br/>W_new = copy(W_old)+noise"]
+  F -->|否| H["常规参数更新"]
+  G --> H
+  H --> I["更新λ(t)衰减系数"]
+  I --> A
+</div>
+</div>
+
+<h3>3.3 流程图2: Forget-Grow协同机制</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+  P1["训练初期: Uniform replay<br/>早期数据主导梯度"] --> P2["Primacy Bias出现<br/>性能平台/退化"]
+  P2 --> P3["Forget: ERD开始衰减<br/>旧数据权重下降"]
+  P3 --> P4["梯度空间释放<br/>新数据信号增强"]
+  P4 --> P5["Grow: NE扩展网络<br/>新增神经元容量"]
+  P5 --> P6["参数空间扩大<br/>新模式获得表达空间"]
+  P6 --> P7["新数据填充新容量<br/>性能突破平台"]
+</div>
+</div>
+</section>
+
+<section id="task">
+<h2>4. Task Definition</h2>
+<h3>4.1 解决的问题</h3>
+<p>提高off-policy深度RL在连续控制任务上的样本效率和最终性能，通过对抗primacy bias使训练过程更充分地利用持续收集的环境交互数据。在4类连续控制基准上验证：</p>
+<ul>
+<li><strong>DMControl (DeepMind Control Suite):</strong> 标准连续控制任务——倒立摆、步行者、机械臂等</li>
+<li><strong>Meta-World:</strong> 多任务机器人操作——开门、按按钮、拾取放置等</li>
+<li><strong>ManiSkill2:</strong> 灵巧操作——更复杂的接触丰富任务</li>
+<li><strong>Gymnasium-MuJoCo:</strong> 经典运动控制——Hopper、HalfCheetah、Ant等</li>
+</ul>
+<p>与BRO、SimBa、TD-MPC2等强baseline比较样本效率和最终回报。40余个任务上均验证。</p>
+</section>
+
+<section id="challenge">
+<h2>5. Key Challenge</h2>
+
+<h3>5.1 第一性原理分析</h3>
+<div class="callout danger">
+<p><strong>Primacy Bias的数学本质：</strong></p>
+<p>Off-policy RL的目标是学习值函数Q*(s,a)，最优值满足Bellman optimality方程。但实际训练中，我们只能从当前replay buffer采样的有限数据中近似。训练开始时：(1) 数据分布极度偏斜——只有初始策略附近的经验（低质量）；(2) 网络参数随机初始化。</p>
+<p>核心问题：<strong>早期梯度主导了参数轨迹</strong>。由于深度网络的非凸性，参数一旦被推向某个局部最小值方向，后续梯度（即使是"更好"的方向）只能在该basin内微调。Uniform replay mean 早期数据永远等概率地被采样——平均意义上，在整个训练过程中，20%的数据来自训练前5%的时间。</p>
+<p>FoG的两个机制恰好从两个正交角度解决：ERD从<strong>数据</strong>端降低早期经验的权重，NE从<strong>模型</strong>端扩展优化landscape的容量。</p>
+</div>
+
+<h3>5.2 方法对比表</h3>
+<table>
+<tr><th>方法</th><th>机制</th><th>vs 首因偏差</th><th>对模型影响</th></tr>
+<tr><td>Prioritized ER (PER)</td><td>按TD-error采样</td><td>间接：大TD-error通常=近期未学习的经验</td><td>不变</td></tr>
+<tr><td>HER (Hindsight ER)</td><td>把失败经验relabel为成功</td><td>间接：重新利用已收集的数据</td><td>不变</td></tr>
+<tr><td>Reset/Re-train</td><td>阶段性地重新初始化网络</td><td>直接但粗暴：完全忘记所有旧学知识</td><td>完全重置</td></tr>
+<tr><td>Curr. Learning</td><td>渐进增加任务难度</td><td>间接：控制数据分布的时间性</td><td>不变</td></tr>
+<tr><td>Progressive Nets</td><td>固定旧层+新增列</td><td>间接：保护旧知识</td><td>单向增长</td></tr>
+<tr class="highlight"><td><strong>FoG (本文)</strong></td><td><strong>ERD + NE</strong></td><td><strong>直接: 数据层+模型层双重对抗</strong></td><td><strong>渐进功能保持扩展</strong></td></tr>
+</table>
+</section>
+
+<section id="method">
+<h2>6. Method</h2>
+
+<h3>6.1 核心公式</h3>
+
+<div class="formula-block">
+  <div class="eq-tag">公式1: ERD — 衰减采样分布</div>
+  <p>标准均匀采样的replay buffer中，transition i被选中的概率为1/N。ERD引入基于age的衰减：</p>
+  $$ P_{\text{ERD}}(s_i) = \frac{\exp(-\lambda(t) \cdot \text{age}_i)}{\sum_j \exp(-\lambda(t) \cdot \text{age}_j)} $$
+  <p>其中age_i = t_current - t_collected_i，lambda(t)为随训练步数t递增的衰减系数：</p>
+  $$ \lambda(t) = \lambda_{\max} \cdot \frac{t}{T} \quad \text{(线性调度)} \quad \text{或} \quad \lambda(t) = \lambda_{\max} \cdot (1 - e^{-t/\tau}) \quad \text{(指数调度)} $$
+  <div class="eq-note"><strong>设计哲学:</strong> 训练早期lambda≈0（均匀采样，保持探索多样性），随着训练进展lambda增大（旧数据权重指数下降，新数据主导）。T为总训练步数，控制遗忘速度。</div>
+</div>
+
+<div class="formula-block">
+  <div class="eq-tag">公式2: ERD — 等效损失加权</div>
+  <p>等价地，可以在loss中对不同age的样本施加不同权重，而保持采样均匀：</p>
+  $$ \mathcal{L}^{\text{ERD}} = \mathbb{E}_{(s,a,r,s') \sim D} \left[ w(\text{age}) \cdot \left( Q_\theta(s,a) - (r + \gamma \bar{Q}(s', \pi(s'))) \right)^2 \right] $$
+  <p>其中 w(age) = exp(-lambda(t) * age) / Z (Z确保总权重不变)。两种实现等价，loss加权在实践中更稳定。</p>
+  <div class="eq-note"><strong>实现选择:</strong> loss加权版本避免了修改采样器的额外开销，且保持每个minibatch的梯度方差不受采样变化影响。</div>
+</div>
+
+<div class="formula-block">
+  <div class="eq-tag">公式3: NE — Net2Net功能保持扩展</div>
+  <p>给定第l层的权重矩阵W_old ∈ R^{m×n}（n输入dim，m输出dim）和偏置b_old ∈ R^m，扩展为宽度k*m的新层：</p>
+  $$ W_{\text{new}} = \begin{bmatrix} W_{\text{old}} \\ W_{\text{old}} \end{bmatrix} + \epsilon \cdot \mathcal{N}(0, \sigma^2 \cdot \|W_{\text{old}}\|^2) $$
+  $$ b_{\text{new}} = \begin{bmatrix} b_{\text{old}} \\ b_{\text{old}} \end{bmatrix} + \epsilon \cdot \mathcal{N}(0, \sigma_b^2) $$
+  <p>下一层的输入权重同步扩展：W_{l+1, new} = [W_{l+1, old} | W_{l+1, old}/2]。除以2确保该层的输出值不变。</p>
+  <div class="eq-note"><strong>功能保持(Zero-cost):</strong> 扩展后立即不做任何训练时，网络对相同输入产生完全相同的输出——新增神经元输出被下一层的除2操作抵消。噪声epsilon确保新增参数不以完全相同的方式启动，从而可以在后续训练中分化。</div>
+</div>
+
+<div class="formula-block">
+  <div class="eq-tag">公式4: FoG联合训练算法</div>
+  <p>FoG = base_RL_algorithm + ERD(lambda_schedule) + NE(expand_steps, expand_ratio)：</p>
+  $$ \text{for } t = 1 \text{ to } T: $$
+  $$ \quad \text{collect data, update buffer} $$
+  $$ \quad \text{sample with ERD: } P \propto \exp(-\lambda(t) \cdot \text{age}) $$
+  $$ \quad \text{update actor/critic with weighted loss} $$
+  $$ \quad \text{if } t \in E_{\text{expand}}: \text{apply Net2Net to expand network} $$
+  $$ \quad \lambda(t) \leftarrow \text{scheduler}(t/T) $$
+  <div class="eq-note"><strong>即插即用:</strong> FoG不修改基础RL算法的核心更新规则——只修改数据采样分布和网络架构。因此可无缝适配SAC、TD3、TD-MPC2等多种off-policy算法。</div>
+</div>
+
+<h3>6.2 关键参数表</h3>
+<table>
+<tr><th>参数</th><th>含义</th><th>典型值</th><th>敏感性</th></tr>
+<tr><td>lambda_max</td><td>ERD最大衰减系数</td><td>0.01-0.1</td><td>中: 太高丢稀有经验，太低效果不足</td></tr>
+<tr><td>衰减调度</td><td>lambda(t)函数形式</td><td>线性/指数</td><td>低: 两种调度差别不大</td></tr>
+<tr><td>扩展时机E_expand</td><td>触发NE的训练步百分比</td><td>25%/50%/75%</td><td>高: 决定新旧知识容量分配</td></tr>
+<tr><td>扩展比expand_ratio</td><td>每层宽度倍增因子</td><td>1.5x-2x</td><td>中: 越大容量越大但计算也增加</td></tr>
+<tr><td>init_noise_sigma</td><td>Net2Net噪声标准差</td><td>0.01-0.05</td><td>低: 确保参数可分化</td></tr>
+<tr><td>Replay Buffer容量N</td><td>存储transition数</td><td>10^6</td><td>低: 标准off-policy设置</td></tr>
+<tr><td>actor/critic扩展时序</td><td>分别何时扩展</td><td>critic先于actor</td><td>中: critic价值函数更复杂</td></tr>
+</table>
+</section>
+
+<section id="principles">
+<h2>7. Principles</h2>
+
+<h3>7.1 深层机理解读</h3>
+<div class="callout tip">
+<p><strong>核心原理1: 数据分布漂移是RL训练的内在特征——不应修复，应利用</strong></p>
+<p>Off-policy RL的训练数据分布天然随时间变化（策略改进→访问新状态→新数据）。传统方法试图通过large buffer使数据分布stationary——但这恰恰保留了早期数据的破坏性影响。FoG的洞见是：<strong>数据的"陈旧性"是信号，不是噪声</strong>。通过主动衰减旧数据，让训练自然适应分布漂移。</p>
+</div>
+<div class="callout tip">
+<p><strong>核心原理2: 模型容量应随数据质量增长——"先小后大"的动态容量</strong></p>
+<p>训练初期数据质量低（随机探索的噪音大），用小网络即可拟合；数据质量随策略改进而提升，此时需要更大网络捕获精细模式。固定大小的网络在两种极端之间妥协——不是太小（后期欠拟合）就是太大（前期过拟合噪音）。NE实现了"跟随数据增长的容量"。</p>
+</div>
+
+<h3>7.2 训练动力学对比</h3>
+<div class="cmp-row">
+  <div class="cmp-col"><h4>基线RL训练</h4><p>早期数据→固定网络容量→primacy bias→性能平台。数据分布自然漂移但旧数据持续存在。</p></div>
+  <div class="cmp-col"><h4>FoG训练</h4><p>早期数据→遗忘旧数据→扩展网络→新模式填入新容量。数据和容量同步演进，突破平台。</p></div>
+</div>
+</section>
+
+<section id="figures">
+<h2>8. Figures &amp; Evidence</h2>
+<div class="paper-figure">
+  <div class="fig-header"><span class="fig-number">Fig.1</span><span class="fig-caption">FoG系统概览: infantile amnesia类比+双机制图</span></div>
+  <div class="fig-image"><img src="figures/overview.png" alt="FoG overview" /></div>
+  <div class="fig-interpretation">
+    <div class="fig-label">INTERPRETATION</div>
+    <ul><li>婴儿遗忘类比——人类早期记忆被"遗忘"以重新组织认知模型，FoG同理</li><li>两条并行机制：ERD(数据) + NE(模型) —— 覆盖首因偏差的两种表现形式</li><li>跨4类benchmark 40+任务验证——展示了方法的通用性</li></ul>
+  </div>
+</div>
+<p><strong>关键证据:</strong> FoG在绝大多数任务上超越baseline (BRO, SimBa, TD-MPC2)；单用ERD或NE已有效果，但两者叠加（FoG）效果最强——验证了互补性；在"极难"任务（长时间尺度、稀疏奖励）上优势尤其明显。</p>
+</section>
+
+<section id="flaw">
+<h2>9. Potential Flaw</h2>
+<div class="callout warn">
+<ul>
+<li><strong>遗忘可能丢失"稀有但关键"的经验:</strong> 某些任务中，成功经验非常稀疏（如500步才成功一次），如果这些经验恰好发生在早期且被遗忘，将严重损害学习。论文未讨论对稀疏奖励场景下ERD的特殊处理。</li>
+<li><strong>扩展时机与衰减速率仍是敏感超参:</strong> lambda_max、扩展步百分比、扩展比——这些参数对每个新环境可能需要手动调优。论文未提供自动化选择方案。</li>
+<li><strong>持续扩展的部署成本:</strong> 如果NE在训练期间多次触发，最终网络可能是初始的4-8倍大——增加推理延迟。对资源受限的实时部署不友好。</li>
+<li><strong>理论分析缺失:</strong> 没有提供ERD收敛性的理论保证——在非平稳的衰减采样分布下，Bellman更新的不动点是否存在/唯一尚不明确。</li>
+<li><strong>仅验证off-policy:</strong> FoG依赖replay buffer的时间戳信息。对on-policy方法（PPO等），forget机制需要不同的设计。</li>
+</ul>
+</div>
+<h3>9.1 扩展方向</h3>
+<ul><li>自适应衰减速率——根据学习曲线自动调整lambda</li><li>选择性遗忘——仅遗忘"低质量"经验而非所有旧经验</li><li>Growing的逆操作(Pruning)——后期剪枝冗余参数以降低部署成本</li><li>扩展FoG到online/on-policy RL</li></ul>
+<h3>9.2 敏感性分析</h3>
+<table>
+<tr><th>组件</th><th>影响</th><th>等级</th><th>说明</th></tr>
+<tr><td>lambda_max</td><td>★★★★☆</td><td>高</td><td>核心参数——确定遗忘"力度"</td></tr>
+<tr><td>扩展时机</td><td>★★★★★</td><td>极高</td><td>过早=浪费容量/过晚=已陷入局部最优</td></tr>
+<tr><td>扩展比</td><td>★★★☆☆</td><td>中</td><td>1.5x-2x间差别不大</td></tr>
+<tr><td>衰减调度类型</td><td>★★☆☆☆</td><td>低</td><td>线性vs指数差别小</td></tr>
+<tr><td>噪声sigma</td><td>★☆☆☆☆</td><td>很低</td><td>仅需确保非零</td></tr>
+<tr><td>ERD vs NE组合</td><td>★★★★★</td><td>极高</td><td>两者叠加效果远超单独使用</td></tr>
+</table>
+</section>
+
+<section id="motivation">
+<h2>10. Motivation</h2>
+
+<h3>10.1 五步动机链</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+  M1["深度RL训练经常失败——即使有更多环境交互也无法提升"] --> M2["根源: primacy bias — 早期低质量数据锁定了网络表示"]
+  M2 --> M3["传统解法: 更大的buffer/更慢的学习率 — 治标不治本"]
+  M3 --> M4["认知科学启示: 婴儿期遗忘+大脑发育= 先忘后长的学习策略"]
+  M4 --> M5["FoG: ERD遗忘旧数据 + NE生长新容量 = 数据与模型协同演进"]
+</div>
+</div>
+<h3>10.2 一句话动机</h3>
+<div class="callout info"><p><strong>许多RL训练的失败不是因为算法不会学习，而是因为训练最初的少量经验过早地固化了网络表示——FoG借鉴人类认知中的遗忘与成长机制，为深度RL重新打开持续学习和表示重构的窗口。</strong></p></div>
+</section>
+
+<section id="takeaway">
+<h2>11. Reading Takeaway</h2>
+
+<h3>11.1 一句话小结</h3>
+<div class="callout tip"><p><strong>FoG证明: 深度RL的首因偏差可以通过"遗忘+生长"双机制系统性解决——ERD(Experience Replay Decay)从数据端衰减早期低质量经验的影响，NE(Network Expansion)从模型端动态增加参数容量以吸收后期优质数据。两者协同作用时效果远超单独使用，在40+连续控制任务上验证了跨算法(SAC/TD3/BRO/SimBa)的即插即用通用性。</strong></p></div>
+
+<h3>11.2 关键教训</h3>
+<ol>
+<li><strong>数据的"年龄"是有用信号:</strong> 不是所有经验等值——陈旧经验对当前策略的参考价值天然低于新鲜经验</li>
+<li><strong>模型容量应随数据质量增长:</strong> 固定容量在RL的动态数据环境中是不合理的——容量需求随训练进展递增</li>
+<li><strong>遗忘可以是建设性的:</strong> 机器学习的通常叙事是"防止灾难性遗忘"，但FoG展示了<strong>选择性遗忘</strong>对学习的促进作用</li>
+<li><strong>即插即用很重要:</strong> FoG不修改核心RL算法——只改数据采样和网络架构——这使其可以无缝适配多种算法</li>
+</ol>
+
+<h3>11.3 UAV强化学习应用展望</h3>
+<div class="callout idea">
+<div class="callout-title">UAV RL如何借鉴FoG?</div>
+<ul>
+<li><strong>对抗sim2real训练中的primacy bias:</strong> UAV仿真训练的早期数据（悬停/简单航线）远多于后期复杂机动数据——ERD可主动遗忘早期简单模式，让网络更好地学习后期复杂策略</li>
+<li><strong>动态网络扩展应对任务增量:</strong> UAV从简单(悬停控制)到复杂(避障穿越+目标跟踪)的任务增量训练中，NE可在不遗忘已有技能的前提下增加新容量</li>
+<li><strong>多旋翼到固定翼的迁移:</strong> 从多旋翼仿真训练扩展到固定翼任务时，NE提供额外参数处理不同动力学</li>
+<li><strong>在线自适应:</strong> 在真实飞行中持续收集经验并在线遗忘/生长，实现飞行性能的终身提升</li>
+</ul>
+</div>
+
+<h3>11.4 推荐阅读(4-6)</h3>
+<table>
+<tr><th>#</th><th>论文</th><th>关联</th></tr>
+<tr><td>1</td><td>Prioritized Experience Replay (Schaul et al., 2016)</td><td>非均匀采样replay的先驱——按TD-error而非年龄加权</td></tr>
+<tr><td>2</td><td>Net2Net (Chen et al., 2016) — Accelerating Learning via Knowledge Transfer</td><td>功能保持网络扩展——NE的数学基础</td></tr>
+<tr><td>3</td><td>Progressive Neural Networks (Rusu et al., 2016)</td><td>通过增加新列保护旧知识——与FoG的不同扩展策略</td></tr>
+<tr><td>4</td><td>BRO (Lee et al., 2024) — Behavior Regularized Offline RL</td><td>FoG的主要对比baseline之一</td></tr>
+<tr><td>5</td><td>SimBa (Hansen et al., 2024) — Simplicity Bias in RL</td><td>简单性偏差——首因偏差的一种表现形式</td></tr>
+<tr><td>6</td><td>TD-MPC2 (Hansen et al., 2024) — Scalable World Models</td><td>当前连续控制SOTA，FoG验证了跨算法通用性</td></tr>
+</table>
+
+<p class="source">From local PDF pages 1-5 analysis. See <a href="Kang et al. - 2025 - A forget-and-grow strategy for deep reinforcement learning scaling in continuous control.pdf">original PDF</a>.</p>
+</section>
+
+</main>
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>&#x1F4C4; Paper Notes &middot; Huazhe Xu &middot; ID 10390 &middot; MathJax + Mermaid</footer>
+</body></html>

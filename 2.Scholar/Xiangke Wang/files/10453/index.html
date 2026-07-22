@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Fusion Control for UAV Target Tracking and Obstacle Avoidance (Li, Liu, Wang et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Xiangke Wang · 18-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10497/index.html">Distributed fault estimat</a>
+<a href="../10496/index.html">Robust cooperative guidan</a>
+<a href="../10493/index.html">three-layer formation man</a>
+<a href="../10487/index.html">L1</a>
+<a class="active" href="../10453/index.html">UAV</a>
+<a href="../10495/index.html">Cooperative impact time</a>
+<a href="../10491/index.html">Adaptive prescribed-time </a>
+<a href="../10472/index.html">Formation under communica</a>
+<a href="../10464/index.html">Formation under communica</a>
+<a href="../10474/index.html">Prescribed-time target en</a>
+<a href="../10473/index.html">Prescribed-time distribut</a>
+<a href="../10484/index.html">UAV</a>
+<a href="../10486/index.html">XTDrone customizable mult</a>
+<a href="../10489/index.html">UAV</a>
+<a href="../10485/index.html">Event-triggered consensus</a>
+<a href="../10488/index.html">Multi-agent distributed</a>
+<a href="../10494/index.html">geometric structure unit</a>
+<a href="../10490/index.html">dual quaternion solution</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Fusion Control for UAV Target Tracking and Obstacle Avoidance Based on Deep Reinforcement Learning（基于深度强化学习的无人机目标跟踪与障碍规避融合控制方法）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>李治威（LI Zhiwei）</strong>、<strong>刘志宏（LIU Zhihong）</strong>、<strong>王祥科（WANG Xiangke，corresponding）</strong></td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">国防科技大学</strong> 智能科学学院（College of Intelligence Science and Technology, National University of Defense Technology, Changsha 410000）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">信息与控制（Information and Control）</strong>，<strong>2026年3月</strong>，Vol. 55，No. 2，pp. 268–278</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE TRO</span> <span class="jif-badge if-value">IF 6.8</span> <span class="jif-badge if-q1">JCR Q1</span> <span class="jif-badge if-cas">CAS 1区</span></div>
+    <tr><td><strong>DOI / CSTR</strong></td><td>DOI: <a href="https://doi.org/10.13976/j.cnki.xk.2025.4002" target="_blank">10.13976/j.cnki.xk.2025.4002</a> | CSTR: 32166.14.xk.2025.4002 | Received: 2025-12-10 | Accepted: 2026-02-27 | Published: 2026-03-18</td></tr>
+    <tr><td><strong>Funding</strong></td><td>基金项目 T252100662576355, U23B2032；通信作者邮箱 zhliu@nudt.edu.cn</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出一种<strong>融合控制方法</strong>，将无人机目标跟踪与障碍规避统一在端到端深度强化学习框架中——图像特征直接映射到 UAV 控制指令，无需分离式设计。核心包含两部分：（1）<strong>运动补偿扩展卡尔曼滤波器（Motion-Compensated EKF）</strong>——利用齐次变换实时估计图像平面内的目标位置与运动方向；（2）<strong>基于 PPO 的 DRL 运动控制器</strong>——接收传感器观测，实时输出 UAV 速度与偏航指令。在 Flightmare + AirSim 双平台验证，目标跟踪成功率在 0.8~1.5 m/s 达 100%，轨迹平滑度（jerk 0.41 vs 1.88 m/s³）和实时性（单步决策 0.91 ms）均显著优于 Fast-Tracker 基线。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Deep Reinforcement Learning</span>
+    <span class="tag tag-green">Target Tracking</span>
+    <span class="tag tag-amber">Obstacle Avoidance</span>
+    <span class="tag tag-purple">Extended Kalman Filter</span>
+    <span class="tag tag-red">End-to-End Control</span>
+    <span class="tag tag-cyan">Sensor Fusion</span>
+    <span class="tag tag-gray">UAV Autonomy</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么传统方法在障碍环境下的目标跟踪效果不好？</strong><br>
+    答：因为传统方法通常将目标跟踪和障碍规避设计为两个独立模块——跟踪模块输出"追向目标"的指令，避障模块输出"远离障碍"的指令，最后通过加权融合或仲裁机制合并。这种分离式设计有三大根本缺陷：（1）两个模块之间存在<strong>目标冲突</strong>（跟踪要求靠近目标 → 可能与避障方向相反），融合权重难以自适应调节；（2）独立设计的模块<strong>无法共享感知特征</strong>——跟踪模块关注目标位置，避障模块关注障碍物深度，各自提取特征造成计算冗余；（3）<strong>决策延迟</strong>——两个模块串行/并行运行后再融合，增加了端到端延迟。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>用端到端的 DRL 策略网络将目标跟踪与障碍规避统一学习</strong>。不是分开设计两个模块再融合，而是让一个神经网络<strong>同时接收所有传感器观测（图像+目标状态+UAV速度）</strong>，直接输出融合后的控制指令。前端的运动补偿 EKF 负责将视觉检测的含噪目标位置估计平滑化并补偿 UAV 自身运动——为 DRL 策略提供干净的状态输入。这样，策略网络在训练中<strong>自然学会了在"追目标"和"躲障碍"之间做最优权衡</strong>，不需要人工设计融合规则。
+  </div>
+
+  <h3>2.2 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 融合控制策略——将跟踪与避障从"分离+仲裁"升级为"统一+端到端"</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统方法（如 Fast-Tracker [10]）将跟踪路径规划与避障走廊约束分开设计，路径规划器生成目标逼近轨迹后，再由避障模块在局部修正。当目标高速运动或障碍密集时，两个模块的冲突导致跟踪失败或轨迹剧烈抖动（Fast-Tracker 在 2.2 m/s 时成功率仅 30%）。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>深度强化学习在多目标权衡任务中的天然优势——DRL 通过奖励函数同时编码多个目标（跟踪精度 + 避障安全 + 轨迹平滑），策略网络在端到端训练中自动学习最优权衡，无需人工设计仲裁逻辑。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>奖励函数 $r_t$ 包含 5 项：目标检测奖励（FIoU-based）、位置跟踪奖励（距离变化+角度）、碰撞惩罚（-50）、目标达成奖励（+0.2）、状态平滑奖励（速度变化惩罚）。策略网络同时接收图像特征（CNN 提取的 512 维向量）、目标状态估计（EKF 输出的 5 维向量 $o_t^d$）和 UAV 自身速度（$o_t^v$），输出 3 维控制指令（$v_x, v_y, \dot{\psi}$）。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 运动补偿 EKF——用齐次变换消除 UAV 自身运动对目标观测的耦合</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>机载单目相机观测目标时，目标在图像平面内的像素运动 $[u_{obs}, v_{obs}]^T$ 是<strong>两个运动的叠加</strong>：目标在世界坐标系中的真实运动 + UAV 自身姿态变化导致的图像平面投影变化。如果直接将像素坐标输入 EKF，估计结果会因 UAV 自身的姿态扰动而严重退化。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>齐次变换矩阵在机器人学中广泛用于坐标系变换——将 UAV 机体运动（由 IMU 测量）通过齐次变换补偿到图像观测中，消除自运动耦合。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在 EKF 的观测更新步骤中，先利用 IMU 数据计算 UAV 在两帧之间的机体运动 $\Delta T$，通过齐次变换将上一帧的目标预测位置映射到当前帧的图像平面，得到运动补偿后的预测观测 $z_{k|k-1} = H \cdot x_k^{\text{comp}}$。只有消除了自运动分量的"纯净"目标运动残差才用于卡尔曼增益更新。EKF 状态为 $x_k = [u_k, v_k, \dot{u}_k, \dot{v}_k]^T$（像素位置+速度），采用匀速（CV）运动模型预测。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 感知-估计-控制一体化 DRL 架构——512 维图像特征直接驱动策略</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统 pipeline（检测→估计→规划→控制）中，每个模块独立优化，信息逐级压缩。特别是目标检测模块输出的 bounding box 坐标仅保留了位置信息，丢失了大量场景上下文（障碍物分布、目标外观变化），而这些上下文对避障决策至关重要。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>端到端强化学习（如 Loquercio et al. 2021 Science Robotics 的高速穿越飞行）已经证明：直接从原始图像特征学习控制策略可以获得比"感知→控制"分离 pipeline 更强的环境适应能力。本文在此基础上引入了 EKF 估计作为结构化先验，实现"数据驱动 + 模型先验"的混合架构。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>CNN 特征提取器（3 层卷积 32×3 卷积核 + stride 2 下采样）将 960×540 RGB 图像编码为 512 维特征向量；EKF 输出 5 维目标状态 $o_t^d = [u_t, v_t, h_t, \dot{u}_t, \dot{v}_t]^T$（含目标在图像中的高度 $h_t$，提供尺度/距离信息）；UAV 速度 $o_t^v$ 提供自身动态。三者拼接后经 4 层全连接 MLP（520→256→128→128→3）输出动作均值，配合对角高斯策略实现随机探索。</div>
+  </div>
+
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — 感知→估计→控制→执行 闭环</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Perception <span>感知层</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>单目 RGB 相机</strong>
+          <small>960×540 @ 30Hz, FOV 108°×75°, 机载前向安装</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>IMU 惯性测量单元</strong>
+          <small>提供 UAV 角速度+加速度，用于 EKF 运动补偿</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Estimation <span>估计层</span></h4>
+        <div class="arch-card arch-power">
+          <strong>目标检测器</strong>
+          <small>YOLO-based detector 输出 bounding box 坐标 [u_obs, v_obs]</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>Motion-Compensated EKF</strong>
+          <small>齐次变换补偿自运动 → CV模型预测 → 卡尔曼更新 → 平滑目标状态</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Control <span>控制层</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>CNN 特征提取</strong>
+          <small>3层卷积 → 512维图像特征向量</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>DRL 策略网络 (PPO)</strong>
+          <small>图像特征 + EKF状态 + UAV速度 → [v_x, v_y, ψ_dot]</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Actuation <span>执行层</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>几何跟踪控制器</strong>
+          <small>SE(3) Geometric Controller [23] 将速度指令转化为电机转速</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>四旋翼 UAV</strong>
+          <small>x-y 平面速度控制 + 偏航角速率控制</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>图像+IMU → 特征</span>
+      <span>观测 → 状态平滑</span>
+      <span>状态 → 控制指令</span>
+      <span>指令 → 电机推力</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>图像特征提取质量与EKF运动补偿精度共同决定策略输入质量</small></div>
+      <div class="arch-metric"><strong>Main invention</strong><small>EKF+DRL融合架构: 模型先验保障估计鲁棒性 + 数据驱动实现端到端控制</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>EKF提供干净的状态估计消除传感器噪声 → DRL策略专注决策</small></div>
+      <div class="arch-metric"><strong>Current limitation</strong><small>仅仿真验证; 2D平面控制 (x-y velocity + yaw rate); 单目标场景</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 System Frame — 整体框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph PERCEPTION["感知层"]
+      CAM["单目RGB相机<br/>960×540 · FOV 108°×75°"]
+      IMU["IMU惯导单元<br/>角速度 + 加速度"]
+      DETECT["目标检测器 YOLO-based<br/>输出: bounding box [u_obs, v_obs]"]
+    end
+
+    subgraph ESTIMATION["估计层 — Motion-Compensated EKF"]
+      COMP["运动补偿 齐次变换<br/>IMU→机体位移→图像平面映射"]
+      PRED["EKF 状态预测 CV模型<br/>x_k⁻ = F·x_{k-1}<br/>x_k = [u,v,&#364;u,&#364;v]ᵀ"]
+      UPDATE["EKF 观测更新<br/>K_k = P_k⁻Hᵀ(HP_k⁻Hᵀ+R_k)⁻¹<br/>x_k = x_k⁻ + K_k(z_k - Hx_k^comp)"]
+    end
+
+    subgraph CONTROL["控制层 — DRL Policy Network PPO"]
+      CNN["CNN 特征提取器<br/>3层卷积 32×3 · stride 2<br/>960×540 → 512维特征"]
+      CONCAT["特征拼接<br/>512图像 + 5目标状态 + UAV速度"]
+      MLP["4层全连接 MLP<br/>520→256→128→128→3<br/>输出: 动作均值 μ = [v_x, v_y, ψ_dot]"]
+    end
+
+    subgraph ACTUATION["执行层"]
+      GEOCTRL["SE(3) 几何跟踪控制器<br/>速度指令 → 期望推力+姿态"]
+      UAV_OUT["四旋翼 UAV<br/>x-y速度 + 偏航角速率"]
+    end
+
+    CAM --> DETECT
+    DETECT -->|"[u_obs, v_obs]"| UPDATE
+    IMU -->|"角速度/加速度"| COMP
+    COMP -->|"x_k^comp 运动补偿状态"| UPDATE
+    PRED --> UPDATE
+    UPDATE -->|"平滑目标状态 o_t^d"| CONCAT
+    CAM -->|"原始RGB图像"| CNN
+    CNN --> CONCAT
+    UAV_OUT -->|"自身速度 o_t^v"| CONCAT
+    CONCAT --> MLP
+    MLP -->|"[v_x, v_y, ψ_dot]"| GEOCTRL
+    GEOCTRL -->|"推力+姿态指令"| UAV_OUT
+
+    UPDATE -.->|"反馈: EKF更新P_k"| PRED
+    UAV_OUT -.->|"反馈: 闭环飞行状态"| CAM
+
+    classDef percep fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef estim fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef ctrl fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef act fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class CAM,IMU,DETECT percep
+    class COMP,PRED,UPDATE estim
+    class CNN,CONCAT,MLP ctrl
+    class GEOCTRL,UAV_OUT act
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 数据流+信息流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SENSING["传感器数据流"]
+      direction LR
+      IMG["RGB图像 960×540@30Hz"] --> DET2["目标检测 → BBox坐标"]
+      IMU_DATA2["IMU 200Hz"] --> MOTION2["机体运动估计 ΔT"]
+    end
+
+    subgraph EKF_PIPELINE["EKF 估计管线"]
+      direction LR
+      INIT2["初始化: x_0, P_0"] --> PRED_STEP2["预测步: x_k⁻=Fx_{k-1}<br/>P_k⁻=FP_{k-1}Fᵀ+Q"]
+      PRED_STEP2 --> COMP_STEP2["运动补偿: x_k^comp<br/>齐次变换消除自运动"]
+      COMP_STEP2 --> UPDATE_STEP2["更新步: 计算K_k<br/>x_k = x_k⁻ + K_k(z_k-Hx_k^comp)"]
+      UPDATE_STEP2 --> OUTPUT_EKF2["输出: o_t^d = [u,v,h,&#364;u,&#364;v]ᵀ"]
+    end
+
+    subgraph DRL_PIPELINE["DRL 决策管线"]
+      direction LR
+      IMG_FEAT2["CNN编码: RGB→512维"] --> FEAT_FUSE2["特征融合: [512+5+UAV_vel]"]
+      EKF_FEAT2["EKF状态: 5维"] --> FEAT_FUSE2
+      UAV_STATE2["UAV速度: o_t^v"] --> FEAT_FUSE2
+      FEAT_FUSE2 --> POLICY2["策略网络: MLP 520→256→128→128→3"]
+      POLICY2 --> ACTION2["采样: a_t ~ N(μ, σ²)"]
+    end
+
+    subgraph REWARD["奖励信号 r_t"]
+      R_DET["r_detection: FIoU-based 检测奖励"]
+      R_POS["r_position: 距离+角度 跟踪奖励"]
+      R_COL["r_collision: -50 碰撞惩罚"]
+      R_GOAL["r_goal: +0.2 目标达成"]
+      R_STATE["r_state: 平滑性惩罚"]
+    end
+
+    SENSING --> EKF_PIPELINE
+    SENSING --> DRL_PIPELINE
+    EKF_PIPELINE -->|"o_t^d"| DRL_PIPELINE
+    ACTION2 -->|"a_t → environment"| REWARD
+    REWARD -.->|"r_t → PPO update"| POLICY2
+
+    classDef sens fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef ekf fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef drl fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef rew fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#047857
+    class IMG,DET2,IMU_DATA2,MOTION2 sens
+    class INIT2,PRED_STEP2,COMP_STEP2,UPDATE_STEP2,OUTPUT_EKF2 ekf
+    class IMG_FEAT2,EKF_FEAT2,UAV_STATE2,FEAT_FUSE2,POLICY2,ACTION2 drl
+    class R_DET,R_POS,R_COL,R_GOAL,R_STATE rew
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 训练与部署全流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["阶段1: 仿真环境搭建"]
+      direction LR
+      ENV1["Flightmare 仿真器 · Unity渲染 · 四旋翼动力学"]
+      ENV2["训练场景: 随机障碍物 · 8字轨迹目标 · 3种速度"]
+      ENV3["接口: RGB图像+IMU+UAV状态 → 动作指令"]
+    end
+
+    subgraph PHASE2["阶段2: PPO 训练"]
+      direction LR
+      TRAIN1["策略网络初始化: 权重随机"]
+      TRAIN2["Rollout: 300 episodes × 100 steps<br/>收集 (s,a,r,s') 轨迹"]
+      TRAIN3["PPO Clip: L(θ)=min(ratio·A, clip(ratio)·A)<br/>actor+critic联合更新"]
+      TRAIN4["60M steps · 80 min · RTX 4090<br/>收敛: 平均奖励稳定上升"]
+    end
+
+    subgraph PHASE3["阶段3: Flightmare 验证"]
+      direction LR
+      EVAL1["目标速度: 0.8/1.5/2.2 m/s"]
+      EVAL2["指标: 跟踪成功率 · 轨迹长度 · Jerk · 决策耗时"]
+      EVAL3["对比: Fast-Tracker 基线 · 消融实验"]
+    end
+
+    subgraph PHASE4["阶段4: AirSim 迁移验证"]
+      direction LR
+      TRANS1["AirSim 高保真物理+视觉仿真"]
+      TRANS2["EKF 估计误差: 不同距离/角度组合"]
+      TRANS3["策略泛化: Flightmare→AirSim 零样本迁移"]
+    end
+
+    PHASE1 -->|"环境就绪"| PHASE2
+    PHASE2 -->|"收敛策略"| PHASE3
+    PHASE3 -->|"通过验证"| PHASE4
+    PHASE4 -->|"结论: 优于Fast-Tracker"| CONCL["最终结论: 融合控制策略在跟踪稳定性+轨迹平滑性+实时性三方面全面优于分离式方法"]
+
+    TRAIN3 -.->|"反馈: 调整奖励权重"| TRAIN2
+    EVAL2 -.->|"反馈: 2.2m/s 时成功率80%→需改进"| TRAIN2
+
+    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef concl fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    class ENV1,ENV2,ENV3 p1
+    class TRAIN1,TRAIN2,TRAIN3,TRAIN4 p2
+    class EVAL1,EVAL2,EVAL3 p3
+    class TRANS1,TRANS2,TRANS3 p4
+    class CONCL concl
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 — MDP 建模</span>
+    $$ \max_{\pi} \; \mathbb{E}_{\tau \sim \pi} \left[ \sum_{t=0}^{T} \gamma^t r_t(s_t, a_t) \right] \quad \text{s.t.} \quad \text{track target} \land \text{avoid obstacles} $$
+    <div class="eq-note">
+      <strong>$\pi(a_t|s_t)$</strong> = DRL 策略网络，输入状态 $s_t$ 输出动作分布 &nbsp;|&nbsp;
+      <strong>$r_t$</strong> = 多目标奖励函数（检测+跟踪+避障+平滑）&nbsp;|&nbsp;
+      <strong>$\gamma = 0.99$</strong> = 折扣因子 &nbsp;|&nbsp;
+      <strong>核心约束</strong>：在每一时刻 $t$，UAV 必须同时满足（a）目标位于视场内（FIoU > 阈值），（b）不与障碍物碰撞，（c）控制指令满足动力学可行性（最大速度 2.5 m/s，最大偏航角速率 0.5 rad/s）。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">状态空间 & 动作空间</span>
+    $$ s_t = [o_t^z, o_t^d, o_t^v] \qquad a_t = [v_x, v_y, \dot{\psi}] \in \mathcal{A} $$
+    $$ o_t^z \in \mathbb{R}^{512}\; (\text{CNN 图像特征}) \qquad o_t^d = [u_t, v_t, h_t, \dot{u}_t, \dot{v}_t]^T\; (\text{EKF 目标状态}) \qquad o_t^v = [v_x^{\text{UAV}}, v_y^{\text{UAV}}, \dot{\psi}^{\text{UAV}}]\; (\text{自身速度}) $$
+    <div class="eq-note">
+      <strong>$o_t^z$</strong> = 512 维 CNN 特征（编码场景上下文：障碍物分布、目标外观、深度信息）&nbsp;|&nbsp;
+      <strong>$o_t^d$</strong> = EKF 输出的 5 维目标状态，$h_t$ 为目标在图像中的高度（提供尺度/距离线索）&nbsp;|&nbsp;
+      <strong>$o_t^v$</strong> = UAV 当前速度向量，为策略提供自身动态上下文 &nbsp;|&nbsp;
+      <strong>$a_t = [v_x, v_y, \dot{\psi}]$</strong> = x-y 平面速度指令 + 偏航角速率 —— 不直接输出电机指令，而是经 SE(3) 几何控制器 [23] 转化为推力+姿态。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度 / 范围</th></tr>
+    <tr><td><strong>输入 — 视觉</strong></td><td>机载前向单目 RGB 相机图像</td><td>960×540×3, FOV 108°×75°, 30 Hz</td></tr>
+    <tr><td><strong>输入 — 惯性</strong></td><td>IMU 角速度 + 加速度（用于 EKF 运动补偿，非直接输入策略）</td><td>3 轴角速度 + 3 轴加速度, 200 Hz</td></tr>
+    <tr><td><strong>输入 — 目标检测</strong></td><td>目标检测器输出的 bounding box 中心坐标</td><td>$[u_{obs}, v_{obs}]^T$, 像素坐标</td></tr>
+    <tr><td><strong>输入 — UAV 状态</strong></td><td>当前 UAV 速度（自身速度反馈）</td><td>$o_t^v = [v_x, v_y, \dot{\psi}]$</td></tr>
+    <tr><td><strong>输出 — 控制指令</strong></td><td>策略网络采样的控制动作，经几何控制器转化为电机指令</td><td>$a_t = [v_x, v_y, \dot{\psi}]$, |v| ≤ 2.5 m/s, |$\dot{\psi}$| ≤ 0.5 rad/s</td></tr>
+    <tr><td><strong>目标</strong></td><td>在障碍环境中持续跟踪非合作运动目标（8 字轨迹），保持目标在视场内且不与障碍碰撞</td><td>跟踪成功率 100%（0.8~1.5 m/s）/ 80%（2.2 m/s）；轨迹长度 131 m；jerk 0.41 m/s³</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>连续控制 + 部分可观测 + 多目标权衡</strong>的序列决策问题。任务形式化：给定流式机载单目视觉观测和 IMU 数据，在每个时间步输出 UAV 速度控制指令，使得 UAV 在障碍环境中持续跟踪运动目标。任务本质是<strong>约束优化</strong>——最大化跟踪质量（目标保持在视场中心）同时最小化碰撞风险，约束为 UAV 动力学包线和实时性要求。评估场景：3 种目标速度（0.8 / 1.5 / 2.2 m/s）× 8 字形复杂轨迹，仿真环境含随机分布的柱状障碍物。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：在障碍环境中跟踪非合作运动目标时，UAV 面临三个互相耦合的困难——<strong>目标运动不确定、视觉遮挡、自身动力学约束</strong>。这三个困难在分离式设计中被各自独立处理，但它们的耦合效应使得独立优化后的简单融合无法奏效。<br><br>
+    （1）<strong>目标运动的不确定性</strong>：非合作目标（不主动配合跟踪）的运动模式未知且可变。在 CV 模型假设下，EKF 可以提供预测，但目标一旦急转弯或变速，模型失配会导致估计误差快速累积。这不仅是估计问题——估计误差会传播到控制层，使得 UAV 飞向"错误"的位置。<br><br>
+    （2）<strong>视觉遮挡与自运动耦合</strong>：当 UAV 绕飞障碍物时，目标可能被短暂遮挡。同时，UAV 自身的姿态变化（尤其是偏航旋转）会在图像平面产生显著的目标像素位移——如果不对自运动进行补偿，EKF 会把 UAV 的偏航误判为目标运动。<br><br>
+    （3）<strong>跟踪-避障的目标冲突</strong>：在多障碍场景中，最优跟踪轨迹可能穿过障碍物区域。分离式方法中，跟踪模块"拉"向目标，避障模块"推"离障碍，两个方向相反时，融合权重决定了 UAV 的行为——权重过大则碰撞，过小则丢失目标。最优权重是时变的（取决于场景密度、目标速度、UAV 位置），人工调参无法覆盖所有情况。<br><br>
+    <strong>将这三点放在一起</strong>：你需要一个系统，在接收含噪的像素级目标观测、UAV 自身姿态不断变化、障碍物分布未知且动态变化的条件下，实时做出正确的"追 or 绕"决策——并且这个决策必须是单个网络端到端产出的，不能依赖人工设计的模块化融合规则。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Fast-Tracker [10]（分离式 规划+避障）</td>
+      <td>路径规划器生成目标逼近轨迹（基于 B 样条）+ 避障模块施加走廊约束（safe corridor），局部重规划修正</td>
+      <td>（1）<strong>模块冲突</strong>：跟踪路径可能与安全走廊冲突，重规划引入延迟；（2）<strong>计算开销</strong>：路径规划 2.46 ms + 走廊生成 0.84 ms + 优化 0.24 ms = 总计 3.54 ms/步，本文方法仅 0.91 ms；（3）<strong>高速目标退化</strong>：2.2 m/s 时成功率仅 30%，因为规划-重规划循环跟不上目标运动</td>
+    </tr>
+    <tr>
+      <td>TF-DQN [14]（DQN-based 避障跟踪）</td>
+      <td>用 DQN 学习目标跟踪策略，离散动作空间（前后左右上下），奖励函数融合跟踪+避障</td>
+      <td>（1）<strong>离散动作</strong>：仅 6 个离散方向，轨迹平滑性差；（2）<strong>Q-learning</strong>：值函数估计在连续状态空间中方差大，训练不稳定；（3）未使用 EKF 做状态估计——直接将含噪检测结果输入策略，估计误差直接污染决策</td>
+    </tr>
+    <tr>
+      <td>MPTD3 [15]（DDPG-based 跟踪避障）</td>
+      <td>Multi-Policy TD3——训练多个子策略分别处理不同场景（跟踪为主 / 避障为主），用 gating 网络选择</td>
+      <td>（1）<strong>子策略切换不连续</strong>：gating 网络在"跟踪模式"和"避障模式"之间切换时，控制指令可能跳变，产生 jerk；（2）<strong>训练复杂</strong>：需要同时训练多个子策略+ gating 网络，收敛难度大；（3）未解决 EKF 估计问题</td>
+    </tr>
+    <tr>
+      <td>Meta-RL [16]（元强化学习 UAV 跟踪避障）</td>
+      <td>用 Meta-RL（PEARL/PEARL-2Buf）在多种任务分布上训练，期望快速适应新环境</td>
+      <td>（1）<strong>元训练代价极高</strong>：需要大量不同场景的训练任务，计算开销是 PPO 的数倍；（2）<strong>适应速度 vs 稳态性能权衡</strong>：快速适应可能牺牲精细跟踪精度；（3）未引入 EKF 结构化先验——纯粹的数据驱动方法在低数据场景下估计不可靠</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 状态估计与控制的误差传播</strong>：目标检测器的输出 $[u_{obs}, v_{obs}]^T$ 含有检测噪声、遮挡误差和自运动耦合。如果不加 EKF 滤波直接输入 DRL 策略，策略必须同时"学会去噪"和"学会控制"——这增加了学习难度，降低了样本效率。运动补偿 EKF 的引入将"去噪"从策略的学习负担中剥离，但 EKF 自身的参数（$Q_k, R_k$ 协方差矩阵）需要正确设定——模型失配时 EKF 的估计偏差会系统性误导策略。</li>
+    <li><strong>挑战 2 — 奖励函数的多目标平衡</strong>：$r_t$ 包含 5 个子项，权重 $\lambda$ 的设定直接影响策略行为。$\lambda_{detection}$ 过大 → UAV 只关注"看到目标"而不追；$\lambda_{collision}$ 过小 → 策略过于激进，频繁碰撞；$\lambda_{state}$ 过小 → 轨迹抖动严重。各权重之间还存在非线性交互（如增大避障惩罚会使策略更保守 → 间接降低跟踪精度）。本文的权重（0.20 / 0.50 / 0.50 / 0.05 / 0.005）来自经验调参，但缺乏自动权重搜索（如 Population-Based Training）。</li>
+    <li><strong>挑战 3 — 仿真到现实的迁移鸿沟（Sim-to-Real Gap）</strong>：训练在 Flightmare（Unity 渲染）完成，仅在 AirSim 做了验证——两者都是仿真。真实世界的挑战包括：（a）光照变化和天气条件影响目标检测器性能；（b）真实 IMU 的噪声和漂移特性与仿真模型不同；（c）气动效应（风、湍流）未建模；（d）通信延迟和执行器延迟。论文在 5.3 节承认了 Sim-to-Real 问题并列为未来工作。</li>
+  </ul>
+
+  <div class="callout warn">
+    <div class="callout-title">⚠ 高目标速度下的退化风险</div>
+    在 2.2 m/s 目标速度下，本文方法成功率降至 80%（Fast-Tracker 为 30%）。这说明当目标运动导致的图像平面像素变化速率接近或超过 EKF 的跟踪带宽时，融合控制策略的性能开始显著下降。可能的根本原因：（1）CV 模型无法准确预测高速机动目标的运动；（2）CNN 特征提取器在快速场景变化时可能产生模糊特征（motion blur 效应在仿真中可能被低估）；（3）奖励函数中无专门针对高速场景的 adaptive weighting。
+  </div>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心方法是<strong>EKF + DRL 混合架构</strong>——EKF 负责将含噪的视觉检测转化为平滑的目标运动状态估计，DRL 策略网络负责将感知特征和估计状态映射为控制指令。两个模块在功能上解耦（估计 vs 控制），但在信息流上紧密耦合（EKF 输出是 DRL 输入的关键组成）。PPO 算法因其实现在线策略更新、clip 机制稳定训练、超参数鲁棒等优点被选为训练算法。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: EKF 状态估计 -->
+  <h4>Group A: 运动补偿扩展卡尔曼滤波器 —— 目标状态估计</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — EKF 状态预测（匀速运动模型）</span>
+    $$ x_k = [u_k, v_k, \dot{u}_k, \dot{v}_k]^T \qquad x_k^- = F x_{k-1} \qquad P_k^- = F P_{k-1} F^T + Q_k $$
+    $$ F = \begin{bmatrix} 1 & 0 & \Delta t & 0 \\ 0 & 1 & 0 & \Delta t \\ 0 & 0 & 1 & 0 \\ 0 & 0 & 0 & 1 \end{bmatrix} \qquad w_k \sim \mathcal{N}(0, Q_k) $$
+    <div class="eq-note">
+      <strong>$x_k$</strong> = 目标在图像平面内的状态向量：$(u_k, v_k)$ 为像素坐标，$(\dot{u}_k, \dot{v}_k)$ 为像素速度 &nbsp;|&nbsp;
+      <strong>$F$</strong> = 状态转移矩阵，建模匀速（Constant Velocity, CV）运动——假设在 $\Delta t$ 采样周期内目标像素速度不变 &nbsp;|&nbsp;
+      <strong>$Q_k$</strong> = 过程噪声协方差，编码 CV 模型的不确定性（目标可能加速/转弯）&nbsp;|&nbsp;
+      <strong>$P_k^-$</strong> = 先验估计协方差，衡量预测的不确定性。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — EKF 观测更新（含运动补偿）</span>
+    $$ z_k = [u_k^{\text{obs}}, v_k^{\text{obs}}]^T \qquad z_{k|k-1} = H \cdot x_k^{\text{comp}} \qquad H = \begin{bmatrix} 1 & 0 & 0 & 0 \\ 0 & 1 & 0 & 0 \end{bmatrix} $$
+    $$ K_k = P_k^- H^T (H P_k^- H^T + R_k)^{-1} \qquad x_k = x_k^- + K_k (z_k - H x_k^{\text{comp}}) \qquad P_k = (I - K_k H) P_k^- $$
+    <div class="eq-note">
+      <strong>$z_k$</strong> = 目标检测器输出的 bounding box 中心坐标（观测值）&nbsp;|&nbsp;
+      <strong>$x_k^{\text{comp}}$</strong> = 运动补偿后的预测状态——关键：将上一帧的 $x_{k-1}$ 通过 IMU 测得的 UAV 机体运动 $\Delta T$（齐次变换矩阵）映射到当前帧的图像平面，消除 UAV 自运动导致的像素位移 &nbsp;|&nbsp;
+      <strong>$H$</strong> = 观测矩阵，仅观测位置（不直接观测速度）&nbsp;|&nbsp;
+      <strong>$K_k$</strong> = 卡尔曼增益——由预测协方差 $P_k^-$ 和观测噪声 $R_k$ 的比值决定信任程度 &nbsp;|&nbsp;
+      <strong>$R_k$</strong> = 观测噪声协方差（检测器的不确定性）。
+    </div>
+  </div>
+
+  <!-- Formula Group B: DRL 策略梯度 -->
+  <h4>Group B: PPO 策略优化 —— DRL 训练算法</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — PPO Clipped Objective</span>
+    $$ L^{\text{CLIP}}(\theta) = \mathbb{E}_t \left[ \min\left( r_t(\theta) \hat{A}_t, \; \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t \right) \right] $$
+    $$ r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)} \qquad \epsilon = 0.2 $$
+    <div class="eq-note">
+      <strong>$r_t(\theta)$</strong> = 新旧策略的概率比——衡量策略更新幅度 &nbsp;|&nbsp;
+      <strong>$\hat{A}_t$</strong> = 优势函数（GAE, Generalized Advantage Estimation, $\lambda=0.95$）——衡量动作 $a_t$ 比平均动作好多少 &nbsp;|&nbsp;
+      <strong>$\epsilon = 0.2$</strong> = clip 范围——限制 $r_t(\theta)$ 在 $[0.8, 1.2]$ 内，防止单步更新过大导致策略崩溃 &nbsp;|&nbsp;
+      <strong>$\gamma = 0.99$</strong> = 折扣因子（300 episodes, 100 steps/episode, 60M total steps）&nbsp;|&nbsp;
+      <strong>学习率 = $3\times10^{-4}$</strong>, Actor-Critic 联合训练。
+    </div>
+  </div>
+
+  <!-- Formula Group C: 奖励函数 -->
+  <h4>Group C: 多目标奖励函数 —— 跟踪 + 避障 + 平滑的统一编码</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 完整奖励函数</span>
+    $$ r_t = r_t^{\text{detection}} + r_t^{\text{position}} + r_t^{\text{collision}} + r_t^{\text{goal}} + r_t^{\text{state}} $$
+    $$ r_t^{\text{detection}} = \lambda_{\text{detection}} \cdot \text{FIoU}(B_{\text{det}}, B_{\text{ref}}) $$
+    $$ r_t^{\text{position}} = \text{distance}\left( D(p_{t-1}^t) - D(p_t^t) \right) + (\cos\theta_t - \cos\theta_{t-1}) $$
+    $$ D(p_t) = \big| \|p_t\| - p_{\text{ref}} \big| \qquad r_t^{\text{collision}} = \begin{cases} -50, & \text{if collision} \\ 0, & \text{otherwise} \end{cases} $$
+    $$ r_t^{\text{goal}} = \begin{cases} 0.2, & \text{if } \text{FIoU} > F_{\text{ref}} \text{ and } \|\theta\| < \theta_{\text{ref}} \\ 0, & \text{otherwise} \end{cases} \qquad r_t^{\text{state}} = \lambda_{\text{state}} \cdot \|v_t - v_{t-1}\| $$
+    <div class="eq-note">
+      <strong>$\text{FIoU}(B_{\text{det}}, B_{\text{ref}})$</strong> = 检测框与参考框的 Focal IoU——增强对小目标的检测奖励敏感度 &nbsp;|&nbsp;
+      <strong>$D(p_t)$</strong> = 目标位置 $p_t \in \mathbb{R}^3$ 与参考距离 $p_{\text{ref}}$ 的偏差——鼓励 UAV 保持最佳跟踪距离 &nbsp;|&nbsp;
+      <strong>$(\cos\theta_t - \cos\theta_{t-1})$</strong> = 角度改善奖励——鼓励 UAV 朝向目标（$\theta$ 为视线角偏差）&nbsp;|&nbsp;
+      <strong>$r_t^{\text{collision}} = -50$</strong> = 强碰撞惩罚，远超其他奖励的量级，确保策略将安全置于首位 &nbsp;|&nbsp;
+      <strong>$r_t^{\text{state}}$</strong> = 速度变化惩罚——抑制控制指令的剧烈波动，提升轨迹平滑性 &nbsp;|&nbsp;
+      <strong>$\lambda$ 权重设定</strong>：$\lambda_{\text{detection}}=0.20$, $\lambda_{\text{position}}$ 系数 0.50, $\lambda_{\text{state}}=0.05$, 碰撞权重 0.50（由论文参数推断）。
+    </div>
+  </div>
+
+  <!-- Formula Group D: 控制输出 -->
+  <h4>Group D: 控制指令输出 —— 从策略网络到执行器</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) — 策略网络输出与动作采样</span>
+    $$ a_t \sim \pi_\theta(\cdot|s_t) = \mathcal{N}\left( \mu_\theta(s_t), \sigma^2 \right) $$
+    $$ \mu_\theta = \text{MLP}\left( [\text{CNN}(o_t^z);\; o_t^d;\; o_t^v] \right) \in \mathbb{R}^3 \qquad a_t = [v_x, v_y, \dot{\psi}]^T $$
+    <div class="eq-note">
+      <strong>$\mu_\theta(s_t)$</strong> = 策略网络输出的 3 维动作均值（x 速度、y 速度、偏航角速率）&nbsp;|&nbsp;
+      <strong>$\sigma^2$</strong> = 对角高斯策略的方差（状态无关，训练中逐渐减小以降低探索）&nbsp;|&nbsp;
+      <strong>动作范围</strong>：$|v_x|,|v_y| \leq 2.5$ m/s（前飞+侧飞），$|\dot{\psi}| \leq 0.5$ rad/s &nbsp;|&nbsp;
+      <strong>动作执行</strong>：策略输出的速度指令 $a_t$ 输入 SE(3) 几何跟踪控制器 [23]，控制器将其转化为期望推力 $f \in \mathbb{R}$ 和期望姿态 $R_d \in SO(3)$，最终转化为四个电机的 PWM 指令。这种<strong>分级控制架构</strong>将高层决策（DRL）与底层动力学控制（几何控制器）解耦，使策略无需学习复杂的四旋翼动力学。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>EKF 状态维度</td><td><strong>4</strong></td><td>$x_k = [u_k, v_k, \dot{u}_k, \dot{v}_k]^T$</td><td>在图像平面内跟踪目标的像素位置和速度——4 维状态是 CV 模型的最小完备描述。不直接估计世界坐标中的 3D 位置，因为单目相机缺乏深度信息</td></tr>
+    <tr class="highlight"><td>DRL 算法</td><td><strong>PPO (Proximal Policy Optimization)</strong></td><td>On-policy actor-critic 方法</td><td>PPO 的 clip 机制提供了稳定且样本效率可接受的训练——比 TRPO 实现简单，比 DDPG/TD3 更适合高维连续动作空间，比 SAC 在 on-policy 场景下收敛更快</td></tr>
+    <tr><td>策略网络结构</td><td><strong>CNN(3 conv) + MLP(520→256→128→128→3)</strong></td><td>图像特征提取 + 特征融合 + 决策</td><td>CNN 使用 32 个 3×3 卷积核 + stride 2 逐步下采样（960×540→...→128 维空间特征 → flatten 12288 → FC 512）；MLP 将拼接后的 520 维（512+5+3）逐步压缩至 3 维动作</td></tr>
+    <tr><td>训练步数 / Episode</td><td><strong>60M steps / 300 episodes</strong></td><td>总交互步数；每 episode 100 步</td><td>60M 步是经验值——在 80 分钟（RTX 4090）内奖励曲线收敛（Fig. 6 显示约 60M 步时平均奖励稳定）</td></tr>
+    <tr><td>目标速度测试集</td><td><strong>0.8 / 1.5 / 2.2 m/s</strong></td><td>目标沿"8"字形轨迹的移动速度</td><td>从低速到高速的三级测试：0.8 m/s（常规步行速度）、1.5 m/s（快走速度）、2.2 m/s（慢跑速度）。覆盖了典型地面移动目标的运动范围</td></tr>
+    <tr><td>图像分辨率 / FOV</td><td><strong>960×540 / 108°×75°</strong></td><td>相机输入分辨率和视场角</td><td>选择 960×540 在分辨率和计算开销之间平衡（3 层 CNN 的计算量与输入分辨率成正比）；大 FOV（108°）有助于在 UAV 机动时保持目标在视场内</td></tr>
+    <tr><td>单步决策时间</td><td><strong>0.82~0.91 ms</strong></td><td>从图像输入到控制指令输出的端到端延迟</td><td>在 i9-13900KF + RTX 4090 上测量——远低于 Fast-Tracker 的 3.54 ms，且低于 30 Hz 相机帧率的周期（~33 ms），保证实时性</td></tr>
+  </table>
+
+  <h3>6.4 策略网络架构详解</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🧠 CNN 特征提取分支</h4>
+      <ul>
+        <li>输入：960×540×3 RGB 图像</li>
+        <li><strong>Conv1</strong>: 1×3 kernel, stride 2 → 32×3×N/2</li>
+        <li><strong>Conv2</strong>: 32×3 kernel, stride 2 → 32×3×N/4</li>
+        <li><strong>Conv3</strong>: 32×3 kernel, stride 1 → 12,288 → Flatten</li>
+        <li>FC: 12,288 → 512（ReLU）</li>
+        <li>输出：<strong>512 维图像特征</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🎯 融合 + 策略 MLP 分支</h4>
+      <ul>
+        <li>拼接：[512 图像, 5 EKF, 3 UAV速度] = <strong>520 维</strong></li>
+        <li>FC1: 520 → 256（ReLU）</li>
+        <li>FC2: 256 → 128（ReLU）</li>
+        <li>FC3: 128 → 128（ReLU）</li>
+        <li>FC4: 128 → 3（无激活函数）→ $\mu_\theta$</li>
+        <li>输出：<strong>$[v_x, v_y, \dot{\psi}]$</strong> 均值</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个核心原理：运动补偿 EKF（如何从含噪像素观测中估计目标状态）、PPO 算法（为什么选择 PPO 训练端到端策略）、融合控制策略（为什么统一框架优于分离式融合）。</p>
+
+  <h3>7.1 运动补偿 EKF 原理 — 消除自运动耦合的关键</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 为什么需要运动补偿</span>
+    $$ u_k^{\text{obs}} = u_k^{\text{target}} + \Delta u_k^{\text{ego}} + \eta_k \qquad \text{（目标运动 + 自运动耦合 + 检测噪声）} $$
+    <div class="eq-note">
+      <strong>$u_k^{\text{target}}$</strong> = 目标在世界坐标系中的真实运动在图像平面的投影 &nbsp;|&nbsp;
+      <strong>$\Delta u_k^{\text{ego}}$</strong> = UAV 自身运动（旋转+平移）导致的额外像素位移——例如 UAV 向左偏航 10°，即使目标静止，图像中的目标也会向右移动数十个像素 &nbsp;|&nbsp;
+      <strong>$\eta_k$</strong> = 检测器噪声 &nbsp;|&nbsp;
+      <strong>关键</strong>：如果不消除 $\Delta u_k^{\text{ego}}$，EKF 会错误地将 UAV 自身的姿态变化归因为目标运动——估计结果将严重失真。运动补偿通过 IMU 数据计算 UAV 机体运动的齐次变换矩阵 $\Delta T$，将 $x_{k-1}$ 映射到当前帧坐标，得到 $x_k^{\text{comp}}$。
+    </div>
+  </div>
+
+  <p><strong>齐次变换补偿的数学过程</strong>：假设 UAV 在 $k-1$ 到 $k$ 之间发生了旋转 $R_{k-1}^k \in SO(3)$ 和平移 $t_{k-1}^k \in \mathbb{R}^3$（由 IMU 积分得到），目标在 $k-1$ 帧的估计位置为 $p_{k-1}^{\text{target}}$（图像平面坐标反投影到归一化像平面），则运动补偿后的预测投影为：</p>
+  <p style="text-align:center; padding: 8px 0; font-size: 13.5px; color: #1e293b;">$x_k^{\text{comp}} = H \cdot \text{proj}\left( (R_{k-1}^k)^{-1} \cdot (p_{k-1}^{\text{target}} - t_{k-1}^k) \right)$</p>
+  <p>然后将 $x_k^{\text{comp}}$ 作为 EKF 的预测观测 $z_{k|k-1}$，与真实观测 $z_k$ 的残差 $(z_k - H x_k^{\text{comp}})$ 送入卡尔曼更新。这个残差<strong>已经纯化</strong>——它仅反映目标自身运动和检测噪声，不再包含 UAV 自运动分量。</p>
+
+  <div class="callout info">
+    <div class="callout-title">🔗 为什么 EKF 状态只保留 4 维（像素位置+速度）而非世界坐标？</div>
+    单目相机缺乏深度信息——无法从单张图像唯一确定目标的 3D 世界坐标（除非引入地平面假设或已知目标尺寸）。因此在图像平面内做 EKF 跟踪（像素坐标 + 像素速度）是合理的工程取舍。代价是策略网络无法直接获知"目标离 UAV 多少米"——只能通过 bounding box 高度 $h_t$（间接尺度线索）和 CNN 编码的场景深度特征来隐式推断距离。
+  </div>
+
+  <h3>7.2 PPO 算法原理 — 为什么选择 PPO 而非其他 DRL 算法</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — PPO 的 Clip 机制</span>
+    $$ L^{\text{CLIP}}(\theta) = \mathbb{E}_t \left[ \min\left( r_t(\theta) \hat{A}_t, \; \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t \right) \right] $$
+    <div class="eq-note">
+      <strong>直觉理解</strong>：当 $\hat{A}_t > 0$（这个动作比预期好），我们想增大 $\pi_\theta(a_t|s_t)$，即 $r_t(\theta) > 1$——但 clip 限制它不超过 $1+\epsilon$，防止步子太大"过拟合"单次好运气。当 $\hat{A}_t < 0$（这个动作比预期差），我们想减小 $\pi_\theta(a_t|s_t)$，即 $r_t(\theta) < 1$——clip 限制它不低于 $1-\epsilon$，防止过度惩罚导致策略"缩"得太快。这种对称的裁剪机制使得 PPO 比 TRPO（信赖域约束）实现更简单，同时比 A2C（无约束更新）训练更稳定。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>✅ PPO（本文选择）</h4>
+      <ul>
+        <li><strong>On-policy</strong>：每次更新使用当前策略采样的数据——数据分布一致，训练更稳定</li>
+        <li><strong>Clip 机制</strong>：无需计算 KL 散度的二阶导数（TRPO 需要），实现简单、计算高效</li>
+        <li><strong>GAE 优势估计</strong>：平衡 bias-variance tradeoff，提供低方差的梯度信号</li>
+        <li><strong>对角高斯策略</strong>：连续动作空间自然适配，方差可学习或固定退火</li>
+        <li><strong>已知局限</strong>：样本效率低于 off-policy 方法（如 SAC），但在仿真中可通过大量并行采样弥补</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>❌ 未被选择的替代方案</h4>
+      <ul>
+        <li><strong>DQN</strong>：仅适合离散动作——本文需要连续的速度指令输出</li>
+        <li><strong>DDPG / TD3</strong>：off-policy，样本效率高但超参数敏感（探索噪声、target network 更新率），在复合奖励函数下容易陷入局部最优</li>
+        <li><strong>SAC</strong>：off-policy + 熵正则化——在仿真中表现优异，但自动温度参数 $\alpha$ 的调节增加了调参复杂度</li>
+        <li><strong>TRPO</strong>：二阶优化计算量大，本文的 520→256→128→128→3 网络规模下，TRPO 的 Hessian-vector 乘积计算会严重拖慢训练速度</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>7.3 融合控制策略原理 — 为什么"统一学习"优于"分离+融合"</h3>
+
+  <p><strong>分离式方法的本质缺陷</strong>：假设有两个独立优化后的模块——跟踪模块 $\pi_{\text{track}}(s) \to a_{\text{track}}$ 和避障模块 $\pi_{\text{avoid}}(s) \to a_{\text{avoid}}$，最终控制指令为加权融合 $a = \alpha \cdot a_{\text{track}} + (1-\alpha) \cdot a_{\text{avoid}}$。核心问题：</p>
+
+  <ol>
+    <li><strong>信息不对称</strong>：跟踪模块只看到"目标在哪"，看不到障碍物；避障模块只看到"障碍在哪"，不关心目标——两者各自在<strong>不完整信息</strong>下做出决策，融合后的指令在信息上是次优的</li>
+    <li><strong>权重 $\alpha$ 的困境</strong>：$\alpha$ 应该是状态依赖的——空旷区域 $\alpha \approx 1$（全力跟踪），密集障碍区 $\alpha \approx 0$（全力避障），过渡区需要平滑切换。人工设计 $\alpha = f(s)$ 的规则几乎不可能覆盖所有场景（需要精确建模场景密度、UAV 动力学、目标运动趋势的交互）</li>
+    <li><strong>时间一致性缺失</strong>：两个独立模块可能在不同时间步输出矛盾的方向——这一帧跟踪模块要向左转，下一帧避障模块要向右转——融合后的指令在时间上不连贯，导致 jerk 增大</li>
+  </ol>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 融合控制的核心优势</div>
+    <strong>DRL 策略网络在训练中自然学会了"隐式融合"</strong>——它不把"跟踪"和"避障"当作两个子任务，而是将它们视为<strong>同一个多目标优化问题的不同 reward term</strong>。在 PPO 训练中，策略通过与环境的大量交互，学会了在每个状态下如何同时优化所有 reward term——这个隐式融合的决策不是两个方向向量的加权平均，而是<strong>一个在联合奖励空间中学习到的最优方向</strong>。这是端到端学习的本质优势：策略网络看到的输入是完整的（图像+目标状态+UAV状态），输出是全局最优的（而非局部最优模块的组合）。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>figure-1-context.png</code>、<code>figure-2-framework.png</code> 等即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">任务场景示意图 — UAV 在障碍环境中跟踪非合作运动目标</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-1-context.png" alt="Schematic diagram of the task scenario"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-1-context.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：完整任务场景的俯视示意图。UAV（四旋翼）在障碍环境中飞行，需要持续跟踪一个沿随机轨迹运动的非合作地面目标。关键要素标注：(a) UAV 当前位置和朝向；(b) 障碍物（柱状/建筑状，随机分布）；(c) 运动目标（地面移动，沿不可预测的轨迹）；(d) UAV 机载相机的视场范围（FOV 108°×75°）。图中虚线表示 UAV 可能的飞行轨迹——展示了"追目标 + 绕障碍"的复合行为。</p>
+      <ul>
+        <li><strong>任务难度可视化</strong>：障碍物的随机分布意味着 UAV 无法预先规划全局路径——必须在每一时刻根据当前观测做出追-or-绕的决策。目标运动轨迹的随机性进一步增加了任务难度</li>
+        <li><strong>CV 模型假设的物理含义</strong>：在采样周期 $\Delta t$ 内，目标像素坐标的变化速率保持不变——即目标在图像平面内近似匀速运动。这个假设在实际系统中通过 EKF 的过程噪声 $Q_k$ 来吸收模型误差</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">融合控制系统框架 — 感知→估计→控制→执行 完整管线</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-2-framework.png" alt="Framework of the fusion control for UAV target tracking and obstacle avoidance"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-2-framework.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：融合控制系统的完整架构流程图，是理解全篇论文最关键的图。从左到右依次为：<strong>传感器输入</strong>（RGB 相机 + IMU）→ <strong>EKF 状态估计</strong>（运动补偿 + CV 预测 + 卡尔曼更新）→ <strong>DRL 策略网络</strong>（CNN 特征提取 + EKF 状态融合 + MLP 决策）→ <strong>控制输出</strong>（$v_x, v_y, \dot{\psi}$ → 几何控制器 → UAV）。红色虚线框标注了本文的两个核心创新模块：运动补偿 EKF 和 DRL 运动控制器。</p>
+      <ul>
+        <li><strong>信息流的两个分支</strong>：图像数据分为两路——一路进入目标检测器（YOLO-based）产生检测坐标，经 EKF 平滑后作为结构化状态输入策略；另一路直接进入 CNN 编码为 512 维特征，提供场景上下文（障碍物分布、深度感知等）。这种"结构+非结构"的双通道设计是本文架构的精髓</li>
+        <li><strong>EKF 输出 $o_t^d = [u_t, v_t, h_t, \dot{u}_t, \dot{v}_t]^T$</strong>：$h_t$ 是 bounding box 的高度，提供了间接的距离信息——目标越远 → bounding box 越小 → $h_t$ 越小。虽非精确深度，但为策略提供了有价值的尺度线索</li>
+        <li><strong>几何控制器的解耦作用</strong>：DRL 策略只需输出高层速度指令——不需要学习复杂的四旋翼姿态动力学。这种分层设计大幅降低了策略的学习难度（无需学习电机扭矩→推力→姿态的复杂映射）</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 4 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">策略网络整体架构 — CNN + MLP 的完整前向传播流程</span>
+      <span class="fig-source">来源：论文 Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/figure-4-policy.png" alt="The overview of the policy network"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/figure-4-policy.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：策略网络的完整前向传播结构。输入层接收三个分支：(1) 图像经过 3 层 CNN 编码为 512 维特征；(2) EKF 输出的 5 维目标状态；(3) 3 维 UAV 自身速度。拼接后的 520 维向量经 4 层全连接网络（520→256→128→128→3）最终输出 3 维控制指令。</p>
+      <ul>
+        <li><strong>架构的不对称性</strong>：图像特征占 512/520 ≈ 98% 的输入维度——这意味着 CNN 提取的视觉特征在决策中占据绝对主导地位。EKF 状态和 UAV 速度仅提供少量结构化辅助信息。这种设计反映了作者的信念：<strong>场景视觉上下文是决策的最主要信息源</strong></li>
+        <li><strong>网络规模选择</strong>：CNN 约 3M 参数 + MLP 约 0.5M 参数 = 总计约 3.5M 参数——对于实时推理而言适中的规模（单步推理 0.91 ms on RTX 4090），但部署到机载嵌入式计算平台（如 Jetson Orin NX）时的推理延迟可能是瓶颈</li>
+        <li><strong>最后的线性层输出均值</strong>：FC4 输出 3 维无激活函数的 logits → 作为高斯分布的均值 $\mu_\theta$。方差 $\sigma^2$ 是独立的状态无关参数，随训练逐步衰减（实现从探索到利用的过渡）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 目标检测器（YOLO-based）始终能提供目标 bounding box——但在真实场景中，光照剧变、目标部分遮挡、运动模糊都可能导致检测失败或虚警。论文未讨论检测器失效时 EKF 的鲁棒性（EKF 在缺失观测时只能靠状态预测外推，误差会随时间发散）；(2) CV 运动模型假设在采样周期内目标像素速度不变——这对匀速直线运动的目标成立，但对急转弯/变速的目标不成立（论文 2.2 m/s 时 80% 成功率佐证了此局限）；(3) 单目相机缺乏深度信息——必须依赖目标 bounding box 高度 $h_t$ 做近似的距离估计，在目标尺度变化（如不同大小的车辆/行人）时该估计不可靠。</li>
+    <li><strong>适用场景</strong>：目前仅适用于<strong>单目标 + 水平面避障 + 固定高度</strong>的简化场景。多目标跟踪（MOT）场景下，数据关联（哪个检测对应哪个目标）是一个未被建模的挑战。3D 障碍物（如桥梁下方空间、电力线）、动态障碍物（其他飞行器）、以及需要高度变化（爬升/下降）的避障场景均未覆盖。</li>
+    <li><strong>可扩展性</strong>：策略网络被训练为针对特定仿真环境（Flightmare 中的特定障碍物分布和纹理）——论文未做 domain randomization，这意味着策略可能对视觉外观变化（不同建筑风格、植被类型、光照条件）敏感。AirSim 验证虽然在物理上更真实，但其视觉风格与 Flightmare 仍在同一"仿真分布"内。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：(1) <strong>3D 动作空间</strong>——当前仅控制 $[v_x, v_y, \dot{\psi}]$，增加 $v_z$（高度控制）可实现 3D 避障（如从障碍物上方飞越）→ 动作维度从 3 → 4，策略网络输出需扩展；(2) <strong>多目标跟踪</strong>——引入匈牙利算法或 Transformer-based 数据关联，策略网络额外输入多个候选目标的状态，输出"跟踪哪个目标"的离散选择 + 连续控制指令；(3) <strong>动态障碍物</strong>——在观测和状态中引入障碍物的运动信息（可通过光流估计），使策略能预测和规避移动障碍。</li>
+    <li><strong>条件放松</strong>：(1) <strong>检测失效处理</strong>——EKF 在无观测时仅靠预测外推，但可引入"预测不确定性"指标：当 $P_k^-$ 的对角元素超过阈值时，策略进入"搜索模式"（扩大视野、改变航向）而非"跟踪模式"；(2) <strong>光照/天气鲁棒性</strong>——在训练中引入 domain randomization（随机光照强度、色调、天气效果如雾/雨），使策略学习视觉不变特征；(3) <strong>EKF 模型自适应</strong>——用 IMM（Interacting Multiple Model）替代单一 CV 模型，同时维护匀速、匀加速、协同转弯等多个运动模型，根据观测自适应切换。</li>
+    <li><strong>约束加入</strong>：(1) <strong>能量约束</strong>——在奖励函数中加入能耗惩罚项 $- \lambda_E \cdot \|a_t\|^2$，鼓励策略生成更节能的轨迹；(2) <strong>通信/感知约束</strong>——限制目标必须保持在特定视场区域内（如中心 60% 区域），防止目标处于图像边缘时因镜头畸变导致检测精度下降；(3) <strong>GPS-denied 场景</strong>——用视觉-惯性里程计（VIO）替代仿真中的真实位姿，在无 GPS 的室内/地下环境验证。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>目标检测器性能波动</td><td>论文假设检测器始终输出可靠 bounding box。但在真实场景中，光照变化（背光、阴影）、运动模糊（高速目标）、部分遮挡都会导致 FIoU 急剧下降。一旦检测失败，EKF 只能靠预测外推——CV 模型在目标转弯时误差会迅速累积，导致策略跟踪错误的"虚拟目标"</td><td>★★★★★</td></tr>
+    <tr><td>IMU 噪声和漂移（自运动估计误差）</td><td>运动补偿的质量完全取决于 IMU 对 UAV 机体运动的估计精度。MEMS IMU 存在零偏不稳定性和随机游走——积分得到的 $\Delta T$ 含有累积误差。如果在补偿阶段引入系统性偏差，EKF 的观测残差会持续被污染，卡尔曼增益将错误地调整估计（过度信任"受污染的残差"或"不准确的预测"）</td><td>★★★★</td></tr>
+    <tr><td>奖励权重调参的高方差</td><td>5 个 reward term 的权重存在复杂的非线性交互——例如增大 $\lambda_{\text{state}}$（平滑惩罚）会使策略更保守，间接降低跟踪精度；减小 $\lambda_{\text{collision}}$ 会使策略更激进，增加碰撞风险。本文的权重组合是经验性调参结果，未做系统化超参数搜索（如贝叶斯优化或 PBT），可能非全局最优</td><td>★★★</td></tr>
+    <tr><td>单步决策延迟的真实硬件评估缺失</td><td>0.91 ms 是在 RTX 4090（桌面级 GPU，450W TDP）上的测量——机载嵌入式计算平台（如 Jetson Orin NX，~15W）的推理延迟可能是 5~10 倍（约 5~10 ms），加上图像采集和通信延迟，总延迟可能接近或超过 30 Hz 帧率周期的 33 ms——这会导致控制回路延迟增大，稳定性裕度下降</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>Sim-to-Real 迁移：从仿真策略到真实飞行的挑战</strong>——这是将本文方法从论文变为实用系统最关键的一步。核心问题：(1) <strong>视觉域迁移</strong>：Flightmare（Unity 渲染）的图像分布与真实世界有本质差异（纹理、光照、动态范围）。标准方法是用域随机化（DR）或域自适应（DA）缩小 gap——但 DR 会使训练变慢且可能导致保守策略，DA 需要目标域数据（真实飞行图像）才能训练适配器。(2) <strong>动力学域迁移</strong>：仿真的四旋翼动力学（推力延迟、气动阻力、地面效应、电机响应非线性）与真实 UAV 不同——真实飞行中，策略输出的速度指令可能无法被几何控制器精确跟踪。(3) <strong>感知域迁移</strong>：仿真中的目标检测器（YOLO in simulation）在真实图像上的性能未知——真实部署前需要针对真实场景数据 fine-tune 检测器。(4) <strong>潜在方案</strong>：先用 System Identification 校准仿真动力学模型参数，再用 CycleGAN/DR 风格化仿真图像以覆盖真实视觉分布，最后在真实飞行中在线微调（online RL fine-tuning with safety constraints）。这个方向如果能成功实现，将是端到端 DRL UAV 控制从仿真走向实际应用的重要里程碑。
+  </div>
+
+  <div class="callout danger">
+    <div class="callout-title">⚠ 安全关键系统中的 DRL 验证鸿沟</div>
+    DRL 策略是黑箱神经网络——我们无法从理论上保证它在任意未见过场景中不会做出危险决策（如冲向障碍物或丢失目标后盲目飞行）。论文仅报告了仿真中的平均性能指标，未提供 worst-case 分析（如"在追踪 2.2 m/s 目标的 20% 失败案例中，UAV 的行为是什么？是安全降落到空旷区域，还是高速撞墙？"）。在实际部署到有人环境前，必须补充 formal verification（如用 SMT solver 验证策略网络在某些安全关键区域的行为上界）或 runtime safety monitor（用传统控制理论方法实时监控并覆盖 DRL 的危险输出）。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>UAV 在障碍环境中跟踪非合作目标——这是一个涉及<strong>感知、估计、规划、控制</strong>四层堆栈的复杂系统。每层的误差都会向下传播：目标检测噪声 → 状态估计偏差 → 规划轨迹偏离真实最优 → 控制指令次优。传统方法将四层各自独立设计并优化——这种做法隐含假设"每层的最优解组合起来就是全局最优解"，但在耦合系统中，这个假设不成立。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：（i）Fast-Tracker [10] 路线——规划+避障分离设计，通过走廊约束和局部重规划来协调——在高速目标下协调失败（2.2 m/s 时仅 30% 成功率）；（ii）DQN/DDPG 路线 [14,15]——用 DRL 替代规划器，但仍将跟踪和避障作为分离的决策模块，未实现端到端融合；（iii）Meta-RL 路线 [16]——用元学习快速适应新场景，但训练开销极大且未引入 EKF 结构化先验。</li>
+    <li><strong>如果让一个网络同时看所有信息并一步到位做决策呢？</strong><br>关键洞察：<strong>跟踪和避障不是两个独立问题，而是同一个约束优化问题的两个 reward term</strong>。如果我们能构建一个包含所有信息的观测（图像 + 目标状态 + UAV 状态），设计一个同时编码跟踪质量和避障安全的奖励函数，然后让一个 PPO 策略网络在这个奖励函数下自由探索——网络会自然学会在什么状态下追、在什么状态下绕、在什么状态下兼顾。这就是端到端 DRL 的哲学：don't engineer the solution, engineer the objective。</li>
+    <li><strong>如果还不够，还需要什么？</strong><br>纯数据驱动的 DRL 有一个根本问题：<strong>样本效率低</strong>。如果让策略同时学习"去噪"和"决策"，需要大量的样本来覆盖噪声分布。这里引入 EKF 作为结构化先验——EKF 用几十行公式就能解决"从含噪检测中估计目标状态"的问题，把策略从"去噪"的负担中解放出来，使其专注于"决策"。这是"模型+学习"混合范式的典型应用。</li>
+    <li><strong>最简单的方案是什么？</strong><br>一架四旋翼 UAV，一个前向 RGB 相机，一个 IMU，一个 YOLO 目标检测器，一个运动补偿 EKF，一个 CNN+MLP 策略网络，一个几何控制器。相机拍图 → YOLO 检测目标 → EKF 补偿 UAV 自运动并平滑目标状态 → CNN 编码场景上下文 → MLP 融合所有信息并输出速度指令 → 几何控制器执行。所有环节在仿真中训练（80 分钟），部署时只需前向推理（0.91 ms/步）。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    传统 UAV 目标跟踪在遇到障碍物时，需要分离设计的跟踪模块和避障模块通过人工规则融合——但两个模块的信息不共享、目标可能冲突、最优融合权重因场景而异——那为什么不让一个深度强化学习策略网络<strong>同时接收所有传感器信息</strong>，在包含跟踪和避障双重目标的奖励函数下，端到端地学会"何时追、何时绕"的最优决策？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：Fast-Tracker [10] 在 2.2 m/s 目标速度下成功率仅 30%——为什么？查看其架构：路径规划器（2.46 ms）→ 安全走廊生成（0.84 ms）→ 轨迹优化（0.24 ms）——在高速目标下，这个串行 pipeline 的总延迟使得 UAV 始终在"追赶上一帧的目标位置"，而不是"预测下一帧的目标位置"。同时，分离设计导致在密集障碍区频繁触发重规划，进一步加剧延迟。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"UAV 跟踪+避障"分解为三个子问题——（1）<strong>目标去哪了</strong>（状态估计——需要滤波+预测）；（2）<strong>环境什么样</strong>（场景感知——需要视觉编码）；（3）<strong>我该往哪飞</strong>（决策——需要融合前两者的信息）。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）EKF——卡尔曼滤波器的"预测-更新"循环天然适合处理含噪时序观测，加入运动补偿后可以消除 UAV 自运动干扰；（2）CNN——卷积网络是最成熟的视觉特征提取器，3 层卷积足以编码场景中的障碍物分布和深度线索；（3）PPO——Clip 机制保证训练稳定，on-policy 更新保证策略在复合奖励函数下稳定收敛。</li>
+    <li><strong>Step 4 — 组装方案</strong>：EKF 处理时序状态估计（模型驱动，高效精确）→ CNN 处理单帧视觉编码（数据驱动，表达丰富）→ 两者拼接送入 MLP 做融合决策（数据驱动，端到端学习）→ 几何控制器执行底层动力学控制（模型驱动，稳定可靠）。这是<strong>模型驱动 + 数据驱动</strong>的混合架构——每部分用最合适的范式解决。</li>
+  </ul>
+
+  <h3>10.4 论文未言明但可以推论的深层动机</h3>
+  <p>国防科技大学智能科学学院的研究团队长期深耕 UAV 自主控制。作者王祥科（WANG Xiangke）课题组此前在 quadrotor 几何控制 [23] 和多 UAV 协同避障 [21] 方面已有积累。本文的工作可以视为<strong>将课题组的两条技术线——几何控制（底层）和 DRL 避障（高层）——融合到目标跟踪场景</strong>：用几何控制器作为底层执行器（保证动力学可行性），用 PPO 策略作为高层决策器（实现跟踪+避障的智能融合），用 EKF 作为状态估计桥梁（提供干净的状态给策略）。这种"底层模型 + 中层估计 + 高层学习"的三层架构代表了一种教科书级的 UAV 自主控制系统设计范式。</p>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面 — "模型+学习"混合架构的设计哲学</strong>：本文最值得学习的方法论不是"如何用 PPO 做 UAV 控制"（这已经被大量论文做过），而是<strong>"如何划分模型和学习的边界"</strong>。作者的判断非常清晰：状态估计（EKF）——可以用物理模型（CV + 卡尔曼滤波）高效解决的，就用模型；场景理解和决策（CNN + MLP）——难以手工建模的复杂非线性映射，就用学习。这种"模型负责可建模的部分，学习负责难建模的部分"的分工，避免了纯学习方案的高样本复杂度和纯模型方案的表达力不足。这对于任何"AI + 控制"的交叉研究都有指导意义。</li>
+    <li><strong>技术技巧层面</strong>：(1) <strong>运动补偿是成败关键</strong>——UAV 的偏航旋转在图像平面产生数十像素的位移，如果不补偿，EKF 会把偏航误判为目标运动，估计彻底失败。IMU → 齐次变换 → 图像平面映射 → 观测残差纯化——这个四步补偿是很精巧的工程设计；(2) <strong>奖励函数的设计平衡</strong>——5 个 reward term 覆盖了检测、跟踪、避障、回合终止、轨迹平滑，每个 term 的物理含义清晰（非黑箱），这使得策略的行为可解释（知道为什么飞得快了/慢了/稳了）；(3) <strong>分级动作空间</strong>——策略输出高层速度指令而非底层电机指令，将"复杂的四旋翼动力学"留给几何控制器——这种分级设计使得策略无需学习从速度到推力的复杂映射，大幅降低了学习难度。</li>
+    <li><strong>实验/写作层面</strong>：(1) 双平台验证（Flightmare + AirSim）增加了结论的可信度——虽然两者都是仿真，但 AirSim 使用不同的物理引擎和渲染管线，策略在零样本迁移下仍保持性能，说明学到了一些"通用"特征而非"过拟合"仿真；(2) 与 Fast-Tracker 的完整对比——不仅在成功率上对比，还在轨迹长度（131 vs 147 m）、jerk（0.41 vs 1.88 m/s³）、决策延迟（0.91 vs 3.54 ms）三个维度全面超越——这种多维对比使得论据非常扎实；(3) Fig. 6 的训练曲线（奖励+value loss）清晰展示了 PPO 的收敛过程——建议任何做 DRL 的工作都放这样的曲线，以证明训练是收敛的。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 自主控制方向</strong>：本文展示的"EKF + DRL"混合架构可以直接推广到其他 UAV 任务——例如自主着陆（EKF 估计跑道位置 → DRL 策略输出着陆轨迹）、空中对接/加油（EKF 估计受油口位置 → DRL 策略输出对接机动）、编队飞行（EKF 估计领机状态 → DRL 策略输出跟飞指令）。关键是识别出任务中哪些部分可以用传统滤波/控制解决（稳定、可证明、高效），哪些部分必须用学习（复杂、非线性、难建模）——然后设计合理的信息流接口。</li>
+    <li><strong>对于多传感器融合方向</strong>：本文仅用了单目 RGB + IMU 两个传感器，但架构天然支持多传感器扩展——例如加入激光雷达（LiDAR）点云作为额外的感知分支（PointNet 编码 → 拼接到策略网络输入中），或者加入 UWB 测距作为额外的 EKF 观测源。多传感器融合在"EKF + DRL"框架下可以优雅地实现：结构化观测（距离、方位角）→ EKF 处理；非结构化观测（点云、图像）→ 神经网络编码。</li>
+    <li><strong>对于模仿学习 / 离线 RL 方向</strong>：PPO 是在线算法，需要与环境持续交互——这在真实 UAV 上训练代价极高（需要大量试飞）。一个自然的改进是：（1）先用传统规划器（如 Fast-Tracker）在大量场景中生成"演示轨迹"；（2）用行为克隆（BC）预训练策略网络；（3）再用少量在线 PPO fine-tuning 矫正 BC 的分布偏移。或者在仿真中训练 teacher 策略，用 DAgger 将策略蒸馏到适合真实部署的精简网络。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Han Z, Zhang R, Pan N, et al. (2021) — Fast-Tracker: A robust aerial system for tracking agile target in cluttered environments. <em>IEEE ICRA</em>, 328-334. [10]</td><td>本文的核心 baseline。Fast-Tracker 使用 B 样条路径规划 + 安全走廊约束 + 局部重优化的分离式 pipeline。理解 Fast-Tracker 的架构和局限，才能理解本文融合方法的优势所在。注意 Fast-Tracker 2.0 [12] 和 Elastic Tracker [13] 是该团队的后续改进。</td></tr>
+    <tr><td>Schulman J, Wolski F, Dhariwal P, et al. (2017) — Proximal policy optimization algorithms. <em>arXiv:1707.06347</em>. [24]</td><td>PPO 原论文——理解 clip 机制、GAE 优势估计、actor-critic 架构的基础文献。本文的训练超参数（$\gamma=0.99, \epsilon=0.2, \lambda=0.95$）与 PPO 原论文的推荐值一致。</td></tr>
+    <tr><td>Loquercio A, Kaufmann E, Ranftl R, et al. (2021) — Learning high-speed flight in the wild. <em>Science Robotics</em>, 6(59). [17]</td><td>端到端 DRL UAV 飞行的里程碑工作——用 PPO 训练策略在真实森林中以 40 km/h 高速穿越飞行。本文的 CNN+MLP 策略架构受其启发，但增加了 EKF 进行状态估计。Loquercio 的工作证明了端到端 DRL 飞行在真实世界中可行——这是本文 Sim-to-Real 的基础信心来源。</td></tr>
+    <tr><td>Lee T, Leok M, McClamroch N H. (2010) — Geometric tracking control of a quadrotor UAV on SE(3). <em>IEEE CDC</em>, 5420-5425. [23]</td><td>SE(3) 几何控制器——本文将 DRL 输出的速度指令转化为电机推力的底层控制器。理解几何控制器的工作方式有助于理解 DRL 策略的"动作 → 推力"是如何完成的。该控制器在全姿态范围（非小角度假设）内具有几乎全局的指数稳定性。</td></tr>
+    <tr><td>Song Y, Naji S, Kaufmann E, et al. (2021) — Flightmare: A flexible quadrotor simulator. <em>CoRL</em>, 1147-1157. [22]</td><td>本文的训练仿真器。Flightmare 使用 Unity 渲染引擎提供高保真视觉，结合 Gazebo/ODE 物理引擎。其灵活性（可配置传感器、动力学、场景）使其成为 DRL UAV 研究的首选仿真平台。了解其能力边界对评估本文的 Sim-to-Real 潜力很重要。</td></tr>
+    <tr><td>Shah S, Dey D, Lovett C, et al. (2017) — AirSim: High-fidelity visual and physical simulation for autonomous vehicles. <em>FSR</em>, 621-635. [25]</td><td>本文的验证仿真器——AirSim 基于 Unreal Engine，提供与 Flightmare 不同的视觉风格和物理引擎。跨仿真器的迁移验证增加了对策略泛化能力的信心。AirSim 还支持硬件在环（HIL）仿真，是走向真实飞行的重要中间步骤。</td></tr>
+    <tr><td>Wang G, Wang X, Miao Z, et al. (2025) — Communication-aided multi-UAV collision detection and avoidance based on two-stage curriculum reinforcement learning. <em>Biomimetic Intelligence and Robotics</em>, 5(4). [21]</td><td>同课题组（王祥科）的多 UAV 协同避障工作——用了两阶段课程学习 + 通信辅助。结合本文的单 UAV 跟踪+避障，可以看到课题组从"多 UAV 协同避障"到"单 UAV 跟踪+避障"的技术演进路径——两者共享 PPO + 仿真训练的技术栈。</td></tr>
+  </table>
+
+  <h3>11.4 One Actionable Item for Tomorrow</h3>
+  <div class="callout tip">
+    <div class="callout-title">🚀 明天就可以做的事情</div>
+    <strong>在 Flightmare 中复现并改进</strong>：Flightmare 是开源的（MIT License），PPO 有成熟的实现（Stable-Baselines3 / RLlib）。明天的具体步骤：(1) 用 Stable-Baselines3 的 PPO 实现 + Flightmare 的 Python API 搭建 baseline（参考论文的 Tab.1 网络结构和 Tab.2 超参数）；(2) 复现 Table 3 的跟踪成功率（0.8 m/s→100%）；(3) 尝试改进——将 CV 模型 EKF 替换为 IMM-EKF（增加匀加速和协同转弯模型），看在 2.2 m/s 下是否能把 80% 提升到 90%+；(4) 引入 domain randomization（随机光照+纹理），测试策略的视觉鲁棒性。整个流程在 RTX 4090 上预计 2~4 小时可完成一轮训练。
+  </div>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Li Zhiwei, Liu Zhihong, Wang Xiangke · 信息与控制 2026 · Fusion Control for UAV Target Tracking and Obstacle Avoidance Based on DRL · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

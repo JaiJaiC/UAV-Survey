@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes -- ViT Quadrotor Obstacle Avoidance (Bhattacharya et al., 2025)</title>
+<script>
+MathJax = { tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], tags: 'ams' }, options: { enableMenu: false } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script><style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 论文笔记</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">核心挑战</a>
+  <a href="#method">关键方法</a>
+  <a href="#principles">基本原理</a>
+  <a href="#figures">实验结果</a>
+  <a href="#flaw">缺陷与扩展</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Vijay Kumar · 17篇论文阅读路径</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10002/index.html">Safety guardrails llm-ena</a>
+<a href="../10001/index.html">Contextual safety reasoni</a>
+<a href="../10017/index.html">Jailbreaking llm-controll</a>
+<a href="../10016/index.html">Deploying foundation mode</a>
+<a href="../10015/index.html">Spine Online semantic</a>
+<a class="active" href="../10014/index.html">Vision transformers end-t</a>
+<a href="../10013/index.html">EvMAPPER High-altitude or</a>
+<a href="../10012/index.html">Constrained learning dece</a>
+<a href="../10011/index.html">Air-ground collaboration</a>
+<a href="../10010/index.html">Distilling on-device lang</a>
+<a href="../10009/index.html">Compositional coordinatio</a>
+<a href="../10008/index.html">Rt-guide Real-time gaussi</a>
+<a href="../10007/index.html">SPAR</a>
+<a href="../10006/index.html">PIP-LLM</a>
+<a href="../10005/index.html">Slideslam Sparse, lightwe</a>
+<a href="../10004/index.html">Heterogeneous robot colla</a>
+<a href="../10003/index.html">Hierarchical llms in-the-</a>
+    </div>
+  </div>
+
+
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">Vision Transformers for End-to-End Vision-Based Quadrotor Obstacle Avoidance</td></tr>
+    <tr><td><strong>作者</strong></td><td><strong>Anish Bhattacharya</strong><sup>*</sup>, <strong>Nishanth Rao</strong><sup>*</sup>, Dhruv Parikh, Pratik Kunapuli, Yuwei Wu, Yuezhan Tao, Nikolai Matni, <strong>Vijay Kumar</strong> (*共同一作)</td></tr>
+    <tr><td><strong>单位</strong></td><td><strong class="bold-affil">University of Pennsylvania</strong>, GRASP Laboratory。通讯作者: anish1@seas.upenn.edu</td></tr>
+    <tr><td><strong>发表</strong></td><td><strong class="bold-venue">IEEE Robotics and Automation Letters (RA-L)</strong>, <strong>2025</strong>, arXiv:2405.10391v3</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE RA-L</span> <span class="jif-badge if-value">IF 5.6</span> <span class="jif-badge if-q2">JCR Q2</span> <span class="jif-badge if-cas">CAS 2区</span></div>
+    <tr><td><strong>DOI / 链接</strong></td><td>arXiv: <a href="https://arxiv.org/abs/2405.10391" target="_blank">2405.10391</a> | 代码: <a href="https://www.anishbhattacharya.com/research/vitfly" target="_blank">anishbhattacharya.com/research/vitfly</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td><strong>首次将 Vision Transformer (ViT) 用于端到端四旋翼避障控制。</strong>在深度图像到速度指令任务上，对比了 ViT 与 ConvNet、UNet+LSTM 和 LSTMnet 架构。<strong>ViT+LSTM</strong> 在高速（>5 m/s）下优于所有模型，能够泛化到未见环境（树木、窄缝），并实现最高 7 m/s 的零样本 sim-to-real 迁移。ViT+LSTM 独有地随速度增加仍保持低能耗。基于 SegFormer 风格层级 ViT + 多层 LSTM。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Vision Transformer</span><span class="tag tag-green">End-to-End Control</span>
+    <span class="tag tag-amber">Obstacle Avoidance</span><span class="tag tag-purple">Quadrotor UAV</span>
+    <span class="tag tag-red">Behavior Cloning</span>
+    <span class="tag tag-cyan">Sim-to-Real Transfer</span>
+    <span class="tag tag-gray">Depth Images</span>
+  </div>
+</section>
+
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    <strong>关键洞察：</strong>传统的模块化四旋翼导航（感知 -> 建图 -> 规划 -> 控制）在高速下因误差累积、传感器噪声和处理延迟而崩溃。端到端学习策略解决了这一问题，但先前工作使用卷积或循环架构，其对深度图像中长程空间关系的建模能力有限。<strong>Vision Transformer (ViT)</strong>——凭借建模所有图像块之间关系的自注意力机制——更适合此任务，因为避障需要理解空间上下文（障碍物之间的间隙在哪里？）而非仅局部特征。添加循环（LSTM）进一步提升了速度指令的时序一致性。关键发现：<strong>ViT+LSTM 是最佳模型，独有地在速度从 3 增加到 7 m/s 时同时保持低碰撞率和低能耗。</strong>
+  </div>
+
+  <h3>2.2 创新点分解</h3>
+  <div class="novelty-card">
+    <h4>创新点1：首次将 ViT 用于端到端四旋翼控制</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>先前的端到端四旋翼控制使用 CNN 或循环网络。ViT 在计算机视觉中表现卓越，但尚未针对深度图像的四旋翼控制进行过研究。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>ViT 通过自注意力建模长程空间依赖——非常适合避障任务，其中附近障碍物的空间布局决定了可飞行通道。SegFormer 风格的层级设计实现了多尺度特征提取。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>基于 SegFormer 的 ViT 编码器：两个层级 Transformer 块，通过 pixel shuffle 上采样，跨层级信息混合通过卷积实现。输出与四旋翼姿态（四元数）和前向速度拼接，然后由 FC 或 LSTM 层处理后预测 3D 速度指令。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点2：5 种架构的全面对比用于基于视觉的控制</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>对于深度图像到四旋翼速度指令这一特定任务，卷积、UNet、循环和 Transformer 架构之间缺乏系统性对比。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>不同架构具有不同的归纳偏置：CNN（局部平移不变性）、UNet（带跳跃连接的多尺度）、LSTM（时序建模）、ViT（全局注意力）。理解哪种偏置对四旋翼控制最重要具有重要价值。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>对比五种模型：ConvNet（235K 参数，仅 CNN）、LSTMnet（3M 参数，CNN+LSTM）、UNet+LSTM（3M 参数，编码器-解码器带跳跃连接 + LSTM）、ViT（3M 参数，SegFormer + FC）、ViT+LSTM（3.6M 参数，SegFormer + LSTM）。全部通过行为克隆从 Flightmare 仿真器中一个可访问障碍物的特权专家训练。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点3：零样本 sim-to-real 迁移与未见环境泛化</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>在仿真中训练的策略在真实硬件上部署时往往因 sim-to-real 差距而失败，且因过拟合训练障碍类型而在新环境中失败。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>仿真中领域随机化训练（随机障碍物配置）+ 能够促进泛化的架构归纳偏置。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在 Falcon250 四旋翼上搭载 Intel RealSense D435 进行零样本部署，速度最高达 7 m/s，包括单/多障碍物避障和穿越窄缝。基于 ViT 的模型是唯一能够在窄缝任务中成功并泛化到未见 Trees 环境的模型。ViT+LSTM 在 Intel NUC 10（i7-10710U CPU）上以 30Hz 机载运行。</div>
+  </div>
+</section>
+
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+  <h3>3.1 端到端控制 Pipeline</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SIM["Flightmare Simulator"]
+      RENDER["Depth Image Rendering
+60x90 pixels"]
+      DYNAMICS["Quadrotor Dynamics
+0.752kg, 0.25m diameter"]
+      STATE["State: orientation q_att
+forward velocity v_fwd"]
+    end
+
+    subgraph MODEL["Learned Policy (ViT+LSTM / ConvNet / UNet+LSTM / LSTMnet)"]
+      ENCODER["Image Encoder
+ViT: SegFormer blocks
+ConvNet: CNN layers
+UNet: Encoder-Decoder"]
+      FEAT["Feature Vector"]
+      CONCAT["Concatenate with
+q_att + v_fwd"]
+      TEMPORAL["Temporal Module
+LSTM or FC layers"]
+      PRED["Velocity Prediction
+v_pred (3D world frame)"]
+    end
+
+    subgraph CONTROL["Dodgelib Control Stack"]
+      TRAJ["Min-Snap Trajectory
+Formation"]
+      GEO["Geometric Controller
+SO(3) + thrust"]
+      MOTORS["Rotor Speeds
+4x PWM"]
+    end
+
+    RENDER --> ENCODER --> FEAT --> CONCAT
+    STATE --> CONCAT
+    CONCAT --> TEMPORAL --> PRED --> TRAJ --> GEO --> MOTORS --> DYNAMICS
+    DYNAMICS --> STATE
+
+    classDef sim fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef model fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef ctrl fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class RENDER,DYNAMICS,STATE sim
+    class ENCODER,FEAT,CONCAT,TEMPORAL,PRED model
+    class TRAJ,GEO,MOTORS ctrl
+    </pre>
+  </div>
+
+  <h3>3.2 模型架构对比</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    DEPTH["Depth Image
+60x90"] --> ENC{"Encoder Type"}
+
+    ENC -->|ViT| V1["SegFormer
+2 hierarchical blocks
+pixel shuffle upsample
+cross-hierarchy conv"]
+    ENC -->|UNet| U1["UNet Encoder-Decoder
+skip connections
+3 levels deep"]
+    ENC -->|ConvNet| C1["CNN: Conv+Pool
++BN+LeakyReLU"]
+
+    V1 --> FEAT["Feature Vector"]
+    U1 --> FEAT
+    C1 --> FEAT
+
+    FEAT --> CAT["Concat with
+q_att (4D) + v_fwd (1D)"]
+    CAT --> TEMP{"Temporal Module"}
+    TEMP -->|LSTM| L1["Multi-Layer LSTM
+2-5 layers"]
+    TEMP -->|FC| F1["Fully Connected
+2-3 layers"]
+    L1 --> OUT["Linear -> vx,vy,vz"]
+    F1 --> OUT
+
+    classDef img fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    classDef enc fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef temp fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    classDef out fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class DEPTH img
+    class V1,U1,C1,FEAT,CAT enc
+    class L1,F1 temp
+    class OUT out
+    </pre>
+  </div>
+
+  <h3>3.3 训练与部署工作流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph EXPERT["Privileged Expert Data Collection"]
+      E1["Obstacle-aware expert
+accesses obstacle positions
+within 10m radius"]
+      E2["Searches 2D grid waypoints
+at fixed horizon"]
+      E3["Selects collision-free waypoint
+closest to center"]
+      E4["Applies gain -> velocity cmd
+Collects: depth_image, q_att, v_fwd, v_cmd"]
+    end
+
+    subgraph TRAIN["Behavior Cloning Training"]
+      T1["588 expert runs -> 112k depth images
+27.5k with collisions"]
+      T2["Student model: imdepth -> v_pred"]
+      T3["L2 loss: E[||v_cmd(t) - v_pred(t; theta)||^2]"]
+      T4["Adam optimizer, lr=1e-4, batch=100, 100 epochs
+Select best validation loss model"]
+    end
+
+    subgraph DEPLOY["Zero-Shot Deployment"]
+      D1["Simulation: Spheres (in-distribution)
++ Trees (unseen generalization)
++ Narrow-gap (extreme)"]
+      D2["Real: Falcon250 + Intel Realsense D435
+Single/multi obstacle + flight-through-gap
+1-7 m/s, onboard inference 30Hz CPU"]
+    end
+
+    E1 --> E2 --> E3 --> E4 --> T1 --> T2 --> T3 --> T4 --> D1 --> D2
+
+    classDef expert fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef train fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef deploy fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class E1,E2,E3,E4 expert
+    class T1,T2,T3,T4 train
+    class D1,D2 deploy
+    </pre>
+  </div>
+</section>
+
+<section id="task">
+  <h2>4. 任务定义 —— 解决了什么问题？</h2>
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">行为克隆目标</span>
+    $$ \mathcal{L}(\theta) = \mathbb{E}_{\tau \sim \mathcal{D}} \left[ \frac{1}{T} \sum_{t=0}^{T-1} \| v_{\text{cmd}}(t) - v_{\text{pred}}(t; \theta) \|_2^2 \right] $$
+    <div class="eq-note">
+      <strong>输入:</strong> 深度图像 im_depth（60x90）、四旋翼姿态 q_att（四元数，4D）、前向速度 v_fwd（标量）。<strong>输出:</strong> 世界坐标系中的 3D 线速度指令 v_pred。<strong>监督信号:</strong> 来自特权专家（可访问障碍物，在固定前瞻距离处搜索 2D 横向-垂直网格上的无碰撞航点）的 v_cmd。<strong>学生模型:</strong> 5 种架构（ConvNet、LSTMnet、UNet+LSTM、ViT、ViT+LSTM）全部通过行为克隆从相同专家数据训练。
+    </div>
+  </div>
+
+  <h3>4.2 输入与输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>单张深度图像 + 四旋翼姿态（四元数）+ 前向速度</td><td>深度: 60x90; q_att: 4D; v_fwd: 1D</td></tr>
+    <tr><td><strong>输出</strong></td><td>世界坐标系中的 3D 线速度指令，送入 Dodgelib 控制栈</td><td>v_pred: 3D (vx, vy, vz)</td></tr>
+    <tr><td><strong>目标</strong></td><td>在密集静态障碍物中向前飞行 60m，最小化碰撞</td><td>碰撞率、能耗、路径偏差</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p><strong>端到端基于视觉的高速四旋翼反应式避障</strong>（3-7 m/s）。这是一个直接感知到控制的任务：原始深度图像 -> 速度指令，无中间建图、规划或轨迹优化。四旋翼（0.752kg, 0.25m 直径）在随机放置静态障碍物的密集环境中向前飞行。特权专家（使用真值障碍物位置进行短时域无碰撞航点搜索）生成监督训练数据。学生模型学习仅从深度图像模仿专家，然后评估碰撞率、能耗、对未见障碍物类型（Trees）的泛化以及真实世界零样本迁移。这是<strong>首次针对此特定任务研究 ViT 架构。</strong></p>
+</section>
+
+<section id="challenge">
+  <h2>5. 核心挑战 —— 为什么困难？</h2>
+  <h3>5.1 本质分析（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾：</strong>高速四旋翼飞行需要快速、反应式的避障，但传统模块化 Pipeline 引入延迟和误差累积。学习型端到端策略必须克服三个关键困难：<br><br>
+    (1) <strong>从深度图进行空间推理：</strong>单张深度图像是 2.5D 表示——模型必须推断 3D 障碍物几何、识别可行飞通道（障碍物之间的间隙）、并预测适当的规避动作。这需要理解<strong>全局空间上下文</strong>（相对于所有障碍物，间隙在哪里？），而非仅局部特征。<br><br>
+    (2) <strong>高速下的时序一致性：</strong>在 7 m/s 速度下，0.25m 的四旋翼每秒飞过 28 个机身长度。速度指令必须时序一致——突变的指令导致跟踪误差和不稳定。纯前馈模型（ConvNet、无 LSTM 的 ViT）缺乏时序平滑性。<br><br>
+    (3) <strong>跨环境泛化和 sim-to-real：</strong>在仿真球形障碍物上训练必须泛化到树木、窄缝和真实世界深度传感器噪声/伪影。不同架构具有截然不同的泛化特性。
+  </div>
+
+  <h3>5.2 先前方法及其局限</h3>
+  <table>
+    <tr><th>先前方法</th><th>核心思想</th><th>局限性</th></tr>
+    <tr><td>模块化：FastPlanner / Double Description</td><td>深度图像 -> 建图 -> B-样条轨迹优化 -> 控制</td><td>为特定速度（~3 m/s）设计。需要调参以扩展到不同速度。处理延迟在高速下导致碰撞。非端到端可学习。</td></tr>
+    <tr><td>基于 CNN 的端到端（Loquercio et al. 2021, Science Robotics）</td><td>训练 CNN 将深度图像直接映射到控制指令</td><td>CNN 的空间上下文感受野有限。无时序建模——速度指令可能突变。在 >5 m/s 时性能退化。</td></tr>
+    <tr><td>循环模型（基于 LSTM）</td><td>CNN 编码器 + LSTM 解码器实现时序一致性</td><td>时序平滑性优于纯 CNN，但仍受限于 CNN 编码器无法建模深度图像中的长程空间依赖。</td></tr>
+  </table>
+
+  <h3>5.3 关键技术挑战</h3>
+  <ul>
+    <li><strong>挑战1 —— 注意力 vs. 卷积用于空间上下文：</strong>ViT 对图像块使用自注意力建模全局关系。这在避障中非常适合（重要信息是场景中所有障碍物的相对位置）。但 ViT 的归纳偏置弱于 CNN——需要更多数据，且在小数据集上可能表现更差。</li>
+    <li><strong>挑战2 —— 动态机器人的时序建模：</strong>四旋翼是欠驱动动力学系统。速度指令必须满足物理可行性。LSTM 循环有帮助，但注意力驱动的空间编码与循环时序建模之间的交互在控制任务中尚未被充分理解。</li>
+    <li><strong>挑战3 —— 零样本泛化评估：</strong>评估泛化需要在训练中从未见过的环境（Trees、窄缝）和硬件（真实 Falcon250）上测试。sim-to-real 差距包括深度传感器噪声、真实世界纹理、螺旋桨引起的振动和风扰动。</li>
+  </ul>
+</section>
+
+<section id="method">
+  <h2>6. 关键方法与公式</h2>
+  <h3>6.1 核心算法</h3>
+  <p><strong>从特权障碍物感知专家的行为克隆。</strong>专家在四旋翼前方的固定前瞻距离处搜索 2D 网格航点，查询每个航点是否与已知障碍物（10m 内）碰撞，选择最靠近中心的无碰撞航点，并应用比例增益生成速度指令。学生模型训练仅从深度图像预测相同速度指令（无障碍物位置访问）。训练：588 条专家轨迹 -> 112k 深度图像，27.5k 包含碰撞。所有时间步的 MSE 损失。Adam 优化器，lr=1e-4，weight decay=1e-3，batch=100，100 epochs。选择最佳验证损失模型。</p>
+
+  <h3>6.2 核心公式</h3>
+
+  <h4>组 A：行为克隆损失函数</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) -- 模仿学习目标</span>
+    $$ \mathcal{L}(\theta) = \mathbb{E}_{\tau \sim \mathcal{D}} \left[ \frac{1}{T} \sum_{t=0}^{T-1} \| v_{\text{cmd}}(t) - v_{\text{pred}}(t; \theta) \|_2^2 \right] $$
+    <div class="eq-note">
+      <strong>tau:</strong> 专家策略下的轨迹 rollout。<strong>T:</strong> 轨迹的时间步长度。<strong>v_cmd(t):</strong> 时间步 t 的专家速度指令。<strong>v_pred(t; theta):</strong> 参数为 theta 的学生模型预测。简单的 L2 损失，涵盖轨迹中所有时间步——无折扣、无终端奖励，纯监督模仿。
+    </div>
+  </div>
+
+  <h4>组 B：ViT 架构（基于 SegFormer）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">ViT 编码器 -- 层级自注意力</span>
+    $$ \text{Attention}(Q,K,V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right) V $$
+    <div class="eq-note">
+      ViT 编码器基于 SegFormer：两个层级 Transformer 块在不同尺度处理深度图像。每个块先应用高效自注意力（通过空间降采样减少序列长度），然后接 Mix-FFN（前馈网络中的 3x3 卷积）。不同层级的输出通过 pixel shuffle 上采样，并通过卷积混合以纳入多尺度信息。所得特征向量与四旋翼状态（q_att, v_fwd）拼接后进行时序处理。
+    </div>
+  </div>
+
+  <h4>组 C：能耗指标</h4>
+  <div class="formula-block">
+    <span class="eq-tag">能耗（来自 AvoidBench）</span>
+    $$ E = \int_{0}^{T} \|a(t)\|^2 dt \quad \text{or} \quad \bar{a} = \frac{1}{T}\sum_t \|a(t)\| $$
+    <div class="eq-note">
+      更低的能耗意味着有限电池下的更长飞行时间。ViT+LSTM 独有地在速度从 3 增加到 7 m/s 时保持<strong>恒定的低能耗</strong>——所有其他模型（以及专家）随速度增加能耗增大。这对电池受限的四旋翼作业是具有关键实际意义的优势。
+    </div>
+  </div>
+
+  <h3>6.3 模型规格</h3>
+  <table>
+    <tr><th>模型</th><th>参数量</th><th>CPU (ms)</th><th>GPU (ms)</th><th>关键组件</th></tr>
+    <tr><td><strong>ConvNet</strong></td><td>235,269</td><td>0.2</td><td>0.4</td><td>CNN + Average/Max Pool + BN + FC</td></tr>
+    <tr><td><strong>LSTMnet</strong></td><td>2,949,937</td><td>4.8</td><td>0.7</td><td>CNN + 5-layer LSTM + FC</td></tr>
+    <tr><td><strong>UNet+LSTM</strong></td><td>2,955,822</td><td>5.6</td><td>1.7</td><td>3-level UNet with skip + 2-layer LSTM + FC</td></tr>
+    <tr><td><strong>ViT</strong></td><td>3,101,199</td><td>5.6</td><td>1.6</td><td>SegFormer (2 blocks) + FC</td></tr>
+    <tr class="highlight"><td><strong>ViT+LSTM</strong></td><td>3,563,663</td><td>9.2</td><td>3.8</td><td>SegFormer (2 blocks) + 3-layer LSTM + FC</td></tr>
+  </table>
+
+  <h3>6.4 架构对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>CNN 类 (ConvNet, UNet+LSTM)</h4>
+      <ul><li><strong>优势：</strong>平移不变性——无论位置如何都能检测障碍物。计算高效。UNet 跳跃连接保留精细空间细节。</li><li><strong>劣势：</strong>感受野有限——无法建模长程空间关系。无内在时序建模（需要 LSTM）。UNet 注意力图聚焦边缘但忽略上下文。</li></ul>
+    </div>
+    <div class="cmp-col">
+      <h4>ViT 类 (ViT, ViT+LSTM)</h4>
+      <ul><li><strong>优势：</strong>自注意力建模所有图像块之间的关系——捕获全局空间上下文（远处障碍物之间的可行飞通道）。更好泛化到未见环境。注意力图同时高亮障碍物边缘和周围上下文。</li><li><strong>劣势：</strong>归纳偏置较弱——需要更多数据。计算成本更高（3.8ms GPU vs. ConvNet 0.4ms）。模型更大（3.6M vs. 235K 参数）。</li></ul>
+    </div>
+  </div>
+</section>
+
+<section id="principles">
+  <h2>7. 基本原理</h2>
+
+  <h3>7.1 为何 ViT 在避障中表现优异——注意力优势</h3>
+  <p>核心架构洞察在于<strong>空间推理的表示能力</strong>。在避障中，关键问题是："给定深度图像中所有可见的障碍物，可行的飞行通道在哪里？"这本质上是一个<strong>全局空间推理</strong>问题：</p>
+  <ul>
+    <li><strong>CNN</strong> 通过局部感受野层级化处理图像。3x3 卷积核只能看到直接邻居。更深的层有更大感受野但丢失精细空间分辨率。两个远处障碍物之间的间隙可能只有最深的 CNN 层才能看到。</li>
+    <li><strong>UNet</strong> 通过跳跃连接在瓶颈处保留空间分辨率，但基本操作仍是局部卷积——长程依赖通过许多层逐渐建立。</li>
+    <li><strong>ViT</strong> 使用自注意力，在单次操作中直接计算所有图像块之间的配对关系。图像两侧的两个障碍物可以直接互相"关注"，并关注它们之间的自由空间。这正是识别飞行通道所需的计算。</li>
+  </ul>
+  <p>这解释了实验结果：基于 ViT 的模型是唯一能在窄缝（穿越窗户）任务中成功的模型——因为该任务需要在障碍物中识别特定的狭窄通道，需要全局空间推理。</p>
+
+  <h3>7.2 循环的作用——时序一致性</h3>
+  <p>在视觉编码器后添加 LSTM 层提供了速度指令的<strong>时序平滑</strong>。四旋翼是欠驱动动力学系统——瞬时突变的速度变化导致跟踪误差、能源浪费和潜在不稳定。LSTM 维护内部状态，促使速度指令随时间保持一致。</p>
+  <p>循环收益的关键证据：</p>
+  <ul>
+    <li><strong>能耗：</strong>无 LSTM 的 ViT 能耗极高（指令大加速度但未实现更好性能）。ViT+LSTM 的<strong>能耗在所有模型中最低</strong>，且<strong>能耗不随速度增加而增加</strong>——唯一具有此特性的模型。</li>
+    <li><strong>碰撞时间：</strong>所有学习模型的"碰撞中时间"远低于专家（当无碰撞搜索失败时专家停滞）——但 ViT+LSTM 在速度 >= 4.5 m/s 时碰撞时间最低。</li>
+    <li><strong>路径直度：</strong>ViT+LSTM 以最直接的路径穿越障碍物，相对于直线轨迹的最大平均横向偏差仅 0.75m。</li>
+  </ul>
+
+  <h3>7.3 通过归纳偏置实现泛化</h3>
+  <p>不同架构对未见环境（Trees）和任务（窄缝）的泛化不同：</p>
+  <ul>
+    <li><strong>ConvNet:</strong> Trees 碰撞率：42-100%（高速下严重退化）。过拟合于训练期间学到的球形障碍物特征。</li>
+    <li><strong>ViT:</strong> Trees 碰撞率：50-90%（跨所有速度远更好）。注意力机制学习更抽象的几何关系，可跨障碍物形状迁移。</li>
+    <li><strong>ViT+LSTM:</strong> Trees 碰撞率：50-80%（带循环后总体最佳）。注意力用于空间推理 + 循环用于时序一致性 = 最佳泛化。</li>
+  </ul>
+
+  <div class="callout tip">
+    <div class="callout-title">架构设计原则</div>
+    对于基于视觉的机器人控制，<strong>全局空间推理（ViT/注意力）+ 时序一致性（LSTM/循环）= 跨速度和环境的最佳性能。</strong>ViT 提供"安全路径在哪里？"，LSTM 提供"如何平滑地跟随它？"单独的任一组件都无法达到 ViT+LSTM 组合模型的完整性能。
+  </div>
+</section>
+
+<section id="figures">
+  <h2>8. 实验结果与图表</h2>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 1</span><span class="fig-caption">零样本 sim-to-real：高速规避机动和快速飞行的迎面无人机避让</span><span class="fig-source">来源：论文 Fig. 1</span></div>
+    <div class="fig-image"><img src="figures/fig1.png" alt="Figure 1" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig1.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p><strong>展示：</strong>(a) 规避静态障碍物的第三人称视角。(b) 机载视角躲避快速迎面飞来的无人机。(c) 带红色速度指令箭头的机载深度图像序列。<strong>展示了在真实硬件上的零样本部署，无需模型重新训练或系统调参。</strong></p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 2</span><span class="fig-caption">系统架构：Flightmare 仿真 -> 学习策略 -> Dodgelib 控制栈 -> 四旋翼</span><span class="fig-source">来源：论文 Fig. 2</span></div>
+    <div class="fig-image"><img src="figures/fig2.png" alt="Figure 2" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig2.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p><strong>展示：</strong>来自 Flightmare 仿真器的深度图像和四旋翼状态（q_att, v_fwd）-> 选定学习模型预测 v_pred -> min-snap 轨迹生成 -> 几何控制器 -> 电机转速 -> 四旋翼动力学。模块化设计将学习的感知到指令与基于模型的跟踪控制器分离。</p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 4</span><span class="fig-caption">碰撞率、路径和能耗：Spheres 和 Trees 环境</span><span class="fig-source">来源：论文 Fig. 4</span></div>
+    <div class="fig-image"><img src="figures/fig4.png" alt="Figure 4" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig4.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p><strong>(a) Spheres:</strong> ViT+LSTM（绿色）在 5 m/s 以上碰撞率最低——唯一持续优于专家的模型。<strong>(b) Trees:</strong> 基于 ViT 的模型（绿色、灰色）泛化显著优于其他。<strong>(c) 路径:</strong> ViT+LSTM 走最直接的路径，横向偏差最小（最大 0.75m）。<strong>(d) 能耗:</strong> ViT+LSTM 独有地在速度增加时保持低且恒定的能耗。</p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 5</span><span class="fig-caption">注意力/激活图：ConvNet（分散）、UNet（边缘聚焦）、ViT（边缘+上下文）</span><span class="fig-source">来源：论文 Fig. 5</span></div>
+    <div class="fig-image"><img src="figures/fig5.png" alt="Figure 5" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig5.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p><strong>展示：</strong>仿真（上行）和真实（下行）注意力图。<strong>ConvNet:</strong> 整个障碍物上的分散高亮——特异性低。<strong>UNet:</strong> 清晰边缘，忽略周围环境。<strong>ViT:</strong> 障碍物边缘及周围上下文——比 UNet 捕获更多附近障碍物。在真实实验中，ConvNet 注意力在障碍物上分散，而 ViT 对障碍物边界的特异性高得多。</p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 6</span><span class="fig-caption">模块化基线对比：碰撞率和速度匹配 vs. 期望速度</span><span class="fig-source">来源：论文 Fig. 6</span></div>
+    <div class="fig-image"><img src="figures/fig6.png" alt="Figure 6" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig6.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p><strong>展示：</strong>为 ~3 m/s 设计的模块化基线（FastPlanner、Double Description）在其他速度下失效。FastPlanner 要么超时（< 3 m/s），要么跟不上（> 3 m/s）。Double Description 在某些速度下碰撞率与 ViT+LSTM 相当，但 ViT+LSTM 是唯一能<strong>在任何期望速度下恰当地飞行</strong>且保持持续低碰撞的方法。</p></div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig. 7</span><span class="fig-caption">真实世界试验：ConvNet vs. ViT+LSTM 路径，Falcon250 平台</span><span class="fig-source">来源：论文 Fig. 7</span></div>
+    <div class="fig-image"><img src="figures/fig7.png" alt="Figure 7" onerror="this.parentNode.innerHTML='<div class=fig-placeholder>将截图保存为 <code>figures/fig7.png</code></div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">图表解读</div><p><strong>展示：</strong>(a) Falcon250 定制四旋翼平台。(b) 1 m/s 下的单一刚性障碍物避障。(c) 路径对比：ViT+LSTM（蓝色）始终比 ConvNet（红色）更早规避，轨迹更平滑。较浅的色调表示更高的横向速度。ViT+LSTM 路径更直接、方差更小。</p></div>
+  </div>
+</section>
+
+<section id="flaw">
+  <h2>9. 潜在缺陷与扩展方向</h2>
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>仅静态障碍物：</strong>训练和主要评估使用静态障碍物。虽然 Fig. 1b 展示了迎面无人机避让（动态障碍物），但未进行系统性评估。策略的反应式特性可能处理慢速移动障碍物，但面对快速移动障碍物的行为未知。</li>
+    <li><strong>单张深度图像输入：</strong>仅使用单张深度图像（无图像堆叠或时序历史）限制了模型估计障碍物速度或预测未来障碍物位置的能力。LSTM 对此进行缓解以实现指令一致性，但未提供显式运动估计。</li>
+    <li><strong>专家质量上限：</strong>行为克隆只能匹配或略超专家。专家是反应式且短视的（无动力学可行规划）——这限制了学习策略的上限。在高速下超越专家的模型是通过学习更平滑、更时序一致的指令实现的，而非规划更好的轨迹。</li>
+    <li><strong>CPU 推理延迟：</strong>ViT+LSTM 在 CPU 上耗时 9.2ms（对比 ConvNet 0.2ms）。虽然 30Hz 对当前速度足够，但更快的飞行需要 GPU 推理或模型优化。</li>
+    <li><strong>有限真实世界评估：</strong>硬件实验是演示性的，非系统性评估。无定量碰撞指标，未在硬件上对比所有 5 种模型，穿越窄缝仅在 2 m/s 下展示（仿真中为 3 m/s）。</li>
+  </ul>
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>动态障碍物：</strong>添加时序输入（堆叠深度图像或事件相机）用于障碍物速度估计。ViT 的注意力机制可自然扩展到图像序列 token 上的时空注意力。</li>
+    <li><strong>RL 替代 IL：</strong>用强化学习替代行为克隆以可能超越专家性能——但需要为避障和在密集环境中的探索精心设计奖励函数。</li>
+    <li><strong>多模态传感器融合：</strong>将深度与 RGB 和/或事件相机结合。ViT 的注意力机制可学习跨模态注意力——关注深度以获取几何信息，关注 RGB 以获取语义线索。</li>
+    <li><strong>模型压缩：</strong>从 ViT+LSTM（3.6M 参数）到更小模型的知识蒸馏，以实现更高飞行速度下更快的 CPU 推理。</li>
+  </ul>
+  <h3>9.3 数据敏感性</h3>
+  <table>
+    <tr><th>问题</th><th>难度</th><th>严重性</th></tr>
+    <tr><td>真实世界深度传感器噪声</td><td>Intel RealSense D435 使用结构 IR + 立体视觉——产生伪影（反射面上缺失深度、视野中有螺旋桨护罩）。在干净仿真深度上训练的模型必须隐式处理这些。</td><td>****</td></tr>
+    <tr><td>状态估计质量</td><td>模型接收 q_att 和 v_fwd 作为输入。在真实飞行中，这些来自运动捕捉（室内）或机载 VIO（室外）。噪声状态估计会退化性能——消融实验显示 ViT+LSTM 在 Trees 环境中对状态移除最敏感。</td><td>****</td></tr>
+    <tr><td>障碍物密度</td><td>碰撞率取决于障碍物密度。Spheres 环境密度可控；真实世界密度变化巨大。无系统性密度消融实验。</td><td>***</td></tr>
+    <tr><td>训练数据碰撞比例</td><td>112k 中 27.5k 张带碰撞图像——模型从成功和失败的专家行为中学习。训练数据中最优碰撞比例未被研究。</td><td>***</td></tr>
+  </table>
+
+  <h3>9.4 值得深入的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深入的方向</div>
+    <strong>ViT + 事件相机用于高速避障：</strong>ViT+LSTM 擅长从深度图像进行空间推理，但受限于深度传感器的范围、噪声和帧率（30Hz）。事件相机提供微秒级时间分辨率、>120dB 动态范围和几乎零运动模糊——非常适合高速飞行。可以训练一个 ViT 直接从事件流（稀疏时空点云）预测速度指令——将 ViT 的全局注意力与事件相机的时序精度相结合。这需要：(1) 将 ViT 的 patch embedding 适配到异步事件表示（体素网格或图神经网络），(2) 在高速飞行的事件数据上训练，(3) 与基于帧的 ViT 基线对比。这一方向融合了 Kumar 实验室的两个研究方向（ViT 用于控制 + 事件相机用于感知）。
+  </div>
+</section>
+
+<section id="motivation">
+  <h2>10. 动机推导（第一性原理）</h2>
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>核心问题是什么？</strong>四旋翼在快速飞行时发挥最大效用（有限电池下更广覆盖），但传统模块化导航（感知 -> 建图 -> 规划 -> 控制）因延迟、误差累积和传感器噪声在高速下崩溃。端到端学习策略解决了这一问题，但现有架构（CNN、LSTM）的空间推理能力有限。</li>
+    <li><strong>CNN 缺少什么而 ViT 能捕获？</strong>避障需要理解障碍物的<strong>全局空间布局</strong>——场景中可行的飞行通道（间隙）在哪里？CNN 通过局部卷积逐步扩大感受野；ViT 通过自注意力直接计算配对图像块关系。这正是寻找障碍物之间路径所需的计算。</li>
+    <li><strong>为什么添加循环（LSTM）？</strong>四旋翼是动力学系统——速度指令必须时序一致。前馈模型（无 LSTM 的 ViT）可能输出突变指令，跟踪控制器无法跟随。LSTM 维护内部状态以实现平滑的时序过渡。</li>
+    <li><strong>为什么系统性地对比？</strong>不同架构类具有不同的归纳偏置。理解哪种偏置对四旋翼控制最重要，能为未来架构设计提供信息。全面的对比（5 种模型 x 2 种环境 x 多种速度 x 真实世界迁移）提供了这种理解。</li>
+    <li><strong>最简完整方案是什么？</strong>基于 SegFormer 的 ViT 编码器（2 个层级块）+ 3 层 LSTM + FC 头。通过行为克隆从短视反应式专家训练。零样本部署到真实硬件。30Hz CPU 推理。约 3.6M 参数。开源。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip"><div class="callout-title">一句话动机</div>Vision Transformer 通过自注意力建模全局空间关系——这正是寻找障碍物间可行飞行通道所需的计算——因此，让我们研究基于 ViT 的架构是否在高速端到端四旋翼避障中优于传统 CNN。</div>
+
+  <h3>10.3 如何想到这个想法</h3>
+  <ul>
+    <li><strong>第1步 —— 观察：</strong>CNN 在密集环境中高速（>5 m/s）时表现挣扎。端到端方法优于模块化 Pipeline，但卷积编码器面临性能上限。</li>
+    <li><strong>第2步 —— 假设：</strong>性能瓶颈是<strong>空间推理</strong>，而非感知质量。ViT 在计算机视觉任务（目标检测、分割）中展现了卓越的空间推理能力。</li>
+    <li><strong>第3步 —— 系统测试：</strong>在同一任务上以相同训练数据对比 ViT 与 CNN、UNet 和 LSTM 基线。控制模型规模（~3M 参数）以隔离架构效应。</li>
+    <li><strong>第4步 —— 部署与验证：</strong>零样本 sim-to-real 迁移测试学习到的表示是否鲁棒。对未见环境（Trees、窄缝）的泛化测试架构是捕获了抽象几何推理还是记忆了训练障碍物形状。</li>
+  </ul>
+</section>
+
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+  <h3>11.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论：</strong>这是一篇<strong>系统性架构对比</strong>论文——贡献在于证明基于 ViT 的模型在此特定任务中更优，而非提出全新算法。价值在于全面的评估（5 种架构、2 种环境、速度扫描、能耗、注意力图分析、真实世界部署），为未来基于视觉的机器人控制架构设计提供了可操作的指导。</li>
+    <li><strong>技术：</strong>(1) ViT+循环 = 基于视觉的机器人控制最佳组合——注意力处理空间推理，循环处理时序一致性。(2) SegFormer 风格层级 ViT 配合 pixel shuffle 上采样和跨层级卷积混合，在保留空间分辨率的同时提供多尺度特征提取。(3) 从简单反应式专家进行行为克隆即足够——学习策略可通过更平滑的时序行为超越专家。</li>
+    <li><strong>实验：</strong>论文的真正价值在于全面的定量对比。碰撞率、能耗、路径分布、注意力图和不同速度下的成功率，提供了超越简单"X 比 Y 好"论断的多维度模型行为视角。</li>
+  </ul>
+  <h3>11.2 直接应用于我的研究</h3>
+  <ul>
+    <li><strong>用于基于视觉的 UAV 控制：</strong>ViT+LSTM 是任何深度图像到控制任务的强基线架构。基于 SegFormer 的编码器设计（层级注意力 + 多尺度特征混合）可直接复用。</li>
+    <li><strong>用于 sim-to-real 迁移：</strong>论文证明在干净仿真深度上通过领域随机化训练（随机障碍物配置）即可实现零样本真实世界部署。无需领域自适应、无需微调、无需系统辨识——只需在仿真中训练并部署到硬件。</li>
+    <li><strong>用于架构选择：</strong>全面的对比提供了清晰的指导：如果计算预算极度受限，ConvNet（235K 参数, 0.4ms GPU）在低速下可能足够。对于高速飞行或泛化需求，ViT+LSTM（3.6M 参数, 3.8ms GPU）是明确的赢家。UNet+LSTM 是中间地带，性能良好但泛化到未见环境的效果不如 ViT+LSTM。</li>
+  </ul>
+  <h3>11.3 关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>重要性</th></tr>
+    <tr><td>Loquercio et al. (2021) -- Learning High-Speed Flight in the Wild. Science Robotics</td><td>使用 CNN 从深度图像进行端到端四旋翼飞行的 state-of-the-art——本工作的直接前身和基线。</td></tr>
+    <tr><td>Dosovitskiy et al. (2020) -- An Image is Worth 16x16 Words: Transformers for Image Recognition. arXiv:2010.11929</td><td>原始 ViT 论文——确立了 Vision Transformer 在图像识别中与 CNN 竞争的地位。</td></tr>
+    <tr><td>Xie et al. (2021) -- SegFormer. NeurIPS 2021</td><td>本工作中使用的 ViT 编码器架构：带高效自注意力与 Mix-FFN 的层级 Transformer。</td></tr>
+    <tr><td>Song et al. (2020) -- Flightmare. CoRL 2020</td><td>用于训练和评估的仿真器：快速物理 + 高保真度 Unity 渲染。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes | Bhattacharya et al. | IEEE RA-L 2025 | Vision Transformers for End-to-End Vision-Based Quadrotor Obstacle Avoidance | MathJax + Mermaid</footer>
+
+</div>
+</body>
+</html>

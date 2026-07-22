@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Optimal Set-Membership Smoothing</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Yirui Cong · 13-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../1356/index.html">Asymptotic Boundedness Di</a>
+<a href="../1352/index.html">Formation Under Communica</a>
+<a href="../1360/index.html">Bounded Formation Stabili</a>
+<a href="../1359/index.html">Single-Beacon Localizatio</a>
+<a class="active" href="../1354/index.html">Optimal Set-Membership Sm</a>
+<a href="../1348/index.html">Stability Linear Set-Memb</a>
+<a href="../1455/index.html">Cooperative Filtering Ran</a>
+<a href="../1350/index.html">Existence Completeness Bo</a>
+<a href="../1750/index.html">Paper</a>
+<a href="../1454/index.html">2305.10366v1</a>
+<a href="../1368/index.html">小型固定翼无人机集群综述和未来发展_王祥科</a>
+<a href="../1367/index.html">Paper</a>
+<a href="../1361/index.html">qy_高阶线性多智能体时延一致性理论及其在多无人机</a>
+    </div>
+  </div>
+
+
+<!-- 1. PAPER INFO -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Optimal Set-Membership Smoothing（最优集合成员平滑）</td></tr>
+    <tr><td><strong>Authors</strong></td><td>Yudong Li<sup>1</sup>, <strong>Yirui Cong</strong><sup>2</sup> (corresponding), Xiangyun Zhou<sup>3</sup>, Jiuxiang Dong<sup>1</sup></td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">1. 东北大学</strong> 流程工业综合自动化国家重点实验室；<strong class="bold-affil">2. 国防科技大学</strong> 智能科学学院；<strong class="bold-affil">3. 澳大利亚国立大学</strong> 工程学院</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Transactions on Automatic Control</strong>, accepted 2025 (published online 2026). arXiv:2410.09857, Oct 2024. 7 pages.</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE TAC</span> <span class="jif-badge if-value">IF 6.8</span> <span class="jif-badge if-q1">JCR Q1</span> <span class="jif-badge if-cas">CAS 1区</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://arxiv.org/abs/2410.09857" target="_blank">arXiv:2410.09857</a> | <a href="http://arxiv.org/abs/2410.09857" target="_blank">Source</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>首次为非随机隐藏马尔可夫模型建立<strong>最优集合成员平滑（SMSing）理论框架</strong>。基于 uncertain variable 数学概念，证明最优平滑集合等于滤波后验与动力学的逆像之交（Theorem 1），揭示了滤波与平滑之间的严格数学关系。对线性 zonotope 约束不确定性给出闭式解（Corollary 1），并扩展到一类非线性系统。核心结论：最优平滑的范围<strong>永远不会比最优滤波的范围更大</strong>——这在集合成员框架中可以直接证明，但在贝叶斯框架下对一般非线性系统无法直接推出。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Set-Membership Smoothing</span>
+    <span class="tag tag-green">Uncertain Variables</span>
+    <span class="tag tag-amber">Hidden Markov Model</span>
+    <span class="tag tag-purple">Constrained Zonotope</span>
+    <span class="tag tag-red">Optimal Estimation</span>
+    <span class="tag tag-cyan">IEEE TAC</span>
+    <span class="tag tag-gray">Non-stochastic Filtering</span>
+  </div>
+</section>
+
+<!-- 2. INSIGHT & NOVELTY -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>在非随机框架下，如何定义"最优"的集合成员平滑？</strong><br>
+    答：利用 uncertain variable 的条件值域（conditional range）——即给定所有观测后状态变量的可能取值范围——来定义平滑集合。这个定义天然具备最优性：它包含了所有与系统动力学和观测一致的状态，且不会更保守。<br><br>
+    问：<strong>平滑和滤波之间是什么数学关系？</strong><br>
+    答：最优平滑集合 = 滤波后验集合 ∩（通过动力学逆像从下一时刻平滑集合"反投"回来的约束）。这个关系（Theorem 1）揭示了平滑的本质：<strong>滤波提供基于过去信息的约束，未来观测通过动力学反向传播提供额外约束</strong>——两者取交集得到更紧的估计范围。这在贝叶斯框架下对一般系统无法直接证明，因为贝叶斯后验概率不能简单地"取交集"。
+  </div>
+
+  <h3>2.2 Inspiration to Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>Uncertain variables (Nair, 2013; Khargonekar, 1993)</td><td>uncertain variable 的"条件值域"可以用集合论精确刻画，天然支持"滤波-平滑"的前向-后向耦合——因为它不需要概率测度，只需集合包含关系</td><td>数学框架</td></tr>
+    <tr><td>贝叶斯平滑中的前向-后向算法 (Kalman smoother / RTS smoother)</td><td>前向滤波输出作为后向平滑的输入——这一计算结构在集合成员框架中也成立，但需要证明其最优性（而非启发式组合）。本文给出了严格证明</td><td>算法结构</td></tr>
+    <tr><td>集合成员滤波 (SMFing) 中的可行集构造</td><td>SMFing 已经定义了最优滤波（Lemma 3）——平滑只需在此基础上加入未来信息。关键是找到一个数学上正确的"未来信息反向传播"操作，本文发现是动力学的逆像（preimage）</td><td>方法</td></tr>
+    <tr><td>约束 zonotope 代数 (Scott et al., 2016; Regruto et al.)</td><td>zonotope 对 Minkowski 和、线性映射、交集都封闭——这使得线性系统的平滑方程可以直接用 zonotope 代数写成闭式，不需要数值积分或采样</td><td>计算工具</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 首次建立最优集合成员平滑的通用数学框架</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>集合成员滤波（SMFing）已有一定理论积累，但集合成员平滑（SMSing）一直缺乏通用的最优数学框架。此前的平滑工作大多是启发式或特定系统特设的，没有严格的"最优性"定义和证明。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>uncertain variable 数学 (Nair 2013) 提供了非概率条件化的严格工具——可以将"给定观测"精确定义为值域的交集约束，而不需要引入概率分布假设。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>基于 uncertain variable 的 Law of Total Range（Lemma 1）和 Bayes' rule for uncertain variables（Lemma 2），将平滑问题转化为集合条件化问题。Theorem 1 给出了最优后向递推方程，Lemma 3 给出前向最优滤波——两者组成完整的最优平滑管道。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 揭示平滑-滤波关系的严格数学证明</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>在概率框架下，"平滑比滤波更准确"是一个直觉——因为平滑使用了更多观测。但在集合成员框架下，这一直觉的严格数学形式是什么？此前无人给出。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>集合的交集运算天然具有"单调收缩"性质——两个约束的交集是各自的子集。如果能将滤波和未来信息分别表示为两个约束集合，那它们的交集自然比任一个更紧。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>证明了最优平滑范围是滤波后验的子集：$\llbracket \mathbf{x}_k | y_{0:T} \rrbracket \subseteq \llbracket \mathbf{x}_k | y_{0:k} \rrbracket$——即平滑永远不差于滤波。Remark 1 特别指出：这个结论在集合成员框架中可以直接证明，但在贝叶斯框架中对一般非线性系统无法直接推出（因为贝叶斯平滑后验不是滤波后验的"收缩"而是"重新加权"）。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 针对线性与非线性系统的实用算法</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>理论框架需要转化为可计算的算法。对于线性系统，如何用 zonotope 代数给出闭式解？对于非线性系统，如何在不失保证的前提下计算近似平滑？</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>约束 zonotope 对线性映射、Minkowski 和、pseudoinverse、交集都封闭——这意味着线性系统的所有平滑操作都可以在 zonotope 代数中完成。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Corollary 1 给出线性系统闭式解：平滑集合 = $\ker(\Phi_k) \oplus \Phi_k^+(\llbracket \mathbf{x}_{k+1}|y_{0:T}\rrbracket \oplus \Gamma_k\llbracket -\mathbf{w}_k\rrbracket) \cap \llbracket \mathbf{x}_k|y_{0:k}\rrbracket$，其中 $\Phi_k^+$ 是 Moore-Penrose 伪逆。对非线性系统，用区间分析或 Taylor 展开近似计算逆像。</div>
+  </div>
+</section>
+
+<!-- 3. SYSTEM ARCHITECTURE -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — 前向滤波 + 后向平滑双通道</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Forward Pass: Filtering <span>Lemma 3</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>初始化</strong>
+          <small>先验范围 $\llbracket\mathbf{x}_0\rrbracket$ 由物理约束或传感器标定给出</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>预测步 (k-1 to k)</strong>
+          <small>$\llbracket\mathbf{x}_k|y_{0:k-1}\rrbracket = f_{k-1}(\llbracket\mathbf{x}_{k-1}|y_{0:k-1}\rrbracket,\llbracket\mathbf{w}_{k-1}\rrbracket)$</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>更新步 (observation y_k)</strong>
+          <small>$\llbracket\mathbf{x}_k|y_{0:k}\rrbracket = g_k^{-1}(\{y_k\}) \cap \llbracket\mathbf{x}_k|y_{0:k-1}\rrbracket$</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Information Storage <span>Memory</span></h4>
+        <div class="arch-card arch-power">
+          <strong>滤波序列存储</strong>
+          <small>所有时刻的滤波后验 $\{\llbracket\mathbf{x}_k|y_{0:k}\rrbracket\}_{k=0}^T$ 被保存</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>系统模型存储</strong>
+          <small>动力学映射 $f_k$、噪声界 $\llbracket\mathbf{w}_k\rrbracket$、观测映射 $g_k$</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>观测序列存储</strong>
+          <small>全部观测 $\{y_k\}_{k=0}^T$ 用于构造逆像约束</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Backward Pass: Smoothing <span>Theorem 1</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>终端条件</strong>
+          <small>$\llbracket\mathbf{x}_T|y_{0:T}\rrbracket = \llbracket\mathbf{x}_T|y_{0:T}\rrbracket$ (滤波结果)</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>后向递推 (k+1 to k)</strong>
+          <small>$\llbracket\mathbf{x}_k|y_{0:T}\rrbracket = f_k^{-1}(\llbracket\mathbf{x}_{k+1}|y_{0:T}\rrbracket) \cap \llbracket\mathbf{x}_k|y_{0:k}\rrbracket$</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Output: Smoothed Sets <span>Result</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>平滑估计集</strong>
+          <small>$\{\llbracket\mathbf{x}_k|y_{0:T}\rrbracket\}_{k=0}^T$ — 每个时刻 s 比滤波集更紧</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>保证性质</strong>
+          <small>$\llbracket\mathbf{x}_k|y_{0:T}\rrbracket \subseteq \llbracket\mathbf{x}_k|y_{0:k}\rrbracket$，真值始终在集合内</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>uncertainty → bound</span>
+      <span>forward propagate</span>
+      <span>backward refine</span>
+      <span>guaranteed containment</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>非线性逆像计算和集合降阶的精度损失</small></div>
+      <div class="arch-metric"><strong>Main invention</strong><small>基于 uncertain variable 的最优后向递推方程</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>集合论取交集 = 不增保守性，信息越多范围越紧</small></div>
+      <div class="arch-metric"><strong>Current limitation</strong><small>计算复杂度随 T 和状态维度增长；非线性扩展仍需近似</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 Algorithm Flowchart — 前向-后向双通道</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph FORWARD["前向通道: 最优集合成员滤波 (Lemma 3)"]
+      direction LR
+      INIT["初始化: ⟦x₀⟧"] --> PRED["预测: ⟦x_k|y_{0:kᐨ1}⟧ = f_{kᐨ1}( ⟦x_{kᐨ1}|y_{0:kᐨ1}⟧, ⟦w_{kᐨ1}⟧ )"]
+      PRED --> UPDATE["更新: ⟦x_k|y_{0:k}⟧ = g_k⁻¹({y_k}) ∩ ⟦x_k|y_{0:kᐨ1}⟧"]
+      UPDATE -->|k++| PRED
+    end
+
+    subgraph BACKWARD["后向通道: 最优集合成员平滑 (Theorem 1)"]
+      direction RL
+      INIT_B["终端: ⟦x_T|y_{0:T}⟧ = ⟦x_T|y_{0:T}⟧"] --> BACK["后向递推: ⟦x_k|y_{0:T}⟧ = f_k⁻¹(⟦x_{k+1}|y_{0:T}⟧) ∩ ⟦x_k|y_{0:k}⟧"]
+      BACK -->|k--| BACK
+    end
+
+    subgraph RESULT["平滑结果"]
+      SMOOTHED["{⟦x_k|y_{0:T}⟧}  ⊂  {⟦x_k|y_{0:k}⟧}"]
+      GUARANTEE["保证: 真值始终 ∈ 平滑集 ⊆ 滤波集"]
+    end
+
+    FORWARD -->|"存储所有 ⟦x_k|y_{0:k}⟧"| BACKWARD
+    BACKWARD --> RESULT
+
+    classDef forward fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef backward fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef result fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class INIT,PRED,UPDATE forward
+    class INIT_B,BACK backward
+    class SMOOTHED,GUARANTEE result
+    </pre>
+  </div>
+
+  <h3>3.2 Mathematical Logic Flow — 从不确定变量到平滑方程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph FOUNDATION["理论基础: Uncertain Variables"]
+      UV["Uncertain Variable x: 可测函数 Ω→X, 范围 ⟦x⟧"]
+      LR["Lemma 1: Law of Total Range ⟦x⟧ = ∪_y ⟦x|y⟧"]
+      BR["Lemma 2: Bayes Rule for UV ⟦x|y⟧ = {x: ⟦y|x⟧ ∩ {y} ≠ ∅}"]
+    end
+
+    subgraph FILTERING["最优滤波 (Lemma 3)"]
+      SMF_PRED["预测: 动力学前向传播"]
+      SMF_UPDATE["更新: 逆测量映射 + 交集"]
+    end
+
+    subgraph SMOOTHING["最优平滑 (Theorem 1)"]
+      TEQ["⟦x_k|y_{0:T}⟧ = [∪_w f_{k,w}⁻¹(⟦x_{k+1}|y_{0:T}⟧)] ∩ ⟦x_k|y_{0:k}⟧"]
+      KEY["关键: 逆像 f_k⁻¹ 将未来约束反向投影到当前时刻"]
+    end
+
+    subgraph LINEAR["线性系统 (Corollary 1)"]
+      LEQ["⟦x_k|y_{0:T}⟧ = [ker(Φ_k) ⊕ Φ_k⁺(⟦x_{k+1}|y_{0:T}⟧ ⊕ Γ_k⟦-w_k⟧)] ∩ ⟦x_k|y_{0:k}⟧"]
+    end
+
+    FOUNDATION --> FILTERING
+    FILTERING --> SMOOTHING
+    SMOOTHING --> LINEAR
+
+    classDef found fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef filt fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef smooth fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef lin fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class UV,LR,BR found
+    class SMF_PRED,SMF_UPDATE filt
+    class TEQ,KEY smooth
+    class LEQ lin
+    </pre>
+  </div>
+</section>
+
+<!-- 4. TASK -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 — 非随机 HMM 的最优集合成员平滑</span>
+    $$ \text{Given: } \begin{cases} \mathbf{x}_{k+1} = f_k(\mathbf{x}_k, \mathbf{w}_k), & \mathbf{w}_k \in \llbracket\mathbf{w}_k\rrbracket \\ \mathbf{y}_k = g_k(\mathbf{x}_k, \mathbf{v}_k), & \mathbf{v}_k \in \llbracket\mathbf{v}_k\rrbracket \end{cases} $$
+    $$ \text{Find: } \llbracket\mathbf{x}_k | y_{0:T}\rrbracket = \{\mathbf{x}_k(\omega) : \mathbf{y}_{0:T}(\omega) = y_{0:T}, \omega \in \Omega\} $$
+    <div class="eq-note">
+      <strong>$\llbracket\mathbf{x}_k | y_{0:T}\rrbracket$</strong> = 在已知全部观测序列 $y_{0:T}$ 的条件下，状态 $\mathbf{x}_k$ 的所有可能取值集合 &nbsp;|&nbsp;
+      <strong>$f_k$</strong> = 状态转移函数（非线性，含过程噪声 $\mathbf{w}_k$）&nbsp;|&nbsp;
+      <strong>$g_k$</strong> = 观测函数（非线性，含量测噪声 $\mathbf{v}_k$）&nbsp;|&nbsp;
+      <strong>$\llbracket\mathbf{w}_k\rrbracket, \llbracket\mathbf{v}_k\rrbracket$</strong> = 已知的有界不确定集合（不需要概率分布！）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：噪声只知道界，不知道分布——因此不能使用贝叶斯框架。需要一种纯粹基于集合包含关系的最优估计方法。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>(1) 系统动力学模型 $f_k(\cdot,\cdot)$ 和观测模型 $g_k(\cdot,\cdot)$；(2) 噪声的有界集合 $\llbracket\mathbf{w}_k\rrbracket, \llbracket\mathbf{v}_k\rrbracket$；(3) 观测序列 $\{y_k\}_{k=0}^T$；(4) 初始状态范围 $\llbracket\mathbf{x}_0\rrbracket$</td><td>模型结构 + 集合描述 + 数据</td></tr>
+    <tr><td><strong>输出</strong></td><td>每个时刻 $k$ 的最优平滑状态集 $\llbracket\mathbf{x}_k | y_{0:T}\rrbracket$——保证包含真值且比滤波集更紧</td><td>集合序列（通常用 zonotope / interval 表示）</td></tr>
+    <tr><td><strong>目标</strong></td><td>建立最优 SMSing 框架，揭示滤波与平滑的关系，为线性和非线性系统提供可计算算法</td><td>理论 + 算法</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>理论框架+算法设计</strong>的工作。核心贡献不是一个新的特定应用场景，而是<strong>为集合成员估计领域补上了"平滑"这一环</strong>——此前 SMFing（滤波）已有大量研究，但 SMSing（平滑）缺乏统一的最优框架。场景：任何可以用非随机隐藏马尔可夫模型建模的系统（目标跟踪、故障诊断、机器人定位等），当噪声统计未知但界已知时，都可以使用本框架进行最优平滑估计。</p>
+</section>
+
+<!-- 5. CHALLENGE -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：在非概率框架下，如何定义"最优"平滑并给出可计算的递推方程？<br><br>
+    （1）<strong>缺少概率测度</strong>：贝叶斯平滑的"最优性"建立在最小均方误差（MMSE）或最大后验概率（MAP）的基础上——这些都需要概率分布。当噪声只有界、没有分布时，不能定义"期望"或"似然"，最优性的定义必须重构。<br><br>
+    （2）<strong>集合的交集非平凡</strong>：理论上，平滑应该利用未来观测来约束当前状态。但在数学上，这意味着要计算"所有能通过系统动力学演化到未来可能状态集合的当前状态"——即动力学的逆像（preimage）。对非线性系统，逆像的计算本身就是一个困难问题（可能需要解非凸约束满足问题）。<br><br>
+    （3）<strong>滤波-平滑的信息流耦合</strong>：前向滤波的结果被后向平滑消费，但平滑又可能反向影响对滤波的评估——两者不是独立的。需要证明：平滑方程给出的集合不仅"更紧"，而且是"给定所有信息后的最小可能集合"（即最优）。这个证明在非概率框架下需要全新的数学工具（uncertain variable 理论）。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Bayesian Smoothing (RTS smoother, particle smoother)</td>
+      <td>基于概率模型的前向-后向递推：$p(x_k|y_{0:T}) \propto p(x_k|y_{0:k}) \int p(x_{k+1}|x_k) p(x_{k+1}|y_{0:T}) / p(x_{k+1}|y_{0:k}) dx_{k+1}$</td>
+      <td><strong>需要精确的噪声概率分布</strong>——这在许多工程场景中不可获得。此外，贝叶斯平滑对一般非线性系统无法保证"平滑后验比滤波后验更集中"——它是重新加权，不是收缩。</td>
+    </tr>
+    <tr>
+      <td>Set-Membership Filtering (SMFing) only</td>
+      <td>只使用过去和当前观测进行状态估计：给定 $y_{0:k}$，计算可行状态集</td>
+      <td><strong>丢弃了未来信息</strong>——如果已知后续观测 $y_{k+1:T}$，它们也应该能帮助约束 $k$ 时刻的状态。单独滤波无法利用这种信息。</td>
+    </tr>
+    <tr>
+      <td>Heuristic SM Smoothing</td>
+      <td>将滤波集合与基于动力学后向投影的集合简单取交集，但缺乏最优性证明</td>
+      <td>没有证明交集是最优的（即最小的可行集）。可能过度保守（交集太大）或丢失真值（交集太小，如果数学推导不正确）。</td>
+    </tr>
+    <tr>
+      <td>Moving Horizon Estimation (MHE)</td>
+      <td>在滑动窗口内求解约束优化问题来估计状态</td>
+      <td>MHE 本质上是"批量优化"而非"递推平滑"——计算量随窗口长度增长，且不提供完整的后向递推理论。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 非概率最优性定义</strong>：没有概率测度，什么算"最优"？答案是：用集合包含关系。一个平滑集合是"最优"的，当且仅当它包含所有与动力学、观测一致的状态，且不包含任何不一致的状态。这个定义等价于"最小可行集"。</li>
+    <li><strong>挑战 2 — 逆像计算</strong>：$f_k^{-1}(S) = \{x : \exists w \in \llbracket\mathbf{w}_k\rrbracket, f_k(x,w) \in S\}$ ——当 $f_k$ 非线性时，这是一个非凸约束满足问题。需要高效的近似方法（区间分析、Taylor 线性化、DC 编程等）同时保证真值的包含性。</li>
+    <li><strong>挑战 3 — 集合表示的复杂度膨胀</strong>：每次递推（交、Minkowski 和、线性变换）都在增加 zonotope 的生成元数量。如果不做降阶，计算量会爆炸。需要在精度和效率之间平衡。</li>
+  </ul>
+</section>
+
+<!-- 6. METHOD & FORMULAS -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心算法包括两个部分：（1）最优集合成员滤波（SMFing, Lemma 3）——前向运行；（2）最优集合成员平滑（SMSing, Theorem 1）——后向运行。以下逐一拆解关键公式。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <h4>Group A: 最优集合成员滤波 (SMFing) — Lemma 3</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Lemma 3 — 前向最优滤波递推</span>
+    $$ \text{初始化: } \llbracket\mathbf{x}_0 | y_{0:0}\rrbracket = g_0^{-1}(\{y_0\}) \cap \llbracket\mathbf{x}_0\rrbracket $$
+    $$ \text{预测: } \llbracket\mathbf{x}_k | y_{0:k-1}\rrbracket = f_{k-1}\big(\llbracket\mathbf{x}_{k-1} | y_{0:k-1}\rrbracket, \llbracket\mathbf{w}_{k-1}\rrbracket\big) $$
+    $$ \text{更新: } \llbracket\mathbf{x}_k | y_{0:k}\rrbracket = \Big(\bigcup_{\mathbf{v}_k \in \llbracket\mathbf{v}_k\rrbracket} g_{k,\mathbf{v}_k}^{-1}(\{y_k\})\Big) \cap \llbracket\mathbf{x}_k | y_{0:k-1}\rrbracket $$
+    <div class="eq-note">
+      <strong>预测步</strong>：将前一时刻的滤波后验通过动力学映射前向传播，同时考虑所有可能的过程噪声——得到先验范围 &nbsp;|&nbsp;
+      <strong>更新步</strong>：对所有可能的量测噪声，计算能产生观测 $y_k$ 的状态集合（逆测量映射），然后与先验取交集——得到后验范围 &nbsp;|&nbsp;
+      <strong>最优性</strong>：$\llbracket\mathbf{x}_k | y_{0:k}\rrbracket$ 是包含真值的最小集合（给定 $y_{0:k}$ 信息）。
+    </div>
+  </div>
+
+  <h4>Group B: 最优集合成员平滑 (SMSing) — Theorem 1</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Theorem 1 — 后向最优平滑递推</span>
+    $$ \boxed{\llbracket\mathbf{x}_k | y_{0:T}\rrbracket = \left[\bigcup_{\mathbf{w}_k \in \llbracket\mathbf{w}_k\rrbracket} f_{k,\mathbf{w}_k}^{-1}\big(\llbracket\mathbf{x}_{k+1} | y_{0:T}\rrbracket\big)\right] \cap \llbracket\mathbf{x}_k | y_{0:k}\rrbracket} $$
+    <div class="eq-note">
+      <strong>$f_{k,\mathbf{w}_k}^{-1}(S)$</strong> = 给定过程噪声 $\mathbf{w}_k$，映射到集合 $S$ 的所有状态的逆像（preimage）：$\{x : f_k(x,\mathbf{w}_k) \in S\}$ &nbsp;|&nbsp;
+      <strong>$\bigcup_{\mathbf{w}_k}$</strong> = 对所有可能的噪声实现取并集——因为真实噪声未知，需要覆盖所有可能性 &nbsp;|&nbsp;
+      <strong>第一项</strong> = 从"$k+1$ 时刻的未来可能状态"通过动力学反向推导"$k$ 时刻哪些状态可能演变到这些未来状态" &nbsp;|&nbsp;
+      <strong>第二项 $\llbracket\mathbf{x}_k | y_{0:k}\rrbracket$</strong> = 前向滤波后验——基于 $k$ 时刻及之前的观测 &nbsp;|&nbsp;
+      <strong>取交集</strong> = 过去信息 + 未来信息 → 双重约束 → 更紧的估计。
+    </div>
+  </div>
+
+  <h4>Group C: 线性系统闭式解 — Corollary 1</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Corollary 1 — 线性系统 zonotope 闭式平滑</span>
+    $$ \text{系统: } \mathbf{x}_{k+1} = \Phi_k \mathbf{x}_k + \Gamma_k \mathbf{w}_k,\quad \mathbf{y}_k = \Xi_k \mathbf{x}_k + \Psi_k \mathbf{v}_k $$
+    $$ \boxed{\llbracket\mathbf{x}_k | y_{0:T}\rrbracket = \left[\ker(\Phi_k) \oplus \Phi_k^{+}\big(\llbracket\mathbf{x}_{k+1} | y_{0:T}\rrbracket \oplus \Gamma_k\llbracket -\mathbf{w}_k\rrbracket\big)\right] \cap \llbracket\mathbf{x}_k | y_{0:k}\rrbracket} $$
+    <div class="eq-note">
+      <strong>$\Phi_k^{+}$</strong> = Moore-Penrose 伪逆——当 $\Phi_k$ 不可逆（奇异矩阵，如状态维度 > 控制维度）时，用伪逆计算最小范数解 &nbsp;|&nbsp;
+      <strong>$\ker(\Phi_k)$</strong> = $\Phi_k$ 的零空间——包含所有通过 $\Phi_k$ 映射到零的状态分量，这些分量不受动力学约束 &nbsp;|&nbsp;
+      <strong>$\oplus$</strong> = Minkowski 和：$A \oplus B = \{a+b : a \in A, b \in B\}$ &nbsp;|&nbsp;
+      <strong>核心工程意义</strong>：这个公式中的所有操作在 zonotope 表示下都是封闭的——线性映射、Minkowski 和、与 zonotope/多面体取交集——因此可以直接用 zonotope 代数实现闭式计算，不需要数值优化。
+    </div>
+  </div>
+
+  <h4>Group D: 平滑 vs 滤波的理论关系</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Remark 1 — 平滑必然不差于滤波</span>
+    $$ \llbracket\mathbf{x}_k | y_{0:T}\rrbracket \subseteq \llbracket\mathbf{x}_k | y_{0:k}\rrbracket \quad \forall k = 0,1,\ldots,T $$
+    <div class="eq-note">
+      <strong>$T \ge k$</strong> 意味着平滑使用了比滤波更多的观测（含未来观测） &nbsp;|&nbsp;
+      <strong>证明思路</strong>：从 Theorem 1 可以直接看出——平滑集合是滤波集合与另一个集合（逆像项）的交集，交集是两者的子集 &nbsp;|&nbsp;
+      <strong>为什么贝叶斯框架下不能直接这么说</strong>：在贝叶斯框架下，$p(x_k|y_{0:T})$ 不是简单地"等于 $p(x_k|y_{0:k})$ 与某个分布的乘积"——它是通过前向-后向算法重新计算的后验，对于非高斯/非线性系统，无法保证其方差矩阵（或置信集）≤ 滤波的方差矩阵。集合成员框架的<strong>格结构（lattice structure）</strong>（集合包含关系构成偏序）使得这个结论自然成立。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>含义</th><th>为什么重要</th></tr>
+    <tr><td>$\llbracket\mathbf{w}_k\rrbracket$</td><td>过程噪声的有界集合（如区间 $[-w_{\max}, w_{\max}]$）</td><td>噪声界越大 → 预测范围越宽 → 滤波/平滑精度越低。需要从物理或标定中获得紧界</td></tr>
+    <tr><td>$\llbracket\mathbf{v}_k\rrbracket$</td><td>量测噪声的有界集合</td><td>直接影响更新步的逆测量映射范围——过估计会导致过度保守</td></tr>
+    <tr><td>$T$ (总时间步数)</td><td>观测序列长度</td><td>平滑的"未来信息量"随 $T-k$ 增大——但计算量也随 $T$ 增长</td></tr>
+    <tr><td>$\Phi_k$ 的秩</td><td>状态转移矩阵的秩（线性系统）</td><td>决定 $\ker(\Phi_k)$ 的维度——零空间越大，逆像的"模糊度"越高</td></tr>
+    <tr><td>zonotope 生成元数量</td><td>表示集合的复杂度</td><td>每次交集和 Minkowski 和操作增加生成元数量——需要定期降阶</td></tr>
+  </table>
+
+  <h3>6.4 前向滤波 vs 后向平滑的比较</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🔵 前向滤波 (Lemma 3)</h4>
+      <ul>
+        <li><strong>信息源</strong>：仅过去和当前观测 $y_{0:k}$</li>
+        <li><strong>计算方向</strong>：$k=0 \to T$（因果/在线）</li>
+        <li><strong>核心操作</strong>：预测（动力学前向）+ 更新（观测约束）</li>
+        <li><strong>精度</strong>：受限于过去信息量</li>
+        <li><strong>实时性</strong>：可以在线运行</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🟣 后向平滑 (Theorem 1)</h4>
+      <ul>
+        <li><strong>信息源</strong>：全部观测 $y_{0:T}$（含未来）</li>
+        <li><strong>计算方向</strong>：$k=T \to 0$（非因果/离线）</li>
+        <li><strong>核心操作</strong>：逆像（动力学反投）+ 交集（滤波后验 ∩ 反投约束）</li>
+        <li><strong>精度</strong>：更紧（信息更多）</li>
+        <li><strong>实时性</strong>：仅离线（需要完整观测序列）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7. FUNDAMENTAL PRINCIPLES -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个关键基础：uncertain variable 的数学理论（为什么可以用集合代替概率分布）、前向-后向的信息耦合机制（为什么平滑比滤波更紧）、线性系统中 zonotope 代数的封闭性（为什么可以闭式计算）。</p>
+
+  <h3>7.1 Uncertain Variable 理论 — 为什么可以不用概率？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — Uncertain Variable 的核心定义</span>
+    $$ \mathbf{x} : \Omega \to \mathbb{X}, \quad \llbracket\mathbf{x}\rrbracket := \{\mathbf{x}(\omega) : \omega \in \Omega\} $$
+    $$ \llbracket\mathbf{x} | y\rrbracket := \{\mathbf{x}(\omega) : \mathbf{y}(\omega) = y, \omega \in \Omega\} $$
+    <div class="eq-note">
+      <strong>$\Omega$</strong> = 样本空间（所有可能"场景"的集合）&nbsp;|&nbsp;
+      <strong>$\mathbf{x}(\omega)$</strong> = 在场景 $\omega$ 下的状态取值 &nbsp;|&nbsp;
+      <strong>$\llbracket\mathbf{x}\rrbracket$</strong> = 无条件值域——所有可能场景下状态的取值范围 &nbsp;|&nbsp;
+      <strong>$\llbracket\mathbf{x}|y\rrbracket$</strong> = 条件值域——在观测到 $y$ 的条件下状态的取值范围 &nbsp;|&nbsp;
+      <strong>关键</strong>：不需要定义 $\Omega$ 上的概率测度——只需要知道每个 $\omega$ 下 $\mathbf{x}$ 和 $\mathbf{y}$ 的函数关系。这在只知道噪声界而不知道分布时非常自然。
+    </div>
+  </div>
+
+  <p>uncertain variable 理论的强大之处在于：它提供了两个关键引理，分别对应概率论中的"全概率公式"和"贝叶斯公式"——但用纯集合论语言表述，不需要概率。</p>
+
+  <div class="formula-block">
+    <span class="eq-tag">Lemma 1 — Law of Total Range（集合论版全概率公式）</span>
+    $$ \llbracket\mathbf{x}\rrbracket = \bigcup_{\mathbf{y} \in \llbracket\mathbf{y}\rrbracket} \llbracket\mathbf{x} | y\rrbracket $$
+    <div class="eq-note">这个引理说：无条件范围 = 所有可能条件范围之并——与概率论中 $p(x) = \sum_y p(x|y)p(y)$ 在结构上对应，但这里没有任何概率权重，只是集合的并。</div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Lemma 2 — Bayes' Rule for Uncertain Variables（集合论版贝叶斯公式）</span>
+    $$ \llbracket\mathbf{x} | y\rrbracket = \{x : \llbracket\mathbf{y} | x\rrbracket \cap \{y\} \neq \varnothing,\; x \in \llbracket\mathbf{x}\rrbracket\} $$
+    <div class="eq-note">给定观测 $y$，一个状态 $x$ 是"可能的"当且仅当：(1) $x$ 本身在无条件范围内；(2) 在 $x$ 发生的条件下，观测到 $y$ 是可能的——即 $\llbracket\mathbf{y}|x\rrbracket$ 包含 $y$。</div>
+  </div>
+
+  <h3>7.2 平滑-滤波的信息耦合 — 为什么"交"是最优操作？</h3>
+
+  <p>从 Theorem 1 的结构可以看出平滑的直觉：</p>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 平滑 = 双约束的交集</span>
+    $$ \begin{aligned} \underbrace{\llbracket\mathbf{x}_k | y_{0:T}\rrbracket}_{\text{平滑后验}} &= \underbrace{\big[\bigcup_{\mathbf{w}_k} f_{k,\mathbf{w}_k}^{-1}(\llbracket\mathbf{x}_{k+1} | y_{0:T}\rrbracket)\big]}_{\text{约束①: 必须能演化到未来的可能状态}} \cap \underbrace{\llbracket\mathbf{x}_k | y_{0:k}\rrbracket}_{\text{约束②: 必须与过去观测一致}} \end{aligned} $$
+    <div class="eq-note">
+      <strong>约束①（未来信息）</strong>：如果 $k+1$ 时刻的状态必须在集合 $S_{k+1}$ 中，那么 $k$ 时刻的状态必须属于 $S_{k+1}$ 的逆像——"所有能到达 $S_{k+1}$ 的状态" &nbsp;|&nbsp;
+      <strong>约束②（过去信息）</strong>：$k$ 时刻的状态必须与 $k$ 及之前的所有观测一致——这就是滤波给出的约束 &nbsp;|&nbsp;
+      <strong>取交集</strong>：两个约束的交集比任一个都紧——而且因为两个约束都是"包含真值的集合"，它们的交集也必然包含真值。
+    </div>
+  </div>
+
+  <h3>7.3 线性系统 Zonotope 代数的封闭性 — 为什么可以闭式计算？</h3>
+
+  <p>约束 zonotope（constrained zonotope）的定义：</p>
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — Constrained Zonotope 的定义与封闭性</span>
+    $$ \mathcal{Z} = \left\{c + \sum_{i=1}^{n_g} \beta_i g_i : \|\beta\|_{\infty} \le 1,\; A\beta = b\right\} $$
+    <div class="eq-note">
+      <strong>$c$</strong> = 中心 &nbsp;|&nbsp;
+      <strong>$g_i$</strong> = 生成元（generators）&nbsp;|&nbsp;
+      <strong>$\beta_i \in [-1,1]$</strong> = 生成元系数 &nbsp;|&nbsp;
+      <strong>$A\beta = b$</strong> = 等式约束（使 zonotope 可以表示非对称/非中心对称的形状）&nbsp;|&nbsp;
+      <strong>关键封闭性</strong>：线性映射、Minkowski 和、与半空间交集、与另一个 constrained zonotope 交集——这些操作的结果<strong>仍然可以用 constrained zonotope 表示</strong>（虽然生成元数量会增加）。这使得 Corollary 1 的整个公式链可以在 zonotope 代数中"一步到位"完成。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    Uncertain Variable 理论提供了数学语言 → 用集合包含关系定义"最优" → Theorem 1 给出递推关系 → 对于线性系统，Corollary 1 因 zonotope 的封闭性可以在不引入额外近似的条件下直接计算 → 三个层次（理论框架 → 递推方程 → 计算实现）层层递进，构成了完整的 SMSing 体系。
+  </div>
+</section>
+
+<!-- 8. PAPER FIGURES -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig3.png</code> 即可自动显示。</p>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">最优集合成员平滑与滤波的对比——双约束交集示意图</span>
+      <span class="fig-source">来源：论文 Fig. 1 (示意)</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="SMSing vs SMFing comparison"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：滤波（仅用过去信息）和平滑（用全部信息）之间的本质区别。滤波集合（蓝色区域）是基于 $y_{0:k}$ 的可行状态范围——它包含了所有与过去观测一致的状态。平滑集合（紫色区域，滤波的子集）在此基础上加入了未来观测 $y_{k+1:T}$ 通过动力学反向传播的约束（红色虚线区域）——两者的交集产生更紧的估计。</p>
+      <ul>
+        <li><strong>为什么平滑一定不差于滤波</strong>：因为平滑集合 = 滤波集合 ∩ 未来约束集合；交集运算天然是单调收缩的</li>
+        <li><strong>为什么平滑的计算比滤波贵</strong>：需要额外的逆像计算和交集；而且需要等待完整观测序列——因此是离线的</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">前向-后向信息流的 Mermaid 逻辑示意图</span>
+      <span class="fig-source">来源：论文 Algorithm 1 / Lemma 3 + Theorem 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Forward-backward algorithm flow"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：完整的前向-后向算法流程。上半部分：前向滤波（Lemma 3）从 $k=0$ 到 $k=T$ 计算并存储每个时刻的滤波后验。下半部分：后向平滑（Theorem 1）从 $k=T$ 反向到 $k=0$，每步将滤波后验与逆像取交集。两条虚线箭头表示信息流向：滤波结果被平滑消费，平滑的更高精度可以用于后续评估（如故障检测阈值）。</p>
+      <ul>
+        <li><strong>算法的在线/离线特性</strong>：滤波是在线的（每来一个观测就更新），平滑是离线的（需要完整观测序列）——这与 Kalman filter / RTS smoother 的使用模式完全相同</li>
+        <li><strong>存储需求</strong>：需要存储 $T$ 个滤波后验集合——对 zonotope 表示来说，存储需求是线性的（每个 zonotope 存储中心 + 生成元矩阵）</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">仿真验证——平滑 vs 滤波的集合大小对比</span>
+      <span class="fig-source">来源：论文 Simulation Section</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Simulation results comparison"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：数值仿真中平滑集合和滤波集合的体积/宽度对比。横轴是时间步 $k$，纵轴是集合的某种度量（如 zonotope 的体积或各维度的最大宽度）。平滑曲线（紫色）始终在滤波曲线（蓝色）之下——验证了理论结论。</p>
+      <ul>
+        <li><strong>$k$ 越接近 $T$，改进越少</strong>：因为接近序列末尾时，未来信息很少——平滑几乎等同于滤波</li>
+        <li><strong>$k$ 越接近 $0$，改进越大</strong>：因为可以参考的未来观测最多——前向滤波在初始阶段的不确定性最大，平滑可以通过后续大量观测来校正</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9. POTENTIAL FLAW -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 系统模型 $f_k$ 和 $g_k$ 必须是精确已知的——如果模型有未建模动态或参数不确定性，最优性保证不再成立；(2) 噪声界 $\llbracket\mathbf{w}_k\rrbracket, \llbracket\mathbf{v}_k\rrbracket$ 必须真实包含所有噪声实现——如果低估，真值可能落在估计集之外；(3) 观测必须无数据丢失和时延。</li>
+    <li><strong>适用场景</strong>：离线批量处理场景（如事后数据分析、轨迹重建、故障根因分析）。不适合对实时性要求高的在线估计任务（此时只能用前向滤波）。</li>
+    <li><strong>可扩展性</strong>：非线性系统的逆像计算本质上是一个困难问题——当前的区间分析/Taylor 展开近似可能导致过度保守。对于高维系统（状态维度 > 10），zonotope 的交集操作会导致生成元数量快速膨胀。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：分布式集合成员平滑——在多传感器网络中，每个节点如何利用邻居的观测进行平滑？这需要将 COIT 概念（来自 Paper 1356）与 SMSing 框架结合。</li>
+    <li><strong>条件放松</strong>：(1) 模型不确定性——当 $f_k, g_k$ 本身也有界不确定性时，如何扩展最优性？(2) 数据丢失——间歇性观测下平滑的鲁棒性。(3) 时变噪声界——在线估计或自适应调整噪声界。</li>
+    <li><strong>约束加入</strong>：(1) 状态约束——如物理约束（速度上限、地理围栏）天然是凸多面体，可以直接加入平滑框架的交集中；(2) 稀疏性约束——如果状态在某些基下是稀疏的，可以额外收缩估计集。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>噪声界误估（过低）</td><td>如果真实噪声偶尔超出预设界 → 真值可能不在估计集中 → 集合成员保证失效。需要更保守的过估计或在线自适应界</td><td>★★★★★</td></tr>
+    <tr><td>模型误差</td><td>$f_k$ 和 $g_k$ 的建模误差会导致逆像和预测步的偏移 → 集合的中心漂移 → 真值可能偏离估计集。对于长期预测尤其严重</td><td>★★★★</td></tr>
+    <tr><td>离散化误差</td><td>如果连续系统被离散化 → 离散化误差会在前向-后向递推中累积 → 需要额外的误差界或更细的时间步长</td><td>★★★</td></tr>
+    <tr><td>集合降阶的精度损失</td><td>每 $n$ 步降阶一次 zonotope → 极端情况下可能损失 > 50% 的精度 → 需要在降阶频率和计算效率之间平衡</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>分布式集合成员平滑 (Distributed SMSing)</strong>——这是将本文的理论框架与 Paper 1356 的 COIT 概念结合的自然延伸。核心问题：(1) 在分布式网络中，每个节点只有局部观测，如何进行最优平滑？需要定义"给定所有节点全部历史观测"的条件值域。(2) 如何在不传输完整 zonotope 的情况下实现分布式平滑？——可以利用 COIT 的"信息塔"思想，将全局观测分解为源组件的观测信息。(3) 分布式平滑的渐近有界性如何保证？——COIT 的条件可以直接扩展：如果每个源组件的观测信息通过图结构能约束所有状态方向，则平滑集有界。
+  </div>
+</section>
+
+<!-- 10. MOTIVATION -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>在集合成员估计中，滤波（SMFing）只使用过去和当前的观测来约束当前状态。但是，当我们事后分析一段数据时（比如飞完后分析日志），未来的观测明明已经知道了，为什么不用？直觉上，更多的信息应该能产生更紧的估计——但需要一个数学框架来严格证明"怎么用"和"为什么是最优的"。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>在概率框架下，贝叶斯平滑（RTS smoother, particle smoother）完美回答了这个问题——通过前向-后向递推。但在集合成员框架下：(a) 没有概率分布，不能直接移植贝叶斯平滑的公式；(b) 此前的 SM 平滑工作或是启发式的（直接取交集但未证明最优性），或是针对特定系统的（缺乏通用性）。</li>
+    <li><strong>如果使用纯集合论语言重新定义条件化呢？</strong><br>uncertain variable 理论（Nair 2013）提供了所需的所有工具——"给定观测 y 时 x 的条件值域"可以纯集合论定义，不需要概率。"全范围公式"和"贝叶斯规则"也有集合论版本（Lemma 1 &amp; 2）。这为定义"最优"（最小可行集）提供了数学基础。</li>
+    <li><strong>平滑 = 前向滤波结果 ∩ 后向动力学反投影</strong><br>前向滤波告诉我们"基于过去信息，状态可能在哪儿"；后向反投影告诉我们"要演化到未来的可能状态，当前状态必须在哪儿"。两者取交集，就是"过去+未来双约束"下的最小可行集。Theorem 1 用 uncertain variable 的语言严格证明了这个集合确实是最优的（最小可行集）。</li>
+    <li><strong>线性系统的红利</strong><br>如果系统是线性的，所有操作（线性映射的逆像 = 伪逆 + 零空间平移、Minkowski 和、交集）在 zonotope 代数中都是封闭的——可以闭式计算，不需要优化求解器。Corollary 1 给出了显式公式。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    集合成员滤波只用过去观测来约束状态——但如果未来的观测已经知道了（离线分析场景），为什么不把它们通过系统动力学反向投影回来，与当前估计取交集，得到一个更紧且仍然包含真值的范围？这需要的不只是直觉——而是一个严格的数学框架来定义"最优"和证明"取交集确实是最优操作"。
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：SMFing 已经有了比较成熟的最优滤波理论，但平滑一片空白。在概率框架中，滤波和对称的平滑（前向-后向）是完美的对偶结构——是否可以在集合论中也建立这种对偶？</li>
+    <li><strong>Step 2 — 分解问题</strong>：(1) 需要一种不用概率的"条件化"定义 → uncertain variable；(2) 需要定义什么是最优平滑 → 最小可行集；(3) 需要找到前向滤波和后向平滑的连接点 → 动力学的逆像。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：(1) uncertain variable 的条件值域 ⇔ 概率框架的条件期望；(2) 逆像 $f_k^{-1}$ ⇔ 贝叶斯平滑中的逆向动力学 $p(x_k|x_{k+1})$；(3) 集合交集 ⇔ 贝叶斯更新中的概率乘积。每个工具在集合论中都有精确的对偶。</li>
+    <li><strong>Step 4 — 验证</strong>：证明交点是最优的（Theorem 1），对线性系统给出闭式解（Corollary 1），做数值仿真验证平滑集合确实比滤波集合更紧。</li>
+  </ul>
+</section>
+
+<!-- 11. KEY TAKEAWAYS -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：本文展示了<strong>"用集合论替代概率论"的完整范式</strong>。当噪声统计未知但界已知时，集合成员方法提供了一种"强保证"（真值一定在估计集中），代价是估计精度可能低于利用完整分布的概率方法。对于安全关键应用（如无人机碰撞避免、故障检测），这种强保证比"概率上很可能"更有价值。uncertain variable 理论证明：集合论可以建立一个与概率论<strong>结构平行但语义不同</strong>的完整估计理论体系。</li>
+    <li><strong>技术技巧层面</strong>：(1) 用 uncertain variable 的 Law of Total Range 和 Bayes' Rule 替代概率论中对应的公式——这在数学上严格且工程上直观；(2) 逆像是平滑的核心操作——对于线性系统用伪逆 + 零空间，对于非线性系统用区间分析；(3) zonotope 的封闭性是计算效率的关键——所有操作都在同一表示中完成。</li>
+    <li><strong>写作层面</strong>：论文的 Remark 1 是一个巧妙的理论贡献——指出"平滑不差于滤波"在集合成员框架中可以直接证明，但在贝叶斯框架中不能——这既强调了本文的理论价值，又揭示了集合成员方法的独特优势。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 状态估计</strong>：UAV 的传感器噪声（IMU、GPS、气压计）的统计特性经常随着环境变化（温度、振动、电磁干扰），精确建模其概率分布极为困难。但<strong>误差的有界性</strong>（如"加速度计偏置不超过 ±0.1g"）更容易从数据手册获得。本文的框架可以直接用于 UAV 的离线轨迹重建——用飞行日志中的全部传感器数据进行平滑，得到比在线 EKF 更精确的轨迹估计（且附带严格误差界）。</li>
+    <li><strong>对于分布式估计</strong>：结合 Paper 1356 的 COIT 框架，可以将单个 UAV 的平滑扩展到多 UAV 编队的分布式平滑——每架 UAV 贡献局部观测，通过通信图传播信息，实现全局最优平滑。这对编队飞行后的轨迹分析、队形精度评估等任务有直接价值。</li>
+    <li><strong>对于故障诊断</strong>：平滑给出的紧集可以设置更准确的故障检测阈值——如果某个时刻的传感器读数不在平滑给出的预测范围内（考虑了未来信息后的紧集），则几乎可以确定异常发生（因为包含真值的保证更强）。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Nair (2013) — A non-stochastic information theory for communication and state estimation. <em>IEEE TAC</em></td><td>uncertain variable 理论的奠基性工作——本文的数学框架直接建立在此之上。理解 UV 理论是理解所有非随机估计方法的前提。</td></tr>
+    <tr><td>Scott, Raimondo, Marseglia, Braatz (2016) — Constrained zonotopes: A new tool for set-based estimation. <em>Automatica</em></td><td>约束 zonotope 的原始论文——揭示了 zonotope 对交集操作的封闭性，这是本文线性系统算法（Corollary 1）能闭式计算的关键。</td></tr>
+    <tr><td>Combastel (2005) — A state bounding observer based on zonotopes. <em>ECC</em></td><td>最早将 zonotope 用于集合成员观测器的工作之一——为 SMFing 的计算效率奠定了基础。</td></tr>
+    <tr><td>Khargonekar (1993) — $H_\infty$ estimation and robust control. <em>Various</em></td><td>$H_\infty$ 滤波与集合成员滤波在思想上同源（都关心最坏情况保证），理解 $H_\infty$ 框架有助于理解集合成员方法的动机和局限。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Li, Cong, Zhou, Dong · IEEE TAC 2025/2026 · Optimal Set-Membership Smoothing · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

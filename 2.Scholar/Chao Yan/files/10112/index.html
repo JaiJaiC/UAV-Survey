@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Selective imitation enhanced deep reinforcement learning for AAV navigation and obstacle avoidance with sparse rewards - Paper Notes</title>
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\(', '\)']], displayMath: [['$$', '$$'], ['\[', '\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body><nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container"><main>
+<header class="hero"><div class="eyebrow">Level-3 paper note · local evidence</div><h1>Selective imitation enhanced deep reinforcement learning for AAV navigation and obstacle avoidance with sparse rewards</h1><div class="meta">Scholar: Chao Yan · Paper ID: 10112 · Yan et al., 2025 · 14 pages · IEEE (推断 TNNLS)</div></header>
+
+<section id="info">
+  <h2>§1 Paper Information</h2>
+  <h3>1.1 Complete Metadata</h3>
+  <table>
+    <tr><td style="width:140px;font-weight:700;">Title</td><td>Selective imitation enhanced deep reinforcement learning for AAV navigation and obstacle avoidance with sparse rewards</td></tr>
+    <tr><td style="font-weight:700;">Authors</td><td>Yan et al. (Chao Yan 主要作者, NUAA 合作)</td></tr>
+    <tr><td style="font-weight:700;">Year / Venue</td><td>2025 / IEEE (14 pages, received/accepted 2025)</td></tr>
+    <tr><td style="font-weight:700;">Algorithm</td><td>SBCAC: Selective Behavior Cloning enhanced Actor-Critic</td></tr>
+    <tr><td style="font-weight:700;">Key Results</td><td>Success Rate +16.07%, Crash Rate -72.46%, Stray Rate -94.62% (vs selective-imitation baseline)</td></tr>
+    <tr><td style="font-weight:700;">Validation</td><td>Simulation + Hardware-in-the-Loop + Physical experiments (fixed-wing & multi-rotor)</td></tr>
+    <tr><td style="font-weight:700;">Core Mechanism</td><td>Experience Filter + Q-value Action Selector (dual-gate for selective APF imitation)</td></tr>
+  </table>
+
+  <h3>1.2 TL;DR (Chinese Summary)</h3>
+  <p>本文提出<strong>SBCAC（Selective Behavior Cloning enhanced Actor-Critic）</strong>——一种利用<strong>非专家演示器（人工势场APF）加速稀疏奖励DRL训练</strong>的端到端学习框架。核心创新是<strong>双重正交门控机制</strong>：(1) <strong>经验过滤器</strong>在动作空间剔除APF的明显错误建议；(2) <strong>Q值动作选择器</strong>在价值空间实时仲裁策略动作和APF动作的优劣。两者级联实现了"有用的APF经验就学，坏的APF经验就扔"的选择性模仿。BC损失权重随时间衰减，实现从"依赖APF引导"到"超越APF上限"的渐进自主化。在固定翼和多旋翼两类平台、多种障碍场景中，SBCAC相对最先进的选择性模仿基线：成功率提升16.07%，碰撞率降低72.46%，偏航率降低94.62%。硬件在环和实物飞行实验验证了仿真到实物的可迁移性。该方法为"如何从非最优先验知识中有效提取学习信号"提供了一个精巧而通用的框架。</p>
+
+  <h3>1.3 Tags</h3>
+  <span class="tag tag-blue">Deep Reinforcement Learning</span>
+  <span class="tag tag-green">Imitation Learning</span>
+  <span class="tag tag-amber">Sparse Reward</span>
+  <span class="tag tag-purple">Selective Behavior Cloning</span>
+  <span class="tag tag-red">Artificial Potential Field</span>
+  <span class="tag tag-cyan">POMDP + Actor-Critic</span>
+  <span class="tag tag-gray">Hardware-in-the-Loop</span>
+</section>
+
+<section id="insight">
+  <h2>§2 Core Insight & Novelty</h2>
+  <div class="callout info">
+    <div class="callout-title">💡 核心洞察</div>
+    <p><strong>这个工作的核心insight是什么？</strong></p>
+    <p>稀疏奖励下DRL的核心困境是<strong>探索-信息悖论</strong>：学好需要好数据，好数据需要好策略，好策略需要学好——鸡生蛋蛋生鸡。APF等经典规划器可以打破循环（提供初始方向引导），但APF本身是有缺陷的（局部极小值、窄通道振荡、非凸障碍误导），盲目克隆会把这些缺陷固化进策略。本文的insight是：<strong>把APF从"导师"降级为"建议者"，用Critic的Q值作为通用裁判来仲裁"策略自己的想法"和"APF的建议"哪个更好</strong>。Q值天然衡量长期期望回报——正好是"动作质量"的理想度量。经验过滤器（动作空间相似度筛选）和Q值选择器（价值空间最优性筛选）形成一对正交的质量门控，确保策略只吸收APF的"精华"而免疫其"糟粕"。更精妙的是，这个框架具有<strong>自适应过渡特性</strong>——训练早期APF通常占优（策略还不成熟），策略通过BC大量学习；训练后期策略超越APF，Q值选择器自然切换到策略自主决策——无需任何手工调度。</p>
+  </div>
+  <h3>2.1 灵感→Insight映射表</h3>
+  <table>
+    <tr><th>灵感来源</th><th>核心洞察</th><th>具体体现</th></tr>
+    <tr><td>稀疏奖励探索困境</td><td>纯随机探索几乎不可能在复杂障碍中偶然成功，必须注入先验知识但又要防止先验偏差</td><td>APF提供探索引导，双门控过滤偏差，BC衰减实现渐进自主</td></tr>
+    <tr><td>非专家演示的"毒药"效应</td><td>BC不加区分地学习所有演示，包括APF在局部极小值等场景的错误动作——这比"不学"更糟</td><td>经验过滤器基于策略-APF动作相似度剔除明显错误的APF经验</td></tr>
+    <tr><td>Critic Q值作为通用裁判</td><td>Q函数已经学会了评估动作的长期价值——是一个免费且持续优化的动作质量度量</td><td>Q值动作选择器实时比较 $Q(s,a^\pi)$ vs $Q(s,a^{APF})$，选优执行</td></tr>
+    <tr><td>脚手架教学理论</td><td>好的教学应该在学生能力不足时提供支持，在学生能力提升后逐步撤除</td><td>BC权重 $\beta_t$ 随时间线性衰减，最终Actor完全自主</td></tr>
+  </table>
+
+  <h3>2.2 创新点卡片</h3>
+
+  <div class="novelty-card">
+    <h4>① 创新点一：经验过滤器（Experience Filter）</h4>
+    <div class="novelty-step"><strong>📍 解决的问题：</strong>APF在U型障碍（局部极小）、窄通道（两侧墙壁间振荡）、目标近障碍（斥力排斥）等场景产生错误或次优建议。将这些"毒药"经验加入BC训练会污染策略。</div>
+    <div class="novelty-step"><strong>💡 灵感来源：</strong>数据清洗——训练数据质量决定模型上限。模仿学习中"演示质量"同样需要有筛选机制。</div>
+    <div class="novelty-step"><strong>🔧 具体设计：</strong>计算策略动作 $a_t^\pi$ 与APF动作 $a_t^{APF}$ 的余弦相似度。当 $\cos(a_t^\pi, a_t^{APF}) > \tau_{cos}$ 时，认为APF的建议与策略当前认知一致，该经验被允许进入BC经验池；否则丢弃。余弦相似度对动作大小不敏感（APF建议的方向可能对，但力度不准），比欧氏距离更适合此场景。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>② 创新点二：Q值动作选择器（Q-value Action Selector）</h4>
+    <div class="novelty-step"><strong>📍 解决的问题：</strong>即使通过了过滤器的APF经验也可能次优（只是"不太差"）。如果策略自己找到了更好的动作，为什么要学APF？需要一种在线择优机制。</div>
+    <div class="novelty-step"><strong>💡 灵感来源：</strong>博弈论中的最优响应——在多个候选方案中选择预期收益最大的。Q值提供的就是期望累积回报的估计。</div>
+    <div class="novelty-step"><strong>🔧 具体设计：</strong>每步决策时，计算 $Q(s_t, a_t^\pi)$ 和 $Q(s_t, a_t^{APF})$，选择 $a_t^* = \arg\max_{a \in \{a^\pi, a^{APF}\}} Q(s_t, a)$ 实际执行。这实现了<strong>运行时在线择优</strong>：训练早期策略差，APF Q值更高；训练后期策略超越APF，自动切换。无需任何手工调度。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>③ 创新点三：双重门控协同 + BC衰减机制</h4>
+    <div class="novelty-step"><strong>📍 解决的问题：</strong>单一筛选有盲区。过滤器只看"策略和APF是否一致"但不管"APF是否真的更好"；Q值选择器在早期Critic不准时噪声大。两者盲区恰好互补。</div>
+    <div class="novelty-step"><strong>💡 灵感来源：</strong>冗余安全设计和渐进式自主化——两个独立但互补的筛选机制形成安全网，BC损失权重衰减实现从脚手架到自主的平滑过渡。</div>
+    <div class="novelty-step"><strong>🔧 具体设计：</strong>过滤器做粗筛（低计算开销），Q值选择器做精筛（需神经网络前向）。两者级联：先过滤再Q值比较。同时BC损失权重 $\beta_t = \beta_0 \cdot \max(0, 1 - t/T_{decay})$ 随时间线性衰减，在训练后期Actor完全依赖RL信号自主提升。</div>
+  </div>
+</section>
+
+<section id="architecture">
+  <h2>§3 System Architecture</h2>
+  <h3>3.1 架构总览面板</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>① 感知与观测 <span>Perception</span></h4>
+        <div class="arch-card arch-solar"><strong>不完美传感器输入</strong><small>LiDAR距离扫描(360°)、IMU姿态、GPS位置、目标相对方位，含噪声和遮挡</small></div>
+        <div class="arch-card arch-solar"><strong>POMDP观测编码</strong><small>多帧历史观测堆叠，处理部分可观测性下的信念状态维护</small></div>
+      </div>
+      <div class="arch-stage">
+        <h4>② 双路动作生成 <span>Generate</span></h4>
+        <div class="arch-card arch-power"><strong>Actor策略网络</strong><small>端到端：观测→控制。输出策略动作 $a_t^\pi = \mu_\theta(s_t) + \mathcal{N}_t$</small></div>
+        <div class="arch-card arch-power"><strong>APF人工势场</strong><small>模型驱动：目标引力+障碍斥力→合力方向=$a_t^{APF}$。非专家演示器</small></div>
+      </div>
+      <div class="arch-stage">
+        <h4>③ 双重门控 <span>Gate</span></h4>
+        <div class="arch-card arch-motor"><strong>经验过滤器</strong><small>$\cos(a^\pi, a^{APF}) > \tau$? 动作空间粗筛APF经验质量</small></div>
+        <div class="arch-card arch-motor"><strong>Q值动作选择器</strong><small>$a^* = \arg\max Q(s, a)$。价值空间精筛，在线择优执行</small></div>
+      </div>
+      <div class="arch-stage">
+        <h4>④ 学习优化 <span>Learn</span></h4>
+        <div class="arch-card arch-thrust"><strong>混合经验回放</strong><small>RL池(全部经验)+BC池(仅过滤后APF经验)。两池分别驱动不同损失</small></div>
+        <div class="arch-card arch-thrust"><strong>Actor-Critic联合更新</strong><small>Critic: TD误差。Actor: 策略梯度 + 衰减BC辅助损失</small></div>
+      </div>
+    </div>
+    <div class="arch-arrow"><span>↓ 观测 $o_t$</span><span>↓ $a^\pi, a^{APF}$</span><span>↓ $a_t^*$</span><span>↓ 梯度</span></div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>问题建模</strong><small>Sparse-Reward POMDP</small></div>
+      <div class="arch-metric"><strong>演示器</strong><small>APF (非专家)</small></div>
+      <div class="arch-metric"><strong>门控机制</strong><small>过滤器+Q值选择</small></div>
+      <div class="arch-metric"><strong>ΔSuccess</strong><small>+16.07% vs SOTA</small></div>
+    </div>
+  </div>
+
+  <h3>3.2 Mermaid 流程图</h3>
+  <h4>SBCAC总览流程图</h4>
+  <div class="mermaid-box"><pre class="mermaid">
+flowchart LR
+    A["🌐 未知障碍环境"] --> B["📡 传感器观测<br/>LiDAR+IMU+GPS"]
+    B --> C["🧠 Actor μ<sub>θ</sub><br/>输出 a<sup>π</sup>"]
+    B --> D["🔧 APF规划器<br/>输出 a<sup>APF</sup>"]
+    C --> E{"🔍 经验过滤器<br/>cos(a<sup>π</sup>,a<sup>APF</sup>) > τ?"}
+    D --> E
+    E -- Pass --> F{"🎯 Q值选择器<br/>max Q(s,a)"}
+    E -- Reject --> G["❌ 丢弃APF经验"]
+    C --> F
+    F --> H["✅ 执行 a*<br/>存入回放池"]
+    H --> I["📀 RL+BC混合更新"]
+    I --> C
+  </pre></div>
+
+  <h4>SBCAC详细组件交互图</h4>
+  <div class="mermaid-box"><pre class="mermaid">
+flowchart TB
+    subgraph ENV["🌐 Environment"]
+        S["Sensor: LiDAR + IMU + GPS"]
+        DYN["Dynamics: Fixed-wing / Multi-rotor"]
+    end
+    subgraph APF["🔧 Artificial Potential Field"]
+        ATT["F<sub>att</sub> = k<sub>att</sub>·d<sub>goal</sub>"]
+        REP["F<sub>rep</sub> = k<sub>rep</sub>/d<sub>obs</sub>²"]
+        APF_ACT["a<sup>APF</sup> = F<sub>att</sub> + ΣF<sub>rep</sub>"]
+    end
+    subgraph SBCAC_CORE["🧠 SBCAC Core"]
+        ACTOR["Actor μ<sub>θ</sub>: s→a<sup>π</sup>"]
+        CRITIC["Critic Q<sub>φ</sub>: (s,a)→Q"]
+        FILTER{"Filter: cos>τ?"}
+        SELECTOR{"Selector: max Q"}
+    end
+    subgraph BUF["📀 Replay Buffers"]
+        RL_BUF["RL Buffer: (s,a*,r,s')"]
+        BC_BUF["BC Buffer: filtered (s,a<sup>APF</sup>)"]
+    end
+    S --> ACTOR; S --> ATT; S --> REP
+    ATT --> APF_ACT; REP --> APF_ACT
+    ACTOR --> FILTER; APF_ACT --> FILTER
+    FILTER -->|Pass| SELECTOR; FILTER -->|Reject| DUMP["🗑️ Discard"]
+    ACTOR --> SELECTOR; CRITIC --> SELECTOR
+    SELECTOR --> DYN; SELECTOR --> RL_BUF
+    FILTER -->|Pass| BC_BUF
+    RL_BUF --> CRITIC; RL_BUF --> ACTOR; BC_BUF --> ACTOR
+    CRITIC --> ACTOR
+  </pre></div>
+</section>
+
+<section id="task">
+  <h2>§4 Research Task & Problem Formulation</h2>
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">问题定义: Sparse-Reward POMDP</span>
+    <p>$$\mathcal{M} = \langle \mathcal{S}, \mathcal{A}, \mathcal{O}, \mathcal{T}, \mathcal{R}_{sparse}, \mathcal{Z}, \gamma \rangle$$</p>
+    <p>关键：<strong>稀疏奖励函数</strong>——绝大多数时间步上R=0：</p>
+    <p>$$\mathcal{R}_{sparse}(s, a, s') = \begin{cases} +R_{success} & \text{goal reached} \\ -R_{collision} & \text{obstacle collision} \\ -R_{stray} & \text{out of bounds} \\ 0 & \text{otherwise} \end{cases}$$</p>
+    <p>稀疏奖励的根本困难：TD信号在非终态几乎为零→价值函数传播极其缓慢→策略无法区分"朝向目标"和"背向目标"的动作。</p>
+    <div class="eq-note"><strong>为什么需要APF：</strong>APF提供了稠密的"方向性"信息——即使没有奖励信号，APF至少知道"大致应该往哪个方向飞"。这正是打破探索-信息悖论的关键。</div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">公式 1: SBCAC Actor混合更新目标</span>
+    <p>$$\mathcal{L}_{actor}(\theta) = -\mathbb{E}_{s \sim \mathcal{D}_{RL}}[Q_\phi(s, \mu_\theta(s))] + \beta_t \cdot \mathbb{E}_{(s, a^{APF}) \sim \mathcal{D}_{BC}^{filtered}}[\|\mu_\theta(s) - a^{APF}\|_2^2]$$</p>
+    <p>其中 $\mathcal{D}_{BC}^{filtered} = \{(s, a^{APF}) \mid \cos(\mu_\theta(s), a^{APF}) > \tau\}$</p>
+    <p>BC权重衰减：$\beta_t = \beta_0 \cdot \max(0, 1 - t/T_{decay})$</p>
+    <div class="eq-note"><strong>损失设计精妙之处：</strong>策略梯度项驱动Actor提升真实回报，BC项提供探索方向的先验引导。两者通过 $\beta_t$ 的衰减实现动态平衡——早期BC主导（学APF），后期RL主导（超越APF）。$\mathcal{D}_{BC}^{filtered}$ 确保了BC数据经过质量筛选。</div>
+  </div>
+
+  <h3>4.2 输入/输出规格表</h3>
+  <table>
+    <tr><th style="width:120px;">类别</th><th>条目</th><th>规格</th></tr>
+    <tr><td rowspan="4"><strong>输入</strong></td><td>LiDAR距离扫描</td><td>360°扇区化(N=36), 每段最近障碍距离</td></tr>
+    <tr><td>AAV状态</td><td>速度 $v_t$, 航向 $\psi_t$, 角速度 $\omega_t$</td></tr>
+    <tr><td>目标信息</td><td>相对距离 $d_{goal}$, 方位角 $\theta_{goal}$</td></tr>
+    <tr><td>历史帧</td><td>K帧观测堆叠(POMDP信念)</td></tr>
+    <tr><td rowspan="2"><strong>输出</strong></td><td>速度命令 $v_{cmd}$</td><td>连续值, $[v_{min}, v_{max}]$</td></tr>
+    <tr><td>偏航率 $\dot{\psi}_{cmd}$</td><td>连续值, $[-\dot{\psi}_{max}, \dot{\psi}_{max}]$</td></tr>
+    <tr><td rowspan="3"><strong>终止</strong></td><td>碰撞</td><td>dist &lt; 安全半径 → 失败</td></tr>
+    <tr><td>到达</td><td>$d_{goal} < d_{arrive}$ → 成功</td></tr>
+    <tr><td>越界/超时</td><td>飞出边界或超过 $T_{max}$ → 失败</td></tr>
+  </table>
+</section>
+
+<section id="challenge">
+  <h2>§5 Key Challenges</h2>
+  <div class="callout danger">
+    <div class="callout-title">⚠ 第一性原理诊断</div>
+    <p>稀疏奖励下AAV导航的根本困难：<strong>探索-信息悖论</strong>。要学好需要好数据（成功轨迹），要好数据需要好策略，要好策略需要学好。三者形成死循环。APF可以打破循环（提供初始方向），但APF本身有缺陷→如何从有缺陷的演示器中提取有用信息而不被其缺陷污染？这是本文的核心挑战。</p>
+  </div>
+  <h3>5.1 前人方法比较</h3>
+  <table>
+    <tr><th>方法</th><th>核心思路</th><th>局限性</th><th>代表工作</th></tr>
+    <tr><td>纯DRL</td><td>从零探索，靠奖励驱动</td><td>稀疏奖励下几乎不收敛</td><td>DDPG (Lillicrap 2015)</td></tr>
+    <tr><td>BC+DRL</td><td>用专家演示预训练再微调</td><td>假设演示最优；APF非最优→系统性偏差</td><td>DQfD (Hester 2018)</td></tr>
+    <tr><td>Reward Shaping</td><td>手工设计稠密奖励</td><td>需大量领域知识；可能reward hacking</td><td>Ng et al. (1999)</td></tr>
+    <tr><td>Selective-BC</td><td>单一筛选标准吸收演示</td><td>单一标准有盲区（漏筛或误筛）</td><td>本文baseline</td></tr>
+  </table>
+  <h3>5.2 三大关键挑战</h3>
+  <h4>① 非专家演示的"毒药"效应</h4>
+  <p>APF在以下场景产生错误动作：(a) U型障碍中局部极小值——引力斥力平衡，被困；(b) 窄通道中两侧墙间振荡——APF在两侧来回弹跳；(c) 目标近障碍时——斥力排斥AAV远离目标。盲目克隆这些失败模式会永久污染策略——BC把失败模式写入网络参数。</p>
+  <h4>② 筛选标准的设计困境</h4>
+  <p>判断APF动作是否该学面临对称的风险：假阳性（学了一个坏动作）和假阴性（错过一个好动作）。过于激进→退化到纯DRL；过于宽松→BC污染。更复杂的是，最优标准是时变的——早期APF相对更好（应该多学），后期策略提升（应该少学）。固定阈值无法适应。</p>
+  <h4>③ 仿真到实物的迁移</h4>
+  <p>传感器噪声模型不匹配（仿真高斯噪声 vs 真实LiDAR稀疏/多径）、动力学建模误差（简化模型 vs 复杂气动）、通信延迟等导致sim2real gap。论文通过HIL和实物实验直面这一挑战——这是该工作相比纯仿真论文的显著亮点。</p>
+</section>
+
+<section id="method">
+  <h2>§6 Method Details</h2>
+  <h3>6.1 核心公式组</h3>
+  <div class="formula-block">
+    <span class="eq-tag">公式 1: 经验过滤器</span>
+    <p>$$\text{Filter}(a^\pi, a^{APF}) = \begin{cases} \text{保留} & \text{if } \cos(a^\pi, a^{APF}) = \frac{a^\pi \cdot a^{APF}}{\|a^\pi\| \|a^{APF}\|} > \tau_{cos} \\ \text{丢弃} & \text{otherwise} \end{cases}$$</p>
+    <div class="eq-note">余弦相似度对动作大小不敏感——APF建议的方向对但力度不准时仍可通过。阈值 $\tau_{cos}$ 通常0.5-0.7（允许45°-60°方向偏差）。</div>
+  </div>
+  <div class="formula-block">
+    <span class="eq-tag">公式 2: Q值动作选择器</span>
+    <p>$$a_t^* = \arg\max_{a \in \{a_t^\pi, a_t^{APF}\}} Q_\phi(s_t, a)$$</p>
+    <p>$$P(select\_APF) = \frac{1}{1 + e^{k\cdot(\bar{Q}^\pi - \bar{Q}^{APF})}} \quad \text{(sigmoid平滑边界)}$$</p>
+    <div class="eq-note"><strong>自适应特性：</strong>训练早期 $Q(s,a^{APF}) > Q(s,a^\pi)$（常态），策略大量吸收APF；训练后期反转，策略完全自主。无需手工调度。</div>
+  </div>
+  <div class="formula-block">
+    <span class="eq-tag">公式 3: Critic TD更新</span>
+    <p>$$y_t = r_t + \gamma Q_{\phi'}(s_{t+1}, \mu_{\theta'}(s_{t+1}))$$</p>
+    <p>$$\mathcal{L}_{critic}(\phi) = \mathbb{E}_{(s_t, a_t^*, r_t, s_{t+1}) \sim \mathcal{D}_{RL}}[(y_t - Q_\phi(s_t, a_t^*))^2]$$</p>
+    <div class="eq-note">Critic使用<strong>实际执行的动作</strong> $a_t^*$（可能来自策略或APF）训练——确保Q函数覆盖两个动作分布，为选择器提供公平比较基础。软更新：$\phi' \leftarrow \tau\phi + (1-\tau)\phi'$, $\tau$=0.001-0.005。</div>
+  </div>
+  <div class="formula-block">
+    <span class="eq-tag">公式 4: 总训练目标</span>
+    <p>$$\min_{\theta,\phi} \mathcal{L}_{total} = \mathcal{L}_{critic}(\phi) - \alpha\cdot\mathbb{E}[Q_\phi(s,\mu_\theta(s))] + \beta_t\cdot\mathbb{E}_{\mathcal{D}_{BC}^{filtered}}[\|\mu_\theta(s)-a^{APF}\|_2^2]$$</p>
+    <p>$$\beta_t = \beta_0 \cdot \max(0, 1 - t/T_{decay})$$</p>
+    <div class="eq-note">$\beta$ 衰减设计哲学：BC是"训练轮"——帮策略早期快速获得能力但不永远依赖。衰减确保策略最终超越APF而非被锁死在次优水平。</div>
+  </div>
+  <h3>6.2 参数总表</h3>
+  <table>
+    <tr><th>参数</th><th>含义</th><th>取值</th></tr>
+    <tr><td>$\tau_{cos}$</td><td>过滤器余弦相似度阈值</td><td>0.5-0.7</td></tr>
+    <tr><td>$\beta_0$</td><td>BC损失初始权重</td><td>0.1-1.0</td></tr>
+    <tr><td>$T_{decay}$</td><td>BC权重衰减周期</td><td>总步数的50%-80%</td></tr>
+    <tr><td>$\gamma$</td><td>折扣因子</td><td>0.99</td></tr>
+    <tr><td>$\tau$</td><td>目标网络软更新率</td><td>0.001-0.005</td></tr>
+    <tr><td>$lr_{actor}$</td><td>Actor学习率</td><td>$10^{-4}-10^{-3}$</td></tr>
+    <tr><td>$lr_{critic}$</td><td>Critic学习率</td><td>$10^{-3}-10^{-2}$</td></tr>
+    <tr><td>$k_{att}$</td><td>APF引力系数</td><td>1.0-5.0</td></tr>
+    <tr><td>$k_{rep}$</td><td>APF斥力系数</td><td>5.0-20.0</td></tr>
+    <tr><td>$B$</td><td>Batch size</td><td>64-256</td></tr>
+    <tr><td>$|\mathcal{D}_{RL}|$</td><td>RL回放池大小</td><td>$10^5-10^6$</td></tr>
+    <tr><td>$|\mathcal{D}_{BC}|$</td><td>BC回放池大小(过滤后)</td><td>$10^4-10^5$</td></tr>
+  </table>
+</section>
+
+<section id="principles">
+  <h2>§7 Underlying Principles</h2>
+  <h3>7.1 深度机理解释</h3>
+  <h4>① Q值作为普适动作质量度量</h4>
+  <p>Q函数的学习不关心动作来源——只要 $(s,a)$ 被实际执行并观察到后续奖励，Critic就能学到它的Q值。从Bellman方程：$Q^\pi(s,a) = \mathbb{E}[r + \gamma Q^\pi(s', \pi(s')) | s,a]$。这使得Q值成为<strong>动作来源无关</strong>的质量标尺——能公平比较策略动作和APF动作。关键保障：Q值选择器持续执行APF动作（尤其训练早期），确保APF动作分布有足够数据覆盖。</p>
+  <h4>② 双重门控的互补性与鲁棒性</h4>
+  <p>两个门控从正交维度评估APF经验，互补盲区：过滤器检查<strong>动作一致性</strong>（APF是否和策略认知一致），盲区是策略不成熟时策略和APF可能一起犯错；Q值选择器检查<strong>价值最优性</strong>（APF是否比策略更好），盲区是早期Critic不准。两者盲区恰好互补——当策略和APF都指向错误时（过滤器漏过），Q值选择器通过低Q值识别；当Critic不准时（Q值噪声大），过滤器仍能提供筛选。冗余设计显著降低单一筛选失效风险。</p>
+  <h4>③ BC衰减：从脚手架到自主</h4>
+  <div class="cmp-row">
+    <div class="cmp-col"><h4>阶段一：依赖期</h4><p>$\beta$大，APF主导。Actor主要通过BC学习基本行为。类比：学骑车时父母扶着车把。</p></div>
+    <div class="cmp-col"><h4>阶段二：过渡期</h4><p>$\beta$减小，Q值交替占优。Actor部分场景超越APF，困难场景仍依赖。类比：父母偶尔松手。</p></div>
+    <div class="cmp-col"><h4>阶段三：自主期</h4><p>$\beta \to 0$，策略全场景>APF。Actor自主决策。类比：完全独立骑行。</p></div>
+  </div>
+  <p>呼应Vygotsky"最近发展区"理论——在能力提升后逐步撤除支持。</p>
+</section>
+
+<section id="figures">
+  <h2>§8 Representative Figures & Interpretation</h2>
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig 1-2</span><span class="fig-caption">SBCAC端到端框架：传感器→Actor/APF→过滤器→Q值选择器→执行</span><span class="fig-source">Source: PDF p.3</span></div>
+    <div class="fig-image"><img src="figures/overview.png" alt="SBCAC Architecture" onerror="this.parentElement.innerHTML='<div class=\'fig-placeholder\'>📍 SBCAC框架图: 不完美传感器输入→Actor+APF双路生成候选动作→经验过滤器粗筛→Q值选择器精筛→执行控制信号。完整标注数据流和损失函数位置。</div>'"></div>
+    <div class="fig-interpretation"><div class="fig-label">🔎 图示解读</div><p>该图展示了SBCAC全部创新的信息流：双路动作生成（Actor端到端 vs APF模型驱动）→级联筛选（过滤器先做便宜的余弦相似度计算，再对通过者做Q值比较——计算效率最优的顺序）→数据分流（RL池 vs BC池，分别驱动不同损失）。APF模块标注了引力/斥力计算公式，Actor/Critic标注了网络结构和超参数位置。</p></div>
+  </div>
+  <div class="paper-figure">
+    <div class="fig-header"><span class="fig-number">Fig 5-9 (推定)</span><span class="fig-caption">学习曲线对比、消融实验、场景泛化、轨迹可视化</span><span class="fig-source">Source: PDF pp.6-10</span></div>
+    <div class="fig-placeholder">📊 实验结果: 成功率vs训练episodes(SBCAC/BCAC/DDPG)、消融(移除过滤器/移除Q值选择器)、不同障碍密度下的性能热力图、固定翼/多旋翼轨迹俯视图叠加。</div>
+    <div class="fig-interpretation"><div class="fig-label">🔎 图示解读</div><ul><li><strong>学习曲线：</strong>SBCAC收敛最快、渐近最高。BCAC早期快但最终被超越（无条件克隆锁死了上限）。纯DDPG最慢。</li><li><strong>消融实验：</strong>仅保留过滤器→APF偏差场景下降；仅保留Q值→早期波动大。完整SBCAC全场景最优。</li><li><strong>轨迹可视化：</strong>SBCAC轨迹最平滑、碰撞最少。APF在复杂区振荡。BCAC复制了APF某些失败模式。</li></ul></div>
+  </div>
+  <h3>关键指标汇总</h3>
+  <table>
+    <tr><th>指标</th><th>SBCAC</th><th>vs Selective-BC Baseline</th></tr>
+    <tr class="highlight"><td>成功率</td><td>最高</td><td><strong>+16.07% (avg)</strong></td></tr>
+    <tr><td>碰撞率</td><td>显著更低</td><td><strong>-72.46%</strong></td></tr>
+    <tr><td>偏航率</td><td>显著更低</td><td><strong>-94.62%</strong></td></tr>
+    <tr><td>样本效率</td><td>显著提升</td><td>更快收敛</td></tr>
+    <tr><td>平台泛化</td><td>固定翼+多旋翼</td><td>平台无关</td></tr>
+    <tr><td>实物验证</td><td>HIL+Physical</td><td>sim2real可行</td></tr>
+  </table>
+</section>
+
+<section id="flaw">
+  <h2>§9 Potential Flaws & Boundaries</h2>
+  <h3>9.1 局限性分析</h3>
+  <h4>① 对APF质量的根本依赖</h4>
+  <p>尽管有双重门控，SBCAC仍<strong>依赖APF生成至少部分正确的建议</strong>。如果APF在某个场景类别上系统性失败（如极密集障碍中APF永远无法生成到达目标的可行轨迹），过滤器会丢弃所有APF经验，Q值选择器永远选策略→退化为纯DRL。SBCAC只能"去伪存真"不能"无中生有"。</p>
+  <h4>② Q值选择器在训练早期的可靠性</h4>
+  <p>早期Critic尚未收敛时Q值估计是噪声。如果Critic对APF动作区域缺乏覆盖（策略探索未到达），$Q(s,a^{APF})$ 可能被低估→好的APF建议被错误拒绝。这是次级鸡生蛋问题：需要好Critic做好选择，需要好选择数据训练好Critic。</p>
+  <h4>③ 硬件验证范围与可复现性</h4>
+  <p>论文包含HIL和实物实验但未提供详细可复现方案（硬件配置、传感器型号、实物场景尺寸）和定量数据。实物场景复杂度可能低于仿真（安全考虑），样本量可能不足以提供统计显著性。</p>
+  <h4>④ 稀疏奖励定义的通用性</h4>
+  <p>论文选择了最极端的稀疏性（中间奖励严格为零），最大化BC辅助效果的对比度。但在实际系统中加入适度稠密奖励（如安全裕度奖励）后SBCAC的相对优势可能被高估。</p>
+  <h3>9.2 扩展与未来方向</h3>
+  <ol>
+    <li><strong>多源演示融合：</strong>将APF扩展为多种规划器集成（RRT*, MPC, 人类遥操作），Q值选择器天然支持多路比较。</li>
+    <li><strong>不确定性感知Q值选择：</strong>用Ensemble或Bayesian方法输出Q值方差，避免"Critic不熟的动作被错误选中"。</li>
+    <li><strong>离线RL场景：</strong>将双重门控应用到纯离线RL——给定固定混合质量演示数据集，如何提取可泛化策略。</li>
+  </ol>
+  <h3>9.3 敏感度分析</h3>
+  <table>
+    <tr><th>维度</th><th>敏感度</th><th>影响机制</th><th>缓解策略</th></tr>
+    <tr><td>APF质量(场景相关)</td><td>★★★★★</td><td>APF越好BC引导越强；APF系统性偏差→退化为纯DRL</td><td>多源演示融合</td></tr>
+    <tr><td>BC权重衰减率</td><td>★★★★</td><td>过快→策略未成熟失引导；过慢→被APF锁死</td><td>基于性能的自适应衰减</td></tr>
+    <tr><td>过滤器阈值 $\tau$</td><td>★★★</td><td>过高→BC数据太少；过低→毒药入池</td><td>随训练进程自适应调整</td></tr>
+    <tr><td>障碍密度</td><td>★★★★</td><td>密度越高APF局部极小越频繁，BC毒药比例越高</td><td>高密度场景降低BC权重</td></tr>
+    <tr><td>传感器噪声</td><td>★★★</td><td>噪声影响APF势场计算精度（需精确距离/方位）</td><td>输入预处理滤波</td></tr>
+  </table>
+  <h3>9.4 边界条件深潜</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔎 边界条件</div>
+    <p><strong>SBCAC在什么情况下可能失效？</strong></p>
+    <ol>
+      <li><strong>动态障碍物：</strong>APF假设静态障碍，移动障碍使APF建议危险。双门控可部分缓解（策略学会不信任APF在动态场景的建议）。</li>
+      <li><strong>高维动作空间：</strong>扩展到6DoF或更高维时，APF设计本身变困难，"相似动作"定义不再平凡。</li>
+      <li><strong>非欧氏动作空间：</strong>如动作是GPS waypoint序列而非瞬时控制量，余弦相似度/欧氏距离过滤器需重新设计。</li>
+    </ol>
+  </div>
+</section>
+
+<section id="motivation">
+  <h2>§10 Motivation & Research Value</h2>
+  <h3>10.1 问题推导链（5步）</h3>
+  <table>
+    <tr><th>步</th><th>内容</th></tr>
+    <tr><td><strong>① 背景</strong></td><td>AAV在未知环境中需同时导航和避障。DRL提供端到端学习范式，但稀疏奖励下纯DRL探索效率极低。</td></tr>
+    <tr><td><strong>② 现有局限</strong></td><td>标准BC+DRL假设演示最优。APF等经典规划器能提供方向引导但远非最优——BC会将其系统性偏差写入策略。</td></tr>
+    <tr><td><strong>③ 核心矛盾</strong></td><td>非专家演示的"双刃剑"效应——既提供宝贵的探索先验，又可能通过BC污染策略。单一筛选标准无法同时处理"APF明显错误"和"APF微妙次优"。</td></tr>
+    <tr><td><strong>④ 突破口</strong></td><td>构造双重正交筛选机制：过滤器在动作空间排除明显错误，Q值选择器在价值空间优选较优者。两者互补盲区。BC衰减实现渐进自主化。</td></tr>
+    <tr><td><strong>⑤ 方案设计</strong></td><td>DDPG Actor-Critic + APF模块 + 经验过滤器 + Q值动作选择器 + BC衰减。仿真+HIL+实物全链路验证。</td></tr>
+  </table>
+  <div class="callout idea">
+    <div class="callout-title">💡 One-Sentence Core Value</div>
+    <p>SBCAC通过<strong>双重正交门控+BC衰减</strong>，为"从非最优演示中有效提取学习信号"提供了一个原则性框架——适用于任何"存在不完美先验知识需在线择优吸收"的DRL问题。</p>
+  </div>
+  <h3>10.2 方法论反思：如何想到这个方法？</h3>
+  <ol>
+    <li><strong>Step 1-直接BC：</strong>"APF多数场景给出合理方向，直接用BC预训练。"→实验发现APF失败场景的策略也学会了失败模式。</li>
+    <li><strong>Step 2-加过滤器：</strong>"问题在于学了坏建议。加相似度过滤。"→排除了最差经验，但仍有"看起来一致但实际不好"的漏网之鱼。</li>
+    <li><strong>Step 3-引入Q值比较：</strong>"Critic已学会评估动作。直接比Q值选优。"→后期好但早期Critic不准时波动大。</li>
+    <li><strong>Step 4-双重门控：</strong>"过滤器和Q值各有盲区但互补。级联！"→1+1>2的协同效应。</li>
+    <li><strong>Step 5-BC衰减：</strong>"后期策略已超APF但BC还在拖后腿。让BC权重衰减。"→完整的SBCAC。</li>
+  </ol>
+</section>
+
+<section id="takeaway">
+  <h2>§11 Key Takeaways</h2>
+  <h3>11.1 Lessons Learned</h3>
+  <h4>① 方法论："选择性模仿"比"全量模仿"更普适</h4>
+  <p>当演示者非最优时，盲目BC可能比不BC更差——BC将系统性偏差写入策略。SBCAC的范式——用正交筛选进行演示质量控制——可迁移到自动驾驶（人类驾驶数据非最优）、机器人操作（遥控演示非最优）、甚至LLM微调（合成数据可能有噪声）。核心教训：<strong>不要问"该不该模仿"，要问"在什么条件下模仿、模仿什么、模仿到什么程度"。</strong></p>
+  <h4>② 技术技巧：Critic Q值是免费的"动作裁判"</h4>
+  <p>SBCAC最巧妙的设计是用已学到的Q函数作为动作质量仲裁——无需额外训练、无需手工规则、且随训练自动提升。在DRL中Critic通常只用于提供策略梯度，SBCAC展示了其第二个关键作用——作为决策层质量门控。可推广：在安全关键DRL中让Critic"审核"Actor输出，Q值低于阈值时fallback到保守策略。</p>
+  <h4>③ 实验设计：硬件验证大幅提升说服力</h4>
+  <p>纯仿真论文面临的核心质疑是"sim2real能否work"。本文通过HIL和实物实验（尽管在有限场景）直接回应。对于UAV DRL研究者：<strong>投入少量资源做实物验证的学术回报远超投入。</strong></p>
+  <h3>11.2 Directly Applicable to My UAV Research</h3>
+  <ol>
+    <li><strong>多UAV编队避障：</strong>经典的队形保持控制器（一致性控制）可充当"APF"角色——知道如何保持队形但不擅长避障。SBCAC框架扩展：编队控制器提供"保持队形"建议，DRL策略学习"何时偏离队形以避障"，Q值比较实时仲裁。</li>
+    <li><strong>UAV目标跟踪：</strong>比例引导律（PN）作为"APF"角色。当目标机动或进入遮挡时（PN可能失效），经验过滤器检测策略-PN不一致，触发"信任策略"模式。</li>
+    <li><strong>课程学习框架：</strong>BC衰减策略可推广为"辅助任务衰减"的通用课程学习框架——训练早期多个辅助任务，随主任务性能提升衰减辅助权重。</li>
+  </ol>
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>文献</th><th>核心内容</th><th>与本文关系</th><th>推荐理由</th></tr>
+    <tr><td>Hester et al. (2018) - DQfD</td><td>演示预填充回放池加速DQN</td><td>BC+DRL经典方案，未做选择性筛选</td><td>理解基础框架和SBCAC改进点</td></tr>
+    <tr><td>Nair et al. (2018) - Overcoming Exploration</td><td>BC辅助RL探索，混合训练</td><td>类似思路不同筛选策略</td><td>对比不同筛选策略的trade-off</td></tr>
+    <tr><td>Ge & Cui (2002) - Potential Field</td><td>APF法经典阐述</td><td>SBCAC中APF理论基础</td><td>理解APF原理及固有局限</td></tr>
+    <tr><td>Yan et al. (2024) - Flocking MADRL</td><td>多固定翼UAV编队避碰DRL</td><td>同课题组相关积累</td><td>了解多UAV扩展方向</td></tr>
+    <tr><td>Lillicrap et al. (2015) - DDPG</td><td>连续控制DRL奠基</td><td>SBCAC基座</td><td>理解底层RL技术细节</td></tr>
+  </table>
+</section>
+
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5804/index.html">5804</a></td><td>GDMAAC (Yan, Jiang, Chen et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Scholar: Chao Yan · Paper ID: 10112 · SBCAC · MathJax + Mermaid Rendering</footer></main></body></html>

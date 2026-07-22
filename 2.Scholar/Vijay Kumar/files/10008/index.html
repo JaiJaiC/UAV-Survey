@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — RT-GuIDE (Tao et al., 2025)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 4px; margin-right: 5px; margin-bottom: 4px; }
+  .tag-blue { background:#dbeafe; color:#1d4ed8; } .tag-green { background:#d1fae5; color:#047857; }
+  .tag-amber { background:#fef3c7; color:#92400e; } .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red { background:#ffe4e6; color:#be123c; } .tag-gray { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">核心挑战</a>
+  <a href="#method">关键方法</a>
+  <a href="#principles">基本原理</a>
+  <a href="#figures">实验结果</a>
+  <a href="#flaw">缺陷与扩展</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Vijay Kumar · 17-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10002/index.html">Safety guardrails llm-ena</a>
+<a href="../10001/index.html">Contextual safety reasoni</a>
+<a href="../10017/index.html">Jailbreaking llm-controll</a>
+<a href="../10016/index.html">Deploying foundation mode</a>
+<a href="../10015/index.html">Spine Online semantic</a>
+<a href="../10014/index.html">Vision transformers end-t</a>
+<a href="../10013/index.html">EvMAPPER High-altitude or</a>
+<a href="../10012/index.html">Constrained learning dece</a>
+<a href="../10011/index.html">Air-ground collaboration</a>
+<a href="../10010/index.html">Distilling on-device lang</a>
+<a href="../10009/index.html">Compositional coordinatio</a>
+<a class="active" href="../10008/index.html">Rt-guide Real-time gaussi</a>
+<a href="../10007/index.html">SPAR</a>
+<a href="../10006/index.html">PIP-LLM</a>
+<a href="../10005/index.html">Slideslam Sparse, lightwe</a>
+<a href="../10004/index.html">Heterogeneous robot colla</a>
+<a href="../10003/index.html">Hierarchical llms in-the-</a>
+    </div>
+  </div>
+
+
+<!-- ========== 1. PAPER INFO ========== -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">RT-GuIDE: Real-Time Gaussian Splatting for Information-Driven Exploration</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yuezhan Tao</strong>, Dexter Ong, Varun Murali, Igor Spasojevic, Pratik Chaudhari, <strong>Vijay Kumar</strong></td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">University of Pennsylvania</strong>, GRASP Lab</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">2025 Conference</strong>. Project page: <a href="https://tyuezhan.github.io/RT_GuIDE" target="_blank">tyuezhan.github.io/RT_GuIDE</a>. Code will be open-sourced.</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td>Project: tyuezhan.github.io/RT_GuIDE | Platform: Clearpath Jackal UGV, NVIDIA GPU</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td><strong>RT-GuIDE</strong> —— 一个使用 <strong>3D Gaussian Splatting (3DGS)</strong> 进行主动建图与探索的统一框架。GPU 加速的运动规划直接在高斯地图上运行，无需中间体素转换。基于高斯参数位移的新型<strong>信息增益启发式</strong>，消除了渲染开销。<strong>分层规划</strong>：高层拓扑图用于区域选择 + 低层运动基元树用于轨迹生成。相比 CPU 规划实现 <strong>18 倍 GPU 加速</strong>，闭环仿真中 PSNR 高出 0.95dB、覆盖率达 92.36%（FisherRF 为 66.40%），并在 4 个环境中实现实时机载 UGV 操作。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">3D Gaussian Splatting</span>
+    <span class="tag tag-green">Active Mapping</span>
+    <span class="tag tag-amber">Information-Driven Exploration</span>
+    <span class="tag tag-purple">GPU-Accelerated Planning</span>
+    <span class="tag tag-red">Viewpoint Selection</span>
+    <span class="tag tag-cyan">Real-Time Autonomy</span>
+    <span class="tag tag-gray">Vijay Kumar</span>
+  </div>
+</section>
+
+<!-- ========== 2. INSIGHT & NOVELTY ========== -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    Q: <strong>为什么现有主动建图框架要为建图和规划维护分离的表示，为什么这样低效？</strong><br>
+    A: 传统主动建图流水线构建体素地图（如占据栅格、TSDF、NeRF）用于重建，然后转换为另一个独立表示（如 ESDF、OctoMap）用于规划。这种双表示方法产生转换开销，在转换过程中丢失信息，并迫使规划器在一个降级表示上运行，无法捕捉场景的全部丰富信息。<br><br>
+    Q: <strong>RT-GuIDE 的核心洞察是什么？</strong><br>
+    A: <strong>将建图与规划统一到单一 3DGS 表示上。</strong> 3DGS 同时具备足够的表达能力用于高质量重建，以及足够的结构性（显式高斯基元）用于直接碰撞检测和信息评估。关键使能技术包括：(1) 一种新颖的信息增益启发式方法，直接从高斯参数位移计算 —— 衡量 3DGS 地图在融合新观测时的变化程度，作为不确定性代理量而无需渲染；(2) GPU 加速碰撞检测，将所有基元与高斯地图并行测试；(3) 分层规划架构，高层规划器选择信息丰富的区域，低层规划器生成安全且信息丰富的轨迹 —— 全部直接在 3DGS 地图上运行。
+  </div>
+
+  <h3>2.2 灵感来源映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>启发了什么洞察</th><th>类型</th></tr>
+    <tr><td>3DGS as an explicit, differentiable scene representation (Kerbl et al., 2023)</td><td>3DGS 将场景表示为具有位置、颜色和协方差的<strong>显式高斯基元</strong>。与 NeRF 的隐式 MLP 不同，3DGS 基元可直接查询空间占据情况 —— 从而在无需渲染的情况下进行碰撞检测。这将 3DGS 从"仅用于可视化"的表示转变为"对规划器友好"的表示。</td><td>架构</td></tr>
+    <tr><td>SplaTAM (Keetha et al., 2024) for online SLAM with 3DGS</td><td>SplaTAM 表明 3DGS 可从流式 RGB-D 数据中以各向同性高斯增量更新。RT-GuIDE 在此建图骨架上增加了规划维度 —— 闭合了"我在哪里"和"我下一步该去哪"之间的回路。</td><td>方法</td></tr>
+    <tr><td>Fisher Information as uncertainty metric (FisherRF, Jiang et al., 2024)</td><td>FisherRF 通过渲染场景来计算逐像素 Fisher 信息。RT-GuIDE 推导出一种<strong>免渲染</strong>替代方案：建图迭代间高斯均值位移的幅度作为信息增益的代理量，由 Fisher 信息近似所支撑。这消除了渲染瓶颈（0.013s vs 1.299s）。</td><td>数学</td></tr>
+    <tr><td>Motion primitive-based planning for ground robots</td><td>独轮车动力学 + 运动基元树是非完整约束规划的标准方法。RT-GuIDE 的创新在于将树搜索<strong>完全在 GPU 上运行</strong>，并行地对数百万个高斯进行碰撞检测 —— 实现 18 倍 CPU 加速。</td><td>工程</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：基于高斯参数位移的免渲染信息增益</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong> 现有的基于信息论的视角选择方法（如 FisherRF）要求从每个候选视角渲染场景、计算逐像素 Fisher 信息并求和 —— 这计算开销极高（每次评估 1.299s），无法实时使用。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong> 观察到当新观测通过 SplaTAM 融合到 3DGS 地图时，充分观测区域的高斯趋于稳定（均值位移小），而观测不足区域的高斯显著移动（均值位移大）。将每高斯信息增益定义为<strong>均值位移的 L2 范数</strong>：$\|\mu_k - \mu_{k-1}\|_2$。这完全无需渲染 —— 仅比较地图更新前后高斯参数的变化。该方法由参数位移与 Fisher 信息矩阵逆的迹之间的关系所支撑。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：直接在 3DGS 基元上进行 GPU 加速碰撞检测</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong> 传统机器人碰撞检测使用在 CPU 上查询的体素表示（占据栅格、ESDF）。将 3DGS 转换为体素网格丢弃了该表示的原生结构，并增加了转换延迟。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong> 将机器人表示为一组测试点（球体近似）。对于候选轨迹，计算每个测试点与所有高斯的碰撞概率：$P(d_\kappa < \gamma) \le \eta$，其中 $d_\kappa$ 为测试点到高斯中心的马氏距离。该并行检测 —— 所有测试点对所有高斯 —— 完全在 GPU 上通过 CUDA 运行，实现 <strong>18 倍加速</strong>（300 万高斯下 0.62s vs 11.65s）。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：分层规划 —— 拓扑图 + 运动基元树</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong> 探索需要同时具备全局推理（下一步探索哪个区域？）和局部推理（具体走什么轨迹？）。单一规划器无法高效处理两种尺度。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong> 高层：将 3DGS 地图划分为长方体区域，计算每个区域的均值不确定性 $\Omega_k$，构建连接里程计节点和区域中心视角节点的拓扑图，使用 Dijkstra 求最短行进路径，然后选择最大化成本效益 $\Omega_k / e^{d}$ 的区域（不确定性收益按行进距离折现）。低层：在选定区域内，基于独轮车动力学扩展运动基元树，按信息效用评估每条轨迹：$\xi(\mathbf{x}, \hat{G}) = \sum_{g \in \hat{G}_H} v(\mathbf{x}, g) - \lambda_\xi \sum_{g \in \hat{G}_L} v(\mathbf{x}, g)$（奖励高不确定性高斯，惩罚已确定高斯），通过 A* 选择最优轨迹。</div>
+  </div>
+</section>
+
+<!-- ========== 3. SYSTEM ARCHITECTURE ========== -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 系统框架 —— RT-GuIDE 统一流水线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SENSING["Sensing"]
+        RGBD["RGB-D Camera<br/>Streaming Input"]
+        ODOM["Odometry<br/>Pose Estimation"]
+    end
+
+    subgraph MAPPING["Mapping: SplaTAM-based 3DGS"]
+        SPLATAM["SplaTAM: Online 3DGS SLAM<br/>Isotropic Gaussians, L1+SSIM Loss"]
+        GAUSSIANS["3D Gaussian Map G<br/>{mu_k, Sigma_k, c_k, alpha_k}"]
+        DISPLACE["Gaussian Displacement<br/>||mu_k - mu_{k-1}||_2"]
+    end
+
+    subgraph HIGH_PLAN["High-Level Planner: Region Selection"]
+        PARTITION["Partition Space into<br/>Cuboidal Regions"]
+        UNCERTAINTY["Compute Mean Uncertainty<br/>Omega_k per Region"]
+        TOPO["Build Topological Graph<br/>Odometry + Viewpoint Nodes"]
+        DIJKSTRA["Dijkstra Shortest Path<br/>+ Cost-Benefit: Omega/e^d"]
+        SELECT["Select Best Region"]
+    end
+
+    subgraph LOW_PLAN["Low-Level Planner: Trajectory Generation"]
+        PRIMITIVES["Motion Primitive Tree<br/>Unicycle Dynamics"]
+        GPU_COL["GPU Collision Checking<br/>P(d_kappa < gamma) <= eta"]
+        ASTAR["A* Tree Search<br/>Maximize Information Utility xi"]
+        TRAJ["Best Trajectory<br/>+ Control Commands"]
+    end
+
+    subgraph EXEC["Execution"]
+        CTRL["Send Velocity Commands<br/>to UGV Actuators"]
+    end
+
+    RGBD --> SPLATAM --> GAUSSIANS
+    ODOM --> SPLATAM
+    GAUSSIANS --> DISPLACE
+    DISPLACE --> PARTITION --> UNCERTAINTY --> TOPO --> DIJKSTRA --> SELECT
+    SELECT --> PRIMITIVES
+    GAUSSIANS --> GPU_COL
+    PRIMITIVES --> GPU_COL --> ASTAR --> TRAJ
+    TRAJ --> CTRL
+    CTRL -->|"New observation"| RGBD
+
+    classDef sense fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    classDef map fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef high fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    classDef low fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    classDef exec fill:#dbeafe,stroke:#2563eb,stroke-width:2px
+    class RGBD,ODOM sense
+    class SPLATAM,GAUSSIANS,DISPLACE map
+    class PARTITION,UNCERTAINTY,TOPO,DIJKSTRA,SELECT high
+    class PRIMITIVES,GPU_COL,ASTAR,TRAJ low
+    class CTRL exec
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 —— 系统信息流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph MAP_UPDATE["Map Update Cycle (~1-3 Hz)"]
+        M1["New RGB-D Frame + Pose"] --> M2["SplaTAM: Add/Update Gaussians"]
+        M2 --> M3["Compute Displacement per Gaussian"]
+        M3 --> M4["Update Uncertainty Map"]
+    end
+
+    subgraph GLOBAL["Global Planning (~1 Hz)"]
+        G1["Partition updated Gaussians<br/>into spatial regions"] --> G2["Compute Omega_k = mean<br/>displacement per region"]
+        G2 --> G3["Build topological graph<br/>nodes: odometry path +<br/>region center viewpoints"]
+        G3 --> G4["Dijkstra + cost-benefit<br/>select target region"]
+    end
+
+    subgraph LOCAL["Local Planning (~10 Hz)"]
+        L1["Generate motion primitive tree<br/>from current pose"] --> L2["GPU collision check:<br/>all test points vs all Gaussians"]
+        L2 --> L3["Evaluate trajectory utility<br/>xi = sum over high-unc<br/>- lambda * sum over low-unc"]
+        L3 --> L4["A* selects best trajectory"]
+    end
+
+    subgraph FEEDBACK["Feedback Loop"]
+        F1["Execute trajectory segment"] --> F2["Collect new observations"]
+        F2 --> F3["Update map -> updated<br/>displacement -> replan"]
+    end
+
+    MAP_UPDATE --> GLOBAL --> LOCAL --> FEEDBACK
+    FEEDBACK --> MAP_UPDATE
+
+    classDef map fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef global fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    classDef local fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    classDef fb fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    class M1,M2,M3,M4 map
+    class G1,G2,G3,G4 global
+    class L1,L2,L3,L4 local
+    class F1,F2,F3 fb
+    </pre>
+  </div>
+
+  <h3>3.3 工作流程 —— 端到端探索</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph INIT["Initialization"]
+        I1["Start with empty 3DGS map"] --> I2["First RGB-D frames initialize<br/>sparse Gaussian set"]
+        I2 --> I3["All regions have high uncertainty"]
+    end
+
+    subgraph LOOP["Exploration Loop"]
+        L1["High-level: select most uncertain<br/>reachable region via Dijkstra"] --> L2["Low-level: generate trajectory<br/>to viewpoint in selected region"]
+        L2 --> L3["GPU collision check validates<br/>trajectory safety in Gaussian map"]
+        L3 --> L4["Execute trajectory, collect<br/>new RGB-D observations"]
+        L4 --> L5["SplaTAM fuses new observations:<br/>adds Gaussians in new areas,<br/>refines existing Gaussians"]
+        L5 --> L6["Compute displacement: well-observed<br/>Gaussians stabilize (low disp),<br/>poorly-observed shift (high disp)"]
+        L6 --> L1
+    end
+
+    subgraph TERM["Termination"]
+        T1["Mean uncertainty across all<br/>regions below threshold?"] -->|"Yes"| T2["Exploration complete:<br/>map ready for downstream tasks"]
+        T1 -->|"No"| LOOP
+    end
+
+    INIT --> LOOP
+    LOOP --> TERM
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    classDef loop fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef term fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class I1,I2,I3 init
+    class L1,L2,L3,L4,L5,L6 loop
+    class T1,T2 term
+    </pre>
+  </div>
+</section>
+
+<!-- ========== 4. TASK ========== -->
+<section id="task">
+  <h2>4. 任务定义 —— 解决什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 —— 信息驱动的探索</span>
+    $$ \text{Given: Streaming RGB-D observations } \{I_t, D_t\}, \text{ odometry poses } \{\mathbf{p}_t\} $$
+    $$ \text{Maintain: 3DGS map } \hat{G}_t = \{(\mu_k, \Sigma_k, c_k, \alpha_k)\}_{k=1}^{N_t} \text{ via online SLAM} $$
+    $$ \text{Find: Control sequence } \{\mathbf{u}_t\} \text{ s.t. } \max \sum_t \mathcal{I}(\hat{G}_{t+1}; \hat{G}_t, \mathbf{u}_t) \text{ (maximize information gain)} $$
+    $$ \text{Subject to: collision-free constraint } P(d_\kappa < \gamma) \le \eta \text{ (probabilistic safety)} $$
+    <div class="eq-note">
+      <strong>$\mu_k, \Sigma_k, c_k, \alpha_k$</strong> = 高斯均值、协方差、颜色、不透明度 &nbsp;|&nbsp;
+      <strong>$\mathcal{I}$</strong> = 信息增益 —— 以高斯参数位移量衡量 &nbsp;|&nbsp;
+      <strong>$d_\kappa$</strong> = 机器人测试点到高斯中心的马氏距离 &nbsp;|&nbsp;
+      <strong>$\gamma, \eta$</strong> = 碰撞距离阈值与概率容忍度 &nbsp;|&nbsp;
+      <strong>核心目标</strong>: 在确保无碰撞导航的前提下，仅用 3DGS 地图同时支撑建图与规划，最大化地图质量（以 PSNR、覆盖率、深度 RMSE 衡量）。
+    </div>
+  </div>
+
+  <h3>4.2 输入 / 输出</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>细节</th></tr>
+    <tr><td><strong>输入</strong></td><td>RGB-D 流 + 里程计位姿</td><td>移动机器人（Clearpath Jackal）搭载标准 RGB-D 相机。无需先验地图，无需预定义航点。</td></tr>
+    <tr><td><strong>输出</strong></td><td>速度指令 + 持续更新的 3DGS 地图</td><td>UGV 的线速度和角速度；已探索环境的照片级真实感 3DGS 重建结果</td></tr>
+    <tr><td><strong>目标</strong></td><td>最大化地图质量（PSNR、覆盖率）和下游任务性能（语义分割 mIoU）</td><td>MP3D 仿真中 92.36% 覆盖率；比 FisherRF 高 0.95dB PSNR</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>统一的主动建图与探索</strong>任务。与传统最大化面积覆盖的探索不同，RT-GuIDE 最大化的是<strong>信息增益</strong>——即 3DGS 地图不确定性的降低。该任务融合了在线 SLAM（增量式 3DGS 重建）、视角选择（下一步观察哪个区域）和轨迹规划（如何安全到达该视角）。输出既是高质量的 scene reconstruction，又作为下游任务（如 open-vocabulary 语义分割 GroundedSAM2）的输入。平台: Clearpath Jackal UGV，搭载 NVIDIA GPU，在 4 个真实环境（实验室、休息室、走廊、会议室）中验证。</p>
+</section>
+
+<!-- ========== 5. CHALLENGE ========== -->
+<section id="challenge">
+  <h2>5. 核心挑战 —— 为什么难？</h2>
+
+  <h3>5.1 本质（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>: 探索需要推理<strong>信息缺失的位置</strong>（不确定性），但 3DGS 中的不确定性并非直接可观测 —— 必须通过地图在新数据到来时的变化来推断。<br><br>
+    (1) <strong>信息驱动探索的鸡生蛋问题</strong>: 要决定去哪里，机器人需要知道地图在哪里不确定。但要知道地图在哪里不确定，它必须去观测那些区域。机器人必须预测每个候选视角能提供多少新信息 —— 而不是真的去那里。传统体素方法从体素占据统计计算不确定性；3DGS 没有原生的占据概念。<br><br>
+    (2) <strong>表示鸿沟</strong>: 3DGS 是为<strong>渲染</strong>设计的，而非<strong>规划</strong>。3DGS 中的碰撞检测并非平凡问题：高斯是概率基元，具有无限空间范围（指数衰减的密度），不是硬表面。规划器必须决定在概率表示中什么构成"碰撞"，并高效地进行评估。<br><br>
+    (3) <strong>实时性约束</strong>: 主动建图必须在物理机器人上实时运行。这意味着：地图以传感器速率更新，规划以控制速率进行，所有计算在机载 NVIDIA GPU 的内存预算内完成。3DGS 地图可能包含数百万个高斯 —— 对所有高斯进行暴力操作将违反实时约束。
+  </div>
+
+  <h3>5.2 先前方法及其局限</h3>
+  <table>
+    <tr><th>先前方法</th><th>核心思想</th><th>为何失败</th></tr>
+    <tr><td>体素探索（占据栅格 + 前沿法）</td><td>从深度构建占据栅格，导航至已知自由空间与未知空间之间的前沿</td><td>最大化面积覆盖而非地图质量。不区分"勉强观测"与"充分观测"区域。忽略重建质量 —— 区域可能已"覆盖"但重建质量差。</td></tr>
+    <tr><td>基于 NeRF 的主动建图（FisherRF, ActiveNeRF）</td><td>使用 NeRF 作为地图，通过从候选视角渲染计算 Fisher 信息，选择信息最大化的视角</td><td>从每个候选视角渲染很慢（每次评估 1.299s）。NeRF 自身更新慢。双表示问题：NeRF 用于建图，另一栅格用于规划。</td></tr>
+    <tr><td>3DGS 探索（GS-Planner）</td><td>将 3DGS 转换为体素表示用于规划</td><td>丢弃了 3DGS 的显式结构。转换有损且增加延迟。未利用 GPU 并行性进行规划 —— 规划在 CPU 上运行。</td></tr>
+    <tr><td>基于学习的探索（RL、模仿学习）</td><td>训练策略从传感器观测输出探索动作</td><td>需要大量训练数据，无法泛化到新环境，不提供地图质量或安全性保证。</td></tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 —— 无需渲染即可定义 3DGS 中的不确定性</strong>: Fisher 信息需要计算渲染损失对高斯参数的 Hessian —— 这涉及渲染。RT-GuIDE 的关键洞察是：在线地图更新期间<strong>高斯均值的时序位移</strong>是不确定性的强代理量 —— 在多次建图迭代间显著移动的高斯处于约束不足的区域。这由 Cramer-Rao 界（将参数估计方差与 Fisher 信息关联）所支撑。</li>
+    <li><strong>挑战 2 —— 对百万高斯进行高效 GPU 碰撞检测</strong>: 对每个机器人测试点与每个高斯进行暴力检测的复杂度为 O(N_points * N_gaussians)。面对数百万个高斯，这在 CPU 上不可行。RT-GuIDE 通过将碰撞检测实现为<strong>并行 GPU 核函数</strong>来解决 —— 每个线程块处理一个测试点子集与一个高斯块，实现 18 倍加速。</li>
+    <li><strong>挑战 3 —— 平衡探索（信息增益）与利用（行进成本）</strong>: 最不确定的区域可能很远，行进成本可能超过信息收益。RT-GuIDE 的拓扑规划使用<strong>成本效益比 $\Omega_k / e^d$</strong>（不确定性除以指数行进距离）自然地平衡探索与利用 —— 中等不确定性但较近的区域可能优于远距离高不确定性区域。</li>
+  </ul>
+</section>
+
+<!-- ========== 6. METHOD & KEY FORMULAS ========== -->
+<section id="method">
+  <h2>6. 关键方法与公式</h2>
+
+  <h3>6.1 核心算法</h3>
+  <p>RT-GuIDE 是一个<strong>三层分层系统</strong>。Layer 1（建图）使用 SplaTAM 进行在线 3DGS 重建（各向同性高斯），生成持续更新的地图和每高斯位移度量。Layer 2（高层规划）将地图划分为空间区域，计算每个区域的平均不确定性，构建拓扑图，并通过 Dijkstra + 成本效益分析选择最佳区域。Layer 3（低层规划）扩展运动基元树，进行 GPU 加速碰撞检测，并通过 A* 搜索选择最大化信息效用的轨迹。</p>
+
+  <h3>6.2 关键公式</h3>
+
+  <h4>A组：建图与信息增益</h4>
+  <div class="formula-block">
+    <span class="eq-tag">式(1)(2) —— 3DGS 地图与基于位移的信息增益</span>
+    $$ \hat{G} = \{(\mu_k, \Sigma_k, c_k, \alpha_k)\}_{k=1}^{N} \quad \text{(3D Gaussian Map)} $$
+    $$ \mathcal{I}(g_k) = \|\mu_k^{(t)} - \mu_k^{(t-1)}\|_2 \quad \text{(Per-Gaussian Information Gain)} $$
+    $$ \text{Motivation: } \text{Var}[\hat{G}] \propto \mathcal{I}_{\text{Fisher}}^{-1}, \quad \|\Delta\mu\| \approx \text{Tr}(\text{Cov}[\mu]) $$
+    <div class="eq-note">
+      <strong>$\mu_k^{(t)}$</strong> = center of Gaussian k at mapping iteration t &nbsp;|&nbsp;
+      <strong>SplaTAM update</strong>: 新 RGB-D 帧用于通过 L1 + SSIM 渲染损失优化高斯参数，并施加各向同性协方差约束以保证几何一致性 &nbsp;|&nbsp;
+      <strong>直觉解释</strong>: 使用第 t 帧更新地图后，被充分观测区域的高斯几乎不动（其参数被很好地约束），而观测不足或未观测区域的高斯会显著移动以适应新数据。位移幅度本身即成为<strong>认知不确定性的代理量</strong>——无需渲染。Fisher 信息的理论依据：Fisher 信息矩阵逆的对角线为参数估计方差提供下界（Cramer-Rao），而均值位移幅度与此方差相关。
+    </div>
+  </div>
+
+  <h4>B组：高层拓扑规划</h4>
+  <div class="formula-block">
+    <span class="eq-tag">式(3)(4) —— 区域不确定性与成本效益选择</span>
+    $$ \Omega_k = \frac{1}{|R_k|} \sum_{g \in R_k} \mathcal{I}(g) \quad \text{(Mean uncertainty of region k)} $$
+    $$ k^* = \arg\max_k \frac{\Omega_k}{e^{d(\mathbf{p}_{\text{robot}}, \mathbf{p}_k)}} \quad \text{(Cost-benefit region selection)} $$
+    <div class="eq-note">
+      <strong>$R_k$</strong> = k-th cuboidal region in the spatial partition &nbsp;|&nbsp;
+      <strong>$\Omega_k$</strong> = average per-Gaussian displacement within region k (higher = more uncertain) &nbsp;|&nbsp;
+      <strong>$d(\mathbf{p}_{\text{robot}}, \mathbf{p}_k)$</strong> = shortest path distance from robot to region center viewpoint, computed via Dijkstra on topological graph &nbsp;|&nbsp;
+      <strong>$e^{d}$</strong> = exponential discount on travel distance -- makes distant regions exponentially less attractive unless they have very high uncertainty &nbsp;|&nbsp;
+      <strong>Topological graph</strong>: nodes = odometry keyframes + region-center viewpoint nodes; edges = straight-line distances between nodes; only viewpoint nodes contribute uncertainty reward.
+    </div>
+  </div>
+
+  <h4>C组：GPU 碰撞检测</h4>
+  <div class="formula-block">
+    <span class="eq-tag">式(5)(6) —— 概率碰撞约束</span>
+    $$ d_\kappa(\mathbf{x}, g) = \sqrt{(\mathbf{x} - \mu_g)^T \Sigma_g^{-1} (\mathbf{x} - \mu_g)} \quad \text{(Mahalanobis distance)} $$
+    $$ P(d_\kappa(\mathbf{x}, g) < \gamma) \le \eta \quad \forall \mathbf{x} \in \mathcal{X}_{\text{robot}}, \forall g \in \hat{G} $$
+    <div class="eq-note">
+      <strong>$\mathcal{X}_{\text{robot}}$</strong> = set of test points approximating the robot's physical extent (sphere model with multiple surface points) &nbsp;|&nbsp;
+      <strong>$\gamma$</strong> = collision distance threshold (if a test point is within Mahalanobis distance $\gamma$ of a Gaussian center, it may be in collision) &nbsp;|&nbsp;
+      <strong>$\eta$</strong> = probability tolerance (small, e.g., 0.05) &nbsp;|&nbsp;
+      <strong>GPU implementation</strong>: All test points are checked against all Gaussians in parallel. For each trajectory in the motion primitive tree, the collision check produces a boolean pass/fail. Only collision-free trajectories proceed to utility evaluation.
+    </div>
+  </div>
+
+  <h4>D组：轨迹效用与选择</h4>
+  <div class="formula-block">
+    <span class="eq-tag">式(7)(8) —— 轨迹信息效用</span>
+    $$ \hat{G}_H = \{g \in \hat{G} : \mathcal{I}(g) > \tau_H\}, \quad \hat{G}_L = \{g \in \hat{G} : \mathcal{I}(g) < \tau_L\} $$
+    $$ \xi(\mathbf{x}, \hat{G}) = \sum_{g \in \hat{G}_H} v(\mathbf{x}, g) - \lambda_\xi \sum_{g \in \hat{G}_L} v(\mathbf{x}, g) $$
+    $$ v(\mathbf{x}, g) = \exp\left(-\frac{\|\mathbf{x} - \mu_g\|^2}{2\sigma_v^2}\right) \quad \text{(Gaussian observation weight)} $$
+    <div class="eq-note">
+      <strong>$\hat{G}_H$</strong> = high-uncertainty Gaussians (displacement above threshold $\tau_H$) -- observing these is <strong>rewarded</strong> &nbsp;|&nbsp;
+      <strong>$\hat{G}_L$</strong> = low-uncertainty Gaussians (displacement below $\tau_L$) -- observing these is <strong>penalized</strong> (waste of time) &nbsp;|&nbsp;
+      <strong>$v(\mathbf{x}, g)$</strong> = Gaussian-weighted observation utility -- a Gaussian contributes more to utility if the trajectory passes close to it &nbsp;|&nbsp;
+      <strong>$\lambda_\xi$</strong> = penalty weight for observing already-certain regions (balances exploration vs. exploitation) &nbsp;|&nbsp;
+      <strong>A* selection</strong>: Among collision-free trajectories, select the one maximizing cumulative utility along the trajectory.
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>建图骨架</td><td><strong>SplaTAM</strong></td><td>在线 3DGS SLAM 系统</td><td>提供增量地图更新与各向同性高斯；L1+SSIM 损失在锐度和感知质量之间取得平衡</td></tr>
+    <tr><td>高斯约束</td><td><strong>各向同性协方差</strong></td><td>高斯为球形（Sigma = sigma^2 * I）</td><td>强制几何一致性 —— 各向异性高斯会过拟合特定视角并产生几何上无效的表面</td></tr>
+    <tr><td>碰撞距离</td><td><strong>gamma</strong></td><td>碰撞的马氏距离阈值</td><td>按机器人尺寸标定：距高斯中心 gamma 以内的测试点可能发生碰撞</td></tr>
+    <tr><td>效用惩罚</td><td><strong>lambda_xi</strong></td><td>惩罚观测低不确定性区域的权重</td><td>平衡探索（观测高不确定性区域）与避免重复观测已建图区域</td></tr>
+    <tr><td>成本效益折扣</td><td><strong>指数 e^d</strong></td><td>区域选择中的行进距离惩罚</td><td>指数（而非线性）折扣适当地惩罚极远区域，同时对近区域更宽容</td></tr>
+    <tr><td>GPU 加速比</td><td><strong>~18x</strong></td><td>碰撞检测相对于 CPU 的加速比</td><td>在 300 万高斯下测得：GPU 0.62s vs CPU 11.65s</td></tr>
+  </table>
+
+  <h3>6.4 RT-GuIDE vs 传统主动建图</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>RT-GuIDE（本文）</h4>
+      <ul>
+        <li><strong>单一表示</strong>: 3DGS 同时用于建图与规划</li>
+        <li><strong>免渲染信息</strong>: 基于位移的不确定性</li>
+        <li><strong>GPU 原生规划</strong>: GPU 碰撞检测，快 18 倍</li>
+        <li><strong>分层架构</strong>: 全局区域选择 + 局部轨迹优化</li>
+        <li><strong>照片级输出</strong>: 3DGS 直接用于新视角合成</li>
+        <li>覆盖率: <strong>92.36%</strong>，PSNR 提升: <strong>+0.95dB</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>传统主动建图（体素 / NeRF）</h4>
+      <ul>
+        <li><strong>双表示</strong>: 重建和规划使用不同地图</li>
+        <li><strong>基于渲染</strong>: 需从每个候选视角渲染（慢）</li>
+        <li><strong>CPU 规划</strong>: 在 CPU 上进行体素查询</li>
+        <li><strong>单层规划</strong>: 要么全局、要么局部，不能两者兼顾</li>
+        <li><strong>视觉质量有限</strong>: 体素或 NeRF 输出的照片真实感较低</li>
+        <li>FisherRF 覆盖率: <strong>66.40%</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 7. FUNDAMENTAL PRINCIPLES ========== -->
+<section id="principles">
+  <h2>7. 基本原理</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 RT-GuIDE 需要掌握三个基础概念：3D Gaussian Splatting 作为显式场景表示、信息论探索以及 GPU 加速的机器人规划。</p>
+
+  <h3>7.1 3DGS -- From Rendering Primitive to Planning Primitive</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">Principle 1 -- 3DGS Rendering and Its Planning Implications</span>
+    $$ C = \sum_{i \in N} c_i \alpha_i \prod_{j=1}^{i-1} (1 - \alpha_j) \quad \text{(Alpha blending for rendering)} $$
+    $$ \alpha_i = o_i \cdot \exp\left(-\frac{1}{2}(\mathbf{x} - \mu_i)^T \Sigma_i^{-1} (\mathbf{x} - \mu_i)\right) \quad \text{(Gaussian contribution at pixel x)} $$
+    <div class="eq-note">
+      <strong>For rendering</strong>: Gaussians are sorted by depth, then alpha-blended front-to-back -- producing photorealistic novel views at 30+ Hz. &nbsp;|&nbsp;
+      <strong>For planning</strong>: The same Gaussians serve as spatial primitives for collision checking -- a test point near a high-opacity Gaussian center is "occupied." This dual use eliminates representation conversion. &nbsp;|&nbsp;
+      <strong>Key property</strong>: Isotropic covariance (Sigma = sigma^2 * I) ensures that the Gaussian's spatial extent is uniform in all directions, which is essential for geometrically meaningful collision checking. Anisotropic Gaussians can stretch along view directions, creating geometrically invalid "collision volumes."
+    </div>
+  </div>
+
+  <p><strong>为什么各向同性约束对规划至关重要</strong>: 各向异性 3DGS（标准形式）允许每个高斯有任意的 3x3 协方差矩阵。这对照片级渲染非常有利 —— 拉长的高斯能高效表示沿视线方向的平面表面。然而，对于碰撞检测，沿相机视线拉长的高斯会在自由空间中产生虚假的"碰撞区域"。各向同性高斯（球形）避免了这一问题：每个高斯表示一个局部球体，使碰撞几何不依赖于视线方向。</p>
+
+  <h3>7.2 Information Gain -- Why Displacement Approximates Uncertainty</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">Principle 2 -- Fisher Information and Parameter Displacement</span>
+    $$ \text{Cramer-Rao: } \text{Cov}[\hat{\theta}] \succeq \mathcal{I}(\theta)^{-1} \quad \text{(Inverse Fisher bounds estimation variance)} $$
+    $$ \|\mu_k^{(t)} - \mu_k^{(t-1)}\|_2 \approx \sqrt{\text{Tr}(\text{Cov}[\mu_k])} \quad \text{(Displacement approximates standard deviation)} $$
+    <div class="eq-note">
+      <strong>$\mathcal{I}(\theta)$</strong> = 高斯参数关于渲染损失的 Fisher 信息矩阵 &nbsp;|&nbsp;
+      <strong>$\text{Cov}[\hat{\theta}]$</strong> = 参数估计的协方差（我们对每个高斯的不确定性程度） &nbsp;|&nbsp;
+      <strong>关键洞察</strong>: 当某高斯的 Fisher 信息高（从多个视角充分观测）时，其参数估计被紧密约束 —— 均值在迭代间变化很小。当 Fisher 信息低（观测不足）时，均值随新数据到来而显著移动。<strong>位移幅度</strong>因此成为 Fisher 信息逆的直接可观测代理量。这完全避免了渲染损失 Hessian 的计算。
+    </div>
+  </div>
+
+  <p><strong>与 FisherRF 的比较</strong>: FisherRF 显式计算 Fisher 信息：从候选视角 j 渲染场景，计算渲染损失对高斯参数的逐像素梯度，累积到 Fisher 信息矩阵中，并求和其迹。这需要对<strong>每个候选视角进行渲染</strong>，是计算瓶颈（每次评估 1.299s）。RT-GuIDE 的位移度量需要<strong>零次渲染</strong>—— 仅需地图更新前后高斯参数的成对相减。结果是每次评估 0.013s（100 倍加速），PSNR 相当。</p>
+
+  <h3>7.3 GPU-Accelerated Planning -- Why Parallelism Changes the Game</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">Principle 3 -- Amdahl's Law for Robot Planning</span>
+    $$ \text{Speedup} = \frac{1}{(1 - P) + \frac{P}{N}} \quad \text{(Amdahl's Law)} $$
+    $$ \text{For collision checking: } P \approx 0.95 \text{ (parallelizable fraction), } N = O(10^4) \text{ (GPU cores)} $$
+    $$ \text{Theoretical speedup} \approx \frac{1}{0.05 + 0.95/10000} \approx 20\times $$
+    <div class="eq-note">
+      <strong>$P$</strong> = 可并行化的计算占比 &nbsp;|&nbsp;
+      <strong>$N$</strong> = 并行处理单元数量 &nbsp;|&nbsp;
+      <strong>实际结果</strong>: 18 倍加速（接近理论 20 倍）。剩余差距源于 GPU 显存传输开销和线程同步。 &nbsp;|&nbsp;
+      <strong>对探索的意义</strong>: 在 18 倍加速下，RT-GuIDE 每个规划周期可评估数百个轨迹候选，使运动基元树更丰富、轨迹质量更高 —— 直接提升探索效率。基于 CPU 的规划器被迫使用更粗糙的运动基元或更少的候选。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">系统级协同</div>
+    三个原理形成紧密集成的流水线：<strong>3DGS 作为统一表示</strong>同时支撑高质量重建与空间推理；<strong>基于位移的不确定性</strong>提供快速、免渲染的信息度量来引导规划器；<strong>GPU 并行性</strong>使统一表示在实时规划中计算可行。去掉任意一个：没有统一 3DGS，就需要双表示与转换开销；没有位移度量，就需要缓慢的基于渲染的不确定性；没有 GPU 规划，数百万高斯无法实时处理。
+  </div>
+</section>
+
+<!-- ========== 8. PAPER FIGURES ========== -->
+<section id="figures">
+  <h2>8. 论文图表</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">论文图表。请截图保存到 <code>figures/</code> 子目录，命名为 <code>fig1.png</code> 等即可自动显示。</p>
+
+  <h3>8.1 系统概览</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">RT-GuIDE system overview: unified mapping and planning on 3DGS</span>
+      <span class="fig-source">来源：论文图 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="RT-GuIDE system overview"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>本图展示了</strong> RT-GuIDE 的完整流水线。从 RGB-D 输入和里程计出发，基于 SplaTAM 的建图模块增量式地构建 3DGS 地图。该地图作为<strong>单一共享表示</strong>服务于三个下游功能：(1) 信息评估：计算每高斯位移以识别不确定区域；(2) 高层规划：拓扑图利用区域不确定性进行视角选择；(3) 低层规划：GPU 碰撞检测直接基于高斯验证轨迹安全性。</p>
+      <ul>
+        <li><strong>关键架构决策</strong>：无中间表示转换。3DGS 地图既是地图、也是不确定性场、也是碰撞环境 —— 全部在一个 GPU 驻留的数据结构中。</li>
+        <li><strong>闭环</strong>：执行的轨迹产生新的观测，更新地图，改变不确定性场，触发重规划。系统持续平衡探索新区域与优化已有区域。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>8.2 探索结果 —— MP3D 闭环仿真</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">Closed-loop exploration comparison: RT-GuIDE vs FisherRF vs baselines on MP3D Unity environments</span>
+      <span class="fig-source">来源：论文实验结果</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Exploration results"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>关键结果</strong>：RT-GuIDE 在 Matterport3D 环境的闭环仿真中达到 <strong>92.36% 覆盖率</strong>（FisherRF 为 66.40%）和<strong>高 0.95dB 的 PSNR</strong>。覆盖率差距在大型复杂场景中尤为显著 —— FisherRF 基于渲染的视角选择成为瓶颈，RT-GuIDE 在相同时间预算内评估更多视角，从而更高效地探索。</p>
+      <ul>
+        <li><strong>覆盖率与 PSNR 权衡</strong>：RT-GuIDE 同时获得更高覆盖率和更高 PSNR，表明基于位移的度量有效地引导机器人到能同时改善地图完整性和重建质量的视角。</li>
+        <li><strong>速度优势的级联效应</strong>：更快的视角评估使重规划更频繁，从而使探索更具适应性，能响应新发现的场景结构。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>8.3 真实世界实验 —— Clearpath Jackal</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">Real-world experiments: 4 environments, Clearpath Jackal, comparison with baselines</span>
+      <span class="fig-source">来源：论文真实世界实验结果</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Real-world experiments"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>请截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>在 4 个环境中进行真实世界验证</strong>（实验室、休息室、走廊、会议室）：RT-GuIDE 相比基线探索方法获得 <strong>高 0.8-2.4dB 的 PSNR</strong> 和 <strong>低 16-48% 的深度 RMSE</strong>。GPU 加速流水线完全在 Clearpath Jackal 的 NVIDIA GPU 上运行，展示了实时自主操作。在 3DGS 地图上进行下游语义分割（GroundedSAM2），相比基线方法的地图显示出<strong>更高的 mIoU</strong>。</p>
+      <ul>
+        <li><strong>信息度量鲁棒性</strong>：尽管存在真实世界传感器噪声（深度丢失、运动模糊），基于位移的度量仍保持有效，验证了其实用可行性。</li>
+        <li><strong>地图质量传递到下游任务</strong>：改善的 PSNR 直接转化为更好的语义分割 —— 高质量 3DGS 地图不仅视觉上吸引人，在感知任务中功能上也更优。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 9. POTENTIAL FLAW ========== -->
+<section id="flaw">
+  <h2>9. 缺陷与扩展</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 基于位移的不确定性度量假设 SplaTAM 优化器在迭代间<strong>充分收敛</strong> —— 若优化器提前停止，未完成优化产生的残差位移可能被误解为高不确定性。(2) 各向同性高斯约束改善了 geometric consistency，但可能在高度各向异性结构的场景中<strong>限制重建质量</strong>（长窄走廊、以掠射角观察的大平面墙）。论文承认了这种规划几何精度与视觉保真度之间的权衡。</li>
+    <li><strong>适用范围</strong>: 目前在<strong>地面机器人（UGV）</strong>上演示，具有 2D 运动（独轮车动力学）。扩展到 UAV（6-DOF）需要：(a) 具有更复杂动力学的 3D 运动基元；(b) 针对高斯地图的 3D 碰撞检测；(c) 处理航空建图中常见的下视相机配置。GPU 碰撞检测框架可泛化到 3D，但运动基元树的复杂性将显著增加。</li>
+    <li><strong>可扩展性</strong>: 3DGS 地图的 GPU 内存占用随探索面积线性增长。对于非常大的环境（多建筑、室外），高斯数量可能超出 GPU 内存。论文未讨论面向无界探索的<strong>高斯剪枝或地图管理</strong>策略。</li>
+  </ul>
+
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>: 将 RT-GuIDE 适配到<strong>UAV 航空探索</strong>。这需要：(1) 6-DOF 运动基元或多项式轨迹生成；(2) 高层规划器使用 3D 体积划分（长方体变为 3D 体素）；(3) 考虑下视相机视场的信息度量。GPU 碰撞检测自然可泛化 —— 同一并行核函数可用于 3D 测试点。</li>
+    <li><strong>条件放松</strong>: (1) <strong>多机器人探索</strong> —— 多个 agent 构建共享 3DGS 地图，每个 agent 的位移度量反映所有 agent 的观测。拓扑规划器需要协调 agent 分配以避免冗余探索。(2) <strong>不确定性感知建图</strong> —— 使用 Bayesian 3DGS 显式建模每高斯不确定性（而非仅位移），将提供更原则性的不确定性度量，但计算成本更高。</li>
+    <li><strong>约束添加</strong>: (1) <strong>语义驱动探索</strong> —— 使用语义分割（GroundedSAM2）输出引导探索朝向语义上有趣的区域（如"比走廊更彻底地探索厨房"）。(2) <strong>主动回环闭合</strong> —— 规划器可以显式地瞄准预测会触发 SLAM 系统回环闭合的视角，减少全局漂移。</li>
+  </ul>
+
+  <h3>9.3 数据敏感性</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重性</th></tr>
+    <tr><td>位移度量对优化器状态的敏感性</td><td>若建图优化器调参不当（错误的学习率、迭代次数不足），高斯位移可能反映优化器动力学而非真实场景不确定性。这将使探索规划器被引导至存在优化器噪声的区域，而非真正不确定的区域。</td><td>****</td></tr>
+    <tr><td>无纹理区域</td><td>3DGS（以及一般的 photometric SLAM）在无纹理区域（白墙、均匀地面）中表现不佳，这些区域光度误差提供的梯度很弱。这些区域中的高斯可能无法收敛，产生持续高位移，误导规划器反复访问不可重建的区域。</td><td>****</td></tr>
+    <tr><td>动态物体</td><td>移动物体（人、门）引起的高斯位移与探索不确定性无关 —— 高斯移动是为了解释动态内容，产生虚假的"不确定性"信号。论文未涉及动态场景处理。</td><td>***</td></tr>
+    <tr><td>视角覆盖偏差</td><td>位移度量受到机器人轨迹的偏差影响 —— 机器人从未访问的区域根本没有高斯（而非高位移）。高层规划器必须分别追踪"未探索空间"（无高斯）与"不确定空间"（高位移高斯）。</td><td>**</td></tr>
+  </table>
+
+  <h3>9.4 值得深挖的方向</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深入研究的点</div>
+    <strong>RT-GuIDE + GaussFly：在 3DGS 中闭合从探索到导航的回路</strong> —— RT-GuIDE 探索并构建 3DGS 地图；GaussFly（来自 NTU/NUAA，10006）使用 3DGS 地图进行 UAV 视觉运动导航。天然集成：RT-GuIDE 的探索策略构建未知环境的高质量 3DGS 地图，GaussFly 的 contrastive RL 策略随后使用该地图进行目标条件导航。这种闭环（先探索后导航）是 UAV 在未知环境中自主部署的基础。关键研究问题：同一 3DGS 地图能否同时服务于探索（RT-GuIDE）和导航（GaussFly），还是每个任务需要不同的地图属性（规划用各向同性 vs 视觉保真度用各向异性）？
+  </div>
+</section>
+
+<!-- ========== 10. MOTIVATION ========== -->
+<section id="motivation">
+  <h2>10. 动机推导 —— 第一性原理推导</h2>
+
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>本质问题是什么？</strong><br>探索未知环境的机器人需要决定下一步看哪里。这需要：(a) 已见区域的地图；(b) 对未见或观测不足区域的估计；(c) 导航至最大化新信息的规划器。传统方法为每个功能使用不同表示 —— 创新在于认识到<strong>3DGS 可以同时充当这三种角色</strong>。</li>
+    <li><strong>已有方法如何处理？为何不足？</strong><br>体素方法（占据栅格）可以追踪"未知"空间，但无法衡量"观测不足"的空间 —— 区域只有"见过"或"没见过"两种状态，没有重建质量梯度。NeRF 方法（FisherRF）可通过 Fisher 信息衡量质量，但需要昂贵的渲染。两种方法都未使用单一表示承担全部三种功能。</li>
+    <li><strong>3DGS 为何特别适合此任务？</strong><br>3DGS 有三个各自有用、组合后更强大的属性：(a) <strong>显式基元</strong> —— 高斯具有空间位置，碰撞检测直接可行；(b) <strong>可微渲染</strong> —— 高斯可通过光度误差优化，实现在线建图；(c) <strong>参数稳定性作为不确定性信号</strong> —— 优化器的收敛行为揭示了地图哪里被充分约束。</li>
+    <li><strong>如何在不渲染的情况下从 3DGS 中提取不确定性？</strong><br>位移观察：当新的 RGB-D 数据通过 SplaTAM 融合时，被充分观测区域的已有高斯几乎不动（其参数被先验数据充分约束），而观测不足区域的高斯则显著移动以适应新的观测。该位移是建图过程的<strong>免费副产品</strong>—— 除了地图更新本身外，无需任何额外计算。</li>
+    <li><strong>为什么要用 GPU 规划？</strong><br>如果地图已经在 GPU 上（3DGS 是 GPU 原生的），规划器也应运行在 GPU 上以避免昂贵的 CPU-GPU 传输。碰撞检测 —— 将众多机器人构型与数百万个高斯进行测试 —— 是天然适合并行的，自然映射到 GPU 架构。18 倍加速使运动基元树更丰富，能找到更好的轨迹。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    与其为重建和规划维护分离的地图——这浪费计算并丢弃信息——RT-GuIDE 构建单一 3D Gaussian Splatting 地图，同时支持照片级真实渲染、信息驱动的视角选择（通过基于位移的不确定性）以及 GPU 加速碰撞检测，在物理机器人上实现实时自主探索。
+  </div>
+
+  <h3>10.3 如何推导出这一想法</h3>
+  <ul>
+    <li><strong>第 1 步 —— 观察双表示的低效</strong>: 在传统主动建图流水线中，你先构建 NeRF 或 TSDF 用于重建，然后将其转换为占据栅格用于规划。这种转换缓慢、有损且概念上不令人满意。为什么一个表示不能服务于两个目的？</li>
+    <li><strong>第 2 步 —— 识别 3DGS 作为候选</strong>: 3DGS 渲染速度快、显式（高斯具有空间参数）、GPU 原生。这些性质表明它可以同时作为地图和规划环境。关键问题是：我们能否高效地从高斯计算不确定性和碰撞？</li>
+    <li><strong>第 3 步 —— 发现位移信号</strong>: 在运行 SplaTAM 进行在线建图时，观察到高斯参数在场景中以不同速率变化。充分观测的高斯快速稳定；观测不足的高斯持续移动。这种高斯参数的时序导数即是不确定性信号。</li>
+    <li><strong>第 4 步 —— 设计分层规划器</strong>: 有了每高斯不确定性定义后，规划问题自然分解：首先，决定探索哪个空间区域（全局，使用聚合区域不确定性）；其次，计算到达那里的精确轨迹（局部，使用每高斯不确定性和 GPU 碰撞检测）。</li>
+    <li><strong>第 5 步 —— 全部搬到 GPU</strong>: 3DGS 地图驻留在 GPU 上。不确定性计算是 GPU 上的简单向量减法。碰撞检测本质上是并行的。将整个流水线保留在 GPU 上消除了数据传输瓶颈，释放了 18 倍加速。</li>
+  </ul>
+</section>
+
+<!-- ========== 11. KEY TAKEAWAYS ========== -->
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+
+  <h3>11.1 经验教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>: 这是一种<strong>以表示为中心</strong>的机器人自主方法。关键洞察是：选择合适的表示（3DGS）可以将多个传统上分离的流水线阶段（建图、不确定性估计、碰撞检测）折叠为单一数据结构。这是值得在其他机器人感知-规划问题中考虑的设计模式：在增加复杂度来桥接不同表示之前，先问<strong>单一表示</strong>是否就能满足所有需求。</li>
+    <li><strong>技术层面</strong>: (1) <strong>免费的信息信号</strong> —— 位移度量是"免费午餐"：它是建图过程的自然副产品，无需额外计算。设计系统以利用此类免费信号是强大的工程原则。(2) <strong>GPU 原生流水线</strong> —— 将所有计算保留在 GPU 上消除了机器人规划的主要瓶颈（CPU-GPU 传输）。18 倍加速并非来自更好的算法，而是来自消除架构低效。(3) <strong>分层分解</strong> —— 将全局区域选择与局部轨迹优化分离，使每一层可以按其自然时间尺度（1 Hz vs 10 Hz）和适当的抽象（聚合不确定性 vs 每高斯效用）运作。</li>
+    <li><strong>实验/写作层面</strong>: 论文在三种不同设置上验证（视角选择基准、闭环仿真、真实世界机器人），每种提供互补证据。下游语义分割实验特别有效 —— 它表明更好的探索带来更好的地图，进而带来在具体任务（open-vocabulary 分割）上更好的性能。这种"任务驱动评估"比单纯的 PSNR 更有说服力。</li>
+  </ul>
+
+  <h3>11.2 可直接应用于我的研究</h3>
+  <ul>
+    <li><strong>面向 UAV 探索</strong>: RT-GuIDE 的方法自然可扩展到空中机器人。基于位移的不确定性度量与传感器无关 —— 可与任何 RGB-D 源配合使用。对于 UAV，关键适配是 3D 运动基元和处理下视相机配置。GPU 碰撞检测可直接泛化到 3D。</li>
+    <li><strong>面向多机器人系统</strong>: 拓扑规划架构支持多 agent 扩展 —— 多个机器人可共享同一 3DGS 地图（通过网络），每个机器人在自身观测上计算位移。高层规划器将为各 agent 分配区域以最小化冗余探索。这与多 UAV 探测任务直接相关。</li>
+    <li><strong>面向 Sim-to-Real 迁移</strong>: RT-GuIDE 将 3DGS 同时用于仿真（渲染照片级视图用于训练）和真实世界建图（在线 SLAM），这创造了自然的 sim-to-real 桥梁。结合 GaussFly 的 contrastive RL 方法，可在 3DGS 渲染环境中训练导航策略，并在 RT-GuIDE 重建的真实环境中部署。</li>
+  </ul>
+
+  <h3>11.3 需要跟进的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Kerbl et al. (2023) -- 3D Gaussian Splatting for Real-Time Radiance Field Rendering. <em>SIGGRAPH</em></td><td>3DGS 基础论文。理解该表示（显式高斯基元、分块光栅化、alpha 混合）对于理解 RT-GuIDE 的设计决策至关重要。</td></tr>
+    <tr><td>Keetha et al. (2024) -- SplaTAM: Splat, Track and Map 3D Gaussians for Dense RGB-D SLAM. <em>CVPR</em></td><td>RT-GuIDE 的建图骨架。SplaTAM 实现了从 RGB-D 进行在线增量式 3DGS 重建 —— 这是使闭环主动建图成为可能的关键能力。</td></tr>
+    <tr><td>Jiang et al. (2024) -- FisherRF: Active View Selection and Uncertainty Quantification for Radiance Fields. <em>ECCV</em></td><td>主要基线。FisherRF 基于渲染的 Fisher 信息是标准方法，RT-GuIDE 通过位移度量将其提升了 100 倍。</td></tr>
+    <tr><td>Zhang et al. (2026) -- GaussFly: Contrastive Reinforcement Learning for Visuomotor Policies in 3D Gaussian Fields. <em>arXiv</em></td><td>天然互补：GaussFly 使用 3DGS 进行导航策略训练。RT-GuIDE 的探索地图可作为 GaussFly 的训练和部署环境，形成完整的基于 3DGS 的自主流水线。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes -- Tao et al. -- 2025 -- RT-GuIDE: Real-Time Gaussian Splatting for Information-Driven Exploration -- MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

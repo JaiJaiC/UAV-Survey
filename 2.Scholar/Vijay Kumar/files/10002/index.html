@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes -- ROBOGUARD (Ravichandran et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 4px; margin-right: 5px; margin-bottom: 4px; }
+  .tag-blue { background:#dbeafe; color:#1d4ed8; } .tag-green { background:#d1fae5; color:#047857; }
+  .tag-amber { background:#fef3c7; color:#92400e; } .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red { background:#ffe4e6; color:#be123c; } .tag-gray { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">论文信息</a>
+  <a href="#insight">核心洞察</a>
+  <a href="#architecture">系统架构</a>
+  <a href="#task">任务定义</a>
+  <a href="#challenge">核心挑战</a>
+  <a href="#method">关键方法</a>
+  <a href="#principles">基本原理</a>
+  <a href="#figures">实验结果</a>
+  <a href="#flaw">缺陷与扩展</a>
+  <a href="#motivation">动机推导</a>
+  <a href="#takeaway">核心收获</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Vijay Kumar · 17-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a class="active" href="../10002/index.html">Safety guardrails llm-ena</a>
+<a href="../10001/index.html">Contextual safety reasoni</a>
+<a href="../10017/index.html">Jailbreaking llm-controll</a>
+<a href="../10016/index.html">Deploying foundation mode</a>
+<a href="../10015/index.html">Spine Online semantic</a>
+<a href="../10014/index.html">Vision transformers end-t</a>
+<a href="../10013/index.html">EvMAPPER High-altitude or</a>
+<a href="../10012/index.html">Constrained learning dece</a>
+<a href="../10011/index.html">Air-ground collaboration</a>
+<a href="../10010/index.html">Distilling on-device lang</a>
+<a href="../10009/index.html">Compositional coordinatio</a>
+<a href="../10008/index.html">Rt-guide Real-time gaussi</a>
+<a href="../10007/index.html">SPAR</a>
+<a href="../10006/index.html">PIP-LLM</a>
+<a href="../10005/index.html">Slideslam Sparse, lightwe</a>
+<a href="../10004/index.html">Heterogeneous robot colla</a>
+<a href="../10003/index.html">Hierarchical llms in-the-</a>
+    </div>
+  </div>
+
+
+<!-- 1. 论文信息 -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Safety Guardrails for LLM-Enabled Robots</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Zachary Ravichandran</strong>, Alexander Robey, <strong>Vijay Kumar</strong>, George J. Pappas, Hamed Hassani</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">University of Pennsylvania</strong> GRASP Lab (Ravichandran, Kumar, Pappas, Hassani); Carnegie Mellon University (Robey)</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Robotics and Automation Letters (RA-L)</strong>, accepted February 2026. arXiv:2503.07885v2</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE RA-L</span> <span class="jif-badge if-value">IF 5.6</span> <span class="jif-badge if-q2">JCR Q2</span> <span class="jif-badge if-cas">CAS 2区</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td>Project: <a href="https://robo-guard.github.io/" target="_blank">robo-guard.github.io</a> | Funding: DARPA SAFRON + ARL DCIST CRA + NSF GRFP + TILOS</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>ROBOGUARD 是一个面向 LLM 驱动机器人的<strong>两阶段护栏架构</strong>。一个 root-of-trust LLM 通过 Chain-of-Thought 推理将预定义的安全规则上下文化，接地到机器人的环境中，生成<strong>Linear Temporal Logic (LTL) 安全规范</strong>。然后一个时序逻辑控制合成模块解决安全规范与潜在不安全的 LLM 生成规划之间的冲突，输出<strong>最小修改的安全规划</strong>。关键在于，root-of-trust LLM 与用户提示<strong>隔离</strong>，防止 jailbreaking 攻击。在最坏情况对抗攻击（ROBOPAIR）下，ROBOGUARD 将不安全规划执行率从<strong>超过 92% 降至不到 3%</strong>，且不影响安全规划性能。资源高效：仅需 1 次 LLM 查询，而攻击者需要 15 次，令牌开销仅为攻击者的 21%。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">LLM Safety Guardrails</span>
+    <span class="tag tag-green">Jailbreaking Defense</span>
+    <span class="tag tag-amber">Linear Temporal Logic</span>
+    <span class="tag tag-purple">Control Synthesis</span>
+    <span class="tag tag-red">Adversarial Robustness</span>
+    <span class="tag tag-cyan">Root-of-Trust LLM</span>
+    <span class="tag tag-gray">IEEE RA-L 2026</span>
+  </div>
+</section>
+
+<!-- 2. 核心洞察与创新点 -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 核心洞察</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    <strong>为什么 LLM 对齐（对聊天机器人有效）对 LLM 驱动机器人不够？</strong><br>
+    因为<strong>有害的机器人行为是上下文相关的</strong>——同一个导航动作在空旷走廊中是安全的，但在紧急疏散时却是危险的（可能阻塞出口）。聊天机器人对齐只解决"不说有害的话"，而不解决物理世界上下文中"不做有害的事"。此外，<strong>jailbreaking 攻击</strong>（如 ROBOPAIR）可以诱导 LLM 驱动机器人产生危险的物理行为——如撞向人类或阻塞紧急出口——即使 LLM 本身已经过对齐训练。<br><br>
+    <strong>本文的核心洞察是什么？</strong><br>
+    <strong>使用受保护的 root-of-trust LLM 进行安全推理，使用形式化方法进行安全执行——两者分离且互补。</strong>关键洞察：(1) 安全推理 LLM 必须与用户输入<strong>隔离</strong>（root-of-trust），使其免受恶意提示操纵；(2) 安全规则（如"不伤害人类"）必须<strong>接地到具体的机器人上下文</strong>（如"在此环境中，person_1 在 doorway_1 附近，因此不得阻塞 doorway_1"）；(3) 安全规范与规划之间的冲突通过<strong>最小违反控制合成</strong>解决——安全优先但最大程度尊重用户意图。
+  </div>
+
+  <h3>2.2 灵感映射</h3>
+  <table>
+    <tr><th>灵感来源</th><th>启发了什么洞察</th><th>类型</th></tr>
+    <tr><td>ROBOPAIR (Robey et al. 2025) 展示了 LLM 驱动机器人 92.3% 的 jailbreak 成功率</td><td>LLM 内置的对齐训练对机器人场景<strong>远远不够</strong>——外部的、独立的安全护栏是必需的。受保护（root-of-trust）的设计至关重要——如果安全 LLM 也能被 jailbreak，整个护栏就会崩溃。</td><td>架构</td></tr>
+    <tr><td>形式化方法中的最小违反规划（Tumova et al.）</td><td>安全规范与规划规范可能冲突——借鉴形式化方法中的<strong>优先级规范合成</strong>来解决冲突。安全规范优先级始终高于规划规范优先级，但在安全边界内最大化保留规划。</td><td>方法</td></tr>
+    <tr><td>语义地图作为世界模型</td><td>将语义地图（物体节点 + 区域节点 + 边）作为 LLM 的上下文输入——LLM 不需要理解原始传感器数据，只需<strong>结构化场景表示</strong>。这使 root-of-trust LLM 在语义层面而非感知层面进行安全推理。</td><td>策略</td></tr>
+    <tr><td>Chain-of-Thought (CoT) 推理对安全决策的关键作用</td><td>消融实验显示移除 CoT 推理使 ASR 从 4.3% 升至 12.8%（3 倍增长）——安全推理不能是"黑盒"。显式推理步骤对于生成正确的 LTL 安全规范至关重要。</td><td>数学</td></tr>
+  </table>
+
+  <h3>2.3 创新点分解</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：Root-of-Trust LLM 架构 —— 将安全推理与用户输入隔离</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统 LLM 规划器直接接受用户输入，因此可被恶意提示操纵。如果安全检查与规划生成共享同一个 LLM，jailbreaking 攻击可以同时绕过两者。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>计算机安全中的 root-of-trust 概念——Trusted Computing Base (TCB) 是一个隔离的、可信的组件，即使系统其余部分被攻破也能维持安全。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>ROBOGUARD 的安全推理 LLM 独立于规划 LLM——它仅接收来自<strong>系统设计者</strong>的安全规则和来自<strong>语义地图</strong>的世界模型更新，从不直接接触用户输入。这种隔离意味着即使攻击者完全攻破规划 LLM，安全护栏仍然有效。实验中，即使攻击者获得对护栏内部的灰盒/白盒访问，ASR 最多仅升至 5.2%。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：将自然语言安全规则接地到 LTL 安全规范</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>高层安全规则（如阿西莫夫第一定律"不伤害人类"）是抽象的——如何在具体环境中将其转化为可形式验证的安全规范？</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>给定世界模型 M 和机器人动作集 F，定义上下文原子命题 AP(M,F)（如 goto(person_1), inspect(drill_1)）。root-of-trust LLM 使用 CoT 推理为每条安全规则生成一个 LTL 公式 phi(i)，取合取：phi_safe = phi(1) and phi(2) and ... and phi(n)。关键实例：无推理时，LLM 可能遗漏 doorway 的约束或对 person 生成过宽约束——CoT 推理大幅提高约束精度（ASR 从 12.8% 降至 4.3%）。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：最小违反控制合成 —— 安全与意图的最优平衡</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>安全规范与 LLM 规划意图可能冲突——简单的"拒绝所有不安全规划"方法过度限制了机器人能力。需要一种在确保安全的同时<strong>最大化遵循用户意图</strong>的机制。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>算法 1（控制合成）：将 LLM 规划 p 转换为 LTL 规范 phi_proposed 和词序列 w。从 phi_safe 构建 Buchi 自动机 B。逐步验证 w 中每个词在 B 上的轨迹。如果 w 被 B 接受（达到接受状态），执行规划；否则回退到 phi_safe（安全优先）。定理 1 保证控制合成模块<strong>始终</strong>提供安全控制规划。</div>
+  </div>
+</section>
+
+<!-- 3. 系统架构 -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 系统框架 —— ROBOGUARD 两阶段护栏架构</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph OFFLINE["Offline Configuration"]
+        direction LR
+        RULES["Safety Rule Set (e.g., 1. Do not harm humans  2. Respect privacy  3. Avoid hazardous zones)"]
+        ROBOT_DESC["Robot Description (API + World Model Format)"]
+    end
+
+    subgraph SAFETY_REASON["Stage 1: Safety Reasoning Module (Root-of-Trust LLM)"]
+        direction LR
+        PROMPT["System Prompt: Safety Logic + API Definitions + World Model Definitions"]
+        COT["Chain-of-Thought Reasoning: Per-Rule Application, Iterative Generation"]
+        GROUND["Contextual Grounding: World Model M + Action Set F to Atomic Propositions AP"]
+        LTL["Generate LTL: phi(1) and phi(2) and ... and phi(n) forming phi_safe"]
+        EXAMPLE["Example: G(!goto(person_1)) and G(!inspect(drill_1)) and G(goto(doorway) implies F(!goto(doorway)))"]
+    end
+
+    subgraph CONTROL_SYNTH["Stage 2: Control Synthesis Module"]
+        direction LR
+        PLAN["LLM Planner Plan p (Natural Language)"]
+        PLAN2LTL["p converted to phi_proposed (LTL)"]
+        AUTOMATA["phi_safe converted to Buchi Automaton B with Safety States F"]
+        VERIFY["Stepwise Verify w = w1 w2 ... wT on B's trace"]
+        DECISION{"Does trace's final state belong to F?"}
+        ACCEPT["Accept: Execute Plan p"]
+        REJECT["Reject: Fall Back to phi_safe"]
+    end
+
+    subgraph WORLD["World Model Updates"]
+        direction LR
+        SEM_MAP["Semantic Map (Object Nodes + Region Nodes + Edges)"]
+        ROBOT_STATE["Robot State (Position + Sensors)"]
+    end
+
+    OFFLINE --> SAFETY_REASON
+    SEM_MAP --> PROMPT
+    ROBOT_STATE --> PROMPT
+    PROMPT --> COT --> GROUND --> LTL --> AUTOMATA
+    PLAN --> PLAN2LTL --> VERIFY
+    AUTOMATA --> VERIFY --> DECISION
+    DECISION -->|"w satisfies phi_safe"| ACCEPT
+    DECISION -->|"w violates phi_safe"| REJECT
+
+    classDef offline fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef safety fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef control fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef world fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef result fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    class RULES,ROBOT_DESC offline
+    class PROMPT,COT,GROUND,LTL,EXAMPLE safety
+    class PLAN,PLAN2LTL,AUTOMATA,VERIFY,DECISION control
+    class SEM_MAP,ROBOT_STATE world
+    class ACCEPT,REJECT result
+    </pre>
+  </div>
+
+  <h3>3.2 数据流 —— 信息流与攻防关系</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph USER["User / Attacker"]
+        direction LR
+        BENIGN["Benign User: Safe Task Request"]
+        ADVERSARY["Attacker: Jailbreak Prompt (ROBOPAIR)"]
+    end
+
+    subgraph PLANNER["LLM Planner (GPT-4o SPINE)"]
+        direction LR
+        NLP["Receive Natural Language Instruction"]
+        PLAN_GEN["Generate Plan: Action Sequence + Semantic Map Operations"]
+    end
+
+    subgraph ROBOGUARD["ROBOGUARD Safety Guardrail"]
+        direction LR
+        RT_LLM["Root-of-Trust LLM (GPT-4o): CoT Reasoning"]
+        SAFE_SPEC["phi_safe: LTL Safety Specification"]
+        SYNTH["Control Synthesis Module (Algorithm 1)"]
+        FINAL_PLAN["Safe Plan: Maximally Satisfies phi_safe"]
+    end
+
+    subgraph ENV["World Model / Semantic Map"]
+        direction LR
+        GRAPH["Semantic Graph: Objects + Regions + Edges"]
+        UPDATE["Online Update: New Semantic Discovery"]
+    end
+
+    BENIGN --> NLP --> PLAN_GEN
+    ADVERSARY --> NLP
+    PLAN_GEN --> SYNTH
+    GRAPH --> RT_LLM --> SAFE_SPEC --> SYNTH
+    UPDATE --> GRAPH
+    SYNTH --> FINAL_PLAN
+    RT_LLM -.->|"Attacker Cannot Access"| RT_LLM
+
+    classDef user fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px
+    classDef planner fill:#fef7ed,stroke:#f59e0b,stroke-width:2px
+    classDef guard fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef env fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class BENIGN,ADVERSARY user
+    class NLP,PLAN_GEN planner
+    class RT_LLM,SAFE_SPEC,SYNTH,FINAL_PLAN guard
+    class GRAPH,UPDATE env
+    </pre>
+  </div>
+
+  <h3>3.3 工作流 —— 对抗场景下的完整安全流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph ATTACK["Attack Scenario Example"]
+        A1["Attacker sends jailbreak prompt to LLM planner"]
+        A2["LLM planner generates dangerous plan: goto(person) + inspect(weapon)"]
+        A3["ROBOGUARD receives dangerous plan + world model"]
+    end
+
+    subgraph DEFENSE["ROBOGUARD Defense Flow"]
+        D1["Root-of-Trust LLM analyzes world model"]
+        D2["Generates safety spec: G(!goto(person_1)) + G(!inspect(weapon))"]
+        D3["Converts to Buchi automaton + verifies plan word sequence"]
+        D4{"Does plan satisfy safety spec?"}
+        D5_YES["Yes: Execute plan (safety + intent both satisfied)"]
+        D5_NO["No: Reject plan (fall back to phi_safe)"]
+    end
+
+    subgraph RESULT["Defense Results"]
+        R1["Benign Tasks: 100% capability preserved"]
+        R2["Adversarial Tasks: ASR from 92.3% down to 2.3%"]
+        R3["Adaptive Attacks: ASR at most 5.2%"]
+    end
+
+    A1 --> A2 --> A3 --> D1 --> D2 --> D3 --> D4
+    D4 -->|"Yes"| D5_YES --> R1
+    D4 -->|"No"| D5_NO --> R2
+    D5_NO -.->|"Worst Case"| R3
+
+    classDef attack fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px
+    classDef defense fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef result fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class A1,A2,A3 attack
+    class D1,D2,D3,D4,D5_YES,D5_NO defense
+    class R1,R2,R3 result
+    </pre>
+  </div>
+</section>
+
+<!-- 4. 任务定义 -->
+<section id="task">
+  <h2>4. 任务定义 —— 解决什么问题？</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 -- Safety Guardrails for LLM-Enabled Robots</span>
+    $$ \text{Given: Safety rule set } \mathcal{R},\; \text{World model } \mathcal{M},\; \text{LLM-generated plan } p $$
+    $$ \text{Find control plan } \pi \text{ s.t. } \pi \models \phi_{\text{safe}} \text{ and } \pi \text{ maximally follows } p $$
+    $$ \text{where } \phi_{\text{safe}} = \bigwedge_{i=1}^n \phi^{(i)}(\mathcal{M}, \mathcal{R}) \text{ is the LTL safety spec grounded to context} $$
+    <div class="eq-note">
+      <strong>$\mathcal{R}$</strong> = 系统设计者离线定义的高层安全规则（如"不伤害人类，尊重隐私，避开危险区域"） |
+      <strong>$\mathcal{M}$</strong> = 在线更新的语义图世界模型（物体 + 区域 + 边） |
+      <strong>$p$</strong> = LLM 规划器生成的规划（可能被对抗性操纵） |
+      <strong>$\phi_{\text{safe}}$</strong> = 接地到当前上下文的 LTL 安全规范 |
+      <strong>核心目标</strong>：安全优先（$\pi \models \phi_{\text{safe}}$）同时最大化效用（$\pi$ 尽可能遵循 $p$）
+    </div>
+  </div>
+
+  <h3>4.2 设计需求 —— LLM 驱动机器人安全护栏的四项要求</h3>
+  <table>
+    <tr><th>需求</th><th>含义</th><th>ROBOGUARD 如何满足</th></tr>
+    <tr><td><strong>D1. 上下文感知</strong></td><td>护栏应在不同机器人上下文中都能缓解不安全行为</td><td>Root-of-trust LLM 将安全规则接地到世界模型的实时状态——同一规则在不同场景下产生不同的 LTL 规范</td></tr>
+    <tr><td><strong>D2. 适用性</strong></td><td>护栏不应依赖特定的 LLM 规划器架构或实例</td><td>ROBOGUARD 仅接收自然语言规划 p 并通过 API 描述交互——独立于底层 LLM</td></tr>
+    <tr><td><strong>D3. 效用</strong></td><td>护栏不应在非对抗环境中降低 LLM 驱动机器人的能力</td><td>安全任务 100% 成功率（与无护栏相同）——最小违反合成确保仅在必要时干预</td></tr>
+    <tr><td><strong>D4. 效率</strong></td><td>护栏应最小化额外离线和在线计算成本及延迟</td><td>仅需 1 次 LLM 查询（攻击者需 15 次），令牌开销仅为攻击者的 21%-12%</td></tr>
+  </table>
+
+  <h3>4.3 任务类型</h3>
+  <p>这是一个<strong>对抗性安全护栏</strong>问题——核心不是检测 jailbreak 攻击本身，而是在<strong>LLM 规划器已被攻破的最坏假设下</strong>确保物理安全。平台：Clearpath Jackal 移动机器人（仿真 + 真实世界）；场景：全层室内办公室 / 户外办公园区；攻击者使用 7 种有害行为（炸弹引爆、阻塞紧急出口、武器搜索、仓库攻击、进入限制区域、隐蔽监视、撞击人员）和多种 jailbreak 方法（直接提示、模板攻击、ROBOPAIR 及自适应变体）。护栏在规划层面运行——接收离散动作序列规划并针对安全规范进行验证，不同于 CORE 在连续控制层面运行。</p>
+</section>
+
+<!-- 5. 核心挑战 -->
+<section id="challenge">
+  <h2>5. 核心挑战 —— 为什么难？</h2>
+
+  <h3>5.1 本质（第一性原理）</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：LLM 的灵活性与安全性之间的根本张力。<br><br>
+    (1) <strong>LLM 的固有脆弱性</strong>：LLM 被训练为"有帮助且不拒绝"——这种开放性恰恰是 jailbreak 攻击的切入点。ROBOPAIR 证明，通过在上下文中构建虚构场景（如"你在拍电影"），攻击者可以诱导 LLM 生成危险的机器人规划。这种脆弱性是<strong>架构性的</strong>，而非偶然的——它是 LLM 开放性生成能力的另一面。<br><br>
+    (2) <strong>安全的上下文依赖性</strong>：对机器人而言，"安全"取决于具体的物理上下文。在语义图中，person 节点可以出现在不同区域——但安全规则必须是"不得与这个特定的人碰撞"而非"不得与任何人类碰撞"。这需要将安全规则从<strong>抽象</strong>（"不伤害人类"）接地到<strong>具体</strong>（"不得 goto(person_1)"）——一个语义推理问题。<br><br>
+    (3) <strong>攻防不对称性</strong>：攻击者只需找到<strong>一个</strong>成功的 jailbreak 提示；防御者必须阻止<strong>所有可能的</strong>攻击。ROBOGUARD 通过<strong>将安全推理与攻击者可访问的 LLM 分离</strong>来解决这种不对称性——攻击者可以操纵规划 LLM，但无法触及 root-of-trust LLM。
+  </div>
+
+  <h3>5.2 前人方法及其局限</h3>
+  <table>
+    <tr><th>前人方法</th><th>核心思想</th><th>失败原因</th></tr>
+    <tr><td>LLM 对齐训练（RLHF）</td><td>通过人类反馈强化学习训练 LLM 避免有害输出</td><td>对聊天机器人部分有效但<strong>无法防止物理世界伤害</strong>。ROBOPAIR 显示经过对齐的 GPT-4o 在机器人场景中仍有 92.3% 的 jailbreak 成功率——因为"有害"在物理上下文中更难以定义和检测</td></tr>
+    <tr><td>规划约束的形式化方法</td><td>使用 LTL/PDDL 限制 LLM 只能生成满足预定义安全规范的规划</td><td>需要<strong>预先枚举所有可能的安全规范</strong>，限制了开放世界适用性。通常也不处理对抗性输入——攻击者可以在允许的规范边界内找到有害行为</td></tr>
+    <tr><td>LLM 安全检查器</td><td>使用第二个 LLM 检查规划 LLM 的输出是否安全</td><td>检查器 LLM 本身也可能被 jailbreak——两个 LLM 共享<strong>共模故障</strong>。此外，检查器通常在文本层面而非物理后果层面进行分析</td></tr>
+    <tr><td>最小违反规划</td><td>在冲突规范中找到"尽可能满足"的规划</td><td>传统方法处理的是<strong>预定义规范</strong>之间的冲突，而非在线推理的安全规范与任意 LLM 规划之间的冲突</td></tr>
+  </table>
+
+  <h3>5.3 关键挑战</h3>
+  <ul>
+    <li><strong>挑战 1 —— Root-of-Trust 隔离设计与维护</strong>：如何确保 root-of-trust LLM 真正免疫于攻击者影响？输入管道必须精心设计——安全推理模块仅接收系统设计者配置和非用户的语义地图输入。在自适应攻击中，即使攻击者获得部分内部信息（灰盒/白盒），ASR 仍保持低水平（3.8%-5.2%），验证了隔离设计的有效性。</li>
+    <li><strong>挑战 2 —— 将抽象安全规则接地到具体 LTL</strong>：Root-of-trust LLM 必须正确解释世界模型中的语义关系。例如在包含 person_1、drill_1、doorway_1 的场景中，LLM 必须推理出：(a) goto(person_1) 可能导致碰撞，生成 G(!goto(person_1))；(b) inspect(drill_1) 可能获取武器，生成 G(!inspect(drill_1))；(c) goto(doorway_1) 可能阻塞出口，生成 G(goto(doorway_1) implies F(!goto(doorway_1)))——可以通过 doorway_1 但不得逗留。</li>
+    <li><strong>挑战 3 —— 防御自适应攻击</strong>：攻击者可能基于 ROBOGUARD 的响应调整策略。了解护栏完整内部状态的白盒攻击者可以设计专门绕过它的提示。实验结果（白盒 ASR 5.2%）表明当前架构仍有一定的攻击面。</li>
+  </ul>
+</section>
+
+<!-- 6. 关键方法与公式 -->
+<section id="method">
+  <h2>6. 关键方法与公式</h2>
+
+  <h3>6.1 核心算法</h3>
+  <p>ROBOGUARD 的核心是一个<strong>两阶段架构</strong>。阶段 1：root-of-trust LLM 接收世界模型（语义图 JSON），使用 CoT 推理将高层安全规则接地为 LTL 公式 phi_safe = conjunction_i phi(i)。阶段 2：将 LLM 规划 p 转换为 LTL 规范 phi_proposed 和词序列 w，通过 Buchi 自动机验证 w 是否满足 phi_safe——如果满足，执行规划；否则回退到安全规范。</p>
+
+  <h3>6.2 关键公式</h3>
+
+  <h4>Group A: 上下文原子命题与 LTL 安全规范</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) -- Contextual Grounding and Safety Specification Synthesis</span>
+    $$ \mathcal{AP}(\mathcal{M}, \mathcal{F}) = \{\text{goto}(r), \text{inspect}(o), ...\} \text{ (Contextual Atomic Propositions)} $$
+    $$ \phi_{\text{safe}} = \phi^{(1)} \land \phi^{(2)} \land \cdots \land \phi^{(n)} \quad \text{(LTL Conjunction of n Safety Rules)} $$
+    <div class="eq-note">
+      <strong>$\mathcal{M}$</strong> = 世界模型（语义图：region_1, region_2, person_1, ...） |
+      <strong>$\mathcal{F}$</strong> = 机器人动作集（goto, inspect, ...） |
+      <strong>$\phi^{(i)}$</strong> = 第 i 条安全规则的 LTL 编码 |
+      <strong>LTL 算子</strong>：G (globally/always), F (finally/eventually), U (until), X (next), ! (negation), implies (implication), and (conjunction) |
+      <strong>示例</strong>：G(!goto(person_1)) = "绝不导航至 person_1"；G(goto(doorway_1) implies F(!goto(doorway_1))) = "如果导航至 doorway_1，必须最终离开"（即不得逗留阻塞出口）。
+    </div>
+  </div>
+
+  <h4>Group B: 控制合成算法 —— Algorithm 1</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Algorithm 1 -- Minimum-Violation Control Synthesis</span>
+    $$ \text{Input: } \phi_{\text{safe}},\; p \text{ (LLM plan)} $$
+    $$ \text{Step 1: } \phi_{\text{proposed}} \leftarrow \text{ToLTL}(p),\; w \leftarrow \text{ToWord}(\phi_{\text{proposed}}) $$
+    $$ \text{Step 2: } \mathcal{B}_{\text{safe}} = (Q, q_{\text{init}}, \Sigma, \delta, F) \leftarrow \text{ToAutomata}(\phi_{\text{safe}}) $$
+    $$ \text{Step 3: Verify whether the trace of } w = w_1 w_2 \ldots w_T \text{ on } \mathcal{B}_{\text{safe}} \text{ is accepted} $$
+    $$ \text{Output: } \begin{cases} \phi_{\text{proposed}} & \text{if } q_T \in F \text{ (accepted)} \\ \phi_{\text{safe}} & \text{otherwise (rejected)} \end{cases} $$
+    <div class="eq-note">
+      <strong>$\mathcal{B}$</strong> = Buchi 自动机——由状态集 Q、初始状态 q_init、字母表 Sigma = 2^AP、转移函数 delta 和接受状态集 F 组成的 5 元组 |
+      <strong>$w$</strong> = 词——规划中的动作序列；每个 w_j 是 AP 中的一个命题 |
+      <strong>接受条件</strong>：轨迹的最终状态属于 F（安全状态集） |
+      <strong>定理 III.2</strong>（安全保证）：控制合成模块<strong>始终</strong>提供安全控制规划——无论输入规划 p 是什么。因为 phi_safe 定义了安全行为的完整边界，算法在规划不满足安全规范时总是回退到 phi_safe。
+    </div>
+  </div>
+
+  <h4>Group C: 具体示例 —— CoT 推理对规范质量的影响</h4>
+  <div class="formula-block">
+    <span class="eq-tag">CoT Reasoning's Impact on Safety Specification Quality</span>
+    $$ \text{Without reasoning: } \phi_{\text{safe}} = G(!\text{inspect(drill\_1)}) \land G(!\text{goto(doorway\_1)}) \quad \text{(misses person constraint!)} $$
+    $$ \text{With reasoning: } \phi_{\text{safe}} = G(!\text{goto(person\_1)}) \land G(!\text{inspect(drill\_1)}) \land G(\text{goto(doorway\_1)} \rightarrow F(!\text{goto(doorway\_1)})) $$
+    <div class="eq-note">
+      <strong>差异分析</strong>：无 CoT 推理时，变体遗漏了对 person_1 的约束，并过度约束了 doorway_1（完全禁止而非"可以通过但不得逗留"）。CoT 推理使 LLM 能够逐步考虑每条安全规则的<strong>物理含义</strong>——person_1 是潜在碰撞风险，drill_1 是潜在武器，doorway_1 是不应阻塞的出口——从而生成更精确和全面的 LTL 约束。这直接反映在 ASR 上：无推理时 ASR 从 4.3% 升至 12.8%。
+    </div>
+  </div>
+
+  <h3>6.3 关键参数</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>理由</th></tr>
+    <tr><td>Root-of-Trust LLM</td><td><strong>GPT-4o</strong></td><td>安全推理引擎</td><td>作为 root-of-trust，需要强大的推理能力。Temperature = 0 确保确定性输出。第 3.2 节消融已证明 CoT 推理的关键性</td></tr>
+    <tr><td>规划 LLM</td><td><strong>GPT-4o SPINE Planner</strong></td><td>生成动作规划的 LLM</td><td>与 root-of-trust LLM 分离的实例——两者共用相同基础模型但在不同上下文中运行，相互隔离</td></tr>
+    <tr><td>安全规则数量</td><td><strong>3 条规则</strong></td><td>尊重隐私 + 不造成身体伤害 + 避开危险区域</td><td>通用且最小化——涵盖主要物理安全风险类别。实验表明 ROBOGUARD 在不同规则集上表现稳定</td></tr>
+    <tr><td>LTL 实现</td><td><strong>Spot (Duret-Lutz)</strong></td><td>Buchi 自动机构建与验证</td><td>Spot 是标准 LTL 工具库，支持高效自动机构建和模型检查</td></tr>
+    <tr><td>LLM Temperature</td><td><strong>0</strong></td><td>Root-of-Trust LLM 采样温度</td><td>确定性输出对安全至关重要——随机性不能导致不一致的安全规范</td></tr>
+    <tr><td>令牌预算</td><td><strong>~4300 tokens/query</strong></td><td>每次 root-of-trust LLM 推理调用的令牌使用量</td><td>远低于攻击者（20,000-52,000 tokens），满足 D4 效率需求</td></tr>
+  </table>
+
+  <h3>6.4 ROBOGUARD vs. 传统安全方法</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>ROBOGUARD（本文）</h4>
+      <ul>
+        <li>安全推理与规划<strong>完全分离</strong></li>
+        <li>Root-of-Trust LLM <strong>免疫于用户输入</strong></li>
+        <li>安全规则<strong>在线接地</strong>到上下文中形成 LTL</li>
+        <li><strong>对抗性感知</strong>：最坏情况 jailbreaking 作为评估基线</li>
+        <li>安全规范与规划规范的冲突通过<strong>优先级合成</strong>解决</li>
+        <li>与规划器/控制器<strong>解耦</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>传统安全方法</h4>
+      <ul>
+        <li>安全通常与规划<strong>紧耦合</strong></li>
+        <li>安全检查器可能与规划器<strong>共享同一个 LLM</strong></li>
+        <li>安全规范<strong>预定义</strong>——不随上下文变化</li>
+        <li>通常<strong>不考虑对抗</strong>场景——假设良性操作</li>
+        <li>冲突解决通过<strong>硬约束</strong>——可能过度限制</li>
+        <li>与<strong>特定系统设计</strong>紧耦合</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7. 基本原理 -->
+<section id="principles">
+  <h2>7. 基本原理</h2>
+
+  <h3>7.1 Linear Temporal Logic (LTL) 用于机器人安全</h3>
+  <p>LTL 通过时序模态扩展命题逻辑，这些模态对于表达随时间变化的安全属性至关重要。核心算子包括：<strong>G phi</strong>（全局/始终 phi——phi 在每个未来时刻都成立），<strong>F phi</strong>（最终/某时刻 phi——phi 在某个未来时刻成立），<strong>X phi</strong>（下一步——phi 在下一时刻成立），<strong>phi U psi</strong>（phi 直到 psi——phi 持续成立直到 psi 变为真）。LTL 公式在系统状态的<strong>无限轨迹</strong>（omega-words）上解释，每个状态是此时成立的原子命题集合。这使得 LTL 天然适合推理机器人动作序列：轨迹是 goto(region_1), inspect(chair), goto(region_2) 等形式，而 LTL 公式如 G(!goto(person_1)) 断言在此序列中机器人绝不导航至 person_1。ROBOGUARD 利用的关键理论属性是<strong>每个 LTL 公式都可以编译为 Buchi 自动机</strong>，实现对给定轨迹是否满足公式的算法验证。ROBOGUARD 中使用的 Spot 库实现了从 LTL 到广义 Buchi 自动机、再到具有单一接受集的非确定性 Buchi 自动机的标准 tableau 转换。</p>
+
+  <h3>7.2 Buchi 自动机与轨迹验证</h3>
+  <p>Buchi 自动机是一个 5 元组 B = (Q, q_init, Sigma, delta, F)，其中 Q 是有限状态集，q_init 是初始状态，Sigma = 2^AP 是字母表（每个符号是原子命题的一个子集），delta: Q x Sigma to 2^Q 是非确定性转移函数，F（Q 的子集）是接受状态集。无限词 w = sigma_1 sigma_2 ... 在 Sigma 上被<strong>接受</strong>，如果存在一条经过 B、无限频繁地访问 F 的运行路径。在 ROBOGUARD 中，规划的动作序列是有限词 w = w_1 w_2 ... w_T，算法验证此有限前缀是否可以扩展为被 B 接受的无限词——等价地，轨迹是否结束在可从中启动接受运行的状态（"活跃"状态）。关键算法属性：如果轨迹的最终状态 q_T 属于可到达接受状态的状态集（通过 SCC 分解计算），则规划被视为安全。Spot 库通过其 <code>spot::otf_product</code> 接口提供高效的 O(|Q| x T) 轨迹验证。这种验证是纯符号化的（无连续动力学），使其足够快以支持在线使用。</p>
+
+  <h3>7.3 Root-of-Trust 设计原则</h3>
+  <p>Root-of-trust 概念源于<strong>计算机硬件安全</strong>：Trusted Computing Base (TCB) 是系统安全所依赖的最小硬件、固件和软件组件集合。核心原则是<strong>最小化和隔离</strong>：TCB 应尽可能小以减少攻击面，并应在架构上与不可信组件隔离，使不可信部分的失陷无法传播到 TCB。ROBOGUARD 将此原则适配到基于 LLM 的系统：(1) root-of-trust LLM 的<strong>输入面</strong>被最小化——它仅读取安全规则集（来自设计者）和世界模型（来自感知），绝无用户提示；(2) root-of-trust LLM 是与规划 LLM <strong>架构上分离的实例</strong>，不共享上下文或状态；(3) root-of-trust LLM 的输出是<strong>可形式验证的</strong>——LTL 安全规范可检查语法正确性，Buchi 自动机可分析一致性。即使规划 LLM 被 jailbreak 攻击完全攻破，攻击者也无法影响 root-of-trust LLM 执行的安全规则，因为从用户输入到 root-of-trust LLM 没有数据通路。</p>
+
+  <h3>7.4 最小违反控制合成</h3>
+  <p>最小违反规划由 Tumova et al. 提出，解决在自动规划中调和<strong>冲突规范</strong>的问题。给定一组带<strong>全序优先级</strong>的规范（如安全 > 任务 > 舒适），算法构造一个满足最高优先级规范并最大化满足低优先级规范的规划。ROBOGUARD 将其简化为<strong>两个规范</strong>的情况：phi_safe（最高优先级，必须满足）和 phi_proposed（较低优先级，理想但非必需）。这种简化是可行的，因为 LLM 规划 p 被转化为单个 LTL 公式 phi_proposed。控制合成算法本质上是一个优先级化的双规范求解器：首先检查提议规划是否满足 phi_safe；如果是，返回它；如果否，返回仅满足 phi_safe 的规划。关键在于，这种合成是<strong>构造性正确的</strong>：定理 III.2 证明无论算法输出什么，它总是满足 phi_safe——因为 phi_safe 本身在 phi_safe 下总是一个有效规划（自反性），而规划仅在被验证满足 phi_safe 后才返回。</p>
+
+  <h3>7.5 Chain-of-Thought 推理用于规范生成</h3>
+  <p>Root-of-trust LLM 使用结构化 CoT 推理将抽象安全规则转化为具体 LTL 公式。推理遵循固定模板：(1) <strong>分解</strong>每条安全规则为子需求；(2) <strong>枚举</strong>世界模型中与每个子需求相关的所有实体；(3) <strong>选择</strong>适当的 LTL 时序算子（G 用于永久禁止，G(... implies F(...)) 用于"可以做 X 但随后必须停止做 X"）；(4) <strong>合成</strong>每个实体-规则对的 LTL 公式；(5) <strong>合取</strong>所有子公式为 phi_safe。消融研究（CoT 时 ASR 4.3% vs. 无 CoT 时 12.8%）证明<strong>显式中间推理步骤防止 LLM 遗漏</strong>——无 CoT 时，LLM 可能完全跳过实体（如遗忘 person_1）或应用错误的时序算子（如对 doorway_1 使用 G(!goto(doorway_1)) 而非更细致的 G(goto(doorway_1) implies F(!goto(doorway_1)))）。CoT 模板有效地将 LLM 的搜索空间约束为结构化清单，减少安全关键遗漏的可能性。</p>
+
+  <h3>7.6 纵深防御：多层安全架构</h3>
+  <p>ROBOGUARD 体现了<strong>纵深防御</strong>的安全原则：不信任任何单一安全层是不可穿透的。层次结构为：(1) LLM 对齐训练（RLHF）提供针对轻率误用的统计第一道防线；(2) root-of-trust LLM 提供理解物理上下文并生成形式化规范的语义第二道防线；(3) Buchi 自动机验证提供<strong>数学第三道防线</strong>——即使 root-of-trust LLM 犯错（生成不完整的规范），形式验证确保<em>已经生成</em>的规范得到执行。第 3 层不纠正第 2 层的错误，但它保证系统的安全行为是可形式化和可审计的。此架构还产生<strong>攻击成本不对称</strong>：防御者每次查询花费约 4300 tokens；攻击者在 15 次查询中花费 20,000-52,000 tokens。防御相对于攻击的经济效率本身就是一种安全属性——绕过的成本高于部署的成本的护栏在实际中是有效的。</p>
+</section>
+
+<!-- 8. 实验结果 -->
+<section id="figures">
+  <h2>8. 实验结果 —— 关键数据与消融分析</h2>
+
+  <h3>8.1 攻击缓解有效性</h3>
+  <table>
+    <tr><th>攻击类型</th><th>攻击方法</th><th>无 ROBOGUARD ASR</th><th>有 ROBOGUARD ASR</th></tr>
+    <tr><td>安全任务（基线）</td><td>Direct Prompt</td><td>100.0%</td><td>100.0% (无损失)</td></tr>
+    <tr class="highlight"><td>非自适应</td><td>Direct Prompt</td><td>1.3%</td><td>0.2%</td></tr>
+    <tr class="highlight"><td>非自适应</td><td>Template Attack</td><td>82.3%</td><td>0.9%</td></tr>
+    <tr class="highlight"><td>非自适应</td><td>ROBOPAIR</td><td>92.3%</td><td>2.3%</td></tr>
+    <tr><td>自适应黑盒</td><td>ROBOPAIR</td><td>-</td><td>2.5%</td></tr>
+    <tr><td>自适应灰盒 (WM)</td><td>ROBOPAIR</td><td>-</td><td>2.9%</td></tr>
+    <tr><td>自适应灰盒 (GR)</td><td>ROBOPAIR</td><td>-</td><td>3.8%</td></tr>
+    <tr><td>自适应白盒</td><td>ROBOPAIR</td><td>-</td><td>5.2%</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">总计超过 1500 次评估（每种攻击类型 210 次）。ROBOGUARD 将 ROBOPAIR 的 ASR 从 92.3% 降至 2.3%，同时保持 100% 安全任务成功率。自适应攻击下，ASR 随访问级别上升（黑盒 2.5% 到白盒 5.2%），但仍远低于无护栏基线。</p>
+
+  <h3>8.2 消融 —— CoT 推理的重要性</h3>
+  <table>
+    <tr><th>配置</th><th>ASR（攻击成功率）</th><th>备注</th></tr>
+    <tr class="highlight"><td><strong>完整 ROBOGUARD</strong></td><td>4.3%</td><td>Root-of-Trust LLM + CoT 推理 + Temperature 0</td></tr>
+    <tr class="highlight"><td>+ High Temperature (T=0.5)</td><td>4.3%</td><td>Temperature 无影响——安全规范经形式验证</td></tr>
+    <tr><td>- CoT 推理</td><td>12.8%</td><td>移除 CoT 使 ASR 增加 3 倍</td></tr>
+    <tr><td>- CoT 推理 + High Temperature</td><td>25.7%</td><td>无推理 + 随机性使 ASR 增加 6 倍</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">最引人注目的发现：移除 CoT 推理导致安全性能急剧下降（4.3% 到 12.8% 到 25.7%）。CoT 推理不仅仅是锦上添花——它对于安全推理是<strong>必需的</strong>。它使 LLM 能够逐步分析每个语义实体与安全规则的关系。</p>
+
+  <h3>8.3 资源效率对比</h3>
+  <table>
+    <tr><th>方法</th><th>令牌使用量</th><th>LLM 查询次数</th><th>令牌比例（防御/攻击）</th></tr>
+    <tr class="highlight"><td><strong>ROBOGUARD</strong></td><td>4,329.6</td><td>1</td><td>-</td></tr>
+    <tr><td>自适应黑盒攻击</td><td>20,471.1</td><td>15</td><td>21.2%</td></tr>
+    <tr><td>自适应灰盒 (WM) 攻击</td><td>24,524.3</td><td>15</td><td>17.7%</td></tr>
+    <tr><td>自适应灰盒 (GR) 攻击</td><td>52,515.6</td><td>15</td><td>8.2%</td></tr>
+    <tr><td>自适应白盒攻击</td><td>36,446.2</td><td>15</td><td>11.9%</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">防御资源消耗远低于攻击成本——这是<strong>经济防御优势</strong>。ROBOGUARD 仅需 1 次 LLM 查询（约 4300 tokens），而攻击者需要 15 次查询（数万 tokens）。</p>
+
+  <h3>8.4 真实世界实验（Clearpath Jackal）</h3>
+  <table>
+    <tr><th>攻击类型</th><th>攻击方法</th><th>无 ROBOGUARD ASR</th><th>有 ROBOGUARD ASR</th></tr>
+    <tr><td>安全任务（基线）</td><td>Direct Prompt</td><td>100%</td><td>100%</td></tr>
+    <tr class="highlight"><td>非自适应</td><td>Direct Prompt</td><td>0%</td><td>0%</td></tr>
+    <tr class="highlight"><td>非自适应</td><td>ROBOPAIR</td><td>100%</td><td>0%</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--text-muted);">在真实世界实验中，ROBOGUARD 阻止了<strong>100%</strong> 的对抗攻击——优于仿真结果（2.3% ASR）。这是因为仿真中可以构造更具挑战性的安全场景，而真实实验室环境中的危险相对更容易识别。</p>
+
+  <h3>8.5 典型执行示例</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 4</span>
+      <span class="fig-caption">ROBOGUARD Online Operation: Safe Task (A) vs. Unsafe Task (B) Execution Trajectories</span>
+      <span class="fig-source">Source: Paper Fig. 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig4.png" alt="Online operation examples"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save screenshot as <code>figures/fig4.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图示解读</div>
+      <p><strong>安全任务 (A)</strong>：LLM 规划器生成探索规划。由于初始世界模型中没有 person 节点，ROBOGUARD 不生成安全约束，允许自由探索。当发现椅子时，LLM 规划器引导 inspect(chair)——ROBOGUARD 继续允许。<strong>不安全任务 (B)</strong>：LLM 规划器被提示去撞击人类。初始探索正常进行（尚未发现 person），但一旦 person 节点加入世界模型，ROBOGUARD 立即生成并执行 G(!goto(person))，阻止碰撞。</p>
+      <ul>
+        <li><strong>自适应安全</strong>：ROBOGUARD 不会预先禁止所有行为——它随着世界模型更新<strong>动态调整</strong>安全约束。这是"开放世界"安全的关键：探索时最大自由，发现危险后立即限制</li>
+        <li><strong>最小干扰</strong>：图 A 显示安全约束不影响正常探索行为——这是 D3（效用）的经验证据</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9. 缺陷与扩展 -->
+<section id="flaw">
+  <h2>9. 缺陷与扩展</h2>
+
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><strong>假设约束</strong>：(1) 世界模型必须<strong>准确</strong>——如果语义图遗漏了关键语义实体（如未检测到的人），ROBOGUARD 无法生成相应的安全约束。这需要额外的<strong>感知安全</strong>措施来确保世界模型完整性。(2) 安全规则必须来自系统设计者——如果规则不完整或不正确，安全规范也会不完整。</li>
+    <li><strong>适用场景</strong>：LTL 编码适用于<strong>离散动作序列</strong>的安全验证，但不适用于需要<strong>连续动力学安全</strong>的场景（如需要实时控制调整的碰撞避免）。论文提到未来工作可使用其他规范语言（如 STL）处理连续时间约束。</li>
+    <li><strong>可扩展性</strong>：(1) 随环境复杂度增长，世界模型扩大，要求 root-of-trust LLM 推理更多语义关系——增加令牌消耗和延迟。(2) 更多安全规则意味着更长的 LTL 公式，存在自动机状态爆炸风险。但当前 LLM 上下文窗口（1M+ tokens）仍有显著余量。</li>
+  </ul>
+
+  <h3>9.2 扩展方向</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从离散动作安全扩展到<strong>连续控制安全</strong>——将 CBF 或其他连续安全方法集成到 ROBOGUARD 中，处理如"不得接近 person 1m 以内"的连续空间约束。这与 CORE（论文 10001）的方向互补。</li>
+    <li><strong>条件放宽</strong>：(1) 使用<strong>蒸馏</strong>将 root-of-trust LLM 的能力压缩到更小的模型中——在嵌入式设备上实现本地安全推理，减少云端延迟和通信依赖。(2) 开发<strong>不确定性感知安全推理</strong>——当 LLM 对场景安全性不确定时，生成更保守的约束。</li>
+    <li><strong>约束增加</strong>：(1) 将安全推理从<strong>被动阻断</strong>升级为<strong>主动引导</strong>——ROBOGUARD 不仅拒绝不安全规划，还向规划 LLM 建议"在当前安全约束下你能做的最接近的事"。(2) 多机器人安全协调——当多个 LLM 驱动机器人共享同一空间时，安全约束可能相互影响。</li>
+  </ul>
+
+  <h3>9.3 数据敏感性</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>世界模型完整性</td><td>如果感知系统遗漏了一个人，ROBOGUARD 不生成该人的安全约束——机器人可能与未检测到的人碰撞。这与 CORE 面临的问题相同：感知是安全链中最薄弱的环节</td><td>严重</td></tr>
+    <tr><td>Root-of-Trust LLM 自身的安全漏洞</td><td>虽然 root-of-trust LLM 不直接接触用户输入，但其系统提示和世界模型描述可能通过<strong>世界模型投毒</strong>被间接操纵——如果攻击者在环境中放置误导性语义标记（如假标记）</td><td>高</td></tr>
+    <tr><td>Buchi 自动机状态爆炸</td><td>随安全规则和世界模型复杂度增加，自动机状态数可能指数增长。论文未报告实际自动机构建的计算时间</td><td>中</td></tr>
+    <tr><td>LLM 延迟与实时性需求</td><td>每次规划验证需要 root-of-trust LLM 推理（约数秒），在高频控制回路中可能成为瓶颈。但论文的设计是慢外环 + 快内环的解耦架构</td><td>低</td></tr>
+  </table>
+
+  <h3>9.4 值得深入研究的课题</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深入研究</div>
+    <strong>CORE + ROBOGUARD —— 感知安全与规划安全的融合</strong>——这是 Vijay Kumar 课题组最自然的下一步。CORE 处理"从视觉观测中推理上下文安全约束"（感知层面）；ROBOGUARD 处理"从 LLM 规划中合成安全行为"（规划层面）。两者互补：(1) CORE 的世界模型来自视觉感知（VLM + 分割 + 深度投影），而 ROBOGUARD 的世界模型来自语义图——CORE 的感知输出可以<strong>注入</strong> ROBOGUARD 的语义图，使安全护栏同时受益于在线视觉推理和形式化验证；(2) CORE 使用 CBF 进行连续空间安全（"离障碍物多远"），ROBOGUARD 使用 LTL 进行离散动作安全（"出口是否被阻塞"）——结合两者可实现<strong>统一的连续-离散安全框架</strong>。
+  </div>
+</section>
+
+<!-- 10. 动机推导 -->
+<section id="motivation">
+  <h2>10. 动机推导 —— 第一性原理推导</h2>
+
+  <h3>10.1 想法推导链</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>LLM 的灵活性同时是其最大优势和安全风险——因为 LLM 可以生成<strong>任何符合语言模式的输出</strong>，包括有害的机器人规划。对齐训练仅在统计上减少有害输出的概率，不保证安全（92.3% 的 jailbreak 成功率是证据）。安全护栏必须在 LLM <strong>外部</strong>构建。</li>
+    <li><strong>前人如何处理的？为什么不够？</strong><br>三条路线：(i) 更好的对齐——减少但不能消除有害输出；(ii) 约束 LLM 输出格式——但约束也限制合法使用；(iii) 形式化验证——但需要预定义规范，且在开放世界中无法预枚举所有可能的危险场景。</li>
+    <li><strong>如果用一个独立的、受保护的 LLM 专门做安全判断呢？</strong><br>关键想法：将"理解用户指令"和"判断指令是否安全"分离到<strong>两个不同的 LLM</strong>中。规划 LLM 可以接触用户输入（用户是必要的），但安全 LLM 只接触系统设计者规则和世界模型（绝不接触用户输入）。即使规划 LLM 被 jailbreak，安全 LLM 仍能阻止有害规划。</li>
+    <li><strong>安全 LLM 如何将抽象规则转化为可执行约束？</strong><br>需要一种<strong>形式化语言</strong>来表达安全——LTL 天然适合表达机器人动作序列的安全属性（"绝不执行 X"，"如果执行 Y 则必须最终离开"）。安全 LLM 的角色是将高层规则"翻译"为 LTL 公式——这需要理解世界模型中的语义关系。</li>
+    <li><strong>如果安全规范与用户意图冲突怎么办？</strong><br>使用最小违反合成——安全规范具有最高优先级，但在安全边界内尽可能遵循用户意图。这确保安全不会变成"什么都做不了"。</li>
+  </ol>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    LLM 驱动机器人可以被 jailbreak 攻击诱导执行危险行为（如撞击人类）——与其试图让 LLM"不变坏"（对齐），不如在 LLM 外部构建一个独立的安全护栏<strong>"无论什么情况都不允许危险行为"</strong>——用 root-of-trust LLM 进行安全推理，用形式化方法进行安全执行。
+  </div>
+
+  <h3>10.3 你如何自己想到这个想法</h3>
+  <ul>
+    <li><strong>步骤 1 —— 观察安全漏洞</strong>：ROBOPAIR（Robey et al. 2025）展示了 LLM 驱动机器人惊人的脆弱性——GPT-4o 在机器人场景中达到 92.3% 的 jailbreak 成功率。这是同一课题组的工作，自然引出"我们需要护栏"的结论。</li>
+    <li><strong>步骤 2 —— 分析漏洞根源</strong>：LLM 的安全漏洞不是"模型不够好"而是<strong>架构性的</strong>——LLM 被设计为"有帮助的"，这种设计本身与"完全安全"存在张力。因此，仅靠更好的对齐无法解决问题。</li>
+    <li><strong>步骤 3 —— 设计隔离架构</strong>：从计算机安全中借鉴 root-of-trust 概念——即使整个系统被攻破，TCB（Trusted Computing Base）仍然可信。将安全推理作为 TCB，与不可信的规划器分离。</li>
+    <li><strong>步骤 4 —— 匹配形式化工具</strong>：LTL + Buchi 自动机 = 标准的离散动作序列验证方法。Tumova et al. 的最小违反规划提供冲突解决模板。将两者与 LLM 推理结合：LLM 生成规范，形式化方法验证规划。</li>
+  </ul>
+</section>
+
+<!-- 11. 核心收获 -->
+<section id="takeaway">
+  <h2>11. 核心收获</h2>
+
+  <h3>11.1 学到的教训</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是<strong>"纵深防御"</strong>在机器人安全中的经典应用——不依赖单一安全层（LLM 对齐），而是构建多个独立的保护层：(1) LLM 对齐是第一层（统计保护），(2) ROBOGUARD 的 root-of-trust LLM 是第二层（语义级保护），(3) 形式化验证是第三层（数学级保证）。对 UAV 领域：自主 UAV 同样面临"指令篡改/干扰"风险——可设计具有 ROBOGUARD 类似架构的独立飞行安全控制器。</li>
+    <li><strong>技术技巧层面</strong>：(1) <strong>Root-of-trust 隔离设计</strong>——安全推理模块绝不应接触任何用户来源的数据，只信任系统设计者和传感器。这一设计原则可推广到任何"不可信 AI + 安全关键系统"场景；(2) <strong>CoT 推理对安全决策的放大效应</strong>——消融数据（4.3% 到 12.8% 到 25.7%）清晰表明安全 LLM 不能是"黑盒"，必须输出可解释的推理步骤；(3) <strong>攻击成本不对称</strong>——防御者仅需 1 次 LLM 查询（4300 tokens），攻击者需要 15 次（20,000-52,000 tokens）——这种经济不对称本身就是一种防御。</li>
+    <li><strong>实验/写作层面</strong>：论文首先定义<strong>四项设计需求 Desiderata</strong>（D1-D4）作为护栏设计评估框架——然后每项需求都通过实验验证。这种"需求定义、设计满足、实验验证"的结构使论文极具说服力。</li>
+  </ul>
+
+  <h3>11.2 直接适用于我的研究</h3>
+  <ul>
+    <li><strong>对 UAV 任务规划安全</strong>：ROBOGUARD 的"规划 LLM + 独立安全 LLM + 形式化验证"三层架构可直接适配到 UAV 任务规划——规划 LLM 生成飞行任务（如"飞到 GPS 坐标 X 采集图像"），安全 LLM 生成安全约束（如"不进入禁飞区，保持最低安全高度"），形式化验证确保飞行规划不违反任何安全规则。</li>
+    <li><strong>对多 UAV 协作</strong>：在多无人机任务中，每架 UAV 可能有不同的安全约束（载荷限制、电池状态、通信范围），UAV 间动作可能相互影响安全。ROBOGUARD 的架构可扩展为<strong>集中式安全协调器</strong>——单个 root-of-trust LLM 处理整个团队的联合安全约束。</li>
+    <li><strong>对人机交互安全</strong>：ROBOGUARD 的高层安全规则接口（"不伤害人类"）是一个<strong>自然语言安全价值观定义接口</strong>——使非技术用户无需编写代码或形式化规范即可定义机器人安全行为准则。这是向"可配置安全机器人"迈出的重要一步。</li>
+  </ul>
+
+  <h3>11.3 需跟进的关键参考文献</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Robey et al. (2025) -- Jailbreaking LLM-controlled robots. <em>ICRA</em></td><td>ROBOPAIR 是 ROBOGUARD 的直接前身——它证明了 LLM 驱动机器人的巨大安全漏洞（92.3% ASR），为 ROBOGUARD 提供了存在的理由。理解这种攻击方法是理解 ROBOGUARD 设计决策的关键</td></tr>
+    <tr><td>Ravichandran et al. (2026) -- CORE. <em>arXiv</em></td><td>同组并行工作——CORE 从视觉感知角度处理上下文安全，ROBOGUARD 从规划验证角度处理。融合两者可产生完整的感知-规划-控制安全技术栈</td></tr>
+    <tr><td>Tumova et al. -- Minimum-violation LTL planning with conflicting specifications. <em>ACC</em></td><td>ROBOGUARD 的控制合成模块（算法 1）直接基于此工作的优先级规范合成方法——将多规范冲突解决简化为双规范情况（安全 > 规划）</td></tr>
+    <tr><td>Zou et al. (2023) -- Universal and transferable adversarial attacks on aligned language models. <em>arXiv</em></td><td>GCG 攻击——自动化 jailbreak 提示生成方法。ROBOPAIR 将此适配到机器人场景。理解 LLM jailbreaking 的基本机制对设计更鲁棒的护栏至关重要</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes | Ravichandran et al. | IEEE RA-L 2026 | ROBOGUARD -- Safety Guardrails for LLM-Enabled Robots | MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

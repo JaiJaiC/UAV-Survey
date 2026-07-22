@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Deep Visual-Semantic Alignments for Generating Image Descriptions (Karpathy & Fei-Fei, 2015)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; margin-bottom: 20px; }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span { font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap; }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr); gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Huazhe Xu · 26-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10384/index.html">RL-100</a>
+<a href="../10382/index.html">RL</a>
+<a href="../10381/index.html">X-distill Cross-architect</a>
+<a href="../10380/index.html">DexImit Learning bimanual</a>
+<a href="../10379/index.html">ViTaS Visual tactile</a>
+<a href="../10378/index.html">Beyond action residuals</a>
+<a href="../10377/index.html">One-policy-fits-all Geome</a>
+<a href="../10376/index.html">VLA</a>
+<a href="../10392/index.html">Fine-tuning hard-to-simul</a>
+<a href="../10391/index.html">DemoSpeedup Accelerating </a>
+<a href="../10390/index.html">forget-and-grow strategy </a>
+<a href="../10389/index.html">Morpheus neural-driven an</a>
+<a href="../10388/index.html">HERMES</a>
+<a href="../10387/index.html">VLA</a>
+<a href="../10386/index.html">Entropy regularizing acti</a>
+<a href="../10385/index.html">Dtactive vision-based tac</a>
+<a href="../10383/index.html">MoE-DP MoE-enhanced diffu</a>
+<a href="../10438/index.html">opportunities risks found</a>
+<a href="../10442/index.html">Visual genome Connecting</a>
+<a href="../10437/index.html">Perceptual losses real-ti</a>
+<a class="active" href="../10441/index.html">Deep visual-semantic alig</a>
+<a href="../10439/index.html">ImageNet large scale</a>
+<a href="../10440/index.html">Large-scale video classif</a>
+<a href="../10443/index.html">3D</a>
+<a href="../10436/index.html">Imagenet large-scale hier</a>
+<a href="../10444/index.html">bayesian hierarchical mod</a>
+    </div>
+  </div>
+
+
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Deep Visual-Semantic Alignments for Generating Image Descriptions（用于生成图像描述的深度视觉-语义对齐）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Andrej Karpathy</strong>（一作）、<strong>Li Fei-Fei</strong>（李飞飞，通讯作者）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">斯坦福大学</strong>（Stanford University）计算机科学系</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">CVPR 2015</strong>（IEEE Conference on Computer Vision and Pattern Recognition），pp. 3128-3137</td></tr>
+      <div class="journal-meta"><span class="jif-name">CVPR</span> <span class="jif-badge if-conf-top">🏆 Top Conference</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://doi.org/10.1109/CVPR.2015.7298932" target="_blank">10.1109/CVPR.2015.7298932</a> | Published: June 2015</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>这篇论文开创性地将<strong>图像描述生成</strong>（Image Captioning）形式化为一个<strong>视觉-语义对齐+语言生成</strong>的二阶段框架：（1）<strong>对齐模型</strong>——在无区域标注的情况下，通过结构化max-margin目标学习图像区域（R-CNN检测框）与文本片段（句子中的词/短语）之间的对应关系；（2）<strong>多模态RNN生成模型</strong>——将对齐模型学到的视觉-语义关系注入RNN，逐词生成图像的自然语言描述。关键洞察：<strong>自然语言本身可以成为比固定类别标签更丰富的视觉监督信号</strong>——一个句子不仅告诉你"图片里有狗"，还告诉你狗的颜色、动作、与环境的关系。在Flickr8K、Flickr30K和MS COCO上达到了当时最佳结果（Flickr8K BLEU-4: 17.0 vs 此前最佳14.1），并首次展示了<strong>区域级密集描述</strong>（Dense Captioning）的潜力。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Image Captioning</span>
+    <span class="tag tag-green">Visual-Semantic Alignment</span>
+    <span class="tag tag-amber">Multimodal RNN</span>
+    <span class="tag tag-purple">Cross-Modal Retrieval</span>
+    <span class="tag tag-red">CVPR 2015</span>
+    <span class="tag tag-cyan">Deep Learning</span>
+    <span class="tag tag-gray">Flickr8K/30K · MS COCO</span>
+  </div>
+</section>
+
+<section id="insight">
+  <h2>2. Insight and Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">Core Insight</div>
+    问：<strong>为什么图像描述生成（Image Captioning）在2015年之前一直是一个极其困难的问题？</strong><br>
+    答：因为此前的方法要么（a）将描述视为<strong>检索问题</strong>——从训练集中找到最相似的图片，返回其描述（但无法生成新描述、无法处理训练集未见的组合）；（b）将描述视为<strong>模板填充问题</strong>——检测对象→填入"主语-动词-宾语"模板（但语言是人类最丰富的表达形式之一，模板永远无法覆盖所有表达）；（c）<strong>缺乏图像区域与文本片段之间的细粒度对应</strong>——训练数据只有"图片→整句描述"，没有哪个词对应哪个区域的信息。<br><br>
+    问：<strong>这篇论文的核心洞察是什么？</strong><br>
+    答：<strong>将自然语言视为比固定类别标签更丰富的视觉监督信号</strong>——"一只棕色狗在草地上奔跑"这个句子同时包含了对象类别（狗）、属性（棕色）、场景（草地）、动作（奔跑），远远超出了ImageNet的"1000类对象"所能提供的监督信息。论文的核心贡献在于设计了一个<strong>端到端的学习框架</strong>——先从"图片+句子"的弱监督中<strong>自动发现</strong>区域-短语的对应关系（对齐模型），然后利用这些对齐关系来<strong>训练生成模型</strong>（多模态RNN），使模型能够为新图片生成从未见过的新描述。
+  </div>
+
+  <h3>2.2 Inspiration to Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>R-CNN目标检测（Girshick et al. 2014）</td><td>R-CNN可以在一张图中检测出多个区域候选框及其视觉特征——这意味着<strong>图像可以被分解为一组区域向量</strong>，每个向量对应一个潜在的"可描述对象"。这为"区域↔单词"的对齐提供了视觉端的基础表征</td><td>基础设施</td></tr>
+    <tr><td>依赖树解析（Dependency Parsing）与双向RNN</td><td>句子可以通过依赖树解析被<strong>分解为一组语义片段</strong>（chunks）——如"一只棕色狗" (NP) + "在草地上" (PP) + "奔跑" (VP)。双向RNN可以为每个词及其上下文生成固定维度的嵌入向量。这两个工具使得"句子↔片段↔词向量"的文本端表征成为可能</td><td>方法</td></tr>
+    <tr><td>结构化预测与max-margin目标（如SSVM, WSABIE等）</td><td>在仅有"图片↔句子"对的弱监督下学习"区域↔片段"的细粒度对应，可以被形式化为一个<strong>结构化隐变量问题</strong>——对齐是隐变量（未在标注中给出），但可以通过一个全局的max-margin ranking目标来推断。这一定义使整个问题在数学上可处理</td><td>数学</td></tr>
+    <tr><td>多模态嵌入学习（DeViSE, Frome et al. 2013）</td><td>将图像和文本映射到<strong>共享的嵌入空间</strong>中，使得语义相似的图文在该空间中接近。但此前的工作只用了图片级的嵌入——这篇论文通过区域-短语对齐将多模态嵌入<strong>细化到子图片级别</strong>，实现了更精细的跨模态检索和描述</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 弱监督下的区域-短语对齐学习——在无定位标注的情况下发现图文对应</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>训练数据（Flickr8K/30K, MS COCO）只有"图片↔整句描述"的对应，没有任何关于"描述中的哪个单词/短语对应图片中的哪个区域"的标注。但生成好的描述需要知道"谁在哪里做什么"——即需要区域级的理解。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>将"寻找区域-短语对齐"形式化为一个<strong>结构化隐变量推理问题</strong>——对齐本身是隐变量，但可以通过让"正确对齐的图文对"在共享嵌入空间中比"错误对齐的对"更接近来间接推断。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）图像端：R-CNN提取每个区域（约19个候选框+1个全图上下文）的CNN特征→嵌入为h维向量；（2）文本端：双向RNN编码句子中每个词，结合依赖解析将句子切分为语义片段（chunks）→每个片段嵌入为h维向量；（3）对齐学习：定义一个结构化max-margin目标——正确的区域-片段对齐的得分（内积）应高于所有非对齐对的得分。这个过程在<strong>整个数据集的所有图片-句子对上联合优化</strong>，无需任何区域-短语的ground truth标注。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 多模态RNN——将对齐信息注入到逐词生成过程中</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>即使学会了区域-短语的对齐，如何将其用于<strong>生成</strong>新图片的描述？需要一个生成模型，能够在条件于图像特征的情况下，逐词输出一个连贯的自然语言句子。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>RNN语言模型（Mikolov et al. 2010）已经证明了RNN可以逐词生成连贯的文本——关键是如何将<strong>视觉信息</strong>作为额外的条件注入到这个生成过程中。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>多模态RNN：在每个时间步t，RNN的输入是（1）前一个词的嵌入向量（2）图像特征向量——两者拼接后输入RNN单元。图像特征可以在第一时间步输入一次（"先看完整张图，然后生成"），也可以在每一个时间步都输入（"每生成一个词都再看一眼图"）。训练目标：最大化生成句子的对数似然——即给定图片和所有前面的词，正确预测下一个词的概率。这与标准RNN语言模型的训练方式一致，只是额外条件于图像。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 确立了"对齐→生成"的二阶段框架，为图像描述生成开辟了新范式</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>2015年之前，"如何生成图像描述"没有一个公认的好框架——是检索？是模板填充？是端到端RNN？检索方法无法生成新组合（如"粉色的长颈鹿站在沙滩上"——训练集中可能从未出现过这个组合），模板方法受限于预定义的语法规则，简单的RNN又无法理解图像的细粒度结构。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>分离"理解"和"表达"——先让模型<strong>在语义层面理解</strong>图片的细粒度内容（通过区域-短语对齐），然后让模型<strong>在语言层面表达</strong>这些理解（通过多模态RNN生成）。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>这是一个优雅的二阶段框架：（1）<strong>对齐阶段</strong>——学习将图片的任何区域映射到文本空间的附近（通过跨模态嵌入和对齐目标）；（2）<strong>生成阶段</strong>——利用对齐模型的嵌入空间来条件化RNN，生成自然语言描述。两个阶段共享相同的视觉和文本编码器，但训练目标不同（对齐用ranking loss，生成用sequence likelihood）。这个框架后来被Show and Tell（Vinyals et al. 2015）、Show, Attend and Tell（Xu et al. 2015）等工作继承和扩展。</div>
+  </div>
+</section>
+
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — 两阶段图文理解-生成系统</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Visual Encoding <span>R-CNN</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>Region Proposal</strong>
+          <small>Selective Search generates ~19 region proposals per image + 1 full-image context.</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>CNN Feature Extraction</strong>
+          <small>Each region goes through VGG/CNN → 4096-dim fc7 feature vector.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Text Encoding <span>BRNN</span></h4>
+        <div class="arch-card arch-power">
+          <strong>Bidirectional RNN</strong>
+          <small>Each word gets a context-aware embedding from forward + backward RNN states.</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>Dependency Chunking</strong>
+          <small>Sentences segmented into meaningful phrases via dependency tree parsing.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Alignment Model <span>ranking loss</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>Multimodal Embedding</strong>
+          <small>Image regions and text chunks projected into a shared h-dimensional space.</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>Structured Max-Margin</strong>
+          <small>Aligned pairs score higher than non-aligned pairs by a margin.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Multimodal RNN <span>generation</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>Conditioned Language Model</strong>
+          <small>At each timestep, RNN conditions on previous word + image features.</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>Sequence Likelihood Max.</strong>
+          <small>Train to maximize probability of generating correct caption word by word.</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>image → regions</span>
+      <span>sentence → words</span>
+      <span>regions ↔ phrases</span>
+      <span>image → caption</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>R-CNN region proposals may miss important objects or over-segment the image.</small></div>
+      <div class="arch-metric"><strong>Main innovation</strong><small>Learning fine-grained alignments without region-level annotations.</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>Language provides richer supervision than fixed class labels for visual learning.</small></div>
+      <div class="arch-metric"><strong>Legacy</strong><small>Precursor to Show-Attend-Tell, DenseCap, neural image captioning paradigm.</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 对齐模型 — 区域-短语对应关系的学习</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph IMAGE["Image Processing Pipeline"]
+      direction LR
+      IMG["Input Image"] --> RP["Selective Search: generate ~19 region proposals"]
+      RP --> CNN["CNN (VGG): extract fc7 features for each region"]
+      CNN --> VE["Visual Embedding: W_m * v_i → h-dim vector"]
+    end
+
+    subgraph TEXT["Text Processing Pipeline"]
+      direction LR
+      SENT["Input Sentence: e.g. A brown dog runs on grass"] --> TOK["Tokenize into words"]
+      TOK --> BRNN["Bidirectional RNN: context-aware word vectors"]
+      BRNN --> DP["Dependency Parsing: segment into chunks"]
+      DP --> TE["Text Embedding: W_m * t_j → h-dim vector"]
+    end
+
+    subgraph ALIGN["Alignment Learning (Structured Max-Margin)"]
+      SIM["Similarity Score: s(v_i, t_j) = v_i · t_j"]
+      RANK["Ranking Objective: aligned pairs score higher than non-aligned"]
+      OPT["Optimize: find best alignment as latent variable via global ranking"]
+    end
+
+    VE --> SIM
+    TE --> SIM
+    SIM --> RANK --> OPT
+
+    classDef image fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef text fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef align fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    class IMG,RP,CNN,VE image
+    class SENT,TOK,BRNN,DP,TE text
+    class SIM,RANK,OPT align
+    </pre>
+  </div>
+
+  <h3>3.2 多模态RNN生成模型 — 从图像特征到自然语言描述</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["Inputs to RNN at each timestep"]
+      direction LR
+      IMG_FEAT["Image feature vector v (from CNN or alignment model)"]
+      PREV_WORD["Previous word embedding w_{t-1}"]
+    end
+
+    subgraph RNN["Multimodal RNN Cell"]
+      direction LR
+      CONCAT["Concatenate: [v, w_{t-1}] → input to RNN"]
+      HIDDEN["RNN Hidden State h_t = f(h_{t-1}, v, w_{t-1})"]
+      OUTPUT["Output projection: softmax over vocabulary"]
+    end
+
+    subgraph TRAINING["Training via Sequence Likelihood"]
+      GT["Ground truth: A brown dog runs on grass"]
+      LOSS["Maximize log P(w_t | w_1...w_{t-1}, v) for each timestep"]
+    end
+
+    subgraph INFERENCE["Inference (Beam Search)"]
+      START["Start with &lt;START&gt; token + image"]
+      BEAM["Beam search: maintain top-K partial sequences"]
+      END["Stop when &lt;END&gt; token generated or max length reached"]
+    end
+
+    IMG_FEAT --> CONCAT
+    PREV_WORD --> CONCAT
+    CONCAT --> HIDDEN --> OUTPUT
+    OUTPUT --> LOSS
+    START --> BEAM --> END
+
+    classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef rnn fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef train fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef infer fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class IMG_FEAT,PREV_WORD input
+    class CONCAT,HIDDEN,OUTPUT rnn
+    class GT,LOSS train
+    class START,BEAM,END infer
+    </pre>
+  </div>
+
+  <h3>3.3 完整工作流 — 从弱监督数据到图像描述生成</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PHASE1["Phase 1: Cross-Modal Alignment Learning"]
+      direction LR
+      P1A["Training Data: images + full-sentence captions"] --> P1B["Run R-CNN on all images → region features"]
+      P1B --> P1C["Run BRNN on all captions → word/chunk features"]
+      P1C --> P1D["Learn region-to-phrase alignment via ranking objective"]
+      P1D --> P1E["Output: shared multimodal embedding space"]
+    end
+
+    subgraph PHASE2["Phase 2: Caption Generation Training"]
+      direction LR
+      P2A["Use aligned embeddings as image features"] --> P2B["Train Multimodal RNN: maximize sequence log-likelihood"]
+      P2B --> P2C["Model learns to generate captions word by word conditioned on image"]
+    end
+
+    subgraph PHASE3["Phase 3: Inference (Generating Captions for New Images)"]
+      direction LR
+      P3A["New image → R-CNN → region features"] --> P3B["Embed into multimodal space"]
+      P3B --> P3C["RNN generates caption via beam search"]
+      P3C --> P3D["Output: natural language description"]
+    end
+
+    PHASE1 --> PHASE2 --> PHASE3
+
+    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class P1A,P1B,P1C,P1D,P1E p1
+    class P2A,P2B,P2C p2
+    class P3A,P3B,P3C,P3D p3
+    </pre>
+  </div>
+</section>
+
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \text{给定图片 } I \text{ 和训练集 } \{(I_n, S_n)\}_{n=1}^{N}, \text{学习生成模型 } p(S|I) = \prod_{t=1}^{T} p(w_t | w_{1:t-1}, I) $$
+    <div class="eq-note">
+      <strong>$I$</strong> = 输入图片（RGB像素矩阵）&nbsp;|&nbsp;
+      <strong>$S = [w_1, w_2, ..., w_T]$</strong> = 自然语言描述句子（词序列）&nbsp;|&nbsp;
+      <strong>$p(w_t | w_{1:t-1}, I)$</strong> = 给定图片和所有前面的词，预测第t个词的条件概率 &nbsp;|&nbsp;
+      <strong>核心挑战</strong>：训练数据中只有图片级别的句子标注，没有"哪个词描述图片的哪个区域"的细粒度对应。这类似于学习翻译但没有单词级的对齐数据——模型必须同时学习"看哪里"和"说什么"。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output — 多任务评估</h3>
+  <table>
+    <tr><th>任务</th><th>输入</th><th>输出</th><th>评估指标</th></tr>
+    <tr>
+      <td><strong>图像→句子检索</strong><br>(Image to Text Retrieval)</td>
+      <td>一张查询图片</td>
+      <td>从候选句子池中检索最匹配的句子</td>
+      <td>Recall@K (K=1,5,10) — 真实匹配句子是否在top-K检索结果中</td>
+    </tr>
+    <tr>
+      <td><strong>句子→图像检索</strong><br>(Text to Image Retrieval)</td>
+      <td>一个查询句子</td>
+      <td>从候选图片池中检索最匹配的图片</td>
+      <td>Recall@K (K=1,5,10)</td>
+    </tr>
+    <tr>
+      <td><strong>图像描述生成</strong><br>(Caption Generation)</td>
+      <td>一张新图片（测试集中未见过的）</td>
+      <td>一个完整的自然语言句子描述</td>
+      <td>BLEU@1-4, METEOR, CIDEr — 自动文本评估指标（与人类参考描述比较）</td>
+    </tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>多模态序列生成</strong>任务——输入是视觉模态（图像），输出是语言模态（词序列）。与图像分类的关键区别在于：（1）输出空间是<strong>开放词汇</strong>的（可以是任何词），而非固定的1000个类别；（2）输出具有<strong>序列结构</strong>——词之间存在语法和语义依赖（形容词修饰名词、及物动词需要宾语）；（3）任务本质上是<strong>一对多</strong>的——同一张图片可以有多个合理的描述（如"一只棕色的狗在草地上奔跑"和"一条棕色犬在草地里跑"都是对同一张图的正确描述）。论文通过检索、生成、和密集描述三个子任务全面评估了模型的跨模态理解能力。</p>
+</section>
+
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">First-Principles Diagnosis</div>
+    <strong>核心矛盾</strong>：自然语言是离散、组合性、无限开放的，而视觉信号是连续、高维、充满歧义的。将两者对应起来需要解决三个根本性挑战。<br><br>
+    （1）<strong>从全局描述到局部对应的"隐变量推断"问题</strong>：训练数据给出的是"这张图 = 这个句子"，但没有给出"句子的第3个词 = 图中右上角的那个区域"。模型必须自主发现这些细粒度对应——这本质上是<strong>无监督结构发现</strong>问题（发现视觉和语言的共享组合结构）。<br><br>
+    （2）<strong>视觉-语言的"语义鸿沟"</strong>：视觉特征（CNN的fc7层4096维向量）和语言特征（词嵌入的300维向量）存在于完全不同的空间中，由完全不同的统计分布生成。将它们映射到同一个语义空间需要让"狗"的图像区域和"dog"这个词在嵌入空间中接近——但两者在原始特征空间中毫无关系。<br><br>
+    （3）<strong>语言生成的"组合性泛化"挑战</strong>：一个好的图像描述模型必须能够生成<strong>训练集中从未出现过的词组合</strong>——如"粉色的长颈鹿在冲浪"（训练集中可能没有这个组合的任何样本）。这要求模型学习的是可重组的语义概念（pink, giraffe, surfing），而非记忆固定的模板。<br><br>
+    <strong>综合来看</strong>：这篇论文直面了整个视觉-语言领域的三个最根本挑战——弱监督对齐、跨模态映射、组合性生成。它提出的"对齐→生成"二阶段框架是对这三个挑战的一次完整的系统性回答。
+  </div>
+
+  <h3>5.2 Prior Methods and Their Limits</h3>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Was Insufficient</th></tr>
+    <tr>
+      <td>Retrieval-based Captioning (Ordonez et al. 2011, Socher et al. 2014)</td>
+      <td>在训练集中找到与查询图片最相似的图片，返回其描述作为预测</td>
+      <td><strong>无法生成新的描述</strong>——如果训练集中没有"长颈鹿冲浪"的图片，模型永远无法生成这个描述。本质上是"查找"而非"理解-生成"。且检索质量完全取决于训练集的覆盖度。</td>
+    </tr>
+    <tr>
+      <td>Template-based Captioning (Kulkarni et al. 2013, Mitchell et al. 2012)</td>
+      <td>检测图片中的对象/属性/关系 → 填入预定义的语法模板（如"[Subject] [Verb] [Object] in [Scene]")</td>
+      <td><strong>语言被简化为模板填空</strong>——真实的人类描述远超出模板的语法覆盖（如"尽管天气阴沉，孩子们仍然在公园里愉快地玩耍"——涉及转折、情感、时间状语，模板无法处理）。且模板设计依赖人工语言学知识。</td>
+    </tr>
+    <tr>
+      <td>Multimodal Embedding (DeViSE (Frome et al. 2013), WSABIE (Weston et al. 2011))</td>
+      <td>将图片和标签/词映射到共享嵌入空间，使用内积度量相似度</td>
+      <td><strong>仅有图片级嵌入，缺乏区域级理解</strong>——图片被编码为单个全局向量，无法区分图中的不同对象及其关系。且这些方法仅用于检索而非生成。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战1 — 没有区域-短语的标注数据</strong>：在2015年之前，没有任何公开数据集提供了"图片区域↔描述短语"的细粒度对应。所有标注都是图片级别的完整句子。而手动标注这种对应极其昂贵（每张图需要标注几十个区域和对应的短语）。论文通过结构化隐变量模型（将对齐视为隐变量）巧妙地绕过了这一数据瓶颈。</li>
+    <li><strong>挑战2 — 一句话同时描述多个对象、属性和关系</strong>："一个穿红衬衫的男人在喂草地上的白马"——这句话涉及（a）两个对象（男人、马）、（b）三个属性（红色、白色、草地）、（c）一个动作（喂）、（d）空间关系（在...上）。模型需要同时理解所有这些元素并将它们正确地组合成一个语法正确的句子。</li>
+    <li><strong>挑战3 — 自动评估指标的局限性</strong>：BLEU和METEOR等自动指标基于生成句子与人类参考句子的n-gram匹配——但"一只棕色的狗在草地上"和"一条棕色犬在草地里"在BLEU中匹配很少（"棕色"和"草"可能匹配n-gram但结构不同），尽管语义几乎相同。这使得评估本身就是开放问题——论文坦诚地讨论了这些指标的局限性。</li>
+  </ul>
+</section>
+
+<section id="method">
+  <h2>6. Method and Key Formulas</h2>
+
+  <h3>6.1 Core Approach</h3>
+  <p>论文的核心方法分为两个阶段：<strong>阶段1（对齐模型）</strong>——学习图片区域与文本片段在共享嵌入空间中的对应关系；<strong>阶段2（多模态RNN）</strong>——利用学到的对齐信息条件化RNN，逐词生成图像描述。</p>
+
+  <h3>6.2 Key Formulas</h3>
+
+  <h4>Group A: 图像和文本的特征编码</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 视觉区域编码</span>
+    $$ v_i = W_m \cdot \text{CNN}_{\theta_c}(R_i) \in \mathbb{R}^h, \quad i \in \{1, 2, ..., 20\} $$
+    <div class="eq-note">
+      <strong>$R_i$</strong> = 第i个候选区域（Selective Search + 全图上下文，约20个/图）&nbsp;|&nbsp;
+      <strong>$\text{CNN}_{\theta_c}(R_i)$</strong> = 在ImageNet上预训练的CNN（VGG-16），取fc7层4096维特征 &nbsp;|&nbsp;
+      <strong>$W_m \in \mathbb{R}^{h \times 4096}$</strong> = 线性嵌入矩阵，将视觉特征映射到h维共享语义空间 &nbsp;|&nbsp;
+      <strong>关键设计</strong>：h维共享空间是视觉和语言"交汇"的地方——在这个空间中，图片区域的向量和描述该区域文本的向量应该靠近。
+    </div>
+  </div>
+
+  <h4>Group B: 结构化Max-Margin对齐目标</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 对齐损失函数</span>
+    $$ \mathcal{L}_{\text{align}} = \sum_{k} \sum_{l} \max(0, \alpha - s_{kl} + s_{kl'}) + \max(0, \alpha - s_{kl} + s_{k'l}) $$
+    $$ s_{kl} = \sum_{t \in g_l} \sum_{i \in g_k} v_i^T t_t, \quad \text{score of matching region group } g_k \text{ and text chunk } g_l $$
+    <div class="eq-note">
+      <strong>$s_{kl}$</strong> = 区域组 $g_k$ 与文本片段 $t_t$ 在共享空间中的相似度（内积之和）&nbsp;|&nbsp;
+      <strong>$\alpha$</strong> = margin（margin）——正确对齐的得分应至少比错误对齐高 $\alpha$ &nbsp;|&nbsp;
+      <strong>$l'$</strong> 和 <strong>$k'$</strong> = 随机采样的负样本（来自其他图片-句子对）&nbsp;|&nbsp;
+      <strong>工作机制</strong>：对于每个训练样本（一张图+一个句子），模型将所有可能的"区域组↔文本片段"对齐视为隐变量——通过让正对齐获得高分、负对齐获得低分的全局ranking目标，模型在优化过程中自动"发现"了哪些区域应该与哪些文本片段对应。这是一个<strong>弱监督下的对比学习</strong>——不需要任何人工标注的对齐关系。
+    </div>
+  </div>
+
+  <h4>Group C: 多模态RNN生成目标</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 序列对数似然最大化</span>
+    $$ \mathcal{L}_{\text{gen}} = -\frac{1}{N} \sum_{n=1}^{N} \sum_{t=1}^{T_n} \log p(w_t^{(n)} | w_{1:t-1}^{(n)}, I_n; \theta) $$
+    $$ p(w_t | w_{1:t-1}, I) = \text{softmax}(W_{\text{out}} \cdot h_t + b_{\text{out}}) $$
+    $$ h_t = f(h_{t-1}, E_w \cdot w_{t-1}, W_v \cdot v) $$
+
+    <div class="eq-note">
+      <strong>$w_t^{(n)}$</strong> = 第n个训练样本中，描述句子的第t个词 &nbsp;|&nbsp;
+      <strong>$T_n$</strong> = 第n个句子的长度（词数）&nbsp;|&nbsp;
+      <strong>$h_t$</strong> = RNN在时间步t的隐藏状态（编码了迄今为止生成的所有词+图像信息）&nbsp;|&nbsp;
+      <strong>$E_w$</strong> = 词嵌入矩阵（将one-hot词索引映射为dense向量）&nbsp;|&nbsp;
+      <strong>$W_v$</strong> = 图像特征映射矩阵 &nbsp;|&nbsp;
+      <strong>$f$</strong> = RNN单元（可以是LSTM或GRU）&nbsp;|&nbsp;
+      <strong>关键</strong>：与标准语言模型（仅条件于前面的词）不同，多模态RNN在<strong>每一个时间步</strong>都额外条件于图像特征v——这意味着模型在生成每个词时都可以"再看一眼"图片。这对于生成与图片内容一致的描述至关重要。
+    </div>
+  </div>
+
+  <h3>6.3 关键实验结果 — 跨数据集全维度对比</h3>
+  <table>
+    <tr><th>Dataset</th><th>Task</th><th>This Paper</th><th>Prior SOTA</th><th>Key insight</th></tr>
+    <tr class="highlight"><td>Flickr8K</td><td>Captioning BLEU-4</td><td><strong>17.0</strong></td><td>14.1 (Socher et al.)</td><td>对齐+生成框架首次在标准captioning指标上超越检索和模板方法</td></tr>
+    <tr class="highlight"><td>Flickr30K</td><td>Image→Text R@10</td><td><strong>50.5%</strong></td><td>43.0% (Socher et al.)</td><td>区域级对齐显著提升了细粒度检索（比图片级嵌入好~7%）</td></tr>
+    <tr><td>MS COCO</td><td>Captioning BLEU-4</td><td>23.0</td><td>19.0 (Vinyals et al.)</td><td>在更大的数据集上优势缩小——区域信息的边际价值随数据增多而递减</td></tr>
+    <tr><td>Flickr8K</td><td>Dense Captioning</td><td><strong>Qualitative</strong></td><td>N/A (首个展示)</td><td>首次展示了模型可以为图片中不同区域生成不同的独立描述</td></tr>
+  </table>
+
+  <h4>6.4 对齐模型 vs 仅使用全图特征生成的对模型的影响</h4>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>Full Image (无对齐) — 全局CNN特征</h4>
+      <ul>
+        <li>图片→单个4096维全局向量</li>
+        <li>优点：简单，计算快</li>
+        <li>缺点：无法定位具体对象——"穿红衬衫的男人"和"白马"混合在一个向量中，RNN难以选择性关注</li>
+        <li>Flickr8K BLEU-4: ~14 (无区域信息)</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>Region Alignment (本文) — 区域-短语对应</h4>
+      <ul>
+        <li>图片→20个区域向量+它们与文本的对齐关系</li>
+        <li>优点：细粒度理解——可以"看到"并"描述"图中每个显著对象</li>
+        <li>代价：需要R-CNN提取区域提案（约1秒/图），对齐学习增加训练复杂度</li>
+        <li>Flickr8K BLEU-4: <strong>17.0</strong> (含区域对齐信息)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">为什么对齐模型的效果优于全图特征？</div>
+    用全图特征生成描述时，RNN必须在每一个时间步从同一个4096维全局向量中"读取"所有信息——这就像在回答"图片中有什么？"时，你的全部信息就是"整张图的模糊缩小版"。而有了区域对齐后，模型可以在生成"男人"时关注人区域的特征、在生成"马"时关注马区域的特征、在生成"草地"时关注背景区域的特征——实现了<strong>隐式的注意力机制</strong>（尽管论文中并未显式建模attention）。这为后来Show, Attend and Tell (Xu et al. 2015)的显式注意力机制提供了实验性的动机。
+  </div>
+</section>
+
+<section id="principles">
+  <h2>7. Fundamental Principles — 视觉-语言学习的四项核心原理</h2>
+
+  <h3>7.1 弱监督对齐原理 — 如何在没有显式标注的情况下学习跨模态对应</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理1 — 隐变量结构发现</span>
+    $$ \text{Alignments}^{*} = \arg\max_{A} \sum_{n} \text{Score}(I_n, S_n | A), \quad A \text{ is latent} $$
+    <div class="eq-note">
+      <strong>$A$</strong> = 区域与文本片段之间的对齐关系（隐变量——训练集中不存在）&nbsp;|&nbsp;
+      <strong>$\text{Score}(I_n, S_n | A)$</strong> = 在对齐A下，图片区域与句子片段的语义匹配总分 &nbsp;|&nbsp;
+      <strong>核心机制</strong>：模型不需要显式地"找到"对齐——通过结构化max-margin目标，正确的对齐自然会得到高分，错误的对齐得到低分。优化过程中，模型逐渐学会"把应该对应的区域和文本片段映射到嵌入空间中相近的位置"。这种<strong>"用排名目标隐式推断结构"</strong>的策略是弱监督学习中一个非常强大的通用范式——它只需要"图片-句子对"级别的标注，但能自动发现更细粒度的结构。
+    </div>
+  </div>
+
+  <h3>7.2 组合性生成原理 — RNN如何生成训练集中未出现的描述组合</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理2 — 词的组合性泛化</span>
+    $$ p(\text{"red car"} | I) = p(\text{car} | I) \cdot p(\text{red} | \text{car}, I) $$
+    <div class="eq-note">
+      <strong>组合性的关键</strong>：RNN语言模型的概率链式法则天然支持组合性——$p(\text{red car} | I) = p(\text{car} | I) \times p(\text{red} | \text{car}, I)$。如果模型见过"red ball"、"blue car"、"red bike"，那么即使<strong>从未见过"red car"的组合</strong>，RNN也能生成它——因为$p(\text{red} | \text{car}, I)$可以通过平滑和泛化来推断。这是RNN相对于检索方法的根本优势——检索方法无法生成训练集中不存在的组合，而RNN可以通过分解概率来泛化。
+    </div>
+  </div>
+
+  <h3>7.3 跨模态嵌入原理 — 视觉和语言如何共享同一个语义空间</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理3 — 共享嵌入空间的质量取决于训练信号的质量</span>
+    $$ \text{如果 } d(v_{\text{dog\_region}}, t_{\text{"dog"}}) \approx 0, \text{ 且 } d(v_{\text{dog\_region}}, t_{\text{"car"}}) \gg 0 $$
+    <div class="eq-note">
+      <strong>$d(v, t)$</strong> = 视觉向量v和文本向量t在共享嵌入空间中的距离 &nbsp|&nbsp
+      <strong>核心要求</strong>：在共享嵌入空间中，"狗"区域的视觉特征应该与"狗"这个词的文本特征接近，而远离"汽车"的文本特征。这个要求看起来朴素，但实现起来并不容易——因为视觉特征（CNN fc7）和文本特征（词嵌入）的原始分布完全不同。论文通过在<strong>大量图片-句子对</strong>上联合训练视觉嵌入和文本嵌入，借助足够的训练样本"对冲"了两种模态的分布差异。
+    </div>
+  </div>
+
+  <h3>7.4 密集描述原理 — 从单句描述到多区域多句描述</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理4 — 密集描述的扩展</span>
+    $$ \text{DenseCaption}(I) = \{(R_1, S_1), (R_2, S_2), ..., (R_K, S_K)\} $$
+    <div class="eq-note">
+      <strong>$R_k$</strong> = 第k个图像区域的边界框 &nbsp;|&nbsp;
+      <strong>$S_k$</strong> = 对该区域的独立自然语言描述 &nbsp;|&nbsp;
+      <strong>为什么重要？</strong>传统图像描述输出一个句子描述整张图（"一只狗在草地上"），而密集描述输出多个句子分别描述图中不同区域（区域1："一只棕色狗在奔跑"，区域2："绿色的草地"，区域3："天空中有一片云"）。这在搜索、导航、无障碍应用中具有巨大价值——你可以<strong>搜索图中的某个特定对象而非整张图</strong>。这篇论文首次展示了这一能力（尽管不是主要贡献），而DenseCap (Johnson et al. 2016) 后来将其发展为独立的研究方向。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">对UAV视觉的启示</div>
+    这篇论文的核心思想——"自然语言是比固定类别更丰富的视觉监督信号"——对UAV场景理解有深刻意义。UAV航拍图像中包含大量的对象（车辆、行人、建筑、道路、植被）和关系（"汽车从东向西行驶"、"无人机悬停在桥梁上方"）。使用自然语言描述作为监督信号，可以同时训练模型识别对象<strong>和</strong>理解它们之间的关系——这与单一的目标检测（仅"what and where"）相比，提供了更丰富的语义理解。
+  </div>
+</section>
+
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">模型概览——将语言视为丰富标签空间的核心思想</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/overview.png" alt="Model overview and core idea visualization"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save a screenshot as <code>figures/overview.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">FIGURE INTERPRETATION</div>
+      <p><strong>本图展示了</strong>：论文最核心的哲学——不要只看标签（"狗"），用描述性语言理解整张图（"一只棕色狗在草地上奔跑"）。</p>
+      <ul>
+        <li><strong>从固定类别到自然语言</strong>：传统视觉系统输出一个类别标签（如"dog"），而图像描述系统输出一个完整的句子——这不仅告诉你是什么，还告诉你颜色、动作、场景和关系。语言提供了比ImageNet的1000类标签丰富<strong>数量级上的</strong>更多监督信息。</li>
+        <li><strong>区域-短语对齐的可视化</strong>：图中展示了模型学到的对齐——每个图像区域（彩色框）对应描述中的一个短语（同色高亮文本）。注意这些对齐是<strong>自动学习</strong>的——训练数据中没有提供任何区域-短语的ground truth对应。</li>
+        <li><strong>密集描述的潜力</strong>：图中展示了模型不仅能为整张图生成一个描述，还能为图中不同区域生成独立描述——这暗示了后来Dense Captioning方向的可能性。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">区域-短语对齐的质量可视化——模型学到了什么对应关系</span>
+      <span class="fig-source">来源：论文 Fig. 3 / Section 4</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Region-to-phrase alignment quality visualization"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save a screenshot as <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">FIGURE INTERPRETATION</div>
+      <p><strong>本图展示了</strong>：对齐模型在测试图片上发现的区域-短语对应关系。这是论文最令人印象深刻的定性结果。</p>
+      <ul>
+        <li><strong>对齐的准确性令人惊讶</strong>：尽管训练数据中没有任何区域-短语的ground truth标注，模型仍然学会了将"man in black shirt"对齐到图中穿黑衬衫的男人区域、将"tennis racket"对齐到网球拍区域。这证明了结构化max-margin目标在弱监督下发现结构的强大能力。</li>
+        <li><strong>失败案例揭示局限性</strong>：在复杂场景中（多人、多对象、遮挡），模型有时会将短语对齐到错误的区域（如将"red car"对齐到红色建筑物的区域）。这些错误提醒我们，弱监督对齐<strong>是不完美的</strong>——对于需要精确grounding的应用（如机器人抓取），仍然需要人工标注的region-phrase对应。</li>
+        <li><strong>依赖解析的价值</strong>：实验中对比了使用依赖解析（将句子切分为语义片段）vs不使用（将每个单独的词作为独立单元）的效果——依赖解析显著提升了对齐质量，因为"black shirt"作为一个整体比"black"和"shirt"分开来更有语义意义。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">生成描述与人类参考描述的对比——生成质量评估</span>
+      <span class="fig-source">来源：论文 Fig. 5 / Section 5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Generated captions vs human references quality comparison"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>Please save a screenshot as <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">FIGURE INTERPRETATION</div>
+      <p><strong>本图展示了</strong>：多模态RNN生成的描述与人类参考描述（ground truth）的对比。这让我们能直观感受2015年图像描述技术的实际能力。</p>
+      <ul>
+        <li><strong>生成的描述通常"正确但不精彩"</strong>：对于一张"男人在公园里喂天鹅"的图片，模型可能生成"a man feeding birds in a park"（一个男人在公园喂鸟）——而人类参考是"a man is feeding some swans in the park"（一个男人在公园里喂一些天鹅）。模型正确地捕捉了核心语义（man, feeding, bird-like, park），但"swan"变成了更泛化的"bird"——反映了fine-grained对象识别的困难。</li>
+        <li><strong>模型有时"编造"内容（幻觉）</strong>：在某些案例中，模型生成的描述包含了图中不存在的对象——如在没有"chair"的图片中错误地描述"a man sitting on a chair"。这是因为RNN语言模型学到的语料统计先验（"man"经常与"sitting on a chair"一起出现）压倒了视觉信号。这是图像描述生成中一个持续到今天的挑战（如何防止模型"胡说"）。</li>
+        <li><strong>BLEU评分的局限性在这个对比中非常明显</strong>："a man feeding birds in a park"和"a man is feeding some swans in the park"在语义上高度一致，但BLEU-4得分可能很低（因为"birds"和"swans"完全不匹配）。这解释了为什么论文同时报告了多个指标（BLEU, METEOR, CIDEr）——没有一个指标能完美衡量生成质量。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="flaw">
+  <h2>9. Potential Flaw and Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>依赖外部区域提案（R-CNN + Selective Search）</strong>：对齐和生成的质量受限于R-CNN检测到的区域——如果一个重要对象没有被Selective Search检测到（如被严重遮挡或太小），模型就无法描述它。这限制了模型在复杂场景（如航拍UAV图像，目标可能非常小）中的应用。后来的端到端方法（如Show, Attend and Tell）通过<strong>可微的注意力机制</strong>绕过了这一问题——不再需要硬性的区域提案。</li>
+    <li><strong>对齐学习并非"真正的理解"</strong>：模型的区域-短语对齐是在<strong>嵌入空间的相似度</strong>层面学习的，而非对"这个区域确实是男人"的语义理解。在某些案例中，对齐可能仅因为区域和短语在训练集中频繁共现（如"water"和蓝色区域），而非因为模型真正理解了"这是水"。这种<strong>相关而非因果</strong>的对齐是当前深度学习的普遍问题。</li>
+    <li><strong>评测指标的不可靠性</strong>：论文诚实讨论了BLEU/METEOR/CIDEr的局限性——它们基于n-gram匹配，而非语义等价。"a dog runs on grass"和"a canine sprints across a lawn"在语义上几乎等价，但在BLEU中几乎零匹配。这使得比较不同方法时，数字的绝对大小意义有限——更重要的是定性评估（通过人工或展示生成样本）。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>注意力机制（Attention）</strong>：Show, Attend and Tell (Xu et al. 2015, 同年ICML) 和后来的Transformer-based方法（Image Transformer, 2020+）将"区域-短语对齐"从硬性阶段演化为<strong>可微的软注意力</strong>——模型在生成每个词时计算所有图像位置的注意力权重，端到端训练。这使得生成过程更加优雅和高效。</li>
+    <li><strong>从描述到视觉问答（VQA）和视觉推理</strong>：这篇论文展示了语言可以作为视觉监督信号——VQA (Antol et al. 2015) 和Visual Reasoning (Johnson et al. 2017) 进一步将这一理念扩展为"问题和答案"的监督形式，推动模型不仅描述所见，还要<strong>推理关于所见的问题</strong>（"如果球被踢出了画面，下一个镜头中球在哪里？"）。</li>
+    <li><strong>密集描述（Dense Captioning）</strong>：DenseCap (Johnson et al. 2016, 同样是李飞飞组的工作) 将这篇论文的"dense captioning"能力发展为完整的端到端模型——同时进行区域检测和描述生成，实现了对图片中所有显著区域的全面语言描述。</li>
+  </ul>
+
+  <h3>9.3 Data and Method Sensitivity</h3>
+  <table>
+    <tr><th>问题</th><th>严重程度</th><th>对UAV研究的影响</th></tr>
+    <tr><td>区域提案质量瓶颈</td><td>★★★★</td><td>UAV航拍图像中的目标通常非常小（如行人可能仅10x20像素），Selective Search可能无法有效检测。需要针对小目标优化的区域提案方法（如多尺度检测）</td></tr>
+    <tr><td>语言模型先验偏见</td><td>★★★</td><td>在UAV场景中，常见对象和关系的语料频率可能与地面照片完全不同（如"drone"在一般语料中频率极低但在UAV描述中频繁出现）。需要领域适应的语言模型</td></tr>
+    <tr><td>评估指标偏差</td><td>★★★★</td><td>UAV图像描述可能包含大量技术术语（如"nadir view"、"orthomosaic"）——自动指标对这些低频词的匹配极差，可能严重低估模型质量</td></tr>
+  </table>
+
+  <div class="callout warn">
+    <div class="callout-title">值得深挖的方向</div>
+    <strong>UAV航拍图像的密集描述生成</strong>——将这篇论文的"对齐+生成"框架应用于UAV航拍图像。UAV图像的特点（俯视视角、小目标、多目标、空间关系重要）使得"区域-短语对齐"比地面照片更加重要——你需要准确地描述"东北角的红色汽车正在向南行驶"而非仅仅"图中有汽车"。对齐模型可以直接用于学习UAV图像中区域（如飞行器、车辆、建筑物）与描述短语之间的对应关系。
+  </div>
+</section>
+
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>传统的图像理解只输出类别标签——"这是狗"、"那是汽车"。但人类理解图像的方式远不止于此——我们看到一张图片时，脑子里产生的是完整的句子和故事："一只棕色的狗在绿色的草地上追逐一个红色的球"。这种<strong>从"标签"到"描述"的升维</strong>是视觉智能的核心一步。</li>
+    <li><strong>为什么用"检索+模板"做不到？</strong><br>因为语言是组合性的——从有限的词汇和语法规则中，可以生成无限多种有意义的句子。检索方法只能返回见过的句子，模板方法只能填充预定义的语法槽——两者都无法捕捉语言的<strong>开放性</strong>和<strong>创造性</strong>。</li>
+    <li><strong>如果用RNN生成呢？</strong><br>RNN语言模型已经在文本生成上证明了组合性泛化的能力——它可以生成训练集中从未出现过的词序列。关键在于如何让RNN在看到图片后生成<strong>与图片内容一致的</strong>描述——这需要将视觉信息注入RNN的条件输入中。</li>
+    <li><strong>但仅仅"看整张图"够吗？</strong><br>不够。当RNN收到一个4096维的全局图片向量时，它很难从中提取"谁、什么颜色、在哪、做什么"这些细粒度信息——所有信息都混在一起。如果能<strong>先教会模型理解图片的各个部分</strong>（区域→短语对应），再让RNN基于这些理解来生成，效果应该会更好。</li>
+    <li><strong>最终方案</strong>：二阶段框架——先学习"看到什么"（区域→短语对齐），再学习"怎么说"（多模态RNN生成）。这一框架将"理解"和"表达"解耦，使得两个子问题都可以用已有的成熟技术（CNN+R-CNN用于理解、RNN用于表达）解决，而连接两者的关键是<strong>共享的多模态嵌入空间</strong>。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    计算机视觉不应该只告诉我们"图片里有狗"——它应该能像人类一样<strong>用完整的自然语言描述</strong>图片中的场景、对象、属性和关系。既然我们已经有了CNN（看）和RNN（说），那么缺少的唯一一环就是让它们<strong>在同一个语义空间中"对话"</strong>——区域对应短语，图片对应句子。
+  </div>
+</section>
+
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这篇论文是对<strong>如何将两个成熟工具（CNN和RNN）组合成一个新系统</strong>的教科书级示范。论文没有发明CNN或RNN，而是通过一个精心设计的<strong>多模态嵌入空间</strong>和对齐目标，将"看"和"说"连接起来。这种"不发明新模块，而是设计新连接"的思路，在今天的多模态大模型（LLaVA, GPT-4V）中仍然是核心设计哲学——视觉编码器+语言模型，通过一个projection layer连接。</li>
+    <li><strong>技术层面</strong>：对齐模型的核心是其<strong>隐变量公式化</strong>——在没有ground truth对应的情况下，通过结构化ranking目标自动推断跨模态对应关系。这种弱监督结构发现技术对于任何"只有实例级标签但需要子结构理解"的问题都适用——包括UAV视频中的"动作片段定位"（只知道整个视频的标签，但需要找到具体哪几帧发生了动作）。</li>
+    <li><strong>对UAV视觉的启示</strong>：UAV图像领域目前主要关注检测和分类（"图片中有车吗？在哪？"），但描述生成提供了更丰富的语义理解——"一辆红色轿车从东北方向驶入十字路口，一辆白色SUV正等待左转"。这种描述性的理解对于航拍监控、自动驾驶的"场景理解"、无人机的自动报告生成都有直接应用价值。而这篇论文的"对齐+生成"框架为构建这样的UAV描述系统提供了直接的蓝图。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于UAV图像描述生成</strong>：可以直接沿用这篇论文的"区域编码→对齐→RNN生成"管线——只是将R-CNN的对象检测替换为适合航拍图像的检测器（如YOLO或专门的航拍检测模型），将训练数据替换为UAV图像+描述标注对。</li>
+    <li><strong>对于UAV视频的弱监督事件定位</strong>：对齐模型的隐变量推理思想可以直接用于UAV视频分析——如果只有视频级别的标签（如"起飞"、"降落"、"巡航"），可以通过类似的结构化ranking目标自动发现哪些帧对应视频标签中的哪个子动作。</li>
+    <li><strong>对于跨模态UAV数据检索</strong>：这篇论文的共享嵌入空间方法使得"用自然语言搜索UAV图像/视频"成为可能——"找所有包含'白色卡车在高速公路上行驶'的航拍片段"可以直接通过查询文本与图像区域在嵌入空间中的相似度来实现。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Vinyals, O. et al. (2015). Show and Tell: A Neural Image Caption Generator. <em>CVPR 2015</em></td><td>与本文同期的工作——用LSTM直接将图像特征"翻译"为文本描述，无需显式的对齐阶段。更简单、更端到端，但缺少区域级的可解释性。与本文代表了图像描述的两条路线：端到端黑箱 vs 结构化可解释。</td></tr>
+    <tr><td>Xu, K. et al. (2015). Show, Attend and Tell: Neural Image Caption Generation with Visual Attention. <em>ICML 2015</em></td><td>将本文的"硬性区域-短语对齐"发展为<strong>可微的软注意力机制</strong>——模型在生成每个词时动态关注图像的不同区域，端到端训练。这是将本文的区域对齐思想推向实用化的关键一步。</td></tr>
+    <tr><td>Johnson, J. et al. (2016). DenseCap: Fully Convolutional Localization Networks for Dense Captioning. <em>CVPR 2016</em></td><td>将本文中展示的密集描述能力发展为完整的端到端模型——同时进行区域检测和描述生成。直接继承了本文"语言作为丰富标签空间"的核心哲学。</td></tr>
+    <tr><td>Antol, S. et al. (2015). VQA: Visual Question Answering. <em>ICCV 2015</em></td><td>将本文的"图片+自然语言"范式从描述生成扩展到<strong>问答</strong>——给定图片和问题（"图片中有几只狗？"），输出答案。这是将语言作为视觉监督信号的自然延伸。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Karpathy and Fei-Fei · CVPR 2015 · Deep Visual-Semantic Alignments for Generating Image Descriptions — Neural Image Captioning Pioneer · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

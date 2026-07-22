@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Graph — UAV-Survey</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'dark',securityLevel:'loose',flowchart:{useMaxWidth:true,htmlLabels:true}})</script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+:root{--bg:#0f1117;--bg-card:#1a1d27;--text:#e1e4ea;--text-dim:#8b8fa3;--border:#2a2d3a;--accent:#60a5fa;--radius:10px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.topbar{position:sticky;top:0;z-index:100;background:rgba(15,17,23,0.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:12px}
+.topbar a{color:var(--text-dim);text-decoration:none;font-size:.82rem;font-weight:600}
+.topbar a:hover{color:#fff}.topbar .home-btn{font-weight:700;color:#f97316;border:1px solid #f97316;padding:5px 12px;border-radius:6px}
+.hero{text-align:center;padding:40px 24px 24px;background:linear-gradient(180deg,#1a1d27 0%,var(--bg) 100%);border-bottom:1px solid var(--border)}
+.hero h1{font-size:2rem;font-weight:800;background:linear-gradient(135deg,#60a5fa,#c084fc,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.main{max-width:1600px;margin:0 auto;padding:24px}
+.stats-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;text-align:center;flex:1;min-width:120px}
+.stat-card strong{display:block;font-size:1.5rem;color:var(--accent)}.stat-card span{font-size:.78rem;color:var(--text-dim)}
+.tabs{display:flex;gap:8px;margin-bottom:20px}
+.tabs button{padding:8px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-dim);cursor:pointer;font-size:.82rem;font-weight:600}
+.tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tab-content{display:none}.tab-content.active{display:block}
+#graph-viz{width:100%;height:700px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+#graph-viz svg{width:100%;height:100%}
+.mermaid-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;overflow-x:auto}
+.legend{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin:16px 0}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text-dim)}
+.legend-dot{width:12px;height:12px;border-radius:50%}
+.footer{text-align:center;padding:24px;color:var(--text-dim);font-size:.78rem;border-top:1px solid var(--border);margin-top:24px}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <a href="index.html" class="home-btn">HOME</a>
+  <a href="#viz">Graph</a><a href="#mermaid">Flowchart</a><a href="#stats">Stats</a>
+</nav>
+<div class="hero">
+  <h1>Knowledge Graph</h1>
+  <p style="color:var(--text-dim);margin-top:8px">Scholar-Paper-Venue relationships across 16 scholars and 140 papers</p>
+</div>
+<main class="main">
+
+<div class="stats-row" id="statsRow"></div>
+
+<div class="tabs">
+  <button class="active" onclick="switchTab('force')">Force-Directed Graph</button>
+  <button onclick="switchTab('mermaid')">Mermaid Flowchart</button>
+</div>
+
+<div id="tab-force" class="tab-content active">
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:#60a5fa"></span> Scholar</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#4ade80"></span> Paper (Journal)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#fbbf24"></span> Paper (Conference)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#94a3b8"></span> Paper (Preprint)</div>
+  </div>
+  <div id="graph-viz"></div>
+</div>
+
+<div id="tab-mermaid" class="tab-content">
+  <div class="mermaid-box"><pre class="mermaid" id="mermaidChart"></pre></div>
+</div>
+
+</main>
+<footer class="footer">UAV-Survey · Knowledge Graph · <a href="index.html" style="color:var(--accent)">Home</a></footer>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active')});
+  document.querySelectorAll('.tabs button').forEach(function(b){b.classList.remove('active')});
+  document.getElementById('tab-'+name).classList.add('active');
+  event.target.classList.add('active');
+}
+// Load graph data
+fetch('data/scholar_graph.json').then(function(r){return r.json()}).then(function(graph){
+  // Stats
+  var scholars = graph.nodes.filter(function(n){return n.type==='scholar'}).length;
+  var papers = graph.nodes.filter(function(n){return n.type==='paper'}).length;
+  var links = graph.links.length;
+  document.getElementById('statsRow').innerHTML =
+    '<div class="stat-card"><strong>'+scholars+'</strong><span>Scholars</span></div>'+
+    '<div class="stat-card"><strong>'+papers+'</strong><span>Papers</span></div>'+
+    '<div class="stat-card"><strong>'+links+'</strong><span>Connections</span></div>'+
+    '<div class="stat-card"><strong>'+(links/papers).toFixed(1)+'</strong><span>Avg Links/Paper</span></div>';
+
+  // D3 Force graph
+  var svg = d3.select('#graph-viz').append('svg');
+  var width = document.getElementById('graph-viz').clientWidth;
+  var height = 700;
+
+  var colorMap = {'scholar':'#60a5fa','journal':'#4ade80','conference':'#fbbf24','preprint':'#94a3b8','other':'#94a3b8'};
+  graph.nodes.forEach(function(n){ n.color = n.type==='scholar'?'#60a5fa':(graph.nodes.find(function(x){return x.id===n.id})||{}).color||'#94a3b8'; });
+  // Color papers by type
+  graph.nodes.forEach(function(n){
+    if (n.type==='paper'){
+      var meta = null;
+      // We approximate: journal if IF known, else conference/preprint
+      n.color = '#4ade80'; // default journal green
+    }
+    n.radius = n.type==='scholar'?14:6;
+  });
+
+  var sim = d3.forceSimulation(graph.nodes)
+    .force('link', d3.forceLink(graph.links).id(function(d){return d.id}).distance(80))
+    .force('charge', d3.forceManyBody().strength(-200))
+    .force('center', d3.forceCenter(width/2, height/2))
+    .force('collision', d3.forceCollide().radius(function(d){return d.radius+2}));
+
+  var link = svg.append('g').attr('stroke','#333').attr('stroke-opacity',0.4).selectAll('line')
+    .data(graph.links).join('line').attr('stroke-width',0.5);
+
+  var node = svg.append('g').selectAll('circle')
+    .data(graph.nodes).join('circle')
+    .attr('r',function(d){return d.radius})
+    .attr('fill',function(d){return d.color})
+    .attr('stroke','#222').attr('stroke-width',1)
+    .call(d3.drag().on('start',function(e,d){if(!e.active)sim.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y})
+      .on('drag',function(e,d){d.fx=e.x;d.fy=e.y})
+      .on('end',function(e,d){if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null}));
+
+  node.append('title').text(function(d){return d.label||d.id});
+
+  var labels = svg.append('g').selectAll('text')
+    .data(graph.nodes.filter(function(d){return d.type==='scholar'}))
+    .join('text')
+    .text(function(d){return d.label})
+    .attr('font-size',10).attr('fill','#e1e4ea').attr('dx',12).attr('dy',4);
+
+  sim.on('tick',function(){
+    link.attr('x1',function(d){return d.source.x}).attr('y1',function(d){return d.source.y})
+        .attr('x2',function(d){return d.target.x}).attr('y2',function(d){return d.target.y});
+    node.attr('cx',function(d){return d.x}).attr('cy',function(d){return d.y});
+    labels.attr('x',function(d){return d.x}).attr('y',function(d){return d.y});
+  });
+
+  // Mermaid chart (scholar-paper relationships)
+  var mm = 'flowchart LR\n';
+  var scholarNodes = graph.nodes.filter(function(n){return n.type==='scholar'});
+  var paperLinks = {};
+  graph.links.filter(function(l){return l.type==='authored_by'}).forEach(function(l){
+    if (!paperLinks[l.target]) paperLinks[l.target] = [];
+    paperLinks[l.target].push(l.source);
+  });
+  // Show top scholars with most papers
+  scholarNodes.sort(function(a,b){return (paperLinks[b.id]||[]).length - (paperLinks[a.id]||[]).length});
+  scholarNodes.slice(0,8).forEach(function(s){
+    var papers = (paperLinks[s.id]||[]).slice(0,5);
+    mm += '  '+s.id.replace(/[^a-zA-Z]/g,'')+'["'+s.label+'"]\n';
+    papers.forEach(function(pid,i){
+      var p = graph.nodes.find(function(n){return n.id===pid});
+      var short = (p?p.label:pid).substring(0,25);
+      mm += '  '+s.id.replace(/[^a-zA-Z]/g,'')+' --> p'+pid+'["'+short+'"]\n';
+    });
+  });
+  // Color classes
+  mm += '  classDef scholar fill:#1a3a5c,stroke:#60a5fa,color:#fff\n';
+  mm += '  classDef paper fill:#1a2a1a,stroke:#4ade80,color:#fff\n';
+  scholarNodes.slice(0,8).forEach(function(s){ mm += '  class '+s.id.replace(/[^a-zA-Z]/g,'')+' scholar\n'; });
+  document.getElementById('mermaidChart').textContent = mm;
+  mermaid.run({nodes:[document.getElementById('mermaidChart')]});
+
+}).catch(function(e){ console.error(e); document.getElementById('graph-viz').innerHTML='<p style="color:var(--text-dim);text-align:center;padding:100px">Knowledge graph data loading... Run generate_metadata.py first.</p>'; });
+</script>
+</body>
+</html>

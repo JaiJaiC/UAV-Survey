@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - Beyond Action Residuals: Real-World Robot Policy Steering via Bottleneck Latent Reinforcement Learning</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style></head>
+<body>
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+<div class="container">
+
+<main class="container">
+
+<!-- §1 Paper Info -->
+<section id="info">
+  <h1>Beyond Action Residuals: Real-World Robot Policy Steering via Bottleneck Latent Reinforcement Learning</h1>
+  <h2>1. 论文信息 (Paper Info)</h2>
+
+  <table>
+    <tr><td style="width:140px;font-weight:700;">完整标题</td><td>Beyond Action Residuals: Real-World Robot Policy Steering via Bottleneck Latent Reinforcement Learning</td></tr>
+    <tr><td style="font-weight:700;">作者</td><td>Yu et al. (Huazhe Xu 课题组, 清华大学 / 上海期智研究院)</td></tr>
+    <tr><td style="font-weight:700;">发表年份</td><td>2026</td></tr>
+    <tr><td style="font-weight:700;">研究类型</td><td>离线到在线强化学习 (Offline-to-Online RL) / 机器人策略自适应</td></tr>
+    <tr><td style="font-weight:700;">核心方法</td><td>ZPRL — 在预训练模仿策略的瓶颈潜空间中执行 RL 策略引导 (Bottleneck Latent RL)</td></tr>
+    <tr><td style="font-weight:700;">测试平台</td><td>Robomimic, Adroit, MetaWorld (仿真视觉操作) + 真实机器人验证</td></tr>
+    <tr><td style="font-weight:700;">对比基线</td><td>全参数微调 (Full Fine-tuning), 动作残差 RL (Action Residual RL), Diffusion Policy, ACT</td></tr>
+    <tr><td style="font-weight:700;">本地文件</td><td><a href="Yu et al. - 2026 - Beyond action residuals Real-world robot policy steering via bottleneck latent reinforcement learni.pdf">Yu et al. - 2026 - Beyond action residuals Real-world robot policy steering via bottleneck latent reinforcement learni.pdf</a></td></tr>
+  </table>
+
+  <div style="margin:14px 0 8px;">
+    <span class="tag tag-blue">Offline-to-Online RL</span>
+    <span class="tag tag-purple">Bottleneck Latent Space</span>
+    <span class="tag tag-green">Imitation + RL 混合</span>
+    <span class="tag tag-amber">Variational Information Bottleneck</span>
+    <span class="tag tag-red">Real-Robot Deployment</span>
+    <span class="tag tag-cyan">Policy Steering</span>
+    <span class="tag tag-gray">Parameter-Efficient</span>
+  </div>
+
+  <div class="callout info">
+    <div class="callout-title">TL;DR</div>
+    传统离线到在线 RL 的两种路线——要么全参数微调（破坏预训练能力、计算昂贵），要么在动作空间上叠加残差（探索抖动、缺乏结构）——都有根本性的缺陷。ZPRL 提出第三种路线：<strong>把 RL 修正的接口从"动作空间"搬到预训练策略内部的"瓶颈潜空间"</strong>。具体做法是冻结基础模仿策略，在其中插入一个可插拔的变分信息瓶颈（VIB），将策略信息压缩到一个低维潜变量 $z$；在线阶段 RL actor 只对 $z$ 施加有界扰动，基础策略解码器再将修正后的 $z$ 解析为结构化的完整动作序列。这既保留了参数效率，又保证了探索的结构性和平滑性。
+  </div>
+</section>
+
+<!-- §2 Insight & Novelty -->
+<section id="insight">
+  <h2>2. 核心洞见与创新点 (Insight &amp; Novelty)</h2>
+
+  <h3>2.1 核心洞见</h3>
+  <div class="callout info">
+    <div class="callout-title">Q: 为什么要把 RL 的修正接口从动作空间搬到潜空间？</div>
+    <p><strong>A:</strong> 动作空间是高维的（对灵巧手可达 30+ 维）、非结构化的（每个电机命令独立），在其中做 RL 探索等价于对每个关节独立施加独立噪声——这产生的探索轨迹是高频抖动、不符合物理约束的，样本效率极低，且容易破坏预训练策略中已经学到的协同模式（如抓取时手指的协同运动）。相反，<strong>预训练策略内部的瓶颈潜空间已经被 VIB 压缩为紧凑的行为表示</strong>——在这个空间中做扰动，本质上是在"技能"或"行为模式"层面做修正（如"抓得更紧一点""移动更偏左一点"），而不是在每个电机命令上试错。这是一种 <em>semantic steering</em>——在语义层面调控行为，而非在信号层面叠加噪声。</p>
+  </div>
+
+  <h3>2.2 灵感溯源 (Inspiration Mapping)</h3>
+  <table>
+    <tr><th style="width:15%;">灵感来源</th><th style="width:28%;">核心思想</th><th style="width:57%;">ZPRL 中的映射</th></tr>
+    <tr>
+      <td><strong>Information Bottleneck Theory</strong><br>(Tishby et al., 1999)</td>
+      <td>在保留预测目标相关信息的前提下，最大化对输入的压缩</td>
+      <td>VIB 将高维观测-动作轨迹压缩为低维潜变量 $z$，在 $\max I(Z; A)$ 和 $\min I(Z; O)$ 之间寻求最优平衡，形成"平滑行为流形"</td>
+    </tr>
+    <tr>
+      <td><strong>Latent Space Manipulation in GANs</strong><br>(StyleGAN, GANSpace)</td>
+      <td>在 GAN 的潜空间中做语义编辑，发现解耦的方向对应可解释的属性变化</td>
+      <td>类比：$z$ 空间的各个维度对应行为的不同语义维度（抓取力度、移动方向、速度档位），在 $z$ 中做扰动等同于进行"行为语义编辑"而非"关节命令编辑"</td>
+    </tr>
+    <tr>
+      <td><strong>Residual RL</strong><br>(Johannink et al., 2019; Silver et al., 2018)</td>
+      <td>在基础控制器输出上叠加一个学习的残差项</td>
+      <td>ZPRL 将残差的位置从动作空间迁移到潜空间：$\Delta z$ 替代 $\Delta a$。关键区别在于 $\Delta z$ 是低维有界的，经解码器后产生的是与预训练行为分布一致的结构化动作修正</td>
+    </tr>
+    <tr>
+      <td><strong>Variational Autoencoders</strong><br>(Kingma &amp; Welling, 2014)</td>
+      <td>通过 KL 正则化的潜变量模型学习紧凑、平滑的表示空间</td>
+      <td>VIB 本质是一个条件 VAE：编码器 $q_\phi(z|o, a)$ 将观测-动作映射到潜空间，解码器 $p_\psi(a|o, z)$ 从潜变量重构动作；KL 项确保潜空间平滑、插值有效</td>
+    </tr>
+  </table>
+
+  <h3>2.3 三大创新点</h3>
+
+  <div class="novelty-card">
+    <h4>创新点 1：修正接口的维度跃迁——从动作空间到潜空间</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>动作残差 RL 在高维控制中探索效率极低——每个关节独立探索破坏了动作序列的内在结构，产生物理上不可行的抖动轨迹。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>信息瓶颈理论 + GAN 潜空间编辑的启发——好的表示空间本身就编码了数据的语义结构。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在冻结的预训练策略中插入可插拔 VIB，将完整的观察-动作映射压缩为低维潜变量 $z \in \mathbb{R}^d$（典型 $d=32$ 或 $64$）。在线 RL 仅在这个低维空间中学习扰动 $\Delta z$，参数规模从动作空间的数百维降到潜空间的几十维。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 2：VIB 作为预训练策略的"可插拔适配器"</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>全参数微调计算量大、部署更新慢，且容易灾难性遗忘预训练技能；已有的参数高效方法（如 LoRA）没有考虑 RL 探索的特殊需求。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>NLP 中的 Adapter / LoRA 思想——插入小型可训练模块而非修改全部参数。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>VIB 模块作为一个"即插即用"的适配层——离线阶段与基础策略联合训练以学习紧凑表示，在线阶段冻结基础策略和 VIB 编码器，仅训练 RL actor 输出的潜空间扰动。这实现了 <em>参数解耦</em>：行为先验在冻结的基座中，适应能力在轻量 RL actor 中。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>创新点 3：有界潜空间扰动保证行为先验保留</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>纯 RL 从头训练或全量微调，在线探索时容易产生危险动作（如机器人撞击环境），缺乏安全保证。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Trust Region Policy Optimization (TRPO) 和约束 RL 的思想——策略更新应保持在信任区域内。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>RL actor 输出的扰动 $\Delta z$ 被显式约束在 $\epsilon$-球内：$\|\Delta z\| \le \epsilon$。这个约束确保修正后的潜变量 $z' = z + \Delta z$ 不会偏离 VIB 学到的有效潜空间太远，解码出来的动作始终保持在预训练策略的行为分布附近，实现了隐式的安全探索。</div>
+  </div>
+</section>
+
+<!-- §3 Architecture -->
+<section id="architecture">
+  <h2>3. 系统架构 (Architecture)</h2>
+
+  <h3>3.1 四级流水线架构</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <!-- Stage 1: Pretrained Policy -->
+      <div class="arch-stage">
+        <h4>Pretrained Policy <span>Frozen Backbone</span></h4>
+        <div class="arch-card arch-solar"><strong>视觉编码器 + 本体感知编码器</strong><small>将 RGB 图像 $o_t$ 和关节状态 $s_t$ 编码为特征</small></div>
+        <div class="arch-card arch-solar"><strong>行为克隆预训练</strong><small>在离线示范数据集 $\mathcal{D}$ 上训练得到 $\pi_b$</small></div>
+        <div class="arch-card arch-solar"><strong>输出中间表示</strong><small>向 VIB 提供观测-动作的条件上下文</small></div>
+      </div>
+      <!-- Stage 2: VIB Bottleneck -->
+      <div class="arch-stage">
+        <h4>VIB Bottleneck <span>Pluggable Adapter</span></h4>
+        <div class="arch-card arch-power"><strong>编码器 $q_\phi(z|o, a)$</strong><small>将观测-动作轨迹压缩为低维潜变量 $z \in \mathbb{R}^d$</small></div>
+        <div class="arch-card arch-power"><strong>KL 正则化</strong><small>$\text{KL}(q_\phi \| p(z))$ 确保潜空间平滑</small></div>
+        <div class="arch-card arch-power"><strong>信息瓶颈约束</strong><small>最大化 $I(Z;A)$，最小化 $I(Z;O)$</small></div>
+      </div>
+      <!-- Stage 3: Latent RL Actor -->
+      <div class="arch-stage">
+        <h4>Latent RL Actor <span>Lightweight RL Head</span></h4>
+        <div class="arch-card arch-motor"><strong>策略网络 $\pi_\theta(\Delta z | z)$</strong><small>以当前潜变量 $z$ 为输入，输出有界扰动 $\Delta z$</small></div>
+        <div class="arch-card arch-motor"><strong>Critic 网络 $Q_\omega(z, \Delta z)$</strong><small>评估潜空间扰动的价值</small></div>
+        <div class="arch-card arch-motor"><strong>扰动约束 $\|\Delta z\| \le \epsilon$</strong><small>限定修正幅度，保留行为先验</small></div>
+      </div>
+      <!-- Stage 4: Action Decoding -->
+      <div class="arch-stage">
+        <h4>Action Decoding <span>Frozen Decoder</span></h4>
+        <div class="arch-card arch-thrust"><strong>解码器 $p_\psi(a | o, z')$</strong><small>从修正后潜变量 $z' = z + \Delta z$ 重构结构化动作</small></div>
+        <div class="arch-card arch-thrust"><strong>动作序列输出</strong><small>输出与预训练分布一致的完整动作 chunk $a_{t:t+H}$</small></div>
+        <div class="arch-card arch-thrust"><strong>环境执行</strong><small>将动作发送到仿真器或真实机器人</small></div>
+      </div>
+    </div>
+    <div class="arch-arrow"><span>&darr; 观测/状态 &rarr;</span><span>&darr; 压缩为 $z$ &rarr;</span><span>&darr; 学习 $\Delta z$ &rarr;</span><span>&darr; 解码为 $a$</span></div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>参数规模</strong><small>~50M (冻结)</small></div>
+      <div class="arch-metric"><strong>潜空间维度</strong><small>$d=32$ 或 $64$</small></div>
+      <div class="arch-metric"><strong>可训练参数</strong><small>~0.5M (RL actor + critic)</small></div>
+      <div class="arch-metric"><strong>动作维度</strong><small>7~30+ DoF</small></div>
+    </div>
+  </div>
+
+  <h3>3.2 三种策略引导接口对比 (Mermaid 流程图)</h3>
+  <div class="mermaid-box">
+    <div class="mermaid">
+graph TB
+    subgraph Interface1["Weight-Space Steering<br/>(Full Fine-tuning)"]
+        A1[预训练策略<br/>所有参数可更新] --> A2[在线RL直接更新<br/>全部网络权重]
+        A2 --> A3[新策略 π_new]
+        A3 --> A4[⚠️ 灾难性遗忘<br/>⚠️ 计算昂贵<br/>⚠️ 部署困难]
+        style A4 fill:#ffeaf0,stroke:#f43f5e
+    end
+
+    subgraph Interface2["Action-Space Steering<br/>(Action Residual RL)"]
+        B1[冻结基础策略 π_b] --> B2[观测 → RL输出残差 Δa]
+        B2 --> B3[a = π_b(o) + Δa]
+        B3 --> B4[⚠️ 高频抖动<br/>⚠️ 无结构化探索<br/>⚠️ 破坏动作协同]
+        style B4 fill:#fef7ed,stroke:#f59e0b
+    end
+
+    subgraph Interface3["Latent-Space Steering<br/>(ZPRL, 本文)"]
+        C1[冻结基础策略 π_b + VIB] --> C2[观测 → VIB编码 → z]
+        C2 --> C3[RL学习 Δz, ‖Δz‖≤ε]
+        C3 --> C4[z' = z + Δz → 解码器 → a]
+        C4 --> C5[✅ 低维有界扰动<br/>✅ 结构化探索<br/>✅ 保留行为先验]
+        style C5 fill:#e6f7ee,stroke:#10b981
+    end
+
+    Interface1 -.->|"问题：全参数更新"| Interface3
+    Interface2 -.->|"问题：非结构化噪声"| Interface3
+    </div>
+  </div>
+
+  <h3>3.3 训练流水线：离线 VIB 训练 → 在线潜空间 RL</h3>
+  <div class="mermaid-box">
+    <div class="mermaid">
+flowchart LR
+    subgraph Offline["🔵 离线阶段: VIB 训练"]
+        D[示范数据集 D] --> E[冻结 π_b 前向传播]
+        E --> F[VIB 编码器 q_φ(z|o,a)]
+        F --> G[潜变量 z ~ N(μ_φ, σ_φ²)]
+        G --> H[解码器 p_ψ(a|o,z)]
+        H --> I[重构损失 L_recon]
+        F --> J[KL 正则化 L_KL]
+        I --> K[VIB 总损失<br/>L = L_recon + β·L_KL]
+        K --> L[✅ 训练好的 VIB 模块<br/>+ 冻结的 π_b]
+    end
+
+    subgraph Online["🟢 在线阶段: Latent RL"]
+        M[环境交互] --> N[观测 o_t]
+        N --> O[VIB 编码 → z_t]
+        O --> P[RL Actor: Δz = π_θ(z_t)]
+        P --> Q[约束: clip(Δz, -ε, +ε)]
+        Q --> R[z'_t = z_t + Δz]
+        R --> S[解码器 → a_t]
+        S --> T[环境执行 a_t]
+        T --> U[奖励 r_t, 下一观测 o_{t+1}]
+        U --> V[更新 Critic Q_ω + Actor π_θ]
+        V --> M
+    end
+
+    Offline --> Online
+    </div>
+  </div>
+</section>
+
+<!-- §4 Task Definition -->
+<section id="task">
+  <h2>4. 任务定义 (Task Definition)</h2>
+
+  <h3>4.1 问题形式化</h3>
+  <div class="formula-block">
+    <div class="eq-tag">Offline Dataset</div>
+    $$\mathcal{D} = \{(o_1, a_1, o_2, a_2, \ldots)_i\}_{i=1}^{N}$$
+    <div class="eq-note">离线数据集包含 $N$ 条专家示范轨迹，每条轨迹由观测序列和动作序列组成。观测 $o_t$ 包括视觉输入（RGB 图像）和本体感知（关节角度、末端执行器位姿）。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">Pretrained Policy</div>
+    $$\pi_b(a_t \mid o_t) = \text{Behavioral Cloning / Diffusion Policy / ACT}$$
+    <div class="eq-note">基础策略 $\pi_b$ 通过在 $\mathcal{D}$ 上进行行为克隆或扩散策略训练得到。它可以输出单步动作或动作 chunk $a_{t:t+H}$。ZPRL 的方法与具体策略架构无关——无论是 Diffusion Policy 还是 ACT (Action Chunking Transformer)，都可以插入 VIB 瓶颈。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">VIB Bottleneck (Offline)</div>
+    $$z \sim q_\phi(z \mid o_{\le t}, a_{\le t}), \quad \hat{a}_t = p_\psi(a_t \mid o_t, z)$$
+    <div class="eq-note">VIB 编码器 $q_\phi$ 以历史观测和动作为条件，输出潜变量 $z$ 的高斯分布参数 $(\mu_\phi, \sigma_\phi)$。解码器 $p_\psi$ 从潜变量和当前观测重构动作。离线训练目标是最小化重构误差，同时通过 KL 项约束潜空间复杂度。</div>
+  </div>
+
+  <div class="formula-block">
+    <div class="eq-tag">Latent RL Policy (Online)</div>
+    $$z'_t = z_t + \Delta z,\quad \Delta z = \pi_\theta(z_t),\quad \text{s.t. } \|\Delta z\|_\infty \le \epsilon$$
+    $$\text{Final action: } a_t \sim p_\psi(a_t \mid o_t, z'_t)$$
+    <div class="eq-note">在线阶段，RL actor $\pi_\theta$ 以当前潜变量 $z_t$ 为输入（不直接看观测！），输出一个在 $\epsilon$-界内的扰动 $\Delta z$。修正后的 $z'_t$ 经过冻结的解码器 $p_\psi$ 映射为最终动作。RL 的优化目标是最大化环境累积奖励 $\mathbb{E}[\sum_t \gamma^t r_t]$。</div>
+  </div>
+
+  <h3>4.2 输入/输出规格</h3>
+  <table>
+    <tr><th style="width:18%;">组件</th><th style="width:22%;">输入</th><th style="width:18%;">输出</th><th style="width:42%;">说明</th></tr>
+    <tr>
+      <td><strong>Pretrained Policy $\pi_b$</strong></td>
+      <td>RGB 图像 $o_t^{\text{img}}$ + 关节状态 $s_t$</td>
+      <td>动作 $a_t$ 或动作 chunk $a_{t:t+H}$</td>
+      <td>冻结；仅用于前向传播提取中间特征和条件</td>
+    </tr>
+    <tr>
+      <td><strong>VIB Encoder $q_\phi$</strong></td>
+      <td>观测-动作序列 $(o_{\le t}, a_{\le t})$</td>
+      <td>潜变量分布参数 $\mu_\phi, \sigma_\phi$ &rarr; $z$</td>
+      <td>离线训练，在线冻结；将历史压缩为紧凑行为表示</td>
+    </tr>
+    <tr>
+      <td><strong>RL Actor $\pi_\theta$</strong></td>
+      <td>当前潜变量 $z_t \in \mathbb{R}^d$</td>
+      <td>扰动 $\Delta z \in [-\epsilon, \epsilon]^d$</td>
+      <td>仅需 $d$ 维输入（~32-64），极轻量的 MLP</td>
+    </tr>
+    <tr>
+      <td><strong>Critic $Q_\omega$</strong></td>
+      <td>潜变量 $z_t$ + 扰动 $\Delta z$</td>
+      <td>Q-value 标量</td>
+      <td>在潜空间中评估状态-动作价值</td>
+    </tr>
+    <tr>
+      <td><strong>Decoder $p_\psi$</strong></td>
+      <td>观测 $o_t$ + 修正后潜变量 $z'_t$</td>
+      <td>最终动作 $a_t$</td>
+      <td>冻结；将潜空间修正"解码"为物理动作</td>
+    </tr>
+  </table>
+</section>
+
+<!-- §5 Key Challenge -->
+<section id="challenge">
+  <h2>5. 关键挑战 (Key Challenge)</h2>
+
+  <h3>5.1 第一性原理诊断：为什么真实机器人策略自适应从根本上困难？</h3>
+  <div class="callout danger">
+    <div class="callout-title">根本矛盾</div>
+    <p>机器人从仿真到真实世界（sim-to-real）或从示范数据到在线部署时，面临一个核心矛盾：<strong>预训练策略提供了宝贵的行为先验（来自大量示范或仿真数据），但真实部署场景不可避免地存在数据分布偏移——新物体、新光照、新动力学。我们需要在不破坏已有技能的前提下高效地适应新场景。</strong></p>
+    <p>这个矛盾的三个维度：</p>
+    <ol>
+      <li><strong>遗忘 vs 适应</strong>：全参数更新容易覆盖预训练权重（灾难性遗忘），而完全冻结则无法适应。</li>
+      <li><strong>安全 vs 探索</strong>：RL 需要探索才能发现更优策略，但在真实机器人上任意探索是危险的。</li>
+      <li><strong>效率 vs 表达力</strong>：轻量更新参数少但表达力有限，重量更新表达力强但部署慢、采样效率低。</li>
+    </ol>
+  </div>
+
+  <h3>5.2 现有方法对比</h3>
+  <table>
+    <tr>
+      <th style="width:16%;">Method</th>
+      <th style="width:16%;">Adaptation Interface</th>
+      <th style="width:16%;">Parameter Efficiency</th>
+      <th style="width:26%;">Exploration Structure</th>
+      <th style="width:26%;">Safety</th>
+    </tr>
+    <tr>
+      <td><strong>Full Fine-tuning</strong></td>
+      <td>All network weights</td>
+      <td>Poor — 50M+ params updated per step</td>
+      <td>Unconstrained — can explore any policy, but prone to catastrophic forgetting</td>
+      <td>Poor — no built-in safety; requires external safety layer</td>
+    </tr>
+    <tr>
+      <td><strong>Action Residual RL</strong></td>
+      <td>Additive residual $\Delta a$ in action space</td>
+      <td>Good — only residual head (~0.1M) is trained</td>
+      <td>Unstructured — independent noise per DoF leads to jittery, physically infeasible exploration</td>
+      <td>Moderate — base policy provides prior, but unstructured residuals can still produce unsafe actions</td>
+    </tr>
+    <tr class="highlight">
+      <td><strong>ZPRL (Ours)</strong></td>
+      <td>Bounded perturbation $\Delta z$ in VIB latent space</td>
+      <td>Excellent — only RL actor (~0.05M) trained; VIB is pre-trained and frozen</td>
+      <td>Structured &amp; Smooth — perturbation in semantic latent space decodes to coordinated, physically plausible actions</td>
+      <td>Good — $\|\Delta z\| \le \epsilon$ constraint + VIB decoder ensures output stays within behavioral prior</td>
+    </tr>
+  </table>
+
+  <h3>5.3 三个关键技术挑战</h3>
+
+  <div class="novelty-card">
+    <h4>挑战 1：如何设计一个既紧凑又信息充分的潜空间？</h4>
+    <p>潜空间维度太低则丢失任务关键信息，维度太高则退化为动作空间、丧失结构化优势。VIB 通过 $\beta$-KL 正则化在压缩率和信息保留之间做连续调节——$\beta$ 越大压缩越强、潜空间越平滑，但可能丢失细粒度控制信息；$\beta$ 越小则退化为普通自编码器。这是信息论中 Rate-Distortion trade-off 在机器人控制中的直接体现。</p>
+  </div>
+
+  <div class="novelty-card">
+    <h4>挑战 2：如何在潜空间中训练 RL 而无需访问原始观测？</h4>
+    <p>标准 RL 需要从观测中提取状态。但 ZPRL 的 RL actor 仅接收潜变量 $z_t$（d=32~64 维向量），不接触原始高维观测（图像+关节状态）。这意味着 RL actor 完全依赖 VIB 编码器的"翻译"来感知环境——如果 VIB 编码不充分，RL 将无法有效学习。作者通过将 Critic 也限制在潜空间中，确保了整个在线学习循环的一致性。</p>
+  </div>
+
+  <div class="novelty-card">
+    <h4>挑战 3：如何保证扰动后的动作仍然"合理"？</h4>
+    <p>即使 $\|\Delta z\| \le \epsilon$，也不能保证解码出的动作在物理上可行。ZPRL 的隐式保证来自两个层面：(1) VIB 将有效动作分布压缩进潜空间，$\epsilon$-球内的点倾向于解码为合理动作；(2) 解码器 $p_\psi$ 本身就是在示范数据上训练的，天然倾向于生成符合示范分布的动作。双重保险确保了在线探索的安全性。</p>
+  </div>
+</section>
+
+<!-- §6 Method -->
+<section id="method">
+  <h2>6. 方法详解 (Method)</h2>
+
+  <h3>6.1 公式组一：VIB 目标函数</h3>
+  <div class="formula-block">
+    <div class="eq-tag">VIB Loss — Information Bottleneck Objective</div>
+    $$\mathcal{L}_{\text{VIB}}(\phi, \psi) = \underbrace{-\mathbb{E}_{z \sim q_\phi(z|o,a)}\left[\log p_\psi(a \mid o, z)\right]}_{\text{重构损失: 最大化 } I(Z;A)} + \beta \cdot \underbrace{\text{KL}\left(q_\phi(z \mid o, a) \;\|\; p(z)\right)}_{\text{KL 正则: 最小化 } I(Z;O)}$$
+    <div class="eq-note">
+      <strong>物理解释：</strong>第一项是负对数似然（重构损失），鼓励潜变量 $z$ 包含足够信息来重构动作 $a$——这对应于最大化 $z$ 和动作之间的互信息 $I(Z; A)$。第二项是 KL 散度，强制 $q_\phi(z|o,a)$ 接近先验 $p(z) = \mathcal{N}(0, I)$——这惩罚"记住"过多观测细节，等价于最小化 $I(Z; O)$。<strong>$\beta$ 是平衡系数：</strong>$\beta \to 0$ 退化为普通自编码器（记住一切），$\beta \to \infty$ 强制 $z$ 完全忽略输入（潜空间坍塌）。关键工程技巧是选择合适的 $\beta$ 使得潜空间既平滑（相近 $z$ 产生相近动作）又信息充分（不同行为映射到不同 $z$ 区域）。
+    </div>
+  </div>
+
+  <h3>6.2 公式组二：潜空间 RL 目标</h3>
+  <div class="formula-block">
+    <div class="eq-tag">Latent RL Objective (Actor-Critic)</div>
+    $$\mathcal{L}_{\text{critic}}(\omega) = \mathbb{E}_{(z, \Delta z, r, z') \sim \mathcal{B}}\left[\left(Q_\omega(z, \Delta z) - \underbrace{(r + \gamma Q_{\bar{\omega}}(z', \pi_\theta(z')))}_{\text{TD target}}\right)^2\right]$$
+    $$\mathcal{L}_{\text{actor}}(\theta) = -\mathbb{E}_{z \sim \mathcal{B}}\left[Q_\omega(z, \pi_\theta(z))\right]$$
+    <div class="eq-note">
+      <strong>关键简化：</strong>RL 的状态空间是 $\mathbb{R}^d$（潜空间），而非原始的高维观测空间。这带来了两个巨大优势：(1) Critic 只需要学习从 $d$ 维向量到价值的映射，而非从图像到价值；(2) Actor 只需要学习从 $d$ 维向量到 $d$ 维扰动的映射。网络规模从视觉 RL 的数千万参数降到数十万参数。<strong>Replay buffer $\mathcal{B}$</strong> 存储的是 $(z, \Delta z, r, z')$ 四元组而非 $(o, a, r, o')$——这意味着 buffer 的存储开销也大幅降低。
+    </div>
+  </div>
+
+  <h3>6.3 公式组三：扰动约束机制</h3>
+  <div class="formula-block">
+    <div class="eq-tag">Bounded Perturbation</div>
+    $$\Delta z = \text{clip}\left(\pi_\theta(z),\; -\epsilon,\; +\epsilon\right)$$
+    $$z' = z + \Delta z,\quad a \sim p_\psi(a \mid o, z')$$
+    <div class="eq-note">
+      <strong>为什么用 $\ell_\infty$ 约束而非 $\ell_2$？</strong>$\ell_\infty$ 约束对潜空间的每个维度独立限制，允许在某些维度上做较大调整而在其他维度上保持原样——这更符合"语义编辑"的直觉（只改变某些行为属性）。$\ell_2$ 约束则将总扰动能量均匀摊到所有维度，可能导致每个维度都有微小扰动但整体没有语义变化。<strong>$\epsilon$ 的选取：</strong>需要根据 VIB 潜空间的 scale 来设定——太小则无法适应，太大则可能偏离有效潜空间区域。实践中，作者在 VIB 训练完成后统计 $z$ 的分布来确定 $\epsilon$（例如设为 $z$ 标准差的 0.1-0.5 倍）。
+    </div>
+  </div>
+
+  <h3>6.4 完整算法流程</h3>
+  <table>
+    <tr><th style="width:8%;">阶段</th><th style="width:8%;">步骤</th><th style="width:84%;">操作</th></tr>
+    <tr>
+      <td rowspan="4" style="text-align:center;font-weight:700;">Offline</td>
+      <td>1</td><td>在 $\mathcal{D}$ 上训练基础策略 $\pi_b$（行为克隆 / Diffusion Policy / ACT）</td>
+    </tr>
+    <tr>
+      <td>2</td><td>冻结 $\pi_b$，插入 VIB 模块（编码器 $q_\phi$ + 解码器 $p_\psi$）</td>
+    </tr>
+    <tr>
+      <td>3</td><td>联合优化 VIB 损失 $\mathcal{L}_{\text{VIB}}$，在重构精度和潜空间压缩之间平衡</td>
+    </tr>
+    <tr>
+      <td>4</td><td>冻结 $\pi_b$、$q_\phi$、$p_\psi$；初始化 RL actor $\pi_\theta$ 和 critic $Q_\omega$</td>
+    </tr>
+    <tr>
+      <td rowspan="5" style="text-align:center;font-weight:700;">Online</td>
+      <td>5</td><td>在每个 episode 开始，环境给出观测 $o_t$</td>
+    </tr>
+    <tr>
+      <td>6</td><td>VIB 编码 $z_t \sim q_\phi(z \mid o_{\le t}, a_{<t})$</td>
+    </tr>
+    <tr>
+      <td>7</td><td>RL actor 输出扰动 $\Delta z = \text{clip}(\pi_\theta(z_t), -\epsilon, +\epsilon)$</td>
+    </tr>
+    <tr>
+      <td>8</td><td>解码动作 $a_t \sim p_\psi(a \mid o_t, z_t + \Delta z)$，执行于环境，获得 $r_t, o_{t+1}$</td>
+    </tr>
+    <tr>
+      <td>9</td><td>将 $(z_t, \Delta z, r_t, z_{t+1})$ 存入 replay buffer，定期更新 critic 和 actor</td>
+    </tr>
+  </table>
+
+  <h3>6.5 关键超参数</h3>
+  <table>
+    <tr><th style="width:25%;">参数</th><th style="width:15%;">典型值</th><th style="width:60%;">作用</th></tr>
+    <tr><td>潜空间维度 $d$</td><td>32 / 64</td><td>控制 bottleneck 的紧凑程度——越小越结构化的探索，越大越细粒度控制</td></tr>
+    <tr><td>VIB 系数 $\beta$</td><td>0.001 ~ 0.1</td><td>平衡重构精度与潜空间平滑度——$\beta$ 越大潜空间越平滑但可能丢失信息</td></tr>
+    <tr><td>扰动界 $\epsilon$</td><td>0.05 ~ 0.3</td><td>限制 RL 探索范围——需根据 VIB 潜空间的 scale 设定</td></tr>
+    <tr><td>RL 学习率</td><td>3e-4</td><td>Actor 和 Critic 的学习率，标准 SAC/TD3 设置</td></tr>
+    <tr><td>折扣因子 $\gamma$</td><td>0.99</td><td>标准 RL 折扣因子</td></tr>
+    <tr><td>Replay Buffer 大小</td><td>1e6 transitions</td><td>存储 $(z, \Delta z, r, z')$ 元组——对 d=32, 每个 transition 仅 ~300 bytes</td></tr>
+    <tr><td>RL Actor 架构</td><td>MLP [256, 256]</td><td>小网络——输入和输出都是 d 维，无需处理高维观测</td></tr>
+    <tr><td>Critic 架构</td><td>MLP [256, 256]</td><td>同样轻量——输入是 $2d$ 维 (z 和 Δz 拼接)</td></tr>
+  </table>
+</section>
+
+<!-- §7 Principles -->
+<section id="principles">
+  <h2>7. 机理分析 (Principles)</h2>
+
+  <h3>7.1 为什么潜空间引导优于动作空间引导？——三个深层机理解释</h3>
+
+  <div class="novelty-card">
+    <h4>机理 1：潜空间提供了"行为流形"上的自然坐标系</h4>
+    <p>预训练策略 $\pi_b$ 在大量示范数据上学习到的不是一个点估计，而是一个<strong>行为流形</strong>（behavior manifold）——即所有"合理动作"的集合。VIB 通过信息瓶颈将这个流形参数化为低维潜空间。在这个潜空间中，<strong>欧氏距离对应于动作语义的差异</strong>：相近的 $z$ 产生语义相近的动作（如抓取力度接近），相距较远的 $z$ 产生语义不同的动作（如抓 vs. 推）。</p>
+    <p>相比之下，在动作空间中，欧氏距离没有语义意义——两个关节角度差 5 度可能代表完全不同的操作意图，也可能只是噪声。在潜空间中做 RL 探索，本质是在行为流形上做 <strong>geodesic 移动</strong>——始终沿着"合理动作"的方向前进。</p>
+  </div>
+
+  <div class="novelty-card">
+    <h4>机理 2：解耦了"行为先验"和"适应能力"</h4>
+    <p>在 ZPRL 的架构中，存在一个自然的<strong>功能二分</strong>：</p>
+    <ul>
+      <li><strong>行为先验</strong>（behavioral prior）完全封装在冻结的 $\pi_b$、$q_\phi$ 和 $p_\psi$ 中——这一部分包含了从示范中提取的所有结构知识（如如何抓取、如何移动、哪些动作序列是物理可行的）。</li>
+      <li><strong>适应能力</strong>（adaptation capability）完全由轻量的 $\pi_\theta$ 提供——这一部分只学习"在当前行为的哪个方向上调整"。</li>
+    </ul>
+    <p>这种解耦带来了工程上的巨大优势：更新 $\pi_\theta$ 时，<strong>行为先验天然作为一个硬约束存在</strong>——无论 RL 输出什么样的 $\Delta z$，解码器都会将其映射为物理合理的动作。这是动作残差 RL 无法做到的——因为动作空间中的加法没有"合理性过滤器"。</p>
+  </div>
+
+  <div class="novelty-card">
+    <h4>机理 3：信息瓶颈自动过滤了与控制无关的感知变化</h4>
+    <p>真实世界机器人面临的一个关键问题是<strong>感知的干扰因素</strong>——光照变化、背景杂乱、相机视角偏移都会剧烈改变观测 $o_t$，但这些变化往往不影响最优动作。VIB 的信息瓶颈机制通过 $\min I(Z; O)$ 约束，<strong>自动学习忽略观测中与控制无关的变化</strong>，只保留对动作预测有价值的信息。</p>
+    <p>这意味着 RL actor 看到的 $z_t$ 已经是一个"净化后"的状态表示——它剔除了光照、纹理、背景等干扰，只编码了"物体的位姿""手的相对位置""当前的接触状态"等与控制直接相关的高级语义特征。在这个空间中训练 RL，样本效率显著高于从原始像素训练。</p>
+  </div>
+
+  <h3>7.2 对比分析：Action Residual RL vs. ZPRL Latent Steering</h3>
+  <div class="cmp-row">
+    <div class="cmp-col" style="border-left: 4px solid #f59e0b;">
+      <h4 style="color:#b45309;">Action Residual RL</h4>
+      <p><strong>探索平滑度：</strong>差——每个 DoF 独立采样噪声，导致高频抖动。在 7-DoF 机械臂上，探索轨迹表现为在目标位置附近的快速振荡。</p>
+      <p><strong>参数数量：</strong>残差 MLP 约 0.1M 参数——但需要处理完整观测（图像+关节状态），实际推理开销远大于 ZPRL 的 critic+actor。</p>
+      <p><strong>行为先验保持：</strong>弱——加法操作不保证 $a = \pi_b(o) + \Delta a$ 落在合理动作分布内。$\Delta a$ 可能将动作推向物理不可行区域（如超出关节限位、施加不连续的力）。</p>
+      <p><strong>根本问题：</strong>动作空间是一个<em>没有内置语义结构</em>的原始控制空间。在其中做加法等价于在电机命令层面"修补"——这类似于在汇编语言层面调试高级程序逻辑。</p>
+    </div>
+    <div class="cmp-col" style="border-left: 4px solid #10b981;">
+      <h4 style="color:#047857;">ZPRL Latent Steering</h4>
+      <p><strong>探索平滑度：</strong>优——在 32 维潜空间中的连续扰动经解码器后产生在完整动作序列上的平滑变化。这是 VIB 潜空间的连续性保证的。</p>
+      <p><strong>参数数量：</strong>~0.05M 可训练参数——RL actor 输入/输出都是 d 维（不处理图像），replay buffer 极紧凑，整体系统内存友好。</p>
+      <p><strong>行为先验保持：</strong>强——双重保护：(1) $\|\Delta z\| \le \epsilon$ 确保不偏离有效潜空间区域；(2) 解码器 $p_\psi$ 本身就是行为先验的实现，只输出"合理"动作。</p>
+      <p><strong>核心优势：</strong>潜空间是一个<em>被信息瓶颈构造的语义坐标系</em>——在其中做加法等价于在"行为意图"层面调整：如"抓得更用力""移得更靠左"。这类似于在高级语言层面修改程序逻辑。</p>
+    </div>
+  </div>
+
+  <h3>7.3 信息瓶颈原理的机械化理解</h3>
+  <div class="callout idea">
+    <div class="callout-title">Information Bottleneck 的三元视角</div>
+    <p>在 ZPRL 的上下文下，信息瓶颈可以理解为对三个量之间关系的优化：</p>
+    <p style="text-align:center;font-size:15px;margin:12px 0;">
+      <strong>$O$ (Observation) &rarr; $Z$ (Bottleneck) &rarr; $A$ (Action)</strong>
+    </p>
+    <table>
+      <tr><th>互信息</th><th>含义</th><th>ZPRL 中的体现</th></tr>
+      <tr><td>$I(Z; A)$</td><td>潜变量编码了多少动作信息——<strong>越大越好</strong></td><td>重构损失 $\mathcal{L}_{\text{recon}}$ 最大化此项</td></tr>
+      <tr><td>$I(Z; O)$</td><td>潜变量保留了多少原始观测信息——<strong>越小越好</strong>（压缩）</td><td>KL 正则 $\beta \cdot \text{KL}$ 约束此项</td></tr>
+      <tr><td>$I(Z; O) - I(Z; A)$</td><td>冗余信息——$Z$ 中与控制无关的感知细节</td><td>VIB 自动过滤，使 RL actor 看到"净化"状态</td></tr>
+    </table>
+    <p>直觉：$Z$ 应该像一个好的"摘要"——只保留"接下来该做什么"的信息（$I(Z; A)$ 高），丢弃"当前画面长什么样"的细节（$I(Z; O)$ 低）。这正是 RL 希望的状态表示：<strong>compact, sufficient, and invariant to task-irrelevant distractors</strong>。</p>
+  </div>
+</section>
+
+<!-- §8 Figures -->
+<section id="figures">
+  <h2>8. 图表解读 (Figures &amp; Evidence)</h2>
+
+  <h3>8.1 论文概览图</h3>
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">ZPRL 系统概览 — 三种策略引导接口的对比</span>
+      <span class="fig-source">来源: PDF Page 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/overview.png" alt="ZPRL Overview — 三种策略引导接口对比"
+           onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'fig-placeholder\'>&#128206; 图片 figures/overview.png 未加载。<br>请将论文 PDF 首页截图保存为 figures/overview.png，<br>或直接查看 <a href=\'Yu et al. - 2026 - Beyond action residuals Real-world robot policy steering via bottleneck latent reinforcement learni.pdf\'>原始 PDF</a> 第 1 页。</div>';"
+      />
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读 (中文)</div>
+      <p>论文的 Fig. 1 展示了三种策略自适应范式的系统对比：</p>
+      <ul>
+        <li><strong>左栏 — 全参数微调 (Weight-space steering)：</strong>RL 直接更新预训练策略的所有参数。优势在于表达力最强、理论上可以学到任意新策略；致命缺陷是容易灾难性遗忘、每一步更新都需要完整的反向传播、部署需要替换整个模型。</li>
+        <li><strong>中栏 — 动作残差 RL (Action-space steering)：</strong>冻结基础策略，在输出层叠加一个可学习的残差 $\Delta a$。优势在于参数效率高；但残差直接作用于非结构化的电机命令，探索表现为高频抖动，缺乏"行为意识"。</li>
+        <li><strong>右栏 — ZPRL 潜空间引导 (Latent-space steering)：</strong>本文的核心贡献。冻结基础策略，在其内部插入 VIB 瓶颈，RL 在紧凑的潜空间中学习有界扰动。潜空间扰动经解码器转化为结构化的完整动作——实现了参数效率、探索结构和行为安全三者之间的最优平衡。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>8.2 实验结果关键发现</h3>
+  <div class="callout tip">
+    <div class="callout-title">核心实验结果摘要</div>
+    <ul>
+      <li><strong>Robomimic 视觉操作任务：</strong>ZPRL 在样本效率和最终成功率上均显著优于 Action Residual RL——在相同在线交互步数下，ZPRL 达到更高成功率。这是因为潜空间探索比动作空间探索更有结构性。</li>
+      <li><strong>Adroit 灵巧手操作：</strong>在 28-DoF 灵巧手上，动作残差 RL 的探索几乎完全失败（高维空间中随机抖动无法形成有效操作），而 ZPRL 通过 VIB 压缩的 32 维潜空间实现了稳定适应。</li>
+      <li><strong>MetaWorld 多任务：</strong>ZPRL 展示了跨任务的泛化潜力——同一 VIB 潜空间可以在不同但相关的任务上复用。</li>
+      <li><strong>真实机器人验证：</strong>从模仿策略出发，ZPRL 在有限在线交互中实现了真实场景下的抓取适应，验证了方法的实用可行性。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- §9 Flaw & Limitations -->
+<section id="flaw">
+  <h2>9. 局限性与扩展方向 (Flaw &amp; Limitations)</h2>
+
+  <h3>9.1 方法局限</h3>
+
+  <div class="novelty-card">
+    <h4>局限 1：VIB 质量是关键瓶颈</h4>
+    <p>整个 ZPRL 流水线的有效性链式依赖于 VIB 的质量：如果 VIB 没有学到好的潜空间（例如 $\beta$ 设置不当导致潜空间坍塌或过度分散），那么无论 RL 在潜空间中如何探索，都无法转化为有意义的行为改进。VIB 训练本身需要与基础策略联合优化，调参空间大（$\beta$, $d$, 网络结构），且没有"黄金标准"来判断潜空间是否足够好。</p>
+  </div>
+
+  <div class="novelty-card">
+    <h4>局限 2：受限于基础策略的能力边界</h4>
+    <p>ZPRL 的潜空间引导本质上是<strong>在基础策略技能范围内的精细化调整</strong>，而不是学习全新的技能。如果某个关键操作完全不在预训练策略的行为库中（例如基础策略根本不会"旋转物体"），那么 VIB 的潜空间也不会编码"旋转"这一语义维度，RL actor 也就无从探索。这与全参数微调形成对比——后者理论上可以学到全新的行为。</p>
+  </div>
+
+  <div class="novelty-card">
+    <h4>局限 3：潜空间可解释性有限</h4>
+    <p>虽然 VIB 潜空间在理论上"语义化"（相近 $z$ 对应相近行为），但实际上潜空间的各个维度<strong>并没有对应用户可理解的语义标签</strong>。不同于 StyleGAN 中已发现的解耦方向（如"微笑""年龄"），ZPRL 的潜空间维度是纠缠的——一个行为变化可能需要同时调整多个 $z$ 维度。这限制了调试和人工干预的可能性。</p>
+  </div>
+
+  <div class="novelty-card">
+    <h4>局限 4：与策略架构的耦合</h4>
+    <p>VIB 的插入位置需要在预训练策略的中间层选择——对于不同架构（Diffusion Policy, ACT, MLP-based BC），"瓶颈"的位置和形状可能不同。作者在多个架构上验证了方法，但每次都需要重新设计和训练 VIB，不是一种真正的"零修改即插即用"方案。需要一定量的架构调整工作。</p>
+  </div>
+
+  <div class="novelty-card">
+    <h4>局限 5：真实部署中的安全边界</h4>
+    <p>虽然 $\|\Delta z\| \le \epsilon$ 约束提供了理论上的安全保证，但在真实机器人部署中，<strong>$\epsilon$ 的选择是一个经验性问题</strong>。$\epsilon$ 太小则适应不足，$\epsilon$ 太大则可能发生意外。在安全关键场景（如手术机器人、人机协作），当前方法缺乏形式化的安全验证。</p>
+  </div>
+
+  <h3>9.2 扩展方向</h3>
+  <ol>
+    <li><strong>多任务 / 元学习潜空间：</strong>在多个相关任务上联合训练 VIB，学习一个跨任务共享的行为潜空间。这样在新的目标任务上，RL actor 可以从一个更丰富的语义空间出发进行适应，可能加速迁移并发现超越单任务策略的技能组合。</li>
+    <li><strong>人机交互式潜空间编辑：</strong>将潜空间维度与可解释的行为属性对齐（如通过对比学习或人工标注），使用户可以直观地在潜空间中"拖拽"来调整机器人行为——类似 Photoshop 中调整滑块来编辑图像属性。这将是 teleoperation 的一种全新范式。</li>
+    <li><strong>Safety-critical 场景下的形式化验证：</strong>利用潜空间的低维特性，在部署前通过可达性分析或 barrier certificate 方法验证：对于所有 $\|\Delta z\| \le \epsilon$ 的扰动，解码出的动作是否满足硬安全约束（如避免碰撞、力限制）。低维潜空间使此类分析更加可行。</li>
+  </ol>
+
+  <h3>9.3 关键维度敏感度评估</h3>
+  <table>
+    <tr><th style="width:30%;">评估维度</th><th style="width:15%;">评分</th><th style="width:55%;">说明</th></tr>
+    <tr><td><strong>VIB 训练质量</strong></td><td>★★★★★</td><td>最关键的依赖——VIB 质量直接决定方法上界。需要仔细调参 ($\beta$, $d$)。</td></tr>
+    <tr><td><strong>基础策略表现</strong></td><td>★★★★☆</td><td>基础策略足够好才能提供有意义的行为先验，但不需要完美（RL 可以修补不足）。</td></tr>
+    <tr><td><strong>扰动界 $\epsilon$</strong></td><td>★★★★☆</td><td>真实部署中的关键参数——需要根据任务和潜空间 scale 仔细设定。</td></tr>
+    <tr><td><strong>离线数据质量</strong></td><td>★★★★☆</td><td>决定了 VIB 学到的行为流形的覆盖范围。数据覆盖越广，适应空间越大。</td></tr>
+    <tr><td><strong>RL 算法选择</strong></td><td>★★★☆☆</td><td>SAC/TD3 等标准算法即可——因为潜空间已大幅简化了 RL 问题。</td></tr>
+    <tr><td><strong>视觉编码器质量</strong></td><td>★★★☆☆</td><td>影响 VIB 输入的表示质量，但 VIB 本身有抗干扰能力（IB 机制过滤噪声）。</td></tr>
+  </table>
+
+  <h3>9.4 深度追问</h3>
+  <div class="callout warn">
+    <div class="callout-title">一个悬而未决的问题：VIB 潜空间能否实现"组合泛化"？</div>
+    <p>当前的 ZPRL 框架在一个固定任务上做适应。但如果 VIB 潜空间真正编码了<strong>可组合的行为原子</strong>（behavioral primitives），那么通过组合不同维度的扰动，应该能够合成训练中未见过的行为模式。例如：如果潜空间的某些维度编码"抓取力度"、另一些编码"手臂高度"，那么同时调整这两组维度应该能产生"在高处轻柔抓取"这样的组合行为——即使训练数据中没有这个精确的组合。这是潜空间引导方法的一个重要未验证潜力。</p>
+  </div>
+</section>
+
+<!-- §10 Motivation -->
+<section id="motivation">
+  <h2>10. 动机与推导链 (Motivation)</h2>
+
+  <h3>10.1 五步推导链：从问题到方案</h3>
+
+  <div style="counter-reset: step 0;">
+    <div class="novelty-card" style="border-left: 4px solid #3b82f6;">
+      <h4>Step 1: 为什么需要 Offline-to-Online？</h4>
+      <p>纯离线 RL 或行为克隆虽然可以从大量示范数据中学习，但<strong>数据覆盖永远是不完全的</strong>。真实部署时，环境动力学、物体外观、光照条件等都会偏离训练分布。纯离线策略在这些场景下会失败——需要在线交互来填补分布偏移（distribution shift）。同时，纯在线 RL 从头训练机器人策略的样本效率极低（需要数百万次交互），不可行。因此，<strong>offline-to-online 是最务实的路线：用离线数据建立基础，用少量在线数据精细适应</strong>。</p>
+    </div>
+
+    <div class="novelty-card" style="border-left: 4px solid #10b981;">
+      <h4>Step 2: 为什么不能全参数微调？</h4>
+      <p>全参数在线 RL 微调有三个致命问题：(1) <strong>灾难性遗忘</strong>——在适应新场景时，网络权重被重写，丢失在原始任务上的能力；(2) <strong>计算与部署开销</strong>——每步更新需要完整的梯度反向传播，在真实机器人上难以做到实时；(3) <strong>不安全的探索</strong>——全参数自由更新意味着策略可能完全偏离原有行为分布，产生危险动作。我们需要一种 <strong>参数高效的、受约束的</strong> 在线适应方式。</p>
+    </div>
+
+    <div class="novelty-card" style="border-left: 4px solid #f59e0b;">
+      <h4>Step 3: 为什么动作残差也不够好？</h4>
+      <p>动作残差 RL（$a = \pi_b(o) + \Delta a$）解决了参数效率问题——只训练残差头，冻结基座。但它有一个<strong>隐蔽的缺陷</strong>：探索的结构性。动作空间的高维性和各维度的独立性意味着 RL 在动作空间中学习到的扰动 $\Delta a$ 往往是<strong>非结构化的独立噪声</strong>——每个关节独立抖动，忽略了关节之间的协同关系。这在低维控制中尚且可行（如 2-DoF 推车），但在 7-DoF 机械臂或 28-DoF 灵巧手上，独立噪声从一开始就注定了探索的低效。</p>
+    </div>
+
+    <div class="novelty-card" style="border-left: 4px solid #8b5cf6;">
+      <h4>Step 4: 为什么选择瓶颈潜空间？</h4>
+      <p>预训练策略在内部已经学习了一个隐式的<strong>行为表示</strong>——网络的中间层激活编码了比原始动作更高级的语义信息。如果我们在策略的"脖子"处（信息流动最集中的位置）插入一个显式的瓶颈，强制信息通过一个低维潜变量，那么这个潜变量自然会收敛为<strong>行为语义的压缩表示</strong>。在这个空间中做 RL 扰动，等价于在"行为层面"进行调整——不再是"多转 3 度关节 1 + 少转 2 度关节 3"，而是"抓得更紧一点"或"移动更偏左一点"。这是从 <strong>signal-level</strong> 到 <strong>semantic-level</strong> 的维度跃迁。</p>
+    </div>
+
+    <div class="novelty-card" style="border-left: 4px solid #f43f5e;">
+      <h4>Step 5: 为什么用 VIB 而非普通自编码器？</h4>
+      <p>普通自编码器（AE）也可以压缩信息到潜空间，但缺乏两个关键属性：(1) <strong>平滑性</strong>——AE 的潜空间可能高度扭曲，相近的动作在潜空间中不一定相近，这破坏了"在潜空间中做小扰动等于在动作上做小调整"的假设；(2) <strong>抗干扰性</strong>——AE 没有信息瓶颈约束，可能将光照、纹理等控制无关的观测细节编码进潜空间，使得 RL actor 需要在潜空间中"过滤噪声"。VIB 通过 KL 正则化强制潜空间平滑（相近点有相近解码），同时通过互信息约束自动过滤与控制无关的感知变化。这使得潜空间成为 RL 的<strong>理想状态空间</strong>：低维、平滑、仅含控制相关信息。</p>
+    </div>
+  </div>
+
+  <h3>10.2 一句话动机</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心动机（One Sentence）</div>
+    <p><strong>要安全高效地让真实机器人从离线示范走向在线适应，必须把 RL 的修正接口从高维非结构化的动作空间，迁移到预训练策略内部通过信息瓶颈构造的紧凑语义潜空间中。</strong></p>
+  </div>
+
+  <h3>10.3 这条思路是如何形成的？</h3>
+  <p>ZPRL 的方法论路径反映了机器人学习社区近年来的一条隐性趋势——<strong>从"端到端黑箱"走向"结构化模块化"</strong>。早期的端到端 RL（如直接从像素到扭矩）追求的是"不用人工设计"的纯粹性，但样本效率极低。随后的 Residual RL 认识到冻结一个基座控制器可以大幅降低探索难度——这是第一次"结构化解耦"。但 Residual RL 仍然在动作空间中操作。ZPRL 的洞见是：<strong>解耦不应该只停留在"基座 vs. 残差"，而应该深入到策略内部的表示层面</strong>——将策略拆分为"感知编码→行为表示→动作解码"三个功能模块，只在中间的行为表示层面做调整。这种设计的优雅之处在于：它同时解决了参数效率、探索结构性和行为安全性三个此前被独立对待的问题。</p>
+</section>
+
+<!-- §11 Takeaways -->
+<section id="takeaway">
+  <h2>11. 阅读收获与应用启示 (Takeaways)</h2>
+
+  <h3>11.1 关键经验教训</h3>
+  <ul>
+    <li><strong>修正接口的维度选择是策略自适应的核心设计决策：</strong>在什么空间中做调整——权重空间、动作空间还是潜空间——决定了参数效率、探索结构和安全性的基本 trade-off。这不是一个实现细节，而是第一性的架构选择。</li>
+    <li><strong>信息瓶颈不仅是压缩工具，更是"语义净化器"：</strong>VIB 的 $\min I(Z; O)$ 约束自动过滤了感知杂讯，使得下游 RL 在一个"干净"的状态空间中学习。这对所有需要从高维感知输入做决策的系统都有启示——<em>先压缩净化，再做决策</em>。</li>
+    <li><strong>"即插即用"的模块化设计降低了真实部署门槛：</strong>VIB 作为一个可插拔模块插入预训练策略，无需修改原始架构。这种设计使得方法可以和任何预训练策略结合——无论是 Diffusion Policy、ACT 还是传统的 BC——极大提升了实用价值。</li>
+    <li><strong>有界探索是真实机器人 RL 的必备条件：</strong>$\|\Delta z\| \le \epsilon$ 约束看似简单，但它是将 RL 从仿真搬到真实世界的关键桥梁。论文展示了如何在不牺牲适应能力的前提下，为 RL 探索套上一个"安全带"。</li>
+    <li><strong>潜空间 RL 的 replay buffer 优势被低估：</strong>在 $d=32$ 维潜空间中的 transition 仅需 ~300 bytes，远小于在图像空间中的 RL（每帧可达数 MB）。这意味着在相同内存下可以存储更多经验，间接提升了样本效率。</li>
+  </ul>
+
+  <h3>11.2 对 UAV 研究的启示</h3>
+  <div class="callout tip">
+    <div class="callout-title">UAV 应用场景映射</div>
+    <p>ZPRL 的框架对无人机（UAV）研究有直接的启发意义：</p>
+    <ul>
+      <li><strong>离线预训练：</strong>在仿真器中收集大量飞行示范数据（如穿越窄缝、动态避障、精确降落），训练一个通用的飞行模仿策略（基于视觉+IMU 输入）。这与 ZPRL 的 offline BC/DP 阶段对应。</li>
+      <li><strong>VIB 瓶颈：</strong>在策略内部训练 VIB，将完整的观测-控制历史压缩为潜变量 $z$——表征当前的飞行模式、相对位置、速度矢量等。这个潜空间可能是 16-32 维的。</li>
+      <li><strong>在线适应：</strong>部署到真实环境后，面对不同的风力、载荷、电机老化等分布偏移，RL actor 在潜空间中学习微调——例如稍微调整俯仰角、略微增加推力等——而不需要重新学习整个飞行策略。</li>
+      <li><strong>安全约束：</strong>$\|\Delta z\| \le \epsilon$ 确保了 RL 的探索不会导致飞行器进入不可恢复的危险状态（如翻转），这对安全第一的 UAV 应用至关重要。</li>
+      <li><strong>关键差异：</strong>UAV 的动力学比机械臂更快（高频控制 100-500Hz），对实时性要求更高。ZPRL 的潜空间 RL actor 极轻量（~0.05M 参数），推理延迟极低（~0.1ms），非常适合高帧率控制。</li>
+    </ul>
+  </div>
+
+  <h3>11.3 关键参考文献</h3>
+  <table>
+    <tr><th style="width:5%;">#</th><th style="width:35%;">论文</th><th style="width:25%;">核心贡献</th><th style="width:35%;">与 ZPRL 的关系</th></tr>
+    <tr>
+      <td>1</td>
+      <td>Tishby et al. (1999)<br><em>The Information Bottleneck Method</em></td>
+      <td>信息瓶颈理论——在预测性和压缩性之间做最优权衡</td>
+      <td>VIB 损失函数的理论基础，定义了 $I(Z;A)$ vs $I(Z;O)$ 的 trade-off</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Zhao et al. (2023)<br><em>Action Chunking with Transformers (ACT)</em></td>
+      <td>使用 Transformer 预测动作序列块，实现高精度模仿学习</td>
+      <td>ZPRL 的基础策略架构之一；VIB 在 ACT 内部做信息压缩</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Chi et al. (2023)<br><em>Diffusion Policy</em></td>
+      <td>使用扩散模型生成机器人动作，表达多模态行为分布</td>
+      <td>ZPRL 的另一基础策略架构；VIB 在扩散过程的中间表示层插入</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Johannink et al. (2019)<br><em>Residual RL for Robot Control</em></td>
+      <td>在基础控制器上叠加可学习残差 $\Delta a$</td>
+      <td>ZPRL 的直接对比方法；ZPRL 将残差位置从动作空间迁移到潜空间</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>Kingma &amp; Welling (2014)<br><em>Variational Autoencoders</em></td>
+      <td>VAE 框架——通过 KL 正则化学习连续潜变量模型</td>
+      <td>VIB 的实现基础；$q_\phi(z|o,a)$ 和 $p_\psi(a|o,z)$ 构成条件 VAE</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Kumar et al. (2020)<br><em>Conservative Q-Learning (CQL)</em></td>
+      <td>离线 RL 中的保守价值估计，防止分布外动作的高估</td>
+      <td>ZPRL 可从 CQL 思想获益——在潜空间中做保守探索进一步保证安全</td>
+    </tr>
+  </table>
+
+  <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0;">
+  <p style="font-size:12px;color:#94a3b8;text-align:center;">
+    本文笔记基于论文原文 <em>"Beyond Action Residuals: Real-World Robot Policy Steering via Bottleneck Latent Reinforcement Learning"</em> (Yu et al., 2026) 的摘要、方法、实验和结论部分编写。
+    所有技术分析和公式解释均以论文内容为事实依据。
+  </p>
+</section>
+
+</main>
+
+</div>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>&#x1F4C4; Paper Notes &middot; Huazhe Xu Group &middot; Paper ID 10378 &middot; MathJax + Mermaid Rendering</footer>
+</body></html>

@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Rotor-Failure-Aware Quadrotors (Zhou et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Fei Gao · 15-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../9976/index.html">Hand-like autonomous flyi</a>
+<a href="../9975/index.html">UAV</a>
+<a href="../9974/index.html">precise real-time force-a</a>
+<a class="active" href="../9973/index.html">Rotor-failure-aware quadr</a>
+<a href="../9972/index.html">3D</a>
+<a href="../9971/index.html">LiDAR-VGGT Cross-modal</a>
+<a href="../9970/index.html">Safe agile transportation</a>
+<a href="../9969/index.html">DPNet Doppler LiDAR</a>
+<a href="../9968/index.html">Primitive-based truncated</a>
+<a href="../9967/index.html">FAR-AVIO</a>
+<a href="../9966/index.html">PathPainter Transferring</a>
+<a href="../9965/index.html">High-speed vision-based f</a>
+<a href="../9964/index.html">UAV</a>
+<a href="../9963/index.html">Agile fall recovery</a>
+<a href="../9962/index.html">Sphere-VIO Fast robust</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Rotor-Failure-Aware Quadrotors Flight in Unknown Environments（旋翼故障感知的四旋翼未知环境飞行）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Xiaobin Zhou</strong>, Miao Wang, Chengao Li, Can Cui, Ruibin Zhang, Yongchao Wang, Chao Xu, <strong>Fei Gao</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">南京大学、浙江大学、香港理工大学、北京航空航天大学</strong></td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Transactions on Aerospace and Electronic Systems (TAES)</strong>，<strong>2026年</strong></td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE TAES</span> <span class="jif-badge if-value">IF 5.1</span> <span class="jif-badge if-q1">JCR Q1</span> <span class="jif-badge if-cas">CAS 1区</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td>IEEE TAES 2026</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>首次实现<strong>旋翼故障下四旋翼在未知复杂环境中的自主飞行</strong>。核心创新：（1）复合故障检测——模型驱动+数据驱动协同实现快速旋翼故障检测与识别；（2）旋翼故障感知的规划器——时空联合优化安全轨迹；（3）专用LiDAR平台——搭载anti-torque plate抑制旋转，保证故障状态下可靠感知。在森林和杂乱室内环境中验证。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Rotor Failure Detection</span>
+    <span class="tag tag-green">Fault-Tolerant Control</span>
+    <span class="tag tag-amber">Spatio-Temporal Planning</span>
+    <span class="tag tag-purple">LiDAR Perception</span>
+    <span class="tag tag-red">Anti-Torque Plate</span>
+    <span class="tag tag-cyan">IEEE TAES 2026</span>
+    <span class="tag tag-gray">Unknown Environments</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么旋翼故障下在未知环境中自主飞行如此困难？</strong><br>
+    答：旋翼故障会产生三重级联效应：（1）动力不对称——剩余旋翼的推力分布失衡，无人机进入高速自旋（yaw无法控制）；（2）感知退化——高速自旋导致LiDAR点云严重畸变（扫描周期内无人机转了N圈），标准SLAM/建图失败；（3）规划失效——传统轨迹优化假设全驱动力学模型，故障后的欠驱模型完全不同，且必须在自旋状态下避开未知障碍物。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>将"故障检测-感知-规划"作为端到端联合问题而非独立组件</strong>处理。（1）用复合FDD（model-based快速检测 + model-free鲁棒识别）在故障发生后<strong>毫秒级</strong>判断哪个旋翼故障及严重程度；（2）用旋翼故障感知规划器在时空域联合优化——轨迹不仅要考虑空间避障，还要考虑自旋速率约束（转速不能太快否则感知崩溃）；（3）硬件层面用anti-torque plate物理抑制自旋速率，为感知系统争取时间窗口。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>Model-Based FDD（故障检测与诊断）——利用动力学残差检测故障</td><td>→ 四旋翼在旋翼故障时推力变化会立即反映在IMU加速度和角速度残差中。基于动力学模型的残差检测可以在<strong>20ms内</strong>发现异常——比数据驱动方法快一个数量级。但model-based方法对建模误差和噪声敏感，容易误报</td><td>方法</td></tr>
+    <tr><td>Data-Driven FDD——用分类器从传感器信号识别故障模式</td><td>→ 训练CNN/LSTM分类器从IMU+电机转速时序中识别具体哪个旋翼故障及故障程度——鲁棒但延迟较高（~100ms）。将model-based（快速但不精确）与data-driven（慢但精确）<strong>级联</strong>：model-based做快速异常检测触发，data-driven做精确故障识别</td><td>架构</td></tr>
+    <tr><td>Anti-Torque Plate（反扭矩板）——物理抑制旋转的经典气动方案</td><td>→ 单旋翼故障时，剩余旋翼的扭矩失衡导致无人机绕z轴自旋。传统方案用反馈控制抑制旋转——但故障后控制能力大幅下降。在机臂上安装<strong>air brake</strong>式anti-torque plate，用被动气动阻力抑制自旋——这是一种"机械层面的鲁棒性"，不消耗控制余量</td><td>硬件</td></tr>
+    <tr><td>Spatio-Temporal Joint Optimization——轨迹规划中的时间维度</td><td>→ 标准轨迹规划只在空间域（x,y,z）优化形状——Yaw作为独立维度单独处理。故障状态下yaw不可控（自旋），需要将<strong>旋转速率作为优化变量和约束</strong>融入轨迹优化——确保规划出的轨迹（1）在空间上避障，（2）在时间上自旋速率不超过感知系统容忍上限</td><td>数学</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 复合FDD——模型驱动快速检测 + 数据驱动精确识别的级联架构</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>旋翼故障检测需要在<strong>速度和准确性之间权衡</strong>——太快容易误报（气流的瞬时扰动被误判为故障），太慢会错过最优控制时机（故障后每毫秒都在偏离轨迹）。单种方法无法同时满足速度和精度要求。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>工业控制中的"快速保护+精确诊断"两级策略——先快速跳闸保护设备，再逐步分析故障原因</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>第一级（model-based）：基于四旋翼动力学模型，实时计算期望加速度与实际IMU加速度的残差——残差超过阈值即触发故障报警（~20ms）。第二级（data-driven）：CNN+LSTM分类器在触发后分析最近200ms的IMU+电机转速时序，输出故障旋翼编号（1-4）和严重程度（partial/complete），耗时~80ms。两级总延迟~100ms——足够后续规划器做出响应。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 旋翼故障感知时空联合规划器——在自旋约束下安全飞行</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>故障后四旋翼是严重欠驱系统——3个位置维度 + 3个姿态维度中仅剩4个可控自由度（故障前6个）。Yaw不可控意味着无人机持续自旋。传统规划器假设全驱，在这种情况下生成的轨迹不可行——飞行器根本无法跟踪。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>故障后的动力学模型是系统性的（对所有故障模式通用），但轨迹优化必须感知具体故障参数（哪个旋翼、故障程度、剩余推力裕度）</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）基于故障后欠驱动力学模型建立轨迹可行性约束——速度、加速度、旋转速率的上限由剩余健康旋翼的最大推力决定；（2）将自旋速率作为<strong>优化代价项</strong>加入轨迹优化目标函数——鼓励轨迹自然抑制旋转；（3）时空联合：轨迹的时间分配必须保证在每一个时刻，自旋速率不超过感知系统的容忍上限（否则LiDAR点云畸变无法使用）。安全着陆点的选择也考虑自旋下降轨迹的安全性。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: Anti-Torque Plate LiDAR平台——为故障感知提供硬件保障</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>故障后无人机自旋——LiDAR扫描一圈（如100ms）期间无人机可能转了180度以上，点云严重畸变，SLAM和障碍物检测完全失效。没有可靠的感知，规划器即使再聪明也无用武之地。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>火箭的尾翼（fins）和汽车的空气刹车（air brake）——用被动气动装置抑制不需要的旋转</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在四旋翼机臂上安装轻量anti-torque plate（碳纤维板，<10g）——当无人机自旋时，平板上的气动阻力产生与旋转方向相反的力矩，被动抑制自旋速率。效果：将故障后自旋速率从~500 deg/s降低到~100 deg/s——在LiDAR的100ms扫描周期内，无人机仅旋转~10度，点云畸变可接受。这是一种<strong>零功耗、零延迟、零计算</strong>的物理层面鲁棒性增强。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph HARDWARE["硬件层：专用LiDAR平台"]
+      direction LR
+      LIDAR["LiDAR · 360°FOV · 10Hz"]
+      IMU["IMU · 200Hz · 加速度+角速度"]
+      ATP["Anti-Torque Plate · 碳纤维 · <10g"]
+      FC["飞控 · Pixhawk · 角速度+推力控制"]
+    end
+
+    subgraph FDD["故障检测与诊断层"]
+      direction LR
+      MB["Model-Based检测 · 动力学残差 · ~20ms"]
+      DL["Data-Driven识别 · CNN+LSTM · ~80ms"]
+      OUTPUT_FDD["输出: 故障旋翼编号+严重程度"]
+    end
+
+    subgraph PERCEPTION["感知层"]
+      direction LR
+      DEWARP["点云去畸变 · 自旋补偿"]
+      SLAM["LiDAR SLAM · 实时定位+建图"]
+      MAP["占用栅格地图 · 障碍物信息"]
+    end
+
+    subgraph PLANNING["规划层"]
+      direction LR
+      MODEL["故障动力学模型 · 欠驱约束"]
+      OPT["时空联合轨迹优化 · 自旋感知"]
+      LANDING["安全着陆点选择 · 自旋下降"]
+    end
+
+    IMU --> MB --> DL --> OUTPUT_FDD
+    OUTPUT_FDD --> MODEL
+    OUTPUT_FDD --> DEWARP
+    LIDAR --> DEWARP --> SLAM --> MAP
+    MAP --> OPT
+    MODEL --> OPT --> LANDING
+    LANDING --> FC
+    ATP -.->|"被动抑制自旋 <100 deg/s"| LIDAR
+
+    classDef hardware fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef fdd fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef perception fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef planning fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    class LIDAR,IMU,ATP,FC hardware
+    class MB,DL,OUTPUT_FDD fdd
+    class DEWARP,SLAM,MAP perception
+    class MODEL,OPT,LANDING planning
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 从传感器到安全着陆</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SENSOR["传感器数据"]
+      direction LR
+      IMU_DATA["IMU: a(200Hz) + ω(200Hz)"]
+      LIDAR_DATA["LiDAR: 点云(10Hz) + 时间戳"]
+      MOTOR_RPM["电机: 转速(100Hz) ×4"]
+    end
+
+    subgraph FDD_PIPE["故障检测管线"]
+      direction LR
+      RESIDUAL["残差计算: a_meas - a_pred > thresh?"]
+      TRIGGER["触发: 残差超限 → 标记异常时间戳"]
+      CNN_LSTM["CNN+LSTM: 200ms时序窗口 → 分类"]
+      FDD_RESULT["结果: motor_i · partial/complete"]
+    end
+
+    subgraph CONTROL_ADAPT["控制自适应"]
+      direction LR
+      RECONF["重构控制分配 · 故障旋翼=0推力"]
+      TILT["推力矢量重分配 · 剩余旋翼补偿"]
+      YAW_FREE["Yaw自由旋转 · 仅控3D位置"]
+    end
+
+    subgraph PERCEPTION_PIPE["感知管线"]
+      direction LR
+      MOTION_COMP["运动补偿: 自旋角速度×时间戳"]
+      UNDISTORT["点云去畸变: 每点补偿旋转位移"]
+      SLAM_OUT["SLAM: 位姿估计 + 局部地图"]
+    end
+
+    subgraph PLAN_PIPE["规划管线"]
+      direction LR
+      REACHABLE["可到达性分析: 剩余推力裕度"]
+      TRAJ_OPT["轨迹优化: 位置最优 + 自旋上限约束"]
+      LAND_SEL["安全着陆: 平坦区域 + 充足空间"]
+    end
+
+    IMU_DATA --> RESIDUAL --> TRIGGER --> CNN_LSTM --> FDD_RESULT
+    MOTOR_RPM --> CNN_LSTM
+    FDD_RESULT --> RECONF --> TILT --> YAW_FREE
+    LIDAR_DATA --> MOTION_COMP --> UNDISTORT --> SLAM_OUT
+    FDD_RESULT --> MOTION_COMP
+    YAW_FREE --> REACHABLE
+    SLAM_OUT --> TRAJ_OPT
+    REACHABLE --> TRAJ_OPT --> LAND_SEL
+    LAND_SEL --> YAW_FREE
+
+    classDef sensor fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef fdd fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef ctrl fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef percep fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef plan fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    class IMU_DATA,LIDAR_DATA,MOTOR_RPM sensor
+    class RESIDUAL,TRIGGER,CNN_LSTM,FDD_RESULT fdd
+    class RECONF,TILT,YAW_FREE ctrl
+    class MOTION_COMP,UNDISTORT,SLAM_OUT percep
+    class REACHABLE,TRAJ_OPT,LAND_SEL plan
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 完整故障响应时间线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph PRE_FAULT["阶段1: 正常飞行"]
+      direction LR
+      NORMAL["正常飞行 · 全驱6DOF控制"]
+    end
+
+    subgraph FAULT["阶段2: 故障发生"]
+      direction LR
+      FAIL["t=0ms: 旋翼i故障 · 推力骤降"]
+      SPIN["自旋开始 · Yaw不可控"]
+    end
+
+    subgraph DETECT["阶段3: 检测与诊断 (0-100ms)"]
+      direction LR
+      D1["t≈20ms: Model-Based检测触发 ⚡"]
+      D2["t≈100ms: CNN+LSTM识别完成 · 输出故障编号+程度"]
+      D3["t≈100ms: 控制器重构 · 故障旋翼推力=0"]
+    end
+
+    subgraph STABILIZE["阶段4: 稳定与感知恢复 (100-200ms)"]
+      direction LR
+      S1["Anti-Torque Plate抑制旋转 · <100 deg/s"]
+      S2["点云去畸变补偿启动 · 运动补偿参数更新"]
+      S3["SLAM恢复定位 · 更新局部地图"]
+    end
+
+    subgraph RECOVER["阶段5: 规划与安全着陆 (200ms-)"]
+      direction LR
+      R1["可到达性分析 · 最优着陆区域搜索"]
+      R2["时空联合轨迹优化 · 自旋约束 · 障碍物约束"]
+      R3["执行安全着陆轨迹 · 持续感知+重规划"]
+    end
+
+    NORMAL --> FAIL --> SPIN --> D1 --> D2
+    D2 --> D3
+    D3 --> S1 --> S2 --> S3
+    S3 --> R1 --> R2 --> R3
+
+    D3 -.->|"反馈: 更新故障参数"| S2
+    R3 -.->|"重规划循环: 每秒多次更新"| R2
+
+    classDef normal fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef fault fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef detect fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef stabilize fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef recover fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    class NORMAL normal
+    class FAIL,SPIN fault
+    class D1,D2,D3 detect
+    class S1,S2,S3 stabilize
+    class R1,R2,R3 recover
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \min_{u(t),\, T} \; J(x(t), u(t)) \quad \text{s.t.} \quad \dot{x} = f_{\text{fault}}(x, u, \theta_{\text{fault}}),\; x \in \mathcal{X}_{\text{free}},\; u \in \mathcal{U}_{\text{reduced}},\; |\omega_z| \le \omega_{\text{max}} $$
+    <div class="eq-note">
+      <strong>$f_{\text{fault}}$</strong> = 故障后四旋翼动力学模型（欠驱，Yaw自由但不可控）&nbsp;|&nbsp;
+      <strong>$\theta_{\text{fault}}$</strong> = 故障参数（哪个旋翼、故障程度、剩余推力）——由FDD模块实时估计 &nbsp;|&nbsp;
+      <strong>$\mathcal{X}_{\text{free}}$</strong> = 无碰撞空间（由LiDAR SLAM实时建图得到）&nbsp;|&nbsp;
+      <strong>$\mathcal{U}_{\text{reduced}}$</strong> = 故障后的缩减控制空间（剩余健康旋翼的推力范围）&nbsp;|&nbsp;
+      <strong>$|\omega_z| \le \omega_{\text{max}}$</strong> = 自旋速率上限约束（由感知系统容忍度决定，本文~100 deg/s）&nbsp;|&nbsp;
+      <strong>目标</strong>：在故障发生后尽可能快地找到并执行一条安全着陆轨迹，同时避免碰撞。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>IMU（加速度+角速度，200Hz）+ LiDAR点云（10Hz）+ 电机转速（100Hz）+ 故障后动力学模型参数</td><td>多模态传感器融合</td></tr>
+    <tr><td><strong>输出</strong></td><td>安全着陆轨迹（3D位置+推力分配）+ 实时控制指令</td><td>4自由度指令（x,y,z,ψ不可控）</td></tr>
+    <tr><td><strong>目标</strong></td><td>在旋翼故障后，于未知环境中检测故障、重构控制、安全着陆，全程无碰撞</td><td>故障检测时间 < 100ms，着陆成功率</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>故障容错自主飞行</strong>问题——涵盖故障检测（Fault Detection & Diagnosis, FDD）、控制重构（Control Reallocation）、故障感知规划（Fault-Aware Planning）和硬件鲁棒性设计（Anti-Torque Plate）。四旋翼旋翼故障是UAV领域最具挑战性的故障模式之一——因为传统的四旋翼在失去一个旋翼后理论上完全不可控（1个旋翼故障 → Yaw失控→ 高速自旋 → 感知崩溃 → 必然坠毁）。本文首次在"未知环境 + 完全自主 + 无需外部定位"的约束下解决此问题。场景：森林、杂乱室内等GPS拒止的未知环境。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：旋翼故障引发不可逆的"故障-感知-控制"正反馈恶性循环。<br><br>
+    （1）<strong>动力学的根本性改变</strong>：四旋翼正常时有6个自由度（3位置+3姿态）均为可控。单个旋翼故障后：推力不对称（位置可控但范围缩小） + 扭矩失衡（Yaw不可控，无人机自旋） → 系统退化为<strong>4个可控自由度</strong>（x,y,z, roll/pitch之一视具体配置）。(2)<strong>感知的灾难性退化</strong>：无人机自旋意味着LiDAR扫描一圈的100ms内，坐标系旋转了数十到数百度——点云中每个点的参考坐标系都不同，直接拼接会导致完全扭曲的"万花筒"式点云。SLAM的特征匹配在此条件下完全失败。(3)<strong>规划的矛盾需求</strong>：需要在"尽快着陆"和"旋转不能太快"之间权衡——前者要求在短时间内大幅改变轨迹（产生较大旋转力矩），后者要求轨迹平滑（旋转速率低以保证感知质量）。<br><br>
+    <strong>三者形成正反馈恶性循环</strong>：自旋越快 → 感知越差 → 规划越不准 → 控制越差 → 自旋更快。打破这个循环需要同时在四个层面发力：硬件（anti-torque plate抑制自旋源头）、FDD（快速识别故障以尽早启动对策）、感知（补偿自旋的去畸变算法）、规划（自旋感知的约束优化）。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>Fault-Tolerant Control (FTC) Only</td>
+      <td>在已知故障后，重构控制分配矩阵，用剩余旋翼维持可控自由度</td>
+      <td>仅解决<strong>控制</strong>问题——假设环境空旷无障碍物（只需维持不掉高度）。在未知复杂环境中，FTC无法避免碰撞——因为不知道障碍物在哪里。且传统FTC假设故障已被检测——FDD本身是难题。</td>
+    </tr>
+    <tr>
+      <td>Emergency Landing by Pre-Planned Path</td>
+      <td>预计算故障后从任意点到安全着陆点的路径，故障发生时执行</td>
+      <td>依赖<strong>预先已知的环境地图</strong>——在未知环境中无效。且预计算的路径假设特定的故障模式和初始状态——实际故障参数（哪个旋翼、故障程度）千差万别，预计算无法覆盖。</td>
+    </tr>
+    <tr>
+      <td>Rotor-Failure Planning in Known Environments</td>
+      <td>已知环境中，用故障后动力学约束规划从故障点到着陆点的轨迹</td>
+      <td>需要<strong>先验地图</strong>和<strong>外部定位</strong>（如Vicon）——这在真实未知环境中不存在。且假设在故障过程中感知系统正常工作——实际上自旋已经破坏了感知。</td>
+    </tr>
+    <tr>
+      <td>Data-Driven FDD Only（纯数据驱动故障检测）</td>
+      <td>用深度学习从传感器数据中检测和分类旋翼故障</td>
+      <td>检测延迟通常在100-500ms——在高速自旋中这段时间足以让无人机转N圈并大幅偏离原轨迹。纯数据驱动方法的<strong>速度</strong>不足以应对旋翼故障的实时性要求。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 毫秒级故障检测与识别</strong>：故障后每毫秒无人机都在偏离安全状态——检测必须在<strong>100ms内</strong>完成否则控制器已无法挽救。但同时必须避免误报（气流扰动被误判为故障 → 不必要的紧急着陆）。</li>
+    <li><strong>挑战 2 — 自旋状态下的可靠感知</strong>：LiDAR在自旋无人机上的点云畸变是原理性的——每个激光点的坐标系都不同。需要精确的IMU角速度积分来逐点补偿——而角速度估计本身在故障后也可能有偏。</li>
+    <li><strong>挑战 3 — 故障约束下的实时轨迹规划</strong>：故障后控制空间急剧缩减——不是所有方向和加速度都可达。规划器必须在缩减的可行域内（而非原来的全空间）寻找安全轨迹——且需要在旋转坐标系下表达障碍物约束，在毫秒级内完成优化。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>系统的核心由三个关键算法构成：（1）复合FDD——model-based残差检测 + CNN-LSTM故障分类的级联架构；（2）故障后动力学建模——建立欠驱系统的运动方程；（3）旋翼故障感知时空轨迹优化——在自旋速率约束下优化安全着陆轨迹。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: FDD -->
+  <h4>Group A: 复合故障检测——模型残差 + 深度学习识别</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — Model-Based残差检测</span>
+    $$ r_a(t) = \| a_{\text{meas}}(t) - \hat{a}_{\text{pred}}(t | u_{1:4}) \|_2 \quad \text{（加速度残差）} $$
+    $$ r_\omega(t) = \| \omega_{\text{meas}}(t) - \hat{\omega}_{\text{pred}}(t | u_{1:4}) \|_2 \quad \text{（角速度残差）} $$
+    $$ \text{Fault Trigger: } r_a(t) > \tau_a \;\text{OR}\; r_\omega(t) > \tau_\omega $$
+    <div class="eq-note">
+      <strong>$a_{\text{meas}}$</strong> = IMU实测加速度 &nbsp;|&nbsp;
+      <strong>$\hat{a}_{\text{pred}}(t|u_{1:4})$</strong> = 基于正常动力学模型和四个电机当前指令$u_{1:4}$预测的加速度 &nbsp;|&nbsp;
+      <strong>$r_a(t)$</strong> = 加速度残差——故障时实际加速度与预期偏差（某个旋翼推力丧失 → 总推力不足/不对称） &nbsp;|&nbsp;
+      <strong>$\tau_a, \tau_\omega$</strong> = 检测阈值（根据正常飞行数据统计分布的3σ上限设定） &nbsp;|&nbsp;
+      <strong>延迟</strong>：约20ms——仅需最近几次IMU读数即可完成残差计算。
+    </div>
+  </div>
+
+  <h4>Group B: 故障后动力学与轨迹优化</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 故障后欠驱动力学模型</span>
+    $$ \ddot{p} = \frac{1}{m} R(\psi) \begin{bmatrix} 0 \\ 0 \\ \sum_{i \in \mathcal{H}} T_i \end{bmatrix} + \begin{bmatrix} 0 \\ 0 \\ -g \end{bmatrix}, \quad \dot{\psi} = \frac{1}{J_z} \sum_{i \in \mathcal{H}} (-1)^i \cdot k_\tau \cdot T_i $$
+    $$ \text{where } \mathcal{H} = \{i: \text{rotor } i \text{ is healthy}\},\quad |\mathcal{H}| = 3 $$
+    <div class="eq-note">
+      <strong>$\mathcal{H}$</strong> = 健康旋翼集合（故障后为3个） &nbsp;|&nbsp;
+      <strong>$R(\psi)$</strong> = 绕z轴的旋转矩阵——Yaw不可控但持续旋转 &nbsp;|&nbsp;
+      <strong>$T_i$</strong> = 第i个旋翼的推力（故障旋翼=0） &nbsp;|&nbsp;
+      <strong>$k_\tau$</strong> = 旋翼反扭矩系数 &nbsp;|&nbsp;
+      <strong>$\dot{\psi}$</strong> = Yaw角速度——由三个剩余旋翼的反扭矩之差驱动，不可直接控制 &nbsp;|&nbsp;
+      <strong>关键</strong>：位置$\ddot{p}$的表达式中，推力向量在体坐标系下表达，需要乘以$R(\psi)$转到世界坐标——而$\psi$是自由旋转的。
+    </div>
+  </div>
+
+  <!-- Formula Group C: Planning -->
+  <h4>Group C: 自旋感知的时空轨迹优化</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 轨迹优化目标与约束</span>
+    $$ \min_{\sigma(t)} \; \int_0^{T} \left( w_1 \|\sigma(t) - p_{\text{land}}\|^2 + w_2 \dot{\psi}^2(t) + w_3 \|\dddot{\sigma}(t)\|^2 \right) dt $$
+    $$ \text{s.t.} \quad \sigma(t) \in \mathcal{X}_{\text{free}},\; \|\dot{\sigma}\| \le v_{\text{max}},\; \|\ddot{\sigma}\| \le a_{\text{max}},\; |\dot{\psi}| \le \omega_{\text{max}}^{\text{perception}} $$
+    <div class="eq-note">
+      <strong>$\sigma(t)$</strong> = 3D轨迹参数化（如多项式样条） &nbsp;|&nbsp;
+      <strong>$p_{\text{land}}$</strong> = 选定的安全着陆点 &nbsp;|&nbsp;
+      <strong>$w_1\|\sigma - p_{\text{land}}\|^2$</strong> = 轨迹终点靠近着陆点 &nbsp;|&nbsp;
+      <strong>$w_2 \dot{\psi}^2$</strong> = 惩罚自旋速率——鼓励轨迹自然抑制旋转 &nbsp;|&nbsp;
+      <strong>$w_3 \|\dddot{\sigma}\|^2$</strong> = 平滑性代价（最小化jerk） &nbsp;|&nbsp;
+      <strong>$\omega_{\text{max}}^{\text{perception}}$</strong> = 自旋速率上限——由LiDAR扫描周期和去畸变算法的容忍度决定（本文约100 deg/s） &nbsp;|&nbsp;
+      <strong>$\mathcal{X}_{\text{free}}$</strong> = 无碰撞空间——实时由LiDAR SLAM的占用栅格地图提供。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>Model-Based检测延迟</td><td><strong>~20 ms</strong></td><td>从故障发生到残差超限触发</td><td>IMU采样率200Hz → 每5ms一个读数。残差计算仅需最近3-4个读数的滑动平均 → 20ms足够可靠判断</td></tr>
+    <tr><td>CNN+LSTM识别延迟</td><td><strong>~80 ms</strong></td><td>从触发到分类完成</td><td>200ms时序窗口输入 CNN+LSTM——足够捕捉故障前后动力学变化模式，但最短也受限于窗口长度</td></tr>
+    <tr><td>Anti-Torque Plate 减旋效果</td><td><strong>500→100 deg/s</strong></td><td>故障后自旋速率</td><td>将自旋速率降低到LiDAR 100ms扫描周期内仅转~10度——点云去畸变算法可轻松补偿。更低的旋转也意味着更小的离心力对IMU的干扰</td></tr>
+    <tr><td>自旋感知上限 $\omega_{\max}$</td><td><strong>~100 deg/s</strong></td><td>轨迹优化中允许的最大自旋速率</td><td>由感知系统测试决定——超过此值，LiDAR点云去畸变后的残差误差超过SLAM可承受范围</td></tr>
+    <tr><td>轨迹重规划频率</td><td><strong>~10 Hz</strong></td><td>每秒重新优化轨迹的次数</td><td>与LiDAR帧率匹配——每次新点云 → 更新地图 → 重规划。更高频率意义不大（地图没有新信息）</td></tr>
+    <tr><td>着陆点搜索半径</td><td><strong>~15 m</strong></td><td>在当前位姿周围搜索安全着陆区域</td><td>由故障后剩余推力裕度决定——更大的搜索范围意味着更远的飞行距离，需要更多剩余能量/高度</td></tr>
+  </table>
+
+  <h3>6.4 Model-Based vs Data-Driven FDD 对比</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>⚡ Model-Based检测（第一级）</h4>
+      <ul>
+        <li><strong>速度</strong>：极快（~20ms）</li>
+        <li><strong>精度</strong>：中等——能检测到"有故障"但不知道"哪个旋翼什么程度"</li>
+        <li><strong>鲁棒性</strong>：对建模误差和噪声敏感——阈值设置是关键trade-off</li>
+        <li><strong>需要</strong>：精确的动力学模型和低噪声IMU</li>
+        <li>输出：二值报警信号 + 异常时间戳</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🧠 Data-Driven识别（第二级）</h4>
+      <ul>
+        <li><strong>速度</strong>：较慢（~80ms，含时序窗口）</li>
+        <li><strong>精度</strong>：高——能精确到哪个旋翼（1/4）及故障程度</li>
+        <li><strong>鲁棒性</strong>：对噪声和建模误差鲁棒——从数据中学习故障模式</li>
+        <li><strong>需要</strong>：大量故障数据训练（仿真中生成）</li>
+        <li>输出：故障旋翼编号 + partial/complete + 置信度</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个关键基础原理：故障后欠驱动力学（为什么推力不对称导致自旋不可控）、自旋补偿点云去畸变（如何让旋转中的LiDAR仍然可用）、时空联合轨迹优化（如何在自旋约束下找安全路径）。</p>
+
+  <h3>7.1 旋翼故障动力学 — 四旋翼从全驱到欠驱的质变</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 故障前 vs 故障后的可控自由度分析</span>
+    $$ \text{正常: } \begin{bmatrix} T_{\text{total}} \\ \tau_x \\ \tau_y \\ \tau_z \end{bmatrix} = A_{4\times4} \begin{bmatrix} T_1 \\ T_2 \\ T_3 \\ T_4 \end{bmatrix} \quad \text{（4个独立控制量 → 映射到4个自由度）} $$
+    $$ \text{故障(旋翼k失效): } \begin{bmatrix} T_{\text{total}} \\ \tau_x \\ \tau_y \\ \tau_z \end{bmatrix} = A_{4\times3} \begin{bmatrix} T_i \\ T_j \\ T_l \end{bmatrix} \quad \text{（3个独立控制量 → 试图控制4个自由度 → Yaw不可控）} $$
+    <div class="eq-note">
+      <strong>正常情况</strong>：控制分配矩阵$A_{4\times4}$可逆——4个旋翼的推力可以独立映射为总推力 + 3轴扭矩——6自由度全可控（位置3 + 姿态3）。&nbsp;|&nbsp;
+      <strong>故障情况</strong>：控制分配矩阵退化为$A_{4\times3}$（4个输出，3个输入）——过约束方程组，无精确解。必须放弃一个自由度的精确控制——最合理的选择是<strong>放弃Yaw</strong>（因为Yaw对飞行轨迹的影响最小，且Yaw方向的扭矩失衡最严重）。
+    </div>
+  </div>
+
+  <p><strong>为什么放弃Yaw而非其他自由度？</strong>位置控制（x,y,z）是安全着陆的基础——如果不能控制位置，无人机将撞上障碍物或坠落。Roll/Pitch控制是维持推力方向所必需的——没有姿态控制，推力方向不受控。Yaw（偏航）仅决定机头朝向——对于着陆任务，机头朝向无关紧要（只要能落在安全区域即可）。因此，故障后的控制策略是：<strong>牺牲Yaw，保位置和Roll/Pitch</strong>——无人机持续自旋但轨迹可控。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>✅ 故障后仍可控</h4>
+      <ul>
+        <li><strong>3D位置</strong> (x, y, z)：由总推力大小和Roll/Pitch姿态控制</li>
+        <li><strong>Roll / Pitch</strong>：由不对称推力控制——虽然是3个旋翼，但可以产生Roll和Pitch力矩</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>❌ 故障后不可控</h4>
+      <ul>
+        <li><strong>Yaw (ψ)</strong>：3个旋翼的反扭矩无法平衡——必定产生净Yaw力矩</li>
+        <li><strong>Yaw角速度 (ψ̇)</strong>：只能通过推力分配<strong>间接影响</strong>（增大对称旋翼推力减小不对称性 → 扭矩失衡减小 → 自旋减速）——但无法精确设定为任意值</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>7.2 自旋补偿点云去畸变 — 用IMU逐点修正旋转偏移</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — LiDAR点云自旋去畸变</span>
+    $$ p_k^{\text{world}} = R_{\text{start}} \cdot R(\Delta\psi_k) \cdot p_k^{\text{body}} + t_{\text{start}} + \Delta t_k \cdot v_{\text{start}} $$
+    $$ \Delta\psi_k = \int_{t_{\text{start}}}^{t_k} \omega_z(\tau) d\tau \approx \bar{\omega}_z \cdot (t_k - t_{\text{start}}) $$
+    <div class="eq-note">
+      <strong>$p_k^{\text{body}}$</strong> = LiDAR在第k个激光点测量时的原始点坐标（在旋转的机体坐标系中） &nbsp;|&nbsp;
+      <strong>$R_{\text{start}}$</strong> = 扫描周期开始时的机体到世界旋转矩阵 &nbsp;|&nbsp;
+      <strong>$R(\Delta\psi_k)$</strong> = 从扫描开始到第k个点的Z轴旋转矩阵——补偿自旋导致的方向变化 &nbsp;|&nbsp;
+      <strong>$t_{\text{start}} + \Delta t_k \cdot v_{\text{start}}$</strong> = 位置补偿——无人机在扫描周期内也在平移 &nbsp;|&nbsp;
+      <strong>$\bar{\omega}_z$</strong> = 平均Yaw角速度（由IMU在扫描周期内积分得到）&nbsp;|&nbsp;
+      <strong>关键假设</strong>：在Anti-Torque Plate作用下，自旋速率稳定（~100 deg/s），可以用常角速度模型近似。
+    </div>
+  </div>
+
+  <p><strong>Anti-Torque Plate的真正价值</strong>：不仅在于降低自旋速率本身，更在于<strong>让自旋速率变得稳定和可预测</strong>——如果没有它，自旋速率会随推力分配变化而剧烈波动（从200到600 deg/s随机变化），去畸变算法无法用简单的线性模型补偿。有了它，自旋速率被物理稳定在~100 deg/s左右——用简单的常角速度假设就能很好地补偿。</p>
+
+  <h3>7.3 时空联合轨迹优化 — 在自旋约束下找安全路径</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 自旋对轨迹优化的多维约束</span>
+    $$ \text{空间约束：} \sigma(t) \in \mathcal{X}_{\text{free}} \; \text{（非凸、时变——因为无人机在旋转，安全空间在旋转坐标系下变化）} $$
+    $$ \text{时间约束：} \dot{\psi}(t) \le \omega_{\text{max}} \; \text{（每个时刻的自旋速率都不能超标）} $$
+    $$ \text{动力学约束：} \ddot{p}(t) = f_{\text{fault}}(\sigma(t), \dot{\sigma}(t), \dot{\psi}(t), u(t)) $$
+    <div class="eq-note">
+      <strong>"时空联合"的本质</strong>：传统路径规划只在空间域优化（找到一条无碰撞的空间曲线），时间分配和Yaw是独立的后处理。但对于自旋无人机，空间路径的形状<strong>直接决定</strong>了自旋速率（例如急转弯需要不对称推力 → 自旋加速）。因此必须将空间形状和时间分配<strong>联合优化</strong>——这不是两个解耦的问题，而是同一个优化变量（轨迹参数）同时影响空间可行性和自旋速率。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    故障动力学告诉我们<strong>能做什么和不能做什么</strong>（位置可控，Yaw不可控） → 点云去畸变告诉我们<strong>自旋速度的上限</strong>（由Anti-Torque Plate硬件保障） → 时空联合优化利用前两者信息<strong>规划安全轨迹</strong>。这三个原理形成了一条完整的"理论-感知-规划"链：了解自己能做什么（动力学）→ 看清环境（去畸变+SLAM）→ 规划安全着陆（约束优化）。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig4.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">系统概览：旋翼故障下的完整自主飞行管线</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="System overview of rotor-failure-aware quadrotor flight"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：从正常飞行 → 旋翼故障 → 检测诊断 → 控制重构 → 安全着陆的完整系统概览。左侧展示专用硬件平台（LiDAR + Anti-Torque Plate），中间展示复合FDD的双级架构（model-based + data-driven），右侧展示故障后轨迹优化和安全着陆的结果可视化。</p>
+      <ul>
+        <li><strong>Anti-Torque Plate设计</strong>：安装在机臂上的碳纤维薄板——将其形象化为"空气舵"：在无人机自旋时，平板推挤空气产生反扭矩。设计的关键参数：面积、展弦比、安装角——需要在减旋效果和额外重量/气动阻力之间平衡</li>
+        <li><strong>时间线对比</strong>：论文展示了有/无本系统的对比——无系统时无人机在故障后1秒内坠毁，有系统时从故障到安全着陆整个过程在3-5秒内完成</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">真实飞行实验：森林和室内杂乱环境中的故障后安全着陆</span>
+      <span class="fig-source">来源：论文 Fig. 4/5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Real-world rotor failure experiments in forests and cluttered rooms"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：在两种极端环境（茂密森林和杂乱室内）中的真实故障飞行实验结果。包括故障时刻的3D轨迹、LiDAR建图结果、着陆点选择可视化。</p>
+      <ul>
+        <li><strong>森林实验</strong>：无人机在树木之间飞行时被触发旋翼故障（人为远程指令切断某个电机电源）。系统在~100ms内检测并识别故障，启动控制重构，Anti-Torque Plate抑制自旋，SLAM继续提供可靠的定位和障碍物信息——无人机在树冠和树干之间找到一块空地并安全着陆</li>
+        <li><strong>室内杂乱实验</strong>：在堆满桌椅、管道、设备的室内环境中触发故障。狭窄空间对轨迹规划的挑战更大——可用着陆区域更少，障碍物更密集。时空联合优化的自旋约束在此场景中尤为重要</li>
+        <li><strong>成功率统计</strong>：在多次实验中（不同故障旋翼位置、不同初始状态、不同环境），系统实现了高成功率的安全着陆——这是首次在未知环境中实现此类能力</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">消融实验：各组件对系统性能的贡献</span>
+      <span class="fig-source">来源：论文 Fig. 6/7</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Ablation study of individual components"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：逐组件移除实验，分析每个模块对系统整体性能的影响。</p>
+      <ul>
+        <li><strong>无Anti-Torque Plate</strong>：自旋速率飙升到500+ deg/s，LiDAR点云去畸变失败，SLAM丢失定位 → 规划器无法工作 → 100%坠毁。这是最关键的单点故障——硬件层面的鲁棒性是整个系统的基础</li>
+        <li><strong>仅用Model-Based FDD</strong>：检测快但精确度不够——某些情况下误判故障旋翼编号（尤其是对角位置旋翼的残差模式相似），导致控制器重构错误 → 控制效果差</li>
+        <li><strong>仅用Data-Driven FDD</strong>：识别精确但延迟较高（~200ms包括数据采集窗口）——在这200ms内无人机已积累了较大的位置偏差和旋转能量，后期恢复更困难</li>
+        <li><strong>无自旋约束（标准轨迹优化）</strong>：规划器的优化结果可能在某个时刻要求自旋速率超过感知容忍上限 → 在那个时刻感知崩溃 → 重规划无法获得新地图 → 可能碰撞</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 仅处理单个旋翼故障（最可能但非唯一——双旋翼故障在推力完全丧失时不可恢复）；(2) Anti-Torque Plate仅对绕Z轴旋转有效——对大角度倾斜后的自旋效果有限；(3) 需要LiDAR——在低光照、雨雾、尘土等LiDAR退化环境中系统可能失效。</li>
+    <li><strong>适用场景</strong>：适用于有足够着陆空间的中等复杂环境。在极端狭窄空间（如窄缝、管道内）——剩余可控自由度无法保证安全着陆轨迹的存在性——此时即使系统完美运行也可能无法着陆，因为物理上不存在安全轨迹。</li>
+    <li><strong>可扩展性</strong>：实验中的故障是人为触发的（切断电机电源），故障程度已知（complete failure）。partial failure（旋翼性能下降但未完全失效）的检测更具挑战性——残差更小、模式更模糊。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从Quadrotor → Hexarotor/Octocopter——更多旋翼意味着故障后冗余度更高（六旋翼单故障后仍有5个旋翼可控），着陆能力更强。但控制分配和FDD的复杂度也随之增加。</li>
+    <li><strong>条件放松</strong>：(1) 无LiDAR方案——双目视觉+IMU替代LiDAR，轻量化但自旋状态下的视觉匹配更困难；(2) 非人为触发——在真实应用中故障可能由桨叶损坏、电机轴承卡死、ESC故障等多种原因导致，每种原因的动力学特征不同，需要FDD能覆盖更多故障模式。</li>
+    <li><strong>约束加入</strong>：(1) 多故障容错——双旋翼故障的恢复策略（需要更激进的控制重构，可能只能在非常有限的条件下安全着陆）；(2) 任务持续——如果任务足够重要（如搜索救援），选择"继续飞行到目标"而非"立即着陆"；(3) 预测性维护——在故障发生前通过异常检测预判风险。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>IMU噪声与偏置漂移</td><td>Model-Based检测依赖精确的加速度预测——IMU偏置（尤其是故障伴随的剧烈振动）会导致残差异常增大，误报风险上升。同时运动补偿的角速度积分误差也会累积</td><td>★★★★</td></tr>
+    <tr><td>LiDAR在尘土/烟雾中的退化</td><td>故障可能导致旋翼撞击障碍物产生尘土/碎片——LiDAR在这种条件下的点云充满噪点，SLAM可能失效。本文未测试此类场景</td><td>★★★★</td></tr>
+    <tr><td>Partial Failure的模糊性</td><td>旋翼性能下降30% vs 气流瞬时扰动的区分非常困难——残差幅度相似但含义完全不同。CNN+LSTM在partial failure上的训练数据也较难生成（需要精确建模退化的物理过程）</td><td>★★★</td></tr>
+    <tr><td>不同机型/尺寸的泛化</td><td>动力学模型、Anti-Torque Plate参数、CNN+LSTM都是针对特定机型设计的——更换机型需要重新校准/训练。这限制了系统的"即插即用"能力</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>自旋状态下纯视觉感知</strong>——这是当前系统依赖LiDAR的最大局限。如果能在高速自旋状态下仍用单目/双目相机进行可靠的SLAM和障碍物检测，就能大幅减轻硬件重量和成本（LiDAR通常50-200g，而相机仅5-20g）。核心挑战：相机的rolling shutter效应在自旋时会更严重（每行像素的曝光时间不同，对应不同的旋转角度），全局快门相机较贵。但最近的事件相机（event camera）天然适合高动态场景——可以考虑用事件相机+IMU在自旋状态下进行运动补偿和SLAM。这是一个硬件替换引发算法创新的方向。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>四旋翼在旋翼故障后几乎必然坠毁——这不是因为没有"可能"的恢复策略（学术界已证明故障后欠驱系统在理论上是可控的），而是因为感知-规划-控制管线在故障带来的高速自旋中全面崩溃。本质是一个"故障引发的级联系统失效"问题，而非单纯的"控制"或"检测"问题。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>（i）FTC只关注控制层面——假设已知故障且环境空旷；（ii）FDD只关注检测层面——延迟太高或误报太多；（iii）硬件冗余（6/8旋翼）——增加成本和重量，且无法处理未知环境。没有一个方案将"检测-感知-规划-控制-硬件"作为<strong>联合系统</strong>来处理。</li>
+    <li><strong>如果从最底层开始解决呢？</strong><br>自旋是感知崩溃的根源——如果能从物理层面抑制自旋（Anti-Torque Plate），整个系统就有了喘息的机会。这是"先物理、后算法"的思路：先确保传感器能看到可用数据，再谈检测、规划、控制。</li>
+    <li><strong>感知恢复了，然后呢？</strong><br>需要知道"发生了什么事"——快速检测（残差）+ 精确识别（CNN+LSTM）的级联FDD给出故障参数。需要知道"在哪里"——去畸变+SLAM给出定位和地图。需要知道"怎么安全着陆"——时空联合优化在故障动力学约束下找最优轨迹。</li>
+    <li><strong>最简单的方案是什么？</strong><br>碳纤维板（Anti-Torque Plate）+ IMU + LiDAR + FDD算法 + 轨迹优化——将现有技术在"旋翼故障"这一特殊场景下以正确的方式组合。没有发明任何全新的基础技术，但通过系统级集成解决了此前无人能解的"未知环境中旋翼故障安全着陆"问题。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    四旋翼在旋翼故障后必然坠毁——不是因为不可控，而是因为高速自旋让感知失效、控制崩塌——那就用<strong>气动硬件（Anti-Torque Plate）从根源遏制自旋、双层FDD快速识别故障、时空联合规划在故障约束下寻找安全着陆轨迹</strong>，让四旋翼在未知环境中第一次实现旋翼故障后的自主安全着陆。
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：真实四旋翼故障视频中，无人机在故障后高速自旋坠毁——感知失效（相机画面旋转模糊，LiDAR不可能工作）是肉眼可见的致命环节。学术界有大量FTC论文——但几乎都在Vicon环境中测试（外部定位完美），没有一篇是在未知环境中自主飞行的。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"故障后安全着陆"分解为5个必须同时满足的条件——（1）快速识别故障，（2）抑制自旋以保护感知，（3）可靠定位与建图，（4）故障动力学下的轨迹可行性，（5）障碍物感知与避让。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）Model-Based + Data-Driven → 复合FDD；（2）Anti-Torque Plate → 物理减旋；（3）IMU补偿+LiDAR SLAM → 自旋感知；（4）自旋约束轨迹优化 → 故障感知规划。</li>
+    <li><strong>Step 4 — 组装方案</strong>：硬件+算法+软件全栈——这是典型的系统级工程工作。论文的贡献不在于任何一个单独组件的突破，而在于将这些组件以正确的接口和顺序整合成一个在极端条件下仍能工作的完整系统。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是"系统思维"克服"组件思维"的范例——单独看每个组件（FDD、SLAM、轨迹优化、Anti-Torque Plate）都不是本领域的首次提出，但将它们以<strong>故障场景特有的因果关系链</strong>串联起来，就解决了一个此前无解的完整问题。对于UAV领域研究者：不要只关注自己的窄领域（控制/感知/规划），要理解故障如何传播并影响整个系统。</li>
+    <li><strong>技术技巧层面</strong>：(1) Anti-Torque Plate——用极低成本（<10g碳纤维板）获得关键的机械层面鲁棒性——这是"简单的物理胜过复杂的算法"的经典案例；（2）两级FDD级联——将快但不精确的方法作为触发器，慢但精确的方法作为诊断器——这是工业中广泛使用的模式，在机器人领域值得更多应用；（3）自旋感知的轨迹优化——将感知系统的物理限制（最大容忍自旋速率）转化为轨迹优化的硬约束——体现了"为感知而规划"的思想。</li>
+    <li><strong>实验/写作层面</strong>：在真实森林和室内环境中进行故障实验——这需要极大的勇气和工程能力（一旦失败就要修/换无人机）。这种"不留退路的真实实验"比仿真结果有说服力得多。此外，故障触发方式（远程切断电机电源）的实验设计简洁、可控、可重复。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于UAV安全方向</strong>：复合FDD的级联架构可以推广到其他故障模式——GPS丢失、IMU故障、通信中断等。核心思想：不要只用一种方法处理所有情况——用"快速粗糙 + 慢速精细"的组合来应对时间紧迫性。</li>
+    <li><strong>对于规划方向</strong>：自旋感知的时空联合优化体现了"硬件限制 → 算法约束"的范式——在做轨迹/路径规划时，不仅要考虑空间障碍物，还要考虑传感器的工作条件（自旋速率、光照、运动模糊阈值）。这种"感知感知的规划"是向真实世界鲁棒部署的关键。</li>
+    <li><strong>对于系统集成方向</strong>：Anti-Torque Plate是"机械层面解决软件问题"的思路启发——很多时候，在机械/电子层面用几克重量的硬件就能消除算法层面的巨大复杂性。在做系统设计时应该优先考虑这种"硬件杠杆"。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Mueller & D'Andrea (2014) — Stability and control of a quadrocopter despite the complete loss of one, two, or three propellers. <em>IEEE ICRA</em></td><td>首次在理论上证明四旋翼单旋翼完全失效后仍可通过高速自旋保持可控——是本文控制重构的理论基础。该工作在Vicon环境中验证，本文将其推进到未知环境中的自主飞行。</td></tr>
+    <tr><td>Sun et al. (2020) — A Review of Fault Detection and Diagnosis for Quadrotors. <em>IEEE Trans. Instrum. Meas.</em></td><td>四旋翼FDD领域的综述——系统梳理了model-based、signal-based、data-driven三类方法。本文的复合FDD正是这三种方法的混合使用。</td></tr>
+    <tr><td>Zhang et al. (2016) — LOAM: Lidar Odometry and Mapping in Real-time. <em>RSS</em></td><td>LiDAR SLAM的里程碑工作——本文的自旋去畸变和SLAM模块基于类似的点云配准框架，但在故障自旋的特殊条件下进行了运动补偿增强。</td></tr>
+    <tr><td>Zhou et al. (2019) — Robust and Efficient Quadrotor Trajectory Generation. <em>IEEE TRO</em></td><td>四旋翼轨迹优化的经典工作——本文的轨迹优化器在其框架上加入了故障动力学约束和自旋速率约束，展示了如何将通用优化框架适配到特殊故障场景。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Zhou et al. · IEEE TAES 2026 · Rotor-Failure-Aware Quadrotors Flight · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Cooperative SMF for Multi-Agent Systems (Ding, Cong & Wang, CCC 2023)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Yirui Cong · 13-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../1356/index.html">Asymptotic Boundedness Di</a>
+<a href="../1352/index.html">Formation Under Communica</a>
+<a href="../1360/index.html">Bounded Formation Stabili</a>
+<a href="../1359/index.html">Single-Beacon Localizatio</a>
+<a href="../1354/index.html">Optimal Set-Membership Sm</a>
+<a href="../1348/index.html">Stability Linear Set-Memb</a>
+<a href="../1455/index.html">Cooperative Filtering Ran</a>
+<a href="../1350/index.html">Existence Completeness Bo</a>
+<a href="../1750/index.html">Paper</a>
+<a class="active" href="../1454/index.html">2305.10366v1</a>
+<a href="../1368/index.html">小型固定翼无人机集群综述和未来发展_王祥科</a>
+<a href="../1367/index.html">Paper</a>
+<a href="../1361/index.html">qy_高阶线性多智能体时延一致性理论及其在多无人机</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Set-Membership Filtering-Based Cooperative State Estimation for Multi-Agent Systems（基于集员滤波的多智能体系统协同状态估计）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yu Ding</strong>（丁宇）、<strong>Yirui Cong</strong>（丛一睿，corresponding）、<strong>Xiangke Wang</strong>（王祥科）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">国防科技大学</strong>（National University of Defense Technology, NUDT），智能科学学院</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">CCC 2023</strong>（第42届中国控制会议），2023年5月，pp. 5791–5796</td></tr>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://arxiv.org/abs/2305.10366" target="_blank">arXiv: 2305.10366v1</a> | Submitted: 2023-05-17 | <a href="https://ieeexplore.ieee.org/abstract/document/10240662" target="_blank">IEEE Xplore</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出了一种基于<strong>集员滤波（Set-Membership Filtering, SMF）</strong>的多智能体系统协同状态估计框架。核心贡献：（1）以<strong>集中式 SMF</strong>作为分布式方案的性能基准（benchmark）；（2）提出<strong>OIT-inspired 有限时域集中式 constrained zonotope 算法</strong>（Algorithm 1）以控制计算复杂度；（3）建立<strong>分布式 SMF 框架</strong>及对应的分布式 constrained zonotope 算法（Algorithm 2），使得每个智能体仅用本地测量和邻居通信即可获得包含真实状态的有界集合估计。严格集合分析表明：分布式 SMF 本质上是对集中式 SMF 结果在相应子空间上投影的外包络（outer-bound）。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Set-Membership Filtering</span>
+    <span class="tag tag-green">Constrained Zonotope</span>
+    <span class="tag tag-amber">Cooperative Estimation</span>
+    <span class="tag tag-purple">OIT-Inspired</span>
+    <span class="tag tag-red">Multi-Agent Systems</span>
+    <span class="tag tag-cyan">CCC 2023</span>
+    <span class="tag tag-gray">Distributed Filtering</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么多智能体协同状态估计中，分布式方案往往缺乏严格的理论性能基准？</strong><br>
+    答：因为大多数分布式估计方法直接设计分布式算法（如分布式卡尔曼滤波），而不分析"如果所有信息集中在中心节点，最优能达到什么程度"——缺乏一个<strong>信息充分的上界</strong>来校准分布式方案的信息损失。这导致分布式算法的保守性无法被量化。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>"先集中，再分布"</strong>——先构造一个信息充分的集中式 SMF 基准（能融合所有智能体的全部测量和相对测量），然后严格分析分布式方案相对于这个基准的关系。关键发现：分布式 SMF 本质上是在计算集中式 SMF 联合不确定集合在对应局部子空间上的<strong>边缘外包络（marginal outer-bound）</strong>。这种"基准 → 近似 → 误差量化"的范式使得分布式方案的保守性可以被严格分析和理解。<br><br>
+    问：<strong>有限时域 OIT-inspired 方法解决了什么瓶颈？</strong><br>
+    答：集中式 SMF 的直接实现会因 zonotope 的生成元（generator）数量随时间<strong>线性增长</strong>而导致计算复杂度爆炸。OIT（Ordered Intersection of Tubes）方法通过滑动窗口仅保留最近 $\bar{\delta}$ 步的信息，将复杂度锁定在常数级别，同时保持估计精度可接受。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>集中式 SMF 的完备信息结构（融合所有测量的理想情况）</td><td>→ 以集中式结果作为<strong>性能上界</strong>（information-theoretic upper bound），统一度量任何分布式方案的信息损失。这为分布式估计提供了"天花板"——任何声称性能好的分布式算法都必须接近这个基准</td><td>架构</td></tr>
+    <tr><td>OIT（Ordered Intersection of Tubes）的有限时域思想（Cong et al. 的 prior work）</td><td>→ 将 OIT 从标准 zonotope 推广到 constrained zonotope，在滑动窗口 $[k-\bar{\delta}, k]$ 内进行递归估计。时间窗长度 $\bar{\delta}$ 取系统可观测性指数 $\mu_0$——恰好是"能唯一确定状态所需的最短时间"——这是信息论最优的窗口选择</td><td>方法</td></tr>
+    <tr><td>集合投影与边缘化（marginalization）的集合论关系</td><td>→ 揭示分布式 SMF 与集中式 SMF 之间的<strong>精确集合论关系</strong>：分布式结果 = 集中式联合集合在局部坐标上的投影后再外包。这个外包（outer-bound）就是信息损失——为不同通信拓扑下的保守性提供了可量化分析框架</td><td>数学 / 理论</td></tr>
+    <tr><td>Constrained Zonotope 的高精度集合表达（Scott et al. 2016）</td><td>→ 相比普通 zonotope，constrained zonotope 通过附加等式约束 $A\xi = b$ 能更紧致地表达非中心对称的集合（如测量更新后的后验集），在相同复杂度下提供更高精度——这对有界误差下有保证估计至关重要</td><td>表示</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 集中式 SMF 基准框架 —— 首次系统分析了融合全部测量信息的性能上界</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>分布式估计领域长期缺乏一个"理论上最优能达到什么程度"的严格基准。分布式方案的性能评估通常只是与另一种分布式方案对比，没有绝对上界参照。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>信息融合的天然上界：如果所有测量集中到中心节点，能得到最紧致的不确定集合——任何分布式方案只能丢失信息而不能创造信息。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>将所有 $N$ 个智能体的状态拼接为增广状态向量 $\mathbf{x}_k = [x_{1,k}^\top, \dots, x_{N,k}^\top]^\top$，构造增广系统矩阵 $A_c = \text{diag}\{A_1,\dots,A_N\}$ 和 $B_c = \text{diag}\{B_1,\dots,B_N\}$，以及增广测量矩阵 $H_c = [C_c^\top, D_c^\top]^\top$——$C_c$ 对应绝对测量、$D_c$ 对应相对测量。在此增广系统上运行 SMF 即得到<strong>理论上最紧致的有保证联合估计</strong>。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: OIT-inspired 有限时域 constrained zonotope 算法 —— 集中式方案的可计算实现</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>直接实现集中式 SMF 会导致 zonotope 生成元数量 $\propto$ 时间步数 → 计算复杂度随时间线性增长 → 实际不可行。需要一种有限时域方案来控制复杂度。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>OIT 方法：不需要从 $k=0$ 开始无限累积所有测量，只需保留最近 $\bar{\delta}$ 个时间步的测量就足以恢复当前状态（因为系统有可观测性指数 $\mu_0$）。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Algorithm 1：当 $k \le \bar{\delta}$ 时，使用经典 constrained zonotope SMF（全历史）；当 $k > \bar{\delta}$ 时，在滑动窗口 $[k-\bar{\delta}, k]$ 上进行有限时域 OIT-inspired SMF——复杂度被锁定在 $O(\bar{\delta} \cdot n_g)$，不再随 $k$ 增长。$\bar{\delta}$ 取系统可观测性指数 $\mu_0$。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 分布式 SMF 框架 —— 证明分布式结果是对集中式结果的边缘外包络</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>如何设计一个仅用本地测量和邻居通信的分布式 SMF，并<strong>严格量化</strong>其与集中式基准之间的差距？此前研究缺乏这种理论联系。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>集合论：如果集中式结果是一个高维 joint set $[[\mathbf{x}_k]]$，那么分布式结果可以理解为 $\text{proj}_{x_i}([[\mathbf{x}_k]])$ 的某个外包络。外包络的紧致程度取决于通信拓扑能传递多少信息。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>Algorithm 2：每个智能体 $i$ 维护本地 zonotope $X_{i,k}$，在 prediction 步用本地动力学传播，在 update 步取以下交集：（a）本地绝对测量约束的反像；（b）<strong>所有邻居 $j \in \mathcal{N}_i$ 的相对测量约束的反像</strong>。关键理论结果：该分布式结果的联合集合是集中式结果的外包络。邻居越多 → 通信越密集 → 外包络越紧。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — centralized benchmark to distributed realization</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>System Model <span>Dynamics + Sensors</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>N agents, each with local dynamics</strong>
+          <small>$x_{i,k+1} = A_i x_{i,k} + B_i w_{i,k}$, process noise bounded: $w_{i,k} \in W_{i,k}$</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>Absolute + Relative measurements</strong>
+          <small>$y_{i,k}^a = C_i x_{i,k} + v_{i,k}^a$ (absolute), $y_{ij,k}^r = D_{ij} (x_{i,k} - x_{j,k}) + v_{ij,k}^r$ (relative)</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Centralized SMF <span>Benchmark</span></h4>
+        <div class="arch-card arch-power">
+          <strong>Augmented state vector</strong>
+          <small>$\mathbf{x}_k = [x_{1,k}^\top, \dots, x_{N,k}^\top]^\top \in \mathbb{R}^{nN}$, full observability via $H_c$</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>OIT-inspired finite horizon</strong>
+          <small>Sliding window $[k-\bar{\delta}, k]$, $\bar{\delta} \ge \mu_0$, Algorithm 1</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Distributed SMF <span>Communication</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>Local prediction + update</strong>
+          <small>Each agent i maintains $X_{i,k}$ via zonotope ops</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>Neighbor relative constraints</strong>
+          <small>Intersection with $\bigcap_{j \in \mathcal{N}_i} Y_{ij,k}^r$, Algorithm 2</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Theoretical Guarantee <span>Set Analysis</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>Distributed outer-bounds centralized</strong>
+          <small>$[[\mathbf{x}_k]]_{\text{cent}} \subseteq [[\mathbf{x}_k]]_{\text{dist}}$ (joint set)</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>Gap = information loss from decentralization</strong>
+          <small>Quantified by projection + outer-bounding conservativeness</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>model → augmented sys</span>
+      <span>centralized → OIT window</span>
+      <span>local + neighbors → intersect</span>
+      <span>dist ⊆ cent → gap analysis</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>Zonotope generator count grows linearly without finite-horizon truncation</small></div>
+      <div class="arch-metric"><strong>Main invention</strong><small>OIT-inspired constrained zonotope algorithm + dist. framework with set-theoretic guarantee</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>Constrained zonotope + sliding window = constant complexity with bounded conservativeness</small></div>
+      <div class="arch-metric"><strong>Current limitation</strong><small>Verification is simulation-only; real-world communication/computation constraints untested</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 System Frame — Centralized-to-Distributed Pipeline</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph MODEL["多智能体系统模型"]
+      AGENT["N个智能体 · 各含独立动力学 x_{i,k+1}=A_i x_{i,k}+B_i w_{i,k}"]
+      ABS["绝对测量: y_{i,k}^a = C_i x_{i,k} + v_{i,k}^a"]
+      REL["相对测量: y_{ij,k}^r = D_{ij} (x_{i,k} - x_{j,k}) + v_{ij,k}^r"]
+      BOUNDS["有界噪声: w∈W, v∈V (集合形式)"]
+    end
+
+    subgraph CENTRAL["集中式 SMF (Benchmark · 性能上界)"]
+      AUG["增广状态: x_k=[x_1^⊤,...,x_N^⊤]^⊤"]
+      ACMAT["增广矩阵: A_c=diag{A_i} · C_c=diag{C_i}"]
+      HCMAT["增广测量矩阵: H_c=[C_c^⊤ D_c^⊤]^⊤"]
+      OIT["OIT-inspired 有限时域 SMF · 窗长δ̄≥μ₀ · Algorithm 1"]
+      CENRES["输出: 联合不确定集合 [[x_k]]_{cent}"]
+    end
+
+    subgraph DIST["分布式 SMF (实际方案 · Algorithm 2)"]
+      LOCAL["每个智能体 i 维护: 本地 zonotope X_{i,k}"]
+      PRED["Prediction: X_{i,k}^{pred}=A_i·X_{i,k-1}⊕B_i·W_{i,k-1}"]
+      UPDATE["Update: X_{i,k}=X_{i,k}^{pred} ∩ Y_{i,k}^{abs} ∩ ⋂_{j∈N_i} Y_{ij,k}^{rel}"]
+      COMM["通信: 与邻居交换相对测量约束"]
+      DISTRES["输出: 各智能体局部不确定集合 X_{i,k}^{dist}"]
+    end
+
+    subgraph THEORY["理论保证"]
+      TH1["严格集合关系: [[x_k]]_{cent} ⊆ [[x_k]]_{dist} (联合集)"]
+      TH2["分布式=集中式投影+外包络 · 信息损失可量化"]
+      TH3["邻居越多→外包络越紧 · 收敛到集中式"]
+    end
+
+    MODEL --> CENTRAL
+    MODEL --> DIST
+    CENTRAL --> THEORY
+    DIST --> THEORY
+
+    CENRES -.->|"上界: 最优可达精度"| DISTRES
+    DISTRES -.->|"下界逼近: 实际可达精度"| CENRES
+
+    classDef model fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef cent fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef dist fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef theory fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class AGENT,ABS,REL,BOUNDS model
+    class AUG,ACMAT,HCMAT,OIT,CENRES cent
+    class LOCAL,PRED,UPDATE,COMM,DISTRES dist
+    class TH1,TH2,TH3 theory
+    </pre>
+  </div>
+
+  <h3>3.2 Algorithm Flow — OIT-Inspired Finite-Horizon SMF</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    A["Algorithm 1 入口: 初始化 δ̄, μ₀"] --> B{"当前步数 k ≤ δ̄ ?"}
+    B -->|"是 · 初始阶段"| C["经典 Constrained Zonotope SMF · 全历史"]
+    B -->|"否 · 稳态阶段"| D["OIT-inspired 有限时域 SMF · 窗口 [k-δ̄, k]"]
+    C --> E["Prediction: 动力学传播 + Minkowski 加噪声"]
+    D --> F["有限时域 Prediction: 仅窗口内的状态传播"]
+    E --> G["Update: 与测量集合取交集 · 绝对+相对"]
+    F --> H["有限时域 Update: 窗口内所有测量同时约束"]
+    G --> I["集合降阶: order reduction 控制 zonotope 生成元数"]
+    H --> I
+    I --> J["输出: 包含真实状态的有保证 zonotope · 确定性保证"]
+    J --> K{"k ← k+1 · 继续 ?"}
+    K -->|"是"| B
+    K -->|"否"| L["结束"]
+
+    style A fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    style B fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    style C fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    style D fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    style J fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    style L fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#4b5563
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \text{给定：} \begin{cases} x_{i,k+1}=A_i x_{i,k}+B_i w_{i,k}, & w_{i,k}\in\mathcal{W}_{i,k} \\ y_{i,k}^a = C_i x_{i,k}+v_{i,k}^a, & v_{i,k}^a\in\mathcal{V}_{i,k}^a \\ y_{ij,k}^r = D_{ij}(x_{i,k}-x_{j,k})+v_{ij,k}^r, & v_{ij,k}^r\in\mathcal{V}_{ij,k}^r \end{cases} $$
+    $$ \text{求：} \hat{X}_{i,k} \ni x_{i,k},\quad \forall i\in\{1,\dots,N\} $$
+    $$ \text{约束：智能体 } i \text{ 仅能访问 } y_{i,k}^a, \{y_{ij,k}^r\}_{j\in\mathcal{N}_i} \text{ 和邻居通信 } \{\hat{X}_{j,k}\}_{j\in\mathcal{N}_i} $$
+    <div class="eq-note">
+      <strong>$x_{i,k} \in \mathbb{R}^{n_i}$</strong> = 智能体 $i$ 的状态向量 &nbsp;|&nbsp;
+      <strong>$w_{i,k}$</strong> = 过程噪声，有界于 $\mathcal{W}_{i,k}$（非随机，不需要概率分布）&nbsp;|&nbsp;
+      <strong>$y_{i,k}^a$</strong> = 绝对测量（如 GPS、自身传感器）&nbsp;|&nbsp;
+      <strong>$y_{ij,k}^r$</strong> = 相对测量（如 UWB 测距、相对位置）&nbsp;|&nbsp;
+      <strong>$\hat{X}_{i,k}$</strong> = 包含 $x_{i,k}$ 的有保证集合（guaranteed to contain true state）&nbsp;|&nbsp;
+      <strong>关键要求</strong>：每个智能体只基于本地信息 + 邻居通信独立运行，不依赖中心节点；估计结果必须有<strong>确定性保证</strong>（不管噪声具体实现，真实状态一定在集合内）。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>(a) 本地绝对测量序列 $\{y_{i,k}^a\}$；(b) 与邻居的相对测量序列 $\{y_{ij,k}^r\}_{j\in\mathcal{N}_i}$；(c) 邻居通信的集合 $\{\hat{X}_{j,k}\}_{j\in\mathcal{N}_i}$；(d) 动力学模型 $(A_i, B_i, \mathcal{W}_{i,k})$；(e) 测量模型 $(C_i, D_{ij}, \mathcal{V})$</td><td>连续时间步的测量流 + 模型先验 + 通信数据</td></tr>
+    <tr><td><strong>输出</strong></td><td>每个智能体 $i$ 的局部有保证状态估计集合 $\hat{X}_{i,k}$（constrained zonotope），满足 $x_{i,k} \in \hat{X}_{i,k}$ 对任意满足噪声边界的噪声实现均成立</td><td>每个智能体输出一个多维 zonotope</td></tr>
+    <tr><td><strong>目标</strong></td><td>使分布式估计集合 $\hat{X}_{i,k}^{\text{dist}}$ 尽可能接近集中式基准 $\hat{X}_{i,k}^{\text{cent}}$（即最小化外包络保守性）</td><td>集合体积 / 直径作为精度指标</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>带有理论保证的分布式状态估计问题</strong>——核心不是设计一个"可能比别的方法好"的启发式算法，而是建立一个严格的<strong>集合论框架</strong>：先定义集中式上界（信息充分的理想结果），再分析分布式方案到上界的距离（信息损失）。本质上是<strong>有界误差假设下</strong>的多智能体合作定位问题，与卡尔曼滤波（假设高斯噪声）形成对偶关系。应用场景：GPS 拒止环境下的 UAV 编队定位、水下 AUV 协同导航、传感器网络节点自定位。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：分布式合作估计中的"信息充分性 vs 通信局部性"困境。<br><br>
+    （1）<strong>集中式融合的信息优势</strong>：如果将 $N$ 个智能体的所有测量集中处理，相对测量 $y_{ij,k}^r = D_{ij}(x_{i,k}-x_{j,k})$ 可以直接作为状态差约束——"智能体 1 和智能体 2 相距 5 米 ± 0.1 米"这个信息同时约束两个变量，而且可以跨图传播（A-B-C → A-C 的间接约束）。集中式处理能<strong>完全利用这种耦合</strong>，得到最紧致的不确定集合。<br><br>
+    （2）<strong>分布式通信的局部性限制</strong>：每个智能体 $i$ 只能与直接邻居 $\mathcal{N}_i$ 通信。当 $j \notin \mathcal{N}_i$ 时，$y_{ij,k}^r$ 不存在。这意味着"跨两层邻居"的信息（如 A-B-C 中 A 关于 C 的间接信息）在纯分布式方案中会丢失，除非通过多跳传播。<br><br>
+    （3）<strong>Zonotope 的维度诅咒</strong>：即使集中式可行，constrained zonotope 的生成元数量随测量数量和时间步数线性增长——每个新测量的求交操作都可能引入新的生成元。如果不做有限时域截断，计算复杂度会随时间无限增长。<br><br>
+    <strong>将这三点放在一起</strong>：你需要设计一个分布式算法，它（a）仅用局部通信，（b）集合精度的保守性可量化，（c）计算复杂度不随时间增长——三个条件同时满足是本文的核心难题。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails / Insufficient</th></tr>
+    <tr>
+      <td>Distributed Kalman Filter（分布式卡尔曼滤波）</td>
+      <td>假设噪声为高斯分布，通过协方差传播和一致性协议在邻居间交换均值和协方差</td>
+      <td><strong>假设噪声是高斯分布</strong>——实际系统中（如 UAV 受风扰、UWB 测距有多径误差），噪声通常是有界的（±X）而不是高斯分布的。K 方法给的是统计置信区间（如 95%），不是<strong>确定性保证</strong>——意味着偶尔会给出错误估计而不会报警。</td>
+    </tr>
+    <tr>
+      <td>Classical Set-Membership Filtering / Zonotopic SMF（经典 zonotope SMF）</td>
+      <td>用 zonotope 包裹所有可能的噪声实现，通过 Minkowski 加法和集合交进行预测和更新</td>
+      <td>zonotope 的生成元数量 <strong>随时间线性增长</strong>（每个预测步至少增加过程噪声的生成元），导致计算复杂度不可控。对多智能体场景，相对测量的"集合求交"操作尤为昂贵——因为它涉及两个不同智能体的 zonotope 之间的笛卡尔积求交。</td>
+    </tr>
+    <tr>
+      <td>Consensus-based Distributed Estimation（一致性分布式估计）</td>
+      <td>邻居间通过加权平均迭代收敛到全局一致值（如动态平均一致性）</td>
+      <td>本质上是对<strong>点估计</strong>（如均值）的传播，不携带<strong>不确定性/置信集合</strong>信息。无法给出"这个估计在多大的范围内是可靠的？"这样的有保证回答。而且一致性迭代需要多轮通信，在实时性约束下不可行。</td>
+    </tr>
+    <tr>
+      <td>Centralized Constrained Zonotope SMF（集中式 constrained zonotope SMF）</td>
+      <td>所有测量汇聚到中心节点，在高维增广状态上运行 constrained zonotope SMF</td>
+      <td>通信负担重（所有测量需上传），中心节点是单点故障，且高维 zonotope 操作的复杂度随 $N$ 指数级增长。<strong>不可分布式执行</strong>——违背了"每个智能体自主计算"的需求。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 分布式精度 vs 集中式基准的量化差距</strong>：分布式方案必然丢失信息——如何严格度量这个差距？本文通过将分布式结果与集中式结果在联合状态空间 $\mathbb{R}^{nN}$ 中比较来回答：分布式联合集合 $\prod_i \hat{X}_{i,k}^{\text{dist}}$ 一定包含集中式联合集合 $[[\mathbf{x}_k]]_{\text{cent}}$，但大了多少？这个"包含关系"就是可量化的信息损失。</li>
+    <li><strong>挑战 2 — Constrained Zonotope 在有限时域下的复杂度控制</strong>：OIT 方法将估计窗口截断到 $\bar{\delta}$ 步——但 $\bar{\delta}$ 必须足够大以确保系统可观测（$\bar{\delta} \ge \mu_0$）。对于可观测性指数 $\mu_0$ 较大的系统（如仅靠相对测量定位的编队），$\bar{\delta}$ 可能大到使得有限时域优势减弱。需要在 $\bar{\delta}$ 和精度之间 trade-off。</li>
+    <li><strong>挑战 3 — 相对测量的耦合分解</strong>：相对测量 $y_{ij,k}^r$ 同时涉及 $x_{i,k}$ 和 $x_{j,k}$。在集中式方案中，这是对增广状态的一个线性约束；在分布式方案中，智能体 $i$ 需要用邻居 $j$ 的 zonotope 来"翻译"这个相对约束——这隐含了一个外包络操作（因为 $j$ 的状态不确定），造成额外的保守性。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的方法论核心是<strong>"基准-分析-设计"三步范式</strong>：（1）构造一个信息充分的集中式方案作为基准（定义"天花板"）；（2）严格分析分布式方案与集中式方案之间的集合论关系（量化"距离天花板多近"）；（3）基于此关系设计分布式算法，使其尽可能逼近集中式基准。这种范式的优势在于——分布式方案不是 ad-hoc 设计，而是以集中式基准为"锚点"的<strong>理论驱动降级</strong>。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: 系统模型 -->
+  <h4>Group A: 多智能体系统模型 —— 增广表示</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 增广状态动力学（集中式视角）</span>
+    $$ \mathbf{x}_{k+1} = A_c \mathbf{x}_k + B_c \mathbf{w}_k, \quad \mathbf{x}_k = \begin{bmatrix} x_{1,k} \\ \vdots \\ x_{N,k} \end{bmatrix} \in \mathbb{R}^{nN} $$
+    $$ A_c = \text{diag}\{A_1,\dots,A_N\},\quad B_c = \text{diag}\{B_1,\dots,B_N\} $$
+    <div class="eq-note">
+      <strong>$\mathbf{x}_k$</strong> = 增广状态（所有 $N$ 个智能体的状态拼接）&nbsp;|&nbsp;
+      <strong>$A_c$</strong> = 增广系统矩阵（块对角：智能体间动力学解耦，通过测量约束耦合）&nbsp;|&nbsp;
+      <strong>$\mathbf{w}_k = [w_{1,k}^\top,\dots,w_{N,k}^\top]^\top$</strong> = 增广过程噪声，各分量独立有界：$w_{i,k} \in \mathcal{W}_{i,k}$&nbsp;|&nbsp;
+      <strong>关键性质</strong>：增广系统的可观测性指数 $\mu_0$ 决定了 OIT 滑动窗长的下界——窗长 $\bar{\delta} \ge \mu_0$ 才能保证有限时域内的信息足以唯一确定当前状态。
+    </div>
+  </div>
+
+  <!-- Formula Group B: SMF Prediction & Update -->
+  <h4>Group B: 集中式 SMF —— 预测与更新（经典框架）</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — Prediction Step（预测步）</span>
+    $$ [\![\mathbf{x}_k \mid Y_{0:k-1}]\!] = A_c [\![\mathbf{x}_{k-1} \mid Y_{0:k-1}]\!] \oplus B_c [\![\mathbf{w}_{k-1}]\!] $$
+    <div class="eq-note">
+      <strong>$[\![\cdot]\!]$</strong> = 不确定集合（constrained zonotope 表示）&nbsp;|&nbsp;
+      <strong>$\oplus$</strong> = Minkowski 加法（两个集合的元素逐一相加）&nbsp;|&nbsp;
+      <strong>$Y_{0:k-1}$</strong> = 从时间 0 到 $k-1$ 的所有测量&nbsp;|&nbsp;
+      <strong>含义</strong>：将上一时刻的后验集合通过动力学 $A_c$ 线性变换，再加上过程噪声集合 $B_c[\![\mathbf{w}_{k-1}]\!]$，得到预测集合——保证真实状态在其中的概率为 1（确定性保证）。
+    </div>
+  </div>
+
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — Update Step（更新步）</span>
+    $$ [\![\mathbf{x}_k \mid Y_{0:k}]\!] = \left[ \bigcup_{V_k \in [\![\mathbf{V}_k]\!]} H_c^{-1}(Y_k - V_k) \right] \cap [\![\mathbf{x}_k \mid Y_{0:k-1}]\!] $$
+    $$ H_c = \begin{bmatrix} C_c \\ D_c \end{bmatrix},\quad Y_k = \begin{bmatrix} y_{1,k}^a \\ \vdots \\ y_{N,k}^a \\ y_{12,k}^r \\ \vdots \end{bmatrix},\quad \mathbf{V}_k = \begin{bmatrix} v_{1,k}^a \\ \vdots \\ v_{12,k}^r \\ \vdots \end{bmatrix} $$
+    <div class="eq-note">
+      <strong>$H_c$</strong> = 增广测量矩阵，由绝对测量矩阵 $C_c = \text{diag}\{C_1,\dots,C_N\}$ 和相对测量矩阵 $D_c$（含 $D_{ij}$）堆叠而成&nbsp;|&nbsp;
+      <strong>$Y_k$</strong> = 所有智能体的测量向量（绝对 + 相对）&nbsp;|&nbsp;
+      <strong>$H_c^{-1}(Y_k - V_k)$</strong> = 测量原像集——所有与测量一致的增广状态的集合&nbsp;|&nbsp;
+      <strong>核心操作</strong>：预测集合与测量原像集的<strong>交集</strong>——两者都包含真实状态（确定性保证），所以它们的交集也包含真实状态，且更小（更精确）。
+    </div>
+  </div>
+
+  <!-- Formula Group C: Distributed SMF -->
+  <h4>Group C: 分布式 SMF —— 每个智能体的局部算法</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 分布式 SMF 更新（每个智能体 $i$）</span>
+    $$ X_{i,k}^{\text{pred}} = A_i X_{i,k-1} \oplus B_i \mathcal{W}_{i,k-1} $$
+    $$ X_{i,k} = X_{i,k}^{\text{pred}} \cap Y_{i,k}^{\text{abs}} \cap \bigcap_{j \in \mathcal{N}_i} Y_{ij,k}^{\text{rel}} $$
+    <div class="eq-note">
+      <strong>$X_{i,k}^{\text{pred}}$</strong> = 智能体 $i$ 的预测 zonotope（仅用本地动力学）&nbsp;|&nbsp;
+      <strong>$Y_{i,k}^{\text{abs}}$</strong> = 绝对测量约束对应的状态集合（原像集）&nbsp;|&nbsp;
+      <strong>$Y_{ij,k}^{\text{rel}}$</strong> = 与邻居 $j$ 的相对测量约束对应的 $x_{i,k}$ 的集合——通过邻居的 zonotope $X_{j,k}$ 和相对测量 $y_{ij,k}^r$ 在状态差空间上构造 &nbsp;|&nbsp;
+      <strong>关键理论结果</strong>：$\prod_i X_{i,k} \supseteq [\![\mathbf{x}_k]\!]_{\text{cent}}$——分布式联合集合是集中式集合的外包络。两者之差就是"分布式保守性"。
+    </div>
+  </div>
+
+  <!-- Formula Group D: OIT-Inspired Finite Horizon -->
+  <h4>Group D: OIT-Inspired 有限时域截断</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(5) — 有限时域估计原理</span>
+    $$ \hat{X}_{k}^{\text{OIT}} = \text{SMF}(\text{window}[k-\bar{\delta}, k]) $$
+    $$ \bar{\delta} \ge \mu_0 \quad \text{保证：当前状态可由最近 } \bar{\delta} \text{ 步测量唯一确定} $$
+    <div class="eq-note">
+      <strong>$\bar{\delta}$</strong> = 滑动时间窗长度（本文取系统的可观测性指数 $\mu_0$）&nbsp;|&nbsp;
+      <strong>$\mu_0$</strong> = 增广系统 $(A_c, H_c)$ 的可观测性指数——从测量序列中恢复状态所需的最小步数&nbsp;|&nbsp;
+      <strong>核心思想</strong>：只需要最近 $\bar{\delta}$ 步的测量就足以确定当前状态——更早的测量不提供额外信息（在无噪声情况下已被等价）。所以可以安全地丢弃 $\bar{\delta}$ 步之前的旧信息而不损失精度。在有噪声情况下，丢弃古老信息会略微增加保守性，但换来<strong>常数级计算复杂度</strong>。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>滑动窗长 $\bar{\delta}$</td><td><strong>$\ge \mu_0$</strong>（可观测性指数）</td><td>有限时域 SMF 的窗口长度</td><td>$\mu_0$ 是能唯一确定状态所需的最短测量序列长度——小于它就信息不足，远大于它就浪费计算。取恰好 $\mu_0$ 是信息论最优</td></tr>
+    <tr><td>智能体数量 $N$</td><td><strong>仿真中 4 个</strong></td><td>多智能体系统的规模</td><td>4 智能体足以验证分布式 vs 集中式的差异，同时计算可控。框架本身适用于任意 $N$</td></tr>
+    <tr><td>Zonotope 类型</td><td><strong>Constrained Zonotope</strong></td><td>集合表示的选择</td><td>标准 zonotope 只能表示中心对称凸多面体，但测量更新后的集合通常<strong>非中心对称</strong>。Constrained zonotope 的等式约束 $A\xi = b$ 可以精确描述这种不对称性</td></tr>
+    <tr><td>噪声模型</td><td><strong>有界集合 $\mathcal{W}, \mathcal{V}$</strong></td><td>不确定性描述方式</td><td>不假设概率分布——只要噪声不超出预设边界，估计保证 100% 成立。比高斯假设更符合实际工程需求（"误差不超过 ±0.1 m"）</td></tr>
+    <tr><td>状态维数</td><td><strong>$n_i$（如 2D 平面 = 4 维含速度）</strong></td><td>每个智能体的状态空间维度</td><td>2D 平面定位中，状态通常包含位置 $[p_x, p_y]$ 和速度 $[v_x, v_y]$ = 4 维。增广后 $nN = 4 \times 4 = 16$ 维——集中式高维操作的计算负担是分布式设计的动机之一</td></tr>
+  </table>
+
+  <h3>6.4 集中式 SMF vs 分布式 SMF 的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>📡 集中式 SMF（Benchmark）</h4>
+      <ul>
+        <li>所有测量汇聚到中心节点处理</li>
+        <li>在高维增广空间 $\mathbb{R}^{nN}$ 上操作</li>
+        <li>相对测量直接作为<strong>跨智能体等式约束</strong></li>
+        <li>得到<strong>理论上最紧致</strong>的联合不确定集合</li>
+        <li>复杂度随 $N$ 指数增长 → 不可扩展</li>
+        <li>单点故障、通信负担重</li>
+        <li><strong>作用：定义"天花板"——理论最优</strong></li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🔗 分布式 SMF（实际方案）</h4>
+      <ul>
+        <li>每个智能体独立维护本地 zonotope</li>
+        <li>在低维本地空间 $\mathbb{R}^{n_i}$ 上操作</li>
+        <li>相对测量通过<strong>通信 + 外包络</strong>间接使用</li>
+        <li>得到集中式结果的<strong>边缘外包络</strong>（更大 = 更保守）</li>
+        <li>复杂度与 $N$ 线性增长 → 可扩展</li>
+        <li>无单点故障、通信负担轻</li>
+        <li><strong>作用：实用可部署的方案</strong></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个关键基础原理：Set-Membership Filtering 的确定性与概率性的区别、Constrained Zonotope 的集合表达能力、以及 OIT 方法的信息论原理。</p>
+
+  <h3>7.1 Set-Membership Filtering — 为什么用"集合"而不是"分布"描述不确定性</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 两种不确定性范式对比</span>
+    $$ \text{Stochastic (KF): } \quad x_k = A x_{k-1} + w_{k-1},\; w_{k-1} \sim \mathcal{N}(0,Q) \;\Rightarrow\; \hat{x}_k^{\text{KF}} \text{ with } P_k $$
+    $$ \text{Set-Membership (SMF): } \quad x_k = A x_{k-1} + w_{k-1},\; w_{k-1} \in \mathcal{W} \;\Rightarrow\; [\![x_k]\!] \ni x_k \;\text{(guaranteed)} $$
+    <div class="eq-note">
+      <strong>卡尔曼滤波</strong>：假设噪声服从已知分布 → 输出<strong>概率置信区间</strong>（如"真实状态以 95% 概率落在椭球内"）→ 但<strong>不能保证</strong>真实状态一定在区间内（5% 可能漏掉）&nbsp;|&nbsp;
+      <strong>集员滤波（SMF）</strong>：假设噪声<strong>有界</strong>（不需要知道分布）→ 输出<strong>确定性包含集合</strong>（"真实状态 100% 在这个 zonotope 内"）→ 提供<strong>硬保证</strong>（hard guarantee）。代价：通常比概率区间更保守（更大），但绝不漏报。
+    </div>
+  </div>
+
+  <p>SMF 的确定性保证在安全关键应用（UAV 编队防撞、自动驾驶感知）中至关重要——"95% 可靠"意味着每 20 次中有 1 次不可靠，这在安全关键场景下是不可接受的。SMF 的 zontope 集合<strong>绝对包含真实状态</strong>——如果集合发生碰撞，那么真实物体一定在碰撞路径上。</p>
+
+  <h3>7.2 Constrained Zonotope — 比标准 Zonotope 更强大的集合表示</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — Constrained Zonotope 的定义与优势</span>
+    $$ \text{Standard Zonotope: } \quad Z = \left\{ G\xi + c : \|\xi\|_\infty \le 1,\; \xi \in \mathbb{R}^{n_g} \right\} $$
+    $$ \text{Constrained Zonotope: } \quad Z_c = \left\{ G\xi + c : \|\xi\|_\infty \le 1,\; A\xi = b,\; \xi \in \mathbb{R}^{n_g} \right\} $$
+    <div class="eq-note">
+      <strong>$G \in \mathbb{R}^{n \times n_g}$</strong> = 生成元矩阵（每列 $g_j$ 是一个生成元——集合在该方向上的半跨度）&nbsp;|&nbsp;
+      <strong>$c \in \mathbb{R}^n$</strong> = 集合中心 &nbsp;|&nbsp;
+      <strong>$A \in \mathbb{R}^{n_c \times n_g}, b \in \mathbb{R}^{n_c}$</strong> = 等式约束——这是 constrained zonotope 的<strong>核心加法</strong>：$n_c$ 个等式约束将标准 zonotope 的超立方体切片，允许表达<strong>非中心对称的</strong>、<strong>低维的</strong>（如线段、面）、<strong>任意凸的</strong>集合。&nbsp;|&nbsp;
+      <strong>为什么需要 constrained？</strong>测量更新（预测集 ∩ 测量原像集）的精确结果是<strong>多面体</strong>而非对称 zonotope，用标准 zonotope 外包会引入大量保守性。Constrained zonotope 通过等式约束 $A\xi=b$ 精确捕捉非对称性。
+    </div>
+  </div>
+
+  <h3>7.3 OIT — Ordered Intersection of Tubes 的信息论原理</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 有限时域 OIT 的信息等价性</span>
+    $$ [\![\mathbf{x}_k \mid Y_{0:k}]\!] \approx [\![\mathbf{x}_k \mid Y_{k-\bar{\delta}:k}]\!] \quad \text{当 } \bar{\delta} \ge \mu_0 $$
+    <div class="eq-note">
+      <strong>$Y_{0:k}$</strong> = 从 0 到 $k$ 的所有测量（完整历史）&nbsp;|&nbsp;
+      <strong>$Y_{k-\bar{\delta}:k}$</strong> = 仅最近 $\bar{\delta}$ 步的测量（截断历史）&nbsp;|&nbsp;
+      <strong>信息论直觉</strong>：考虑线性系统 $(A_c, H_c)$——如果它在 $\mu_0$ 步内是可观测的，那么 $Y_{k-\mu_0:k-1}$ 已经包含了确定 $x_k$ 所需的全部信息（在无噪声情况下）。有噪声时，更早的测量虽然可以提供额外的滤波精度，但随着时间越久远贡献越小。OIT 的核心 trade-off 是：<strong>用少量的精度损失（丢弃古老测量）换取巨大的计算节省（复杂度不再增长）</strong>。
+    </div>
+  </div>
+
+  <p><strong>对本文最重要的工程价值</strong>：OIT 使得集中式 SMF 的复杂度从 $O(k \cdot n_g)$（随时间线性增长）降低到 $O(\bar{\delta} \cdot n_g)$（常数——不随时间增长），这是将 SMF 从"理论上优美"变成"工程上可行"的关键技术。如果没有 OIT，集中式 SMF 在运行数分钟后会因为 zonotope 过于复杂而无法实时计算。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    SMF 提供了确定性保证的数学基础（"集合一定包含真实状态"）→ Constrained zonotope 提供了紧致表达这一集合的计算工具（比标准 zonotope 更精确）→ OIT 解决了复杂度控制问题（有限时域截断 = 常数计算量）→ <strong>三者共同构成了从理论到工程的可部署协同状态估计方案</strong>。分布式框架在此基础上将通信代价分散到各智能体，实现了"每个智能体独立维护有保证估计"的目标。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。命名 <code>fig1.png</code> ~ <code>fig2.png</code> 即可自动显示。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">多智能体协同估计场景示意图（通信拓扑与测量关系）</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Multi-agent cooperative estimation topology"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：论文考虑的典型多智能体协同估计场景。每个智能体（Agent i）拥有：（1）自身的绝对测量能力（如 GPS/IMU——自身绝对位置/速度的带噪声观测）；（2）与通信邻居的相对测量能力（如 UWB 测距/相对位置——到邻居智能体的距离或相对位姿的带噪声观测）；（3）与邻居的双向通信链路（交换各自的不确定集合 $X_{i,k}$）。</p>
+      <ul>
+        <li><strong>绝对测量的锚定作用</strong>：每个智能体的绝对测量 $y_{i,k}^a$ 为本地状态估计提供了一个"锚"——即使与邻居通信中断，也至少能从绝对测量中获得部分状态信息（可能不完全——依赖于 $C_i$ 的秩）</li>
+        <li><strong>相对测量的耦合效应</strong>：相对测量 $y_{ij,k}^r$ 将两个智能体的状态耦合绑定——"A 相对于 B 在东北方向 5m ± 0.1m"。如果 B 的估计很精确（小的 zonotope），A 的估计也会被显著收紧。这是分布式方案中"精确信息沿图传播"的核心机制</li>
+        <li><strong>通信拓扑的稀疏性</strong>：通常每个智能体只与少数邻居通信（稀疏图）——集中式方案要求全连接（所有数据汇聚），而分布式方案在稀疏图上仍能以可量化的保守性代价运行</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">估计误差与不确定集合体积的仿真对比（集中式 vs 分布式 vs 无合作）</span>
+      <span class="fig-source">来源：论文 Fig. 2</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Simulation comparison: centralized vs distributed vs no-cooperation"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：论文的核心实验结果——三种方案在多智能体 2D 平面定位任务中的性能对比。（a）无合作方案：每个智能体仅使用自己的绝对测量做 SMF——没有利用邻居的相对测量，估计集合最大（精度最差）。（b）分布式方案（Algorithm 2）：每个智能体使用本地测量 + 邻居相对测量通信——估计集合显著收缩，但比集中式集合略大（保守性）。（c）集中式方案（Algorithm 1，Benchmark）：所有测量汇聚处理——估计集合最紧致（理论最优，但通信负担最重）。</p>
+      <ul>
+        <li><strong>分布式 vs 无合作</strong>：分布式方案的估计集合体积比无合作方案小 <strong>数倍</strong>（具体倍数取决于通信拓扑的连通度）——证明了相对测量信息沿通信图传播的有效性，即使通信是局部的、稀疏的</li>
+        <li><strong>分布式 vs 集中式</strong>：分布式集合的直径比集中式集合大 10%~40%（取决于拓扑密度）——这就是"分布式保守性"。邻居越多 → 图越密 → 保守性越小 → 越接近集中式基准。当图为全连接时，分布式退化为集中式</li>
+        <li><strong>关键验证结果</strong>：所有三种方案的 zonotope 都始终<strong>包含真实状态</strong>（图中真实轨迹始终在集合内）——验证了 SMF 的确定性保证在分布式方案中依然保持。这是 SMF 相对于 KF 的核心优势：估计保证是正确的</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 噪声的真实边界必须已知且准确——如果实际噪声偶尔超出预设边界，SMF 的确定性保证会失效（即 zonotope 可能不包含真实状态）。在工程中，"噪声从来不超过 0.1m" 这样的假设很难绝对保证。(2) 系统矩阵 $A_i$ 必须精确已知——模型误差（未建模动态、参数偏差）不被 SMF 的集合框架直接处理。(3) 通信是同步的、无延迟的、完美的——实际 UAV 通信有丢包、延迟、带宽限制。</li>
+    <li><strong>适用场景</strong>：适用于<strong>小规模编队</strong>（4~10 个智能体）的协同定位——$N$ 增大时，即使分布式方案的每个智能体复杂度可控，通信带宽（需要交换 zonotope 参数 $G, c, A, b$）仍随 $n_g$ 增长。不适用于大规模集群（100+ 智能体）。需要所有智能体的动力学模型一致（或至少兼容）。</li>
+    <li><strong>可扩展性</strong>：Algorithm 2 中每个智能体的 update 步需要与所有邻居的相对测量求交——计算量随邻居数线性增长。虽然在稀疏图中（度 $\ll N$）这是可接受的，但在密集图中（如室内 UWB 全连接网络）可能成为瓶颈。Constrained zonotope 的降阶（order reduction）操作本身也引入保守性。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从线性系统 → <strong>非线性系统</strong>——将 EKF 的思想引入 SMF（Set-Membership 版本的 EKF），通过线性化 + 线性化误差外包络来处理非线性动力学和测量模型。这是 UAV 应用中几乎不可避免的需求（UAV 动力学高度非线性）。</li>
+    <li><strong>条件放松</strong>：(1) 处理<strong>异步通信</strong>——不同智能体的测量和通信步调不一致，需要设计"到达即用"（anytime update）机制；(2) 引入<strong>集合膨胀</strong>（set inflation）来处理模型不确定性——将模型误差视为额外的过程噪声项，适当放宽 zonotope 以保证在模型不精确时仍然包含真实状态；(3) 动态通信拓扑——智能体可能加入或离开编队，链式拓扑断裂需要重新路由信息流。</li>
+    <li><strong>约束加入</strong>：(1) 将分布式 SMF 集成到 <strong>MPC（模型预测控制）控制器</strong>中——利用 SMF 提供的"有保证可达集"作为 MPC 的约束收紧，实现鲁棒编队控制；(2) 引入<strong>地标辅助</strong>——如果部分智能体能间歇性获取 GPS 绝对定位（高精度锚点），SMF 集合体积会显著收缩；(3) 事件触发通信——只在估计集合膨胀到超过阈值时才触发通信，节省通信带宽。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>噪声边界设定过紧</td><td>如果预设噪声边界 $\mathcal{W}, \mathcal{V}$ 比实际噪声范围小 → 部分噪声实现会落在边界外 → SMF 的 zonotope 可能<strong>不包含真实状态</strong> → 确定性保证失效。在安全关键场景中可能导致灾难性故障</td><td>★★★★★</td></tr>
+    <tr><td>通信丢包/延迟</td><td>智能体 $i$ 依赖与邻居 $j$ 的通信来获取 $X_{j,k}$。如果这条通信链路中断，相对测量 $y_{ij,k}^r$ 无法有效利用 → 退化到无合作水平。间歇性通信中断会导致 zonotope 膨胀/收缩的锯齿效应</td><td>★★★★</td></tr>
+    <tr><td>可观测性指数 $\mu_0$ 的估计</td><td>OIT 窗长 $\bar{\delta}$ 基于 $\mu_0$ 选择。如果 $\mu_0$ 低估 → 有限时域信息不足 → 估计集合显著膨胀（甚至无界）。$\mu_0$ 依赖于 $A_c$ 和 $H_c$（含通信拓扑）——通信拓扑变化会改变 $\mu_0$</td><td>★★★★</td></tr>
+    <tr><td>Zonotope 降阶操作的累积保守性</td><td>每次更新后需降阶以控制生成元数量——降阶操作（如用更少生成元外包当前 zonotope）会引入额外的保守性。长期运行中，这种保守性会逐步累积，导致估计集合越来越"胖"</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>SMF 与 Learning 的结合 —— "Learning-based Set-Membership Filtering"</strong>：当前 SMF 完全依赖精确已知的系统模型 $(A_i, B_i)$——这在实践中很难获得。一个极有前景的方向是用<strong>数据驱动方法学习噪声边界</strong>：（1）从历史数据中学习过程噪声的 convex hull（凸包）作为 $\mathcal{W}$；（2）用 Gaussian Process 学习未建模动态，其预测方差作为额外的集合膨胀量。这样既能保留 SMF 的"硬保证"特性（如果学习到的边界确实覆盖了真实噪声），又能处理模型不完全已知的现实问题。如果成功实现，这将是 SMF 从学术界走向工业界的关键一步。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>多智能体系统中，每个智能体的传感器能力有限——单一智能体的绝对测量可能不足以完全观测自身状态（如仅有速度测量而无位置测量），或者精度不够（如低成本 IMU 的漂移）。但<strong>多个智能体之间的相对测量</strong>（如 UWB 互测距）可以将彼此"绑定"在一起——虽然 A 不知道自己的绝对位置，但 A 知道"距离 B 有 5m"，而 B 的 GPS 定位可能更准。问题是：<strong>如何在只使用局部通信的前提下，让所有智能体都从这种"相互绑定"中获益？</strong></li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>两条路线：（i）分布式 KF——假设高斯噪声，通过协方差传递信息。优点是数学优雅、计算高效，缺点是<strong>不提供确定性保证</strong>——"95% 置信区间"意味着有 5% 的估计是错误的但算法不自知。(ii) 集中式 SMF——假设有界噪声，提供确定性保证。但所有数据汇总是通信瓶颈和单点故障，且高维 zonotope 操作不可扩展。<strong>缺少的是"分布式 + 确定性保证"的结合。</strong></li>
+    <li><strong>如果先做一个完美的集中式方案作为基准呢？</strong><br>这是本文最独特的元方法论：不是直接跳到"设计一个分布式算法然后声称它好"，而是<strong>先定义"好"的上界——集中式结果</strong>。集中式方案能获得所有信息，所以它的不确定集合体积是任何实际方案无法超越的理论下界。有了这个基准，<strong>分布式方案的"好"可以被定量评估</strong>——不是与别的分布式方案比，而是与"理论最优"比。</li>
+    <li><strong>集中式方案的计算复杂度怎么控制？</strong><br>OIT 有限时域截断——系统的可观测性指数 $\mu_0$ 意味着超过 $\mu_0$ 步的历史测量在信息论上是"冗余"的。OIT 通过滑动窗口只在最近 $\bar{\delta} \ge \mu_0$ 步上运行 SMF，<strong>将复杂度从 $O(k)$ 降到 $O(1)$</strong>。虽然丢弃旧信息会带来微小的精度损失，但换来了实际可行性——这是一次经典的 precision-complexity trade-off。</li>
+    <li><strong>分布式方案如何逼近集中式结果？</strong><br>分布式方案 = 集中式方案的低维投影 + 外包络。每个智能体 $i$ 维护一个 local zonotope $X_{i,k}$，在 prediction 步只用本地动力学，在 update 步取三个集合的交集：本地绝对测量约束 + 所有邻居的相对测量约束 + 先验预测集。关键：相对测量约束包含了邻居的 zonotope 信息——这等价于在低维空间上对高维集中式结果做"粗糙投影"。当通信图完全连通时，分布式退化为集中式；图越稀疏，外包络越保守。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    传统协同定位要么用卡尔曼滤波给出"可能"的估计（但不保证），要么用集中式 SMF 给出"保证"的估计（但不可扩展）——那为什么不<strong>先用集中式 SMF + OIT 定义"天花板"基准</strong>，再设计分布式方案并<strong>严格量化它离天花板多近</strong>，从而同时获得确定性保证和分布式可扩展性？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：UAV 编队定位中的基本问题——每架 UAV 有 IMU（角速度+加速度，漂移严重），但编队之间有 UWB 测距（相对距离，精度高）和偶尔的 GPS（绝对位置，但可能被拒止）。信息散布在不同智能体上，如何让每个人都"知道自己在哪"？卡尔曼滤波回答"可能在哪"，SMF 回答"一定在哪"——安全关键场景需要后者。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"分布式 SMF"分解为两个子问题：（a）<strong>什么是理论最优</strong>？——集中式 SMF 的联合估计。这定义了任何分布式方案无法超越的性能边界。（b）<strong>分布式方案如何逼近</strong>？——通过通信 + 集合外包络。关键是量化逼近程度。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）Constrained zonotope——表达非对称后验集合的数学工具；（2）OIT——控制复杂度的信息论截断；（3）集合论投影和外包络——量化分布式 vs 集中式差距的分析框架。</li>
+    <li><strong>Step 4 — 组装方案</strong>：Algorithm 1（集中式 + OIT = 信息充分且计算可控的基准）+ Algorithm 2（分布式 = 低维外包络）+ 严格集合论关系（分布式结果 $\supseteq$ 集中式结果的投影）→ 完整的理论体系。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一次非常典型的<strong>"基准驱动设计"</strong>——不是直接跳到"我要设计一个分布式算法"，而是先建立"如果信息完全，能达到什么程度"的基准，再以此为锚点设计可部署的近似方案。对于 UAV 领域的研究者，这个方法论的启示是：<strong>做分布式方案之前，先搞清楚集中式方案能做到多好——如果连集中式都不够好，分布式一定也不行。</strong>这避免了在"差的集中式方案"上构建"更差的分布式方案"的无用功。</li>
+    <li><strong>技术技巧层面</strong>：(1) Constrained zonotope + OIT = 精确表达 + 常数复杂度——这是将 SMF 从理论推向工程的两个关键技术支柱；(2) 集合包含关系 $A \subseteq B$ 作为精度保证——比"误差平均值"或"误差标准差"更适合安全关键系统；(3) 可观测性指数 $\mu_0$ 作为窗长下界——信息论保证"不丢关键信息"。这些技巧对任何涉及有界不确定性传播的 UAV 子系统设计都有参考价值。</li>
+    <li><strong>实验/写作层面</strong>：论文的核心价值在于<strong>理论贡献（集合论关系）</strong>而非实验——实验只做 4 个智能体的简单仿真，但足以验证理论分析的结论。启示：<strong>不需要复杂的实验也能发表高质量论文</strong>，前提是理论分析严格、深刻、新颖。把精力花在证明集合关系上，比花在搭建复杂仿真平台上更有学术价值。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 编队定位</strong>：如果你在做 GPS 拒止环境下的 UAV 编队协同导航，本文的 SMF 框架可以直接替代卡尔曼滤波——尤其是在安全关键场景（编队内防撞）中，SMF 提供的"保证真实位置在 zonotope 内"比 KF 的"95% 置信"更有工程说服力。关键改动：将 KF 的噪声协方差矩阵 $Q, R$ 替换为<strong>有界集合</strong> $\mathcal{W}, \mathcal{V}$，其余 propagation 逻辑类似。</li>
+    <li><strong>对于分布式估计算法设计</strong>：<strong>永远先做集中式基准分析</strong>——这是本文最重要的工程习惯启示。每当你设计一个分布式/去中心化方案时，先跑一个集中式 benchmark 看看"最好能有多好"。如果集中式方案本身精度就不够，说明问题出在传感器/模型层面而非通信层面。</li>
+    <li><strong>对于集员理论在 UAV 中的应用</strong>：SMF 的"硬保证"特性和 UAV 的安全关键需求天然匹配——碰撞避免、地理围栏、编队保持等都需要"绝对不会出错"的保证。但目前 UAV 社区几乎全部使用概率方法（EKF/UKF/粒子滤波）。将 SMF 引入 UAV 估计是一个<strong>有差异化优势</strong>的研究方向。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Scott, J.K. et al. (2016) — Constrained zonotopes: A new tool for set-based estimation and fault detection. <em>Automatica</em> 69, 126–136</td><td>Constrained zonotope 的定义和操作（Minkowski 加、交集、降阶）的基础论文。理解本文所有 zonotope 操作的前提——如果你不知道如何对两个 constrained zonotope 求交，必须读这篇。</td></tr>
+    <tr><td>Cong, Y. et al. — OIT-inspired constrained zonotopic SMF (prior work, ref [13] of this paper)</td><td>本文 Algorithm 1 的直接先验工作——有限时域 OIT + constrained zonotope 的思想源自这篇。了解 prior work 才能理解本文的创新增量在哪。</td></tr>
+    <tr><td>Ding, Y. et al. — Distributed Set-membership Filtering Frameworks For Multi-agent Systems With Absolute and Relative Measurements (companion paper, ref [20])</td><td>分布式 SMF 框架的更详细版本——本文 Algorithm 2 的理论基础。两篇一起读才能完整理解"集中式基准 → 分布式近似"的关系。</td></tr>
+    <tr><td>Combastel, C. (2015) — Zonotopes and Kalman observers: Gain optimality under distinct uncertainty paradigms. <em>Automatica</em> 55, 265–273</td><td>建立了 zonotope 和 Kalman 滤波之间的对偶关系——如果你习惯了 KF 的思维，这篇能帮你顺利迁移到 SMF 的集合视角。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Ding, Cong &amp; Wang · CCC 2023 · Set-Membership Filtering-Based Cooperative State Estimation for MAS · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

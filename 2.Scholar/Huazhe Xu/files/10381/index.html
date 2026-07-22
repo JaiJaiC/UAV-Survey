@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Paper Notes - X-Distill: Cross-Architecture Vision Distillation for Visuomotor Learning</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  .series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+  .series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+  .series-links { display:flex; gap:7px; flex-wrap:wrap; }
+  .series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+  .series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+</style></head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+    <div class="series-nav">
+    <div class="series-nav-title">📖 Huazhe Xu · 26-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10384/index.html">RL-100</a>
+<a href="../10382/index.html">RL</a>
+<a class="active" href="../10381/index.html">X-distill Cross-architect</a>
+<a href="../10380/index.html">DexImit Learning bimanual</a>
+<a href="../10379/index.html">ViTaS Visual tactile</a>
+<a href="../10378/index.html">Beyond action residuals</a>
+<a href="../10377/index.html">One-policy-fits-all Geome</a>
+<a href="../10376/index.html">VLA</a>
+<a href="../10392/index.html">Fine-tuning hard-to-simul</a>
+<a href="../10391/index.html">DemoSpeedup Accelerating </a>
+<a href="../10390/index.html">forget-and-grow strategy </a>
+<a href="../10389/index.html">Morpheus neural-driven an</a>
+<a href="../10388/index.html">HERMES</a>
+<a href="../10387/index.html">VLA</a>
+<a href="../10386/index.html">Entropy regularizing acti</a>
+<a href="../10385/index.html">Dtactive vision-based tac</a>
+<a href="../10383/index.html">MoE-DP MoE-enhanced diffu</a>
+<a href="../10438/index.html">opportunities risks found</a>
+<a href="../10442/index.html">Visual genome Connecting</a>
+<a href="../10437/index.html">Perceptual losses real-ti</a>
+<a href="../10441/index.html">Deep visual-semantic alig</a>
+<a href="../10439/index.html">ImageNet large scale</a>
+<a href="../10440/index.html">Large-scale video classif</a>
+<a href="../10443/index.html">3D</a>
+<a href="../10436/index.html">Imagenet large-scale hier</a>
+<a href="../10444/index.html">bayesian hierarchical mod</a>
+    </div>
+  </div>
+
+    <div class="arch-arrow"><span>语义特征</span><span>MSE 损失</span><span>动作监督</span><span>实时推理</span></div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>教师: DINOv2 ViT-L/14</strong><small>304M 参数，冻结，仅阶段1使用</small></div>
+      <div class="arch-metric"><strong>蒸馏数据: ImageNet-1K</strong><small>1.28M 自然图像，无机器人数据</small></div>
+      <div class="arch-metric"><strong>学生: ResNet-18</strong><small>11M 参数，~3ms 推理延迟</small></div>
+      <div class="arch-metric"><strong>评估: 34 sim + 5 real</strong><small>少样本演示（10-25条）· 三类操作</small></div>
+    </div>
+  </div>
+
+  <h3>3.2 System Architecture Mermaid -- Full Framework</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph PHASE1["阶段1: 跨架构知识蒸馏 · 通用ImageNet数据 · 一次性离线计算"]
+      direction LR
+      T1["教师: DINOv2 ViT-L/14 · 冻结权重 · 输出 f_T(x) ∈ R^1024"] --> T3["特征MSE损失: L_KD = ||f_S(x) - f_T(x)||^2"]
+      T2["学生: ResNet-18 + 线性投影头 · 可训练 · 输出 f_S(x) ∈ R^512→R^1024"] --> T3
+      T3 --> T4["优化: AdamW · lr=1e-3 · batch=256 · ~8 GPU-hours"]
+    end
+
+    subgraph PHASE2["阶段2: 机器人策略微调 · 少量演示数据 · 每任务单独训练"]
+      direction LR
+      P1["视觉编码器: 蒸馏后ResNet-18 · 阶段1权重初始化"] --> P3["联合微调: L_total = L_diffusion + lambda*L_reg"]
+      P2["策略头: Diffusion Policy · 1D U-Net · 条件注入(FiLM) · 输出Action Chunk"] --> P3
+      P3 --> P4["优化: AdamW · lr=1e-4 · 仅机器人数据 · 数十个demo"]
+    end
+
+    subgraph PHASE3["阶段3: 实时部署 · 低延迟推理 · 满足40Hz闭环"]
+      direction LR
+      D1["机器人相机 224x224 RGB"] --> D2["ResNet-18 编码 ~3ms"]
+      D2 --> D3["DDIM 去噪 ~22ms (10步)"]
+      D3 --> D4["输出: 动作序列 a_t:t+16 · 执行首帧 · Receding Horizon"]
+    end
+
+    PHASE1 -->|"蒸馏后 ResNet 权重"| PHASE2
+    PHASE2 -->|"微调后完整策略"| PHASE3
+
+    classDef p1 fill:#fff7ed,stroke:#fed7aa,stroke-width:2px,color:#92400e
+    classDef p2 fill:#eff6ff,stroke:#bfdbfe,stroke-width:2px,color:#1d4ed8
+    classDef p3 fill:#f5f3ff,stroke:#ddd6fe,stroke-width:2px,color:#6d28d9
+    class T1,T2,T3,T4 p1
+    class P1,P2,P3,P4 p2
+    class D1,D2,D3,D4 p3
+    </pre>
+  </div>
+
+  <h3>3.3 Training Pipeline Mermaid -- 端到端训练数据流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph DATA["数据层: 两个独立数据集"]
+      direction LR
+      D_IMG["ImageNet-1K · 1.28M张通用自然图像 · 1000类 · 无机器人标注"]
+      D_ROBOT["机器人演示 · 34个仿真任务 + 5个真实任务 · 每任务10-25条演示"]
+    end
+
+    subgraph ENC["视觉编码层: 教师-学生双通道"]
+      direction LR
+      E_VIT["DINOv2 ViT-L · 冻结 · f_T(x) = [CLS] token · 1024-d"]
+      E_RES["ResNet-18 · 蒸馏初始化 → 机器人微调 · GAP → 512-d"]
+    end
+
+    subgraph LOSS["损失函数层: 两阶段解耦"]
+      direction LR
+      L_KD["L_KD = MSE(f_S, f_T) · 阶段1 · 仅在ImageNet上 · 教师不更新"]
+      L_DIFF["L_diff = E[||epsilon - epsilon_theta(A_k|f_S(o),k)||^2] · 阶段2"]
+      L_REG["L_reg = lambda*||theta_S - theta_S^distill||^2 · lambda=0.01"]
+    end
+
+    subgraph POLICY["策略输出层: Diffusion Policy 推理"]
+      direction LR
+      ACT["扩散去噪: A_T → DDIM(10步) → A_0 (Clean Action Chunk)"]
+      OUT["执行: 取序列首帧动作 → 机械臂执行 → 新观测 → Receding Horizon"]
+    end
+
+    D_IMG -->|"阶段1"| E_VIT
+    D_IMG -->|"阶段1"| E_RES
+    E_VIT --> L_KD
+    E_RES --> L_KD
+    L_KD -->|"梯度反传 (仅ResNet)"| E_RES
+
+    D_ROBOT -->|"阶段2"| E_RES
+    E_RES --> L_DIFF
+    E_RES -.->|"正则化锚点"| L_REG
+    L_DIFF --> ACT
+    L_REG --> ACT
+    ACT --> OUT
+
+    classDef data fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef enc fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef loss fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef policy fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class D_IMG,D_ROBOT data
+    class E_VIT,E_RES enc
+    class L_KD,L_DIFF,L_REG loss
+    class ACT,OUT policy
+    </pre>
+  </div>
+</section>
+
+<!-- SECTION 4: TASK DEFINITION -->
+<section id="task">
+  <h2>4. Task Definition -- What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 -- 少样本视觉运动策略学习</span>
+    $$ \max_{\theta_S, \theta_\pi} \; \mathbb{E}_{(o, a^*) \sim \mathcal{D}_{\text{demo}}}\left[ \log p_{\theta_\pi}(a^* \mid f_{\theta_S}(o)) \right] \quad \text{with} \quad f_{\theta_S} \approx f_T \; \text{(via KD on ImageNet)} $$
+    $$ \text{Subject to: } |\mathcal{D}_{\text{demo}}| \ll |\mathcal{D}_{\text{ImageNet}}| \quad \text{(10-25 vs. 1.28M)} \quad \text{and} \quad \text{Latency}(f_{\theta_S}) < 5\text{ms} $$
+    <div class="eq-note">
+      <strong>核心目标</strong>：在仅有 10-25 个专家演示的极低数据条件下，训练视觉运动策略 pi，使机器人基于单目 RGB 观测 o 产生正确的 6-DoF 末端执行器动作 + 夹爪控制 a^*。视觉编码器 f_S 需先在 ImageNet 上通过 KD 学习 DINOv2 教师 f_T 的表征函数，再在机器人数据上微调。&nbsp;|&nbsp;
+      <strong>theta_S</strong> = ResNet-18 视觉编码器参数（11M） &nbsp;|&nbsp;
+      <strong>theta_pi</strong> = Diffusion Policy 去噪网络参数 &nbsp;|&nbsp;
+      <strong>D_demo</strong> = 机器人演示数据集（10-25 条轨迹，每条约 50-200 个时间步）&nbsp;|&nbsp;
+      <strong>f_T</strong> = 冻结 DINOv2 ViT-L 教师函数 &nbsp;|&nbsp;
+      <strong>核心约束</strong>：演示数据极度稀缺；部署时推理延迟 &lt; 30ms；仅使用单目 RGB（无深度、无点云）。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output Table</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度/说明</th></tr>
+    <tr><td><strong>输入（阶段1）</strong></td><td>ImageNet-1K 自然图像 x，包含 1000 类物体、场景、动物等</td><td>224x224x3 RGB，1.28M 张，无任何机器人标注</td></tr>
+    <tr><td><strong>输入（阶段2）</strong></td><td>机器人单目 RGB 观测 o_t（可能含历史帧堆叠）</td><td>224x224x3（或 3x224x224 堆叠），来自 Franka/Panda 腕部相机</td></tr>
+    <tr><td><strong>输出（阶段1）</strong></td><td>学生编码器特征 f_S(x) —— 经投影头对齐至 1024-d 语义空间</td><td>512-d（ResNet GAP）→ 1024-d（投影后），与教师对齐</td></tr>
+    <tr><td><strong>输出（阶段2）</strong></td><td>动作序列 A_{t:t+H}——末端位姿（xyz + 欧拉角） + 夹爪开合度</td><td>H=16 × 7维（6-DoF位姿 + 1-d夹爪），扩散去噪生成</td></tr>
+    <tr><td><strong>评价指标</strong></td><td>任务成功率（Success Rate %）、推理延迟（ms）、参数量（M）</td><td>目标：SR > 75% 真实世界，延迟 < 30ms，参数 < 15M</td></tr>
+  </table>
+
+  <h3>4.3 Task Scope &amp; Diversity</h3>
+  <p>X-Distill 在<strong>三类操作任务</strong>上验证，覆盖机器人操作的主要形态：（1）<strong>夹爪操作（Gripper, 29 MetaWorld tasks）</strong>——标准 Franka + 平行夹爪，完成抓取、放置、推、拉、按钮等任务，考察空间定位和精确抓取；（2）<strong>灵巧手操作（Dexterous, 3 Adroit tasks）</strong>——Shadow Hand（20+ DoF）完成物体旋转、开门、转笔，考察高维动作空间下的视觉-运动协调；（3）<strong>关节物体操作（Articulated, 2 DexArt tasks）</strong>——操作笔记本电脑、水桶等具有运动学约束的日常物体，考察对关节结构的语义理解。三类任务覆盖了从简单 2D 桌面操作到 3D 高自由度灵巧操作的全谱系，对视觉编码器的泛化能力提出了全面考验。</p>
+</section>
+
+<!-- SECTION 5: KEY CHALLENGE -->
+<section id="challenge">
+  <h2>5. Key Challenge -- Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：机器人视觉运动学习中"视觉表征深度"与"数据稀缺性"的结构性张力，以及归纳偏置与泛化能力之间的架构选择困境。<br><br>
+    （1）<strong>视觉表征深度的需求</strong>：机器人操作需要理解场景的语义结构——物体的身份、位置、姿态、边缘、部件关系、与夹爪的空间关系。这不仅仅是"分类"（知道这是杯子），更是"细粒度理解"（杯子把手在左上方 30 度，杯口朝上）。标准 ImageNet 分类预训练提供的是前者（"这是杯子，类别 968"），DINOv2 自监督特征提供的是后者（连续语义空间中的精确位置，包含几何和语义对应）。但 DINOv2 运行在 ViT 架构上，推理速度慢。<br><br>
+    （2）<strong>数据稀缺的现实约束</strong>：真实机器人演示成本极高——每采集一条成功轨迹需要专家操控 30-120 秒，加上重置环境的时间，每小时只能采集 10-20 条。1.28M ImageNet 图像 vs. 500-2500 帧机器人图像——数据量差距达 500-2500 倍。直接从机器人数据学习视觉特征完全不可行。<br><br>
+    （3）<strong>架构选择的两难</strong>：ViT（Transformer）通过自注意力捕捉全局关系，泛化能力强但不具备 CNN 的局部性先验——在小数据下表现为过拟合或随机猜测；CNN 具备天然的局部性和平移等变性，但缺少大规模预训练带来的语义理解。X-Distill 的破局之道是：<strong>让 ViT 在大数据上提炼语义知识，通过蒸馏注入 CNN 的结构化归纳偏置</strong>——CNN 不再需要"从头学习世界"，而是"继承 ViT 的世界观并用 CNN 的语言表达出来"。
+  </div>
+
+  <h3>5.2 Prior Methods and Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">表头为英文，正文为中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails in Low-Data Robot Learning</th></tr>
+    <tr>
+      <td>From-Scratch CNN (ResNet-18 trained on robot data only)</td>
+      <td>在机器人演示数据上从头训练 ResNet 视觉编码器 + 策略头——最直接的端到端方案，无外部依赖</td>
+      <td>在 10-25 条演示（约 500-2500 帧图像）上，CNN 完全无法学到有意义的视觉特征——网络从零开始需要百万级图像才能收敛。ResNet-18（11M 参数）严重过拟合——记住了训练场景的纹理、光照和物体摆放，对新位置/新光照完全失效。真实世界任务成功率仅 41.9%——在灵巧手和关节物体操作上几乎为 0</td>
+    </tr>
+    <tr>
+      <td>Frozen DINOv2 ViT (frozen feature extractor + diffusion head)</td>
+      <td>冻结 DINOv2 ViT 提取图像特征，仅训练 Diffusion Policy 头——保留 ViT 强大的语义理解，避免视觉编码器在小数据上过拟合</td>
+      <td><strong>推理延迟成为部署瓶颈</strong>——ViT-L（304M）单帧编码需 40-60ms（Jetson Orin），加上扩散策略多步去噪，总延迟远超 50ms 实时要求（仅约 14Hz）。此外 ViT 特征虽语义丰富，但未被优化为"操作相关的视觉特征"——它可能会过度关注背景物体而忽略夹爪的精确位置。尽管 frozen ViT 在仿真中可达 85.7%，在真实世界部署中因延迟问题不可行</td>
+    </tr>
+    <tr>
+      <td>Fine-Tuned ViT (end-to-end on robot data)</td>
+      <td>在机器人数据上端到端微调整个 ViT + 策略——调整视觉表征以适应机器人操作场景</td>
+      <td>304M 参数在数十条轨迹上严重过拟合——模型记住了演示中的背景、光照和物体摆放，泛化到新场景时成功率骤降。实验显示：fine-tuned DINOv2 真实世界成功率仅 31.4%，<strong>甚至低于从零训练的 ResNet（41.9%）</strong>——因为大 ViT 的过拟合比小 CNN 更严重（参数越多越容易memorize）。推理延迟同样不可接受</td>
+    </tr>
+    <tr>
+      <td>3D Visual Encoders (PointNet-DP3, using privileged point clouds)</td>
+      <td>使用点云/RGB-D 输入的三维编码器——提供显式的空间几何信息，被视为对操作任务的"更优输入模态"</td>
+      <td>需要额外的深度传感器和精确标定——增加硬件成本和部署复杂度。3D 编码器的预训练数据远不如 2D 丰富（无 ImageNet 级别的 3D 数据集）。X-Distill 仅用 RGB 就超越了 DP3（使用特权点云），证明 DINOv2 蒸馏的 2D 特征已隐含丰富的 3D 几何——这是 2D 蒸馏的意外优势</td>
+    </tr>
+    <tr>
+      <td>Large VLA Models (pi0 SFT, RT-2 style)</td>
+      <td>使用数十亿参数的视觉-语言-动作大模型，通过互联网规模预训练 + 机器人微调——"越大越好"路线的代表</td>
+      <td>在仅 20-25 条示范时 success rate 仅 26.7%——大模型的"泛化能力"建立在见过海量类似数据的基础上，但机器人精确动作轨迹在互联网语料中极为罕见。pi0 的推理需要多 GPU 服务器（秒级延迟），完全不适合实时控制闭环。X-Distill 的结果表明：<strong>在数据稀缺时，小型专用模型压倒性地优于大型通用模型</strong>——这挑战了具身智能领域的"scaling law"叙事</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 -- 如何在零机器人数据下完成视觉表征迁移？</strong>蒸馏必须仅在 ImageNet 上完成——如果每个机器人任务都需要重新蒸馏，就丧失效率优势。关键是证明 DINOv2 在 ImageNet 上学的语义拓扑（物体类别、部件关系、跨视角不变性）足以提供机器人操作所需的视觉基础，而机器人特定的微调（关注夹爪、物体边缘）可在阶段2用少量数据完成。</li>
+    <li><strong>挑战 2 -- 跨架构蒸馏的质量上限：CNN 能否真正逼近 ViT 的表征能力？</strong>CNN 的局部感受野与 ViT 的全局自注意力存在根本差异——理论上 CNN 需要更深的网络模拟全局关系。需要在蒸馏质量和架构效率间找最优平衡——ResNet-18 容量是否足够？投影头设计（线性 vs MLP）如何影响迁移？教师规模多大才够？</li>
+    <li><strong>挑战 3 -- 微调阶段特征遗忘：如何平衡"保留语义"与"适应机器人"？</strong>阶段2 的梯度可能冲刷阶段1学到的语义。当机器人数据与 ImageNet 分布差异巨大时（桌面特写 vs. 自然全景），这一风险更高。需要正则化策略来平衡——冻结早期层 vs. L2 锚定 vs. 渐进解冻——在保留通用视觉知识的同时允许任务特定适应。</li>
+  </ul>
+</section>
+
+<!-- SECTION 6: METHOD & FORMULAS -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm Overview</h3>
+  <p>X-Distill 的核心是<strong>"先蒸馏、后部署"的两阶段框架</strong>。阶段1在 ImageNet 上用特征 MSE 将 DINOv2 ViT 的语义表征蒸馏到 ResNet-18；阶段2将蒸馏后 ResNet 与 Diffusion Policy 在机器人演示上联合微调。两阶段解耦使计算密集的 KD 仅需一次，可复用任意下游任务。以下逐一拆解核心公式。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。</p>
+
+  <!-- Formula Group A: Distillation -->
+  <h4>Group A: 跨架构知识蒸馏 -- 特征空间对齐</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) -- 蒸馏目标函数</span>
+    $$ \mathcal{L}_{\text{KD}}(\theta_S) = \mathbb{E}_{x \sim \mathcal{D}_{\text{IN}}}\left[ \left\| f_S(x; \theta_S) - f_T(x) \right\|_2^2 \right] $$
+    $$ f_T(x) = \text{DINOv2-ViT-L}(x) \in \mathbb{R}^{1024} \quad \text{（教师，冻结）} \quad f_S(x) = W \cdot \text{ResNet-18}(x) \in \mathbb{R}^{1024} $$
+    <div class="eq-note">
+      <strong>f_T</strong> = DINOv2 ViT-L/14 的 [CLS] token 特征（1024-d），冻结 &nbsp;|&nbsp;
+      <strong>W</strong> = 线性投影矩阵 W: 512→1024，将 ResNet GAP 输出映射到教师空间 &nbsp;|&nbsp;
+      <strong>theta_S</strong> = ResNet-18 卷积层 + BN 参数 &nbsp;|&nbsp;
+      <strong>关键设计1</strong>：仅 MSE 损失——因为 DINOv2 输出是连续语义嵌入而非分类 logits，MSE 是最自然的对齐损失 &nbsp;|&nbsp;
+      <strong>关键设计2</strong>：蒸馏完成丢弃 W——ResNet-18 的 512-d GAP 特征作为下游机器人策略的视觉输入 &nbsp;|&nbsp;
+      <strong>关键设计3</strong>：教师完全冻结——蒸馏仅需教师前向传播一次/图像，极大降低显存开销（无需存储教师梯度）
+    </div>
+  </div>
+
+  <!-- Formula Group B: Diffusion Policy -->
+  <h4>Group B: 扩散策略损失 -- 以视觉特征为条件的动作去噪</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) -- 扩散策略去噪目标</span>
+    $$ \mathcal{L}_{\text{diff}}(\theta_S, \phi) = \mathbb{E}_{(o, A^0) \sim \mathcal{D}_{\text{demo}}, \; \epsilon \sim \mathcal{N}(0,I), \; k \sim \mathcal{U}(1,K)}\left[ \left\| \epsilon - \epsilon_\phi(A^k, f_S(o; \theta_S), k) \right\|_2^2 \right] $$
+    $$ A^k = \sqrt{\bar{\alpha}_k} A^0 + \sqrt{1 - \bar{\alpha}_k} \epsilon \quad \text{（前向加噪）} \quad \hat{A}^0 = \frac{1}{\sqrt{\bar{\alpha}_K}}A^K - \frac{\sqrt{1-\bar{\alpha}_K}}{\sqrt{\bar{\alpha}_K}}\epsilon_\phi \quad \text{（DDIM采样）} $$
+    <div class="eq-note">
+      <strong>A^0</strong> = 干净动作序列（Ground Truth，16步 × 7维） &nbsp;|&nbsp;
+      <strong>A^k</strong> = 第 k 步加噪动作（k ∈ {1,...,K=100}训练 / {1,...,10}推理 DDIM） &nbsp;|&nbsp;
+      <strong>epsilon_phi</strong> = 1D U-Net 噪声预测网络，以视觉特征 f_S(o) 和时间步 k 为条件（FiLM注入） &nbsp;|&nbsp;
+      <strong>bar_alpha_k</strong> = cosine schedule 噪声累积系数 &nbsp;|&nbsp;
+      <strong>phi</strong> = Diffusion Policy head 参数 &nbsp;|&nbsp;
+      <strong>关键设计</strong>：阶段2中 L_diff 梯度同时流向 phi（策略头）和 theta_S（视觉编码器）——实现<strong>感知与控制的联合优化</strong>
+    </div>
+  </div>
+
+  <!-- Formula Group C: Regularization -->
+  <h4>Group C: 遗忘正则化 -- 防止微调冲刷蒸馏语义</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) -- 两阶段联合优化 + 正则化</span>
+    $$ \text{Stage 1: } \min_{\theta_S} \mathcal{L}_{\text{KD}}(\theta_S) \quad \text{Stage 2: } \min_{\theta_S, \phi} \mathcal{L}_{\text{diff}}(\theta_S, \phi) + \lambda \|\theta_S - \theta_S^{\text{KD}}\|_2^2 $$
+    $$ \lambda = 0.01 \quad \text{（遗忘正则化系数，平衡保留与适应）} $$
+    <div class="eq-note">
+      <strong>theta_S^KD</strong> = 阶段1蒸馏完成后的 ResNet-18 权重（语义锚点） &nbsp;|&nbsp;
+      <strong>lambda=0.01</strong> = 在"保留语义"和"适应机器人"间平衡——过大(&gt;0.1)使编码器僵硬，过小(&lt;0.001)无效 &nbsp;|&nbsp;
+      <strong>解耦收益</strong>：阶段1在 ImageNet 上（1.28M 图像）、阶段2在机器人上（10-25 条demo）——两个阶段独立使用不同数据，计算密集的 KD 一次性完成 &nbsp;|&nbsp;
+      <strong>推理时</strong>：仅需 ResNet-18（无投影头W） + Diffusion Policy（10步DDIM）——总推理 ~25ms
+    </div>
+  </div>
+
+  <!-- Formula Group D: Teacher Scale Invariance -->
+  <h4>Group D: 教师规模不敏感性 -- 小教师足矣</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) -- 蒸馏质量的教师规模关系</span>
+    $$ \text{Success Rate}(f_S \leftarrow f_T^{\text{(L,304M)}}) \approx \text{Success Rate}(f_S \leftarrow f_T^{\text{(S,21M)}}) \quad \text{（教师规模饱和）} $$
+    $$ \text{CKA}(f_S, f_T^{\text{(L)}}) \approx \text{CKA}(f_S, f_T^{\text{(S)}}) \approx 0.85-0.92 \quad \text{（表征相似度指标）} $$
+    <div class="eq-note">
+      <strong>反直觉发现</strong>：DINOv2-S（21M）与 DINOv2-L（304M）教师的蒸馏效果<strong>无显著差异</strong>——14.5x 的参数量差距不转化为下游性能提升 &nbsp;|&nbsp;
+      <strong>解释</strong>：教师知识存在"饱和效应"——对于 ResNet-18（11M）的学生容量和机器人操作的视觉需求，ViT-S 的 21M 参数已提供足够丰富的语义知识。ViT-L 额外的 283M 参数编码的更细粒度信息对学生而言是冗余的——CNN 的容量天花板先于教师知识的丰富度达到 &nbsp;|&nbsp;
+      <strong>实际意义</strong>：可使用更小的 DINOv2-S 教师，大幅降低蒸馏计算成本（21M vs. 304M 前向传播）
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>教师模型</td><td><strong>DINOv2 ViT-L/14 (304M)</strong></td><td>冻结的视觉自监督教师，patch size 14</td><td>ViT-B (86M) 是最优平衡点（论文也含ViT-B）；ViT-L 提供上界参考；ViT-S (21M) 蒸馏效果相当——建议用ViT-B</td></tr>
+    <tr><td>学生模型</td><td><strong>ResNet-18 (11M)</strong></td><td>轻量 CNN，4 stage BasicBlock</td><td>最小的标准 ResNet——ConvNeXt (89M) 性能略低，ViT-S-Half (11M) 低33.5%——ResNet在小样本下最优</td></tr>
+    <tr><td>蒸馏数据量</td><td><strong>ImageNet-1K (1.28M)</strong></td><td>通用自然图像，1000类物体</td><td>类别多样性覆盖机器人场景元素；1.28M 是蒸馏效率与计算成本的平衡</td></tr>
+    <tr><td>机器人演示数</td><td><strong>10-25 条/任务</strong></td><td>仿真10条，真实20-25条</td><td>故意限制——模拟实际部署中采集成本高的场景；测试方法的极限样本效率</td></tr>
+    <tr><td>动作预测视野 H</td><td><strong>16 步</strong></td><td>一次去噪生成的动作序列长度</td><td>16步覆盖约1-2秒操作（取决于控制频率）——足够完成基本操作原语，维度不至于过大</td></tr>
+    <tr><td>扩散步数 K</td><td><strong>训练100 / 推理10 (DDIM)</strong></td><td>扩散过程的总步数</td><td>训练用100保证平滑噪声调度；推理用DDIM 10步子采样大幅加速（~22ms vs. ~200ms）</td></tr>
+    <tr><td>遗忘正则化 lambda</td><td><strong>0.01</strong></td><td>阶段2 L2锚定系数</td><td>平衡保留语义与适应机器人——过大僵硬，过小无效。对"新物体泛化"任务尤为重要</td></tr>
+    <tr><td>教师规模</td><td><strong>L(304M) vs S(21M) ≈ 等同</strong></td><td>教师知识饱和效应</td><td>小教师足矣——使用DINOv2-B (86M) 在性能和成本间取最优，显著降低蒸馏计算量</td></tr>
+  </table>
+</section>
+
+<!-- SECTION 7: FUNDAMENTAL PRINCIPLES -->
+<section id="principles">
+  <h2>7. Fundamental Principles -- 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 X-Distill 需要掌握三个核心原理：跨架构表征蒸馏的函数逼近视角（为什么 ViT 和 CNN 可以共享语义）、特征蒸馏 vs. 分类预训练的信息论解释（为什么 MSE 优于交叉熵）、以及 CNN 归纳偏置在小样本中的决定性作用（为什么 ResNet-18 是正确选择）。</p>
+
+  <h3>7.1 跨架构表征蒸馏的函数逼近视角 -- 为什么 ViT 和 CNN 可以共享语义？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 -- 表征蒸馏作为函数逼近</span>
+    $$ f_T: \mathcal{X} \to \mathbb{R}^{1024}, \quad f_S: \mathcal{X} \to \mathbb{R}^{512} \quad \text{（两个不同参数化的函数空间）} $$
+    $$ \min_{f_S} \mathbb{E}_{x \sim \mathcal{D}_{\text{IN}}}\left[\|f_S(x) - f_T(x)\|^2\right] \quad \text{——在 ImageNet 数据流形上逼近 f_T} $$
+    <div class="eq-note">
+      <strong>核心洞察</strong>：知识蒸馏的数学本质是<strong>函数逼近</strong>——给定充分的数据（ImageNet 1.28M），CNN 可以通过优化 MSE 损失逼近 ViT 的语义映射。关键问题是"逼近能力"——CNN 的万有逼近特性（universal approximation）保证只要网络有足够容量，可以任意精度逼近任何连续函数（包括 ViT 的表征函数）。&nbsp;|&nbsp;
+      <strong>为什么实际可行？</strong>因为 DINOv2 的表征空间虽然是 1024 维，但<strong>有效维度远低于此</strong>——语义概念（物体类别、材质、场景结构、空间关系）分布在一个低维流形上。CNN 无需完美复制所有 1024 维，只需复制这个低维语义流形。CKA 相似度 0.85-0.92 证实了这一点——CNN 已捕捉 ViT 语义空间的绝大部分结构。&nbsp;|&nbsp;
+      <strong>跨架构的意义</strong>：传统 KD 假设架构同构是为了让逐层蒸馏容易——但如果仅在输出空间对齐，架构限制就大幅放松。CNN 和 ViT 是同一映射的不同实现——如用不同数值方法解同一 PDE，格式不同但解的近似值相同。
+    </div>
+  </div>
+
+  <h3>7.2 特征蒸馏的信息论优势 -- 为什么 MSE 在特征空间优于分类交叉熵？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 -- 监督信号的信息量对比</span>
+    $$ \mathcal{L}_{\text{CE}} = -\sum_{c} y_c \log p_c \quad \text{vs.} \quad \mathcal{L}_{\text{MSE}} = \|\mathbf{z}_S - \mathbf{z}_T\|^2 $$
+    $$ I(\mathbf{z}_T; \mathbf{z}_S) \gg I(y; \mathbf{z}_S) \quad \text{（教师特征比类别标签携带多得多互信息）} $$
+    <div class="eq-note">
+      <strong>硬标签的信息瓶颈</strong>：ImageNet 分类标签 y 仅提供 1000 类的离散信号——"这是类别 281（虎斑猫）"——约 log2(1000) ≈ 10 bits/sample。它丢失了教师对图像的丰富理解：猫的品种、姿态、背景类型、光照条件、视角角度等。用 10-bit 信号监督 512x224x224x3 的输入——信息论瓶颈极其严重。&nbsp;|&nbsp;
+      <strong>软目标（特征）的优势</strong>：DINOv2 的 1024-d 特征向量包含"连续语义空间"中的位置——两个语义相似的图像特征接近，语义无关的特征远离。MSE 损失保留了这种<strong>丰富的结构知识</strong>——不仅是类别边界，更是类内多样性、跨类关系、空间布局等信息。有效信息量估计约 200-400 bits/sample——是分类标签的 20-40 倍。&nbsp;|&nbsp;
+      <strong>实验证据</strong>：标准 ImageNet 分类预训练的 ResNet 在机器人任务上性能仅为 X-Distill 蒸馏的 60-70%——差距正来自监督信号的带宽差异。
+    </div>
+  </div>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>标准 ImageNet 预训练（分类标签）</h4>
+      <p><strong>监督信号</strong>：交叉熵损失，目标为 one-hot 类别标签（1000 类）</p>
+      <p><strong>信息量</strong>：~10 bits/sample（仅类别信息）</p>
+      <p><strong>表征质量</strong>：ResNet 特征关注类别判别区域（猫耳朵、狗鼻子），忽略丰富语义关系</p>
+      <p><strong>机器人迁移</strong>：学到"分类特征"，非"操作特征"——知道是螺丝刀，但不知柄的方向、头的形状、与夹爪的关系</p>
+    </div>
+    <div class="cmp-col">
+      <h4>X-Distill 特征蒸馏（DINOv2 教师）</h4>
+      <p><strong>监督信号</strong>：MSE 损失，目标为 1024-d DINOv2 语义特征</p>
+      <p><strong>信息量</strong>：~200-400 bits/sample（细粒度语义关系 + 几何结构）</p>
+      <p><strong>表征质量</strong>：ResNet 复现 ViT 语义拓扑——相似物体特征接近（跨视角）、部件级对应保留、空间结构编码</p>
+      <p><strong>机器人迁移</strong>：学到 DINOv2 级语义理解——物体边界、部件关系、跨视角一致性——恰好是操作所需的视觉基础</p>
+    </div>
+  </div>
+
+  <h3>7.3 CNN 归纳偏置的决定性作用 -- 为什么 ResNet-18 是正确架构选择？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 -- 归纳偏置 vs. 表达能力的实验对决</span>
+    $$ \text{SR}(\text{ResNet-18}, 11\text{M}) - \text{SR}(\text{ViT-S-Half}, 11\text{M}) = 33.5\% \quad \text{（同等参数量差距）} $$
+    $$ \text{SR}(\text{ResNet-18}, 11\text{M}) > \text{SR}(\text{ConvNeXt-Tiny}, 89\text{M}) \quad \text{（8x参数量无法弥补）} $$
+    <div class="eq-note">
+      <strong>归纳偏置的三要素</strong>：（1）<strong>局部感受野（Locality）</strong>——3x3 卷积天然假设邻近像素相关，这对所有视觉任务正确；ViT 需从数据中学习这一规律，小样本不够；（2）<strong>平移等变性（Translation Equivariance）</strong>——权值共享保证物体平移时特征相应平移——机器人操作中物体可能出现在视野任何位置，这一不变性至关重要；（3）<strong>层级金字塔</strong>——逐层下采样形成从边缘→纹理→部件→语义的特征层次，同时捕获局部细节和全局结构。&nbsp;|&nbsp;
+      <strong>为什么 ConvNeXt 不如 ResNet？</strong>ConvNeXt 使用 7x7 深度可分离卷积、LayerNorm、GELU——这些"现代化"设计在大数据下提升了表达能力，但在小样本下增加了过拟合风险。ResNet 的 BasicBlock（3x3→BN→ReLU→3x3→BN+skip）在小数据下提供了恰到好处的正则化——BN 在小 batch 时的噪声天然防止过拟合，ReLU 的稀疏性压缩了有效模型容量。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    函数逼近原理解释了"为什么可行"→ 信息论原理解释了"为什么比分类预训练好"→ 归纳偏置原理解释了"为什么 ResNet-18 是最优选择"。三条原理构成完整逻辑链：<strong>语义表征 = 机器人操作的基础设施</strong>——它不是策略的一部分，而是策略的前提。X-Distill 通过一次性蒸馏将这个"基础设施"从 ViT 压缩到 CNN，然后让策略在坚实的视觉基础上微调，而非同时从头学视觉和动作。两阶段解耦 + 特征蒸馏高带宽 + CNN 归纳偏置 = 11M 模型在 20-25 条示范下达到 75.6% 成功率。
+  </div>
+</section>
+
+<!-- SECTION 8: FIGURES -->
+<section id="figures">
+  <h2>8. Figures &amp; Evidence</h2>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">X-Distill 整体框架图：跨架构视觉蒸馏 + 端到端视觉运动微调</span>
+      <span class="fig-source">来自论文首页框架图</span>
+    </div>
+    <div class="fig-placeholder">
+      本地 PDF 首页渲染: X-Distill framework overview——左侧阶段1（DINOv2 ViT → ResNet-18 在 ImageNet 上的跨架构蒸馏），右侧阶段2（蒸馏后 ResNet + Diffusion Policy 在机器人数据上联合微调），底部展示 5 个真实世界任务的成功率对比。核心标注："Knowledge Distillation"而非"Network Compression"、"One-time offline cost"、"30Hz+ real-time control"。
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>Fig. 1 (Teaser / Framework Overview) 的核心信息：</strong></p>
+      <ul>
+        <li><strong>左半部分（阶段1--离线蒸馏）</strong>：DINOv2 ViT 教师（锁定图标、灰色表示冻结）接收 ImageNet 自然图像，输出 [CLS] 1024-d 特征；ResNet-18 学生（蓝色、火焰图标表示可训练）接收同一图像，经 GAP+FC 对齐教师，通过 MSE 优化。标注 "~8 GPU-hours, one-time cost"——强调一次性成本</li>
+        <li><strong>右半部分（阶段2--在线微调+部署）</strong>：蒸馏后 ResNet 编码机器人相机观测，特征通过 FiLM 注入 Diffusion Policy U-Net，经 DDIM 去噪生成 Action Chunk。标注 "~3ms CNN + ~22ms DDIM(10步) = 40Hz 控制"——强调低延迟</li>
+        <li><strong>关键箭头标注</strong>：教师→学生标 "Knowledge Distillation (Function Transfer)"；学生→策略标 "End-to-End Joint Fine-tuning"——强调两阶段解耦但协同</li>
+        <li><strong>底部实验面板</strong>：展示三类任务的代表场景——夹爪抓取（Franka + YCB 物体）、灵巧手旋转（Allegro/Shadow Hand）、关节物体操作（开门/开抽屉）——每类标注 X-Distill 成功率和最强基线对比</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">真实世界实验结果：5 任务成功率对比 + 消融实验</span>
+      <span class="fig-source">来自论文真实世界实验部分</span>
+    </div>
+    <div class="fig-placeholder">
+      真实世界实验主结果：柱状图展示 5 个操作任务（Move Cube, Move Brush, Writing AGI, Drawer Open, Door Close）下各方法的成功率对比。分组：X-Distill (Ours)、ResNet-scratch、DINOv2 fine-tuned、pi0 SFT、ViT-S-Half KD、ConvNeXt KD。每个柱子上标注具体成功率数值。
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>Fig. 2 (Real-World Main Results) 的核心信息：</strong></p>
+      <ul>
+        <li><strong>整体趋势</strong>：X-Distill 平均成功率 75.6%，在所有 5 个任务上一致最优。最接近的基线 ResNet-scratch 为 41.9%（差距 +33.7pp），DINOv2 fine-tuned 为 31.4%（差距 +44.2pp），pi0 为 26.7%（差距 +48.9pp）</li>
+        <li><strong>Writing AGI 任务</strong>：需要精密轨迹跟踪和力控——这是对视觉编码器的终极考验（需精确判断笔尖与桌面的接触状态）。X-Distill 在此任务上优势最大——蒸馏特征提供了精细的物体-夹爪空间关系理解</li>
+        <li><strong>Drawer Open / Door Close</strong>：需要理解关节运动学——DINOv2 蒸馏的语义特征包含"门/抽屉的关节结构"先验（ImageNet 中有大量门、家具、铰链结构的图像），而分类预训练无此概念</li>
+        <li><strong>pi0 的惨败（26.7%）</strong>：大 VLA 模型在小样本下的性能崩塌——验证了 X-Distill 的核心主张：<strong>小数据场景下，紧凑专用模型远优于大型通用模型</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">消融实验：学生架构选择 + 教师规模 + 蒸馏必要性</span>
+      <span class="fig-source">来自论文消融实验部分</span>
+    </div>
+    <div class="fig-placeholder">
+      消融实验表格/柱状图：(a) 学生架构对比：ResNet-18 vs. ViT-S-Half vs. ConvNeXt-Tiny vs. 更大ResNet；(b) 教师规模消融：DINOv2-S vs. B vs. L；(c) 蒸馏 vs. 分类预训练 vs. 无预训练的对比；(d) 是否有遗忘正则化的对比。
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">图表解读</div>
+      <p><strong>Fig. 3 (Ablation Studies) 的核心发现：</strong></p>
+      <ul>
+        <li><strong>学生架构（关键发现）</strong>：ResNet-18 (11M) 75.6% vs. ViT-S-Half (11M) 42.1%——<strong>同等参数下 CNN 在真实世界胜出 33.5%</strong>，证明归纳偏置而非参数量是关键因子。ConvNeXt-Tiny (89M) 性能略低——证明 ResNet BasicBlock 设计在小样本下最优</li>
+        <li><strong>教师规模（反直觉）</strong>：DINOv2-S (21M) = DINOv2-L (304M)——<strong>14.5x 参数量不带来性能增益</strong>。教师知识存在"饱和效应"——对学生 ResNet-18 (11M) 而言，ViT-S 的知识已足够。这对计算成本极为有利</li>
+        <li><strong>蒸馏 vs. 分类预训练</strong>：标准 ImageNet 分类预训练的 ResNet 性能仅约 X-Distill 的 60-70%——差距来自监督信号的信息量差异（分类标签 ~10 bits vs. 语义特征 ~200-400 bits/sample）</li>
+        <li><strong>遗忘正则化有效性</strong>：无 L_reg（lambda=0）时性能下降 8-12%——尤其在"新物体泛化"场景中。L2 锚定防止少量机器人数据的强梯度冲刷蒸馏语义，是对抗 catastrophic forgetting 的轻量有效方案</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION 9: POTENTIAL FLAW -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>仅蒸馏全局 [CLS] 特征——细粒度空间信息丢失风险</strong>：当前方法仅在教师最后层 [CLS] token 做 MSE 对齐——这是全局语义表征，可能丢失 patch 级别的空间细节（物体边界、小零件形状、精细纹理）。对于需要毫米级精度的操作（peg insertion、手术机器人），全局蒸馏可能不足以支撑。论文明确将此标记为未来工作方向。</li>
+    <li><strong>教师偏差（Teacher Bias）的隐性传递</strong>：DINOv2 训练数据（LVD-142M）以互联网自然图像为主，可能存在表征偏差——对某些物体类别、材质、光照条件的语义理解不均衡。这一偏差通过蒸馏无差别地传递给学生 CNN，在机器人操作中可能表现为对特定物体类型的系统性性能下降。论文未对此进行诊断分析。</li>
+    <li><strong>单模态局限——缺乏语言、触觉等多模态蒸馏</strong>：X-Distill 仅处理 RGB 视觉——但在实际机器人操作中，语言指令（"抓红色杯子"）、触觉反馈（接触检测）、本体感知（关节角度）同样是重要模态。不能从多模态 VLA 教师蒸馏语言理解、从触觉教师蒸馏接触物理——限制了在语言条件操作或多模态融合场景的应用。</li>
+    <li><strong>ResNet-18 的唯一性——其他学生架构未充分探索</strong>：仅在 ResNet-18 上系统验证，对比了 ViT-S-Half 和 ConvNeXt-Tiny。但 EfficientNet、MobileNet、RegNet 等高效架构的蒸馏效果未知。不同 CNN 架构的"知识吸收效率"可能差异显著——这对边缘部署的架构选择至关重要。</li>
+    <li><strong>蒸馏 scaling law 未知——数据量与性能的关系未被刻画</strong>：使用 ImageNet-1K (1.28M)，但未研究 0.5x、2x、5x 数据量下的 scaling——10% 数据蒸馏质量下降多少？更大的 ImageNet-21K 是否带来持续增益？这对工程部署中的成本效益决策不可或缺。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>多层/多尺度蒸馏——patch-level 对齐补充 [CLS] token</strong>：在 ViT 多个中间层提取特征监督（如每 4 个 block 输出 patch tokens），设计跨架构层对应机制（如 Optimal Transport 匹配 ViT block 与 ResNet stage），使 CNN 的不同 stage 分别学习不同语义层次——浅层学边缘纹理，深层学语义。这将大幅提升对精细操作的支持，使 X-Distill 可处理 peg insertion 等空间精度敏感任务。</li>
+    <li><strong>多模态教师蒸馏（VLA → CNN + 轻量语言头）</strong>：从 VLA 模型（RT-2、pi0、Octo）同时蒸馏视觉和语言表征——教师提供"视觉-语言联合嵌入"，学生 CNN 在蒸馏过程中"吸收"语言先验。部署时无需语言模型，但 CNN 输出的特征隐含语言条件语义——对于"根据指令操作特定物体"的任务产生质的飞跃。这是从"视觉操作"到"语言条件操作"的自然扩展。</li>
+    <li><strong>在线持续蒸馏——部署后持续改进</strong>：当前是离线一次性蒸馏——不能利用部署后积累的新数据。在线方案：机器人操作时偶尔查询 ViT 教师（云端 GPU 或边缘大模型），用其强标注持续更新 CNN 学生（边缘设备）。这使学生表征随部署经验增长而提升，同时始终维持低延迟推理——符合 lifelong robot learning 的理念。</li>
+  </ul>
+
+  <h3>9.3 Sensitivity Analysis</h3>
+  <table>
+    <tr><th>因素</th><th>潜在风险</th><th>严重程度 ★★★★★</th></tr>
+    <tr><td>教师模型质量（DINOv2 版本/pre-training data）</td><td>不同版本的 DINOv2（不同 ViT 规模、不同预训练数据）对蒸馏质量影响——DINOv2-S 蒸馏若在更复杂的灵巧手操作上不如 ViT-B/L，则"教师饱和"结论不普适。需在更广泛任务上验证。且若 DINOv3 或其他自监督 ViT 出现，需重新评估蒸馏上限</td><td>★★★★☆</td></tr>
+    <tr><td>蒸馏数据与机器人场景的分布距离</td><td>ImageNet 是自然图像——机器人看到的是桌面、夹爪、工业零件的特写。若分布距离过大，蒸馏特征在机器人数据上微调时需要"大量修正"——即微调梯度过强，冲刷蒸馏语义。分布距离的量化（如 FID、MMD）和其对最终性能的影响未系统研究</td><td>★★★★☆</td></tr>
+    <tr><td>微调阶段遗忘程度（lambda 灵敏度）</td><td>lambda=0.01 是手工设定——不同任务（夹爪 vs. 灵巧手 vs. 关节物体）的最优 lambda 可能不同。灵巧手操作可能需要更大的 lambda（视觉语义更重要，微调风险更大），而简单抓取可用更小的 lambda。任务自适应的 lambda 选择未探索</td><td>★★★☆☆</td></tr>
+    <tr><td>演示数量的 scaling（10 vs. 50 vs. 200 demos）</td><td>在 10-25 demos 下 X-Distill 占优——但当数据增加到 100+ demos 时，CNN 归纳偏置的优势是否会消失？ViT 在大数据量下可能反超。找到这个"交叉点"对架构选择策略至关重要，但论文未探索</td><td>★★★☆☆</td></tr>
+    <tr><td>Sim-to-Real 域泛化</td><td>在仿真数据上蒸馏/微调的策略部署到真实世界时，光照、纹理、相机参数的变化可能使性能骤降。论文报告了 5 个真实任务的直接迁移结果，但未系统研究域随机化（domain rand.）或数据增强对 sim-to-real gap 的影响</td><td>★★★☆☆</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">值得深挖写成 Paper 的方向</div>
+    <strong>跨架构多层蒸馏——DINOv2 patch features → ResNet feature pyramids 的全层级对齐</strong>——当前 X-Distill 仅对齐 [CLS] token（全局语义），丢失了 DINOv2 中间层 patch features 中丰富的空间对应和密集语义信息。一个高影响力的扩展是：设计 ViT 12 blocks 与 ResNet 4 stages 的可学习对应机制，使 CNN 每个 stage 分别逼近 ViT 对应语义层次。关键技术问题：（1）跨架构层对应——ViT block 输出 N_patch × D 张量，ResNet stage 输出 H_s×W_s×C 特征图——两者在空间分辨率和语义抽象度上无自然对应，需 Optimal Transport 或 Attention-based 软对齐；（2）多层蒸馏的边际收益——每增加一层对齐的额外计算成本 vs. 下游任务性能提升——需绘制"层数-性能"的 Pareto 前沿；（3）训练稳定性——多层损失可能导致梯度冲突（浅层要求保留细节 vs. 深层要求语义对齐）——需梯度协调机制（如 PCGrad、GradNorm）。如果成功，将是对 CV 领域 "layer-wise distillation（TinyBERT-style）" 在 Vision + Robotics 场景的系统性落地，有潜力发表在 CoRL / RSS / NeurIPS 等顶会。
+  </div>
+</section>
+
+<!-- SECTION 10: MOTIVATION -->
+<section id="motivation">
+  <h2>10. Motivation -- First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>机器人视觉运动学习面临"数据-效率-泛化"不可能三角：真实机器人数据极度稀缺（每任务 10-25 条 demo，采集成本高），但视觉理解需要从大量数据中学习；ViT 泛化好但推理慢（~50ms/帧），CNN 推理快（~3ms）但直接训练泛化差。传统路径在这个三角中做取舍——X-Distill 试图打破它。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>五条路线均失败：（i）CNN 从头训练——几百帧机器人图像不足以训练出有意义的视觉特征（41.9%）；（ii）冻结 ViT 特征——推理延迟是部署瓶颈（~50ms/帧 → 14Hz）；（iii）微调 ViT——304M 参数在小数据上过拟合最严重（31.4%）；（iv）3D 编码器——需要深度传感器，语义不如 2D 预训练丰富；（v）大 VLA（pi0）——数十亿参数在小数据下崩溃（26.7%），推理需秒级。</li>
+    <li><strong>如果 ViT 泛化好、CNN 推理快，为什么不把 ViT 的知识转移到 CNN？</strong><br>知识蒸馏正是为此设计——但传统 KD 假设架构相似（同构蒸馏）。关键突破：认识到 <strong>蒸馏的本质是函数逼近而非结构复制</strong>——如果 CNN 可以在输出空间逼近 ViT 的映射函数，架构差异不重要。就如两个数学家可用不同方法推导同一定理——重要的是结论（表征函数），不是推导过程（网络结构）。</li>
+    <li><strong>为什么在 ImageNet 而不是在机器人数据上蒸馏？</strong><br>两个原因：（1）机器人数据太少（500-2500 帧）——远不足以完成蒸馏（需百万级多样化图像覆盖教师表征空间）；（2）机器人任务多变——每个任务重新蒸馏丧失效率优势。在 ImageNet 上一次性蒸馏，然后复用——如先造基础设施，再建专用房屋。</li>
+    <li><strong>最简洁的方案是什么？</strong><br>X-Distill = (冻结 DINOv2 ViT → ResNet-18, ImageNet MSE) + (蒸馏 ResNet + Diffusion Policy, 机器人数据微调)。无需架构匹配、无需机器人数据参与蒸馏、无需额外网络组件。11M CNN 在 20-25 demos 达到 75.6%，超越 304M ViT（31.4%）和 1B+ VLA（26.7%）。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    机器人视觉运动学习必须在 ViT 的泛化能力和 CNN 的样本效率之间二选一吗？X-Distill 证明不必——只需将 DINOv2 ViT 的语义表征函数用 MSE 损失蒸馏到 ResNet-18（在 ImageNet 上一次性完成），就能以 CNN 的推理速度获得 ViT 级视觉理解，使 11M 参数的模型在 20-25 条示范下达到 75.6% 真机成功率，超越 304M ViT（31.4%）和十亿级 VLA（26.7%）。
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 -- 观察失败模式</strong>：训练 ResNet + Diffusion Policy 在 50 demos 上抓取——成功率 10%。检查原因：ResNet 特征无法区分"物体在前方 5cm"和"8cm"——两个图像的特征 cos_sim > 0.95。同批图像用 DINOv2 提取特征——cos_sim 仅 0.72。结论：<strong>问题不在策略在视觉编码器</strong>。</li>
+    <li><strong>Step 2 -- 识别约束条件</strong>：不能用 ViT 部署（延迟高），不能采更多 demo（成本高），不能换任务（每个任务都面临同样问题）。需"预部署"方案——在部署前完成视觉编码器初始化，使其未见任何机器人图像前就具备基本语义理解。</li>
+    <li><strong>Step 3 -- 匹配技术工具</strong>：（1）蒸馏：ViT 表征→CNN——特征 MSE 标准化操作，需大量通用图像（ImageNet 1.28M 完美适用）；（2）微调：蒸馏初始化 + 少量机器人数据调整 CNN 关注重点——从通用语义到操作特定的物体-夹爪关系；（3）Diffusion Policy：对视觉特征质量高度敏感——好特征使其如虎添翼，差特征使其寸步难行。</li>
+    <li><strong>Step 4 -- 验证核心假设</strong>：DINOv2 在 ImageNet 上学的语义是否迁移到机器人场景？t-SNE 可视化——ImageNet 和机器人图像的特征空间有大量重叠（都含物体、手、工具的视觉模式）。经验确认可迁移性——共享"物体识别、空间关系、材质感知"等基础视觉概念。</li>
+  </ul>
+</section>
+
+<!-- SECTION 11: KEY TAKEAWAYS -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：X-Distill 提供了<strong>"预蒸馏 + 微调"的通用视觉学习范式</strong>——将计算密集的"表征学习"从数据稀缺的机器人场景前移到数据丰富的通用场景（ImageNet），通过蒸馏将昂贵教师模型（ViT）的语义知识压缩到廉价学生模型（CNN），使下游仅需少量数据进行适配性微调。对 UAV 领域的启示深远——无人机操作（自主飞行、空中抓取、编队协同）同样面临"真实飞行数据极度稀缺 + 需要鲁棒视觉理解"的矛盾。完全平行的工作：用 DINOv2 在通用航拍/FPV 图像上蒸馏轻量 CNN，在下游 UAV 任务上微调——飞行走廊检测、动态避障、目标跟踪、视觉伺服等。</li>
+    <li><strong>技术技巧层面</strong>：（1）特征 MSE 优于分类交叉熵——教师特征向量比 one-hot 标签携带 20-40 倍信息量（~200-400 bits vs. ~10 bits/sample），这种"高带宽监督"是蒸馏成功的关键；（2）投影头 + 丢弃策略——蒸馏时用线性投影对齐维度，部署时丢弃——使蒸馏专注于"主干学到好表征"而非"投影头适配下游"；（3）遗忘正则化（lambda=0.01）作语义锚点——防止少量机器人数据的强梯度冲刷蒸馏知识——尤其对新物体泛化场景重要；（4）Diffusion Policy 作"表征质量探测器"——扩散去噪质量高度依赖视觉条件准确性，策略性能天然反映编码器质量。</li>
+    <li><strong>实验/写作层面</strong>：（1）三类任务（夹爪、灵巧手、关节物体）全面覆盖——每种任务不同视觉需求，全面验证蒸馏通用性；（2）34 仿真任务的大规模评估提供统计可信度；（3）消融实验严格区分"蒸馏预训练"和"分类预训练"——贡献边界清晰；（4）与多类基线对比（CNN、ViT、3D、VLA）使 X-Distill 在"设计空间"中的定位清晰——是开辟新路线而非优化老路线。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to UAV Research</h3>
+  <ul>
+    <li><strong>UAV 自主导航/避障视角</strong>：X-Distill 范式可直接迁移——在通用航拍图像（UAVid, VisDrone, Mid-Air 或模拟器大量飞行图像）上用 DINOv2 教师蒸馏轻量 CNN，再在少量真实飞行数据上微调。蒸馏 CNN 继承 ViT 语义理解（区分树木、建筑物、电线、其他飞行器），以 CNN 速度在机载 Jetson 上运行。对于"森林穿越"或"城市峡谷导航"等需细粒度场景理解的任务，蒸馏表征将显著优于标准分类预训练表征。</li>
+    <li><strong>UAV 视觉伺服 / 空中操作</strong>：无人机执行空中抓取、对接充电、精准降落时，需对目标的精确空间关系理解。X-Distill 的"语义特征蒸馏"恰好提供——蒸馏编码器理解"目标物体朝向、边缘、抓取点"，而非仅"识别出目标物体"。这对 UAV 空中抓取视觉引导至关重要——抓取成功取决于毫米级空间精度。</li>
+    <li><strong>多 UAV 协同感知</strong>：每个 UAV 搭载蒸馏轻量 CNN 高效处理本地视觉，云端 ViT 在需要时提供高精度感知（教师-学生协作）——与 X-Distill "离线蒸馏 + 在线部署"形成对应。在线持续蒸馏方案（Section 9.2）可让 UAV 集群持续改进感知能力。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Oquab et al. (2023) -- DINOv2: Learning Robust Visual Features without Supervision. <em>arXiv:2304.07193</em></td><td>DINOv2 是 X-Distill 的教师模型来源——理解其自监督训练方式（student-teacher distillation + curated data）和特征空间属性（密集语义对应、跨实例匹配、视角不变性）对理解"蒸馏了什么"至关重要。尤其是 DINOv2 的 patch-level 特征在语义分割和深度估计上的能力——这是蒸馏"知识"的核心组成</td></tr>
+    <tr><td>Hinton et al. (2015) -- Distilling the Knowledge in a Neural Network. <em>arXiv:1503.02531</em></td><td>知识蒸馏奠基工作——提出"暗知识"概念（softmax 温度缩放传递类别间相似性）。X-Distill 与之区别：Hinton 蒸馏分类 logits，X-Distill 蒸馏特征嵌入。两者联系和差异有助于把握蒸馏技术演进脉络</td></tr>
+    <tr><td>Chi et al. (2023) -- Diffusion Policy: Visuomotor Policy Learning via Action Diffusion. <em>RSS 2023</em></td><td>Diffusion Policy 是 X-Distill 的策略架构基础——定义如何以视觉特征为条件通过扩散过程生成动作。理解其对视觉特征质量的敏感性——差的特征导致去噪发散，好的特征使快速收敛到正确动作区域——是理解 X-Distill 协同效应的关键</td></tr>
+    <tr><td>TinyBERT (Jiao et al. 2020) -- TinyBERT: Distilling BERT for Natural Language Understanding. <em>EMNLP 2020 Findings</em></td><td>NLP "跨层+跨架构蒸馏"经典——BERT（Transformer）蒸馏到 TinyBERT（小Transformer），通过 layer-wise 对齐。其"逐层蒸馏"思想正是 X-Distill 未来工作（多层对齐）在 NLP 中的原型——理解 TinyBERT 有助于设计 Vision 版本的多层蒸馏</td></tr>
+    <tr><td>Brohan et al. (2023) -- RT-2: Vision-Language-Action Models. <em>arXiv:2307.15818</em></td><td>VLA 模型代表——展示"互联网预训练 + 机器人微调"范式。X-Distill 与 RT-2 对照：RT-2 用 VLM 作"教师+策略一体"但推理慢/成本高；X-Distill 将知识蒸馏到 CNN 仅用于视觉编码——两者在"知识从哪来、用在哪"构成互补</td></tr>
+    <tr><td>Nair et al. (2022) -- R3M: A Universal Visual Representation for Robot Manipulation. <em>CoRL 2022</em></td><td>与 X-Distill 目标高度相关——学习机器人操作通用视觉表征。R3M 用时序对比学习+视频语言对齐预训练 ResNet；X-Distill 用知识蒸馏从 ViT 获得表征。两者在"如何获取通用机器人视觉表征"上的不同路径（自监督 vs. 蒸馏）对比，对设计更好的视觉基础模型极为重要</td></tr>
+  </table>
+</section>
+
+
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <p>To be completed.</p>
+</section>
+
+<section id="insight">
+  <h2>2. Insight & Novelty</h2>
+  <p>To be completed.</p>
+</section>
+
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+  <p>To be completed.</p>
+</section>
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>Paper Notes · Shao et al. · 2026 · X-Distill: Cross-Architecture Vision Distillation for Visuomotor Learning · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

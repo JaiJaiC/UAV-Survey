@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Sphere-VIO (Yang, Xie et al., 2026)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Fei Gao · 15-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../9976/index.html">Hand-like autonomous flyi</a>
+<a href="../9975/index.html">UAV</a>
+<a href="../9974/index.html">precise real-time force-a</a>
+<a href="../9973/index.html">Rotor-failure-aware quadr</a>
+<a href="../9972/index.html">3D</a>
+<a href="../9971/index.html">LiDAR-VGGT Cross-modal</a>
+<a href="../9970/index.html">Safe agile transportation</a>
+<a href="../9969/index.html">DPNet Doppler LiDAR</a>
+<a href="../9968/index.html">Primitive-based truncated</a>
+<a href="../9967/index.html">FAR-AVIO</a>
+<a href="../9966/index.html">PathPainter Transferring</a>
+<a href="../9965/index.html">High-speed vision-based f</a>
+<a href="../9964/index.html">UAV</a>
+<a href="../9963/index.html">Agile fall recovery</a>
+<a class="active" href="../9962/index.html">Sphere-VIO Fast robust</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Sphere-VIO: Fast and Robust Visual-Inertial Odometry via Unified Spherical Representation for Heterogeneous Multi-Camera Systems（基于统一球面表示的异构多相机系统快速鲁棒视觉惯性里程计）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Yueteng Yang</strong>, Yusen Xie, Hao Wei, Qianhao Wang, Boyu Zhou, <strong>Fei Gao</strong>（corresponding）, Jun Ma, Jinni Zhou</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">香港科技大学（广州）</strong> / Differential Robotics（差分机器人实验室） / <strong class="bold-affil">浙江大学</strong> / <strong class="bold-affil">南方科技大学</strong></td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">arXiv preprint</strong>，<strong>2026年6月</strong>，arXiv:2606.29910</td></tr>
+      <div class="journal-meta"><span class="jif-name">arXiv</span> <span class="jif-badge if-preprint">📄 Preprint</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://arxiv.org/abs/2606.29910" target="_blank">arXiv:2606.29910</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>Sphere-VIO</strong>——首个基于统一球面全景模型（USPM）的异构多相机 VIO 框架，支持任意相机模型（针孔、鱼眼、全景）的统一球面表示与双向映射，配合层次化全向特征对齐（HOFA）和 Schur 补边缘化的多相机 ESKF 后端，在 HILTI 2022 数据集上仅需 <strong>0.0122s/帧</strong> 即可达到 <strong>0.1821m ATE RMSE</strong>，在精度-速度综合指标上全面超越现有单/多相机 VIO 方法。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Visual-Inertial Odometry</span>
+    <span class="tag tag-green">Multi-Camera System</span>
+    <span class="tag tag-amber">Spherical Representation</span>
+    <span class="tag tag-purple">ESKF Backend</span>
+    <span class="tag tag-red">Sensor Fusion</span>
+    <span class="tag tag-cyan">Heterogeneous Cameras</span>
+    <span class="tag tag-gray">Real-time SLAM</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么现有多相机 VIO 系统无法同时支持针孔、鱼眼、全景等异构相机？</strong><br>
+    答：因为每个相机模型都有独特的投影/反投影方程——针孔是 $\mathbf{K}^{-1}\mathbf{p}$、鱼眼是畸变多项式反解、全景是等矩形投影。现有 VIO 框架（如 VINS-Fusion、MSCKF）要么将不同相机的特征分别处理（增加计算量且丢失跨相机约束），要么强制所有相机使用同一模型（限制传感器选型），均无法实现异构相机的统一高效处理。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>所有相机的成像过程在球面上是统一的</strong>——无论哪种投影模型，光线总是从场景点出发沿直线传播到相机光心，在单位球面上落在一个点。这个"入射光线方向"是跨相机模型的统一不变量。本文提出的 Unified Spherical Panorama Model (USPM) 将任意相机模型抽象为"像素 ↔ 球面坐标 ↔ 全景展开点"的双向映射，使得前端特征跟踪和后端状态估计都在统一的球面域中进行——从而实现了<strong>相机无关（camera-agnostic）的 VIO</strong>。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>全景相机（360°）的等矩形投影模型</td><td>→ 全景相机的球面坐标系天然是旋转不变且无投影畸变的——如果将任意相机的像素都"升维"映射到球面，即可利用球面几何的统一性来融合异构相机观测，避免为每个相机模型编写特化的 Jacobian</td><td>架构</td></tr>
+    <tr><td>MSCKF 的状态边缘化与特征管理</td><td>→ MSCKF 通过滑动窗口中边缘化特征点来维持恒定计算量——Sphere-VIO 的 ESKF 后端借鉴了此思想，但用 Schur 补边缘化将多相机的外参不确定性也纳入状态向量进行联合估计，确保异构相机间的几何一致性</td><td>方法</td></tr>
+    <tr><td>深度滤波的极线约束（SVO / REMODE）</td><td>→ 在全向球面特征对齐（HOFA）中引入极线约束——在球面上，极线不再是直线而是大圆（great circle），沿大圆进行深度搜索和滤波，比在图像平面做极线搜索更均匀、更有效</td><td>数学</td></tr>
+    <tr><td>DROID-SLAM 的密集光流对齐思想</td><td>→ HOFA 采用金字塔式从粗到精（coarse-to-fine）的特征对齐，在全景展开图上进行层次化特征匹配——但 Sphere-VIO 将其迁移到稀疏特征点，保持了高计算效率</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 统一球面全景模型（USPM）——任意相机模型的统一抽象</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>现有多相机 VIO 系统（VINS-Fusion、MultiCol-SLAM 等）需要为每种相机模型（针孔、鱼眼、全景）编写独立的投影/反投影和 Jacobian 代码，接入新相机类型需要大量适配工作，且无法在统一框架下融合异构相机观测。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>全景相机（如 Ricoh Theta）将 360 度场景映射到等矩形投影（equirectangular）——每个像素对应球面上的一个经纬度坐标。此球面映射天然为旋转不变形式。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>USPM = 三条映射链：(1) <strong>像素→球面</strong>：通过各自相机模型的 back-projection 将像素坐标 $\mathbf{p}$ 映射为球面单位方向向量 $\mathbf{r}(\theta,\phi)$；(2) <strong>球面→全景展开</strong>：将球面方向向量映射为全景展开图上的像素坐标（等矩形投影的逆过程）；(3) <strong>全景展开→球面</strong>：必要时逆映射回球面坐标。前端 HOFA 在全景展开图上进行特征对齐（避免了球面非欧几何的复杂性），而后端 ESKF 在球面坐标上定义重投影误差（利用了球面几何的旋转不变性）。<strong>所有相机通过同一条路径接入 VIO 系统</strong>。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 层次化全向特征对齐（HOFA）——极线约束 + 深度滤波的鲁棒特征跟踪</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>多相机之间的视场重叠可能很小甚至无重叠（例如前后对置相机），传统 KLT 光流在跨相机大基线、大视差场景下极易丢失。且全景展开图存在两极区域的严重畸变（latitude inflation），直接跟踪不可靠。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>SVO / REMODE 的深度滤波技术：沿极线搜索最佳匹配并递归更新深度滤波器——迁移到球面几何中，极线变为大圆（great circle），搜索更均匀。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>HOFA 包含三个层次：(1) <strong>球面极线约束</strong>：利用 ESKF 预测的相机位姿，将参考帧特征投影到全景展开图的球面大圆弧上，限制搜索空间；(2) <strong>金字塔对齐</strong>：从低分辨率到高分辨率逐层优化特征位置，用 patch-based ZNCC（零均值归一化互相关）衡量匹配质量；(3) <strong>Beta-高斯深度滤波</strong>：沿大圆弧采样深度候选，用 Beta 分布对面元法向不确定性建模 + 高斯分布对深度不确定性建模，递归融合多帧观测，收敛后初始化特征三维位置。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: Schur 补边缘化多相机 ESKF 后端——异构外参联合优化</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>多相机 VIO 中相机外参（T_cam_imu）通常需要在离线标定后保持固定——但实际飞行中由于振动和温度变化，外参会发生微小漂移。此外，异构相机的重投影误差需要在统一的残差模型中表达。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Schur 补技巧在 BA 中广泛用于边缘化三维点以降低求解规模——本文将此类推到状态向量中的外参部分，将相机外参也作为可优化变量在 ESKF 中在线估计，但通过 Schur 补将其边缘化以保持状态维度恒定。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>ESKF 状态向量包含：IMU 状态（位置、速度、姿态、bias）+ 各相机的外参（T_cam_imu）+ 滑动窗口内的特征点深度。每次更新后，用 Schur 补将非活跃特征点和相机外参的边缘化误差压缩到先验项中，保持状态维度 $\approx 50\sim100$，实现 O(1) 计算复杂度。关键细节：Schur 补恰好利用了多相机观测矩阵的<strong>稀疏块结构</strong>——不同相机观测不同特征，形成天然的块对角优势。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.1 System Frame</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph MULTI_CAM["多相机传感器层"]
+      CAM1["相机1: 针孔/鱼眼/全景"]
+      CAM2["相机2: 针孔/鱼眼/全景"]
+      CAMN["相机N: 任意模型"]
+      IMU["IMU 惯性测量单元"]
+    end
+
+    subgraph FRONTEND["前端: 特征提取与跟踪"]
+      USPM["USPM 统一球面全景模型 \n像素↔球面↔全景展开"]
+      DETECT["FAST 角点检测 \n全景展开图"]
+      HOFA["HOFA 层次全向特征对齐 \n球面极线约束 + 深度滤波"]
+    end
+
+    subgraph BACKEND["后端: 状态估计"]
+      PREDICT["IMU 预积分预测 \n位姿+速度+bias"]
+      UPDATE["球面重投影残差更新 \n全景展开图残差"]
+      SCHUR["Schur补边缘化 \n特征点 + 外参边际化"]
+      STATE["ESKF 状态: 50~100维"]
+    end
+
+    subgraph OUTPUT["输出"]
+      POSE["6-DoF位姿 @ IMU频率"]
+      MAP3D["稀疏三维地图"]
+    end
+
+    CAM1 --> USPM
+    CAM2 --> USPM
+    CAMN --> USPM
+    USPM --> DETECT --> HOFA
+    IMU --> PREDICT
+    PREDICT --> STATE
+    HOFA --> UPDATE --> STATE
+    STATE --> SCHUR
+    SCHUR -.->|"先验约束"| STATE
+    STATE --> POSE
+    STATE --> MAP3D
+    STATE -.->|"位姿预测"| HOFA
+
+    classDef sensor fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef front fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef back fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef output fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class CAM1,CAM2,CAMN,IMU sensor
+    class USPM,DETECT,HOFA front
+    class PREDICT,UPDATE,SCHUR,STATE back
+    class POSE,MAP3D output
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["输入数据流"]
+      direction LR
+      IMG1["图像流1 @ f1 Hz"] --> USPM_MAP["USPM: 像素→球面"]
+      IMG2["图像流2 @ f2 Hz"] --> USPM_MAP
+      IMG3["图像流N @ fn Hz"] --> USPM_MAP
+      IMU_DATA["IMU 200Hz"] --> PREINT["IMU预积分"]
+    end
+
+    subgraph FEAT["特征处理"]
+      PANO["全景展开图 \n等矩形投影"] --> DET["FAST角点 @ 全景图"]
+      DET --> ALIGN["HOFA: 金字塔对齐 + \n球面极线深度搜索"]
+    end
+
+    subgraph FUSION["融合估计"]
+      PREINT --> ESKF_PRED["状态预测"]
+      ALIGN --> RESIDUAL["球面重投影残差"]
+      RESIDUAL --> ESKF_UPDATE["ESKF更新 \n(Mahalanobis门限外点剔除)"]
+      ESKF_PRED --> MERGE["合并: 预测+观测"]
+      ESKF_UPDATE --> MERGE
+      MERGE --> MARG["边缘化 \n(Schur补 + FEJ)"]
+      MARG -.->|"先验"| ESKF_PRED
+    end
+
+    subgraph MAP["建图"]
+      CONVERGE["深度收敛检查 \n(方差 < 阈值)"] --> TRIANG["三角化新地图点"]
+      TRIANG --> BUNDLE["局部BA优化"]
+    end
+
+    USPM_MAP --> PANO
+    MARG --> CONVERGE
+    BUNDLE -.->|"优化后位姿"| ESKF_PRED
+
+    classDef in fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef feat fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px
+    classDef fus fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px
+    classDef mp fill:#e6f7ee,stroke:#10b981,stroke-width:2px
+    class IMG1,IMG2,IMG3,IMU_DATA,USPM_MAP,PREINT in
+    class PANO,DET,ALIGN feat
+    class ESKF_PRED,RESIDUAL,ESKF_UPDATE,MERGE,MARG fus
+    class CONVERGE,TRIANG,BUNDLE mp
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph INIT["阶段1: 初始化"]
+      I1["多相机离线标定 \n各相机内参+外参初值"] --> I2["USPM构建 \n为每个相机建立像素↔球面映射表"]
+      I2 --> I3["IMU静止初始化 \n陀螺bias+重力方向"]
+      I3 --> I4["视觉-惯性松耦合对齐 \n估计尺度+速度+重力"]
+    end
+
+    subgraph TRACK["阶段2: 逐帧跟踪"]
+      T1["接收新图像+IMU"] --> T2["USPM→全景展开"]
+      T2 --> T3["HOFA金字塔对齐"]
+      T3 --> T4{"对齐成功?"}
+      T4 -- "是" --> T5["深度滤波更新"]
+      T4 -- "否" --> T6["重新检测FAST角点"]
+      T6 --> T3
+    end
+
+    subgraph ESTIMATE["阶段3: 状态估计"]
+      E2["IMU预积分传播"] --> E3["构建重投影残差"]
+      T5 --> E3
+      E3 --> E4["ESKF更新+边缘化"]
+      E4 --> E5["输出位姿"]
+    end
+
+    subgraph LOOP["阶段4: 闭环与全局优化"]
+      L1["回环检测 \n(DBoW3 在全景图)"] --> L2["位姿图优化"]
+      L2 -.->|"全局一致位姿"| E2
+    end
+
+    INIT --> TRACK
+    TRACK --> ESTIMATE
+    ESTIMATE --> LOOP
+    ESTIMATE -.->|"位姿先验"| TRACK
+
+    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef track fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef est fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef loop fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class I1,I2,I3,I4 init
+    class T1,T2,T3,T4,T5,T6 track
+    class E2,E3,E4,E5 est
+    class L1,L2 loop
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \min_{\mathbf{x}} \sum_{(i,j)\in\mathcal{C}} \left\| \mathbf{z}_{ij} - \pi_{\text{sph}}\big( \mathbf{T}_{wc_i}^{-1} \cdot \mathbf{p}_j^w \big) \right\|_{\Sigma_{ij}}^2 \quad \text{s.t.} \quad \mathbf{x} = [\mathbf{x}_{\text{IMU}}, \mathbf{x}_{\text{ext}}, \mathbf{x}_{\text{pts}}] $$
+    <div class="eq-note">
+      <strong>$\mathbf{z}_{ij}$</strong> = 第 $i$ 帧图像中第 $j$ 个特征点的球面观测（全景展开图坐标）&nbsp;|&nbsp;
+      <strong>$\mathbf{T}_{wc_i}$</strong> = 第 $i$ 帧相机在世界系下的位姿 &nbsp;|&nbsp;
+      <strong>$\mathbf{p}_j^w$</strong> = 第 $j$ 个地图点的世界坐标 &nbsp;|&nbsp;
+      <strong>$\pi_{\text{sph}}$</strong> = USPM 球面重投影函数（像素→球面坐标→全景展开点的复合映射）&nbsp;|&nbsp;
+      <strong>$\mathcal{C}$</strong> = 所有异构相机的观测集合（针孔、鱼眼、全景均可）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：重投影残差必须在统一的球面空间中定义，使得异构相机的 Jacobian 共用同一个解析形式。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>多相机图像流（任意数量、任意相机模型）+ IMU 测量（加速度 + 角速度，~200 Hz）</td><td>N × 图像 (H×W) + 6 DoF IMU</td></tr>
+    <tr><td><strong>输出</strong></td><td>6-DoF 刚体位姿（位置 + 姿态四元数）+ 稀疏三维地图点</td><td>位姿 7 维/帧，地图点 3D 坐标 + 描述子</td></tr>
+    <tr><td><strong>目标</strong></td><td>在 CPU 上以实时速率（>30 Hz）输出高精度轨迹，支持任意相机组合（针孔+鱼眼、全景+针孔等），ATE RMSE 在挑战性数据集上 < 0.2 m</td><td>HILTI 2022: 0.1821 m ATE RMSE @ 0.0122 s/帧</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>统一架构的多传感器状态估计</strong>问题。属于视觉-惯性里程计（VIO）范畴，但突破了单相机/同质多相机的传统设定——在统一的球面几何框架下，将任意相机模型的观测转化为相同的残差形式。场景：室内外复杂环境（HILTI 2022 数据集涵盖建筑工地、实验室、走廊等），传感器：任意组合的异构多相机 + IMU，核心挑战：<strong>在相机无关的统一表示下保持高精度和实时性</strong>。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：异构相机→统一表示→精度-效率三角困境。<br><br>
+    （1）<strong>相机模型的多样性</strong>：针孔相机（透视投影 $x = fX/Z$）、鱼眼相机（等距/等立体角/正交投影等多种畸变模型）、全景相机（等矩形投影 $u = \phi \cdot W/2\pi$）——它们的正投影和反投影方程完全不同。如果为每种相机模型都写一份 Jacobian，代码量呈 $O(N^2)$ 增长。需要在某个"更高维"的空间中找到所有相机的统一表示。<br><br>
+    （2）<strong>跨相机特征匹配的困难</strong>：不同相机的视场重叠有限（例如前后对置的鱼眼相机），且同一三维点在两个相机中的投影外观可能完全不同（光照、尺度、方向差异）。传统 KLT 光流假设小基线小运动，在多相机大基线、大视差场景下极易失效。<br><br>
+    （3）<strong>实时性要求</strong>：VIO 要求在 30 ms 内完成一帧的跟踪+估计。多相机意味着 N 倍图像数据，如果每个相机都独立进行特征检测和跟踪，计算量也是 N 倍。需要在"更多数据→更好精度"和"更多数据→更大计算量"之间找到最优平衡。<br><br>
+    <strong>将三者放在一起</strong>：需要在统一的球面几何框架下，用 O(1) 的计算量（相对于相机数量）处理任意相机模型的观测，同时保证精度不低于针对每个相机模型特化的最优方案。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>VINS-Mono / VINS-Fusion（单/多针孔 VIO）</td>
+      <td>基于针孔相机模型的紧耦合 VIO，前端用 KLT 光流，后端用滑动窗口非线性优化</td>
+      <td><strong>仅支持针孔相机</strong>。对于鱼眼相机需要繁琐的去畸变预处理（损失 FoV），全景相机完全无法接入。多相机版本（VINS-Fusion）将每个相机独立处理，未利用跨相机球面约束。</td>
+    </tr>
+    <tr>
+      <td>MSCKF / OpenVINS（多相机 MSCKF）</td>
+      <td>EKF 框架下的多相机 VIO，特征通过边缘化从状态向量中消除以保持恒定计算量</td>
+      <td><strong>相机模型硬编码</strong>——每个相机类型需要单独的观测模型和 Jacobian。不支持全景相机。前端依赖 KLT 在原始图像平面跟踪，对大畸变相机鲁棒性差。</td>
+    </tr>
+    <tr>
+      <td>OmniMSCKF / SVO for fisheye（鱼眼特化方案）</td>
+      <td>将鱼眼相机的投影模型（如 Kannala-Brandt 模型）直接纳入 EKF 的观测方程</td>
+      <td>每个相机模型一个方案——<strong>无跨模型泛化能力</strong>。且双目/多目的特征关联仍然在畸变图像平面上进行，受畸变影响严重。全景相机不在支持范围内。</td>
+    </tr>
+    <tr>
+      <td>MultiCol-SLAM / CCM-SLAM（通用多相机 SLAM）</td>
+      <td>每个相机独立提取特征后统一建图，用 BA 联合优化</td>
+      <td><strong>计算量极大</strong>（多相机 BA 的 Hessian 矩阵维度增大），无法实时运行。同样受限于相机模型多样性——每个相机一个投影函数。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 统一几何表示</strong>：找到一个对所有相机模型都有效且可微的统一映射。球面是自然的选择（入射光线方向），但如何从球面进一步映射到便于特征跟踪的 2D 域（全景展开图）？全景展开图的两极畸变如何补偿？</li>
+    <li><strong>挑战 2 — 跨相机特征的鲁棒关联</strong>：同一三维点在多相机之间的外观差异（光照/尺度/方向）+ 大基线视差 = 传统描述子匹配不可靠。需要在球面极线约束下进行密集的深度搜索和滤波，但又要保持计算量可控（不像双目深度估计那样需要全图密集匹配）。</li>
+    <li><strong>挑战 3 — 计算效率与精度的平衡</strong>：多相机意味着更多可用的视觉约束 → 更高精度，但也意味着更多图像 → 更多计算量。如何在 ESKF 框架中通过 Schur 补边缘化将计算量压缩到 O(1)，同时不丢失多相机带来的精度增益？如何在滑动窗口中选择"最有信息量"的特征和相机帧进行边缘化？</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>Sphere-VIO 的核心是由三个模块构成的 pipeline：(1) <strong>USPM</strong> 将任意相机模型的像素映射到统一的全景展开空间；(2) <strong>HOFA</strong> 在全景展开空间中进行层次化特征对齐和深度估计；(3) <strong>ESKF 后端</strong> 在球面空间中进行状态估计，用 Schur 补边缘化维持恒定计算量。整个过程在 CPU 上以 >80 Hz 运行。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A -->
+  <h4>Group A: USPM 统一球面全景模型——像素 ↔ 球面的双向映射</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 像素→球面→全景展开</span>
+    $$ \mathbf{r}_s = \pi_{\text{cam}}^{-1}(\mathbf{p}; \mathbf{K}, \mathcal{D}) = \begin{bmatrix} \sin\phi\cos\theta \\ \sin\phi\sin\theta \\ \cos\phi \end{bmatrix}, \quad \mathbf{p}_{\text{pano}} = \begin{bmatrix} W \cdot \phi/\pi \\ H \cdot \theta/\pi \end{bmatrix} $$
+    <div class="eq-note">
+      <strong>$\mathbf{p}$</strong> = 原始图像像素坐标 &nbsp;|&nbsp;
+      <strong>$\pi_{\text{cam}}^{-1}$</strong> = 相机模型的反投影（针孔: $\mathbf{K}^{-1}\mathbf{p}$，鱼眼: Kannala-Brandt 逆模型，全景: 等矩形反投影）&nbsp;|&nbsp;
+      <strong>$\mathbf{r}_s$</strong> = 单位球面上的方向向量（入射光线方向）&nbsp;|&nbsp;
+      <strong>$\mathbf{p}_{\text{pano}}$</strong> = 全景展开图上的像素坐标 &nbsp;|&nbsp;
+      <strong>$(\theta,\phi)$</strong> = 球面坐标（方位角、天顶角）&nbsp;|&nbsp;
+      <strong>核心优势</strong>：$\mathbf{r}_s$ 完全由相机模型的反投影决定，但一旦到达球面，后续所有计算（特征对齐残差、重投影残差）对任何相机模型都是统一形式。
+    </div>
+  </div>
+
+  <!-- Formula Group B -->
+  <h4>Group B: HOFA 球面极线约束——大圆上的深度搜索</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 球面极线约束与深度滤波</span>
+    $$ \mathbf{r}_j = \mathbf{R}_{c_i c_{ref}} \cdot \mathbf{r}_{ref}, \quad \mathbf{l}_{\text{epi}} = \text{GreatCircle}(\mathbf{r}_j, \mathbf{t}_{c_i c_{ref}}) $$
+    $$ p(d | \mathcal{Z}) \propto p(d) \prod_k p(z_k | d) \quad \text{（Beta-Gaussian 深度滤波）} $$
+    <div class="eq-note">
+      <strong>$\mathbf{R}_{c_i c_{ref}}$</strong> = 从参考帧到当前帧的相对旋转（由 ESKF 位姿计算）&nbsp;|&nbsp;
+      <strong>$\mathbf{t}_{c_i c_{ref}}$</strong> = 相对平移 &nbsp;|&nbsp;
+      <strong>$\mathbf{l}_{\text{epi}}$</strong> = 球面大圆弧——当前帧中特征点可能出现的位置 &nbsp;|&nbsp;
+      <strong>$p(d | \mathcal{Z})$</strong> = 给定所有观测 $\mathcal{Z}$ 的深度后验概率 &nbsp;|&nbsp;
+      <strong>关键</strong>：在球面上极线是大圆弧而非直线——沿大圆弧均匀采样深度候选，每个候选用 ZNCC patch 评分，递归更新 Beta-Gaussian 滤波器直到深度方差收敛。
+    </div>
+  </div>
+
+  <!-- Formula Group C -->
+  <h4>Group C: ESKF 状态估计——Schur 补边缘化多相机系统</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 球面重投影残差 + Schur 补边缘化</span>
+    $$ \mathbf{e}_{ij} = \mathbf{z}_{ij}^{\text{pano}} - \pi_{\text{sph}}\big( \mathbf{T}_{wc_i}^{-1} \cdot \mathbf{p}_j^w \big), \quad \mathbf{H}\delta\mathbf{x} = \mathbf{b} $$
+    $$ \begin{bmatrix} \mathbf{H}_{11} & \mathbf{H}_{12} \\ \mathbf{H}_{12}^T & \mathbf{H}_{22} \end{bmatrix} \begin{bmatrix} \delta\mathbf{x}_{\text{keep}} \\ \delta\mathbf{x}_{\text{marg}} \end{bmatrix} = \begin{bmatrix} \mathbf{b}_1 \\ \mathbf{b}_2 \end{bmatrix} \xrightarrow{\text{Schur}} (\mathbf{H}_{11} - \mathbf{H}_{12}\mathbf{H}_{22}^{-1}\mathbf{H}_{12}^T)\delta\mathbf{x}_{\text{keep}} = \mathbf{b}_1 - \mathbf{H}_{12}\mathbf{H}_{22}^{-1}\mathbf{b}_2 $$
+    <div class="eq-note">
+      <strong>$\mathbf{e}_{ij}$</strong> = 第 $i$ 帧中第 $j$ 个特征点的球面重投影残差（2 维——全景展开图上的 $u,v$ 坐标差）&nbsp;|&nbsp;
+      <strong>$\mathbf{H}_{11}$</strong> = 对应保留状态（IMU 状态 + 活跃相机外参 + 活跃特征深度）的 Hessian 块 &nbsp;|&nbsp;
+      <strong>$\mathbf{H}_{22}$</strong> = 对应待边缘化状态（非活跃特征 + 旧帧）的 Hessian 块 &nbsp;|&nbsp;
+      <strong>Schur 补</strong>：将 $\delta\mathbf{x}_{\text{marg}}$ 的边缘化信息压缩到 $\mathbf{H}_{11}$ 的先验项中——保留其统计约束但消除其显式变量，<strong>维持状态维度恒定</strong>。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>全景展开图分辨率</td><td><strong>W=1024, H=512</strong></td><td>等矩形投影图的宽高（2:1 比例）</td><td>1024×512 对应方位角分辨率 ~0.35°/pixel——与针孔相机 640×480 @ 90° FoV 的分辨率相当，确保不损失信息</td></tr>
+    <tr><td>滑动窗口大小</td><td><strong>10 帧</strong></td><td>ESKF 中保持的最近帧数</td><td>10 帧确保足够的视差用于深度收敛，同时控制计算量。超过 10 帧的旧帧被边缘化</td></tr>
+    <tr><td>每帧特征点数</td><td><strong>100~200</strong></td><td>在全景展开图上检测的 FAST 角点数量</td><td>在多相机场景下，该数量在"足够约束"和"计算可控"之间平衡。特征太多 → ESKF 更新维度过大</td></tr>
+    <tr><td>深度滤波收敛阈值</td><td><strong>深度方差/深度 < 0.1</strong></td><td>判断深度估计是否收敛到可靠值</td><td>相对标准差 < 10% 意味着深度估计足够准确，可安全用于三角化和 ESKF 更新</td></tr>
+    <tr><td>IMU 频率</td><td><strong>200 Hz</strong></td><td>IMU 加速度+角速度采样率</td><td>200 Hz 是大多数 MEMS IMU（如 BMI088、ICM-20948）的标准频率——在预积分误差和计算量之间平衡</td></tr>
+  </table>
+
+  <h3>6.4 USPM vs 传统相机特定方案</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🌐 Sphere-VIO USPM（本文）</h4>
+      <ul>
+        <li>所有相机统一映射到球面，一个残差模型适用全部</li>
+        <li>新增相机模型只需提供 $\pi_{\text{cam}}^{-1}$ 函数</li>
+        <li>全景展开图上的特征跟踪利用 2D 图像的成熟算法</li>
+        <li>球面域的重投影误差天然旋转不变</li>
+        <li>多相机外参在线标定（ESKF 中联合估计）</li>
+        <li>计算量 $O(K)$ 其中 $K$ 为总特征数（与相机数无关）</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>📷 传统方案（VINS-Fusion / MSCKF）</h4>
+      <ul>
+        <li>每种相机模型独立的投影方程和 Jacobian</li>
+        <li>新增相机模型需要实现完整的观测模型</li>
+        <li>特征在原图像平面跟踪——大畸变下不可靠</li>
+        <li>重投影误差依赖特定投影模型</li>
+        <li>多相机外参需要离线标定，运行时固定</li>
+        <li>计算量 $O(N \cdot K/N)$——每相机独立处理</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+
+  <h3>7.1 球面几何与重投影——为什么球面是统一表示的正确选择</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 相机模型的统一性：入射光线的球面不变性</span>
+    $$ \mathbf{r} = \frac{\mathbf{X}^c}{\|\mathbf{X}^c\|} = \frac{\mathbf{R}_{wc}^T (\mathbf{X}^w - \mathbf{t}_{wc})}{\|\mathbf{R}_{wc}^T (\mathbf{X}^w - \mathbf{t}_{wc})\|} \in \mathbb{S}^2 $$
+    <div class="eq-note">
+      <strong>$\mathbf{X}^c$</strong> = 三维点在相机坐标系下的坐标（与相机模型无关）&nbsp;|&nbsp;
+      <strong>$\mathbf{r}$</strong> = 单位球面方向向量（入射光线的方向）&nbsp;|&nbsp;
+      <strong>关键事实</strong>：无论相机模型是什么（针孔、鱼眼、全景），三维点 → 入射光线方向这个几何关系是<strong>完全相同</strong>的——它是透视投影的物理本质。相机模型的差异只在于"入射光线方向 → 像素坐标"这一步，而这一步在 USPM 中被抽象为 $\pi_{\text{cam}}^{-1}$ 的可插拔模块。
+    </div>
+  </div>
+
+  <p>球面几何的另一优势是<strong>旋转不变性</strong>：在球面上，帧间旋转相当于整个球面图案的一个旋转变换——不改变球面上点之间的角度关系。这意味着旋转估计和特征匹配可以被解耦，简化了优化问题的结构。</p>
+
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🌐 球面空间中的操作（本文）</h4>
+      <p><strong>特征跟踪</strong>：在全景展开图（2D 欧氏平面）上进行——这是对球面进行等矩形参数化后得到的 2D 图像。虽然两极有畸变（纬度越高像素密度越大），但在方位角方向（行方向）上保持了均匀性。</p>
+      <p><strong>残差定义</strong>：重投影残差定义在<strong>全景展开图坐标</strong>上——$\mathbf{e} = \mathbf{p}_{\text{pano}}^{\text{obs}} - \mathbf{p}_{\text{pano}}^{\text{proj}}$。这是因为全景展开图坐标的 2D 欧氏残差比球面弧度残差更容易优化（梯度更平滑）。</p>
+      <p><strong>几何约束</strong>：极线约束定义在<strong>球面</strong>上——球面大圆弧是极线的正确几何形式。</p>
+    </div>
+    <div class="cmp-col">
+      <h4>📷 图像平面中的操作（传统方案）</h4>
+      <p><strong>特征跟踪</strong>：在原始图像平面上进行——鱼眼图像边缘严重畸变，针孔图像有透视效应，全景图像两极极度拉伸。</p>
+      <p><strong>残差定义</strong>：重投影残差定义在<strong>原始图像坐标</strong>上——需要针对每种相机模型计算不同的 Jacobian。</p>
+      <p><strong>几何约束</strong>：极线约束定义在<strong>原始图像平面</strong>上——鱼眼相机中极线不是直线，且在不同图像位置有不同的曲率。</p>
+    </div>
+  </div>
+
+  <h3>7.2 Schur 补边缘化——在 ESKF 中维持 O(1) 计算量的数学工具</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — Schur 补的边缘化信息压缩</span>
+    $$ \mathbf{\Lambda}_{\text{prior}} = \mathbf{H}_{11} - \mathbf{H}_{12}\mathbf{H}_{22}^{-1}\mathbf{H}_{12}^T, \quad \boldsymbol{\eta}_{\text{prior}} = \mathbf{b}_1 - \mathbf{H}_{12}\mathbf{H}_{22}^{-1}\mathbf{b}_2 $$
+    <div class="eq-note">
+      <strong>$\mathbf{\Lambda}_{\text{prior}}$</strong> = 边缘化后保留在系统里的信息矩阵（作为下一次优化的先验）&nbsp;|&nbsp;
+      <strong>$\boldsymbol{\eta}_{\text{prior}}$</strong> = 先验信息向量 &nbsp;|&nbsp;
+      <strong>物理含义</strong>：Schur 补将"被边缘化变量（旧帧、旧特征）与保留变量之间的统计约束"压缩为一个等效的先验项——它就像一本"已结案的案件卷宗"，不需要重新审阅案件细节，但保留了判决结论对后续案件的约束力。这使得 ESKF 的状态维度始终保持在一个小的常数范围（~50~100），而不是随时间线性增长。
+    </div>
+  </div>
+
+  <p>在多相机 VIO 的语境下，Schur 补边缘化的关键技巧在于<strong>利用观测矩阵的稀疏块结构</strong>：不同相机观测不同的特征子集（或从不同角度观测同一特征），这导致观测 Hessian 矩阵具有天然的分块对角可分离性。当边缘化某个相机的外参时，只需要 Schur 补该相机对应的 Hessian 块——与其他相机无关。</p>
+
+  <h3>7.3 Beta-Gaussian 深度滤波——鲁棒的递归深度估计</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 递归贝叶斯深度更新</span>
+    $$ p(d | z_{1:t}) \propto p(d) \prod_{k=1}^t p(z_k | d) = \mathcal{N}(d; \mu_t, \sigma_t^2) \cdot \text{Beta}(a_t, b_t) $$
+    <div class="eq-note">
+      <strong>$d$</strong> = 特征点的深度（逆深度参数化更稳定）&nbsp;|&nbsp;
+      <strong>$\mathcal{N}(\mu_t, \sigma_t^2)$</strong> = 深度的高斯分布——$t$ 帧观测后的均值和方差 &nbsp;|&nbsp;
+      <strong>$\text{Beta}(a_t, b_t)$</strong> = 面元法向一致性的 Beta 分布——建模不同视角下面元法向的不确定性 &nbsp;|&nbsp;
+      <strong>融合策略</strong>：每帧新观测沿球面大圆弧搜索最佳匹配 → 用 ZNCC 评分衡量匹配质量 → 更新 Beta-Gaussian 后验 → 当方差/均值 < 10% 时判定深度收敛。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    球面几何提供统一表示（相机无关）→ ESKF + Schur 补提供高效估计（O(1) 计算量）→ Beta-Gaussian 深度滤波提供鲁棒初始化（跨相机深度一致性）→ <strong>三者共同使 Sphere-VIO 成为首个在运行时和精度上同时超越特化方案（如 VINS-Mono on pinhole）的统一多相机 VIO</strong>。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">USPM 统一球面全景模型的映射流程与跨相机特征对齐</span>
+      <span class="fig-source">来源：论文 Fig. 2-3</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="USPM mapping and cross-camera feature alignment"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 三种典型相机模型（针孔、鱼眼、全景）的图像到球面再到全景展开图的映射过程。针孔相机只覆盖球面的一小部分（~90° FoV），鱼眼相机覆盖半球（~180°），全景相机覆盖整个球面（360°×180°）。(b) 在全景展开图上，不同相机观测到的同一三维点在展开图中处于不同位置——这是由各相机的外参决定的。HOFA 利用球面极线约束将不同相机的观测关联起来。</p>
+      <ul>
+        <li><strong>全景展开图的"空白区域"</strong>：针孔相机只覆盖展开图的一小部分，其余区域为黑色——这是合理的，因为针孔相机无法看到后方。但所有相机的观测都映射到<strong>同一全景展开坐标系</strong>中，构成了统一的多相机观测图</li>
+        <li><strong>两极畸变的处理</strong>：HOFA 在金字塔的顶层（低分辨率）降低两极特征的权重——避免因两极像素密度过高而产生虚假匹配</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">HOFA 层次化全向特征对齐：金字塔匹配 + 深度滤波收敛过程</span>
+      <span class="fig-source">来源：论文 Fig. 4-5</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="HOFA hierarchical omnidirectional feature alignment"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：HOFA 的三层金字塔对齐过程。(a) 全景展开图上的 FAST 角点检测结果——特征分布在有效像素区域（非黑色区域）。(b) 球面极线大圆弧的生成——由 ESKF 预测的位姿计算两帧之间的相对运动，将参考帧特征映射到当前帧全景展开图上的大圆弧。(c) 从粗到精的金字塔对齐——L2 层（128×64）沿大圆弧采样 20 个深度候选 → L1 层（256×128）细化到 10 个候选 → L0 层（512×256）精确定位。(d) 深度滤波器的收敛曲线——5~10 帧后深度方差/均值降至 0.1 以下，深度估计收敛。</p>
+      <ul>
+        <li><strong>ZNCC 评分的鲁棒性</strong>：使用零均值归一化互相关而非 SSD（平方差之和），因为全景展开图中不同相机观测的绝对亮度可能不同（曝光、增益差异）</li>
+        <li><strong>Beta 分布的物理意义</strong>：面元法向的不确定性——从斜角度观测时，patch 的外观扭曲更严重，Beta 分布通过增加 $b$ 参数来建模这种不确定性</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 3 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">HILTI 2022 数据集上的轨迹对比与消融实验</span>
+      <span class="fig-source">来源：论文 Fig. 7-8</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Trajectory comparison and ablation on HILTI 2022"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) HILTI 2022 数据集上 Sphere-VIO 与 VINS-Fusion、MSCKF、OpenVINS 的轨迹对比——Sphere-VIO 在所有序列上的 ATE RMSE 均最低。(b) 消融实验：去除 USPM（直接用原始图像特征跟踪）→ 精度下降 35%；去除 HOFA 深度滤波（用简单三角化）→ 特征跟踪丢失率从 8% 升至 28%；去除 Schur 补边缘化 → 计算时间从 12.2 ms/帧增至 48.7 ms/帧。(c) 不同相机组合（1 针孔、2 针孔、1 针孔+1 鱼眼、2 鱼眼、1 全景+1 针孔）下的性能——相机越多精度越高，但计算时间几乎不变（12~14 ms/帧），验证了 USPM 的相机数量无关性。</p>
+      <ul>
+        <li><strong>全景+针孔组合的优势</strong>：全景相机提供全覆盖的视觉约束（无死角），针孔相机在前方提供高分辨率细节——两者互补，ATE RMSE 最低（0.1821 m）</li>
+        <li><strong>消融实验的教训</strong>：最大精度贡献来自 HOFA（深度滤波），最大速度贡献来自 Schur 补——两个模块缺一不可</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>全景展开图的两极畸变</strong>：等矩形投影在两极（天顶角接近 0 或 $\pi$）处，像素密度趋于无穷——一个 1° 的天顶角变化对应全图宽度的像素。在天顶/天底区域特征跟踪不可靠。当前方案通过降低两极区域的权重缓解，但本质上未解决等矩形投影的奇异性问题。</li>
+    <li><strong>计算效率的"相机数量无关"有前提</strong>：虽然 ESKF 的计算复杂度与相机数量无关，但 USPM 映射（每像素一次反投影）和全景展开图上的特征检测/跟踪（图像尺寸固定）的成本是恒定的。如果所有相机都是高分辨率（如 2K×2K 每台），映射和检测将成为瓶颈。</li>
+    <li><strong>动态场景无处理</strong>：当前 HOFA 假设场景是静态刚体。在建筑工地（HILTI 2022 场景）中，移动的工人/车辆会导致特征跟踪错误和深度滤波器发散。论文未讨论动态物体过滤机制。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>自适应全景图分辨率</strong>：根据相机 FoV 动态调整全景展开图的有效区域——如果只用针孔相机，没必要处理整个 360° 全景。可以用"自适应切图"（adaptive cubemap projection）替代全尺寸全景展开图来避免两极奇异性。</li>
+    <li><strong>学习型特征匹配</strong>：用 SuperPoint + LightGlue 替代 FAST + ZNCC——学习型特征在跨相机大视角变化下更鲁棒，且可以在 GPU 上实现实时推理，释放 CPU 用于滤波。</li>
+    <li><strong>动态物体剔除</strong>：在 HOFA 中增加语义分割 mask（如轻量级 SegFormer），在深度滤波前剔除动态物体区域的特征，提升在动态环境中的鲁棒性。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>相机外参漂移（温度/振动）</td><td>USPM 假设外参在短时间窗内不变——但 UAV 飞行中电机的振动和温度变化可能导致外参缓慢漂移。在线外参估计通过 Schur 补边缘化缓解了此问题，但边缘化本身引入了线性化误差</td><td>★★★★</td></tr>
+    <tr><td>光照剧烈变化</td><td>HOFA 的 ZNCC 评分对光照变化有一定鲁棒性（零均值归一化），但在室内外切换（自动曝光变化）或强光/阴影交替场景仍可能匹配失败。缺少曝光补偿机制</td><td>★★★</td></tr>
+    <tr><td>低纹理环境</td><td>FAST 角点检测在全景展开图的低纹理区域（白墙、天空）无法检测到足够特征——此时深度滤波无法收敛，VIO 退化为纯惯性积分（漂移加速）</td><td>★★★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>球面 Gaussian Splatting + Sphere-VIO 的紧耦合</strong>——当前的 Sphere-VIO 输出稀疏地图，但全向球面表示天然适合作为 3D Gaussian Splatting 的初始化。如果用 Sphere-VIO 的球面位姿和深度估计来初始化球面 Gaussian 地图，可以实现实时的稠密全向重建。更进一步，Gaussian Splatting 的渲染结果可以作为反馈信号，与 HOFA 特征跟踪进行双向验证（"渲染-对比"闭环），同时在"看得清楚"的区域自动增加特征密度。这是一个从 VIO → 实时全向稠密 SLAM 的自然扩展路径。
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>无人机和机器人需要 VIO 进行状态估计。随着传感器多样化（针孔、鱼眼、全景、事件相机等），传统的"一种相机模型一套代码"的 VIO 开发模式不可持续——每接入一种新相机类型都需要大量重复的适配工作。本质问题是：<strong>相机模型的多样性 vs VIO 框架的统一性之间的矛盾</strong>。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>方案 A：为每种相机分别实现 VIO（VINS-Fisheye、OmniMSCKF 等）——代码不可复用，无法融合异构相机。方案 B：只用一种相机模型（全部用针孔或去畸变处理）——丢失了鱼眼的大 FoV 和全景的全向优势。方案 C：在原始图像平面分别处理多相机特征后统一优化——每个相机独立的特征跟踪使得跨相机约束丢失，且计算量随相机数线性增长。</li>
+    <li><strong>如果存在一个"所有相机共享的中间表示"呢？</strong><br>光线传播的物理本质——任何相机的成像都是三维场景点到二维像素的投影。这个投影的"中间态"是光线方向（球面单位向量）。如果将所有相机都映射到球面，再展开为全景图，就能在一个统一的空间中处理所有相机的特征。这就是 USPM 的核心思想——球面是"所有相机的最大公约数"。</li>
+    <li><strong>统一表示带来了什么额外好处？</strong><br>(1) 球面重投影残差的一个解析形式适用所有相机——Jacobian 只需要写一次。(2) 多相机的外参变成了球面对球面的刚体变换——几何意义更直观。(3) 全景展开图上的特征跟踪可以借用成熟的 2D 图像处理算法。(4) 球面极线的"大圆"形式比图像平面的曲线极线更便于采样。</li>
+    <li><strong>还需要什么才能让这个方案在 CPU 上实时运行？</strong><br>计算效率的关键在 ESKF 后端——需要让状态维度不随时间线性增长。Schur 补边缘化是经典解法：将"不再需要的变量"的边缘化信息压缩到先验中，保留其对剩余变量的统计约束。多相机观测矩阵的稀疏块结构使得 Schur 补特别高效——这正是 Sphere-VIO 能保持 12 ms/帧的关键。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    现有 VIO 框架迫使开发者为每种相机模型编写专门的代码——那为什么不将所有相机都映射到它们"共有"的球面表示上，在一个统一的几何空间中完成特征跟踪和状态估计，从而用一套代码支持任意相机组合？
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察痛点</strong>：实验室里同时使用针孔相机（前视）和鱼眼相机（下视）做 VIO 时，需要分别跑 VINS-Mono 和 VINS-Fisheye 两个独立系统再融合——维护两套代码、两个参数配置文件，且融合时丢失了跨相机约束。全景相机的 VIO 则完全没有现成方案。</li>
+    <li><strong>Step 2 — 寻找不变量</strong>：翻看多视图几何教材——所有相机模型的投影方程都是 $\mathbf{x} = \pi(\mathbf{RX}+\mathbf{t})$ 的形式，区别只在于 $\pi$ 函数。但 $\pi^{-1}$ 总是将像素映射为射线方向——这个方向在球面上是一个点。球面是跨相机模型的<strong>不变量</strong>。</li>
+    <li><strong>Step 3 — 验证可行性</strong>：在 MATLAB 中快速验证——将针孔、鱼眼、全景图像分别反投影到球面再用等矩形投影展开，观察展开图。发现虽然三个原始图像看起来完全不同，但在全景展开图上它们共享同一个坐标系——特征是可以在展开图上统一处理的。</li>
+    <li><strong>Step 4 — 工程实现</strong>：设计 USPM（可插拔的相机模型接口 + 共享的全景展开图）+ HOFA（球面极线约束 + 金字塔对齐 + 深度滤波）+ ESKF（Schur 补边缘化），在 HILTI 2022 数据集上验证。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这也是一个<strong>"升维统一"</strong>的案例——不去为每种相机模型写特化代码，而是找到一个更高维的几何空间（球面），在这个空间里所有相机的观测变成同一种形式。类似的思路可以推广到其他传感器融合场景：找到不同传感器共享的物理量（如入射光线方向、深度、语义类别），以该物理量为枢纽进行融合。</li>
+    <li><strong>技术技巧层面</strong>：(1) 全景展开图的选用很巧妙——避免了直接在球面（非欧几何）上做优化，但利用了球面的旋转不变性定义残差；(2) Schur 补是 SLAM 领域最经典也最被低估的技巧——它让"保留边缘化变量的统计信息但不保留其显式变量"成为可能；(3) Beta-Gaussian 深度滤波器将面元法向不确定性也纳入建模——这在跨大视角观测时至关重要（斜角度观测的深度估计天然更不确定）。</li>
+    <li><strong>实验/写作层面</strong>：消融实验设计得很好——每个模块（USPM、HOFA、Schur 补）都有独立的消融实验来量化贡献。论文还展示了"1 针孔 → 2 针孔 → 针孔+鱼眼 → 1 全景+1 针孔"的渐进式性能变化，清晰论证了"相机越多精度越高、计算量几乎不变"的核心论点。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于多传感器融合方向</strong>：USPM 的"统一中间表示"思路可以直接迁移到其他传感器融合场景——例如 LiDAR + 相机融合：找到两者共有的几何表示（如深度图、点云），在统一空间中进行关联和优化。</li>
+    <li><strong>对于实时 SLAM 方向</strong>：Schur 补边缘化 + ESKF 的组合是保持实时性的经典范式——如果你的系统状态维度随时间增长，考虑"哪些变量可以被边缘化？边缘化后的统计信息如何保留？"这是将 batch optimization 转化为 incremental estimation 的关键。</li>
+    <li><strong>对于 UAV 视觉方向</strong>：多相机（前视+下视+后视）是 UAV 的常见配置——Sphere-VIO 提供了一个直接可用的 VIO 方案。尤其是鱼眼相机（大 FoV）在 UAV 中广泛应用，而传统 VIO 对鱼眼的支持很弱——Sphere-VIO 的全景展开方案正好填补了这个空白。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Mourikis & Roumeliotis (2007) — A Multi-State Constraint Kalman Filter for Vision-aided Inertial Navigation. <em>ICRA</em></td><td>MSCKF 的原论文——定义了 EKF 框架下特征边缘化的范式。Sphere-VIO 的 ESKF 后端是 MSCKF 的继承和发展，通过 Schur 补边缘化将 MSCKF 的单相机设定扩展到多相机+在线外参估计。</td></tr>
+    <tr><td>Qin et al. (2018) — VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator. <em>TRO</em></td><td>VINS-Mono 是当前最广泛使用的开源 VIO 系统——但仅支持针孔相机。Sphere-VIO 可以视为 VINS-Mono 在"异构多相机 + 统一球面表示"方向上的泛化。</td></tr>
+    <tr><td>Forster et al. (2014) — SVO: Semi-Direct Visual Odometry. <em>ICRA</em></td><td>SVO 提出了基于极线搜索的深度滤波技术——Sphere-VIO 的 HOFA 在全景展开图的球面大圆弧上进行了类似的深度搜索，将平面极线推广到球面大圆。</td></tr>
+    <tr><td>HILTI 2022 SLAM Challenge — Helmberger et al.</td><td>Sphere-VIO 的主要评测基准。HILTI 数据集以建筑工地的挑战性场景（剧烈光照变化、动态物体、大范围运动）著称——在此数据集上的优良表现证明了 Sphere-VIO 的鲁棒性。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Yang, Xie et al. · arXiv 2026 · Sphere-VIO — Unified Spherical VIO for Heterogeneous Multi-Camera Systems · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes - L1 adaptive prescribed-time control</title>
+
+<script>
+
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 files · 18-note reading path</div>
+    <div class="series-links">
+
+<a href="../../index.html">Index</a>      <a href="../10453/index.html">10453</a>      <a href="../10464/index.html">10464</a>      <a href="../10472/index.html">10472</a>      <a href="../10473/index.html">10473</a>      <a href="../10474/index.html">10474</a>      <a href="../10484/index.html">10484</a>      <a href="../10485/index.html">10485</a>      <a href="../10486/index.html">10486</a>      <a class="active" href="../10487/index.html">10487</a>      <a href="../10488/index.html">10488</a>      <a href="../10489/index.html">10489</a>      <a href="../10490/index.html">10490</a>      <a href="../10491/index.html">10491</a>      <a href="../10493/index.html">10493</a>      <a href="../10494/index.html">10494</a>      <a href="../10495/index.html">10495</a>      <a href="../10496/index.html">10496</a>      <a href="../10497/index.html">10497</a>
+    </div>
+  </div>
+
+<!-- ═══════════════ §1 PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. 论文信息</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>标题</strong></td><td class="bold-title">L1 Adaptive Prescribed-Time Control for Uncertain Nonlinear Systems</td></tr>
+    <tr><td><strong>作者</strong></td><td>Zhu et al.</td></tr>
+    <tr><td><strong>发表年份</strong></td><td><strong class="bold-venue">2026</strong></td></tr>
+    <tr><td><strong>研究领域</strong></td><td>自适应控制 · 预设时间控制 · 非线性系统 · 鲁棒控制</td></tr>
+    <tr><td><strong>核心问题</strong></td><td>针对含匹配与非匹配不确定性的非线性系统，设计一种同时保证<strong>预设时间收敛</strong>与<strong>L1自适应鲁棒性</strong>的控制框架</td></tr>
+    <tr><td><strong>方法论</strong></td><td>L1自适应控制 + 预设时间Lyapunov稳定性理论 + 反步法 (Backstepping) + 低通滤波</td></tr>
+    <tr><td><strong>研究对象</strong></td><td>严格反馈 (strict-feedback) 非线性系统，含参数不确定性与外部扰动</td></tr>
+    <tr><td><strong>验证方式</strong></td><td>数值仿真，对比传统自适应控制与有限时间控制方法</td></tr>
+    <tr><td><strong>论文来源</strong></td><td>Zhu et al. - 2026 - L1 adaptive prescribed-time control.pdf</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Paper #10487</span>
+    <span class="tag tag-green">2026</span>
+    <span class="tag tag-purple">L1 Adaptive Control</span>
+    <span class="tag tag-amber">Prescribed-Time</span>
+    <span class="tag tag-red">Nonlinear Systems</span>
+    <span class="tag tag-cyan">Backstepping</span>
+    <span class="tag tag-blue">Uncertainty Compensation</span>
+    <span class="tag tag-gray">Lyapunov Stability</span>
+  </div>
+</section>
+
+<!-- ═══════════════ §2 INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+<h2>2. 核心洞察与创新点</h2>
+
+<h3>2.1 核心洞察 Q&A</h3>
+<div class="callout idea">
+  <div class="callout-title">💡 核心洞察: 为什么 L1 自适应 + 预设时间控制的结合是突破性的？</div>
+  <p>传统自适应控制（如 Model Reference Adaptive Control, MRAC）仅保证<strong>渐近收敛</strong>（$t \to \infty$），有限时间控制虽能在有限时间内收敛，但收敛时间上界<strong>依赖于初始条件</strong>。L1 自适应控制通过引入<strong>低通滤波器</strong>解耦估计回路与控制回路，实现了对快时变不确定性的鲁棒补偿，但此前的 L1 控制同样只有渐近/指数收敛保证。本文将 L1 自适应架构嵌入<strong>预设时间 Lyapunov 框架</strong>中，利用时变缩放函数 (time-varying scaling function) 构造控制器，使得：① 跟踪误差在<strong>用户预先指定的时间 $T$</strong> 内收敛到零（与初始状态无关）；② 在 $T$ 时刻之后误差恒为零（而非渐近接近）；③ L1 低通滤波结构保证<strong>瞬态性能</strong>，避免高增益导致的高频振荡。这一组合填补了"预设时间收敛 + 鲁棒不确定性补偿"这一理论空白。</p>
+</div>
+
+<h3>2.2 灵感来源 → 技术洞察映射表</h3>
+<table>
+  <tr><th style="width:28%;">启发来源</th><th style="width:72%;">本文转化出的技术洞察</th></tr>
+  <tr>
+    <td><strong>L1 自适应控制</strong><br>(Cao & Hovakimyan, 2006–2008)<br>——解耦估计与控制，低通滤波抑制高频</td>
+    <td>保留 L1 架构的核心优势：状态预测器 (state predictor) + 分段常数自适应律 (piecewise-constant adaptation) + 控制律低通滤波 (low-pass filter)，但将其<strong>嵌入预设时间反步框架</strong>中，使得每一步虚拟控制律都具有预设时间收敛特性。</td>
+  </tr>
+  <tr>
+    <td><strong>预设时间稳定性理论</strong><br>(Song et al., 2017; Holloway & Krstic, 2019)<br>——时变缩放函数 $\mu(t)$</td>
+    <td>采用时变缩放函数 $\mu(t)=\frac{T}{T-t}$（其中 $T$ 为用户指定收敛时间），构造 Lyapunov 函数 $V$ 使其满足 $\dot{V} \leq -\frac{c}{\mu(t)}V$，从而保证在 $t \to T^-$ 时 $V \to 0$。将 L1 状态预测器的误差动态也纳入此框架中。</td>
+  </tr>
+  <tr>
+    <td><strong>反步法 (Backstepping)</strong><br>(Krstic et al., 1995)<br>——递归构造严格反馈系统控制器</td>
+    <td>为处理非匹配不确定性（出现在状态方程中但不直接与控制输入在同一通道），将系统分解为 $n$ 步递归设计。每一步的虚拟控制律结合 L1 自适应补偿和预设时间缩放，确保整个级联系统的预设时间稳定性。</td>
+  </tr>
+  <tr>
+    <td><strong>有限/固定时间控制</strong><br>(Polyakov, 2012; Zuo, 2015)<br>——非 Lipschitz 反馈实现有限时间收敛</td>
+    <td>与传统有限时间控制依赖分数幂项（如 $|x|^\alpha \text{sign}(x), 0<\alpha<1$）不同，本文的预设时间方法通过<strong>时变增益</strong>而非非线性反馈实现收敛时间的可预设性，避免了分数幂在原点附近的奇异性与抖振问题。</td>
+  </tr>
+</table>
+
+<h3>2.3 三大创新点详解</h3>
+
+<div class="novelty-card">
+  <h4>🎯 创新点 1: L1 自适应预设时间反步控制框架</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>传统反步自适应控制（如调谐函数法 tuning function）只能保证渐近跟踪，且自适应参数更新与控制器高度耦合，瞬态性能难以预先保证。有限时间反步控制则依赖于初始条件，无法事先指定收敛截止时刻。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>将 L1 自适应控制中的"估计-控制解耦"思想引入预设时间框架——利用状态预测器在线估计不确定性，自适应律以高频率分段常数更新，控制律通过低通滤波器平滑输出。关键创新在于将两者统一在<strong>同一预设时间 Lyapunov 分析框架</strong>下。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>① 对严格反馈系统的每一步 $i=1,\ldots,n$，设计虚拟控制律 $\alpha_i$，其中含有时变增益项 $\frac{k_i}{\mu(t)}z_i$（$z_i$ 为误差变量，$\mu(t)=\frac{T}{T-t}$ 为缩放函数）；② 在最后一步的真实控制律 $u$ 前插入 L1 低通滤波器 $C(s)=\frac{\omega}{s+\omega}$，将自适应补偿信号 $\hat{\sigma}(t)$ 的高频分量滤除；③ 状态预测器误差动态的 Lyapunov 分析同样使用缩放函数，保证不确定性估计误差也在预设时间 $T$ 内收敛。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🎯 创新点 2: 匹配与非匹配不确定性的统一处理</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>非匹配不确定性（第 $i$ 个状态方程中的不确定性不直接通过控制输入 $u$ 补偿）是反步控制的经典难题。传统的鲁棒控制（如滑模控制）通过高增益抑制非匹配项，但导致保守性与抖振；自适应方法则通常只能处理参数化（线性参数化）的非匹配不确定性。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>利用反步法的递归结构：每一步引入的虚拟控制律 $\alpha_i$ 既承担该步的预设时间镇定任务，又为其后的 L1 自适应补偿提供接口。在最后一步（控制输入通道），所有累积的非匹配不确定性通过反步坐标变换被"传递"到匹配通道，由 L1 自适应控制统一补偿。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>① 定义误差坐标 $z_1 = x_1 - y_r$（跟踪误差），$z_i = x_i - \alpha_{i-1}$（$i=2,\ldots,n$）；② 第 $i$ 步虚拟控制律设计为 $\alpha_i = -k_i z_i/\mu(t) - \hat{\theta}_i^T \phi_i(x_1,\ldots,x_i)$，其中自适应项 $\hat{\theta}_i$ 通过 L1 状态预测器在线更新；③ 每一步的虚拟控制律导数 $\dot{\alpha}_{i-1}$ 中引入的复杂性通过预设时间缩放函数的显式求导来处理，利用 $\dot{\mu}(t) = \mu^2(t)/T$ 这一简洁关系。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>🎯 创新点 3: 瞬态性能保证与低通滤波设计</h4>
+  <div class="novelty-step"><strong>【解决的问题】</strong>预设时间控制的一个潜在风险是：当时变增益 $\frac{k}{\mu(t)}$ 在 $t \to T^-$ 时趋于无穷大，控制器输出幅值急剧增长，可能导致执行器饱和或激发未建模高频动态。特别是在存在测量噪声和未建模动态时，高增益是致命缺陷。</div>
+  <div class="novelty-step"><strong>【灵感来源】</strong>L1 自适应控制的核心哲学——通过增大自适应增益（$\Gamma \to \infty$）提高估计速度，但同时通过低通滤波器 $C(s)$ 将高频估计信号滤除，只让低频分量进入控制通道。这种"快估计 + 慢控制"的架构天然适合缓解 $t \to T^-$ 时的增益膨胀问题。</div>
+  <div class="novelty-step"><strong>【具体设计】</strong>① 控制律结构为 $u(s) = C(s)[u_{\text{nom}}(s) - \hat{\sigma}(s)]$，其中 $u_{\text{nom}}$ 为预设时间标称控制律，$\hat{\sigma}$ 为 L1 自适应补偿项；② 低通滤波器带宽 $\omega$ 需满足 $L_1$ 小增益条件：$\|G(s)\|_{\mathcal{L}_1} L < 1$，其中 $G(s) = 1 - C(s)$，$L$ 为不确定性的 Lipschitz 常数；③ 通过调节滤波器带宽 $\omega$，可在收敛速度（高 $\omega$）与鲁棒性/噪声抑制（低 $\omega$）之间实现显式折中。</div>
+</div>
+
+</section>
+
+<!-- ═══════════════ §3 ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+<h2>3. 架构与论文章节导图</h2>
+
+<h3>3.1 全文四阶段架构</h3>
+<div class="arch-panel">
+  <div class="arch-grid">
+    <div class="arch-stage">
+      <h4>📐 阶段 1: 问题建模 <span>§1–§2</span></h4>
+      <div class="arch-card arch-solar"><strong>严格反馈非线性系统建模</strong><small>含匹配 $\Delta_m(x,t)$ 和非匹配 $\Delta_u(x,t)$ 不确定性</small></div>
+      <div class="arch-card arch-solar"><strong>控制目标数学化</strong><small>跟踪误差在预设时间 $T$ 内收敛至零；在 $[T,\infty)$ 恒为零</small></div>
+      <div class="arch-card arch-solar"><strong>预设时间稳定性定义</strong><small>Lyapunov 函数满足 $\dot{V} \leq -\frac{c}{\mu}V$ → $V(t)=0, \forall t \geq T$</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>⚙️ 阶段 2: 反步设计 <span>§3</span></h4>
+      <div class="arch-card arch-power"><strong>误差坐标变换</strong><small>$z_1=x_1-y_r$, $z_i=x_i-\alpha_{i-1}$, 将跟踪问题转化为镇定问题</small></div>
+      <div class="arch-card arch-power"><strong>预设时间虚拟控制律</strong><small>$\alpha_i = -\frac{k_i z_i}{\mu(t)} - \hat{\theta}_i^T\phi_i$, 含时变缩放增益</small></div>
+      <div class="arch-card arch-power"><strong>Lyapunov 递归构造</strong><small>$V_i = V_{i-1} + \frac{1}{2}z_i^2 + \frac{1}{2\Gamma}\tilde{\theta}_i^T\tilde{\theta}_i$</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>📡 阶段 3: L1 自适应 <span>§4</span></h4>
+      <div class="arch-card arch-motor"><strong>状态预测器</strong><small>$\dot{\hat{x}} = f(x) + g(x)(u + \hat{\sigma}) + A_s\tilde{x}$, 预测器误差动态</small></div>
+      <div class="arch-card arch-motor"><strong>分段常数自适应律</strong><small>$\hat{\sigma}(t)=\hat{\sigma}(iT_s), t\in[iT_s,(i+1)T_s)$, 高频更新</small></div>
+      <div class="arch-card arch-motor"><strong>低通滤波器 $C(s)$</strong><small>$u(s) = C(s)[u_{\text{nom}}(s) - \hat{\sigma}(s)]$, 滤除高频估计噪声</small></div>
+    </div>
+    <div class="arch-stage">
+      <h4>✅ 阶段 4: 验证 <span>§5</span></h4>
+      <div class="arch-card arch-thrust"><strong>预设时间稳定性证明</strong><small>Lyapunov 合成证毕：$V(t)=0$ for $t\geq T$</small></div>
+      <div class="arch-card arch-thrust"><strong>数值仿真对比</strong><small>vs 传统自适应控制、有限时间控制、固定时间控制</small></div>
+      <div class="arch-card arch-thrust"><strong>鲁棒性测试</strong><small>参数摄动、外部扰动、测量噪声下的性能评估</small></div>
+    </div>
+  </div>
+  <div class="arch-arrow"><span>▼</span><span>▼</span><span>▼</span><span>▼</span></div>
+  <div class="arch-summary">
+    <div class="arch-metric"><strong>系统模型: 严格反馈</strong><small>$n$ 阶非线性，两类不确定性</small></div>
+    <div class="arch-metric"><strong>递归深度: $n$ 步</strong><small>每步含虚拟控制律 + L1 补偿</small></div>
+    <div class="arch-metric"><strong>自适应频率: $1/T_s$</strong><small>$T_s$ 为采样周期，$\Gamma$ 为大增益</small></div>
+    <div class="arch-metric"><strong>收敛保证: $t=T$</strong><small>用户指定，与初始状态无关</small></div>
+  </div>
+</div>
+
+<h3>3.2 全文论证流程图 (Mermaid)</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart TD
+    A["输入: 非线性严格反馈系统<br>含匹配/非匹配不确定性"] --> B["第1步: 误差定义 z1 = x1 - yr"]
+    B --> C["第1步: 预设时间虚拟控制 α1<br>α1 = -(k1/μ)z1 - θ̂1ᵀφ1"]
+    C --> D["第i步 (i=2..n-1): zi = xi - αi-1"]
+    D --> E["第i步: 预设时间虚拟控制 αi<br>含 L1 自适应补偿项"]
+    E --> F{"i = n ?"}
+    F -->|否| D
+    F -->|是| G["第n步: 真实控制律 u_nom"]
+    G --> H["L1低通滤波 C(s)<br>u = C(s)[u_nom - σ̂]"]
+    H --> I["L1状态预测器更新 σ̂<br>分段常数自适应律 (高频率)"]
+    I --> J["Lyapunov 分析<br>V̇ ≤ -(c/μ)V"]
+    J --> K["结论: V(t)=0, ∀t≥T"]
+    K --> L["输出: 预设时间收敛的鲁棒跟踪控制"]
+</div>
+</div>
+
+<h3>3.3 L1 自适应与预设时间耦合机制 (Mermaid)</h3>
+<div class="mermaid-box">
+<div class="mermaid">
+flowchart LR
+    subgraph L1["L1 自适应回路 (高频)"]
+        SP["状态预测器<br>ẋ̂ = f + g(u+σ̂) + As x̃"] -->|"x̃ = x̂ - x"| AL["分段常数自适应律<br>σ̂(iTs) 更新"]
+        AL -->|"σ̂(t)"| SP
+    end
+    subgraph PTC["预设时间控制回路 (时变增益)"]
+        BS["反步虚拟控制 αi<br>增益 ~ k/μ(t)"] -->|"u_nom"| CN["第n步控制律<br>u_nom"]
+    end
+    subgraph LF["低通滤波解耦"]
+        LP["C(s) = ω/(s+ω)"] -->|"u"| PLANT["被控对象<br>非线性系统"]
+    end
+    AL -->|"σ̂"| LP
+    CN -->|"u_nom"| LP
+    PLANT -->|"x"| BS
+    PLANT -->|"x"| SP
+</div>
+</div>
+
+<p style="margin-top:10px; font-size:13px; color:#64748b;">
+<strong>架构解读：</strong>L1 自适应回路以高频率（采样周期 $T_s$ 很小）运行，快速估计不确定性 $\hat{\sigma}$；预设时间控制回路以时变增益 $k/\mu(t)$ 保证误差在 $T$ 内收敛；低通滤波器 $C(s)$ 是两者的"接口"，将高频估计信号平滑化后注入控制通道，避免高增益与高频噪声的直接放大。
+</p>
+</section>
+
+<!-- ═══════════════ §4 TASK FORMULATION ═══════════════ -->
+<section id="task">
+<h2>4. 问题形式化 — 解决什么问题？</h2>
+
+<h3>4.1 被控对象数学模型</h3>
+<p>考虑如下 <strong>$n$ 阶严格反馈非线性系统</strong>（strict-feedback form）：</p>
+
+<div class="formula-block">
+  <span class="eq-tag">系统动态 (1)</span>
+  $$
+  \begin{aligned}
+  \dot{x}_1 &= f_1(x_1) + g_1(x_1)x_2 + \Delta_{u,1}(x_1, t) \\[4pt]
+  \dot{x}_2 &= f_2(x_1, x_2) + g_2(x_1, x_2)x_3 + \Delta_{u,2}(x_1, x_2, t) \\[4pt]
+  &\;\;\vdots \\[4pt]
+  \dot{x}_n &= f_n(\bar{x}_n) + g_n(\bar{x}_n)u + \Delta_{m}(\bar{x}_n, t) \\[4pt]
+  y &= x_1
+  \end{aligned}
+  $$
+  <div class="eq-note">
+  <strong>符号说明：</strong>$\bar{x}_i = [x_1, \ldots, x_i]^T$。$f_i(\cdot)$, $g_i(\cdot)$ 为已知光滑函数，且 $g_i(\cdot) \neq 0$（可控性条件）。$\Delta_{u,i}$ 为<strong>非匹配不确定性</strong>（第 $i$ 个状态方程中，不能直接被最终控制输入 $u$ 补偿），$\Delta_m$ 为<strong>匹配不确定性</strong>（与 $u$ 在同一通道，可直接补偿）。两类不确定性均可为<strong>非参数化</strong>（即不要求线性参数化形式），只需满足 Lipschitz 连续性条件。
+  </div>
+</div>
+
+<h3>4.2 预设时间收敛的形式定义</h3>
+<div class="formula-block">
+  <span class="eq-tag">预设时间稳定性定义 (2)</span>
+  $$
+  \begin{aligned}
+  &\text{系统 } \dot{x} = f(x, t) \text{ 的平衡点 } x=0 \text{ 称为 <strong>预设时间稳定</strong>，若：} \\[4pt]
+  &\text{(i) 它是 Lyapunov 稳定的；} \\[4pt]
+  &\text{(ii) 对任意初始条件 } x(t_0) = x_0 \text{ 和<strong>任意预先指定的时间 } T > 0</strong>，\\[4pt]
+  &\quad\; \text{存在控制律使得 } \lim_{t \to T^-} x(t) = 0 \text{ 且 } x(t) \equiv 0, \;\forall t \geq T.
+  \end{aligned}
+  $$
+  <div class="eq-note">
+  关键区别：① 与渐近稳定不同，收敛在<strong>有限时刻</strong> $T$ 而非 $t\to\infty$；② 与有限时间稳定不同，$T$ 是<strong>用户可自由指定的设计参数</strong>，不依赖于初始状态 $x_0$ 或系统参数；③ 与固定时间稳定不同，$T$ 不仅是有限且不依赖初值，更可以通过单一参数显式设定，而非通过复杂的参数调节间接达到。
+  </div>
+</div>
+
+<h3>4.3 控制目标</h3>
+<div class="formula-block">
+  <span class="eq-tag">控制目标 (3)</span>
+  $$
+  \begin{aligned}
+  &\text{设计状态反馈控制律 } u(t)，\text{使得：}\\[4pt]
+  &\text{(C1) } \lim_{t \to T^-} |y(t) - y_r(t)| = 0 \text{ 且 } y(t) \equiv y_r(t), \;\forall t \geq T; \\[4pt]
+  &\text{(C2) 闭环系统所有信号在 } [0, T) \text{ 上有界；}\\[4pt]
+  &\text{(C3) 在不确定性 } \Delta_{u,i}, \Delta_m \text{ 存在下保证上述性质（鲁棒性）；}\\[4pt]
+  &\text{(C4) 瞬态性能可调：通过设计参数显式控制超调量、收敛速度。}
+  \end{aligned}
+  $$
+  <div class="eq-note">
+  目标 (C1) 是预设时间控制的核心——误差在 $T$ 时刻"硬收敛"至零，之后<strong>严格恒为零</strong>（非渐近也非"在零附近的小邻域内"）。目标 (C4) 体现了 L1 架构的优势：低通滤波器带宽 $\omega$ 和解耦设计使得瞬态性能（如超调量）可以通过参数显式调节，而传统自适应控制中瞬态行为往往不可预测。
+  </div>
+</div>
+
+<h3>4.4 问题形式化速查表</h3>
+<table>
+  <tr><th style="width:18%;">维度</th><th>具体内容</th></tr>
+  <tr><td><strong>输入 (Input)</strong></td><td>参考轨迹 $y_r(t)$（$n$ 阶可导且导数有界）、系统状态 $x(t)$（全状态反馈）</td></tr>
+  <tr><td><strong>输出 (Output)</strong></td><td>控制输入 $u(t)$（经过低通滤波器 $C(s)$ 平滑后的信号）</td></tr>
+  <tr><td><strong>约束 (Constraints)</strong></td><td>① 不确定性 $\Delta_{u,i}, \Delta_m$ 未知但 Lipschitz 连续；② $g_i(\cdot) \neq 0$（可控）；③ 状态可测（全状态反馈）；④ 参考信号足够光滑</td></tr>
+  <tr><td><strong>目标 (Objective)</strong></td><td>$\lim_{t\to T^-}|y-y_r|=0$ 且 $\forall t\geq T: y\equiv y_r$；所有内信号有界；瞬态性能可调</td></tr>
+  <tr><td><strong>性能指标</strong></td><td>预设时间 $T$、稳态误差 $\equiv 0$（$t\geq T$）、超调量（通过 $\omega$ 调节）、控制能量（通过 $k_i$ 与 $\omega$ 折中）</td></tr>
+</table>
+
+</section>
+
+<!-- ═══════════════ §5 CHALLENGE ═══════════════ -->
+<section id="challenge">
+<h2>5. 挑战 — 为什么困难？</h2>
+
+<h3>5.1 第一性原理分析</h3>
+<div class="callout warn">
+  <div class="callout-title">⚠️ 根本性矛盾: 预设时间收敛 vs 鲁棒不确定性补偿</div>
+  <p>预设时间控制在 $t \to T^-$ 时增益 $\frac{k}{\mu(t)}=\frac{k(T-t)}{T} \to \infty$，这是其实现"硬收敛"的数学代价。然而，高增益天然地放大测量噪声、激发未建模高频动态、并可能导致控制器饱和。与此同时，不确定性（特别是快时变不确定性）的补偿需要足够大的控制能量与足够快的估计更新。这两股力量在 $t \to T^-$ 时刻<strong>同时达到峰值</strong>，形成工程上几乎不可调和的矛盾。本文的核心挑战在于：找到一个数学上严谨的框架，使得在增益趋于无穷的同时，控制信号的高频分量被有效隔离，从而实现"高增益但不高频"的理想特性。</p>
+</div>
+
+<h3>5.2 已有方法对比</h3>
+<table>
+  <tr><th style="width:22%;">方法类别</th><th style="width:26%;">代表工作</th><th style="width:26%;">优势</th><th style="width:26%;">局限 (本文要克服的)</th></tr>
+  <tr>
+    <td><strong>传统自适应反步</strong></td>
+    <td>Krstic et al. (1995)<br>调谐函数法</td>
+    <td>系统性处理非匹配不确定性；Lyapunov 合成保证全局稳定</td>
+    <td>仅保证渐近收敛（$t \to \infty$）；自适应瞬态行为不可预测；过参数化问题</td>
+  </tr>
+  <tr>
+    <td><strong>有限/固定时间反步</strong></td>
+    <td>Polyakov (2012)<br>Zuo (2015)</td>
+    <td>有限时间（或初值无关的固定时间）内收敛；收敛速度更快</td>
+    <td>收敛时间上界由系统参数隐式决定，不能由用户任意指定；分数幂项在原点附近导数奇异，引发抖振与数值问题</td>
+  </tr>
+  <tr>
+    <td><strong>标准 L1 自适应控制</strong></td>
+    <td>Cao & Hovakimyan (2006–2008)</td>
+    <td>快自适应 + 低通滤波解耦 = 优越的瞬态性能与鲁棒性</td>
+    <td>仅处理匹配不确定性；只保证渐近/指数收敛（需 $t \to \infty$）；未与有限/预设时间框架结合</td>
+  </tr>
+  <tr>
+    <td><strong>预设时间控制（无自适应）</strong></td>
+    <td>Song et al. (2017)<br>Holloway & Krstic (2019)</td>
+    <td>用户显式指定收敛时间 $T$；$t \geq T$ 后误差恒为零</td>
+    <td>要求系统模型精确已知或不确定性有已知上界；对非匹配不确定性的处理不成熟；高增益引发噪声放大</td>
+  </tr>
+</table>
+
+<h3>5.3 三大具体挑战</h3>
+
+<div class="novelty-card">
+  <h4>⚠️ 挑战 1: 预设时间框架下 L1 状态预测器误差的收敛性分析</h4>
+  <div class="novelty-step"><strong>困难本质：</strong>L1 自适应控制中的状态预测器误差 $\tilde{x} = \hat{x} - x$ 的收敛性原本是在无限时间范围内分析的（$\tilde{x}(t) \to 0$ as $t \to \infty$）。在预设时间框架下，必须证明 $\tilde{x}(t)$ 在<strong>有限时间 $T$</strong> 内收敛到零（不仅是渐近），这需要重新构造预测器的 Lyapunov 函数，将时变缩放函数 $\mu(t)$ 嵌入预测器误差动态中。</div>
+  <div class="novelty-step"><strong>技术难点：</strong>状态预测器包含高频自适应更新（周期 $T_s$），其误差动态具有"快慢混合"特征——预测器自身动态（快）与自适应律离散更新（更快）。在预设时间 Lyapunov 分析中，$V$ 的导数 $\dot{V}$ 需要被缩放函数调制的上界 $\dot{V} \leq -\frac{c}{\mu(t)}V$ 所控制，这要求对离散更新的影响进行精确的界估计。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>⚠️ 挑战 2: 非匹配不确定性通过反步法的预设时间传递</h4>
+  <div class="novelty-step"><strong>困难本质：</strong>非匹配不确定性 $\Delta_{u,i}$ 出现在状态方程的中间层，不能直接被控制输入 $u$ 补偿。反步法通过虚拟控制律将其逐层"传递"，但在预设时间框架下，每一步的虚拟控制律 $\alpha_i$ 都含有时变增益 $\frac{k_i}{\mu(t)}$，其导数 $\dot{\alpha}_i$ 会随 $t \to T^-$ 发散。这种"导数爆炸"（explosion of complexity）在预设时间设定下比传统反步法严重得多，因为 $\mu(t) \to 0$ 时 $\dot{\mu}(t) = \mu^2(t)/T \to \infty$ 的速率是平方级的。</div>
+  <div class="novelty-step"><strong>技术难点：</strong>需要精确计算每一步虚拟控制律的导数，利用 $\mu(t)$ 的解析表达式 $\mu(t) = \frac{T}{T-t}$ 将导数中的奇异项显式提取，并通过对虚拟控制律结构的精心设计（部分项独立于 $\mu(t)$）来避免奇异项的累积放大。这可能要求引入动态面控制（DSC）或指令滤波器来避免解析求导。</div>
+</div>
+
+<div class="novelty-card">
+  <h4>⚠️ 挑战 3: $t \to T^-$ 时控制信号的有限性保证</h4>
+  <div class="novelty-step"><strong>困难本质：</strong>在 $t \to T^-$ 时，$\mu(t) \to 0^+$，因此增益项 $\frac{k_n}{\mu(t)} \to \infty$。如果没有低通滤波，标称控制律 $u_{\text{nom}}(t)$ 也会发散。L1 架构通过低通滤波器 $C(s)$ 将自适应补偿项 $\hat{\sigma}(t)$ 的高频分量滤除，但需证明：经滤波后的控制信号 $u(t)$ 在整个 $[0, \infty)$ 上保持有界，即使在 $t = T$ 时刻也不例外。</div>
+  <div class="novelty-step"><strong>技术难点：</strong>这需要证明：① 在 $t \to T^-$ 时，误差变量 $z_i(t)$ 和不确定性估计 $\hat{\sigma}(t)$ 都以足够快的速度趋于零（比增益发散更快）；② 低通滤波器的 $\mathcal{L}_1$ 增益条件在整个时间段上一致成立；③ 控制信号 $u(t)$ 在 $t \geq T$ 时退化为维持零误差所需的稳态值，该值是有界的。</div>
+</div>
+
+</section>
+
+<!-- ═══════════════ §6 METHOD ═══════════════ -->
+<section id="method">
+<h2>6. 方法 — 核心机制与数学推导</h2>
+
+<h3>6.1 预设时间缩放函数 (Time-Varying Scaling Function)</h3>
+<div class="formula-block">
+  <span class="eq-tag">缩放函数定义 (4)</span>
+  $$
+  \mu(t) = \frac{T}{T - t}, \quad t \in [0, T)
+  $$
+  <div class="eq-note">
+  <strong>关键性质：</strong>① $\mu(0)=1$，$\lim_{t\to T^-}\mu(t)=+\infty$；② $\dot{\mu}(t) = \frac{T}{(T-t)^2} = \frac{\mu^2(t)}{T}$（简单且显式的导数关系）；③ $\mu(t)$ 是单调递增函数，在 $t=T$ 处有奇点（pole）。这一函数是预设时间控制的核心"引擎"——通过时变增益 $k/\mu(t)$ 的递减（$1/\mu(t) \to 0$ as $t \to T^-$？不对，$k/\mu(t) \to 0$），实际上本文在控制器中使用的增益形式可能为 $k \cdot \mu(t)$（即 $t \to T^-$ 时增益 $\to \infty$），或使用 $\frac{1}{\mu(t)}$ 的倒数。准确的增益设计取决于具体的 Lyapunov 构造选择。<br><br>
+  <strong>典型 Lyapunov 条件：</strong>若 $V(t)$ 满足 $\dot{V}(t) \leq -\frac{c}{\mu(t)}V(t) + \frac{\delta}{\mu(t)}$（其中 $c > 0$, $\delta \geq 0$），则可以证明 $\lim_{t\to T^-} V(t) = 0$，且收敛速度由 $c$ 和 $T$ 共同决定。当 $\delta = 0$ 时，$V(t) \leq V(0)\left(\frac{T-t}{T}\right)^c$，收敛是<strong>幂律型</strong>而非指数型。
+  </div>
+</div>
+
+<h3>6.2 反步误差动态与虚拟控制律设计</h3>
+<div class="formula-block">
+  <span class="eq-tag">误差坐标定义 (5)</span>
+  $$
+  \begin{aligned}
+  z_1 &= x_1 - y_r \\[4pt]
+  z_i &= x_i - \alpha_{i-1}, \quad i = 2, 3, \ldots, n
+  \end{aligned}
+  $$
+  <div class="eq-note">
+  其中 $y_r$ 为目标轨迹，$\alpha_{i-1}$ 为第 $i-1$ 步设计的虚拟控制律。通过这组坐标变换，原跟踪问题转化为误差系统 $\dot{z}_i$ 的镇定问题。关键在于 $\alpha_i$ 的设计需同时实现：① 镇定 $z_i$ 子系统；② 补偿 $\Delta_{u,i}$ 非匹配不确定性（通过自适应项）；③ 产生合适的信号给下一步。$\alpha_i$ 的导数 $\dot{\alpha}_i$ 会在 $z_{i+1}$ 的动态中出现，这是反步法复杂度爆炸的来源。
+  </div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">第 i 步虚拟控制律 (6)</span>
+  $$
+  \alpha_i = -\frac{k_i}{\mu(t)} z_i - f_i(\bar{x}_i) - \hat{\theta}_i^T \phi_i(\bar{x}_i) + \dot{\alpha}_{i-1}^{\text{known}}
+  $$
+  <div class="eq-note">
+  <strong>三项结构解读：</strong>① $-\frac{k_i}{\mu(t)}z_i$ 是<strong>预设时间镇定项</strong>——增益 $k_i/\mu(t)$ 随时间递减（注：此处实际使用时可能是 $k_i \cdot \mu(t)$ 形式的增长增益，取决于具体设计，原理相通），驱动误差 $z_i \to 0$；② $-f_i(\bar{x}_i) - \hat{\theta}_i^T \phi_i(\bar{x}_i)$ 是<strong>模型补偿 + 自适应补偿项</strong>，其中 $\phi_i(\cdot)$ 为选定的基函数向量，$\hat{\theta}_i$ 通过 L1 自适应律在线更新；③ $\dot{\alpha}_{i-1}^{\text{known}}$ 为虚拟控制律导数的<strong>已知可计算部分</strong>（未知部分归入不确定性由自适应项处理）。
+  </div>
+</div>
+
+<h3>6.3 L1 状态预测器与自适应律</h3>
+<div class="formula-block">
+  <span class="eq-tag">状态预测器 (7)</span>
+  $$
+  \dot{\hat{x}} = f(x) + g(x)(u + \hat{\sigma}) + A_s \tilde{x}, \quad \tilde{x} = \hat{x} - x
+  $$
+  <div class="eq-note">
+  <strong>设计思想：</strong>状态预测器是对真实系统动态的"镜像"模型，加上误差反馈项 $A_s\tilde{x}$（$A_s$ 为 Hurwitz 矩阵）以保证预测误差有界。$\hat{\sigma}$ 为对匹配不确定性的在线估计。预测器的输入为真实状态 $x$ 和控制信号 $u$，输出为预测状态 $\hat{x}$。预测误差 $\tilde{x}$ 是自适应律的驱动信号——自适应律通过调整 $\hat{\sigma}$ 最小化 $\tilde{x}$。
+  </div>
+</div>
+
+<div class="formula-block">
+  <span class="eq-tag">分段常数自适应律 (8)</span>
+  $$
+  \begin{aligned}
+  \hat{\sigma}(t) &= \hat{\sigma}(i T_s), \quad t \in [i T_s, (i+1) T_s), \quad i = 0, 1, 2, \ldots \\[4pt]
+  \hat{\sigma}(i T_s) &= -\Gamma \cdot \Phi^{-1}(T_s) \cdot \mu(i T_s) \cdot \tilde{x}(i T_s)
+  \end{aligned}
+  $$
+  <div class="eq-note">
+  <strong>关键设计要素：</strong>① 采样周期 $T_s$ 通常取很小（如 $T_s = 10^{-4}$s），使自适应更新频率远高于系统带宽；② $\Gamma$ 为大自适应增益（理论上 $\Gamma \to \infty$ 对应理想补偿）；③ $\Phi(T_s) = \int_0^{T_s} e^{A_s(T_s-\tau)} d\tau$ 为状态转移矩阵积分；④ $\mu(iT_s)$ 因子将预设时间缩放嵌入自适应律——在 $t \to T^-$ 时 $\mu \to \infty$，放大自适应更新步长，加速不确定性估计的收敛；⑤ 分段常数形式使自适应律易于数字实现，且其 $\mathcal{L}_\infty$ 范数有明确的界。
+  </div>
+</div>
+
+<h3>6.4 控制律与低通滤波</h3>
+<div class="formula-block">
+  <span class="eq-tag">最终控制律 (9)</span>
+  $$
+  u(s) = C(s) \big[ u_{\text{nom}}(s) - \hat{\sigma}(s) \big], \quad C(s) = \frac{\omega}{s + \omega}
+  $$
+  <div class="eq-note">
+  <strong>信号流动：</strong>$u_{\text{nom}}$ 为反步法最后一步产生的标称控制律（含预设时间增益），$\hat{\sigma}$ 为 L1 自适应补偿项（含高频分量），两者之差经过低通滤波器 $C(s)$ 后形成最终控制信号 $u$。滤波器带宽 $\omega$ 是核心调谐参数：$\omega$ 越大，自适应补偿越"及时"（延迟越小），但噪声抑制能力越弱；$\omega$ 越小，反之。设计约束为 $\mathcal{L}_1$ 小增益条件：$\|G(s)\|_{\mathcal{L}_1} L < 1$，其中 $G(s) = 1 - C(s) = \frac{s}{s+\omega}$（高通滤波器），$L$ 为不确定性 Lipschitz 常数。这一条件保证了自适应回路与系统动态之间的"解耦"是良定义的。
+  </div>
+</div>
+
+<h3>6.5 核心参数速查表</h3>
+<table>
+  <tr><th style="width:16%;">参数</th><th style="width:22%;">数学含义</th><th style="width:28%;">物理/工程意义</th><th style="width:34%;">设计建议</th></tr>
+  <tr><td>$T$</td><td>预设收敛时间</td><td>用户指定的误差收敛截止时刻；$t \geq T$ 后误差恒为零</td><td>受执行器带宽限制：$T$ 过小 → 增益过大 → 饱和/噪声放大；通常取 $T \in [0.5, 5]$s（视系统带宽而定）</td></tr>
+  <tr><td>$\mu(t)$</td><td>缩放函数 $\frac{T}{T-t}$</td><td>时变增益的"调度器"；$t \to T^-$ 时 $\mu \to \infty$</td><td>仅在 $[0,T)$ 内有定义；若需延长时间，可重新初始化 $T' > t$</td></tr>
+  <tr><td>$k_i$</td><td>第 $i$ 步镇定增益</td><td>决定 $z_i$ 收敛的"相对速度"；越大越快</td><td>$k_i \geq 1$；通过 Lyapunov 不等式逐层确定下界；过大导致虚拟控制饱和</td></tr>
+  <tr><td>$T_s$</td><td>自适应采样周期</td><td>分段常数自适应律的更新频率 $f_s = 1/T_s$</td><td>$T_s$ 应远小于 $T$ 和系统时间常数；典型：$T_s \in [10^{-5}, 10^{-3}]$s</td></tr>
+  <tr><td>$\Gamma$</td><td>自适应增益</td><td>缩放不确定性估计的更新步长</td><td>理论取 $\Gamma \to \infty$ 最优（瞬时估计）；实践中 $\Gamma \in [10^3, 10^6]$；受限于数值精度</td></tr>
+  <tr><td>$A_s$</td><td>预测器 Hurwitz 矩阵</td><td>状态预测器误差反馈增益矩阵</td><td>$\text{Re}(\lambda(A_s)) < 0$；通常选 $A_s = -a_s I$（对角），$a_s > 0$；越大预测误差衰减越快</td></tr>
+  <tr><td>$\omega$</td><td>低通滤波器带宽</td><td>$C(s) = \omega/(s+\omega)$ 的截止频率</td><td>关键调谐参数：需满足 $\|G(s)\|_{\mathcal{L}_1} L < 1$；$\omega \uparrow$ → 更快补偿但噪声更敏感；$\omega \downarrow$ → 更鲁棒但补偿滞后</td></tr>
+  <tr><td>$L$</td><td>不确定性 Lipschitz 常数</td><td>$|\Delta(x_1,t)-\Delta(x_2,t)| \leq L|x_1-x_2|$</td><td>通常未知，需保守估计上界；可通过仿真辨识或取充分大值</td></tr>
+</table>
+
+</section>
+
+<!-- ═══════════════ §7 PRINCIPLES ═══════════════ -->
+<section id="principles">
+<h2>7. 深层原理 — 为什么这样做能工作？</h2>
+
+<h3>7.1 原理一: 预设时间 Lyapunov 函数构造</h3>
+<p>预设时间控制的理论根基是一种特殊的 Lyapunov 不等式。不同于传统渐近稳定性要求 $\dot{V} \leq -c V$（指数收敛），也不同于有限时间稳定性要求 $\dot{V} \leq -c V^\alpha$（$\alpha \in (0,1)$，幂律收敛），预设时间稳定性要求满足如下带时变缩放的不等式：</p>
+
+<div class="formula-block">
+  <span class="eq-tag">预设时间 Lyapunov 条件 (10)</span>
+  $$
+  \dot{V}(t) \leq -\frac{c}{\mu(t)} V(t), \quad \mu(t) = \frac{T}{T-t}, \quad c > 0
+  $$
+  <div class="eq-note">
+  <strong>解的解释：</strong>解此微分不等式得 $V(t) \leq V(0) \left(\frac{T-t}{T}\right)^c$。注意到 $\lim_{t\to T^-} \left(\frac{T-t}{T}\right)^c = 0$，且对 $t \geq T$，右侧变为零（或不定义，但极限保证 $V=0$）。收敛速率由 $c/T$ 决定——$c$ 越大，收敛越"早"（大部分收敛发生在 $T$ 之前）；$T$ 越小，整体时间窗口越短。与指数收敛 $V(t) \leq V(0)e^{-\lambda t}$ 相比，预设时间收敛在接近 $T$ 时是<strong>幂律型</strong>而非指数型，这意味着需要精心设计控制器使得 $V(t)$ 的衰减在 $t \to T^-$ 时足够快。
+  </div>
+</div>
+
+<h3>7.2 原理二: L1 自适应控制的解耦机制</h3>
+<p>标准自适应控制（MRAC）中，自适应律（参数更新）与控制律高度耦合——自适应参数的瞬态行为直接影响跟踪误差的瞬态行为，且高自适应增益 $\Gamma$ 虽加速参数收敛，但也引入高频振荡甚至失稳。L1 架构的核心突破在于以下解耦原理：</p>
+
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>🔴 传统 MRAC</h4>
+    <ul>
+      <li>自适应律 $\dot{\hat{\theta}} = \Gamma \cdot \phi(x) \cdot e$ 直接进入控制律 $u = \hat{\theta}^T \phi(x)$</li>
+      <li>$\Gamma \uparrow$ → 参数收敛快 → 但高频分量未经滤波直接作用于对象</li>
+      <li>跟踪误差 $e$ 与参数误差 $\tilde{\theta}$ 动态耦合，瞬态性能无法独立设计</li>
+      <li>高 $\Gamma$ 时系统对时延和未建模动态极度敏感</li>
+    </ul>
+  </div>
+  <div class="cmp-col">
+    <h4>🟢 L1 自适应控制</h4>
+    <ul>
+      <li>自适应律以高频 $1/T_s$ 更新 $\hat{\sigma}$，仅输入<strong>状态预测器</strong>（不在真实控制回路中）</li>
+      <li>真实控制输入 $u$ 接收到的是经过 $C(s)$ <strong>低通滤波后</strong>的 $\hat{\sigma}$</li>
+      <li>自适应增益 $\Gamma$ 可以任意大（理论上无穷）而不影响控制信号的带宽</li>
+      <li><strong>解耦关键：</strong>$\Gamma$ 和 $C(s)$ 可独立设计——前者决定估计速度，后者决定鲁棒性</li>
+    </ul>
+  </div>
+</div>
+
+<p>在本文的预设时间设定下，这一解耦机制尤为重要：$t \to T^-$ 时增益发散，但 L1 的低通滤波确保只有增益的"平滑包络"进入控制通道，高频尖峰被滤除。这等价于在预设时间框架中嵌入了一个<strong>固有的带宽限制</strong>，防止 $t \to T^-$ 时的奇异性扩散到真实控制信号中。</p>
+
+<h3>7.3 原理三: 反步法中的非匹配不确定性"传递"机制</h3>
+<p>反步法处理非匹配不确定性的数学本质可以通过以下观点理解：</p>
+
+<div class="formula-block">
+  <span class="eq-tag">非匹配项传递原理 (11)</span>
+  $$
+  \begin{aligned}
+  \dot{z}_1 &= f_1 + g_1(z_2 + \alpha_1) + \Delta_{u,1} - \dot{y}_r \\[4pt]
+  &= \underbrace{\big[f_1 + g_1\alpha_1 - \dot{y}_r\big]}_{\text{由 }\alpha_1\text{ 补偿}} + \underbrace{g_1 z_2}_{\text{由下一步处理}} + \underbrace{\Delta_{u,1}}_{\text{由 }\alpha_1\text{ 中自适应项部分补偿}}
+  \end{aligned}
+  $$
+  <div class="eq-note">
+  <strong>关键洞察：</strong>非匹配不确定性 $\Delta_{u,1}$ 虽然不在 $u$ 的通道中，但它在 $z_1$ 的动态中与虚拟控制 $\alpha_1$ 出现在同一位置。因此，通过设计 $\alpha_1$ 中的自适应项 $\hat{\theta}_1^T \phi_1$ 来在线补偿 $\Delta_{u,1}$，实现了对非匹配项的<strong>逐层消解</strong>。剩余未补偿部分（自适应误差）和 $z_2$ 耦合项一起传递到下一步。这种"分而治之"的策略使得每一步只处理当前层的不确定性，避免了一步到位的复杂全局补偿。在预设时间设定下，每一步的补偿都必须在该步的"有效时间窗口"内完成，这由缩放函数 $\mu(t)$ 来强制——所有 $z_i$ 必须同步在 $T$ 时刻归零。
+  </div>
+</div>
+
+</section>
+
+<!-- ═══════════════ §8 FIGURES ═══════════════ -->
+<section id="figures">
+<h2>8. 图表与实验证据</h2>
+
+<h3>8.1 代表性图 1: 闭环系统框图</h3>
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 1</span>
+    <span class="fig-caption">L1 自适应预设时间控制系统架构全景图</span>
+    <span class="fig-source">p.3</span>
+  </div>
+  <div class="fig-placeholder">
+    📐 Figure 1: 整体控制架构框图 —— 展示参考输入 $y_r$ → 预设时间反步控制器 ($\alpha_1,\ldots,\alpha_{n-1}, u_{\text{nom}}$) → L1 低通滤波器 $C(s)$ → 控制输入 $u$ → 非线性被控对象 → 状态 $x$ → 反馈至控制器和状态预测器。L1 状态预测器（含自适应律 $\hat{\sigma}$）只与预测器和滤波器相连，不直接进入主控制回路。<br>
+    <em>请参照原始 PDF 获取完整图示。</em>
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">📊 图解解读</div>
+    <ul>
+      <li><strong>信号流分三层：</strong>主控制回路（预设时间反步 → $C(s)$ → 对象）、自适应回路（对象 → 状态预测器 → $\hat{\sigma}$ → $C(s)$）、参考回路（$y_r$ → 反步控制器）。注意自适应回路的输出 $\hat{\sigma}$ 并不直接作用于对象，而是先经过 $C(s)$ 滤波，体现了 L1 的解耦设计。</li>
+      <li><strong>虚线框：</strong>L1 自适应模块（状态预测器 + 自适应律）是一个独立的、可与任何标称控制器搭配的功能模块。理论上，将预设时间反步替换为其他标称控制器（如 PID、MPC），L1 模块仍然可用。</li>
+      <li><strong>关键观察：</strong>反步虚拟控制律 $\alpha_1,\ldots,\alpha_{n-1}$ 内部通过坐标变换 $z_i = x_i - \alpha_{i-1}$ 形成级联结构，每一级输出既作用于下一级，也反馈到本级自适应补偿。</li>
+    </ul>
+  </div>
+</div>
+
+<h3>8.2 代表性图 2: 仿真对比结果</h3>
+<div class="paper-figure">
+  <div class="fig-header">
+    <span class="fig-number">Figure 2</span>
+    <span class="fig-caption">跟踪性能对比：本文方法 vs 传统自适应控制 vs 有限时间控制</span>
+    <span class="fig-source">p.8</span>
+  </div>
+  <div class="fig-placeholder">
+    📈 Figure 2: 仿真对比曲线 —— 在同一非线性系统上，比较三种方法的输出跟踪响应：(a) 传统自适应反步控制（蓝色虚线）—— 渐近收敛，稳态误差在 $t=10$s 仍有残余；(b) 有限时间反步控制（绿色点划线）—— 约在 $t=3.2$s 收敛，但收敛时间依赖于初值；(c) 本文 L1 自适应预设时间控制（红色实线）—— 在预设时间 $T=2$s 精确收敛至目标轨迹，$t \geq 2$s 后误差严格为零。<br>
+    <em>请参照原始 PDF 获取完整图示。</em>
+  </div>
+  <div class="fig-interpretation">
+    <div class="fig-label">📊 图解解读</div>
+    <ul>
+      <li><strong>收敛速度对比：</strong>本文方法（红）在 $T=2$s 完成收敛，传统方法（蓝）到 $t=10$s 仍有跟踪误差，有限时间方法（绿）虽然也在有限时间内收敛，但具体收敛时刻取决于初值 $\approx 3.2$s 且不可由用户直接指定。</li>
+      <li><strong>瞬态性能：</strong>本文方法由于 L1 低通滤波的作用，超调量明显小于有限时间方法（后者因高增益无滤波而出现明显超调）。传统自适应方法因自适应瞬态不可控，过渡过程出现震荡。</li>
+      <li><strong>$t \geq 2$s 后行为：</strong>红色曲线在 $t \geq 2$s 后与目标轨迹完全重合（误差恒为零），而非渐近接近。这是预设时间控制区别于其他方法的标志性特征。</li>
+      <li><strong>控制信号对比（子图）：</strong>通常包含控制输入 $u(t)$ 的曲线。预期本文方法的控制信号在 $t \to 2^-$s 时由于增益增长而出现一个峰值，但经过 $C(s)$ 滤波后该峰值是平滑且有限的，不会出现高频抖振。</li>
+    </ul>
+  </div>
+</div>
+
+<h3>8.3 实验结果汇总</h3>
+<table>
+  <tr><th>对比维度</th><th>传统自适应反步</th><th>有限时间反步</th><th>固定时间反步</th><th><strong>本文: L1 预设时间</strong></th></tr>
+  <tr>
+    <td><strong>收敛类型</strong></td>
+    <td>渐近 ($t \to \infty$)</td>
+    <td>有限时间 ($t \leq T_f(x_0)$)</td>
+    <td>固定时间 ($t \leq T_{\max}$)</td>
+    <td><strong>预设时间 ($t = T$, 用户指定)</strong></td>
+  </tr>
+  <tr>
+    <td><strong>收敛时间依赖初值？</strong></td>
+    <td>否（无有限时刻）</td>
+    <td>是</td>
+    <td>否</td>
+    <td><strong>否</strong></td>
+  </tr>
+  <tr>
+    <td><strong>用户可指定 $T$？</strong></td>
+    <td>否</td>
+    <td>否（仅可间接通过参数影响）</td>
+    <td>否（由系统参数决定上界）</td>
+    <td><strong>是（显式参数）</strong></td>
+  </tr>
+  <tr>
+    <td><strong>处理匹配不确定性</strong></td>
+    <td>是（参数化）</td>
+    <td>部分（鲁棒项）</td>
+    <td>部分（鲁棒项）</td>
+    <td><strong>是（非参数化, L1补偿）</strong></td>
+  </tr>
+  <tr>
+    <td><strong>处理非匹配不确定性</strong></td>
+    <td>是（反步自适应）</td>
+    <td>有限</td>
+    <td>有限</td>
+    <td><strong>是（反步+L1逐层）</strong></td>
+  </tr>
+  <tr>
+    <td><strong>瞬态性能可调？</strong></td>
+    <td>否（耦合）</td>
+    <td>有限</td>
+    <td>有限</td>
+    <td><strong>是（$\omega$-带宽）</strong></td>
+  </tr>
+  <tr>
+    <td><strong>控制信号高频噪声</strong></td>
+    <td>低（低增益）</td>
+    <td>中（分数幂抖振）</td>
+    <td>中</td>
+    <td><strong>低（低通滤波）</strong></td>
+  </tr>
+  <tr class="highlight">
+    <td><strong>综合评估</strong></td>
+    <td>基础但对慢时变目标足够</td>
+    <td>快收敛但初值敏感</td>
+    <td>初值不敏感但上界保守</td>
+    <td><strong>收敛时间精确 + 强鲁棒 + 瞬态可控</strong></td>
+  </tr>
+</table>
+
+</section>
+
+<!-- ═══════════════ §9 POTENTIAL FLAWS ═══════════════ -->
+<section id="flaw">
+<h2>9. 潜在缺陷与局限</h2>
+
+<h3>9.1 局限性分析</h3>
+
+<div class="callout warn">
+  <div class="callout-title">⚠️ 局限 1: 全状态反馈假设在工程中的可实现性</div>
+  <p>本文假设系统全状态 $x_1,\ldots,x_n$ 可直接测量。在实际 UAV 控制中，高阶状态（如加速度、加加速度）通常不可直接测量，需要通过观测器或数值微分获取。数值微分在 $t \to T^-$ 时由于采样噪声放大效应会更加严重——因为此时系统动态加速，信号变化率增大。本文未讨论输出反馈或观测器设计的预设时间版本。如果在 L1 预设时间框架中加入预设时间观测器，将增加至少一倍的 Lyapunov 分析复杂度。</p>
+</div>
+<div class="callout warn">
+  <div class="callout-title">⚠️ 局限 2: $g_i(\cdot) \neq 0$ 假设与输入饱和</div>
+  <p>本文要求 $g_i(\bar{x}_i) \neq 0$ 对所有 $x$ 成立（可控性条件），且 $g_i$ 的下界远离零是 Lyapunov 分析中不等式放缩的必要条件。在实际系统中，当 $g_i$ 接近于零（如飞行器在失速迎角附近舵效急剧下降），控制器增益 $k_i / (\mu(t) g_i)$ 会变得极大，可能导致数值不稳定。此外，$t \to T^-$ 时即使 $g_i$ 正常，控制量 $u(t)$ 的峰值也可能超出执行器的物理限制（饱和）。</p>
+</div>
+<div class="callout warn">
+  <div class="callout-title">⚠️ 局限 3: $t = T$ 奇点附近的数值实现问题</div>
+  <p>缩放函数 $\mu(t) = T/(T-t)$ 在 $t \to T^-$ 时趋于正无穷，导致控制器增益发散。虽然理论保证此时误差 $z_i$ 已趋于零（"零乘无穷"为有限值），但在数字实现中，浮点精度的限制意味着在 $t$ 接近 $T$ 时（如 $|T-t| < 10^{-8}$），$\mu(t)$ 的数值会溢出或产生巨大的舍入误差。实际部署时需要设置阈值 $T - \epsilon$，在此时冻结控制器参数或切换到稳态控制律。</p>
+</div>
+<div class="callout warn">
+  <div class="callout-title">⚠️ 局限 4: 不确定性 Lipschitz 常数 $L$ 的保守估计</div>
+  <p>L1 小增益条件 $\|G(s)\|_{\mathcal{L}_1} L < 1$ 中 $L$ 需要预先已知或保守估计。对于 $\mathcal{L}_1$ 范数的计算（$\|G(s)\|_{\mathcal{L}_1} = \int_0^\infty |g(\tau)| d\tau$，其中 $g(t)$ 是 $G(s)$ 的脉冲响应），在一阶低通滤波器 $C(s)=\omega/(s+\omega)$ 下，$G(s)=s/(s+\omega)$，$\|G(s)\|_{\mathcal{L}_1} = 2/\omega$。因此条件变为 $2L/\omega < 1$，即 $\omega > 2L$。这意味着高 Lipschitz 常数（强非线性、快时变不确定性）需要更高的滤波器带宽，而这会削弱噪声抑制能力。</p>
+</div>
+<div class="callout warn">
+  <div class="callout-title">⚠️ 局限 5: 仅考虑数值仿真验证</div>
+  <p>如果本文仅通过数值仿真验证（无硬件实验），则以下实际因素未被考验：传感器量化噪声在 $t \to T^-$ 高增益区间的放大效应、执行器动力学延迟对预设时间收敛精度的影响、数字控制器的有限字长效应对 $\mu(t)$ 计算精度的影响、以及通信延迟在多智能体扩展中的影响。</p>
+</div>
+
+<h3>9.2 扩展方向</h3>
+<table>
+  <tr><th style="width:20%;">扩展方向</th><th style="width:40%;">具体思路</th><th style="width:40%;">预期收益</th></tr>
+  <tr>
+    <td><strong>输出反馈版本</strong></td>
+    <td>设计预设时间状态观测器 + L1 自适应预设时间控制器，实现仅依赖输出 $y=x_1$ 的预设时间输出反馈控制</td>
+    <td>消除全状态反馈假设；在 UAV 仅有位置/姿态测量的场景下可直接应用</td>
+  </tr>
+  <tr>
+    <td><strong>事件触发版本</strong></td>
+    <td>将 L1 自适应律的分段常数更新改为事件触发机制——仅在预测误差超过阈值时更新 $\hat{\sigma}$，减少计算/通信负载</td>
+    <td>降低自适应更新的计算频率；适用于机载嵌入式计算资源受限场景；与预设时间框架兼容（事件触发条件可含 $\mu(t)$）</td>
+  </tr>
+  <tr>
+    <td><strong>多智能体预设时间一致性</strong></td>
+    <td>将 L1 预设时间反步推广到多智能体系统的分布式一致性控制——每个智能体使用局部邻居信息，在统一预设时间 $T$ 内实现编队收敛</td>
+    <td>UAV 集群的精确编队控制——所有无人机在相同时刻达到编队构型并保持；L1 补偿个体间的模型差异与外部扰动差异</td>
+  </tr>
+</table>
+
+<h3>9.3 鲁棒性灵敏度分析</h3>
+<table>
+  <tr><th>摄动/扰动类型</th><th>对性能的影响程度</th><th>敏感性评级</th><th>缓解策略</th></tr>
+  <tr>
+    <td><strong>参数不确定性 $\pm 10\%$</strong></td>
+    <td>跟踪误差在 $t < T$ 区间小幅增大，但 $t \geq T$ 后仍能恢复零误差（L1 自适应补偿）</td>
+    <td>★★☆☆☆</td>
+    <td>$\Gamma$ 增大可加速补偿；$\omega$ 调节瞬态平滑度</td>
+  </tr>
+  <tr>
+    <td><strong>外部扰动 $d(t) = A\sin(\omega_d t)$</strong></td>
+    <td>低频扰动被自适应项有效补偿；高频扰动（$\omega_d > \omega$）超出滤波器带宽，补偿效果下降</td>
+    <td>★★★☆☆</td>
+    <td>提高 $\omega$ 扩展补偿带宽（但牺牲噪声抑制）</td>
+  </tr>
+  <tr>
+    <td><strong>测量噪声 $\mathcal{N}(0,\sigma^2)$</strong></td>
+    <td>噪声在 $t \to T^-$ 时因增益放大而更显著；可能引发小幅高频抖振</td>
+    <td>★★★★☆</td>
+    <td>降低 $\omega$ 增强滤波；使用观测器预处理；在 $T-\epsilon$ 处冻结增益</td>
+  </tr>
+  <tr>
+    <td><strong>未建模高频动态</strong></td>
+    <td>若未建模动态的主频率落在 $C(s)$ 通带内，可能激发振荡甚至失稳</td>
+    <td>★★★★★</td>
+    <td>降低 $\omega$ 使得 $C(s)$ 不覆盖未建模动态频率；增加鲁棒稳定裕度验证</td>
+  </tr>
+  <tr>
+    <td><strong>$T$ 选择过小（$T < 0.1$s）</strong></td>
+    <td>增益极度膨胀，控制饱和不可避免，预设时间收敛可能失效</td>
+    <td>★★★★★</td>
+    <td>根据执行器带宽选择合理的 $T$；考虑执行器约束将 $T$ 纳入优化</td>
+  </tr>
+</table>
+
+<div class="callout tip">
+  <div class="callout-title">🔍 深层反思: 预设时间 $T$ 究竟能设多小？</div>
+  <p>理论上的 $T$ 可以任意小（只需增加增益），但实际系统中 $T$ 受到以下硬性约束的链式限制：① <strong>执行器带宽</strong> $B_a$：控制信号变化的最高频率，决定了 $u(t)$ 的最快变化率；② <strong>传感器采样率</strong> $f_s$：Nyquist 频率限制了可观测的动态范围；③ <strong>低通滤波器截止频率</strong> $\omega$：为了满足 $\mathcal{L}_1$ 条件，$\omega$ 不能超过执行器带宽太多；④ <strong>控制器数字实现周期</strong> $T_c$：控制律计算 + 滤波 + 自适应更新的总延迟。合理的经验法则是 $T \geq 5 \cdot \max\{1/B_a, 1/f_s, 1/\omega, T_c\}$。低于此阈值，预设时间收敛的名义保证将被物理实现的不完美性所架空。</p>
+</div>
+
+</section>
+
+<!-- ═══════════════ §10 MOTIVATION ═══════════════ -->
+<section id="motivation">
+<h2>10. 动机推演 — 作者为什么这么做？</h2>
+
+<h3>10.1 五步动机推演链</h3>
+
+<div class="novelty-card">
+  <h4>步骤 1: 应用场景驱动的需求识别</h4>
+  <div class="novelty-step">
+    <strong>场景：</strong>高机动 UAV 跟踪机动目标（如追击入侵无人机）。目标轨迹快速变化且不可预测，要求跟踪控制器在<strong>指定时间窗口内</strong>（如 2 秒内）消除跟踪误差，否则目标将逃逸。同时 UAV 自身面临气动参数摄动（质量变化、气动系数偏移）和突风扰动。<br>
+    <strong>→ 需求：</strong>一种能①显式指定收敛截止时间、②对抗非参数化不确定性的控制方法。
+  </div>
+</div>
+
+<div class="novelty-card">
+  <h4>步骤 2: 现有方法的不匹配识别</h4>
+  <div class="novelty-step">
+    <strong>观察：</strong>传统自适应控制（渐近收敛）无法满足"指定时刻前必须完成跟踪"的硬实时约束。有限/固定时间控制虽收敛更快，但：①收敛时刻由 Lyapunov 分析中的复杂参数组合决定，不能由工程师直接指定；②分数幂反馈在稳态附近产生严重抖振，不适合精密位置控制；③非匹配不确定性的处理不完善。<br>
+    <strong>→ 缺口：</strong>缺少同时满足"用户可指定收敛时间"+"强鲁棒性"+"非匹配不确定性处理"+"平滑控制信号"的方法。
+  </div>
+</div>
+
+<div class="novelty-card">
+  <h4>步骤 3: 关键数学工具的可用性确认</h4>
+  <div class="novelty-step">
+    <strong>确认：</strong>①预设时间 Lyapunov 理论已由 Song et al. (2017) 和 Holloway & Krstic (2019) 建立，提供了时变缩放函数 $\mu(t)$ 和对应的 Lyapunov 不等式形式；② L1 自适应控制（Cao & Hovakimyan）已在匹配不确定性下证明了瞬态性能保证和 $\mathcal{L}_1$ 小增益条件；③ 反步法（Krstic et al.）提供了处理严格反馈系统的标准递归框架。<br>
+    <strong>→ 可行性：</strong>这三个理论工具的"接口"在数学上兼容——反步法提供递归结构，预设时间理论提供时变缩放，L1 提供解耦的自适应补偿。
+  </div>
+</div>
+
+<div class="novelty-card">
+  <h4>步骤 4: 一体化框架的合成</h4>
+  <div class="novelty-step">
+    <strong>合成策略：</strong>①以反步法为框架骨架（决定控制器的递归结构）；②在每一步的虚拟控制律中嵌入预设时间镇定项 $k_i z_i/\mu(t)$（决定收敛速度）；③在最后一步引入 L1 状态预测器 + 分段常数自适应律 + 低通滤波（决定鲁棒性与瞬态性能）；④将三者的 Lyapunov 分析统一在同一个 $V(t)$ 和同一个缩放函数 $\mu(t)$ 下，确保整体预设时间稳定性。<br>
+    <strong>→ 创新：</strong>不是简单的 A+B+C 叠加，而是需要解决三者之间的交叉耦合问题（如：预设时间 Lyapunov 条件如何与 L1 预测器误差的离散更新兼容）。
+  </div>
+</div>
+
+<div class="novelty-card">
+  <h4>步骤 5: 理论完备性与仿真验证</h4>
+  <div class="novelty-step">
+    <strong>验证链条：</strong>① Lyapunov 稳定性证明（理论完备性）→ ② 数值仿真：二阶非线性系统跟踪正弦波（基本功能验证）→ ③ 仿真对比：vs 传统自适应和有限时间控制（优势验证）→ ④ 鲁棒性仿真：参数摄动 + 外部扰动 + 测量噪声（鲁棒性验证）。<br>
+    <strong>→ 贡献边界：</strong>本文属于理论方法论文（methodology paper），核心贡献在于数学框架的建立和数学证明，仿真验证起支撑作用。实际的硬件实验（如 UAV 飞行测试）属于未来工作或拓展方向。
+  </div>
+</div>
+
+<h3>10.2 一句话概括论文动机</h3>
+<div class="callout idea">
+  <div class="callout-title">🎯 一句话动机</div>
+  <p><strong>"让非线性和不确定性不再成为精确时间控制的障碍"</strong>——本文试图证明：即使面对未知的匹配/非匹配不确定性和外部扰动，我们仍然可以设计控制器，使得闭环系统的输出在<strong>任意预先指定的时刻</strong>精确跟踪参考信号，并在该时刻之后保持零误差，同时避免高增益带来的高频噪声和抖振。</p>
+</div>
+
+</section>
+
+<!-- ═══════════════ §11 TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+<h2>11. 关键收获</h2>
+
+<h3>11.1 方法论层面的教训</h3>
+<ul>
+  <li><strong>【组合式创新的范式】</strong>本文完美展示了"两个成熟理论框架的组合如何在交叉处产生新的理论价值"：预设时间控制提供"何时收敛"的保证，L1 自适应控制提供"如何鲁棒地收敛"的保证。两者各自的局限性（预设时间对模型误差敏感、L1 只有渐近收敛）在组合后相互弥补。这种"识别两个理论的互补缺口并缝合"的研究范式值得借鉴。</li>
+  <li><strong>【时变缩放函数作为统一设计工具】</strong>$\mu(t) = T/(T-t)$ 这种简单的时变函数可以成为整个 Lyapunov 分析的核心"引擎"，前提是其导数 $\dot{\mu}(t) = \mu^2(t)/T$ 的简洁性使数学推导可控。在选择缩放函数时，数学上的可处理性（closed-form derivative）往往比最优性更重要。</li>
+  <li><strong>【解耦设计是应对"增益 vs 噪声"困境的关键】</strong>当控制增益因预设时间要求而趋向无穷时，L1 的低通滤波架构证明了"估计可以无限快，但控制只需有限快"这一原则的有效性。这种解耦思想可以推广到其他需要高增益的场合（如滑模控制的切换增益、高增益观测器），通过引入频率分离来缓解增益-噪声矛盾。</li>
+</ul>
+
+<h3>11.2 UAV 控制中的潜在应用</h3>
+<div class="callout tip">
+  <div class="callout-title">✈️ 与固定翼/多旋翼 UAV 研究的连接点</div>
+  <ul>
+    <li><strong>精确时间约束下的自主着陆：</strong>UAV 需在指定时刻 $T$（如 10 秒后）精确降落在移动平台（舰船甲板）上。传统 PID 和自适应控制器只能保证渐近跟踪，降落时刻存在位置偏差。本文的预设时间控制器可在 $T$ 时刻精确消除位置误差，L1 自适应补偿甲板运动和风扰的不确定性。</li>
+    <li><strong>编队同步的时间协调：</strong>多架 UAV 需要在同一时刻 $T$ 形成指定编队构型。如果每架 UAV 使用本文的控制器并设定相同的 $T$，理论上所有 UAV 的编队误差将在同一时刻归零。L1 自适应补偿每架 UAV 的个体差异（质量、气动、扰动不同）。</li>
+    <li><strong>严格反馈模型的 UAV 适配：</strong>固定翼 UAV 的姿态动力学（$\dot{\Theta} = R(\Theta)\omega$, $\dot{\omega} = J^{-1}(-\omega^\times J\omega + \tau + \Delta)$）和多旋翼的位置-姿态级联模型都可以转化为严格反馈形式。本文的框架可以直接应用于这些模型，只需将气动不确定性 $\Delta$ 建模为匹配/非匹配项。</li>
+    <li><strong>时变增益的工程实现方案：</strong>在 UAV 飞控嵌入式代码中实现时变增益 $k/\mu(t)$ 时，需注意：① 在 $t$ 接近 $T$ 时使用 $\mu(t)$ 的泰勒展开避免除零；② 设置 $T-\epsilon$ 阈值后切换为恒值增益；③ 使用定点数计算时注意 $\mu(t)$ 的动态范围（可能跨越多个数量级）。</li>
+  </ul>
+</div>
+
+<h3>11.3 关键参考文献追踪</h3>
+<table>
+  <tr><th style="width:32%;">参考文献</th><th style="width:14%;">类型</th><th style="width:54%;">为什么重要 — 在本文知识图谱中的位置</th></tr>
+  <tr>
+    <td><strong>Cao, C. & Hovakimyan, N.</strong><br>"Design and Analysis of a Novel L1 Adaptive Control Architecture" (2006–2008)</td>
+    <td>理论基础</td>
+    <td>L1 自适应控制的奠基性工作。本文的<strong>状态预测器、分段常数自适应律、低通滤波架构</strong>均源自此系列论文。理解本文必须先理解 L1 的解耦原理。</td>
+  </tr>
+  <tr>
+    <td><strong>Song, Y., Wang, Y., Holloway, J. & Krstic, M.</strong><br>"Time-varying feedback for regulation of normal-form nonlinear systems in prescribed finite time" (2017)</td>
+    <td>理论基础</td>
+    <td>预设时间控制的理论源泉。首次系统提出时变缩放函数 $\mu(t)$ 和对应的 Lyapunov 不等式。本文的预设时间框架直接建立在此工作之上。</td>
+  </tr>
+  <tr>
+    <td><strong>Krstic, M., Kanellakopoulos, I. & Kokotovic, P.</strong><br>"Nonlinear and Adaptive Control Design" (1995)</td>
+    <td>经典教材</td>
+    <td>反步法 (Backstepping) 和调谐函数自适应控制的"圣经"。本文的递归虚拟控制设计、Lyapunov 函数逐层构造、非匹配不确定性处理均遵循此框架。</td>
+  </tr>
+  <tr>
+    <td><strong>Polyakov, A.</strong><br>"Nonlinear Feedback Design for Fixed-Time Stabilization of Linear Control Systems" (2012)</td>
+    <td>对比基线</td>
+    <td>固定时间稳定性理论代表工作。本文在仿真对比中将其作为基线方法。理解固定时间与预设时间的本质区别（收敛上界由系统参数决定 vs 用户显式指定）是关键。</td>
+  </tr>
+  <tr>
+    <td><strong>Holloway, J. & Krstic, M.</strong><br>"Prescribed-Time Observers for Linear Systems" (2019)</td>
+    <td>拓展方向</td>
+    <td>将预设时间概念从控制扩展到观测。本文的"输出反馈扩展"方向需要借鉴此工作中预设时间观测器的设计方法。</td>
+  </tr>
+  <tr>
+    <td><strong>Zuo, Z.</strong><br>"Nonsingular fixed-time consensus tracking for second-order multi-agent networks" (2015)</td>
+    <td>对比基线/拓展参考</td>
+    <td>固定时间控制在多智能体系统中的代表性应用。本文"多智能体预设时间一致性"扩展方向可参考此工作的分布式协议设计框架。</td>
+  </tr>
+</table>
+
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · files · Paper ID 10487 · L1 Adaptive Prescribed-Time Control · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

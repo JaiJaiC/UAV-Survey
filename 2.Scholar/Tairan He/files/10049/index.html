@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — H2O (He, Luo et al., 2024)</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-perception { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-retarget { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-policy   { background: #fff7ed; border-color: #fed7aa; }
+  .arch-execution { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to UAV-Survey">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Tairan He · 13-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../10059/index.html">Hold my beer</a>
+<a href="../10056/index.html">FALCON</a>
+<a href="../10054/index.html">Humanoid policy ~</a>
+<a href="../10052/index.html">Hover Versatile neural</a>
+<a href="../10048/index.html">ASAP</a>
+<a href="../10053/index.html">WoCoCo Learning whole-bod</a>
+<a href="../10050/index.html">Agile but safe</a>
+<a class="active" href="../10049/index.html">Learning human-to-humanoi</a>
+<a href="../10047/index.html">OmniH2O Universal dextero</a>
+<a href="../10058/index.html">Probabilistic safeguard</a>
+<a href="../10057/index.html">Safety index synthesis</a>
+<a href="../10051/index.html">State-wise safe reinforce</a>
+<a href="../10055/index.html">Energy-based imitation le</a>
+    </div>
+  </div>
+
+
+<!-- ═══════════════ 1. PAPER INFO ═══════════════ -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Learning Human-to-Humanoid Real-Time Whole-Body Teleoperation（基于学习的人到人形机器人实时全身遥操作）</td></tr>
+    <tr><td><strong>Authors</strong></td><td><strong>Tairan He</strong><sup>†</sup>、<strong>Zhengyi Luo</strong><sup>†</sup>（共同一作），Wenli Xiao，Chong Zhang，Kris Kitani，Changliu Liu，<strong>Guanya Shi</strong>（corresponding）</td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">卡内基梅隆大学</strong>（Carnegie Mellon University），Robotics Institute（机器人研究所）</td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE/RSJ IROS 2024</strong>（International Conference on Intelligent Robots and Systems），pp. 8944–8951</td></tr>
+      <div class="journal-meta"><span class="jif-name">IROS</span> <span class="jif-badge if-conf-top">🏆 Top Conference</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://doi.org/10.1109/IROS58592.2024.10801984" target="_blank">10.1109/IROS58592.2024.10801984</a> | arXiv: <a href="https://arxiv.org/abs/2403.04436" target="_blank">2403.04436</a> | 项目主页: <a href="https://human2humanoid.com/" target="_blank">human2humanoid.com</a></td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出 <strong>H2O（Human-to-Humanoid）</strong>——首个仅用单目 RGB 相机实现全尺寸人形机器人（Unitree H1）实时全身遥操作的端到端学习框架。核心创新链条：（1）<strong>Sim-to-Data</strong>——从大规模人体动作数据集（AMASS）出发，通过逆运动学重定向 + 特权仿真模仿器筛选不可行动作，自动构建大规模人形机器人可执行动作数据集；（2）<strong>Sim-to-Real RL Policy</strong>——基于目标条件 PPO + 域随机化训练，零样本迁移到真实机器人；（3）<strong>实时遥操作</strong>——现成的 3D 人体姿态估计器（HybrIK）+ RL 策略 = 无标定、无外骨骼、无障碍的即插即用遥操作。展示了行走、后跳、踢腿、转身、挥手、推、拳击、取放物体、推婴儿车共 9 种全身技能。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Sim-to-Real RL</span>
+    <span class="tag tag-green">Whole-Body Teleoperation</span>
+    <span class="tag tag-amber">Humanoid Robot</span>
+    <span class="tag tag-purple">Domain Randomization</span>
+    <span class="tag tag-red">Goal-Conditioned PPO</span>
+    <span class="tag tag-cyan">IROS 2024</span>
+    <span class="tag tag-gray">Motion Retargeting</span>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. INSIGHT & NOVELTY ═══════════════ -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">🎯 核心洞察</div>
+    问：<strong>为什么人形机器人遥操作长期依赖昂贵的动捕/外骨骼设备，且缺乏全身自然交互？</strong><br>
+    答：因为存在两个难以跨越的鸿沟——（1）<strong>表征鸿沟（Representation Gap）</strong>：人体运动数据（关节角度、骨骼比例、运动学结构）与人形机器人存在本质差异，直接映射会超出关节限位或违背物理约束；（2）<strong>具身鸿沟（Embodiment Gap）</strong>：人体运动隐含了人类的身体动力学（摩擦力、质量分布、执行器特性），机器人力学与人类不同，即使运动学上可行的动作也可能在动力学上不可执行（如摔倒）。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>不要试图让一个策略同时解决两个鸿沟</strong>——而是将它们解耦为两个阶段：<strong>第一阶段</strong>用"特权教师"（可访问仿真全部状态的 RL 策略）充当"动力学可行性过滤器"——在仿真中尝试执行海量人体动作，只有成功的被保留；<strong>第二阶段</strong>用过滤后的高质量数据训练"学生策略"（仅依赖可部署传感器的观察），配合域随机化实现 Sim-to-Real 迁移。这个两阶段解耦使得每个阶段都变成了标准监督学习/RL 问题，避免了"同时在运动学和动力学层面跨越鸿沟"的艰难联合优化。
+  </div>
+
+  <h3>2.2 Inspiration → Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>→ What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>运动模仿（motion imitation）与特权学习（privileged learning）文献：Peng et al. (2018) DeepMimic, Lee et al. (2020) 等</td><td>→ "先学会模仿任意运动"的框架已有，但受限于手工设计的运动数据。如果能把互联网规模的人体动作数据（AMASS 含 40+ 小时动作）自动转换为机器人训练数据，数据瓶颈就被打破了。关键洞察：<strong>教师策略 = 可行性过滤器</strong></td><td>框架</td></tr>
+    <tr><td>Teacher-Student 蒸馏范式（Rusu et al. 2016, Chen et al. 2020）</td><td>→ 特权教师（访问仿真真值：接触力、物体位置、外部扰动）学习难度更低、收敛更快、成功率更高；学生策略虽然只看到本体感知和参考姿态差值，但通过模仿教师的行为分布，隐式学到了鲁棒控制策略。这种"信息不对称 → 行为对齐"的范式是本工作的核心方法论</td><td>方法</td></tr>
+    <tr><td>动作重定向（Motion Retargeting）与逆运动学（IK）</td><td>→ 人体 SMPL 模型（22 关节）与人形机器人（19 自由度）之间的关节对应可以通过 IK 优化求解。关键是：不需要精确的逐帧映射，"大致合理"即可，因为后续的 RL 策略会<strong>自动修正残留误差</strong>——这大大降低了重定向的质量门槛</td><td>架构</td></tr>
+    <tr><td>现成的 3D 姿态估计器——HybrIK（Li et al. 2021）</td><td>→ 在遥操作端的感知不需要自研——HybrIK 处理单目 RGB 输出 SMPL 姿态参数，直接作为重定向的输入。这使得整个系统可以"即插即用"：任意单目相机 + 现成姿态估计器 + H2O 策略 = 实时遥操作</td><td>策略</td></tr>
+    <tr><td>Domain Randomization（Tobin et al. 2017, OpenAI et al. 2019）</td><td>→ 在仿真中随机化质量、摩擦、关节力矩、控制延迟、地面几何等物理参数，训练出的策略对真实世界的物理不确定性具有天然的鲁棒性。关键在于随机化范围的标定——需要保守到覆盖现实参数范围，又不能太激进导致策略无法收敛</td><td>工程</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: Sim-to-Data —— 自动化构建人形机器人可执行动作数据集</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>RL 模仿学习需要大规模、高质量的姿态参考数据，但人形机器人的动作数据极其稀缺（手工设计或动捕成本高昂）。互联网上有大规模人体动作数据（AMASS），但人体运动 ≠ 机器人可执行运动——直接迁移会导致关节超限、动力学不可行、摔倒。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Teacher-Student 框架 + "先学会再筛选"的思路——不追求从人体运动直接学会机器人控制，而是先用一个强大的仿真内教师学会模仿所有动作，再观察它"哪些能成功、哪些会失败"</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）AMASS 人体动作 → IK 重定向到 H1 关节空间 → 生成初始参考姿态序列；（2）训练"特权运动模仿器"（privileged motion imitator）——可以访问仿真全部状态的 PPO 策略，目标是最小化与参考姿态的误差；（3）用训练好的教师策略在仿真中逐段执行重定向后的动作序列，记录每段的成功率（跟踪误差低于阈值 = 成功）；（4）保留成功的动作段，丢弃失败的——形成 <strong>Sim-to-Data 数据集</strong>：大规模 + 高质量 + 机器人可执行 + 自带仿真真值标签。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: Sim-to-Real RL Policy —— 仅用可部署传感器实现零样本迁移的鲁棒运动模仿</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>从 Sim-to-Data 数据集到真实机器人的零样本部署面临经典的 sim-to-real gap——仿真物理参数（质量、摩擦、关节阻尼、延迟）与真实世界不匹配，且学生策略只能访问部署时实际可用的传感器（本体感知 + 参考姿态），缺乏接触力等仿真特权信息。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>Domain Randomization + 教师蒸馏——在训练学生策略时，通过大量随机化物理参数，迫使策略学会"与具体物理参数无关"的鲁棒行为</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）学生策略输入：本体感知（关节位置/速度、基座角速度、重力方向）+ 目标状态（参考姿态差值）——共 19 自由度 + 根状态；（2）输出：目标关节位置（PD 控制器跟踪）；（3）域随机化：质量 ±30%、关节力矩 ±20%、地面摩擦力 ±50%、控制延迟 0~20ms、推力和扰动等；（4）奖励函数：姿态奖励 + 速度奖励 + 末端执行器奖励 + 平衡奖励的加权和；（5）PPO 训练约 10 亿步后零样本部署到真实 Unitree H1。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 端到端实时遥操作 —— 单目 RGB → 全身控制在 25 Hz 闭环运行</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>传统人形机器人遥操作方案依赖（a）昂贵的光学动捕系统（Vicon，数十万美元），（b）穿戴式外骨骼（操作者需要穿戴设备，不自然），或（c）VR 手柄（只能控制上半身或几个自由度）——没有方案能同时满足"低成本 + 全身控制 + 自然交互 + 高速闭环"。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>现成的 3D 姿态估计技术已经足够好（HybrIK 在单目 RGB 上可实时运行），配合训练好的 RL 策略，整个链路变为："相机看到人 → 姿态估计器理解姿态 → 策略转换为关节命令"——不需要标定、不需要外骨骼、不需要动捕</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>（1）操作端：单目 RGB 相机（如 webcam）拍摄操作者 → HybrIK 实时输出 SMPL 姿态参数（25 Hz）；（2）SMPL → 重定向到 H1 关节 → 作为目标状态输入学生策略；（3）策略推理（<1ms on GPU）输出 19 个目标关节位置 → 发送到 H1 底层 PD 控制器（200 Hz）；（4）反馈闭环：机器人自身状态通过本体感知反馈给策略，形成 25 Hz 高层规划 + 200 Hz 底层执行的闭环架构。演示了 9 种技能：行走（0.5 m/s）、后跳、踢腿、原地转身、挥手、推重物、拳击、取放物体、推婴儿车。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. SYSTEM ARCHITECTURE ═══════════════ -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — 从人体运动到机器人执行的完整数据流</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Perception <span>HybrIK</span></h4>
+        <div class="arch-card arch-perception">
+          <strong>Single RGB camera</strong>
+          <small>Webcam or phone camera; no calibration, no markers, no pose suits.</small>
+        </div>
+        <div class="arch-card arch-perception">
+          <strong>HybrIK 3D pose estimator</strong>
+          <small>Real-time SMPL body model output at 25 Hz from monocular RGB.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Retargeting <span>IK Solver</span></h4>
+        <div class="arch-card arch-retarget">
+          <strong>SMPL → H1 joint mapping</strong>
+          <small>22-joint human model → 19-DOF humanoid; IK optimization with joint limits.</small>
+        </div>
+        <div class="arch-card arch-retarget">
+          <strong>Goal state extraction</strong>
+          <small>Pose error Δq, velocity error Δ\dot{q}, end-effector error Δx — all in H1 joint space.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Policy <span>PPO Actor</span></h4>
+        <div class="arch-card arch-policy">
+          <strong>Goal-conditioned RL policy</strong>
+          <small>MLP: proprioception + goal state → 19 target joint positions at 25 Hz.</small>
+        </div>
+        <div class="arch-card arch-policy">
+          <strong>Student (deployable) policy</strong>
+          <small>Trained with domain randomization; no privileged info needed at test time.</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Execution <span>Unitree H1</span></h4>
+        <div class="arch-card arch-execution">
+          <strong>PD controller (200 Hz)</strong>
+          <small>Target joint position → torque commands; low-level joint impedance control.</small>
+        </div>
+        <div class="arch-card arch-execution">
+          <strong>Whole-body motion</strong>
+          <small>Walking, jumping, kicking, turning, waving, pushing, boxing, pick-and-place.</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>human pose → SMPL params</span>
+      <span>SMPL → joint refs</span>
+      <span>refs → joint targets</span>
+      <span>targets → torques</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>Representation gap + embodiment gap between human and humanoid.</small></div>
+      <div class="arch-metric"><strong>Main invention</strong><small>Sim-to-Data pipeline: teacher filters feasible motions from infeasible ones.</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>Decoupling motion feasibility check from deployable policy training.</small></div>
+      <div class="arch-metric"><strong>Current limitation</strong><small>No hand/finger control; fine manipulation and heavy contact remain open.</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 System Frame — 完整系统框架</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph PERCEPTION["感知层 (Operator Side)"]
+      CAM["单目RGB相机 · 30fps"]
+      HYBRIK["HybrIK · 3D人体姿态估计 · 25Hz"]
+      SMPL["SMPL模型 · 22关节 · 姿态参数 θ, β"]
+    end
+
+    subgraph RETARGET["重定向层 (Motion Mapping)"]
+      IK["逆运动学求解器 · SMPL→H1"]
+      JOINTMAP["关节对应映射 · 22→19 DOF"]
+      LIMITCHECK["关节限位检查 · 裁剪超限值"]
+      GOAL["目标状态生成 · Δq, Δq̇, Δx"]
+    end
+
+    subgraph POLICY["策略层 (H2O Core)"]
+      PROP["本体感知: q, q̇, ω_base, g"]
+      ACTOR["PPO策略网络 · MLP · 256-128-128"]
+      ACTION["19维目标关节位置 · a_t ∈ R^19"]
+    end
+
+    subgraph ROBOT["执行层 (Unitree H1)"]
+      PD["PD控制器 · Kp=40, Kd=0.5 · 200Hz"]
+      TORQUE["关节力矩 · τ = Kp(q_des-q) + Kd(q̇_des- q̇)"]
+      H1["Unitree H1 · 19-DOF · ~47kg · 1.8m"]
+    end
+
+    subgraph SKILLS["技能演示"]
+      WALK["行走 0.5m/s"]
+      JUMP["后跳"]
+      KICK["踢腿"]
+      TURN["转身"]
+      WAVE["挥手"]
+      PUSH["推重物"]
+      BOX["拳击"]
+      PNP["取放物体"]
+    end
+
+    CAM --> HYBRIK --> SMPL
+    SMPL --> IK --> JOINTMAP --> LIMITCHECK --> GOAL
+    GOAL --> ACTOR
+    PROP --> ACTOR
+    ACTOR --> ACTION --> PD --> TORQUE --> H1
+    H1 --> SKILLS
+
+    H1 -.->|"本体感知反馈 · 25Hz"| PROP
+    GOAL -.->|"实时更新 · 25Hz"| ACTOR
+    PD -.->|"200Hz闭环"| H1
+
+    classDef percep fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef retarget fill:#f5f3ff,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef policy fill:#fff7ed,stroke:#f59e0b,stroke-width:2px,color:#b45309
+    classDef robot fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#047857
+    classDef skills fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
+    class CAM,HYBRIK,SMPL percep
+    class IK,JOINTMAP,LIMITCHECK,GOAL retarget
+    class PROP,ACTOR,ACTION policy
+    class PD,TORQUE,H1 robot
+    class WALK,JUMP,KICK,TURN,WAVE,PUSH,BOX,PNP skills
+    </pre>
+  </div>
+
+  <h3>3.2 Dataflow — 训练数据流与在线推理数据流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph OFFLINE["离线训练阶段 (Sim-to-Data + Policy Training)"]
+      direction LR
+      AMASS["AMASS数据集 · 40h+人体动作"] --> IKRET["IK运动学重定向 · SMPL→H1"]
+      IKRET --> TEACHER["特权教师训练 · PPO+全部仿真状态"]
+      TEACHER --> FILTER["可行性筛选 · 跟踪误差<阈值 = 成功"]
+      FILTER --> DATASET["Sim-to-Data数据集 · 大规模+高质量+机器人可执行"]
+      DATASET --> STUDENT_TRAIN["学生策略训练 · PPO+域随机化 · ~10亿步"]
+      STUDENT_TRAIN --> DEPLOY["可部署策略 · 零样本迁移"]
+    end
+
+    subgraph ONLINE["在线遥操作阶段 (Real-Time Teleop)"]
+      direction LR
+      RGB["操作者单目RGB"] --> POSE["HybrIK姿态估计 25Hz"]
+      POSE --> RET["IK重定向 · SMPL→H1"]
+      RET --> TGT["目标姿态 q_ref(t)"]
+      TGT --> POL["H2O策略推理 <1ms"]
+      POL --> CMD["19维目标关节位置"]
+      CMD --> LOW["PD控制器 200Hz"]
+      LOW --> REAL["真实H1执行"]
+    end
+
+    subgraph FEEDBACK["反馈闭环"]
+      REAL -->|"本体感知: q, q̇, ω"| PROP_FB["关节编码器+IMU"]
+      PROP_FB --> POL
+      REAL -->|"25Hz视觉刷新"| POSE
+    end
+
+    OFFLINE -->|"导出策略权重"| POL
+    REAL --> FEEDBACK
+
+    classDef offline fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef online fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef fb fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    class AMASS,IKRET,TEACHER,FILTER,DATASET,STUDENT_TRAIN,DEPLOY offline
+    class RGB,POSE,RET,TGT,POL,CMD,LOW,REAL online
+    class PROP_FB fb
+    </pre>
+  </div>
+
+  <h3>3.3 Workflow — 从数据到部署的完整管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TD
+    subgraph STAGE1["阶段1: 数据收集与重定向"]
+      direction LR
+      S1A["AMASS人体动作数据集<br/>3000+ subjects · 40h+ mocap"] --> S1B["SMPL参数提取<br/>身体姿态θ + 体型β + 全局平移"]
+      S1B --> S1C["IK运动学重定向<br/>最小化SMPL-H1关键点误差"]
+      S1C --> S1D["重定向动作序列<br/>19 DOF · 50Hz · 包含关节限位裁剪"]
+    end
+
+    subgraph STAGE2["阶段2: Sim-to-Data 可行性筛选"]
+      direction LR
+      S2A["训练特权运动模仿器<br/>PPO · 访问仿真全部状态"] --> S2B["特权教师渲染:<br/>接触力·物体位姿·扰动信息"]
+      S2B --> S2C["逐段执行重定向动作<br/>记录每段跟踪误差"]
+      S2C --> S2D{误差<阈值?}
+      S2D -->|是| S2E["保留到Sim-to-Data数据集"]
+      S2D -->|否| S2F["丢弃 · 不可行动作"]
+    end
+
+    subgraph STAGE3["阶段3: 学生策略训练"]
+      direction LR
+      S3A["Sim-to-Data数据集<br/>大规模+高质量目标姿态"] --> S3B["目标条件PPO训练<br/>学生策略·仅可部署观测"]
+      S3B --> S3C["域随机化<br/>质量±30%·摩擦±50%·延迟0~20ms"]
+      S3C --> S3D["收敛检查<br/>回报稳定·跟踪误差<阈值"]
+      S3D --> S3E["导出可部署策略权重 · ~10亿步训练"]
+    end
+
+    subgraph STAGE4["阶段4: 零样本部署与遥操作"]
+      direction LR
+      S4A["加载策略 · GPU推理"] --> S4B["连接单目RGB相机"]
+      S4B --> S4C["HybrIK实时姿态估计 25Hz"]
+      S4C --> S4D["策略生成关节命令"]
+      S4D --> S4E["H1 PD控制器执行 200Hz"]
+      S4E --> S4F["实时全身遥操作<br/>行走·跳·踢·转身·挥手·推·拳击·取放"]
+    end
+
+    STAGE1 -->|"重定向动作"| STAGE2
+    STAGE2 -->|"可行性筛选数据集"| STAGE3
+    STAGE3 -->|"策略权重文件"| STAGE4
+
+    S3D -.->|"不收敛: 调整随机化范围·奖励权重"| S3B
+    S2D -.->|"筛选率反馈: 调整重定向精度"| S1C
+    S4F -.->|"策略鲁棒性反馈: 调整域随机化"| S3C
+
+    classDef s1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef s2 fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef s3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef s4 fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#047857
+    class S1A,S1B,S1C,S1D s1
+    class S2A,S2B,S2C,S2D,S2E,S2F s2
+    class S3A,S3B,S3C,S3D,S3E s3
+    class S4A,S4B,S4C,S4D,S4E,S4F s4
+    </pre>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. TASK ═══════════════ -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题</span>
+    $$ \max_{\pi} \; \mathbb{E}_{\tau \sim \pi} \left[ \sum_{t=0}^{T} \gamma^t r(s_t, a_t, g_t) \right] \quad \text{s.t.} \quad a_t = \pi(o_t, g_t), \quad g_t = \mathcal{R}(\text{HybrIK}(I_t)), \quad o_t = \text{Proprio}(s_t) $$
+    <div class="eq-note">
+      <strong>$\pi$</strong> = 目标条件策略（goal-conditioned policy）——输入本体感知 $o_t$ 和目标姿态 $g_t$，输出关节目标位置 $a_t$ &nbsp;|&nbsp;
+      <strong>$g_t = \mathcal{R}(\text{HybrIK}(I_t))$</strong> = 从单目 RGB 图像 $I_t$ 经过 HybrIK 姿态估计 → IK 重定向 → 目标关节姿态 &nbsp;|&nbsp;
+      <strong>$o_t$</strong> = 本体感知状态（关节位置 $q$、关节速度 $\dot{q}$、基座角速度 $\omega_{\text{base}}$、重力方向投影）&nbsp;|&nbsp;
+      <strong>$a_t$</strong> = 19 维目标关节位置，输入底层 PD 控制器 &nbsp;|&nbsp;
+      <strong>$r(s_t, a_t, g_t)$</strong> = 包含姿态跟踪、速度匹配、末端位置、平衡维持的复合奖励 &nbsp;|&nbsp;
+      <strong>核心约束</strong>：策略 $\pi$ 必须在真实 Unitree H1 上<strong>零样本部署</strong>——即训练仅在仿真中进行，没有真实机器人微调阶段。同时必须满足实时性（25 Hz 感知-策略-执行闭环）。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入（操作端）</strong></td><td>单目 RGB 视频流（普通网络摄像头），操作者全身在画面内</td><td>H×W×3 图像帧 @ 30fps</td></tr>
+    <tr><td><strong>输出（机器人端）</strong></td><td>19 个目标关节位置（H1 全身关节：双腿 6×2 + 双臂 4×2 + 躯干 1）</td><td>$\mathbb{R}^{19}$ @ 25 Hz → PD 跟踪 @ 200 Hz</td></tr>
+    <tr><td><strong>目标</strong></td><td>操作者的全身动作被 H1 零延迟、高保真地实时复现（行走、后跳、踢腿、转身、挥手、推、拳击、取放、推车）</td><td>姿态跟踪误差 Minimize + 成功率 Maximize</td></tr>
+    <tr><td><strong>中间产物</strong></td><td>Sim-to-Data 数据集——大规模、高质量、经动力学可行性验证的人形机器人动作数据，可复用于未来的模仿学习/强化学习</td><td>（姿态序列，成功标记，仿真真值）元组</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>学习型全身遥操作（Learning-based Whole-Body Teleoperation）</strong>任务——核心难点在于将经典遥操作问题（需要精确标定的硬件链路）转化为学习问题（从数据中自动习得人-机器人映射关系）。任务性质是<strong>目标条件下的连续控制</strong>（Goal-Conditioned Continuous Control），结合了 Sim-to-Real Transfer 和 Real-Time Systems 两个子领域。平台：Unitree H1 全尺寸人形机器人（19 自由度，~47 kg，1.8 m），场景：操作者在任意环境中通过单目相机遥操作机器人执行多种全身技能，目标：零样本部署 + 低成本硬件（无需动捕/外骨骼）+ 全身高保真控制。</p>
+</section>
+
+<!-- ═══════════════ 5. CHALLENGE ═══════════════ -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">💡 第一性原理诊断</div>
+    <strong>核心矛盾</strong>：人形机器人遥操作的本质是"跨具身映射"（cross-embodiment mapping）——将人类身体的动作映射到一个运动学相似但动力学完全不同的机器人身体上。这个映射面临<strong>三重鸿沟</strong>。<br><br>
+    （1）<strong>表征鸿沟（Representation Gap）</strong>：人体（SMPL 模型，~22 关节）与人形机器人（H1，19 DOF）的关节数、关节类型（球关节 vs 铰链关节）、骨骼比例（人体平均身高 1.7 m vs H1 1.8 m，腿长比例不同）、关节限位范围都不同。从 3D 人体姿态到机器人关节空间不存在解析解——需要用 IK 优化求解一个"最接近"的映射。但 IK 解不唯一，且可能违反物理约束。<br><br>
+    （2）<strong>具身鸿沟（Embodiment Gap）</strong>：即使运动学上找到了"看起来合理"的关节映射，人体的质量分布、脚底摩擦力、执行器特性（肌肉 vs 电机）完全不同。人类能优雅地执行的动态动作（后跳、踢腿）在机器人上可能因为扭矩不足、质心偏移过大、或脚底滑动而立即摔倒。这就是<strong>动力学不可行</strong>——也是 Sim-to-Data 阶段的核心价值：用仿真内教师策略试跑所有动作，把动力学不可行的动作过滤掉。<br><br>
+    （3）<strong>感知-控制协同鸿沟（Perception-Control Gap）</strong>：单目 RGB 姿态估计不可避免地存在噪声、遮挡误判和深度歧义——HybrIK 输出的 SMPL 参数可能在某些帧与真实人体姿态有显著偏差。如果 RL 策略对这些噪声没有鲁棒性，将导致机器人执行危险动作。同时，机器人自身传感器的延迟（IMU ~1 ms、关节编码器 ~1 ms）加上视觉处理延迟（HybrIK ~30-40 ms）构成闭环延迟累积。<br><br>
+    <strong>三重鸿沟的交叉效应</strong>：表征映射误差 × 动力学不匹配 × 感知噪声 = 极其脆弱的系统。传统的工程化方案（高精度动捕 + 系统辨识 + 控制器调参）试图逐一消除每个误差源——但代价是设备昂贵、标定复杂、场景受限。H2O 的关键哲学转变：<strong>不要试图消除误差源，而是训练一个对所有这些误差源联合鲁棒的策略</strong>。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">⚠ 表头用英文，正文用中文</p>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails for This Task</th></tr>
+    <tr>
+      <td>Optical Motion Capture Teleoperation（光学动捕遥操作）</td>
+      <td>操作者穿戴反光标记球，多台红外相机实时跟踪人体关节 3D 位置（亚毫米精度），直接映射到机器人关节（如 DARPA Robotics Challenge 中使用 Vicon + Atlas）</td>
+      <td><strong>硬件成本极高</strong>（Vicon 系统数十万美元）、需要专用场地（无法在野外/家庭使用）、标记球容易遮挡和脱落。本质上是<strong>高精度但无泛化能力</strong>——精度依赖标定和硬件，而非智能映射。</td>
+    </tr>
+    <tr>
+      <td>Wearable Exoskeleton / Haptic Device（穿戴式外骨骼遥操作）</td>
+      <td>操作者穿戴外骨骼或力反馈设备，通过机械连接或惯性传感器直接测量人体关节角度，具有力反馈功能（如 Sarcos、IHMC 方案）</td>
+      <td><strong>穿戴负担重</strong>——操作者需要穿上几十公斤的设备，长时间操作疲劳。校准复杂（每次穿脱都需要重新标定），且外骨骼本身限制了人体自然运动范围。力反馈虽然有用，但增加了机械复杂度。</td>
+    </tr>
+    <tr>
+      <td>VR Controller / Kinematic Retargeting（VR 手柄 + 运动学重定向）</td>
+      <td>操作者使用 Oculus/Vive 手柄和头显，通过简单的运动学缩放映射到机器人末端执行器，结合全身 IK 求解生成关节姿态（如 Ishiguro et al., NVIDIA Isaac Gym 示例）</td>
+      <td><strong>无法感知全身姿态</strong>——手柄只能追踪手部 6-DOF 位姿，躯干、腿部、脚部姿态无法直接获取。全身动作依赖 IK 补全（如固定腰部、脚不离地），导致<strong>无法执行腿部动作</strong>（行走、踢腿等）——而这恰恰是人形机器人的核心价值。</td>
+    </tr>
+    <tr>
+      <td>Imitation Learning from Human Video（从人类视频学习机器人技能）</td>
+      <td>从互联网视频中提取 2D/3D 人体姿态，用行为克隆或逆强化学习直接训练机器人策略（如 Peng et al. 2018, NIST 挑战中使用的方法）</td>
+      <td><strong>缺少动力学验证环节</strong>——直接从人类视频学习忽略了人类与机器人的动力学差异。即使运动学上可行的轨迹，机器人执行时可能因为接触力不匹配、扭矩不足或 ZMP 超出支撑域而失败。这类方法需要在真实机器人上大量在线调整。</td>
+    </tr>
+    <tr>
+      <td>Whole-Body MPC / Optimization-Based Control（全身模型预测控制 / 轨迹优化）</td>
+      <td>建立人形机器人全身动力学模型，在线求解非线性 MPC 问题生成关节扭矩（如 IHMC、MIT Cheetah 使用的方法）</td>
+      <td><strong>模型依赖 + 实时求解困难</strong>——全身动力学模型（包含接触约束）是高维非线性系统，在实时频率（100+ Hz）下求解超实时困难。且模型精度（质量分布、摩擦锥模型、接触刚度）难以保证，模型误差会在动态动作中迅速放大导致失稳。</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 人体-机器人运动映射的不适定性</strong>：人体 22+ 关节（含球关节）→ 机器人 19 DOF（铰链关节）的映射是非满射的——多个不同的人体姿态可能映射到同一个机器人姿态，也存在人体可执行但机器人不可执行的姿态（如劈叉）。IK 解不唯一且可能跳变（相邻帧 IK 解跳跃），必须在"关节空间平滑性"和"末端位置精度"之间做权衡。</li>
+    <li><strong>挑战 2 — 大规模机器人可执行动作数据的缺失</strong>：RL 训练需要海量、多样化的动作参考数据。手工设计动作（slow、tedious、not scalable）；真实机器人动捕（需要在机器人上安装标记或外骨骼，昂贵且危险——尚未学会控制的机器人可能摔倒损坏设备）。H2O 的 Sim-to-Data 方案实际上是在"创造数据"——从人体数据出发，通过仿真教师自动生成机器人数据。</li>
+    <li><strong>挑战 3 — Sim-to-Real Gap 在动态全身动作中的严峻性</strong>：行走、后跳、踢腿等动态动作涉及高加速度、足-地冲击和快速接触切换。仿真接触模型（Hunt-Crossley 碰撞模型 vs 真实弹性/塑性接触）的误差在静态站立时微不足道，但在后跳着陆瞬间可能导致策略在仿真中"以为能站住"但在真实机器人上摔倒。域随机化虽然有帮助，但无法覆盖所有物理差异——如何在"随机化范围"（越大越鲁棒）和"训练收敛性"（越小越容易收敛）之间平衡是关键。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 6. METHOD & FORMULAS ═══════════════ -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>H2O 的核心方法论是<strong>两阶段解耦 + 域随机化 + 教师-学生蒸馏</strong>的组合。第一阶段（Sim-to-Data）：训练一个可访问仿真全部状态的"特权教师策略"，用它来筛选人体动作数据中的"机器人可执行"子集；第二阶段（Policy Training）：用筛选后的数据和域随机化训练一个仅依赖可部署传感器的"学生策略"。两个阶段都使用 PPO（Proximal Policy Optimization）算法，但观察空间和奖励函数设计有差异——教师有特权信息所以奖励更丰富，学生只有本体感知和参考姿态差值所以必须学会<strong>隐式推理接触力和外部扰动</strong>。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. 显示公式用 <code>$$...$$</code>，行内公式用 <code>$...$</code>。⚠ 符号解释请用中文。</p>
+
+  <!-- Formula Group A: 奖励函数设计 -->
+  <h4>Group A: 复合奖励函数——多维度的模仿质量评估</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 复合奖励函数</span>
+    $$ r_t = w_p \cdot r_{\text{pose}} + w_v \cdot r_{\text{vel}} + w_e \cdot r_{\text{ee}} + w_b \cdot r_{\text{balance}} $$
+    $$ r_{\text{pose}} = \exp\left(-\sigma_p \| q_t - q_t^{\text{ref}} \|^2 \right) \qquad r_{\text{vel}} = \exp\left(-\sigma_v \| \dot{q}_t - \dot{q}_t^{\text{ref}} \|^2 \right) $$
+    $$ r_{\text{ee}} = \exp\left(-\sigma_e \sum_{i \in \mathcal{E}} \| x_t^i - x_t^{i,\text{ref}} \|^2 \right) \qquad r_{\text{balance}} = \mathbb{1}\left[ |\theta_{\text{torso}}| < \theta_{\text{max}} \right] $$
+    <div class="eq-note">
+      <strong>$r_{\text{pose}}$</strong> = 关节位置跟踪奖励——指数衰减形式，$\sigma_p$ 控制敏感度与容错带宽的权衡 &nbsp;|&nbsp;
+      <strong>$r_{\text{vel}}$</strong> = 关节速度跟踪奖励——确保动态动作的时序准确性（不只是静态姿态匹配）&nbsp;|&nbsp;
+      <strong>$r_{\text{ee}}$</strong> = 末端执行器位置奖励——对手和脚的世界坐标 3D 位置进行独立监督，$\mathcal{E}$ = {左手, 右手, 左脚, 右脚} &nbsp;|&nbsp;
+      <strong>$r_{\text{balance}}$</strong> = 平衡奖励——躯干倾角 $\theta_{\text{torso}}$ 小于阈值 $\theta_{\text{max}}$ 时为 1，否则为 0。这是一个<strong>稀疏但关键</strong>的安全奖励：倾斜过大的惩罚不按比例，而是二值化的"摔倒/没摔倒" &nbsp;|&nbsp;
+      <strong>$w_p, w_v, w_e, w_b$</strong> = 四个奖励项的相对权重，论文通过网格搜索调优。
+    </div>
+  </div>
+
+  <!-- Formula Group B: 目标条件策略 -->
+  <h4>Group B: 目标条件策略——从状态和目标到动作的映射</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 目标条件策略定义</span>
+    $$ a_t = \pi_\theta(o_t, g_t) \quad \text{where} \quad o_t = [q_t, \dot{q}_t, \omega_{\text{base}}, g_{\text{proj}}], \quad g_t = [\Delta q_t, \Delta \dot{q}_t, \Delta x_t^{\text{ee}}] $$
+    <div class="eq-note">
+      <strong>$\pi_\theta$</strong> = 参数为 $\theta$ 的 MLP 策略网络（教师：512-256-128；学生：256-128-128）&nbsp;|&nbsp;
+      <strong>$o_t$</strong> = 49 维本体感知向量（19 关节位置 + 19 关节速度 + 3 基座角速度 + 3 重力方向投影 + 5 其他）&nbsp;|&nbsp;
+      <strong>$g_t$</strong> = 目标状态（参考姿态误差），包含 3 部分：关节位置差 $\Delta q_t = q_t^{\text{ref}} - q_t$（19 维）、关节速度差 $\Delta \dot{q}_t$（19 维）、末端位置差 $\Delta x_t^{\text{ee}}$（12 维 = 4 个末端各 3D）&nbsp;|&nbsp;
+      <strong>$a_t$</strong> = 19 维目标关节位置，输入 PD 控制器转换为力矩 &nbsp;|&nbsp;
+      <strong>设计关键</strong>：策略输入的是<strong>误差</strong>（$\Delta q_t$）而非绝对参考值（$q_t^{\text{ref}}$）——这种"残差"公式化使得策略学会的是"如何修正当前姿态向目标靠近"，而非记忆"每个绝对姿态对应的关节命令"。这是 Sim-to-Real 泛化的关键设计。
+    </div>
+  </div>
+
+  <!-- Formula Group C: DAgger 蒸馏 -->
+  <h4>Group C: DAgger 风格的特权教师蒸馏——从特权信息到可部署观测</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 教师-学生蒸馏损失</span>
+    $$ \mathcal{L}_{\text{distill}} = \mathbb{E}_{(o_t, g_t) \sim \mathcal{D}_{\text{teacher}}} \left[ \| \pi_{\text{student}}(o_t, g_t) - \pi_{\text{teacher}}(o_t^{\text{priv}}, g_t) \|^2 \right] $$
+    <div class="eq-note">
+      <strong>教师策略 $\pi_{\text{teacher}}$</strong> 输入包含特权信息 $o_t^{\text{priv}}$（接触力、物体位姿、外部扰动向量、真实地面摩擦系数、完整刚体状态），输出关节目标位置 &nbsp;|&nbsp;
+      <strong>学生策略 $\pi_{\text{student}}$</strong> 输入仅有可部署观测 $o_t$（本体感知 + 参考姿态误差），但<strong>训练目标是最小化与教师输出的差异</strong> &nbsp;|&nbsp;
+      <strong>$\mathcal{D}_{\text{teacher}}$</strong> = 教师在筛选过程中生成的状态-动作数据集（在线收集，使用 DAgger 风格——学生策略运行时的状态由教师标签）&nbsp;|&nbsp;
+      <strong>关键洞察</strong>：学生不需要显式推理接触力——它只需要学会"在什么本体感知状态下，模仿教师会输出什么动作"。教师提供的接触力信息<strong>隐式编码在动作中</strong>，学生通过回归学会了"看起来像教师的动作"，而无需理解为什么。
+    </div>
+  </div>
+
+  <!-- Formula Group D: 域随机化 -->
+  <h4>Group D: 域随机化——在参数空间中搜索鲁棒策略</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 域随机化目标</span>
+    $$ \max_\theta \; \mathbb{E}_{\xi \sim \Xi} \left[ \mathbb{E}_{\tau \sim \pi_\theta(\cdot|\xi)} \left[ \sum_t \gamma^t r_t^\xi \right] \right] \quad \text{where} \quad \Xi = \left\{ \xi \;|\; \xi \sim \mathcal{U}(\xi_{\min}, \xi_{\max}) \right\} $$
+    <div class="eq-note">
+      <strong>$\xi$</strong> = 随机化的物理参数向量，包括：连杆质量 $m_i \in [0.7\bar{m}_i, 1.3\bar{m}_i]$、关节力矩 $\tau_i \in [0.8\bar{\tau}_i, 1.2\bar{\tau}_i]$、地面摩擦系数 $\mu \in [0.5, 1.5]$、控制延迟 $d \in [0, 20]\text{ ms}$、外部随机推力 $F_{\text{ext}}$ 等 &nbsp;|&nbsp;
+      <strong>$\Xi$</strong> = 参数分布（均匀分布 $\mathcal{U}$ 在上下界之间）&nbsp;|&nbsp;
+      <strong>$r_t^\xi$</strong> = 在物理参数 $\xi$ 下的奖励值——同一策略在不同参数下的表现可能完全不同 &nbsp;|&nbsp;
+      <strong>PPO 实现</strong>：每个 episode 从 $\Xi$ 中采样一组参数，该 episode 内参数保持固定。策略必须学会在<strong>任何合理的物理参数组合下</strong>都能成功跟踪参考姿态。这种"参数鲁棒性"是零样本 Sim-to-Real 成功的核心机制。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>H1 自由度（DOF）</td><td><strong>19</strong></td><td>双腿各 6（髋 3 + 膝 1 + 踝 2）+ 双臂各 4（肩 3 + 肘 1）+ 躯干 1</td><td>Unitree H1 的实际硬件配置。不控制手指（手部为被动/固定），因此精细操作能力受限</td></tr>
+    <tr><td>PD 控制器增益</td><td><strong>$K_p = 40$, $K_d = 0.5$</strong></td><td>目标位置 → 力矩转换的比例-微分增益</td><td>经验选择的权衡值——太高导致刚度过大（刚性碰撞损伤关节），太低导致跟踪精度不足。RL 策略的输出是动态的"目标位置"，PD 负责底层的高频跟踪（200 Hz）</td></tr>
+    <tr><td>PPO 训练步数</td><td><strong>~10 亿步</strong>（教师和学生合计）</td><td>总强化学习环境交互步数</td><td>大规模并行仿真（Isaac Gym，4096 环境并行）使得 10 亿步可在数天内完成。足够策略探索各种动作组合和动力学情况</td></tr>
+    <tr><td>奖励函数权重</td><td><strong>$w_p=0.5, w_v=0.05, w_e=0.3, w_b=0.15$</strong></td><td>姿态/速度/末端/平衡的加权系数</td><td>姿态匹配是最高优先级（权重 0.5），末端位置次之（0.3，因为操作任务需要手部精度），平衡和速度是辅助项</td></tr>
+    <tr><td>域随机化质量范围</td><td><strong>±30%</strong> 标称质量</td><td>每个连杆质量在标称值 ±30% 范围内均匀随机</td><td>覆盖制造公差（~5%）和负载变化（如手持物体），并留下充分裕量。30% 是经验值——太小则 sim-to-real 过拟合，太大则策略难以收敛</td></tr>
+    <tr><td>控制延迟范围</td><td><strong>0 ~ 20 ms</strong></td><td>从策略输出到 PD 执行的模拟延迟</td><td>真实 H1 系统的通信延迟约 5~15 ms。20 ms 上界覆盖了最差情况（包括视觉处理延迟的前馈影响）</td></tr>
+    <tr><td>感知-策略频率</td><td><strong>25 Hz</strong></td><td>HybrIK 姿态估计 → IK 重定向 → 策略推理的频率</td><td>受限于 HybrIK 的实时运行速度（~40ms/帧）。25 Hz 对于步行（1~2 Hz 步频）和中等速度动作足够，但对于高速动态动作（如奔跑 >3 Hz）可能不够</td></tr>
+    <tr><td>Sim-to-Data 可行性阈值</td><td><strong>跟踪误差 < 0.1 rad</strong>（关节）</td><td>判断一个动作段"是否可执行"的关节跟踪误差上界</td><td>0.1 rad ≈ 5.7°——在机器人关节空间中是一个合理的"近似跟踪"阈值。太严格（如 0.01 rad）会丢弃太多数据，太宽松（如 0.3 rad）会留下低质量数据</td></tr>
+  </table>
+
+  <h3>6.4 H2O 学习式遥操作 vs 传统工程式遥操作的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>🧠 H2O 学习式遥操作（本文方案）</h4>
+      <ul>
+        <li>硬件：<strong>单目 RGB 相机</strong>（$<100）——普通 webcam 即可</li>
+        <li>映射方式：<strong>数据驱动</strong>——从 AMASS 自动学习人-机器人映射关系</li>
+        <li>标定需求：<strong>无需标定</strong>——策略隐式适应不同相机视角和人体体型</li>
+        <li>容错机制：<strong>RL 策略内在鲁棒</strong>——域随机化训练使策略对感知噪声和物理不确定性有天然抵抗力</li>
+        <li>可扩展性：<strong>数据可复用</strong>——Sim-to-Data 数据集可作为下游任务的预训练数据</li>
+        <li>动作多样性：<strong>9 种全身技能</strong>——行走、跳、踢、转身、挥手、推、拳击、取放、推车</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>🔧 传统工程式遥操作（动捕/外骨骼）</h4>
+      <ul>
+        <li>硬件：<strong>光学动捕系统</strong>（$100k+）或穿戴式外骨骼（$10k+），需要专用场地</li>
+        <li>映射方式：<strong>规则/解析</strong>——标定后的线性映射或手工设计的运动学链</li>
+        <li>标定需求：<strong>精确标定</strong>——相机外参/内参、人体-机器人对应关系均需手动标定</li>
+        <li>容错机制：<strong>脆弱</strong>——标记遮挡、外骨骼漂移直接导致遥操作失败</li>
+        <li>可扩展性：<strong>受限</strong>——每次更换机器人型号/操作者都需要重新标定和调整</li>
+        <li>操作者负担：<strong>重</strong>——穿戴设备，限制自然运动，长时间操作疲劳</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. FUNDAMENTAL PRINCIPLES ═══════════════ -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解 H2O 需要掌握三个关键基础原理：运动学重定向（如何把人体运动映射到机器人关节空间）、Sim-to-Data 可行性筛选（如何用仿真教师过滤不可行动作）、域随机化 Sim-to-Real 迁移（如何使仿真训练的策略在真实世界工作）。</p>
+
+  <h3>7.1 运动学重定向原理 —— 从 SMPL 到 H1 的关节映射</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 基于 IK 的人体-机器人运动学映射</span>
+    $$ \min_{\mathbf{q}_{\text{H1}}} \; \sum_{i \in \mathcal{K}} w_i \left\| \mathbf{p}_i^{\text{SMPL}} - \mathbf{p}_i^{\text{H1}}(\mathbf{q}_{\text{H1}}) \right\|^2 \quad \text{s.t.} \quad \mathbf{q}_{\min} \le \mathbf{q}_{\text{H1}} \le \mathbf{q}_{\max} $$
+    <div class="eq-note">
+      <strong>$\mathcal{K}$</strong> = 预定义的人体-机器人关键点对应集合（肩、肘、腕、髋、膝、踝等 10+ 个对应点）&nbsp;|&nbsp;
+      <strong>$w_i$</strong> = 第 $i$ 个关键点的权重（手部/脚部权重更高，因为末端精度最重要）&nbsp;|&nbsp;
+      <strong>$\mathbf{p}_i^{\text{SMPL}}$</strong> = HybrIK 输出的人体第 $i$ 个关键点的 3D 世界坐标 &nbsp;|&nbsp;
+      <strong>$\mathbf{p}_i^{\text{H1}}(\mathbf{q}_{\text{H1}})$</strong> = 机器人正向运动学函数——给定关节角度 $\mathbf{q}_{\text{H1}}$，计算该关键点的 3D 位置 &nbsp;|&nbsp;
+      <strong>约束</strong>：$\mathbf{q}_{\min} \le \mathbf{q}_{\text{H1}} \le \mathbf{q}_{\max}$ 确保解在关节硬件限位内 &nbsp;|&nbsp;
+      <strong>核心简化</strong>：这是一个<strong>运动学层面的优化</strong>——只关注空间位置匹配，不涉及动力学。误差的"残留部分"（如因为骨骼长度不同导致的不可消除误差）由后续 RL 策略来补偿。
+    </div>
+  </div>
+
+  <p><strong>为什么 IK 重定向的精度要求不需要很高？</strong>因为 H2O 的架构设计是<strong>分层的</strong>——IK 只负责提供一个"大致合理"的初始目标姿态；RL 策略的奖励函数是<strong>相对误差</strong>（当前姿态与参考姿态的差值），而非绝对姿态。这意味着 IK 解的小偏移会被策略当作"需要修正的方向"——策略通过本体感知的反馈来隐式修正 IK 的不准确性。这与传统方案"IK 必须完美否则机器人会摔倒"有本质区别。</p>
+
+  <h3>7.2 Sim-to-Data 管线原理 —— 教师策略作为动力学可行性过滤器</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 可行性筛选的数学形式</span>
+    $$ \mathcal{D}_{\text{feasible}} = \left\{ \tau^{\text{ref}} \in \mathcal{D}_{\text{AMASS}}^{\text{retarget}} \;\middle|\; \mathbb{E}_{s_0 \sim \rho_0} \left[ \frac{1}{T} \sum_{t=1}^T \mathbb{1}\left[ \|q_t - q_t^{\text{ref}}\| < \epsilon \right] \right] > \alpha \right\} $$
+    <div class="eq-note">
+      <strong>$\mathcal{D}_{\text{AMASS}}^{\text{retarget}}$</strong> = 经 IK 重定向后的 AMASS 动作段集合（每个动作段 $T$ 秒长）&nbsp;|&nbsp;
+      <strong>$\rho_0$</strong> = 初始状态分布（机器人的起始姿态在参考姿态附近随机采样）&nbsp;|&nbsp;
+      <strong>$\epsilon$</strong> = 关节跟踪误差的可行性阈值（论文使用 ~0.1 rad）&nbsp;|&nbsp;
+      <strong>$\alpha$</strong> = 时间占比阈值——至少 $\alpha$ 比例的时间步跟踪误差在阈值以内，整个动作段才被标记为"可行"&nbsp;|&nbsp;
+      <strong>核心价值</strong>：教师策略在这个公式中扮演的角色是<strong>黑盒可行性测试器</strong>——不需要人工定义"什么是可行的"，只需要让教师尝试执行，看结果。这本质上是在做<strong>基于实验的大规模数据清洗</strong>。
+    </div>
+  </div>
+
+  <table>
+    <tr><th>对比维度</th><th>传统数据筛选（人工规则）</th><th>Sim-to-Data（教师策略筛选）</th></tr>
+    <tr><td>筛选标准</td><td>手工设计的运动学/动力学规则（关节限位、速度上限、ZMP约束）</td><td>教师策略的<strong>实际执行结果</strong>（能否成功跟踪）</td></tr>
+    <tr><td>覆盖面</td><td>只能排除明显违反规则的，但无法判断"动力学是否可行"</td><td>同时考核运动学和动力学——策略摔倒 = 不可行</td></tr>
+    <tr><td>泛化性</td><td>规则需要针对每种机器人重新设计</td><td>只需重新训练教师策略（自动化）</td></tr>
+    <tr><td>可扩展性</td><td>规则复杂度 O(1)，无法覆盖更多微妙情况</td><td>教师策略越强 → 筛选越准 → 可训练更复杂的技能</td></tr>
+  </table>
+
+  <h3>7.3 Sim-to-Real 域随机化原理 —— 为什么物理参数扰动能产生鲁棒部署策略</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 域随机化的鲁棒性机制</span>
+    $$ \pi_{\text{robust}}^* = \arg\max_\pi \; \mathbb{E}_{\xi \sim \Xi} \left[ J(\pi, \xi) \right] \quad \Rightarrow \quad \pi_{\text{robust}}^* \approx \pi_{\text{real}}^* \quad \text{if} \quad \xi_{\text{real}} \in \text{conv}(\Xi) $$
+    <div class="eq-note">
+      <strong>$\Xi$</strong> = 域随机化参数的分布（质量、摩擦、延迟等）&nbsp;|&nbsp;
+      <strong>$J(\pi, \xi)$</strong> = 策略 $\pi$ 在物理参数 $\xi$ 下的期望累积回报 &nbsp;|&nbsp;
+      <strong>核心假设</strong>：真实物理参数 $\xi_{\text{real}}$ 落在随机化分布 $\Xi$ 的凸包内——即真实世界是仿真参数空间的<strong>一个未被采样的点</strong>，但离采样点足够近 &nbsp;|&nbsp;
+      <strong>鲁棒性来源</strong>：在随机化分布上最大化期望回报等价于让策略学会<strong>对参数变化不敏感</strong>——因为策略不知道当前 episode 使用的是什么参数，只能学习在不同参数下都有效的通用行为模式。这种"被迫泛化"的效果与经典机器学习中的 data augmentation 精神一致。
+    </div>
+  </div>
+
+  <p><strong>域随机化为什么对全身动作特别有效？</strong>全身动态动作（行走、后跳、踢腿）的关键难点是接触事件——脚何时触地、触地时地面反力多大、是否会滑动。这些接触事件的物理特性极度依赖难以精确建模的参数（接触刚度、阻尼、摩擦锥形状）。域随机化通过让策略经历"各种可能的接触物理"，使其学会不依赖特定的接触力/摩擦假设——策略的输出变为"在大多数合理物理下都能维持平衡的动作"，而不是"在特定物理参数下精准的动作"。</p>
+
+  <div class="callout tip">
+    <div class="callout-title">💡 三个原理的系统级协同</div>
+    IK 重定向（原理 1）提供了从人体到机器人的几何对应 → 但 IK 解不保证动力学可行性；Sim-to-Data 教师筛选（原理 2）通过实际执行过滤了动力学不可行的动作 → 但筛选后的策略还停留在仿真中；域随机化（原理 3）使策略在真实世界也能工作 → <strong>三个原理构成完整的"数据→可行性→迁移"闭环</strong>。任何一个环节缺失都会导致系统崩塌：没有原理 1 就无法获取大规模训练数据；没有原理 2 数据中充斥着机器人无法执行的动作（垃圾进垃圾出）；没有原理 3 策略只在仿真中工作。
+  </div>
+</section>
+
+<!-- ═══════════════ 8. PAPER FIGURES ═══════════════ -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文关键图表截图。图片保存至 <code>figures/</code> 子目录。</p>
+
+  <!-- Figure 1 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">H2O 系统概览——从人体运动到人形机器人实时遥操作的完整闭环</span>
+      <span class="fig-source">来源：论文 Fig. 1 — System Overview</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="H2O system overview: human-to-humanoid teleoperation pipeline"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：H2O 系统的完整 pipeline——从操作者的单目 RGB 图像输入到 Unitree H1 全身动作输出的端到端链路。核心分为四层：(a) <strong>感知层</strong>——操作者自然站立在普通摄像头前，HybrIK 从 RGB 帧中实时提取 SMPL 人体模型参数（3D 姿态 θ 和体型 β）；(b) <strong>重定向层</strong>——SMPL 人体关节通过 IK 优化映射到 H1 机器人关节空间，考虑关节限位和骨骼比例差异，生成目标关节姿态序列；(c) <strong>策略层</strong>——H2O 策略接收两个输入流：当前本体感知状态（关节位置/速度、IMU）和重定向后的目标姿态差值，输出 19 维目标关节位置；(d) <strong>执行层</strong>——H1 底层 200 Hz PD 控制器跟踪目标关节位置，转换为关节力矩驱动。右上角插图展示了 9 种演示技能的机器人快照。</p>
+      <ul>
+        <li><strong>系统的端到端特性</strong>：整个链路从相机到机器人完全自动化，不需要任何人工干预——操作者穿上日常服装即可开始遥操作。没有标定步骤（不同于动捕需要标定相机内外参和人体-机器人对应关系），没有穿戴设备，没有专用场地</li>
+        <li><strong>两层控制频率的分层设计</strong>：视觉感知 + 策略推理在 25 Hz 运行（高层规划），PD 控制在 200 Hz 运行（底层执行）。这种分层是平衡"感知延迟"和"控制精度"的标准工程实践——25 Hz 足够捕捉人体运动的主要频率成分，200 Hz 的 PD 控制保证机械层面的快速响应</li>
+        <li><strong>Sim-to-Data 的隐式展示</strong>：上图右侧的训练 pipeline 显示了 Sim-to-Data 阶段（AMASS → Retarget → RL 训练 → 可行性筛选 → Sim-to-Data 数据集），但论文将此作为方法的核心贡献而非仅仅预处理步骤——这种"数据集既是输入又是输出"的设计在人形机器人领域是开创性的</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Figure 2 -->
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">H2O 真实机器人遥操作演示——9 种全身技能的遥操作快照与定量评估</span>
+      <span class="fig-source">来源：论文 Fig. 2 / Fig. 3 — Real-robot demonstrations</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="H2O real-robot teleoperation snapshots across 9 whole-body skills"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：H2O 在真实 Unitree H1 上的遥操作实验结果——操作者通过单目相机控制 H1 执行多种全身技能的抓拍和定量评估。9 种技能覆盖了不同动态特性和接触模式：(1) 行走——持续性周期运动，双足交替支撑，涉及稳定的步态周期和质心横向摆动；(2) 后跳——爆发性运动，需要短时间失重期 + 着陆冲击吸收；(3) 踢腿——单腿支撑 + 另一腿高速摆动，足部末端速度可达数 m/s；(4) 原地转身——双脚交替抬放的准静态转动；(5) 挥手——上半身独立运动，下半身维持站立平衡；(6) 推重物——双手接触外部物体，力通过双臂传递到全身，需要全身协调对抗反力；(7) 拳击——双臂高速交替出拳，上半身高速运动对躯干平衡产生周期性扰动；(8) 取放物体——双手抓取-搬运-放置，涉及精确的手部定位；(9) 推婴儿车——双手固定接触 + 行走，是最复杂的组合技能。</p>
+      <ul>
+        <li><strong>技能多样性的意义</strong>：9 种技能覆盖了单足支撑（踢腿）、双足支撑（行走）、跳跃（后跳）、上半身高速运动（拳击）、外部接触（推重物、推车）、精细末端定位（取放）——这套组合几乎穷举了人形机器人全身控制的核心挑战维度。单一系统覆盖如此广泛的技能谱系，此前未见报道</li>
+        <li><strong>Sim-to-Real 零样本部署的证据</strong>：这些结果全部来自<strong>零样本部署</strong>——策略仅在仿真中训练，加载到 H1 后直接执行，没有在真实机器人上进行任何微调或在线学习。这验证了域随机化的有效性：在足够宽的随机化范围内训练，真实机器人物理参数自然落在泛化范围内</li>
+        <li><strong>延迟与稳定性的隐含信息</strong>：HybrIK 处理一帧约 30-40 ms，加上网络传输、策略推理、PD 控制闭环，总端到端延迟约 50-70 ms。在这样的延迟下仍能稳定执行后跳和踢腿等动态动作，说明策略学会了<strong>预测性</strong>补偿——通过本体感知的历史信息推断当前的真实状态和即将到来的接触事件</li>
+        <li><strong>定量跟踪精度</strong>：论文报告了各技能的关节跟踪误差——行走 <0.08 rad（4.6°）、后跳 <0.12 rad（6.9°）——动态动作的误差略大于准静态动作，这与直觉一致。行走的纵向速度可达 0.5 m/s，虽然不如人类自然步速（~1.4 m/s），但对于远程操作已足够实用</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. POTENTIAL FLAW ═══════════════ -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 操作者在相机视野内且全身清晰可见，遮挡（如操作者转身背对相机）会导致姿态估计失败或产生不可预测的输出；(2) 光照条件适中——HybrIK 在极端光照（过暗/过曝）下精度下降；(3) 操作者穿着非厚重衣物——宽松衣物会破坏人体轮廓，影响姿态估计；(4) 机器人站立在平坦硬地面上，未测试不平整/松软地面。</li>
+    <li><strong>适用场景</strong>：(1) 无手指/手部精细控制——H1 的手部是被动/固定的，因此取放物体依赖特定的抓取策略而非灵巧手指操作；(2) 高速动态动作的上限——0.5 m/s 行走速度受限于 HybrIK 25 Hz 的更新率和策略对动态不稳定性的鲁棒边界，奔跑（>1 m/s）尚未验证；(3) 无环境接触的力反馈——策略不输出力矩或接触力目标，仅输出关节位置，因此当机器人接触环境时（如推门、搬运重物），操作者无法感知接触力的大小和方向。</li>
+    <li><strong>可扩展性</strong>：(1) Sim-to-Data 是离线过程——教师训练、筛选和数据集构建需要数天。每当希望加入新的动作类型（如爬楼梯、跳跃过障碍），需要重新运行整个 pipeline；(2) 教师策略的能力上限决定了 Sim-to-Data 数据集的覆盖范围——教师学不会的动作将永远被排除在数据集之外；(3) 策略是特定于 H1 型号的——更换机器人型号（如 Tesla Optimus、Figure 02）需要重新训练全部组件。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从 19 DOF → 含灵巧手的全身控制（~40+ DOF）——增加手指自由度可以实现真正的操作遥操作（如拧螺丝、使用工具、穿针引线）。需要配合高帧率手部姿态估计器（如 FrankMocap）或 VR 手套</li>
+    <li><strong>条件放松</strong>：(1) <strong>多模态感知融合</strong>——增加深度相机（RGB-D）或激光雷达，减少对单目视差的依赖，提高遮挡和极端光照下的鲁棒性；(2) <strong>端到端学习</strong>——将 HybrIK 替换为直接从 RGB 到机器人关节命令的视觉-运动策略网络（类似 RT-2 的理念），消除姿态估计的中间表示瓶颈和信息损失</li>
+    <li><strong>约束加入</strong>：(1) <strong>力反馈</strong>——在 H1 上安装力矩传感器，将接触力编码后以振动/视觉方式反馈给操作者，实现双向遥操作；(2) <strong>安全约束层</strong>——在策略输出与 PD 控制器之间增加安全检查层（如 ZMP 约束、关节力矩上限、自碰撞检测），防止策略在极端感知噪声下输出危险动作；(3) <strong>Sim-to-Data 可微化</strong>——将可行性筛选过程嵌入端到端可微 pipeline，用梯度方法优化筛选标准而非二进制门控</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>单目姿态估计的输入质量敏感性</td><td>HybrIK 对光照、视角、遮挡、衣物宽松度敏感。极端情况下（操作者侧身、蹲下、部分被遮挡），SMPL 参数输出可能跳跃或漂移。这些噪声直接作为策略的输入目标——如果噪声幅度超过策略的鲁棒边界，可能导致机器人执行突变动作甚至摔倒。目前的解决方案是"依赖策略鲁棒性"，但缺少显式的异常检测/拒绝机制</td><td>★★★★★</td></tr>
+    <tr><td>操作者-机器人比例差异的残余误差</td><td>IK 重定向已经尽力最小化了关节位置误差，但人体（约 1.7 m）与 H1（1.8 m）的骨骼比例差异导致末端执行器（手、脚）的世界坐标存在<strong>无法消除的系统性偏移</strong>。例如操作者手臂较短但 H1 手臂较长——当操作者手碰到桌面时 H1 的手可能已经穿透桌面。这种系统误差在当前框架中没有补偿机制</td><td>★★★★</td></tr>
+    <tr><td>AMASS 数据集的偏差与 Sim-to-Data 的放大效应</td><td>AMASS 主要来源于实验室动捕，动作类型偏向行走、跑步、日常动作，但缺少人形机器人真正需要执行的操作类动作（如搬运、开门、使用工具）。Sim-to-Data 管道会进一步过滤掉"机器人难以执行"的动作——如果 AMASS 本身缺乏某类动作，Sim-to-Data 数据集也会缺乏。这可能导致策略的<strong>动作多样性天花板</strong>由源数据集决定</td><td>★★★</td></tr>
+    <tr><td>域随机化的"赌注"性质</td><td>域随机化的成功依赖于真实物理参数落在随机化分布内这一关键假设。如果真实 H1 的某个物理特性（如关节静摩擦的 stiction 效应、PD 控制器的量化误差）在仿真中完全没有建模，域随机化也无法覆盖。验证方法只有实机测试——如果测试失败，往往不知道哪个未建模的物理项是元凶</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>从"遥操作"到"自主数据飞轮"——H2O 的真正潜力可能不是遥操作本身，而是它构建的 Sim-to-Data 数据生成范式可以扩展为"人形机器人基础运动模型"的训练数据引擎</strong>。核心思路：(1) 将 Sim-to-Data 从离线流程升级为<strong>在线流程</strong>——每当收集到新的人体动作视频，自动重定向 + 筛选 + 加入数据集；(2) 用不断扩充的数据集训练<strong>人形机器人基础策略</strong>（类似 GPT 的预训练-微调范式），覆盖尽可能多的动作类型；(3) 基础策略作为下游任务（Locomotion、Manipulation、Human-Robot Interaction）的初始化权重。这个方向如果成功，可以为人形机器人领域提供类似 ImageNet 的统一 data engine，大幅降低新技能的开发成本。核心挑战：(a) 如何设计统一的动作表示（覆盖行走、操作、交互等异构动作类型）？(b) 如何保证数据质量随规模扩大不退化（防止低质量数据污染数据集）？(c) 如何在新机器人型号上做最低成本的迁移（或许可以通过少量真实机器人数据做微调 adapter）？
+  </div>
+</section>
+
+<!-- ═══════════════ 10. MOTIVATION ═══════════════ -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>人形机器人需要学习大量技能才能在社会中发挥作用——行走、搬运、操作、交互。但如果每种技能都需要人类工程师手工设计控制器和收集专门的训练数据，那么"通用人形机器人"将永远遥不可及。问题的本质是<strong>数据稀缺</strong>——我们没有办法为每一种技能收集足够的机器人训练数据。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>三条路线：(i) <strong>仿真合成数据</strong>——在仿真中自动生成任务，用课程学习逐步增加难度（如 OpenAI 的灵巧手旋转方块）。问题：仿真任务设计依赖人工先验，难以覆盖"真实世界中会出现但工程师没想到"的动作；(ii) <strong>遥操作收集数据</strong>——用动捕或 VR 设备控制机器人执行任务并记录数据。问题：设备昂贵，操作者负担重，数据收集速度慢——这是数据稀缺的另一种表现；(iii) <strong>互联网视频学习</strong>——从 YouTube 视频中提取人体动作信息直接用于机器人训练。问题：缺乏动力学可行性验证——视频里的人能做不代表机器人也能做。</li>
+    <li><strong>如果互联网上有海量人体动作数据（AMASS），我们如何把它转化为机器人训练数据？</strong><br>AMASS 包含 40+ 小时、3000+ 人的动捕数据——覆盖行走、跑步、跳跃、舞蹈、日常活动等广泛动作类型。如果我们能<strong>自动筛选</strong>出其中"机器人可执行"的子集，就相当于拥有了一个大规模、高质量、多样化的机器人训练数据库——而这一切不需要真实机器人参与。</li>
+    <li><strong>如何筛选？如果机器人还不会做这些动作，怎么知道哪些是可执行的？</strong><br>这正是 Sim-to-Data 的精妙之处：<strong>先用仿真训练一个足够强的教师策略</strong>。教师接受 IK 重定向后的目标姿态为输入，尝试在仿真中模仿。因为教师可以访问仿真全部状态（接触力、物体位置等特权信息），它的学习能力远强于只能访问有限观测的策略。教师学会的动作 = 可能在真实机器人上执行的动作（因为仿真动力学虽然不完备但已经足够接近）。教师失败的动作 = 几乎不可能在真实机器人上执行的动作。</li>
+    <li><strong>最简单的方案是什么？</strong><br>三阶段管线：(1) AMASS → IK 重定向 → 初始参考姿态数据集（运动学层面）；(2) 特权教师模仿训练 → 逐个动作段试执行 → 成功率筛选 → Sim-to-Data 高质量数据集（动力学层面）；(3) 学生策略 + 域随机化训练 → 零样本 Sim-to-Real → 真实机器人遥操作。整个管线不需要真实机器人参与第一阶段——只在最后一步部署到 H1。如果成功，证明"互联网规模的人体运动数据 = 人形机器人的免费训练数据来源"。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">💡 一句话动机</div>
+    人形机器人需要学习全身技能但训练数据极度稀缺，而互联网上有海量人体动作数据——如果能在仿真中自动筛选出机器人可执行的动作子集来训练策略，那么<strong>每一个人体动捕序列都可能成为机器人训练数据</strong>——H2O 就是在验证"这个免费数据源是否可用，以及用这些数据训练的策略能否零样本部署到真实机器人进行遥操作"。
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：人形机器人领域存在"数据饥饿"——RL 需要海量环境交互，但真实机器人时间昂贵且危险（摔倒损坏）。同时注意到 AMASS 是一个大规模、高质量、标准化的人体动作数据集——但从来没有人把它系统性地用于机器人训练。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将"从人体视频到机器人执行"分解为三个子问题——（1）人体关节空间 → 机器人关节空间的几何映射（运动学层）；（2）运动学可行的轨迹 → 动力学可执行的轨迹的过滤（动力学层）；（3）仿真中可行的策略 → 真实世界可部署的策略的迁移（Sim-to-Real 层）。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：（1）IK 运动学重定向——成熟的优化工具，用于第一层映射；（2）特权教师 PPO——访问仿真全部状态的 RL 策略，作为动力学可行性过滤器；（3）域随机化 PPO + 教师蒸馏——训练对物理不确定性鲁棒的学生策略。三个工具组合形成完整的数据流。</li>
+    <li><strong>Step 4 — 组装方案</strong>：AMASS → IK Retarget → Privileged Teacher Imitation → Feasibility Filtering → Sim-to-Data Dataset → Student PPO + Domain Rand → Zero-Shot Teleop on H1。整个方案的优雅之处在于：它是<strong>数据自举</strong>的——从人体数据出发，自动生成机器人数据，训练机器人策略——无需人工标注或手工设计。</li>
+  </ul>
+</section>
+
+<!-- ═══════════════ 11. KEY TAKEAWAYS ═══════════════ -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：这是一个教科书级的<strong>"解耦复杂问题 → 用学习替代规则"</strong>案例。H2O 没有尝试设计一个人体-机器人映射的解析模型，没有手工编写可行性规则，没有手工调参控制器——而是用 RL 分别训练了"教师"和"学生"，让数据驱动整个流程。对于 UAV 领域的启示：<strong>当你面对一个难以建模的复杂映射问题时（如操纵杆输入 → 无人机轨迹、视觉输入 → 避障动作），考虑用仿真 + RL 来学习这个映射——仿真中的物理不一定完美，但结合域随机化可以获得足够鲁棒的策略</strong>。</li>
+    <li><strong>技术技巧层面</strong>：(1) 特权信息蒸馏——让教师看到仿真真值（接触力、物体位姿），学生只看到本体感知。这种"信息不对称 + 行为对齐"的范式可以广泛用于任何需要从仿真迁移到真实系统的控制问题；(2) 残差目标表示——策略输入的是"姿态误差"而非"绝对姿态"，这迫使策略学习修正行为而非记忆映射，显著提升泛化性；(3) Sim-to-Data 数据工厂——用教师策略自动筛选可信数据，将"数据清洗"从训练前步骤变为训练的一部分。这个理念在自动驾驶（数据挖掘）、计算机视觉（主动学习）中也有广泛应用。</li>
+    <li><strong>实验/写作层面</strong>：论文通过 9 种截然不同的技能演示证明了系统的通用性——不是精心挑选的"最容易"案例，而是涵盖单足支撑、跳跃、接触交互、末端定位等多个维度的挑战性技能。这种<strong>"一图胜千言"的多维度实验验证</strong>是优秀机器人论文的标志。如果只展示行走一种技能，读者会质疑"是否只能做这个"；展示 9 种后，质疑自然消解。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 操作/遥操作方向</strong>：H2O 的"单目 RGB → 全身控制"范式可以直接类比到无人机遥操作——操作者用身体姿态/手势控制无人机飞行，H2O 的人体姿态估计 + RL 策略的 pipeline 可以复用到"人体运动 → 无人机轨迹"的映射。核心价值：<strong>不需要专用无人机遥控器（如 DJI 手柄），任何人在任何地点举起手机就能控制无人机</strong>。这降低了无人机操作的门槛，特别适合搜救场景（非专业人员需要快速部署无人机）。</li>
+    <li><strong>对于 Sim-to-Real RL 方向</strong>：H2O 的域随机化策略可以作为 UAV Sim-to-Real 的模板——随机化质量（载重变化）、推力（电机效率 ±20%）、气动参数（阻力系数 ±30%）、风扰（随机风速和方向）、传感器延迟和噪声——将策略训练为对这些因素不敏感，实现零样本部署。UAV 的空中环境比人形机器人更复杂（风力、湍流、气压变化），域随机化的范围可能需要更宽。</li>
+    <li><strong>对于 UAV 感知-控制集成方向</strong>：H2O 的"现成视觉模型 + 训练控制策略"组合思路值得借鉴——不需要自研视觉模型来完美理解场景，只需要一个"足够好"的视觉估计器（如目标检测、深度估计、语义分割），然后<strong>让控制策略学会在视觉噪声下做正确决策</strong>。这种"感知给大致方向、控制补细节"的思路可以加速 UAV 自主飞行系统的开发。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Peng et al. (2018) — DeepMimic: Example-Guided Deep Reinforcement Learning of Physics-Based Character Skills. <em>ACM Trans. Graph.</em> (SIGGRAPH 2018)</td><td>运动模仿领域的奠基性工作——首次用 RL 训练仿真角色模仿动捕数据中的复杂技能（后空翻、侧手翻等）。H2O 的运动模仿范式直接继承自 DeepMimic，但将其从"仿真动画"推进到了"真实机器人遥操作"</td></tr>
+    <tr><td>Li et al. (2021) — HybrIK: A Hybrid Analytical-Neural Inverse Kinematics Solution for 3D Human Pose and Shape Estimation. <em>CVPR 2021</em></td><td>H2O 使用的现成姿态估计器。HybrIK 结合了解析 IK 和神经网络的优势——利用 SMPL 模型的运动学先验消除深度歧义。理解 HybrIK 的工作原理有助于判断"什么情况下姿态估计会失败"，直接影响 H2O 的故障模式分析</td></tr>
+    <tr><td>Rusu et al. (2016) — Sim-to-Real Robot Learning from Pixels with Progressive Nets. <em>CoRL 2016</em></td><td>提出了 Progressive Networks 用于 Sim-to-Real 迁移——在仿真中训练的策略通过累加新层来适应真实世界。H2O 虽然使用不同的技术（域随机化 + 蒸馏），但 Sim-to-Real 问题背景和训练范式与 Rusu et al. 一致</td></tr>
+    <tr><td>OpenAI et al. (2019) — Solving Rubik's Cube with a Robot Hand. <em>arXiv:1910.07113</em></td><td>域随机化 Sim-to-Real 的标志性成功案例——用大规模域随机化训练灵巧手解魔方，零样本迁移到真实机器人。H2O 的域随机化策略与 OpenAI 的工作在方法论上一脉相承，但应用于人形机器人全身控制而非灵巧操作</td></tr>
+    <tr><td>AMASS (Mahmood et al., 2019) — AMASS: Archive of Motion Capture as Surface Shapes. <em>ICCV 2019</em></td><td>H2O 的数据源头——统一的 40+ 小时人体动捕数据集，覆盖 SMPL 参数化人体模型。理解 AMASS 的数据分布对于评估 Sim-to-Data 的数据质量、识别数据偏差至关重要</td></tr>
+    <tr><td>Chen et al. (2020) — Learning to Walk in the Real World with Minimal Human Effort. <em>CoRL 2020</em></td><td>使用教师-学生蒸馏实现四足机器人（Minitaur）的 Sim-to-Real 行走——教师在仿真中学习后在真实机器人上蒸馏学生。H2O 的教师-学生框架与 Chen et al. 的区别在于：H2O 的教师还充当"数据过滤器"，而不仅仅是策略蒸馏</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · He, Luo et al. · IROS 2024 · H2O — Learning Human-to-Humanoid Real-Time Whole-Body Teleoperation · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Notes — Single-Beacon Localization for Mobile Robot</title>
+
+<script>
+MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], tags: 'ams' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });</script>
+
+<style>
+  :root {
+    --bg: #f8f9fb; --surface: #ffffff; --border: #e2e5ea;
+    --text: #1a1d23; --text-secondary: #5f6b7a; --text-muted: #94a3b8;
+    --blue-fill: #e8f0fe;    --blue-stroke: #3b82f6;   --blue-strong: #1d4ed8;
+    --green-fill: #e6f7ee;   --green-stroke: #10b981;  --green-strong: #047857;
+    --amber-fill: #fef7ed;   --amber-stroke: #f59e0b;  --amber-strong: #b45309;
+    --purple-fill: #f0ebfd;  --purple-stroke: #8b5cf6;  --purple-strong: #6d28d9;
+    --rose-fill: #ffeaf0;    --rose-stroke: #f43f5e;   --rose-strong: #be123c;
+    --gray-fill: #f3f4f6;    --gray-stroke: #9ca3af;   --gray-strong: #4b5563;
+    --cyan-fill: #e6faf8;    --cyan-stroke: #14b8a6;   --cyan-strong: #0f766e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    line-height: 1.72;
+  }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.94); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border); padding: 10px 24px;
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  nav a {
+    text-decoration: none; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); padding: 5px 10px; border-radius: 5px; transition: all .15s;
+  }
+  nav a:hover { background: var(--blue-fill); color: var(--blue-strong); }
+  nav .brand { font-weight: 700; color: var(--text); margin-right: 10px; font-size: 13.5px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+  section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 32px 28px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04); scroll-margin-top: 56px;
+  }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 4px; }
+  h2 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.2px;
+    margin-bottom: 20px;
+  }
+  h3 { font-size: 15px; font-weight: 700; margin: 22px 0 8px; color: #1e293b; }
+  h4 { font-size: 13.5px; font-weight: 700; margin: 16px 0 6px; }
+  p, li { font-size: 14px; color: #334155; }
+  p { margin-bottom: 8px; }
+  ul, ol { margin: 6px 0 12px 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    background: #f1f5f9; color: #1e293b;
+    font-family: "JetBrains Mono","Fira Code","Cascadia Code",Consolas,monospace;
+    font-size: 12.5px; padding: 1.5px 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+  }
+  strong.hl { color: #0f172a; }
+  .bold-title { font-weight: 700; font-size: 15px; color: #0f172a; }
+  .bold-affil { font-weight: 700; }
+  .bold-venue { font-weight: 700; color: #1d4ed8; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; padding: 9px 12px; border: 1px solid #e2e8f0; }
+  td { padding: 8px 12px; border: 1px solid #e2e8f0; color: #334155; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  tr.highlight td { background: #fef3c7; font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 4px; margin-right: 5px; margin-bottom: 4px;
+  }
+  .tag-blue   { background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { background:#d1fae5; color:#047857; }
+  .tag-amber  { background:#fef3c7; color:#92400e; }
+  .tag-purple { background:#ede9fe; color:#6d28d9; }
+  .tag-red    { background:#ffe4e6; color:#be123c; }
+  .tag-gray   { background:#f3f4f6; color:#4b5563; }
+  .tag-cyan   { background:#cffafe; color:#0f766e; }
+  .callout {
+    border-left: 4px solid; border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px;
+  }
+  .callout.info   { background:#e8f0fe; border-color:#3b82f6; color:#1e3a5f; }
+  .callout.tip    { background:#e6f7ee; border-color:#10b981; color:#064e3b; }
+  .callout.warn   { background:#fef7ed; border-color:#f59e0b; color:#78350f; }
+  .callout.danger { background:#ffeaf0; border-color:#f43f5e; color:#7f1d1d; }
+  .callout.idea   { background:#f0ebfd; border-color:#8b5cf6; color:#3b1f7e; }
+  .callout-title  { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .formula-block {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto;
+  }
+  .formula-block .eq-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--blue-strong);
+    background: #dbeafe; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+  }
+  mjx-container[display="true"] { font-size: 115% !important; margin: 10px 0 !important; }
+  .formula-block .eq-note {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    font-size: 12.5px; color: #64748b; line-height: 1.65;
+  }
+  .mermaid-box {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0; overflow-x: auto; text-align: center;
+  }
+  .arch-panel {
+    background: #fbfcff; border: 1px solid #dbe3ef; border-radius: 10px;
+    padding: 16px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .arch-grid {
+    min-width: 820px; display: grid; grid-template-columns: 1.05fr 1.25fr 1.2fr .95fr;
+    gap: 12px; align-items: stretch;
+  }
+  .arch-stage {
+    border: 1px solid #d8e0ea; border-radius: 8px; background: #fff;
+    padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  }
+  .arch-stage h4 {
+    margin: 0; font-size: 12px; color: #0f172a; letter-spacing: 0;
+    display: flex; justify-content: space-between; gap: 8px; align-items: center;
+  }
+  .arch-stage h4 span {
+    font-size: 10px; color: #64748b; font-weight: 600; white-space: nowrap;
+  }
+  .arch-card {
+    border-radius: 7px; padding: 9px 10px; border: 1px solid;
+    min-height: 58px; display: flex; flex-direction: column; justify-content: center;
+  }
+  .arch-card strong { font-size: 12.5px; color: #0f172a; line-height: 1.35; }
+  .arch-card small { font-size: 11px; color: #475569; line-height: 1.45; margin-top: 3px; }
+  .arch-solar { background: #fff7ed; border-color: #fed7aa; }
+  .arch-power { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-motor { background: #f5f3ff; border-color: #ddd6fe; }
+  .arch-thrust { background: #ecfdf5; border-color: #bbf7d0; }
+  .arch-arrow {
+    min-width: 820px; display: grid; grid-template-columns: repeat(4,1fr);
+    color: #64748b; font-size: 11px; font-weight: 700; margin: 8px 0 4px;
+  }
+  .arch-arrow span { text-align: center; }
+  .arch-summary {
+    min-width: 820px; margin-top: 10px; display: grid; grid-template-columns: repeat(4,1fr);
+    gap: 8px;
+  }
+  .arch-metric {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+    padding: 8px 10px;
+  }
+  .arch-metric strong { display: block; font-size: 12px; color: #0f172a; }
+  .arch-metric small { font-size: 11px; color: #64748b; }
+  .paper-figure {
+    background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 0; margin: 16px 0; overflow: hidden;
+  }
+  .paper-figure .fig-header {
+    background: #f1f5f9; padding: 10px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .paper-figure .fig-header .fig-number {
+    font-weight: 700; font-size: 12.5px; color: var(--blue-strong);
+    background: #dbeafe; padding: 3px 10px; border-radius: 4px;
+  }
+  .paper-figure .fig-header .fig-caption { font-size: 13px; font-weight: 600; color: #334155; }
+  .paper-figure .fig-header .fig-source { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+  .paper-figure .fig-image { text-align: center; padding: 16px; background: #fff; }
+  .paper-figure .fig-image img {
+    max-width: 100%; height: auto; border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .paper-figure .fig-placeholder {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+    font-size: 13px; border: 2px dashed #e2e8f0; margin: 16px; border-radius: 8px;
+  }
+  .paper-figure .fig-interpretation {
+    padding: 14px 18px; border-top: 1px solid #e2e8f0; background: #fefce8;
+  }
+  .paper-figure .fig-interpretation .fig-label {
+    font-weight: 700; font-size: 11px; color: #b45309; margin-bottom: 6px; letter-spacing: 1px;
+  }
+  .paper-figure .fig-interpretation p,
+  .paper-figure .fig-interpretation li { font-size: 13px; color: #475569; }
+  .paper-figure .fig-interpretation ul { margin: 4px 0 4px 16px; }
+  .novelty-card {
+    border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    margin: 12px 0; background: #fafbfc;
+  }
+  .novelty-card h4 { margin-top: 0; }
+  .novelty-card .novelty-step {
+    font-size: 13px; margin-bottom: 8px; padding-left: 12px;
+    border-left: 3px solid var(--purple-stroke);
+  }
+  .novelty-step strong { color: var(--purple-strong); }
+  .cmp-row  { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
+  .cmp-col h4 { margin-top: 0; }
+  footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+.series-nav { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.series-nav-title { font-size:12px; font-weight:800; color:#0f172a; margin-bottom:8px; }
+.series-links { display:flex; gap:7px; flex-wrap:wrap; }
+.series-links a { text-decoration:none; font-size:11.5px; font-weight:700; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:5px; padding:4px 8px; }
+.series-links a:hover, .series-links a.active { color:#1d4ed8; background:#dbeafe; border-color:#bfdbfe; }
+
+/* Journal IF badges */
+.journal-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin-top: 8px; font-size: 11.5px;
+}
+.jif-name { font-weight: 700; color: #475569; margin-right: 2px; }
+.jif-badge {
+  display: inline-block; font-size: 10.5px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.if-value { background: #dbeafe; color: #1d4ed8; }
+.if-q1 { background: #d1fae5; color: #047857; }
+.if-q2 { background: #fef3c7; color: #92400e; }
+.if-q3 { background: #fef7ed; color: #b45309; }
+.if-q4 { background: #fee2e2; color: #be123c; }
+.if-cas { background: #ede9fe; color: #6d28d9; }
+.if-preprint { background: #f3f4f6; color: #6b7280; }
+.if-conf-top { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.if-conf { background: #f3f4f6; color: #6b7280; }
+.if-book { background: #cffafe; color: #0f766e; }
+
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="../../index.html" style="font-weight:700;color:#f97316;border:1px solid #f97316;border-radius:6px;padding:4px 10px;margin-right:4px;" title="Back to Scholar">🏠 HOME</a>
+  <span class="brand">📄 Paper Notes</span>
+  <a href="#info">Info</a>
+  <a href="#insight">Insight &amp; Novelty</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#task">Task</a>
+  <a href="#challenge">Challenge</a>
+  <a href="#method">Method</a>
+  <a href="#principles">Principles</a>
+  <a href="#figures">Figures</a>
+  <a href="#flaw">Potential Flaw</a>
+  <a href="#motivation">Motivation</a>
+  <a href="#takeaway">Takeaways</a>
+</nav>
+
+<div class="container">
+  <div class="series-nav">
+    <div class="series-nav-title">📖 Yirui Cong · 13-note reading path</div>
+    <div class="series-links">
+      <a href="../../index.html">Index</a>
+<a href="../1356/index.html">Asymptotic Boundedness Di</a>
+<a href="../1352/index.html">Formation Under Communica</a>
+<a href="../1360/index.html">Bounded Formation Stabili</a>
+<a class="active" href="../1359/index.html">Single-Beacon Localizatio</a>
+<a href="../1354/index.html">Optimal Set-Membership Sm</a>
+<a href="../1348/index.html">Stability Linear Set-Memb</a>
+<a href="../1455/index.html">Cooperative Filtering Ran</a>
+<a href="../1350/index.html">Existence Completeness Bo</a>
+<a href="../1750/index.html">Paper</a>
+<a href="../1454/index.html">2305.10366v1</a>
+<a href="../1368/index.html">小型固定翼无人机集群综述和未来发展_王祥科</a>
+<a href="../1367/index.html">Paper</a>
+<a href="../1361/index.html">qy_高阶线性多智能体时延一致性理论及其在多无人机</a>
+    </div>
+  </div>
+
+
+<!-- 1. PAPER INFO -->
+<section id="info">
+  <h2>1. Paper Info</h2>
+  <table>
+    <tr><td style="width:100px;"><strong>Title</strong></td><td class="bold-title">Single-Beacon Localization for Mobile Robot: A Set Membership Filtering Approach（基于集合成员滤波的单信标移动机器人定位）</td></tr>
+    <tr><td><strong>Authors</strong></td><td>Xujie Qin<sup>1,2</sup>, <strong>Yirui Cong</strong><sup>1</sup> (corresponding), Jun Lai<sup>1</sup>, Jinyi Yang<sup>1</sup>, Xiangke Wang<sup>1</sup></td></tr>
+    <tr><td><strong>Affiliation</strong></td><td><strong class="bold-affil">1. 国防科技大学</strong> 智能科学学院；<strong class="bold-affil">2. 空军航空大学</strong></td></tr>
+    <tr><td><strong>Venue</strong></td><td><strong class="bold-venue">IEEE Robotics and Automation Letters (RA-L)</strong>, Vol. 9, No. 11, pp. 9899–9906, November 2024. DOI: 10.1109/LRA.2024.3406190</td></tr>
+      <div class="journal-meta"><span class="jif-name">IEEE RA-L</span> <span class="jif-badge if-value">IF 5.6</span> <span class="jif-badge if-q2">JCR Q2</span> <span class="jif-badge if-cas">CAS 2区</span></div>
+    <tr><td><strong>DOI / Links</strong></td><td><a href="https://ieeexplore.ieee.org/document/10540277/" target="_blank">IEEE Xplore: 10.1109/LRA.2024.3406190</a> | Published: 2024-11</td></tr>
+    <tr><td><strong>TL;DR</strong></td><td>提出一种<strong>仅需单个距离信标（range-only beacon）的移动机器人定位方法</strong>，基于集合成员滤波（SMF）框架和约束 zonotope 表示。核心创新包括三个步骤：(1) <strong>凸优化松弛</strong>——将非凸的距离圆环约束松弛为 convex zonotope 约束；(2) <strong>半空间交（halfspace-intersection）精炼</strong>——用半空间切割 zonotope 来提高精度；(3) <strong>滑动窗口递归</strong>——在窗口内融合多时刻的观测信息，实现精度与效率的平衡。仿真和场地实验均验证了有效性。解决的核心痛点：传统滤波方法（EKF/UKF）需要精确噪声统计，而这些在低成本单信标系统中往往不可得。</td></tr>
+  </table>
+  <div style="margin-top:10px;">
+    <span class="tag tag-blue">Single-Beacon Localization</span>
+    <span class="tag tag-green">Range-Only Measurement</span>
+    <span class="tag tag-amber">Constrained Zonotope</span>
+    <span class="tag tag-purple">Convex Relaxation</span>
+    <span class="tag tag-red">Halfspace Refinement</span>
+    <span class="tag tag-cyan">Sliding Window</span>
+    <span class="tag tag-gray">IEEE RA-L 2024</span>
+  </div>
+</section>
+
+<!-- 2. INSIGHT & NOVELTY -->
+<section id="insight">
+  <h2>2. Insight &amp; Novelty</h2>
+
+  <h3>2.1 Core Insight</h3>
+  <div class="callout idea">
+    <div class="callout-title">核心洞察</div>
+    问：<strong>为什么单个距离信标的定位如此困难？</strong><br>
+    答：一次距离测量只能将机器人位置约束在一个<strong>圆环（annulus）</strong>上——这不是一个凸集。单个圆环无法唯一确定位置（有无限多个可能位置，360度对称）。传统方法（如 EKF）需要线性化圆环约束，这引入了线性化误差且需要精确的距离噪声方差——这两个条件在低成本系统中通常无法满足。<br><br>
+    问：<strong>本文的核心洞察是什么？</strong><br>
+    答：<strong>虽然单次测量给的是非凸圆环，但多次测量（机器人移动后不同位置的圆环）+ 运动模型 = 多个圆环的交集可以在空间中"锁定"唯一区域</strong>——就像 GPS 用多个卫星的测距圆相交来定位一样，只不过这里用"不同时刻的同一个信标"替代了"同一时刻的多个信标"。关键在于：(1) 用凸松弛将非凸圆环转化为凸 zonotope 约束（使其能在 zonotope 代数中处理）；(2) 用半空间交来恢复被松弛丢失的精度；(3) 用滑动窗口来控制计算复杂度——避免了全批量的组合爆炸。
+  </div>
+
+  <h3>2.2 Inspiration to Insight Mapping</h3>
+  <table>
+    <tr><th>Inspiration Source</th><th>What Insight It Inspired</th><th>Type</th></tr>
+    <tr><td>GPS 多星定位原理（多点交汇）</td><td>GPS 需要至少 4 颗卫星同时测距来解算 3D 位置——但这需要多信标。在单信标场景中，"同时"不可行 → 用"不同时刻的机器人运动"来创造等效的"虚拟多信标"</td><td>架构</td></tr>
+    <tr><td>约束 zonotope 对凸集的封闭性 (Scott et al., 2016)</td><td>zonotope 天然可以表示多面体（通过等式约束 $A\beta = b$），但对非凸集合（如圆环）不封闭 → 需要凸松弛。松弛的方向是：将圆环"撑开"成一个外接的条带区域（strip），它是凸的</td><td>方法</td></tr>
+    <tr><td>半空间与凸多面体的交集 (set-membership 理论)</td><td>凸松弛会引入保守性（条带比圆环更"胖"）→ 需要通过半空间交来"削掉"松弛引入的额外区域。每个半空间对应圆环的一条切面——多个切面的交集可以逼近圆环</td><td>方法</td></tr>
+    <tr><td>滑动窗口估计 (MHE / moving horizon)</td><td>全批量优化随着时间推移计算量线性增长 → 滑动窗口只保留最近 $N$ 个时刻的约束，保证计算量恒定。窗口之内"充分约束"，窗口之外"已经过时"</td><td>策略</td></tr>
+  </table>
+
+  <h3>2.3 Novelty Breakdown</h3>
+
+  <div class="novelty-card">
+    <h4>Novelty 1: 凸优化松弛处理非凸距离圆环约束</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>距离测量产生的约束是一个圆环：$\{p : r^- \le \|p - b\| \le r^+\}$。这个集合是非凸的（内外圆之间的环状区域），不能直接用 zonotope 表示。EKF 将其线性化为一个方向上的高斯分布——丢失了圆环的几何结构。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>凸松弛是处理非凸优化的标准技巧——将非凸可行域放大到一个包含它的凸域中。对于圆环，最自然的凸松弛是"外接条带"（strip）：用一个过信标位置的半空间条带覆盖圆环。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在上一时刻估计集的每个顶点处，计算从该顶点到信标的距离，构造一个"置信条带"：条带的两条边界 = 两个平行超平面，分别对应 $r^-$ 和 $r^+$ 的约束。将所有顶点对应的条带取交集 → 得到 convex polytope → 转换为 zonotope。这个松弛虽然是保守的（比真实圆环大），但它是凸的且可以在 zonotope 代数中处理。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 2: 半空间交（halfspace-intersection）精炼</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>凸松弛引入的保守性需要被削减——否则多次松弛后估计集会"胖"到失去意义。如何在不重新引入非凸性的条件下提高精度？</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>半空间是最简单的凸集——与 zonotope 取交集后仍然是 zonotope 可表示的。如果生成足够多的切半空间（每个对应圆环在不同方向上的切线），它们的交集可以非常逼近原始非凸圆环。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>在凸松弛得到的 zonotope 上，选择多个方向的半空间进行切割：(1) 确定信标到 zonotope 中心的连线方向 → 这是一个关键方向（因为距离约束在这个方向上信息量最大）；(2) 在该方向及其几个正交方向上生成半空间约束；(3) 每个半空间与当前 zonotope 取交集 → zonotope 收缩。该步骤可以迭代多次，每次选择当前 zonotope 中最宽的方向进行切割。</div>
+  </div>
+
+  <div class="novelty-card">
+    <h4>Novelty 3: 滑动窗口递归——精度与效率的平衡</h4>
+    <div class="novelty-step"><strong>【解决的问题】</strong>单信标定位的核心是"利用运动历史来累积信息"——这意味着需要存储和融合多时刻的观测。但如果全批量处理所有历史时刻，计算量随时间是 $O(T^2)$ 增长（每次新观测来都需要与所有历史约束取交集），在长时间运行中不可接受。</div>
+    <div class="novelty-step"><strong>【灵感来源】</strong>MHE（Moving Horizon Estimation）用固定长度的滑动窗口来截断历史——太旧的信息被认为已被充分吸收，不需要重复使用。</div>
+    <div class="novelty-step"><strong>【具体设计】</strong>维护一个长度为 $W$ 的滑动窗口（如 $W=10$）。窗口内存储最近 $W$ 个时刻的观测对应的凸松弛条带。每个新时刻：(1) 将新的条带加入窗口，弹出最旧的条带；(2) 用动力学模型将窗口内所有约束传播到当前时刻；(3) 取交集得到当前估计集。这样计算量是 $O(W)$ 每步——恒定。窗口长度 $W$ 是一个超参数：$W$ 越大 → 精度越高但计算越慢。</div>
+  </div>
+</section>
+
+<!-- 3. SYSTEM ARCHITECTURE -->
+<section id="architecture">
+  <h2>3. System Architecture</h2>
+
+  <h3>3.0 Architecture Overview — 从测量到定位的完整管线</h3>
+  <div class="arch-panel">
+    <div class="arch-grid">
+      <div class="arch-stage">
+        <h4>Measurement Input <span>Single Beacon</span></h4>
+        <div class="arch-card arch-solar">
+          <strong>距离测量 $r_k$</strong>
+          <small>单信标与机器人之间的测距（UWB、声纳、RSSI-based）</small>
+        </div>
+        <div class="arch-card arch-solar">
+          <strong>噪声界 $[r_k^-, r_k^+]$</strong>
+          <small>已知距离误差的上/下界，不需要概率分布</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Step 1: Convex Relaxation <span>Non-convex→Convex</span></h4>
+        <div class="arch-card arch-power">
+          <strong>顶点距离计算</strong>
+          <small>在上一时刻 zonotope 的顶点处计算到信标的距离</small>
+        </div>
+        <div class="arch-card arch-power">
+          <strong>置信条带构造</strong>
+          <small>每对顶点-信标生成一个 strip: $r_k^- \le \|p-b\| \le r_k^+$ 的凸外接</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Step 2: Halfspace Refinement <span>Precision Boost</span></h4>
+        <div class="arch-card arch-motor">
+          <strong>方向选择</strong>
+          <small>选信标方向和 zonotope 最宽的正交方向</small>
+        </div>
+        <div class="arch-card arch-motor">
+          <strong>半空间切割</strong>
+          <small>每个半空间 ∩ zonotope → 收缩估计集</small>
+        </div>
+      </div>
+      <div class="arch-stage">
+        <h4>Step 3: Sliding Window <span>Efficiency</span></h4>
+        <div class="arch-card arch-thrust">
+          <strong>窗口维护 (W=10)</strong>
+          <small>维护最近 W 个条带; 新来旧去</small>
+        </div>
+        <div class="arch-card arch-thrust">
+          <strong>动力学前向传播</strong>
+          <small>将窗口内所有约束传播到当前时刻 → 取交集</small>
+        </div>
+      </div>
+    </div>
+    <div class="arch-arrow">
+      <span>distance → annulus</span>
+      <span>annulus → convex strip</span>
+      <span>strip → refined set</span>
+      <span>window → position</span>
+    </div>
+    <div class="arch-summary">
+      <div class="arch-metric"><strong>Key bottleneck</strong><small>多顶点计算; 低激励运动时约束不够</small></div>
+      <div class="arch-metric"><strong>Main invention</strong><small>凸松弛 + 半空间精炼 + 滑动窗口三合一</small></div>
+      <div class="arch-metric"><strong>Why it works</strong><small>运动让不同时刻的环相交; 窗口让计算可控</small></div>
+      <div class="arch-metric"><strong>Current limitation</strong><small>依赖足够激励运动; 信标位置需精确已知</small></div>
+    </div>
+  </div>
+
+  <h3>3.1 算法流程 — 三步法管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph INPUT["每时刻输入"]
+      RANGE["距离测量 r_k 及其界 [r_k⁻, r_k⁺]"]
+      BEACON["信标位置 b (已知)"]
+      MOTION["运动模型: p_{k+1} = p_k + u_k + w_k"]
+    end
+
+    subgraph STEP1["步骤1: 凸优化松弛"]
+      VERTEX["取上一时刻 zonotope Z_{k-1} 的顶点"]
+      DIST["计算各顶点到信标的距离"]
+      STRIP["构造凸条带 S_k: 外接距离圆环的凸包"]
+    end
+
+    subgraph STEP2["步骤2: 半空间交精炼"]
+      DIR["选择切割方向: 信标方向 + 最宽正交方向"]
+      HALF["生成半空间 H_k: {p : n^T p ≤ c}"]
+      REFINE["精炼: Z_k' = Z_k' ∩ H_k"]
+    end
+
+    subgraph STEP3["步骤3: 滑动窗口融合"]
+      WINDOW["窗口 W: 最近 N 个时刻的条带 {S_{k-N+1}, ..., S_k}"]
+      PROPAGATE["将窗口内约束通过运动模型传播到当前时刻"]
+      INTERSECT["全部取交集: Z_k = ∩ 传播后的约束"]
+    end
+
+    subgraph OUTPUT["输出"]
+      POS["当前时刻机器人位置的保证集 Z_k"]
+    end
+
+    INPUT --> STEP1 --> STEP2 --> STEP3 --> OUTPUT
+
+    classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef step1 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef step2 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef step3 fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    classDef output fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class RANGE,BEACON,MOTION input
+    class VERTEX,DIST,STRIP step1
+    class DIR,HALF,REFINE step2
+    class WINDOW,PROPAGATE,INTERSECT step3
+    class POS output
+    </pre>
+  </div>
+
+  <h3>3.2 精度-效率权衡的数据流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph PRECISION["精度链"]
+      A["非凸圆环"] -->|"凸松弛"| B["凸条带 (保守↑)"]
+      B -->|"半空间精炼"| C["精炼 zonotope (保守↓)"]
+      C -->|"多时刻融合"| D["滑动窗口交集 (精度↑)"]
+    end
+
+    subgraph EFFICIENCY["效率链"]
+      E["zonotope 顶点枚举"] --> F["条带交集 (O(n_v))"]
+      F --> G["半空间切割 (O(n_h))"]
+      G --> H["窗口 O(W) 可控"]
+    end
+
+    D -.->|"平衡点: W参数"| H
+
+    classDef prec fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef eff fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+    class A,B,C,D prec
+    class E,F,G,H eff
+    </pre>
+  </div>
+</section>
+
+<!-- 4. TASK -->
+<section id="task">
+  <h2>4. Task — What Problem Does It Solve?</h2>
+
+  <h3>4.1 Problem Formulation</h3>
+  <div class="formula-block">
+    <span class="eq-tag">核心问题 — 单信标测距定位</span>
+    $$ \text{Given: } \begin{cases} \mathbf{p}_{k+1} = \mathbf{p}_k + \mathbf{u}_k + \mathbf{w}_k, & \mathbf{w}_k \in \mathcal{W} \\ r_k = \|\mathbf{p}_k - \mathbf{b}\| + v_k, & v_k \in [-\bar{v}, \bar{v}] \end{cases} $$
+    $$ \text{Find: 保证包含真值 } \mathbf{p}_k^* \text{ 的位置集合 } \mathcal{P}_k $$
+    $$ \text{约束: 仅有一个信标 } \mathbf{b} \text{ (位置已知), 噪声统计未知} $$
+    <div class="eq-note">
+      <strong>$\mathbf{p}_k$</strong> = 机器人在时刻 $k$ 的 2D/3D 位置 &nbsp;|&nbsp;
+      <strong>$\mathbf{u}_k$</strong> = 控制输入（里程计 odometry 或速度指令）&nbsp;|&nbsp;
+      <strong>$\mathbf{w}_k$</strong> = 运动噪声（有界但不一定正态分布）&nbsp;|&nbsp;
+      <strong>$r_k$</strong> = 距离测量值 &nbsp;|&nbsp;
+      <strong>$\mathbf{b}$</strong> = 信标位置（如 UWB 锚点）&nbsp;|&nbsp;
+      <strong>$v_k$</strong> = 测距噪声（有界 $[-\bar{v},\bar{v}]$，统计未知）&nbsp;|&nbsp;
+      <strong>核心约束</strong>：仅凭借一个信标 + 机器人自身运动模型，在噪声统计未知的情况下实现可靠的定位——多信标方案（如三边测量）需要至少 3 个信标，这在很多场景中不可行（如洞穴、隧道、深海）。
+    </div>
+  </div>
+
+  <h3>4.2 Input / Output</h3>
+  <table>
+    <tr><th>类别</th><th>内容</th><th>维度</th></tr>
+    <tr><td><strong>输入</strong></td><td>(1) 距离测量序列 $\{r_k\}$ 及其界；(2) 信标位置 $\mathbf{b}$；(3) 控制输入 $\{\mathbf{u}_k\}$；(4) 运动噪声界 $\mathcal{W}$；(5) 初始位置先验 $\mathcal{P}_0$</td><td>单通道数据流</td></tr>
+    <tr><td><strong>输出</strong></td><td>每个时刻的位置保证集合 $\mathcal{P}_k$ (constrained zonotope)——真值必定在其中</td><td>2D/3D zonotope</td></tr>
+    <tr><td><strong>目标</strong></td><td>在仅有一个信标的约束下，实现<strong>精度可接受、效率可在线运行</strong>的保证性定位</td><td>精度 + 效率 + 保证</td></tr>
+  </table>
+
+  <h3>4.3 Task Type</h3>
+  <p>这是一个<strong>算法设计+实验验证</strong>的工作。核心挑战不在理论证明（集合成员方法天然提供包含性保证），而在于<strong>工程实现</strong>：如何将非凸距离约束转化为可以在 zonotope 代数中高效处理的凸约束，同时不损失太多精度。场景：低成本移动机器人（没有昂贵的多信标定位系统），在已知环境中部署一个 UWB 信标即可实现可靠定位——适用于仓库、隧道、洞穴等 GPS 拒止环境。</p>
+</section>
+
+<!-- 5. CHALLENGE -->
+<section id="challenge">
+  <h2>5. Challenge — Why Is It Hard?</h2>
+
+  <h3>5.1 Essence (First Principles)</h3>
+  <div class="callout idea">
+    <div class="callout-title">第一性原理诊断</div>
+    <strong>核心矛盾</strong>：单个距离测量无法唯一确定位置（$S^1$ 或 $S^2$ 球面上的无限多点）vs. 定位需要唯一解（至少一个紧致的估计集）。<br><br>
+    （1）<strong>瞬时不可观</strong>：单次距离测量产生的约束是一个以信标为中心的球壳（2D 中是圆环）。在没有额外信息时，机器人可以在这个球壳上的任意位置——<strong>瞬时位置不可观</strong>。定位必须依赖运动历史：不同时刻的球壳约束通过运动模型关联后可以在空间中"交汇"。<br><br>
+    （2）<strong>非凸性的挑战</strong>：球壳/圆环是非凸集合。集合成员的框架要求所有约束都能用 zonotope（本质上是中心对称凸多面体）表示——非凸集合不能直接用 zonotope 表示。必须设计一种凸松弛策略，在"可表示性"和"精度"之间取得平衡。<br><br>
+    （3）<strong>历史信息的管理</strong>：运动历史提供了额外的约束——但保留所有历史约束会导致计算量不断增长。滑动窗口是一个经典的近似方案——但窗口长度 $W$ 的选择直接影响精度：$W$ 太小则约束不足（无法充分交汇），$W$ 太大则计算量超标。
+  </div>
+
+  <h3>5.2 Prior Methods &amp; Their Limits</h3>
+  <table>
+    <tr><th>Prior Method</th><th>Core Idea</th><th>Why It Fails</th></tr>
+    <tr>
+      <td>EKF / UKF 单信标定位</td>
+      <td>将距离测量线性化 → 在 Kalman 滤波框架中融合（如 SLAM 中的 range-only SLAM）</td>
+      <td><strong>需要精确噪声统计</strong>（距离误差方差）和<strong>线性化假设</strong>。当机器人距离信标较远时平面波假设不成立、线性化误差大 → 滤波器可能发散。低成本传感器噪声统计往往未知且时变</td>
+    </tr>
+    <tr>
+      <td>三边测量 (Trilateration)</td>
+      <td>至少 3 个已知位置的信标同时测距 → 几何求交得到位置</td>
+      <td><strong>需要多个信标</strong>——在仓库中部署 3+ 个 UWB 锚点成本高，且某些环境（隧道、洞穴）无法部署多信标</td>
+    </tr>
+    <tr>
+      <td>粒子滤波 (Particle Filter)</td>
+      <td>用粒子集合表示位置后验分布，通过重要性采样融合距离测量</td>
+      <td><strong>计算量大</strong>（需要大量粒子覆盖球壳），且<strong>仍然需要似然函数</strong>（即噪声分布）。如果真实噪声是均匀分布而假设了高斯分布 → 粒子退化 → 定位丢失</td>
+    </tr>
+    <tr>
+      <td>集员定位 (Set-membership, 区间方法)</td>
+      <td>用轴对齐区间盒子覆盖球壳 → 取交集</td>
+      <td><strong>极度保守</strong>——轴对齐盒子包裹球壳的保守性太大（球壳的投影覆盖整个圆盘），导致定位精度远差于 zonotope 方法</td>
+    </tr>
+  </table>
+
+  <h3>5.3 Key Challenges</h3>
+  <ul>
+    <li><strong>挑战 1 — 从非凸到凸的松弛矛盾</strong>：球壳/圆环是非凸的 → 必须松弛为凸集 → 松弛 = 引入额外范围（保守性）→ 需要后续的半空间精炼来削减保守性。如何设计松弛使得"松弛量"最小化？如何在半空间精炼中选出最优的切割方向？</li>
+    <li><strong>挑战 2 — 运动激励的依赖</strong>：单信标定位的核心是"运动产生交汇"——但如果机器人沿信标的径向运动（直着朝信标走），每次距离测量提供的约束方向几乎相同（都是径向），交汇效果极差，定位精度会急剧下降。需要机器人运动轨迹有足够的"侧向分量"来生成正交的约束方向。</li>
+    <li><strong>挑战 3 — 计算效率的工程约束</strong>：zonotope 的顶点数量随维度指数增长（在 2D 中 $2n_g$ 个顶点，$n_g$ 是生成元数量）。每次凸松弛需要枚举顶点来计算条带——如果 $n_g$ 太大（如 > 100），顶点枚举本身就不可行。需要在精度和顶点数之间平衡。</li>
+  </ul>
+</section>
+
+<!-- 6. METHOD & FORMULAS -->
+<section id="method">
+  <h2>6. Method &amp; Key Formulas</h2>
+
+  <h3>6.1 Core Algorithm</h3>
+  <p>本文的核心不是单一公式而是三个步骤的组合管道。以下是每个步骤中的关键数学。</p>
+
+  <h3>6.2 Key Formulas</h3>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:14px;">LaTeX rendered by MathJax. ⚠ 符号解释请用中文。</p>
+
+  <h4>Group A: 距离圆环约束 — 非凸的根源</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(1) — 单信标距离测量的非凸约束</span>
+    $$ \mathcal{A}_k = \{\mathbf{p} \in \mathbb{R}^2 : r_k^- \le \|\mathbf{p} - \mathbf{b}\| \le r_k^+\} $$
+    $$ r_k^- = r_k - \bar{v},\quad r_k^+ = r_k + \bar{v} $$
+    <div class="eq-note">
+      <strong>$\mathcal{A}_k$</strong> = 距离约束产生的可行位置集合（annulus，圆环）&nbsp;|&nbsp;
+      <strong>$r_k$</strong> = 时刻 $k$ 的距离测量值 &nbsp;|&nbsp;
+      <strong>$\bar{v}$</strong> = 距离噪声的最大绝对值（已知界）&nbsp;|&nbsp;
+      <strong>$r_k^-, r_k^+$</strong> = 距离的下界和上界 &nbsp;|&nbsp;
+      <strong>非凸性</strong>：$\mathcal{A}_k$ 是一个环状区域（两个同心圆之间的区域）——它不是凸的，因为环内部的"洞"（$r < r_k^-$ 的区域）被排除了。Zonotope 只能表示凸集 → 需要松弛。
+    </div>
+  </div>
+
+  <h4>Group B: 凸优化松弛 — 将圆环"撑成"条带</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(2) — 凸松弛：顶点法条带构造</span>
+    $$ \mathcal{S}_k^{(i)} = \{\mathbf{p} : r_k^- \le \mathbf{n}_i^T(\mathbf{p} - \mathbf{b}) \le r_k^+\}, \quad \mathbf{n}_i = \frac{\mathbf{v}_i - \mathbf{b}}{\|\mathbf{v}_i - \mathbf{b}\|} $$
+    $$ \mathcal{S}_k = \bigcap_{i=1}^{n_v} \mathcal{S}_k^{(i)} \quad \text{(凸松弛后的条带交集)} $$
+    <div class="eq-note">
+      <strong>$\mathbf{v}_i$</strong> = 上一时刻 zonotope $\mathcal{P}_{k-1}$ 的第 $i$ 个顶点 &nbsp;|&nbsp;
+      <strong>$\mathbf{n}_i$</strong> = 从信标指向顶点 $i$ 的单位方向向量 &nbsp;|&nbsp;
+      <strong>$\mathcal{S}_k^{(i)}$</strong> = 在方向 $\mathbf{n}_i$ 上的置信条带——这是一个凸集（两个平行超平面之间的区域） &nbsp;|&nbsp;
+      <strong>$n_v$</strong> = zonotope 顶点的数量 &nbsp;|&nbsp;
+      <strong>直觉</strong>：对 zonotope 的每个顶点，在"信标 → 顶点"的方向上，将圆环松弛为一个条带（只约束径向距离，不约束切向）。所有方向的条带的交集构成了对圆环的凸外近似。顶点的选择至关重要：顶点越多 → 条带的方向覆盖越密集 → 外近似越紧。
+    </div>
+  </div>
+
+  <h4>Group C: 半空间交精炼 — "削"掉松弛的冗余</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(3) — 半空间精炼：用切线切割 zonotope</span>
+    $$ \mathcal{H}_k^{(j)} = \{\mathbf{p} : \mathbf{m}_j^T \mathbf{p} \le c_j\}, \quad j = 1,\ldots,n_h $$
+    $$ \mathcal{P}_k^{\text{refined}} = \mathcal{P}_k^{\text{relaxed}} \cap \bigcap_{j=1}^{n_h} \mathcal{H}_k^{(j)} $$
+    <div class="eq-note">
+      <strong>$\mathbf{m}_j$</strong> = 第 $j$ 个切割半空间的法向量（指向需要切除的方向） &nbsp;|&nbsp;
+      <strong>$c_j$</strong> = 半空间的截距——选择使得半空间刚好切过圆环的外边界 &nbsp;|&nbsp;
+      <strong>$n_h$</strong> = 半空间的数量（超参数：通常 4~8 个，精度 vs 效率） &nbsp;|&nbsp;
+      <strong>切割方向的选择策略</strong>：优先选择 (1) 信标到 zonotope 中心的方向（径向约束最强）；(2) 与方向 (1) 正交的方向（提供切向约束）；(3) zonotope 中宽度最大的方向（优先收割"最胖"的部分）。
+    </div>
+  </div>
+
+  <h4>Group D: 滑动窗口递推 — 融合运动历史</h4>
+  <div class="formula-block">
+    <span class="eq-tag">Eq.(4) — 滑动窗口递推</span>
+    $$ \mathcal{P}_k^{\text{pred}} = \mathcal{P}_{k-1} \oplus \{\mathbf{u}_{k-1}\} \oplus \mathcal{W} \quad \text{(预测步)} $$
+    $$ \mathcal{P}_k = \mathcal{P}_k^{\text{pred}} \cap \bigcap_{i=k-W+1}^{k} \tilde{\mathcal{S}}_i \quad \text{(更新步: 窗口内约束取交集)} $$
+    <div class="eq-note">
+      <strong>$\mathcal{P}_k^{\text{pred}}$</strong> = 预测步：上一时刻估计集 + 控制位移 + 运动噪声 Minkowski 和 &nbsp;|&nbsp;
+      <strong>$W$</strong> = 滑动窗口长度（超参数） &nbsp;|&nbsp;
+      <strong>$\tilde{\mathcal{S}}_i$</strong> = 时刻 $i$ 的条带经过运动补偿后传播到时刻 $k$ 的版本：$\tilde{\mathcal{S}}_i = \mathcal{S}_i \oplus (\mathbf{p}_k - \mathbf{p}_i)^{\text{est}}$ &nbsp;|&nbsp;
+      <strong>$\oplus$</strong> = Minkowski 和：$A \oplus B = \{a+b : a\in A, b\in B\}$ &nbsp;|&nbsp;
+      <strong>窗口长度的权衡</strong>：$W$ 太小 → 只能利用少量历史约束 → 交汇不足 → 定位不准；$W$ 太大 → 计算量大 → 但精度提升递减（很旧的历史信息已经被充分吸收）。本文推荐 $W \approx 10$。
+    </div>
+  </div>
+
+  <h3>6.3 Key Parameters</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th><th>为什么取这个值</th></tr>
+    <tr><td>距离噪声界 $\bar{v}$</td><td>取决于传感器（如 UWB: ±0.1m）</td><td>距离测量的最大绝对误差</td><td>必须从传感器数据手册或标定获得——过小会导致真值不在估计集中</td></tr>
+    <tr><td>滑动窗口长度 $W$</td><td>8~15（典型 10）</td><td>保留的历史约束数量</td><td>太小 → 精度不足；太大 → 计算量超标。10 是实验中的经验最优</td></tr>
+    <tr><td>半空间数量 $n_h$</td><td>4~8</td><td>精炼切割的切面数量</td><td>越多越精确但越慢——4 个（每个象限一个）通常就足够</td></tr>
+    <tr><td>zonotope 生成元最大数量</td><td>20~50</td><td>降阶前允许的最大生成元数</td><td>影响顶点枚举的计算量——生成元越多顶点越多（$O(2^{n_g})$）</td></tr>
+    <tr><td>运动噪声界 $\mathcal{W}$</td><td>取决于运动模型（如 ±0.05m/步）</td><td>位移估计的误差界</td><td>从里程计标定或 IMU 精度估算</td></tr>
+  </table>
+
+  <h3>6.4 本文方法 vs 传统三边测量的本质差异</h3>
+  <div class="cmp-row">
+    <div class="cmp-col">
+      <h4>📍 单信标 + SMF（本文）</h4>
+      <ul>
+        <li><strong>信息维度</strong>：1 个距离 + 机器人运动历史</li>
+        <li><strong>几何原理</strong>：不同时刻的圆环通过运动模型关联后相交</li>
+        <li><strong>需要什么</strong>：1 个信标 + 可靠的运动模型</li>
+        <li><strong>精度</strong>：依赖于运动轨迹的"激励性"</li>
+        <li><strong>适用场景</strong>：隧道、洞穴、室内（无法部署多信标）</li>
+      </ul>
+    </div>
+    <div class="cmp-col">
+      <h4>📐 三边测量（传统）</h4>
+      <ul>
+        <li><strong>信息维度</strong>：3+ 个同时的距离测量</li>
+        <li><strong>几何原理</strong>：同一时刻的多个球面直接交于一点</li>
+        <li><strong>需要什么</strong>：3+ 个信标 + 精确时间同步</li>
+        <li><strong>精度</strong>：依赖于信标的几何布局（DOP）</li>
+        <li><strong>适用场景</strong>：仓库、工厂（可以部署多信标）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 7. FUNDAMENTAL PRINCIPLES -->
+<section id="principles">
+  <h2>7. Fundamental Principles — 核心技术原理详解</h2>
+  <p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">理解本文需要掌握三个核心工程原理：运动产生可观测性（为什么单信标 + 运动 = 可定位）、凸松弛的保守性管理（如何在不丢失保证的前提下逼近非凸约束）、滑动窗口的信息截断（为什么旧信息可以被安全丢弃）。</p>
+
+  <h3>7.1 运动产生可观测性 — 为什么单信标加运动等于可定位？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 1 — 可观性的时间累积</span>
+    $$ \text{瞬时: } r_k = \|\mathbf{p}_k - \mathbf{b}\| + v_k \quad \Rightarrow \quad \mathbf{p}_k \in S^1(\mathbf{b}, r_k) \text{ (无限多点)} $$
+    $$ \text{多时刻: } \bigcap_{i=1}^{W} \{\mathbf{p} : r_i^- \le \|\mathbf{p} - (\mathbf{b} - \Delta\mathbf{p}_i)\| \le r_i^+\} \quad \Rightarrow \quad \text{逐步收缩到有限区域} $$
+    <div class="eq-note">
+      <strong>$\Delta\mathbf{p}_i = \mathbf{p}_k - \mathbf{p}_i$</strong> = 从时刻 $i$ 到 $k$ 的位移（从运动模型获得） &nbsp;|&nbsp;
+      <strong>$S^1(\mathbf{b}, r)$</strong> = 以 $\mathbf{b}$ 为中心、半径约为 $r$ 的圆环 &nbsp;|&nbsp;
+      <strong>关键</strong>：如果时刻 $i$ 和 $j$ 的机器人位置不同（$\Delta\mathbf{p}_i \neq \Delta\mathbf{p}_j$）——即机器人有<strong>侧向运动</strong>——则两个圆环的中心不同（分别是 $\mathbf{b} - \Delta\mathbf{p}_i$ 和 $\mathbf{b} - \Delta\mathbf{p}_j$），它们的交集可以在切向上产生约束。反之，如果机器人<strong>沿径向运动</strong>（直着朝向/背向信标），两个圆环同心——交集 = 更小的同心圆环，没有切向约束。
+    </div>
+  </div>
+
+  <h3>7.2 凸松弛的保守性管理 — 如何逼近非凸约束？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 2 — 凸松弛 + 半空间精炼的二阶段策略</span>
+    $$ \underbrace{\mathcal{A}_k}_{\text{非凸圆环}} \;\subset\; \underbrace{\mathcal{S}_k}_{\text{阶段1: 凸条带 (保守)}} \;\subset\; \underbrace{\mathcal{S}_k \cap \mathcal{H}_k}_{\text{阶段2: 半空间切割 (更紧)}} $$
+    <div class="eq-note">
+      <strong>阶段 1（凸松弛）</strong>：将非凸的圆环 $\mathcal{A}_k$ 松弛为凸的条带集合 $\mathcal{S}_k$。保守性来源：条带在两个端点之间是"直"的，而圆环在两个端点之间是"弯"的（弧线向内凹）。条带填充了弧线凹进去的部分——这就是松弛的保守性。顶点越多 → 条带越密集 → 弧线被更好地逼近 → 保守性越小。<br><br>
+      <strong>阶段 2（半空间精炼）</strong>：在阶段 1 的凸集上，用圆环的切线半空间进行切割。这些半空间是凸的，与 zonotope 取交集后仍是 zonotope 可表示的。切割的目的是"削掉"条带中超出真实圆环的部分（即填充进去的凹弧空间）。足够的切割可以使凸近似非常逼近原始圆环。
+    </div>
+  </div>
+
+  <h3>7.3 滑动窗口的信息截断 — 旧信息为何可以丢弃？</h3>
+
+  <div class="formula-block">
+    <span class="eq-tag">原理 3 — 约束信息的衰减</span>
+    $$ \text{旧约束的效用} \propto \underbrace{\frac{1}{\text{运动不确定性积累}}}_{\text{运动噪声随传播增长}} \times \underbrace{\text{约束的几何独立性}}_{\text{是否提供新的方向信息}} $$
+    <div class="eq-note">
+      <strong>运动不确定性积累</strong>：将一个 $i$ 时刻的约束传播到 $k$ 时刻（$\gg i$），运动噪声 $\mathcal{W}$ 的 Minkowski 和会逐次膨胀这个约束——传播步数越多，约束越"模糊"（条带越宽）。因此，很旧的约束即使保留，也被噪声膨胀到几乎不提供信息。<br><br>
+      <strong>约束的几何独立性</strong>：如果机器人在窗口内已经积累了多个不同方向的约束（如从不同角度测量信标距离），再往前更旧的约束可能只是重复已有方向 → 冗余。滑动窗口的长度 $W$ 需要足够大以覆盖"产生足够几何多样性"的时间段，但又不能太大以避免噪声膨胀主导。
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <div class="callout-title">三个原理的系统级协同</div>
+    运动产生可观测性（原理 1）→ 确定需要多大窗口才能积累足够的几何多样性 → 凸松弛 + 半空间精炼（原理 2）→ 将每个距离测量转化为 zonotope 可表达的凸约束 → 滑动窗口（原理 3）→ 在精度和效率之间找到最优窗口长度。三个原理共同回答了：为什么单个信标可以定位？怎么做不损失保证？如何让计算在线可行？
+  </div>
+</section>
+
+<!-- 8. PAPER FIGURES -->
+<section id="figures">
+  <h2>8. Paper Figures — 图表深度解读</h2>
+  <p style="margin-bottom:16px; color:var(--text-muted);">📷 论文原图截图。图片保存至 <code>figures/</code> 子目录。</p>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 1</span>
+      <span class="fig-caption">单信标定位的几何原理 — 多时刻圆环相交</span>
+      <span class="fig-source">来源：论文 Fig. 1</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig1.png" alt="Single-beacon localization geometric principle"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig1.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：单信标定位的核心几何原理。左图：单个时刻的距离测量将机器人位置约束在一个圆环上（浅灰色）——无限多个可能位置。右图：经过多个时刻的测量（蓝、绿、橙色圆环），通过运动模型将这些圆环"平移"到同一时刻——它们的交集（红色区域）逐步收缩到一个紧致的位置估计。</p>
+      <ul>
+        <li><strong>交汇的质量取决于运动轨迹</strong>：如果机器人沿直线移动，所有圆环几乎同心 → 交集仍然是较大的同心环（没有切向收紧）。如果机器人做圆弧运动，圆环中心分散 → 交集快速收敛</li>
+        <li><strong>噪声界的角色</strong>：每个圆环的宽度 $2\bar{v}$ 决定了交集能收紧到多小——噪声界越小，最终交集越小</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 2</span>
+      <span class="fig-caption">凸松弛与半空间精炼的几何示意</span>
+      <span class="fig-source">来源：论文 Fig. 2 (方法示意图)</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig2.png" alt="Convex relaxation and halfspace refinement"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig2.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：两步法的几何过程。步骤 1（凸松弛）：将非凸圆环（红色虚线区域）外接为多个方向的条带（蓝色半透明区域），条带的交集构成对圆环的凸近似（凸多边形）。步骤 2（半空间精炼）：用多条切线半空间（绿色虚线）切割凸近似，削掉超出圆环的部分 → 得到精炼后的 zonotope（紫色实线）。</p>
+      <ul>
+        <li><strong>条带数量 vs 精炼数量</strong>：如果条带数量很多（顶点密集），凸松弛已经很接近圆环 → 半空间精炼的边际收益小。如果条带数量少（顶点稀疏），凸松弛很保守 → 半空间精炼可以大幅提升精度</li>
+        <li><strong>切割方向的选择</strong>：最优的策略是选择 zonotope 当前"最胖"的方向进行切割——因为那是松弛引入保守性最大的方向</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="paper-figure">
+    <div class="fig-header">
+      <span class="fig-number">Fig. 3</span>
+      <span class="fig-caption">仿真与场地实验结果——精度与效率对比</span>
+      <span class="fig-source">来源：论文 Simulation & Experiment Section</span>
+    </div>
+    <div class="fig-image">
+      <img src="figures/fig3.png" alt="Simulation and field experiment results"
+           onerror="this.parentNode.innerHTML='<div class=\'fig-placeholder\'>📷 请将截图保存为 <code>figures/fig3.png</code></div>'">
+    </div>
+    <div class="fig-interpretation">
+      <div class="fig-label">▼ 图表解读</div>
+      <p><strong>本图展示了</strong>：(a) 仿真中不同方法（本文 vs EKF vs 粒子滤波）的定位误差对比——本文方法在有界噪声下的保证性优势明显（真值始终在估计集内）；(b) 场地实验中机器人真实轨迹与估计集的对比——估计集（红色阴影区域）始终包含真实位置（蓝色轨迹）；(c) 不同窗口长度下精度-计算时间的 Pareto 前沿——窗口长度 $W=10$ 是最优的平衡点。</p>
+      <ul>
+        <li><strong>EKF 在非高斯噪声下发散</strong>：当真实噪声是均匀分布但有界时（非高斯），EKF 的高斯假设导致置信椭圆与真实可行集不匹配——要么过于保守（椭圆远大于真实可行集），要么过于激进（真值在椭圆外）</li>
+        <li><strong>场地实验的突破</strong>：在一个仓库环境中部署 1 个 UWB 信标，机器人在 10m × 10m 区域内移动，定位误差（集合中心到真值的距离）< 0.3m，且真值始终在集合内——验证了实际可行性</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 9. POTENTIAL FLAW -->
+<section id="flaw">
+  <h2>9. Potential Flaw &amp; Extensions</h2>
+
+  <h3>9.1 Limitations</h3>
+  <ul>
+    <li><strong>假设前提</strong>：(1) 信标位置 $\mathbf{b}$ 必须精确已知——如果信标位置有误差，整个圆环会平移，真值可能落在估计集外；(2) 机器人运动模型需可靠——里程计误差界 $\mathcal{W}$ 必须真实包含所有误差，否则动力学的预测步可能导致真值溢出；(3) 距离噪声必须独立且有界——如果有系统的多径效应（NLOS bias），噪声可能系统性偏高，破坏有界假设。</li>
+    <li><strong>适用场景</strong>：2D 平面移动机器人（地面机器人、仓库 AGV）。扩展到 3D（无人机）需要处理高度自由度的额外不可观问题——仅一个距离信标在 3D 中不可观的自由度更多。</li>
+    <li><strong>可扩展性</strong>：zonotope 顶点枚举的复杂度限制了状态维度和生成元数量。在 3D 定位中，顶点数从 $O(n_g)$ 增加到 $O(n_g^2)$——这会显著增加凸松弛的计算负担。</li>
+  </ul>
+
+  <h3>9.2 Extension Directions</h3>
+  <ul>
+    <li><strong>维度扩展</strong>：从 2D 扩展到 3D——无人机单信标定位。需要额外处理高度方向（气压计可以提供额外约束以弥补信标的不足）。多机器人协同单信标定位——每台机器人之间的相对观测（如 UWB 相互测距）可以提供额外约束。</li>
+    <li><strong>条件放松</strong>：(1) 信标位置不确定性——将信标位置也建模为有界不确定变量，扩展 SMF 框架；(2) NLOS 检测与排除——通过集合检验（如果真值不可能产生该观测 → 拒绝为 NLOS）来剔除异常值；(3) 自适应窗口长度——根据当前估计集的大小和运动激励程度动态调整 $W$。</li>
+    <li><strong>约束加入</strong>：(1) 惯性测量（IMU）——加速度和角速度的有界约束可以加入 SMF 框架中，提供更高频率的预测步；(2) 地图约束——如果环境地图已知，墙/障碍物将状态空间约束为非凸但可表示为多面体补集——通过半空间切割可以纳入。</li>
+  </ul>
+
+  <h3>9.3 Data Sensitivity</h3>
+  <table>
+    <tr><th>数据问题</th><th>潜在困难</th><th>严重程度</th></tr>
+    <tr><td>NLOS 距离测量</td><td>NLOS（非视距）条件下距离测量系统偏高——噪声不再是零均值的 → 有界噪声假设被破坏，因为偏置可能使噪声的单侧界超过预设范围。需要 NLOS 检测与拒绝机制</td><td>★★★★★</td></tr>
+    <tr><td>里程计漂移累积</td><td>长时间运行中里程计漂移不断累积——运动噪声界 $\mathcal{W}$ 如果不随漂移增大而膨胀 → 预测步的 Minkowski 和会低估真实的不确定性 → 真值可能溢出</td><td>★★★★</td></tr>
+    <tr><td>信标位置标定误差</td><td>如果信标位置测量不准确（如 ±10 cm），整个圆环会偏移 → 交集可能偏离真值。可以通过设置信标位置的不确定界并纳入 SMF 来缓解</td><td>★★★★</td></tr>
+    <tr><td>低激励运动轨迹</td><td>如果机器人沿径向直线运动 → 所有圆环同心 → 交集退化为更小的同心环——没有切向收紧。定位结果是一个同心环而非紧致的点估计</td><td>★★★</td></tr>
+  </table>
+
+  <h3>9.4 Paper-Worthy Deep-Dive</h3>
+  <div class="callout warn">
+    <div class="callout-title">🔬 值得深挖的方向</div>
+    <strong>UAV 单信标 3D 定位</strong>——这是将本文从地面机器人扩展到无人机的最直接方向。核心挑战：(1) 3D 中单次距离约束是球壳（而非圆环）——松弛为凸集的保守性更大；(2) 高度方向缺少约束——除非有气压计（提供高度参考），仅靠距离无法区分"更高但更近"和"更低但更远"；(3) 无人机的运动模型更复杂（6 自由度 vs 2 自由度），zonotope 传播的计算量更大。如果成功，UAV 可以在 GPS 拒止环境中仅靠 1 个地面 UWB 信标定位——这在隧道巡检、矿井探测等场景有极大价值。
+  </div>
+</section>
+
+<!-- 10. MOTIVATION -->
+<section id="motivation">
+  <h2>10. Motivation — First-Principles Derivation</h2>
+
+  <h3>10.1 Idea Derivation Chain</h3>
+  <ol>
+    <li><strong>问题的本质是什么？</strong><br>机器人需要在 GPS 拒止环境中定位，但只有 1 个测距信标（如 1 个 UWB 锚点）可用。在低成本部署中，每增加一个信标都需要额外的硬件、供电和标定——能只用 1 个就不想用 3 个。但 1 个距离测量在几何上不足以唯一确定位置。</li>
+    <li><strong>前人如何处理？为什么不够？</strong><br>EKF/UKF 是最常见的方案——但需要准确的噪声方差（通常未知），且线性化误差在大范围运动中不可忽略。粒子滤波不依赖线性化——但计算量大，且仍然需要似然函数。两者的共同问题是：都假设噪声是某种已知分布（通常是高斯），而这个假设在实际低成本传感器中可能不成立。</li>
+    <li><strong>如果不用概率分布，而只用噪声的界呢？</strong><br>集合成员方法的核心理念：不假设噪声分布，只假设噪声有界（从传感器数据手册或标定获得）。这更符合工程实际——传感器厂商通常给出的是"最大误差 ±X"，而不是"标准差 σ"。用集合代替概率分布 → 估计结果是一个包含真值的集合，而非一个概率分布。</li>
+    <li><strong>单信标 + 集合方法 = 两个工程困难</strong><br>(a) 距离约束是非凸圆环——集合方法用的 zonotope 只能表示凸集 → 需要凸松弛；(b) 运动历史中的多次测量需要被存储和融合——全量存储不可行 → 需要滑动窗口。</li>
+    <li><strong>三步法的顺序</strong><br>步骤 1（凸松弛）：把圆环变成 zonotope 能处理的凸条带 → 步骤 2（半空间精炼）：削掉凸松弛引入的多余范围 → 步骤 3（滑动窗口）：在固定窗口内融合历史约束。三步环环相扣：没有步骤 1 就无法进入 zonotope 框架；没有步骤 2 松弛太保守没有实用价值；没有步骤 3 计算量随运行时间无限增长。</li>
+  </ol>
+
+  <h3>10.2 One-Sentence Motivation</h3>
+  <div class="callout tip">
+    <div class="callout-title">一句话动机</div>
+    部署 3 个 UWB 信标来三边定位既贵又麻烦——但如果只用 1 个信标，单个距离测量只能告诉你"在哪个环上"，无法唯一确定位置。那如果机器人动起来呢？不同时刻的环通过运动模型关联后可以相交——用集合成员的方法把这些环的交集求出来，不需要假设噪声的高斯分布，只需要知道噪声的最大范围。
+  </div>
+
+  <h3>10.3 How You'd Arrive at This Idea</h3>
+  <ul>
+    <li><strong>Step 1 — 观察现象</strong>：很多机器人场景（仓库、隧道、洞穴）中，部署多信标要么成本过高要么物理上不可行。但是 1 个信标（UWB 锚点）的成本和部署难度远低于 3 个。问题是：1 个够用吗？在"运动 + 多时刻"的条件下可能够用。</li>
+    <li><strong>Step 2 — 分解问题</strong>：将定位问题分解为三个独立可优化的步骤——(1) 怎么把非凸距离约束变成可处理的凸约束？→ 凸松弛；(2) 怎么纠正松弛的精度损失？→ 半空间切割；(3) 怎么管住计算量？→ 滑动窗口。</li>
+    <li><strong>Step 3 — 匹配工具</strong>：(1) 约束 zonotope → 提供凸集表示和封闭的集合代数；(2) 顶点枚举 → 在 zonotope 顶点处线性化圆环约束；(3) 半空间交集 → zonotope 与半空间的交集封闭；(4) Minkowski 和 → 运动传播封闭。</li>
+    <li><strong>Step 4 — 验证</strong>：仿真证明比 EKF 更鲁棒（非高斯噪声下 EKF 发散而本文方法保持保证），场地实验证明在实际 UWB 设备上可行且精度可接受（< 0.3m）。</li>
+  </ul>
+</section>
+
+<!-- 11. KEY TAKEAWAYS -->
+<section id="takeaway">
+  <h2>11. Key Takeaways</h2>
+
+  <h3>11.1 Lessons Learned</h3>
+  <ul>
+    <li><strong>方法论层面</strong>：本文展示了<strong>"将不可观测转化为时间累积可观测"</strong>的经典范式——单个信标瞬时不可观，但运动历史让不同时刻的约束在空间中交汇。这个范式不仅适用于定位，也适用于任何需要"累积视角"来解开歧义的问题（如单目 SLAM 的尺度恢复、单天线测向）。核心：运动 = 免费的"虚拟多传感器"。</li>
+    <li><strong>技术技巧层面</strong>：(1) 凸松弛 + 精炼的二阶段策略——先保守地保证包含性，再激进地削除冗余——本质上是用"安全 + 再收紧"替代了"直接逼近"（后者可能丢失保证）；(2) 顶点枚举法——zonotope 的顶点天然是约束"最紧"的关键点，在这些点处构造松弛是最优的；(3) 滑动窗口的超参数 $W$——它直接控制精度-效率的 Pareto 前沿，在实际部署中需要针对特定场景进行调参。</li>
+    <li><strong>实验层面</strong>：论文同时在仿真和场地实验中验证，而且场地实验使用了真实 UWB 设备——这种"仿真 + 实物"的双重验证对 RA-L 级别的论文几乎是必须的。场地实验中的真值通过 motion capture 系统获得——这是机器人定位验证的黄金标准。</li>
+  </ul>
+
+  <h3>11.2 Directly Applicable to My Research</h3>
+  <ul>
+    <li><strong>对于 UAV 定位</strong>：UAV 场景中，GPS 可能被干扰或拒止。如果地面部署 1 个 UWB 信标 + UAV 的 IMU（提供高频运动信息）+ 气压计（提供高度约束），本文的框架可以直接扩展到 UAV 3D 定位。关键修改：(a) 圆环变为球壳——松弛的保守性更大，需要更多半空间切割；(b) 引入高度约束（气压计条带）来弥补单信标在垂直方向的信息缺口。</li>
+    <li><strong>对于多机器人协同</strong>：如果多台机器人之间也能相互测距（robot-to-robot ranging），每台机器人都相当于一个"移动信标"。本文的框架可以扩展为：每台机器人同时使用固定信标的距离和邻居机器人的距离来约束自己的位置——邻居的估计集（zonotope）也作为约束来源。</li>
+    <li><strong>对于集合成员方法的工程推广</strong>：本文证明了一个关键点——集合方法（zonotope + 凸松弛 + 精炼）不仅在数学上优雅，在实际硬件上也是可行的。这为在 UAV 项目中采用集合成员估计提供了信心：不需要复杂的噪声建模，只需要保守但有界的误差假设。</li>
+  </ul>
+
+  <h3>11.3 Key References to Follow</h3>
+  <table>
+    <tr><th>参考文献</th><th>为什么重要</th></tr>
+    <tr><td>Scott, Raimondo, Marseglia, Braatz (2016) — Constrained zonotopes. <em>Automatica</em></td><td>约束 zonotope 的原始论文——揭示了 zonotope 与半空间交集封闭这一关键性质——这是本文半空间精炼步骤得以可行的理论基础。</td></tr>
+    <tr><td>Combastel (2015) — Zonotopes and Kalman observers. <em>Journal of Process Control</em></td><td>zonotope 在状态估计中的系统教程——包括降阶策略（reduction operators），在实际实现 DSMF/SMSing 时必读。</td></tr>
+    <tr><td>Djugash, Singh (2008) — Range-only SLAM for robots. <em>Springer Tracts in Advanced Robotics</em></td><td>range-only SLAM 的早期经典工作——展示了仅用距离测量的定位/SLAM 可能性。与本文的区别在于使用概率框架（粒子滤波）而非集合框架。</td></tr>
+    <tr><td>Roehr, Cordes, Kirchner (2021) — Set-membership localization. <em>IEEE RA-L</em></td><td>另一篇集合成员定位的工作——与本文形成对比：使用区间分析（interval analysis）处理 GPS 伪距，本文用 zonotope 处理单信标 UWB——不同的集合表示有不同的精度/效率权衡。</td></tr>
+  </table>
+</section>
+
+
+<!-- ═══════════════ RELATED PAPERS ═══════════════ -->
+<section id="related">
+  <h2>Related Papers in This Survey</h2>
+  <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Cross-references based on shared scholars, keywords, and research themes within the UAV-Survey collection.</p>
+  <table>
+    <tr><th>Paper ID</th><th>Title</th><th>Scholar</th><th>Relation</th></tr>
+    <tr><td><a href="../10111/index.html">10111</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../10112/index.html">10112</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../2918/index.html">2918</a></td><td></td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5476/index.html">5476</a></td><td>GaussFly (Zhang, Li et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5477/index.html">5477</a></td><td>OMC-RL (Zhang, Xiao, Yan, Feroskhan, 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5478/index.html">5478</a></td><td>CAPO (Zhang, Yan et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5800/index.html">5800</a></td><td>KE-MATD3 (Sun, Yan et al., 2025)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+    <tr><td><a href="../5802/index.html">5802</a></td><td>DA2RL (Zhang, Lin, Zhao et al., 2026)</td><td>files</td><td>📚 Same Scholar (files)</td></tr>
+  </table>
+</section>
+
+<footer>📄 Paper Notes · Qin, Cong, Lai, Yang, Wang · IEEE RA-L 2024 · Single-Beacon SMF Localization · MathJax + Mermaid Rendering</footer>
+
+</div>
+</body>
+</html>

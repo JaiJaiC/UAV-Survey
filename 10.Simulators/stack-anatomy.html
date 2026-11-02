@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>训练栈是怎么「统一」的？ · 10.Simulators</title>
+<link rel="stylesheet" href="assets/sim.css">
+<style>
+  .flow { display:flex; flex-direction:column; gap:8px; margin:18px 0; }
+  .flow .row { display:grid; grid-template-columns: 170px 1fr; gap:12px; align-items:center; }
+  .flow .tag { font-size:.76rem; font-weight:700; color:#dbe3f2; text-align:right; }
+  .flow .boxes { display:flex; flex-wrap:wrap; gap:7px; }
+  .flow .box {
+    font-size:.76rem; padding:6px 10px; border-radius:7px;
+    background:#232735; border:1px solid var(--border); color:#c9d2e3;
+  }
+  .flow .box.core { border-color:rgba(249,115,22,.45); color:#fdba74; background:rgba(249,115,22,.08); }
+  .flow .box.blue { border-color:rgba(96,165,250,.4); color:#bfdbfe; background:rgba(96,165,250,.08); }
+  .flow .box.green { border-color:rgba(74,222,128,.35); color:#bbf7d0; background:rgba(74,222,128,.06); }
+  .flow .box.purple { border-color:rgba(192,132,252,.35); color:#e9d5ff; background:rgba(192,132,252,.06); }
+  .timeline { width:100%; border-collapse:collapse; font-size:.8rem; min-width:720px; }
+  .timeline th, .timeline td { padding:8px 10px; border-bottom:1px solid var(--border-soft); text-align:left; }
+  .timeline th { background:#232735; color:#dbe3f2; }
+  .contract { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin:18px 0; }
+  .contract .card h3 { font-size:.95rem; }
+  .contract .card p { font-size:.84rem; }
+  .cu-table table { min-width:1200px; }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="../index.html" class="home-btn">HOME</a>
+  <span class="crumb"><a href="index.html">10.Simulators</a> / 训练栈的「统一」</span>
+  <span class="spacer"></span>
+  <a class="navlink" href="counter-uav.html">反无选型</a>
+  <a class="navlink" href="comparison.html">对比表</a>
+  <a class="navlink" href="sim-training-stack-report.pdf">PDF 报告</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="kicker">Stack Anatomy · One command, many processes</span>
+    <h1>训练栈不是一个软件，<br><span style="font-size:.55em;opacity:.85">它是一组契约</span></h1>
+    <p class="lede">
+      “统一”不是把 Gazebo、PX4、YOLO、PPO 编译进同一个可执行文件，而是让它们<strong>用同一套数据、同一套时间、同一份场景配置</strong>协同工作。
+      你在终端敲的那一条 <code>ros2 launch</code> 或 Python 脚本，可以启动五个进程，让你感觉像“一个东西”；
+      但内部仍然是五个各有分工的进程。这不是偷懒，而是因为它们的<strong>时间尺度、硬件、保真度、迭代速度</strong>根本不同。
+    </p>
+    <div class="meta-row">
+      <span class="chip accent">一个命令 ≠ 一个进程</span>
+      <span class="chip">接口统一</span>
+      <span class="chip">时间统一</span>
+      <span class="chip warm">场景统一</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="one-command">
+  <h2><span class="num">00</span>一个命令，五个进程：你现在的栈已经“统一”了</h2>
+  <p>以你的反无任务为例，一个典型的启动脚本实际上做的是：</p>
+
+  <div class="flow">
+    <div class="row"><div class="tag">启动器</div><div class="boxes">
+      <span class="box core">ros2 launch / Python orchestrator / docker compose</span>
+      <span class="box">一份 scenario.yaml</span>
+    </div></div>
+    <div class="row"><div class="tag">世界与物理</div><div class="boxes">
+      <span class="box blue">Gazebo Sim：世界、风、地形、相机、intruder 物理</span>
+    </div></div>
+    <div class="row"><div class="tag">飞控</div><div class="boxes">
+      <span class="box green">PX4 SITL defender（advanced_plane）</span>
+      <span class="box green">PX4 SITL intruder（x500）</span>
+    </div></div>
+    <div class="row"><div class="tag">感知</div><div class="boxes">
+      <span class="box purple">YOLO v11 节点</span>
+      <span class="box purple">二阶矩 / 虚拟平面 → 19-D 特征</span>
+    </div></div>
+    <div class="row"><div class="tag">策略</div><div class="boxes">
+      <span class="box core">PPO policy 节点（或外部 trainer）</span>
+    </div></div>
+    <div class="row"><div class="tag">记录与评估</div><div class="boxes">
+      <span class="box">MCAP / rosbag</span>
+      <span class="box">miss distance / time-to-intercept</span>
+    </div></div>
+  </div>
+
+  <div class="callout idea">
+    <span class="label">关键</span>
+    用户看到的是“一条命令启动一个系统”；系统内部是“多个进程 + 一组接口”。
+    <strong>统一发生在接口层，不发生在二进制层。</strong>
+  </div>
+</section>
+
+<section id="why">
+  <h2><span class="num">01</span>为什么不能真的塞进一个二进制？</h2>
+  <p>不是不能强行塞，而是塞进去会同时损失性能、可替换性和团队协作。</p>
+
+  <div class="table-wrap">
+    <table class="timeline">
+      <thead><tr><th>组件</th><th>典型频率 / 时间尺度</th><th>主要硬件</th><th>保真度重点</th></tr></thead>
+      <tbody>
+        <tr><td>物理 / 气动</td><td>250–1000 Hz</td><td>CPU（或 GPU 批量）</td><td>接触、气动、积分稳定</td></tr>
+        <tr><td>PX4 飞控</td><td>250–400 Hz</td><td>CPU（真实飞控更严格）</td><td>控制律、延迟、执行器</td></tr>
+        <tr><td>相机</td><td>30–60 Hz</td><td>GPU / 图像管线</td><td>内参、曝光、运动模糊</td></tr>
+        <tr><td>YOLO</td><td>20–50 Hz</td><td>GPU</td><td>检测精度、延迟</td></tr>
+        <tr><td>PPO 决策</td><td>10–50 Hz</td><td>GPU（训练） / CPU（推理）</td><td>样本吞吐、泛化</td></tr>
+        <tr><td>渲染</td><td>30–60 Hz（或离线）</td><td>GPU</td><td>照片级、材质、光照</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <h3>1. 时间尺度不同</h3>
+      <p>把 1 kHz 物理、400 Hz 飞控、30 Hz 相机、10 Hz PPO 塞进一个循环，只能按最慢的节拍走，或者写非常复杂的调度。分开进程，各自按自己的频率跑，再用时间戳对齐。</p>
+    </div>
+    <div class="card">
+      <h3>2. 硬件不同</h3>
+      <p>物理和 PX4 吃 CPU 单核/实时性，渲染和 PPO 吃 GPU。一个进程很难同时把 CPU 实时性和 GPU 吞吐都吃满。</p>
+    </div>
+    <div class="card">
+      <h3>3. 保真度重点不同</h3>
+      <p>气动要 JSBSim 级，视觉要 UE/RTX 级，PPO 要万级并行。没有一个引擎能在这三件事上都做到最好；分开才能各取所需。</p>
+    </div>
+    <div class="card">
+      <h3>4. 迭代速度不同</h3>
+      <p>换 reward 不该重编译 Gazebo；换相机不该动 PX4；换气动模型不该动 PPO。接口稳定，组件才能独立演进。</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span class="label">“一个软件”的真相</span>
+    Isaac Lab 的 <code>isaaclab train</code>、RflySim 的一键启动、AirSim 的 UE 插件，都是把多个模块<strong>封装</strong>成“一个入口”。
+    它们内部仍然是物理、渲染、任务、RL 多个子系统。封装让你少配置，不等于单体。
+  </div>
+</section>
+
+<section id="contracts">
+  <h2><span class="num">02</span>统一的三个层次：数据、时间、场景</h2>
+  <p>真正要统一的是下面三份“契约”。只要这三份契约稳定，底下换 Gazebo、Isaac Lab、RflySim 都不会把上层推倒重来。</p>
+
+  <div class="contract">
+    <div class="card">
+      <h3>① 数据契约</h3>
+      <p><strong>19-D 观测</strong>：7 视觉 + 4 运动学 + 4 姿态 + 3 历史动作 + 1 高度。</p>
+      <p><strong>动作</strong>：acc / pitch / yaw(roll) 的归一化范围、单位、限幅。</p>
+      <p class="mb0"><strong>坐标系</strong>：ENU/NED、机体/世界、相机光学系；时间戳。</p>
+    </div>
+    <div class="card">
+      <h3>② 时间契约</h3>
+      <p><strong>仿真时钟</strong>：<code>/clock</code> 或 PX4 sim time；所有节点用同一时间源。</p>
+      <p><strong>锁步 / 异步</strong>：PPO 训练可以锁步；相机、YOLO、PX4 允许有延迟，但必须可测。</p>
+      <p class="mb0"><strong>延迟</strong>：相机曝光、YOLO 推理、MAVLink、舵机，各自打时间戳。</p>
+    </div>
+    <div class="card">
+      <h3>③ 场景契约</h3>
+      <p><strong>一份 YAML</strong>：初始位置、速度、航向、风/湍流、相机内参、检测噪声、PPO 配置。</p>
+      <p><strong>同一份场景</strong>在 Gazebo、Isaac Lab、RflySim 里都能加载，才能做 sim2sim。</p>
+      <p class="mb0"><strong>同一套指标</strong>：脱靶量、拦截时间、控制量、漏检率。</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>契约</th><th>最小实现</th><th>常见坑</th></tr></thead>
+      <tbody>
+        <tr><td><strong>数据</strong></td><td>一个 <code>Observation</code> dataclass + JSON schema；训练/推理共用</td><td>训练用归一化，部署忘了；s1/s2 坐标系和相机系混用</td></tr>
+        <tr><td><strong>时间</strong></td><td>ROS 2 <code>/clock</code> + 每条消息带 stamp；记录 latency</td><td>Gazebo 实时因子波动；PPO 用墙钟，仿真用 sim time</td></tr>
+        <tr><td><strong>场景</strong></td><td>一个 <code>scenario.yaml</code>，启动器读取并分发</td><td>Gazebo 世界文件、PX4 参数、PPO 配置各写一份，改一处忘两处</td></tr>
+        <tr><td><strong>传输</strong></td><td>ROS 2 topic（感知/控制）、MAVLink（PX4）、共享内存（高频）</td><td>ROS 2 与 PX4 时间不同步；高频图像走网络</td></tr>
+        <tr><td><strong>日志</strong></td><td>MCAP/rosbag + PPO rollout 日志，统一时间戳</td><td>失败样本只留在终端，无法回放</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="bundles">
+  <h2><span class="num">03</span>现成工具里，谁最像“一个东西”？</h2>
+  <div class="table-wrap cu-table">
+    <table>
+      <thead><tr><th>工具</th><th>你看到的“一个入口”</th><th>内部实际有什么</th><th>能否覆盖你的四条链路</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Isaac Lab</strong></td>
+          <td><code>isaaclab train</code> 一条命令</td>
+          <td>PhysX/Newton + 渲染器 + 任务 manager + RL 库 + 数据管线</td>
+          <td class="part">气动/PPO/视觉可以，PX4 要外接；固定翼气动要自己补</td>
+        </tr>
+        <tr>
+          <td><strong>RflySim</strong></td>
+          <td>一键启动 PX4 + UE + Simulink</td>
+          <td>PX4 SITL/HITL + UE 渲染 + MATLAB/Simulink + 模型库</td>
+          <td class="tick">最接近全覆盖：固定翼/PX4/视觉；RL 可用 Simulink 或外接 Python</td>
+        </tr>
+        <tr>
+          <td><strong>AirSim</strong></td>
+          <td>UE 插件 + Python API</td>
+          <td>UE 渲染 + 简化的多旋翼动力学 + PX4/ArduPilot 接口</td>
+          <td class="part">视觉强；固定翼弱；RL 要外接</td>
+        </tr>
+        <tr>
+          <td><strong>Gazebo + PX4</strong></td>
+          <td><code>ros2 launch</code> / PX4 <code>make px4_sitl</code></td>
+          <td>Gazebo 物理/渲染 + PX4 飞控 + 你的 YOLO/PPO 节点</td>
+          <td class="tick">系统闭环全覆盖；PPO 吞吐弱；视觉中等</td>
+        </tr>
+        <tr>
+          <td><strong>JSBSim + FlightGear</strong></td>
+          <td>两个进程，靠网络/接口连</td>
+          <td>JSBSim 气动 + FlightGear 渲染/仪表</td>
+          <td class="part">气动/视觉可以；无 PPO、无 PX4 原生训练</td>
+        </tr>
+        <tr>
+          <td><strong>UE5 自定义</strong></td>
+          <td>一个 UE 工程</td>
+          <td>渲染 + 场景 + 蓝图/C++；物理和飞控要外接</td>
+          <td class="no">只覆盖视觉；不是训练栈</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    结论：RflySim / Isaac Lab 更像“一个软件”，是因为它们把多个模块封装进一个发行版/入口；
+    Gazebo + PX4 更像“一套系统”，因为每个模块都暴露成独立进程。两种都能统一，只是统一在哪一层不同。
+  </p>
+</section>
+
+<section id="your-stack">
+  <h2><span class="num">04</span>给你的反无栈：一套契约，两种运行模式</h2>
+  <p>不需要把 Gazebo 换掉，也不需要把 PPO 塞进 Gazebo。把栈拆成“训练模式”和“系统模式”，共用同一份 19-D 契约。</p>
+
+  <div class="flow">
+    <div class="row"><div class="tag">共用</div><div class="boxes">
+      <span class="box core">scenario.yaml</span>
+      <span class="box core">19-D observation contract</span>
+      <span class="box core">action contract</span>
+      <span class="box core">metrics</span>
+    </div></div>
+    <div class="row"><div class="tag">训练模式</div><div class="boxes">
+      <span class="box blue">Isaac Lab / MuJoCo：固定翼气动 + 特征级观测 + 噪声</span>
+      <span class="box blue">PPO GPU 并行</span>
+      <span class="box">不渲染照片，只生成 19-D 特征</span>
+    </div></div>
+    <div class="row"><div class="tag">系统模式</div><div class="boxes">
+      <span class="box green">Gazebo Sim + PX4：advanced_plane + x500</span>
+      <span class="box green">YOLO + 虚拟平面</span>
+      <span class="box green">PPO 推理节点</span>
+      <span class="box">MCAP 记录</span>
+    </div></div>
+    <div class="row"><div class="tag">视觉模式</div><div class="boxes">
+      <span class="box purple">RflySim / AirSim / UE5：照片级图像</span>
+      <span class="box purple">YOLO 训练/验证</span>
+      <span class="box">不参与 PPO 大规模训练</span>
+    </div></div>
+    <div class="row"><div class="tag">气动复核</div><div class="boxes">
+      <span class="box">JSBSim / FlightGear：配平、失速、风扰</span>
+    </div></div>
+  </div>
+
+  <div class="callout idea">
+    <span class="label">统一的真正含义</span>
+    同一份 <code>scenario.yaml</code>、同一个 19-D 定义、同一套指标，能在三种模式里跑。
+    这样你换仿真器只是换“执行器”，不是重写任务。
+  </div>
+</section>
+
+<section id="checklist">
+  <h2><span class="num">05</span>最小统一清单</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>产物</th><th>内容</th><th>放在哪里</th></tr></thead>
+      <tbody>
+        <tr><td><strong>scenario.yaml</strong></td><td>初始位置/速度/航向、风、相机内参、检测噪声、PPO 配置</td><td>仓库根目录，所有模式读取</td></tr>
+        <tr><td><strong>observation.py</strong></td><td>19-D 的字段、顺序、归一化、坐标系、时间戳</td><td>训练与推理共用同一个包</td></tr>
+        <tr><td><strong>action.py</strong></td><td>acc/pitch/yaw 的范围、限幅、单位、history</td><td>同上</td></tr>
+        <tr><td><strong>launch</strong></td><td>ros2 launch / docker compose / Python orchestrator</td><td>一条命令启动系统模式</td></tr>
+        <tr><td><strong>recorder</strong></td><td>MCAP/rosbag + PPO rollout + 指标</td><td>统一时间戳，能回放失败</td></tr>
+        <tr><td><strong>eval</strong></td><td>miss distance、time-to-intercept、控制量、漏检率</td><td>三种模式共用</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="when">
+  <h2><span class="num">06</span>什么时候可以“只用一个软件”？</h2>
+  <div class="grid grid-2">
+    <div class="card green">
+      <h3>可以</h3>
+      <ul class="mb0">
+        <li>任务简单、只做刚体控制，不需要 PX4/HIL</li>
+        <li>团队小，接受用一个发行版绑定物理+渲染+RL</li>
+        <li>只需要一种保真度（比如纯视觉或纯控制）</li>
+        <li>用 Isaac Lab / RflySim 的封装入口，接受它的边界</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>不建议</h3>
+      <ul class="mb0">
+        <li>同时要固定翼气动、照片级视觉、PX4 HIL、GPU 大规模 PPO</li>
+        <li>需要换物理引擎或换渲染器做 sim2sim</li>
+        <li>多人分工：气动、感知、RL、飞控各管一摊</li>
+        <li>需要把真机失败样本回放到仿真里</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="label">一句话</span>
+    统一的是<strong>契约</strong>，不是<strong>二进制</strong>。一个命令可以启动五个进程；五个进程可以像一件事一样工作。
+  </div>
+</section>
+
+<section id="links">
+  <h2><span class="num">07</span>相关页面</h2>
+  <ul>
+    <li><a href="counter-uav.html">反无拦截选型导航（19 个仿真器 / 9 套训练栈，分开看）</a></li>
+    <li><a href="comparison.html">通用训练栈对比表（含 Gazebo）</a></li>
+    <li><a href="index.html">10.Simulators 总览</a></li>
+    <li><a href="https://docs.px4.io/main/en/sim_gazebo_gz/vehicles" target="_blank" rel="noopener">PX4 Gazebo 机型（rc_cessna / advanced_plane）</a></li>
+    <li><a href="https://docs.ros.org/en/rolling/" target="_blank" rel="noopener">ROS 2 文档</a></li>
+  </ul>
+</section>
+
+<div class="prevnext">
+  <a href="counter-uav.html">← 反无专项选型</a>
+  <a href="index.html">返回总览 →</a>
+</div>
+
+</main>
+
+<footer class="footer">
+  UAV-Survey · 10.Simulators / 训练栈的「统一」 · 资料截至 2026-10 · <a href="../index.html">Home</a>
+</footer>
+</body>
+</html>

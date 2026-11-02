@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genesis World · 仿真与训练栈档案</title>
+<link rel="stylesheet" href="../assets/sim.css">
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="../../index.html" class="home-btn">HOME</a>
+  <span class="crumb"><a href="../index.html">10.Simulators</a> / Genesis World</span>
+  <span class="spacer"></span>
+  <a class="navlink" href="../comparison.html">对比表（含 Gazebo）</a>
+  <a class="navlink" href="../sim-training-stack-report.pdf">PDF 报告</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="kicker">Layer 01 · 闭环评估与仿真基础设施</span>
+    <h1>Genesis World<br><span style="font-size:.55em;opacity:.85">仿真不只是造数据，也可以做「可信的裁判」</span></h1>
+    <p class="lede">
+      很多人一提机器人仿真，第一反应是「用它生成训练数据」。Genesis World 的切入点更靠前：
+      <strong>先把评估做好</strong>。它把仿真称为机器人基础模型的「评估与迭代引擎」，并强调只用真实数据训练、
+      在仿真中直接评估——训练与评估分布刻意分离，避免「模型只是更适配仿真器」的假进步。
+      再叠加 Nyx 渲染、统一多物理与 Quadrants 编译器，它试图把评估做成一套可规模化的基础设施。
+    </p>
+    <div class="meta-row">
+      <span class="chip accent">Genesis AI</span>
+      <span class="chip">Genesis World 1.0 · 2026-05</span>
+      <span class="chip">Apache-2.0</span>
+      <span class="chip">PyPI 1.4.5</span>
+      <span class="chip warm">评估基础设施</span>
+    </div>
+  </div>
+</header>
+
+<div class="article-grid">
+<main class="main-col">
+
+<section id="why">
+  <h2><span class="num">01</span>为什么「评估」值得单独做一层</h2>
+  <p>
+    机器人基础模型要覆盖大量任务、物体、场景和扰动。单靠真实机器人做评估，会被硬件数量、场地、操作员和维护成本卡住。
+    更麻烦的是，如果训练和评估都来自同一个仿真分布，模型表现变好到底是能力变强，还是更适配模拟器，很容易混在一起。
+  </p>
+  <p>
+    Genesis 的做法是先做<strong>基于仿真的评估</strong>，并且强调「真实数据训练、仿真中直接评估」：
+    被评估的策略只用真实数据训练，仿真主要承担闭环评估任务。这样评估分布和训练分布是分离的，
+    指标才有资格被称为「泛化」而不是「拟合仿真器」。
+  </p>
+  <div class="callout idea">
+    <span class="label">一句话定位</span>
+    Genesis World 不是「又一个训练环境库」，而是<strong>把仿真往「系统评估基础设施」方向推了一步</strong>：
+    物理、渲染、编译、传感、评估在同一套栈里，最后服务模型迭代。
+  </div>
+</section>
+
+<section id="arch">
+  <h2><span class="num">02</span>四层系统栈</h2>
+  <div class="stack">
+    <div class="layer"><div class="lname">Simulation Interface<span>应用层</span></div><div class="items">
+      <span class="item blue">资产解析（URDF / MJCF / OBJ / GLB / USD）</span><span class="item blue">控制器</span><span class="item blue">传感器</span><span class="item blue">并行 / 异构环境</span><span class="item blue">GUI</span>
+    </div></div>
+    <div class="layer"><div class="lname">Render<span>渲染</span></div><div class="items">
+      <span class="item hot">Nyx（机器人专用实时光追）</span><span class="item">Luisa（DSL 光追）</span><span class="item">Pyrender（光栅化）</span><span class="item">3DGS / PBR / 多相机</span>
+    </div></div>
+    <div class="layer"><div class="lname">Physics<span>统一多物理</span></div><div class="items">
+      <span class="item green">Rigid</span><span class="item green">FEM</span><span class="item green">MPM</span><span class="item green">PBD / SPH</span><span class="item green">uipc</span><span class="item green">Coupler / SAP</span>
+    </div></div>
+    <div class="layer"><div class="lname">Compiler<span>编译器</span></div><div class="items">
+      <span class="item purple">Quadrants</span><span class="item">CUDA / ROCm / Metal / Vulkan</span><span class="item">x86 / ARM64</span><span class="item">autodiff · GPU graphs · fastcache</span>
+    </div></div>
+  </div>
+  <p>
+    这套栈的设计超过了单个物理求解器：同一场景、同一状态里可以同时有刚体、FEM、MPM、PBD/SPH、uipc，
+    再通过 coupler 做耦合；渲染作为相机传感器接入；Quadrants 把 Python kernel 编译到多种后端，
+    并承载自动微分、GPU 图和缓存机制。它的目标不是「一个更快的刚体引擎」，而是「物理 + 渲染 + 编译 + 评估」的整体。
+  </p>
+</section>
+
+<section id="eval">
+  <h2><span class="num">03</span>评估叙事：89% 相关性与「半小时」</h2>
+  <p>
+    Genesis 博客给出的核心论据是：一项原本需要真实机器人连续运行很久的评估，可以在 GPU 集群上用仿真在约半小时内完成；
+    并称仿真评估与真机执行结果的相关性约 <strong>89%</strong>。公开报道中的具体口径是：
+    一个约 4 万次独立试验的灵巧手抓取评估，真机连续运行约需 <strong>166 小时</strong>，
+    仿真约 <strong>30 分钟</strong>；也有转述写作「超过 200 小时 → 0.5 小时以内」。
+  </p>
+  <p>
+    口径略有差异，但量级一致：把「等真机排队」变成「用计算批量比较」。如果这个相关性在更多任务上稳定成立，
+    它会改变机器人基础模型的迭代方式——不是「训练完再上真机试试」，而是「先在仿真里做一轮可信的淘汰」。
+  </p>
+  <div class="callout warn">
+    <span class="label">读数字时要保留的怀疑</span>
+    89% 是厂商在特定任务、特定模型规模、特定扰动设置下报告的相关性，不是普适常数。
+    相关性也会随任务、渲染保真度、接触复杂度、真机标定而变化。正确用法是把它当成「值得验证的假设」，
+    而不是「可以直接写进验收标准的结论」。
+  </div>
+  <p>
+    更值得学的是它的<strong>评估方法论</strong>：仿真与真机并排、同初始化；观测可以按层混合（sim / real），
+    用来归因物理、渲染、控制、通信的 gap；沿视觉、行为、语义三个正交扰动轴做单参数扫描，
+    定义各轴的 robustness。这些设计比单个数字更有复用价值。
+  </p>
+</section>
+
+<section id="design">
+  <h2><span class="num">04</span>三个结构性选择</h2>
+
+  <h3>1. 统一多物理，而不是拼多个引擎</h3>
+  <p>
+    很多栈的做法是「刚体用 A，软体用 B，布料用 C」，再写胶水层。Genesis 的选择是同一场景、同一状态里放多种物理，
+    用 coupler 处理交互。这降低了跨物理类型任务（比如机器人抓软体、布料覆盖刚体）的工程摩擦，
+    但也意味着每个求解器的成熟度会被整体进度牵制。
+  </p>
+
+  <h3>2. 自研渲染 + 自研编译器</h3>
+  <p>
+    Nyx 面向机器人应用，不是游戏渲染；Quadrants 从 Taichi fork 而来，目标是让同一份 Python kernel 跑在
+    CUDA、ROCm、Metal、Vulkan、x86、ARM64 上。这两个选择都很重，但它们决定了「大规模并行渲染」和「跨平台」
+    能不能作为产品能力，而不是 demo 特性。
+  </p>
+
+  <h3>3. 先把「评估」做成产品，再谈「训练」</h3>
+  <p>
+    这是 Genesis 和 Isaac Lab / mjlab / Playground 最大的叙事差异。后者主要回答「怎么更快地训练」，
+    Genesis 主要回答「怎么更可信地评估，并把评估接回迭代」。这不代表它不做训练——博客也提到未来会做
+    仿真内 post-training RL——但当前的重心在评估与数据闭环。
+  </p>
+</section>
+
+<section id="cost">
+  <h2><span class="num">05</span>边界与风险</h2>
+  <ul>
+    <li><strong>范围很宽，深度待验证。</strong> 刚体、软体、MPM、布料、渲染、编译器、评估全都要做，任何一层都可能有短板。</li>
+    <li><strong>相关性是任务相关的。</strong> 89% 不能直接搬到你的任务；需要自己做 sim↔real 校准。</li>
+    <li><strong>不是 Isaac / PhysX 的 drop-in。</strong> 资产、传感器、ROS、部署链路都要重新接；迁移成本真实存在。</li>
+    <li><strong>名称容易混淆。</strong> 开源 Genesis（2024-12）与 Genesis World 1.0（2026-05）、Genesis AI 的 GENE 模型是不同事物，引用时要核对主体。</li>
+    <li><strong>商业与开源的边界。</strong> 代码 Apache-2.0，但 Genesis AI 是公司；长期治理、路线图与支持策略需要观察。</li>
+  </ul>
+</section>
+
+<section id="fit">
+  <h2><span class="num">06</span>什么时候该看它</h2>
+  <div class="grid grid-2">
+    <div class="card green">
+      <h3>适合关注</h3>
+      <ul class="mb0">
+        <li>机器人基础模型 / VLA 的大规模闭环评估</li>
+        <li>需要真实数据训练、仿真评估的分布分离</li>
+        <li>任务涉及软体、布料、颗粒、流体等多物理</li>
+        <li>需要跨平台（CUDA / ROCm / Metal / CPU）的仿真与渲染</li>
+        <li>想把评估、失败定位、数据采集决策接成闭环</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>暂缓</h3>
+      <ul class="mb0">
+        <li>需要成熟稳定的 Isaac / PhysX 资产与 ROS 链路</li>
+        <li>只做刚体 locomotion，且已有可靠训练栈</li>
+        <li>无法接受厂商自报指标需要独立验证的成本</li>
+        <li>团队规模小，难以同时维护一套新栈</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="facts">
+  <h2><span class="num">07</span>事实卡</h2>
+  <dl class="kv">
+    <dt>起源</dt><dd>2024-12 开源 Genesis；后由 Genesis AI 支持，演进为 Genesis World</dd>
+    <dt>Genesis World 1.0</dt><dd>2026-05 博客发布；PyPI <code>genesis-world</code> 1.4.5（2026-10-22）</dd>
+    <dt>代码</dt><dd><a href="https://github.com/Genesis-Embodied-AI/genesis-world" target="_blank" rel="noopener">Genesis-Embodied-AI/genesis-world</a>，Apache-2.0</dd>
+    <dt>四层</dt><dd>Simulation Interface / Render / Physics / Compiler</dd>
+    <dt>物理</dt><dd>Rigid、FEM、MPM、PBD/SPH、uipc、Coupler、SAP，共享场景与状态</dd>
+    <dt>渲染</dt><dd>Nyx（自研）、Luisa、Pyrender</dd>
+    <dt>编译器</dt><dd>Quadrants（Taichi fork）→ CUDA / ROCm / Metal / Vulkan / x86 / ARM64</dd>
+    <dt>评估主张</dt><dd>real-to-sim 闭环评估；约 89% 相关性；约 166–200 小时 → 约 30 分钟（厂商口径）</dd>
+    <dt>入口</dt><dd><span class="mono">pip install genesis-world</span></dd>
+  </dl>
+</section>
+
+<section id="links">
+  <h2><span class="num">08</span>资源</h2>
+  <ul>
+    <li><a href="https://www.genesis.ai/blog/the-role-of-simulation-in-scalable-robotics-genesis-world-10-and-the-path-forward" target="_blank" rel="noopener">Genesis World 1.0 博客（评估与迭代引擎）</a></li>
+    <li><a href="https://github.com/Genesis-Embodied-AI/genesis-world" target="_blank" rel="noopener">代码：Genesis-Embodied-AI/genesis-world</a></li>
+    <li><a href="https://genesis-world.readthedocs.io/en/latest/" target="_blank" rel="noopener">文档：Genesis World</a></li>
+    <li><a href="https://pypi.org/project/genesis-world/" target="_blank" rel="noopener">PyPI：genesis-world</a></li>
+    <li><a href="https://github.com/Genesis-Embodied-AI/genesis-nyx" target="_blank" rel="noopener">Nyx 渲染器</a></li>
+    <li><a href="https://github.com/Genesis-Embodied-AI/quadrants" target="_blank" rel="noopener">Quadrants 编译器</a></li>
+    <li><a href="resources.md">本页资源清单（Markdown）</a></li>
+  </ul>
+</section>
+
+<div class="prevnext">
+  <a href="../05.Newton/index.html">← Newton</a>
+  <a href="../index.html">返回对比总览 →</a>
+</div>
+
+</main>
+
+<aside class="side-col">
+  <nav class="toc">
+    <h4>On this page</h4>
+    <a href="#why">评估为什么单独做</a>
+    <a href="#arch">四层系统栈</a>
+    <a href="#eval">89% 与半小时</a>
+    <a href="#design">结构性选择</a>
+    <a href="#cost">边界与风险</a>
+    <a href="#fit">选型建议</a>
+    <a href="#facts">事实卡</a>
+    <a href="#links">资源</a>
+    <a class="back" href="../index.html">← 10.Simulators</a>
+  </nav>
+</aside>
+</div>
+
+<footer class="footer">
+  UAV-Survey · 10.Simulators / Genesis World · 资料截至 2026-10 · <a href="../../index.html">Home</a>
+</footer>
+</body>
+</html>

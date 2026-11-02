@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>反无训练栈选型：只看训练栈 · 10.Simulators</title>
+<link rel="stylesheet" href="assets/sim.css">
+<style>
+  .stack-table table { min-width: 1320px; }
+  .stack-table th:nth-child(1), .stack-table td:nth-child(1) { min-width: 190px; }
+  .stack-table th:nth-child(2), .stack-table td:nth-child(2) { min-width: 150px; }
+  .stack-table th:nth-child(3), .stack-table td:nth-child(3) { min-width: 150px; }
+  .stack-table th:nth-child(4), .stack-table td:nth-child(4) { min-width: 120px; }
+  .stack-table th:nth-child(5), .stack-table td:nth-child(5) { min-width: 120px; }
+  .stack-table th:nth-child(6), .stack-table td:nth-child(6) { min-width: 130px; }
+  .stack-table th:nth-child(7), .stack-table td:nth-child(7) { min-width: 110px; }
+  .stack-table th:nth-child(8), .stack-table td:nth-child(8) { min-width: 170px; }
+  .stack-table th:nth-child(9), .stack-table td:nth-child(9) { min-width: 220px; }
+  .stack-table td { font-size: .8rem; line-height: 1.55; }
+  .mode { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin:18px 0; }
+  .mode .card h3 { font-size: .95rem; }
+  .mode .card p { font-size: .84rem; }
+  .tree { background:#141722; border:1px solid var(--border); border-radius:10px; padding:16px 18px; font-family:var(--mono); font-size:.78rem; line-height:1.7; color:#c9d2e3; overflow-x:auto; }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="../index.html" class="home-btn">HOME</a>
+  <span class="crumb"><a href="index.html">10.Simulators</a> / <a href="counter-uav.html">反无</a> / 训练栈</span>
+  <span class="spacer"></span>
+  <a class="navlink" href="counter-uav-simulators.html">只看仿真器</a>
+  <a class="navlink" href="counter-uav.html">反无导航</a>
+  <a class="navlink" href="stack-anatomy.html">栈怎么统一</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="kicker">Training-stack-only · Counter-UAS</span>
+    <h1>反无训练栈选型<br><span style="font-size:.55em;opacity:.85">这一页只看训练栈，不比较单个仿真器</span></h1>
+    <p class="lede">
+      训练栈要回答的是：环境怎么组织、采样怎么并行、19-D 特征怎么接、PPO 怎么训、策略怎么回到 PX4。
+      同一个仿真器可以被不同训练栈使用；同一个训练栈也可以换仿真后端。这一页只比<strong>栈的组织方式</strong>，
+      仿真器的气动/相机/PX4 细节在另一页。
+    </p>
+    <div class="meta-row">
+      <span class="chip accent">9 套训练栈</span>
+      <span class="chip">19-D 特征 PPO</span>
+      <span class="chip">PX4 部署</span>
+      <span class="chip warm">只比训练栈</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="parts">
+  <h2><span class="num">00</span>训练栈的五个部件</h2>
+  <p>先把「训练栈」拆开。它不是一个仿真器，也不是一个 PPO 脚本，而是下面五段的组合。</p>
+  <div class="stack">
+    <div class="layer"><div class="lname">环境接口<span>env API</span></div><div class="items">
+      <span class="item blue">Gymnasium reset/step</span><span class="item blue">manager terms</span><span class="item blue">Hydra 配置</span><span class="item">向量化 env</span>
+    </div></div>
+    <div class="layer"><div class="lname">仿真后端<span>sim backend</span></div><div class="items">
+      <span class="item">Gazebo / PX4</span><span class="item">Isaac Lab / PhysX·Newton</span><span class="item">MuJoCo / MJX</span><span class="item">JSBSim</span><span class="item">RflySim</span>
+    </div></div>
+    <div class="layer"><div class="lname">学习器<span>trainer</span></div><div class="items">
+      <span class="item green">PPO</span><span class="item green">RSL-RL</span><span class="item green">Brax</span><span class="item green">SB3 / RLlib</span><span class="item">Simulink RL</span>
+    </div></div>
+    <div class="layer"><div class="lname">感知桥<span>perception</span></div><div class="items">
+      <span class="item purple">YOLO v11</span><span class="item purple">二阶矩</span><span class="item purple">虚拟平面</span><span class="item purple">19-D 特征 + 噪声</span>
+    </div></div>
+    <div class="layer"><div class="lname">部署与评估<span>deploy / eval</span></div><div class="items">
+      <span class="item hot">PX4 offboard</span><span class="item hot">ONNX</span><span class="item">MAVLink</span><span class="item">MCAP</span><span class="item">miss distance</span>
+    </div></div>
+  </div>
+  <div class="callout">
+    <span class="label">术语：RSL-RL 是什么</span>
+    RSL-RL 是 ETH Zurich RSL 的轻量 PyTorch RL 库（BSD-3，论文 arXiv:2509.10771），主打 <strong>PPO + student-teacher distillation</strong>、多 GPU、代码量小。
+    它是「学习器」，不是仿真器，也不是飞控：Isaac Lab、mjlab、MuJoCo Playground 都拿它当默认 PPO 训练器。
+    你的 19-D → 3-D 动作可以直接喂给它，但它不负责 Gazebo/ROS/PX4；在 Gazebo 栈里用，需要自己写 Gym wrapper，或保留你现在的 PPO。
+  </div>
+
+  <div class="callout idea">
+    <span class="label">关键</span>
+    训练栈的差异，主要不在「PPO 算法」，而在<strong>环境接口、并行方式、感知接入、部署闭环</strong>这四件事。
+    19-D MLP 本身不是瓶颈；瓶颈是 env/s、特征质量和 sim2real。
+  </div>
+</section>
+
+<section id="table">
+  <h2><span class="num">01</span>训练栈 vs 训练栈</h2>
+  <p>
+    下表只比较训练栈的组织方式：环境接口、并行吞吐、视觉接入、PX4 部署、固定翼支持、适合阶段。
+    仿真后端只是其中一列，不在这里展开气动/相机对比。
+  </p>
+
+  <div class="table-wrap sticky stack-table">
+    <table>
+      <thead>
+        <tr>
+          <th>训练栈</th>
+          <th>环境接口</th>
+          <th>仿真后端</th>
+          <th>并行 / 吞吐</th>
+          <th>视觉接入</th>
+          <th>PX4 / 部署</th>
+          <th>固定翼</th>
+          <th>适合阶段</th>
+          <th>主要限制</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>你当前：Gazebo + PX4 + PPO</strong><span class="sub">自定义 Gym wrapper</span></td>
+          <td>自定义 reset/step</td>
+          <td>Gazebo + PX4</td>
+          <td class="no">低<span class="sub">单实例 CPU</span></td>
+          <td class="part">中<span class="sub">Gazebo 相机</span></td>
+          <td class="tick">原生<span class="sub">SITL/HITL</span></td>
+          <td class="part">中<span class="sub">lift/drag</span></td>
+          <td>系统集成、基线、HITL</td>
+          <td>PPO 样本效率 × 单实例吞吐 = 实验慢；视觉不够真</td>
+        </tr>
+        <tr>
+          <td><strong>Gazebo Sim + PX4 + SB3/skrl</strong></td>
+          <td>Gymnasium wrapper</td>
+          <td>Gazebo Sim + PX4</td>
+          <td class="no">低</td>
+          <td class="part">中</td>
+          <td class="tick">原生</td>
+          <td class="part">中—高<span class="sub">advanced_plane</span></td>
+          <td>保留 PX4 的渐进升级</td>
+          <td>吞吐没质变；多机调参仍麻烦</td>
+        </tr>
+        <tr>
+          <td><strong>RflySim + PX4 + Simulink RL</strong></td>
+          <td>Simulink / Python</td>
+          <td>RflySim（UE + PX4）</td>
+          <td class="part">中</td>
+          <td class="tick">高</td>
+          <td class="tick">原生<span class="sub">HITL</span></td>
+          <td class="tick">高</td>
+          <td>工程化、HIL、视觉闭环</td>
+          <td>商业授权；MATLAB/Simulink 工作流重；GPU 并行有限</td>
+        </tr>
+        <tr>
+          <td><strong>Isaac Lab + RSL-RL + 自定义固定翼</strong></td>
+          <td>manager / direct</td>
+          <td>PhysX / Newton</td>
+          <td class="tick">高<span class="sub">GPU 并行</span></td>
+          <td class="tick">高<span class="sub">RTX 相机</span></td>
+          <td class="no">无原生 PX4</td>
+          <td class="part">中<span class="sub">需补气动</span></td>
+          <td>PPO 规模化、视觉 RL、sim2sim</td>
+          <td>固定翼气动/执行器要自己建模；PX4 要外接</td>
+        </tr>
+        <tr>
+          <td><strong>MuJoCo/MJX + Brax/RSL-RL</strong></td>
+          <td>Gymnasium / MJX</td>
+          <td>MuJoCo / MJX</td>
+          <td class="tick">高</td>
+          <td class="no">低—中</td>
+          <td class="no">无</td>
+          <td class="part">中<span class="sub">自定义气动</span></td>
+          <td>控制 RL、控制器/气动快速对照</td>
+          <td>视觉弱；固定翼模型自己写；无 PX4</td>
+        </tr>
+        <tr>
+          <td><strong>JSBSim + Gym + PPO</strong></td>
+          <td>自定义 Gym wrapper</td>
+          <td>JSBSim</td>
+          <td class="part">中<span class="sub">CPU 批量</span></td>
+          <td class="no">无</td>
+          <td class="part">经 FlightGear/PX4</td>
+          <td class="tick">高</td>
+          <td>气动可信的 PPO、控制律对照</td>
+          <td>无视觉；需要自己写 wrapper；吞吐一般</td>
+        </tr>
+        <tr>
+          <td><strong>AirSim + SB3/RLlib</strong></td>
+          <td>Python API</td>
+          <td>AirSim（UE）</td>
+          <td class="no">低—中</td>
+          <td class="tick">高</td>
+          <td class="part">PX4（多旋翼）</td>
+          <td class="no">低</td>
+          <td>YOLO 数据、视觉验证</td>
+          <td>固定翼支持有限；单实例；维护放缓</td>
+        </tr>
+        <tr>
+          <td><strong>Aerial Gym / Flightmare</strong></td>
+          <td>Isaac Gym / 自定义</td>
+          <td>Isaac Gym / Unity</td>
+          <td class="tick">高</td>
+          <td class="part">中—高</td>
+          <td class="no">无</td>
+          <td class="no">低<span class="sub">四旋翼</span></td>
+          <td>仅 intruder / 旋翼大规模 RL</td>
+          <td>四旋翼专用；不能训练 defender；无 PX4</td>
+        </tr>
+        <tr>
+          <td><strong>Genesis + 自定义评估/RL</strong></td>
+          <td>自定义 / Python</td>
+          <td>Genesis World</td>
+          <td class="tick">高</td>
+          <td class="tick">高<span class="sub">Nyx</span></td>
+          <td class="no">无</td>
+          <td class="part">中<span class="sub">自定义</span></td>
+          <td>评估、多物理、失败回流</td>
+          <td>生态年轻；无 PX4；需自己搭训练循环</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    「并行 / 吞吐」指训练栈能组织多少并行环境、学习器利用率如何，不是单个仿真器的峰值。
+    「固定翼」指该栈是否已有可用的固定翼训练路径；「中」通常意味着要自己补气动/执行器模型。
+  </p>
+</section>
+
+<section id="modes">
+  <h2><span class="num">02</span>三种运行模式，不要用一个栈硬扛</h2>
+  <div class="mode">
+    <div class="card green">
+      <h3>训练模式</h3>
+      <p><strong>目标：</strong>19-D 特征上的 PPO 大规模迭代。</p>
+      <p><strong>栈：</strong>Isaac Lab + RSL-RL / MuJoCo+MJX + Brax。</p>
+      <p class="mb0"><strong>关键：</strong>特征噪声、漏检、延迟、风扰；不渲染照片。</p>
+    </div>
+    <div class="card">
+      <h3>系统模式</h3>
+      <p><strong>目标：</strong>PX4 SITL/HITL、MAVLink、两机同步、offboard。</p>
+      <p><strong>栈：</strong>Gazebo Sim + PX4 + PPO 推理节点 / RflySim。</p>
+      <p class="mb0"><strong>关键：</strong>时序、飞控参数、执行器延迟；不在这里做大规模 PPO。</p>
+    </div>
+    <div class="card purple">
+      <h3>视觉模式</h3>
+      <p><strong>目标：</strong>YOLO v11 数据、虚拟平面误差、检测延迟。</p>
+      <p><strong>栈：</strong>RflySim / AirSim / UE5 + YOLO。</p>
+      <p class="mb0"><strong>关键：</strong>相机内参、FOV、运动模糊；图像不进入 PPO 训练循环。</p>
+    </div>
+  </div>
+  <div class="callout warn">
+    <span class="label">为什么不能一个栈全包</span>
+    训练模式要 GPU 并行和特征噪声；系统模式要 PX4 实时闭环；视觉模式要照片级渲染。
+    三者的节拍和硬件不同，塞进一个循环只会互相拖慢。它们共用 19-D 契约，但不共用同一个执行循环。
+  </div>
+</section>
+
+<section id="recommend">
+  <h2><span class="num">03</span>给你的推荐组合</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>阶段</th><th>训练栈</th><th>为什么</th><th>验收指标</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>主训练</strong></td>
+          <td>Isaac Lab + RSL-RL + 自定义固定翼气动；或 MuJoCo/MJX + Brax/RSL-RL</td>
+          <td>GPU 并行、19-D 特征、域随机化；先把 PPO 的样本效率提上来</td>
+          <td>env/s、样本效率、命中率、初始几何泛化</td>
+        </tr>
+        <tr>
+          <td><strong>系统闭环</strong></td>
+          <td>Gazebo Sim + PX4（advanced_plane / x500）+ PPO 推理</td>
+          <td>MAVLink、offboard、两机同步、HITL；保留真实飞控链路</td>
+          <td>offboard 切换、指令延迟、两机时钟偏差</td>
+        </tr>
+        <tr>
+          <td><strong>视觉验证</strong></td>
+          <td>RflySim / AirSim / UE5 + YOLO v11</td>
+          <td>照片级图像验证二阶矩/虚拟平面；不参与 PPO 大规模训练</td>
+          <td>mAP、s1/s2 误差、漏检率、延迟</td>
+        </tr>
+        <tr>
+          <td><strong>气动复核</strong></td>
+          <td>JSBSim + Gym + PPO（或 FlightGear 可视化）</td>
+          <td>高保真气动对照，确认简化模型没把策略带偏</td>
+          <td>配平误差、失速边界、风扰响应</td>
+        </tr>
+        <tr>
+          <td><strong>Intruder</strong></td>
+          <td>Aerial Gym / Flightmare（旋翼）</td>
+          <td>旋翼目标的大规模 RL 或脚本化飞行；与 defender 分开训练</td>
+          <td>旋翼策略成功率、规避行为</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="contract">
+  <h2><span class="num">04</span>让这些栈共用一套契约</h2>
+  <p>训练栈可以换，但下面这些东西不能变。否则每换一个栈，任务就要重写一遍。</p>
+  <div class="tree">counter_uav/
+├── scenario.yaml                 # 初始几何 / 风 / 相机 / 检测噪声 / PPO 配置
+├── contracts/
+│   ├── observation.py            # 19-D 字段、顺序、归一化、坐标系、时间戳
+│   └── action.py                 # acc / pitch / yaw 范围、限幅、history
+├── sims/
+│   ├── gazebo/                   # 系统模式
+│   ├── isaac/                    # 训练模式
+│   └── jsbsim/                   # 气动复核
+├── perception/
+│   ├── yolo_node.py
+│   └── virtual_plane.py
+├── policy/
+│   ├── train_ppo.py
+│   └── policy_node.py
+├── launch/system.launch.py
+└── eval/metrics.py</div>
+  <p style="margin-top:12px">这套契约的详细解释在 <a href="stack-anatomy.html">训练栈是怎么「统一」的</a>。</p>
+</section>
+
+<section id="links">
+  <h2><span class="num">05</span>下一步</h2>
+  <ul>
+    <li><a href="counter-uav-simulators.html">另一条线：只看仿真器</a></li>
+    <li><a href="counter-uav.html">反无选型导航</a></li>
+    <li><a href="stack-anatomy.html">训练栈怎么「统一」：一个命令、多进程、三份契约</a></li>
+    <li><a href="comparison.html">通用训练栈对比（含 Gazebo）</a></li>
+  </ul>
+  <div class="callout">
+    <span class="label">一句话</span>
+    训练栈比的是「怎么组织训练」；仿真器比的是「物理、相机、PX4 够不够真」。两件事分开选，最后用 19-D 契约拼起来。
+  </div>
+</section>
+
+<div class="prevnext">
+  <a href="counter-uav-simulators.html">← 只看仿真器</a>
+  <a href="counter-uav.html">反无导航 →</a>
+</div>
+
+</main>
+
+<footer class="footer">
+  UAV-Survey · 10.Simulators / 反无训练栈选型 · 资料截至 2026-10 · <a href="../index.html">Home</a>
+</footer>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Newton · 仿真与训练栈档案</title>
+<link rel="stylesheet" href="../assets/sim.css">
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="../../index.html" class="home-btn">HOME</a>
+  <span class="crumb"><a href="../index.html">10.Simulators</a> / Newton</span>
+  <span class="spacer"></span>
+  <a class="navlink" href="../comparison.html">对比表（含 Gazebo）</a>
+  <a class="navlink" href="../sim-training-stack-report.pdf">PDF 报告</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="kicker">Layer 05 · 底层物理引擎 / 连接器</span>
+    <h1>Newton<br><span style="font-size:.55em;opacity:.85">它不是一个新环境库，而是底座之间的接口层</span></h1>
+    <p class="lede">
+      如果把 Newton 写成「英伟达又发布了一个物理引擎」，就会漏掉它真正的位置。它建立在 NVIDIA Warp 之上，
+      以 MuJoCo Warp 为主要后端，用 OpenUSD 表达场景与资产，强调可微与可扩展，并由 Linux 基金会治理。
+      它连接的是几个原本各有重心的生态：USD、Warp、MuJoCo、Isaac Lab。短期它不会替代谁，
+      但会改变「物理仿真如何接入学习系统」的写法。
+    </p>
+    <div class="meta-row">
+      <span class="chip accent">Disney Research · Google DeepMind · NVIDIA</span>
+      <span class="chip">Linux Foundation</span>
+      <span class="chip">Apache-2.0</span>
+      <span class="chip">Isaac Lab 3.0 一等后端</span>
+      <span class="chip warm">物理引擎层</span>
+    </div>
+  </div>
+</header>
+
+<div class="article-grid">
+<main class="main-col">
+
+<section id="why">
+  <h2><span class="num">01</span>先把它放对位置</h2>
+  <p>
+    Newton 不是一个「拿来就能跑任务」的框架。它没有 Isaac Lab 的任务管理器，也没有 Playground 的环境库；
+    它提供的是<strong>物理世界的计算底座</strong>：刚体、关节、接触、可变形体、颗粒、布料、线缆，
+    以及把这些求解器组织起来的场景与状态表示。
+  </p>
+  <p>
+    它和上层框架的关系，更像「编译器后端」和「语言前端」：Isaac Lab 3.0 把 Newton 作为可选的物理后端，
+    通过 <code>physics=newton_mjwarp</code> 这样的预设切换；同一个任务可以跑在 PhysX 上，也可以跑在 Newton 上，
+    并提供了 PhysX↔Newton 的策略迁移验证。这种「同一任务、两个物理引擎」的能力，是 sim2sim 真正有意义的前提。
+  </p>
+  <div class="callout idea">
+    <span class="label">一句话定位</span>
+    Newton 是<strong>物理引擎层的连接器</strong>：向下接 Warp 的 GPU 计算，向上接 Isaac Lab / MuJoCo 生态，
+    向外接 OpenUSD 的资产与场景表达。
+  </div>
+</section>
+
+<section id="arch">
+  <h2><span class="num">02</span>架构：Warp 之上，USD 之间</h2>
+  <div class="stack">
+    <div class="layer"><div class="lname">上层框架<span>consumers</span></div><div class="items">
+      <span class="item blue">Isaac Lab（isaaclab_newton）</span><span class="item blue">MuJoCo Warp</span><span class="item blue">自定义训练栈</span>
+    </div></div>
+    <div class="layer"><div class="lname">Newton<span>engine</span></div><div class="items">
+      <span class="item hot">Model / State</span><span class="item hot">Solver</span><span class="item hot">Collision</span><span class="item hot">Sensors</span><span class="item hot">Differentiable paths</span>
+    </div></div>
+    <div class="layer"><div class="lname">求解器<span>solvers</span></div><div class="items">
+      <span class="item">MuJoCo-Warp（主后端）</span><span class="item">XPBD</span><span class="item">Featherstone</span><span class="item">VBD</span><span class="item">MPM</span><span class="item">Kamino</span>
+    </div></div>
+    <div class="layer"><div class="lname">计算与场景<span>foundation</span></div><div class="items">
+      <span class="item green">NVIDIA Warp</span><span class="item green">OpenUSD</span><span class="item">CUDA</span><span class="item">CPU（macOS）</span>
+    </div></div>
+  </div>
+  <p>
+    Newton 的技术报告与 README 把关键点写得很清楚：它扩展并泛化了 Warp 已弃用的 <code>warp.sim</code> 模块，
+    把 MuJoCo Warp 集成为主要后端，强调 GPU 计算、OpenUSD、可微性和用户自定义扩展。
+    「可微」不是一句口号：它意味着系统辨识、设计优化、控制优化和数据效率这些方向，可以在物理层直接获得梯度，
+    而不必把仿真当成黑箱。
+  </p>
+</section>
+
+<section id="design">
+  <h2><span class="num">03</span>四个值得关注的信号</h2>
+
+  <h3>1. 治理结构：Linux 基金会</h3>
+  <p>
+    Newton 由 Disney Research、Google DeepMind、NVIDIA 共同发起，由 Linux Foundation 管理。
+    这不是普通的「公司开源项目」：它试图把物理引擎变成多方共同治理的基础设施。
+    对担心单一厂商锁定的团队，这是一个积极信号；但治理的开放不等于技术的成熟，两者要分开看。
+  </p>
+
+  <h3>2. 多物理：从刚体走向软体、颗粒、布料、线缆</h3>
+  <p>
+    人形机器人早晚会遇到全身接触、灵巧手细粒度接触、移动操作中的推拉拖挤，以及布料、软体、颗粒材料、触觉。
+    这些东西如果都靠外层域随机化硬盖，会越来越难受。Newton 的 MPM、VBD、布料、线缆、软体示例，
+    说明它在为这些任务做准备——虽然成熟度还参差。
+  </p>
+
+  <h3>3. Isaac Lab 3.0：从「实验性集成」到「一等后端」</h3>
+  <p>
+    Isaac Lab 3.0 的 <code>isaaclab_newton</code> 支持 MuJoCo-Warp、VBD、MPM、Kamino 等求解路径，
+    并且可以在不安装 Isaac Sim 的 kit-less 模式下运行。3.0 GA 还提供了 PhysX↔Newton 的策略迁移指南与验证示例。
+    这和早期 beta 阶段「只支持经典 RL 和平地 locomotion」的状态相比，是一个实质性的进展。
+  </p>
+
+  <h3>4. 它把「物理保真度」变成可替换变量</h3>
+  <p>
+    过去选框架，往往等于选物理引擎；物理引擎又被绑在平台上。Newton 的方向是：
+    任务 API 不变，物理后端可换。这会让「用哪个求解器」从架构决策变成一个实验变量——
+    对 sim2real 研究，这是很重要的自由度。
+  </p>
+</section>
+
+<section id="cost">
+  <h2><span class="num">04</span>现在不必神化，但一定要盯</h2>
+  <ul>
+    <li><strong>年轻。</strong> API、求解器覆盖、文档都在快速变化；Isaac Lab 3.0 的 release notes 仍把部分功能标为 backend-specific 或 unsupported。</li>
+    <li><strong>硬件门槛。</strong> GPU 路径需要 NVIDIA Turing 及以上（compute capability 7.5+）与较新的驱动；macOS 只能 CPU 运行。</li>
+    <li><strong>求解器差异是真实的。</strong> MuJoCo-Warp、XPBD、Featherstone、VBD 的行为不同，策略迁移不是「换个 flag 就等价」。</li>
+    <li><strong>生态仍在建设。</strong> 相比 PhysX / MuJoCo 数十年的积累，Newton 的资产、教程、社区答案都还少。</li>
+  </ul>
+  <div class="callout warn">
+    <span class="label">选型提醒</span>
+    如果明天只是训练一个普通速度跟踪策略，Newton 未必是第一选择。稳定、资料多、调试顺、能和现有代码接起来，
+    可能比「更新的物理引擎」更重要。Newton 的价值更适合放在 6–18 个月的时间尺度上看。
+  </div>
+</section>
+
+<section id="fit">
+  <h2><span class="num">05</span>什么时候该看它</h2>
+  <div class="grid grid-2">
+    <div class="card green">
+      <h3>适合关注</h3>
+      <ul class="mb0">
+        <li>任务开始涉及复杂接触、软体、布料、颗粒、线缆</li>
+        <li>需要可微物理做系统辨识、设计优化、控制优化</li>
+        <li>想在 Isaac Lab 内做 PhysX↔Newton 的 sim2sim 验证</li>
+        <li>希望物理层由多方治理、避免单一厂商锁定</li>
+        <li>做多物理耦合的研究型任务</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>暂缓</h3>
+      <ul class="mb0">
+        <li>需要稳定、资料丰富、开箱即用的 locomotion baseline</li>
+        <li>团队没有 NVIDIA GPU 或较新的驱动</li>
+        <li>任务只涉及简单刚体接触，现有引擎已足够</li>
+        <li>不能接受 API 与求解器行为的快速变化</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="facts">
+  <h2><span class="num">06</span>事实卡</h2>
+  <dl class="kv">
+    <dt>发起方</dt><dd>Disney Research、Google DeepMind、NVIDIA</dd>
+    <dt>治理</dt><dd>Linux Foundation 项目，社区共建</dd>
+    <dt>代码</dt><dd><a href="https://github.com/newton-physics/newton" target="_blank" rel="noopener">newton-physics/newton</a>，Apache-2.0（文档 CC-BY-4.0）</dd>
+    <dt>计算基座</dt><dd>NVIDIA Warp；泛化已弃用的 <code>warp.sim</code></dd>
+    <dt>主后端</dt><dd>MuJoCo Warp</dd>
+    <dt>场景表达</dt><dd>OpenUSD</dd>
+    <dt>求解器</dt><dd>MuJoCo-Warp、XPBD、Featherstone、VBD、MPM、Kamino 等</dd>
+    <dt>Isaac Lab 集成</dt><dd><code>isaaclab_newton</code>；3.0 GA 支持 kit-less、多求解器、策略迁移</dd>
+    <dt>硬件</dt><dd>Linux（x86-64 / aarch64）、Windows（x86-64）、macOS（仅 CPU）；GPU 需 Turing+</dd>
+    <dt>入口</dt><dd><span class="mono">pip install "newton[examples]"</span> / <span class="mono">python -m newton.examples</span></dd>
+  </dl>
+</section>
+
+<section id="links">
+  <h2><span class="num">07</span>资源</h2>
+  <ul>
+    <li><a href="https://github.com/newton-physics/newton" target="_blank" rel="noopener">代码：newton-physics/newton</a></li>
+    <li><a href="https://newton-physics.github.io/newton/latest/guide/overview.html" target="_blank" rel="noopener">文档：Newton Overview</a></li>
+    <li><a href="https://www.linuxfoundation.org/press/linux-foundation-announces-contribution-of-newton-by-disney-research-google-deepmind-and-nvidia-to-accelerate-open-robot-learning" target="_blank" rel="noopener">Linux Foundation 公告</a></li>
+    <li><a href="https://developer.nvidia.com/blog/announcing-newton-an-open-source-physics-engine-for-robotics-simulation/" target="_blank" rel="noopener">NVIDIA 博客：Announcing Newton</a></li>
+    <li><a href="https://developer.nvidia.com/blog/train-a-quadruped-locomotion-policy-and-simulate-cloth-manipulation-with-nvidia-isaac-lab-and-newton/" target="_blank" rel="noopener">NVIDIA 教程：Isaac Lab + Newton 四足与布料</a></li>
+    <li><a href="../01.IsaacLab/index.html">本目录：Isaac Lab 的多后端架构</a></li>
+    <li><a href="resources.md">本页资源清单（Markdown）</a></li>
+  </ul>
+</section>
+
+<div class="prevnext">
+  <a href="../04.UniLab/index.html">← UniLab</a>
+  <a href="../06.Genesis/index.html">下一层：Genesis →</a>
+</div>
+
+</main>
+
+<aside class="side-col">
+  <nav class="toc">
+    <h4>On this page</h4>
+    <a href="#why">位置</a>
+    <a href="#arch">架构</a>
+    <a href="#design">四个信号</a>
+    <a href="#cost">边界</a>
+    <a href="#fit">选型建议</a>
+    <a href="#facts">事实卡</a>
+    <a href="#links">资源</a>
+    <a class="back" href="../index.html">← 10.Simulators</a>
+  </nav>
+</aside>
+</div>
+
+<footer class="footer">
+  UAV-Survey · 10.Simulators / Newton · 资料截至 2026-10 · <a href="../../index.html">Home</a>
+</footer>
+</body>
+</html>

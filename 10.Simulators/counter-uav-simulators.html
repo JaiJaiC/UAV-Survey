@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>反无仿真器选型：只看仿真器 · 10.Simulators</title>
+<link rel="stylesheet" href="assets/sim.css">
+<style>
+  .sim-table table { min-width: 1560px; }
+  .sim-table th:nth-child(1), .sim-table td:nth-child(1) { min-width: 155px; }
+  .sim-table th:nth-child(2), .sim-table td:nth-child(2) { min-width: 115px; }
+  .sim-table th:nth-child(3), .sim-table td:nth-child(3) { min-width: 190px; }
+  .sim-table th:nth-child(4), .sim-table td:nth-child(4) { min-width: 170px; }
+  .sim-table th:nth-child(5), .sim-table td:nth-child(5) { min-width: 180px; }
+  .sim-table th:nth-child(6), .sim-table td:nth-child(6) { min-width: 120px; }
+  .sim-table th:nth-child(7), .sim-table td:nth-child(7) { min-width: 120px; }
+  .sim-table th:nth-child(8), .sim-table td:nth-child(8) { min-width: 150px; }
+  .sim-table th:nth-child(9), .sim-table td:nth-child(9) { min-width: 210px; }
+  .sim-table td { font-size: .79rem; line-height: 1.55; }
+  .score { color: var(--warm); font-weight: 800; font-family: var(--mono); }
+  .role { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin:18px 0; }
+  .role .card h3 { font-size: .95rem; }
+  .role .card p { font-size: .84rem; }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="../index.html" class="home-btn">HOME</a>
+  <span class="crumb"><a href="index.html">10.Simulators</a> / <a href="counter-uav.html">反无</a> / 仿真器</span>
+  <span class="spacer"></span>
+  <a class="navlink" href="counter-uav-stacks.html">只看训练栈</a>
+  <a class="navlink" href="counter-uav.html">反无导航</a>
+  <a class="navlink" href="stack-anatomy.html">栈怎么统一</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="kicker">Simulator-only · Counter-UAS</span>
+    <h1>反无仿真器选型<br><span style="font-size:.55em;opacity:.85">这一页只看仿真器，不看 PPO 用哪个库</span></h1>
+    <p class="lede">
+      约束来自你的任务：<strong>固定翼 defender、旋翼 intruder、单目 YOLO、PX4 SITL/HITL、两机对抗</strong>。
+      仿真器要回答的是：气动够不够真、PX4 能不能闭环、相机能不能生成可信图像、多机能不能同步。
+      训练栈怎么组织，是另一页的事。
+    </p>
+    <div class="meta-row">
+      <span class="chip accent">19 个仿真器/平台</span>
+      <span class="chip">固定翼 + 旋翼</span>
+      <span class="chip">PX4 SITL/HITL</span>
+      <span class="chip warm">只比仿真器</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="constraints">
+  <h2><span class="num">00</span>四个硬约束</h2>
+  <div class="grid grid-2">
+    <div class="card warm">
+      <h3>① 固定翼气动</h3>
+      <p>不是「有没有固定翼模型」，而是「失速、侧滑、风切变、舵面延迟下，拦截控制还成不成立」。Gazebo 的 <code>advanced_plane</code> + Advanced Lift Drag / AVL 是底线；JSBSim / FlightGear / X-Plane 是参考系。</p>
+    </div>
+    <div class="card">
+      <h3>② PX4 SITL / HITL</h3>
+      <p>你要的是两架 PX4：defender 固定翼 + intruder 旋翼，MAVLink、offboard、时钟同步都要通。没有 PX4 接口的仿真器，只能做算法原型，不能做系统闭环。</p>
+    </div>
+    <div class="card cyan">
+      <h3>③ 单目相机</h3>
+      <p>YOLO 的输入质量取决于 FOV、内参、曝光、运动模糊、纹理和延迟。照片级渲染不是「好看」，而是让二阶矩和虚拟平面误差可测。</p>
+    </div>
+    <div class="card green">
+      <h3>④ 多机与吞吐</h3>
+      <p>两机只是下限；你还会做初始几何扫描、风扰、检测噪声。仿真器要能稳定跑多实例，最好能批量并行，否则实验周期会被排队吃掉。</p>
+    </div>
+  </div>
+</section>
+
+<section id="table">
+  <h2><span class="num">01</span>仿真器 vs 仿真器</h2>
+  <p>
+    下表只比较仿真器本身：气动、PX4、相机、多机、吞吐、平台。最后一列是「针对本任务」的主观适配度，
+    不是通用排名。第一列固定，横向滚动看全部列。
+  </p>
+
+  <div class="table-wrap sticky sim-table">
+    <table>
+      <thead>
+        <tr>
+          <th>仿真器 / 版本</th>
+          <th>类型</th>
+          <th>固定翼气动</th>
+          <th>PX4 / HIL</th>
+          <th>相机 / 渲染</th>
+          <th>多机 / 传感器</th>
+          <th>并行 / 吞吐</th>
+          <th>许可 / 平台</th>
+          <th>反无适配</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Gazebo Sim</strong><span class="sub">Jetty LTS</span></td>
+          <td>ROS 2 仿真平台</td>
+          <td class="part">中—高<span class="sub">advanced_plane + AVL</span></td>
+          <td class="tick">PX4 原生<span class="sub">SITL/HITL</span></td>
+          <td>OGRE 2.x<span class="sub">中等真实感</span></td>
+          <td class="tick">强</td>
+          <td class="no">低<span class="sub">CPU 单实例</span></td>
+          <td>Apache-2.0 / Linux</td>
+          <td><span class="score">4.5/5</span> 系统闭环、多机、HITL 首选</td>
+        </tr>
+        <tr>
+          <td><strong>Gazebo Classic</strong><span class="sub">11 · EOL</span></td>
+          <td>ROS 1 仿真平台</td>
+          <td class="part">中<span class="sub">PX4 plane / lift-drag</span></td>
+          <td class="tick">PX4 / ArduPilot</td>
+          <td>OGRE 1.x</td>
+          <td class="tick">强</td>
+          <td class="no">低</td>
+          <td>Apache-2.0 / Linux</td>
+          <td><span class="score">3/5</span> 能跑但已 EOL（2025-01-29）</td>
+        </tr>
+        <tr>
+          <td><strong>RflySim</strong><span class="sub">PX4 + UE</span></td>
+          <td>PX4 工程仿真 / HIL</td>
+          <td class="tick">高<span class="sub">固定翼配置 + PX4</span></td>
+          <td class="tick">PX4 为主<span class="sub">SITL/HITL</span></td>
+          <td class="tick">UE 高<span class="sub">视觉/场景强</span></td>
+          <td class="tick">强</td>
+          <td class="part">中<span class="sub">UE + PX4 多实例</span></td>
+          <td>商业/学术授权 / Windows</td>
+          <td><span class="score">4.5/5</span> 最接近「PX4 + 固定翼 + 视觉」工程闭环</td>
+        </tr>
+        <tr>
+          <td><strong>XTDrone</strong><span class="sub">PX4 + Gazebo</span></td>
+          <td>多机型研究平台</td>
+          <td class="part">中<span class="sub">固定翼 / VTOL</span></td>
+          <td class="tick">PX4</td>
+          <td>Gazebo 中</td>
+          <td class="tick">强</td>
+          <td class="no">低</td>
+          <td>BSD-3 / Linux</td>
+          <td><span class="score">3.5/5</span> 多机型原型/教学，工程化弱于 RflySim</td>
+        </tr>
+        <tr>
+          <td><strong>AirSim</strong><span class="sub">UE 插件</span></td>
+          <td>视觉/学习仿真</td>
+          <td class="no">低—中<span class="sub">以多旋翼为主</span></td>
+          <td class="part">PX4/ArduPilot<span class="sub">多旋翼成熟</span></td>
+          <td class="tick">UE 高<span class="sub">相机/天气/深度</span></td>
+          <td class="part">中</td>
+          <td class="no">低—中</td>
+          <td>MIT / Windows·Linux</td>
+          <td><span class="score">3/5</span> 视觉数据强，固定翼与维护是短板</td>
+        </tr>
+        <tr>
+          <td><strong>FlightGoggles</strong><span class="sub">MIT · Unity</span></td>
+          <td>视觉无人机仿真</td>
+          <td class="no">低<span class="sub">四旋翼</span></td>
+          <td class="no">无</td>
+          <td class="tick">Unity 高<span class="sub">照片级相机</span></td>
+          <td class="part">中</td>
+          <td class="no">低</td>
+          <td>开源 / Windows·Linux</td>
+          <td><span class="score">2.5/5</span> 只做视觉验证，不覆盖固定翼/PX4</td>
+        </tr>
+        <tr>
+          <td><strong>Flightmare</strong><span class="sub">UZH · Unity</span></td>
+          <td>四旋翼 RL 仿真</td>
+          <td class="no">低<span class="sub">四旋翼</span></td>
+          <td class="no">无</td>
+          <td class="tick">Unity 高<span class="sub">渲染/物理解耦</span></td>
+          <td class="tick">强</td>
+          <td class="tick">高<span class="sub">数百 quad 并行</span></td>
+          <td>MIT / Linux</td>
+          <td><span class="score">3/5</span> 视觉 RL 快，但只适合 intruder/旋翼</td>
+        </tr>
+        <tr>
+          <td><strong>RotorS</strong><span class="sub">Gazebo</span></td>
+          <td>MAV 研究仿真</td>
+          <td class="no">低<span class="sub">多旋翼</span></td>
+          <td class="no">无<span class="sub">ROS 控制</span></td>
+          <td>Gazebo 中</td>
+          <td class="part">中</td>
+          <td class="no">低</td>
+          <td>开源 / Linux</td>
+          <td><span class="score">2/5</span> 旧，四旋翼控制研究</td>
+        </tr>
+        <tr>
+          <td><strong>Aerial Gym</strong><span class="sub">Isaac Gym</span></td>
+          <td>GPU 旋翼 RL</td>
+          <td class="no">低<span class="sub">四旋翼/六旋翼</span></td>
+          <td class="no">无</td>
+          <td class="part">中<span class="sub">基础相机</span></td>
+          <td class="tick">强</td>
+          <td class="tick">高<span class="sub">万级 env</span></td>
+          <td>开源 / NVIDIA</td>
+          <td><span class="score">2.5/5</span> 训练 intruder 可以，defender 不行</td>
+        </tr>
+        <tr>
+          <td><strong>Isaac Sim / Isaac Lab</strong><span class="sub">3.0</span></td>
+          <td>GPU 平台 / RTX</td>
+          <td class="part">中<span class="sub">固定翼需自定义气动</span></td>
+          <td class="no">无</td>
+          <td class="tick">RTX 高<span class="sub">相机/深度/材质</span></td>
+          <td class="tick">强</td>
+          <td class="tick">高<span class="sub">GPU 并行</span></td>
+          <td>BSD-3 / NVIDIA</td>
+          <td><span class="score">4/5</span> GPU 仿真 + 视觉，但要把固定翼气动补上</td>
+        </tr>
+        <tr>
+          <td><strong>JSBSim</strong><span class="sub">独立 FDM</span></td>
+          <td>飞行动力学库</td>
+          <td class="tick">高<span class="sub">6-DoF 气动/发动机</span></td>
+          <td class="part">经 FlightGear/PX4</td>
+          <td class="no">无</td>
+          <td class="no">弱</td>
+          <td class="part">中<span class="sub">CPU 批量</span></td>
+          <td>开源 / 跨平台</td>
+          <td><span class="score">4/5</span> 气动最可信，视觉/多机外接</td>
+        </tr>
+        <tr>
+          <td><strong>FlightGear</strong><span class="sub">JSBSim</span></td>
+          <td>飞行模拟器</td>
+          <td class="tick">高<span class="sub">JSBSim</span></td>
+          <td class="tick">PX4/ArduPilot</td>
+          <td class="part">中—高</td>
+          <td class="part">中</td>
+          <td class="no">低</td>
+          <td>GPL / 跨平台</td>
+          <td><span class="score">3.5/5</span> 气动 + 视觉 + PX4，不是 RL 环境</td>
+        </tr>
+        <tr>
+          <td><strong>X-Plane</strong><span class="sub">11/12</span></td>
+          <td>商业飞行模拟</td>
+          <td class="tick">高</td>
+          <td class="tick">PX4 SITL</td>
+          <td class="tick">高</td>
+          <td class="part">中</td>
+          <td class="no">低</td>
+          <td>商业 / Windows·macOS</td>
+          <td><span class="score">4/5</span> 固定翼 + 视觉很好，RL 要自己接</td>
+        </tr>
+        <tr>
+          <td><strong>MuJoCo / MJX</strong><span class="sub">MJWarp</span></td>
+          <td>物理引擎 / RL</td>
+          <td class="part">中<span class="sub">自定义气动</span></td>
+          <td class="no">无</td>
+          <td class="no">低—中</td>
+          <td class="part">中</td>
+          <td class="tick">高<span class="sub">MJX/MJWarp</span></td>
+          <td>Apache-2.0 / 广</td>
+          <td><span class="score">3.5/5</span> 控制仿真快，固定翼模型要自己写</td>
+        </tr>
+        <tr>
+          <td><strong>Genesis World</strong><span class="sub">Nyx</span></td>
+          <td>多物理 / 评估</td>
+          <td class="part">中<span class="sub">自定义气动</span></td>
+          <td class="no">无</td>
+          <td class="tick">Nyx 高</td>
+          <td class="tick">强</td>
+          <td class="tick">高</td>
+          <td>Apache-2.0 / 多后端</td>
+          <td><span class="score">3/5</span> 评估/多物理有潜力，生态年轻</td>
+        </tr>
+        <tr>
+          <td><strong>PyBullet</strong><span class="sub">gym-pybullet-drones</span></td>
+          <td>轻量物理 / RL</td>
+          <td class="part">低—中<span class="sub">自定义</span></td>
+          <td class="no">无</td>
+          <td class="no">低</td>
+          <td class="part">中</td>
+          <td class="part">中—高</td>
+          <td>zlib / 跨平台</td>
+          <td><span class="score">2.5/5</span> 控制原型快，视觉/气动弱</td>
+        </tr>
+        <tr>
+          <td><strong>Webots</strong><span class="sub">Cyberbotics</span></td>
+          <td>通用机器人仿真</td>
+          <td class="part">低—中<span class="sub">自定义</span></td>
+          <td class="no">无</td>
+          <td class="part">中</td>
+          <td class="part">中</td>
+          <td class="part">中</td>
+          <td>Apache-2.0 / 跨平台</td>
+          <td><span class="score">2.5/5</span> 传感器/ROS 2 好，飞行动力学不专</td>
+        </tr>
+        <tr>
+          <td><strong>CoppeliaSim</strong><span class="sub">V-REP</span></td>
+          <td>通用机器人仿真</td>
+          <td class="part">低—中<span class="sub">自定义</span></td>
+          <td class="no">无</td>
+          <td class="part">中</td>
+          <td class="part">中</td>
+          <td class="part">中</td>
+          <td>商业/免费版 / 跨平台</td>
+          <td><span class="score">2.5/5</span> 插件/传感器多，飞行动力学不专</td>
+        </tr>
+        <tr>
+          <td><strong>Unreal Engine 5</strong><span class="sub">自定义</span></td>
+          <td>渲染 / 场景引擎</td>
+          <td class="no">需外接 FDM</td>
+          <td class="no">需外接</td>
+          <td class="tick">最高<span class="sub">Lumen/Nanite</span></td>
+          <td class="part">取决于实现</td>
+          <td class="no">低</td>
+          <td>商业 / Windows</td>
+          <td><span class="score">3.5/5</span> 视觉最强，动力学/PX4 都要自己接</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    评分是「固定翼 defender + 旋翼 intruder + 单目 + PX4」的主观适配度（1–5），不是通用排名。
+    Aerial Gym / Flightmare / FlightGoggles 是旋翼专用，适合 intruder 或视觉验证，不适合 defender。
+    Gazebo 的 <code>rc_cessna</code> 只是起点；自有气动体优先用 <code>advanced_plane</code> + Advanced Lift Drag / AVL。
+  </p>
+</section>
+
+<section id="roles">
+  <h2><span class="num">02</span>按角色选，不选「全能冠军」</h2>
+  <div class="role">
+    <div class="card green">
+      <h3>系统闭环 / 多机 / HITL</h3>
+      <p><strong>Gazebo Sim</strong>：PX4 + advanced_plane + 旋翼 intruder，两机、MAVLink、offboard 都能验证。</p>
+      <p class="mb0"><strong>RflySim</strong>：预算允许时，PX4 + UE + 固定翼配置更接近工程闭环。</p>
+    </div>
+    <div class="card">
+      <h3>气动基准 / 控制复核</h3>
+      <p><strong>JSBSim + FlightGear</strong>：配平、失速、侧滑、风扰的参考系；FlightGear 提供可视化。</p>
+      <p class="mb0"><strong>X-Plane</strong>：商业固定翼/视觉验证，PX4 SITL 可接。</p>
+    </div>
+    <div class="card purple">
+      <h3>视觉数据 / YOLO 验证</h3>
+      <p><strong>RflySim / AirSim / UE5</strong>：照片级图像、相机内参、天气；FlightGoggles 也可做纯视觉。</p>
+      <p class="mb0"><strong>Gazebo 相机</strong>：只做集成 baseline，不要指望它生成训练级图像。</p>
+    </div>
+    <div class="card warm">
+      <h3>GPU 仿真 / 大规模 PPO</h3>
+      <p><strong>Isaac Lab</strong>：RTX 相机 + GPU 并行；固定翼气动要自己补。</p>
+      <p class="mb0"><strong>MuJoCo/MJX</strong>：控制仿真快；视觉弱，固定翼模型自己写。</p>
+    </div>
+    <div class="card cyan">
+      <h3>旋翼 intruder</h3>
+      <p><strong>Aerial Gym / Flightmare / PyBullet</strong>：四旋翼大规模 RL 或快速原型。</p>
+      <p class="mb0">它们不能训练固定翼 defender，别拿来做主栈。</p>
+    </div>
+    <div class="card">
+      <h3>通用机器人 / 教学</h3>
+      <p><strong>Webots / CoppeliaSim</strong>：ROS 2、传感器、插件丰富，但飞行动力学不专。</p>
+      <p class="mb0">适合验证感知/控制接口，不适合做主训练平台。</p>
+    </div>
+  </div>
+</section>
+
+<section id="decide">
+  <h2><span class="num">03</span>选择顺序</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>先问</th><th>如果是</th><th>选</th><th>如果不是</th></tr></thead>
+      <tbody>
+        <tr><td>需要 PX4 SITL/HITL 吗？</td><td>是</td><td>Gazebo Sim / RflySim / XTDrone</td><td>可看 Isaac Lab / MuJoCo / JSBSim</td></tr>
+        <tr><td>固定翼气动要可信到失速/风扰吗？</td><td>是</td><td>advanced_plane + AVL；JSBSim / FlightGear / X-Plane 复核</td><td>Gazebo 默认模型可先跑通</td></tr>
+        <tr><td>需要照片级 YOLO 数据吗？</td><td>是</td><td>RflySim / AirSim / UE5 / FlightGoggles</td><td>Gazebo 相机做 baseline</td></tr>
+        <tr><td>需要万级并行 PPO 吗？</td><td>是</td><td>Isaac Lab / MuJoCo/MJX（固定翼自定义）</td><td>Gazebo/RflySim 单实例即可</td></tr>
+        <tr><td>只训练旋翼 intruder 吗？</td><td>是</td><td>Aerial Gym / Flightmare / PyBullet</td><td>不要用旋翼专用仿真器训 defender</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn">
+    <span class="label">不要做的事</span>
+    不要用 Gazebo Classic 开新项目（已 EOL）；不要指望 AirSim 原生支持固定翼；不要用 Aerial Gym 训练固定翼 defender；
+    不要把「能加载固定翼模型」当成「气动可信」。
+  </div>
+</section>
+
+<section id="links">
+  <h2><span class="num">04</span>资料与下一步</h2>
+  <ul>
+    <li><a href="counter-uav-stacks.html">另一条线：只看训练栈</a></li>
+    <li><a href="counter-uav.html">反无选型导航</a></li>
+    <li><a href="https://docs.px4.io/main/en/sim_gazebo_gz/vehicles" target="_blank" rel="noopener">PX4 Gazebo 机型（rc_cessna / advanced_plane）</a></li>
+    <li><a href="https://docs.px4.io/main/en/sim_gazebo_gz/tools_avl_automation" target="_blank" rel="noopener">PX4 Advanced Lift Drag / AVL 工具</a></li>
+    <li><a href="https://docs.px4.io/main/en/sim_jsbsim/" target="_blank" rel="noopener">PX4 JSBSim</a></li>
+    <li><a href="http://www.rflysim.com/doc/zh/px4psp/RflySimAPIs/2.RflySimUsage/0.ApiExps/e2_FWConfig/Readme.pdf" target="_blank" rel="noopener">RflySim 固定翼配置</a></li>
+  </ul>
+</section>
+
+<div class="prevnext">
+  <a href="counter-uav.html">← 反无导航</a>
+  <a href="counter-uav-stacks.html">只看训练栈 →</a>
+</div>
+
+</main>
+
+<footer class="footer">
+  UAV-Survey · 10.Simulators / 反无仿真器选型 · 资料截至 2026-10 · <a href="../index.html">Home</a>
+</footer>
+</body>
+</html>

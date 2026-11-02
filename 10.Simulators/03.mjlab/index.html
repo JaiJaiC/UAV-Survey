@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mjlab · 仿真与训练栈档案</title>
+<link rel="stylesheet" href="../assets/sim.css">
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="../../index.html" class="home-btn">HOME</a>
+  <span class="crumb"><a href="../index.html">10.Simulators</a> / mjlab</span>
+  <span class="spacer"></span>
+  <a class="navlink" href="../comparison.html">对比表（含 Gazebo）</a>
+  <a class="navlink" href="../sim-training-stack-report.pdf">PDF 报告</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="kicker">Layer 02 · 任务与环境入口</span>
+    <h1>mjlab<br><span style="font-size:.55em;opacity:.85">真正值得看的不是组合，而是环境的组织方式</span></h1>
+    <p class="lede">
+      mjlab 常被读成「MuJoCo Warp + Isaac Lab API」的一次工程拼装。这个描述没错，但漏掉了重点：
+      它把<strong>环境定义本身</strong>抬成了一个需要长期维护的基础设施问题。observation、reward、event、command、
+      curriculum、metrics 被拆成可组合模块，底层保留 MuJoCo 的原生数据结构和可调试性——这让它在「快速试错」和
+      「长期迭代」之间找到了一个比较少见的平衡点。
+    </p>
+    <div class="meta-row">
+      <span class="chip accent">Zakka / Liao / Yi 等</span>
+      <span class="chip">arXiv <b>2601.22074</b></span>
+      <span class="chip">Apache-2.0</span>
+      <span class="chip">MuJoCo Warp <b>3.16</b></span>
+      <span class="chip warm">轻量工程折中</span>
+    </div>
+  </div>
+</header>
+
+<div class="article-grid">
+<main class="main-col">
+
+<section id="why">
+  <h2><span class="num">01</span>它回答的是「代码还能不能继续组织」</h2>
+  <p>
+    人形机器人训练最怕的往往不是「训练慢」，而是代码越写越乱。今天做速度跟踪，明天做动作模仿，后天加地形，
+    再后来加视觉、负载、末端接触、摔倒恢复。每个任务都需要 observation、reward、event、command、curriculum。
+    如果每个环境都是一个巨型脚本，短期能跑，长期会很难维护；等你要比较多个机器人、本体版本和奖励设计时，
+    实验会被代码结构反过来拖住。
+  </p>
+  <p>
+    mjlab 的做法是把 Isaac Lab 里被证明有效的 <strong>manager-based API</strong> 拿过来，
+    让这些组成部分以 term 的形式组合；底层换成 MuJoCo Warp 做 GPU 并行，同时保留对原生 <code>MjModel</code> /
+    <code>MjData</code> 的直接访问。它没有试图在功能上超过 Isaac Lab，而是把「该有的任务组织」保留下来，
+    把「开局成本」压到足够低。
+  </p>
+  <div class="callout idea">
+    <span class="label">一句话定位</span>
+    mjlab 不是「小号 Isaac Lab」。它更像一个<strong>关于环境抽象的实验</strong>：证明 manager API 可以脱离
+    Isaac Sim 的重量，独立存在。
+  </div>
+</section>
+
+<section id="arch">
+  <h2><span class="num">02</span>架构：从 MjSpec 到 GPU 并行</h2>
+  <div class="stack">
+    <div class="layer"><div class="lname">任务配置<span>manager terms</span></div><div class="items">
+      <span class="item blue">Observation</span><span class="item blue">Reward</span><span class="item blue">Event</span><span class="item blue">Command</span><span class="item blue">Curriculum</span><span class="item blue">Metrics</span>
+    </div></div>
+    <div class="layer"><div class="lname">实体与场景<span>spec</span></div><div class="items">
+      <span class="item">Entity</span><span class="item">MjSpec</span><span class="item">MjModel</span><span class="item">Terrain</span><span class="item">Sensor</span>
+    </div></div>
+    <div class="layer"><div class="lname">仿真后端<span>physics</span></div><div class="items">
+      <span class="item hot">MuJoCo Warp</span><span class="item">GPU 并行</span><span class="item">原生 MuJoCo 数据结构</span>
+    </div></div>
+    <div class="layer"><div class="lname">训练接口<span>RL</span></div><div class="items">
+      <span class="item green">ManagerBasedRlEnv</span><span class="item green">RSL-RL PPO</span><span class="item">多 GPU</span><span class="item">W&amp;B</span><span class="item">ONNX 导出</span>
+    </div></div>
+  </div>
+  <p>
+    论文里的链路很清楚：实体组成 <code>MjSpec</code>，编译成 <code>MjModel</code>，交给 MuJoCo Warp 做 GPU 并行仿真；
+    上层用 <code>ManagerBasedRlEnv</code> 管理 RL 任务，再接 RSL-RL 训练。这条链路没有隐藏的「平台层」，
+    研究者可以一路往下看到 MuJoCo 的数据结构。
+  </p>
+</section>
+
+<section id="design">
+  <h2><span class="num">03</span>四个工程选择</h2>
+
+  <h3>1. 把「开局摩擦」当成一等指标</h3>
+  <p>
+    mjlab 的安装路径短到有点反常：<code>uvx --from mjlab --refresh demo</code> 可以直接跑 demo，
+    训练命令也只差一个 task id。论文把「single command install, minimal dependencies」写进摘要，
+    说明作者认为研究者在前 30 分钟流失，是一个真实的问题。这不是懒，而是对研究节奏的尊重。
+  </p>
+
+  <h3>2. 保留原生 MuJoCo 的可调试性</h3>
+  <p>
+    很多「轻量框架」最后会把底层封得不透明：出问题只能看日志。mjlab 明确保留对 MuJoCo 原生数据结构的访问，
+    这意味着接触、约束、执行器的问题可以按 MuJoCo 的方式排查。对做 sim2real 的团队，这个属性比多几个传感器更重要。
+  </p>
+
+  <h3>3. 用 dummy agent 做 MDP  sanity check</h3>
+  <p>
+    这是一个很实用的细节：<code>--agent zero</code> 发送零动作，<code>--agent random</code> 发送均匀随机动作。
+    在正式训练前，先用零动作确认机器人不会穿地、不会爆炸，再用随机动作确认 termination、reset、observation
+    的维度与语义没问题。它把「调试环境」和「调试算法」拆开了。
+  </p>
+
+  <h3>4. 厂商开始用它组织真机流程</h3>
+  <p>
+    Unitree 的 <code>unitree_rl_mjlab</code> 基于 mjlab + MuJoCo，支持 Go2、A2、As2、G1、R1、H1_2、H2，
+    流程写成 <strong>Train → Play → Sim2Real</strong>，训练时导出 ONNX，部署前用 <code>unitree_mujoco</code> 做仿真验证。
+    这个信号比「mjlab 很轻」更重要：轻量框架如果只停留在 toy task，很难证明自己；当机器人厂商拿它组织 RL 流程，
+    说明它至少在「快速研究」和「真实任务」之间找到了接口。
+  </p>
+</section>
+
+<section id="cost">
+  <h2><span class="num">04</span>边界：它故意没有做什么</h2>
+  <ul>
+    <li><strong>不是完整平台。</strong> 没有 Isaac Lab 级别的 USD 资产管理、ROS bridge、XR 遥操作、HIL、照片级渲染。</li>
+    <li><strong>依赖 NVIDIA GPU。</strong> 训练需要 NVIDIA GPU，macOS 只支持评估；跨厂商硬件不是当前目标。</li>
+    <li><strong>功能面更窄。</strong> 传感器、可变形体、多物理耦合、复杂场景的支持不如 Isaac Lab / Newton / Genesis。</li>
+    <li><strong>生态还年轻。</strong> 第三方任务、资产、教程的数量远少于 Isaac Lab；遇到问题时社区答案也少。</li>
+  </ul>
+  <p>
+    这些不是「缺陷」，而是设计选择。mjlab 的目标不是覆盖所有工作流，而是让<strong>研究前段</strong>足够顺：
+    先知道一个想法值不值得继续投时间，再决定要不要迁移到更重的平台。
+  </p>
+</section>
+
+<section id="fit">
+  <h2><span class="num">05</span>什么时候该选它</h2>
+  <div class="grid grid-2">
+    <div class="card green">
+      <h3>适合</h3>
+      <ul class="mb0">
+        <li>人形 / 四足的速度跟踪、动作模仿、灵巧操作快速迭代</li>
+        <li>需要比较多个 reward、本体版本、动作空间</li>
+        <li>团队想保留 MuJoCo 的可调试性，又需要 GPU 并行</li>
+        <li>想把真机流程写成 Train / Play / Sim2Real 的清晰链路</li>
+        <li>作为「研究前段」的轻量环境，之后迁移到 Isaac Lab</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>不适合</h3>
+      <ul class="mb0">
+        <li>需要多模态传感、复杂场景、照片级渲染</li>
+        <li>需要软体、布料、颗粒、流体等多物理</li>
+        <li>团队没有 NVIDIA GPU，或需要跨厂商硬件</li>
+        <li>需要成熟的企业级资产管理、部署、权限与协作</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="facts">
+  <h2><span class="num">06</span>事实卡</h2>
+  <dl class="kv">
+    <dt>论文</dt><dd>arXiv:2601.22074，v1 2026-01-29，v2 2026-02-25，11 页</dd>
+    <dt>作者</dt><dd>Kevin Zakka, Qiayuan Liao, Brent Yi, Louis Le Lay, Koushil Sreenath, Pieter Abbeel</dd>
+    <dt>代码</dt><dd><a href="https://github.com/mujocolab/mjlab" target="_blank" rel="noopener">mujocolab/mjlab</a>，Apache-2.0</dd>
+    <dt>物理后端</dt><dd>MuJoCo Warp 3.16.0（GPU 并行）</dd>
+    <dt>API 风格</dt><dd>Isaac Lab manager-based：observation / reward / event / command / curriculum / metrics</dd>
+    <dt>参考任务</dt><dd>Velocity-Flat-Unitree-G1、Tracking-Flat-Unitree-G1、manipulation</dd>
+    <dt>规模</dt><dd>单卡示例 4096 envs，多 GPU 通过 <code>--gpu-ids</code></dd>
+    <dt>硬件</dt><dd>训练需 NVIDIA GPU；macOS 仅评估</dd>
+    <dt>入口</dt><dd><span class="mono">uvx --from mjlab --refresh demo</span> / <span class="mono">uv run train Mjlab-Velocity-Flat-Unitree-G1 --env.scene.num-envs 4096</span></dd>
+  </dl>
+</section>
+
+<section id="links">
+  <h2><span class="num">07</span>资源</h2>
+  <ul>
+    <li><a href="https://arxiv.org/abs/2601.22074" target="_blank" rel="noopener">论文：mjlab: A Lightweight Framework for GPU-Accelerated Robot Learning</a></li>
+    <li><a href="https://github.com/mujocolab/mjlab" target="_blank" rel="noopener">代码：mujocolab/mjlab</a></li>
+    <li><a href="https://mujocolab.github.io/mjlab/" target="_blank" rel="noopener">文档：mjlab Documentation</a></li>
+    <li><a href="https://github.com/unitreerobotics/unitree_rl_mjlab" target="_blank" rel="noopener">Unitree RL Mjlab（Train / Play / Sim2Real）</a></li>
+    <li><a href="https://github.com/google-deepmind/mujoco_warp" target="_blank" rel="noopener">代码：MuJoCo Warp</a></li>
+    <li><a href="resources.md">本页资源清单（Markdown）</a></li>
+  </ul>
+</section>
+
+<div class="prevnext">
+  <a href="../02.MuJoCo/index.html">← MuJoCo / Playground</a>
+  <a href="../04.UniLab/index.html">下一层：UniLab →</a>
+</div>
+
+</main>
+
+<aside class="side-col">
+  <nav class="toc">
+    <h4>On this page</h4>
+    <a href="#why">代码的组织问题</a>
+    <a href="#arch">架构拆解</a>
+    <a href="#design">工程选择</a>
+    <a href="#cost">边界</a>
+    <a href="#fit">选型建议</a>
+    <a href="#facts">事实卡</a>
+    <a href="#links">资源</a>
+    <a class="back" href="../index.html">← 10.Simulators</a>
+  </nav>
+</aside>
+</div>
+
+<footer class="footer">
+  UAV-Survey · 10.Simulators / mjlab · 资料截至 2026-10 · <a href="../../index.html">Home</a>
+</footer>
+</body>
+</html>

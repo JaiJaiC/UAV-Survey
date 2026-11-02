@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Isaac Lab · 仿真与训练栈档案</title>
+<link rel="stylesheet" href="../assets/sim.css">
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="../../index.html" class="home-btn">HOME</a>
+  <span class="crumb"><a href="../index.html">10.Simulators</a> / Isaac Lab</span>
+  <span class="spacer"></span>
+  <a class="navlink" href="../comparison.html">对比表（含 Gazebo）</a>
+  <a class="navlink" href="../sim-training-stack-report.pdf">PDF 报告</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="kicker">Layer 04 · 大平台 / 统一工作台</span>
+    <h1>Isaac Lab<br><span style="font-size:.55em;opacity:.85">把复杂性收进同一个工作台，然后为它付账</span></h1>
+    <p class="lede">
+      Isaac Lab 不是「更快的 Isaac Gym」，也不只是 Isaac Sim 的 Python 前端。它真正做的是把
+      <strong>资产、物理、传感、渲染、任务 API、训练、评估、部署</strong> 收进同一条工程链路。
+      3.0 之后，它更进一步把物理后端变成可选项——PhysX、Newton、OVPhysX 可以按任务切换，
+      这让它从「英伟达全家桶的入口」变成了「一个可以选择底座的机器人学习平台」。
+    </p>
+    <div class="meta-row">
+      <span class="chip accent">NVIDIA</span>
+      <span class="chip">arXiv <b>2511.04831</b></span>
+      <span class="chip">代码 <b>BSD-3-Clause</b></span>
+      <span class="chip">3.0 GA · <b>2026-10-20</b></span>
+      <span class="chip warm">平台层 / 闭环主训练</span>
+    </div>
+  </div>
+</header>
+
+<div class="article-grid">
+<main class="main-col">
+
+<section id="why">
+  <h2><span class="num">01</span>它到底解决了什么问题</h2>
+  <p>
+    如果把机器人学习拆成一条流水线，Isaac Lab 的野心是让这条流水线上每一段都「有地方放」：
+    机器人资产有 USD 描述，场景有 OpenUSD 组合，物理状态是 GPU tensor，传感器有统一接口，
+    域随机化、课程、模仿学习数据采集、策略训练、评估和部署前验证都在同一套配置体系里。
+  </p>
+  <p>
+    这件事在人形机器人上尤其重要。真实任务不会只给你关节角和速度命令，还会给你相机、深度、
+    接触、地形、负载、遮挡、不同频率的传感器，以及一个经常被低估的东西——<strong>团队协作的接口</strong>。
+    当一个人改资产、一个人改 reward、一个人改部署脚本时，平台的价值不是「跑得快」，而是让三个人
+    改的东西不会互相覆盖。
+  </p>
+  <div class="callout idea">
+    <span class="label">一句话定位</span>
+    Isaac Lab 卖的不是仿真速度，而是<strong>复杂机器人项目的组织能力</strong>。它的「重」有一部分是迟早要付的账：
+    你可以现在把它放进系统，也可以以后靠人肉流程补。
+  </div>
+</section>
+
+<section id="arch">
+  <h2><span class="num">02</span>架构：四条纵向链路，一个横向选择</h2>
+  <p>
+    论文把 Isaac Lab 描述为 GPU 并行物理、照片级渲染、模块化环境设计与训练流程的统一体。
+    落到 3.0 的代码结构，可以概括成「四条纵向链路 + 一个横向后端选择」。
+  </p>
+
+  <div class="stack">
+    <div class="layer"><div class="lname">任务与 MDP<span>task / manager</span></div><div class="items">
+      <span class="item blue">Manager-based</span><span class="item">Direct</span><span class="item">Observation</span><span class="item">Reward</span><span class="item">Event / Curriculum</span><span class="item">Command</span>
+    </div></div>
+    <div class="layer"><div class="lname">资产与场景<span>assets / scene</span></div><div class="items">
+      <span class="item">OpenUSD</span><span class="item">URDF / MJCF importer</span><span class="item">Rigid / Articulation</span><span class="item">Deformable</span><span class="item">Terrain</span>
+    </div></div>
+    <div class="layer"><div class="lname">物理与传感<span>physics / sensors</span></div><div class="items">
+      <span class="item">PhysX</span><span class="item">Newton · MuJoCo-Warp</span><span class="item">OVPhysX</span><span class="item">Camera / RayCaster</span><span class="item">IMU / Contact / FrameTransformer</span>
+    </div></div>
+    <div class="layer"><div class="lname">训练与部署<span>train / deploy</span></div><div class="items">
+      <span class="item">RSL-RL</span><span class="item">RL-Games</span><span class="item">skrl</span><span class="item">SB3</span><span class="item">RLinf / TorchRL</span><span class="item">LEAPP export</span>
+    </div></div>
+    <div class="layer"><div class="lname">横向：后端选择<span>presets</span></div><div class="items">
+      <span class="item hot">physics=isaacsim_physx</span><span class="item hot">physics=newton_mjwarp</span><span class="item hot">physics=ovphysx</span><span class="item">renderer=isaacsim_rtx / ovrtx / newton_renderer</span>
+    </div></div>
+  </div>
+
+  <p>
+    3.0 最关键的结构变化是<strong>工厂化的多后端架构</strong>：<code>Articulation</code>、<code>RigidObject</code>、
+    <code>ContactSensor</code> 这些类背后是抽象基类，具体实现放在 <code>isaaclab_physx</code>、
+    <code>isaaclab_newton</code>、<code>isaaclab_ov</code> 等扩展包里。任务代码不需要知道当前跑在哪个物理引擎上，
+    但可以显式选择后端。
+  </p>
+  <p>
+    另一条变化是 <strong>Warp-native 数据通路</strong>。资产和传感器的 <code>.data.*</code> 返回 <code>ProxyArray</code>，
+    可以零拷贝地取 <code>.torch</code> 或 <code>.warp</code> 视图。这听起来像 API 细节，实际影响很大：
+    以前「物理在 Warp、学习在 PyTorch」之间的转换开销，会在大规模并行时变成真实的墙钟成本。
+  </p>
+</section>
+
+<section id="design">
+  <h2><span class="num">03</span>四个值得注意的设计决策</h2>
+
+  <h3>1. 用 manager 把环境拆成可组合的「条款」</h3>
+  <p>
+    observation、reward、event、command、curriculum、termination 各自是 manager 管理的 term 集合。
+    这件事的价值在任务变多之后才显现：速度跟踪、动作模仿、地形行走、移动操作可以共享大量 term，
+    而不是每个任务复制一份巨型脚本。mjlab 后来把这套 API 带到 MuJoCo Warp，恰恰说明这个抽象是有效的。
+  </p>
+
+  <h3>2. 把「传感器」当成一等公民，而不是附加项</h3>
+  <p>
+    论文特别强调多频率传感器仿真。真实人形系统里，IMU、关节编码器、相机、接触、力矩传感器的频率不同，
+    延迟也不同。如果训练框架只提供「一个 step 返回一个观测向量」，后面接 VLA、世界模型或 sim2real 时会反复打补丁。
+  </p>
+
+  <h3>3. 后端可插拔，而不是把任务绑死在一个引擎上</h3>
+  <p>
+    3.0 允许同一任务在 PhysX 和 Newton 之间切换，并提供了 PhysX↔Newton 的策略迁移指南与验证示例。
+    这对 sim2sim 很有价值：<strong>同一个策略在两个物理引擎里都跑得通</strong>，比在单个引擎里刷高成功率更能说明问题。
+    当然，后端支持仍然是 task-specific 的，不能假设「所有任务都能无缝切换」。
+  </p>
+
+  <h3>4. Kit-less：把 Isaac Sim 从「必需」降级为「可选」</h3>
+  <p>
+    这是 3.0 最被低估的变化。过去 Isaac Lab 的门槛很大一部分来自 Isaac Sim / Omniverse Kit 的安装与启动。
+    现在大多数工作流可以只装 Newton 后端，用 Newton GL、Viser、Rerun 做可视化；需要 ROS bridge、XR、
+    livestreaming、完整 RTX 时再装 Isaac Sim。这让「轻量试一下」和「完整部署」不再是二选一。
+  </p>
+
+  <div class="callout">
+    <span class="label">工程含义</span>
+    Isaac Lab 正在从「一个基于 Isaac Sim 的框架」变成「一个可以编译到不同底座上的机器人学习运行时」。
+    这也是它和 MuJoCo Playground、mjlab 最本质的区别：后两者是围绕一个物理引擎做薄，Isaac Lab 是在物理引擎之上做厚。
+  </div>
+</section>
+
+<section id="cost">
+  <h2><span class="num">04</span>代价：重，而且有些重是结构性的</h2>
+  <p>Isaac Lab 的问题从来不是「功能少」，而是获得这些功能的路径比较长。</p>
+  <ul>
+    <li><strong>安装与依赖重。</strong> 即使 kit-less 降低了门槛，完整 RTX / ROS / XR 仍然需要 Isaac Sim 与对应的驱动、容器或 wheel。Windows、aarch64、DGX Spark 的安装路径也各有坑。</li>
+    <li><strong>概念多。</strong> USD、PhysX schema、scene、manager、preset、backend、renderer、visualizer，每一层都有自己的配置。对熟练团队是效率，对新人是认知负担。</li>
+    <li><strong>版本迁移有真实成本。</strong> 2.x → 3.0 把四元数从 WXYZ 改成 XYZW，数据属性改成 <code>ProxyArray</code>，schema 改成 fragment，训练入口统一成 <code>isaaclab train</code>。这些都是会破坏下游代码的改动。</li>
+    <li><strong>英伟达生态耦合。</strong> 虽然 3.0 支持 OVPhysX / OVRTX 等独立库，但 GPU、CUDA、驱动仍然是最顺的路径；跨厂商硬件不是它的设计目标。</li>
+  </ul>
+  <p>
+    所以「Isaac Lab 太重」这句话只对了一半。更准确的说法是：<strong>它把复杂度前置了</strong>。
+    如果你的项目会走到多模态、多任务、多人协作、真机部署，这些复杂度迟早会出现；如果你只是验证一个 reward，
+    为它付这笔前置成本并不划算。
+  </p>
+</section>
+
+<section id="fit">
+  <h2><span class="num">05</span>什么时候该选它</h2>
+  <div class="grid grid-2">
+    <div class="card green">
+      <h3>适合</h3>
+      <ul class="mb0">
+        <li>人形 / 四足 / 灵巧手的全身控制与移动操作，任务会持续变复杂</li>
+        <li>需要相机、深度、接触、IMU 等多模态传感与域随机化</li>
+        <li>团队要共享资产、任务、训练和部署流程</li>
+        <li>需要 PhysX / Newton 双后端做 sim2sim 与策略迁移验证</li>
+        <li>要把策略导出到真机，且希望有官方部署示例与工具链</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>不适合</h3>
+      <ul class="mb0">
+        <li>只想在一下午验证一个 reward 或一组算法对照</li>
+        <li>硬件只有 CPU / Apple Silicon，或强依赖非 NVIDIA 加速器</li>
+        <li>任务以刚体 locomotion 为主，且对启动速度极度敏感</li>
+        <li>团队没有精力维护 USD / Omniverse 相关工具链</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="facts">
+  <h2><span class="num">06</span>事实卡</h2>
+  <dl class="kv">
+    <dt>维护方</dt><dd>NVIDIA（Isaac Lab Project Developers）</dd>
+    <dt>前身</dt><dd>Isaac Gym；论文明确称其为 natural successor</dd>
+    <dt>论文</dt><dd>arXiv:2511.04831，2025-11-06</dd>
+    <dt>当前版本</dt><dd>3.0 GA（2026-10-20）；依赖 Isaac Sim 6.2、Python 3.12、PyTorch 2.11、Warp 1.17、Newton 1.6.1、RSL-RL 5.5.1</dd>
+    <dt>物理后端</dt><dd>Isaac Sim PhysX（默认）、Newton（MuJoCo-Warp / VBD / MPM / Kamino）、OVPhysX</dd>
+    <dt>渲染 / 可视化</dt><dd>Isaac Sim RTX、OVRTX、Newton Warp renderer；Kit、Newton GL、Viser、Rerun</dd>
+    <dt>训练库</dt><dd>RSL-RL、RL-Games、skrl（PyTorch/JAX）、Stable-Baselines3、RLinf、TorchRL</dd>
+    <dt>许可</dt><dd>代码 BSD-3-Clause；Isaac Sim 及其组件另有 NVIDIA 许可</dd>
+    <dt>硬件</dt><dd>NVIDIA GPU 为主；部分后端支持 CPU，完整 RTX 需 RTX 级 GPU</dd>
+    <dt>入口</dt><dd><span class="mono">uv run isaaclab train --rl_library rsl_rl --task ... physics=...</span></dd>
+  </dl>
+</section>
+
+<section id="links">
+  <h2><span class="num">07</span>资源</h2>
+  <ul>
+    <li><a href="https://arxiv.org/abs/2511.04831" target="_blank" rel="noopener">论文：Isaac Lab: A GPU-Accelerated Simulation Framework for Multi-Modal Robot Learning</a></li>
+    <li><a href="https://github.com/isaac-sim/IsaacLab" target="_blank" rel="noopener">代码：isaac-sim/IsaacLab</a></li>
+    <li><a href="https://isaac-sim.github.io/IsaacLab/" target="_blank" rel="noopener">文档：Isaac Lab Documentation</a></li>
+    <li><a href="https://github.com/isaac-sim/IsaacLab/releases/tag/v3.0.0" target="_blank" rel="noopener">Release：v3.0.0（多后端、kit-less、统一 CLI）</a></li>
+    <li><a href="https://developer.nvidia.com/isaac-lab" target="_blank" rel="noopener">产品页：NVIDIA Isaac Lab</a></li>
+    <li><a href="../05.Newton/index.html">本目录：Newton · 底层物理引擎</a></li>
+    <li><a href="resources.md">本页资源清单（Markdown）</a></li>
+  </ul>
+</section>
+
+<div class="prevnext">
+  <a href="../index.html">← 返回对比总览</a>
+  <a href="../02.MuJoCo/index.html">下一层：MuJoCo →</a>
+</div>
+
+</main>
+
+<aside class="side-col">
+  <nav class="toc">
+    <h4>On this page</h4>
+    <a href="#why">它解决了什么</a>
+    <a href="#arch">架构拆解</a>
+    <a href="#design">关键设计</a>
+    <a href="#cost">代价与边界</a>
+    <a href="#fit">选型建议</a>
+    <a href="#facts">事实卡</a>
+    <a href="#links">资源</a>
+    <a class="back" href="../index.html">← 10.Simulators</a>
+  </nav>
+</aside>
+</div>
+
+<footer class="footer">
+  UAV-Survey · 10.Simulators / Isaac Lab · 资料截至 2026-10 · <a href="../../index.html">Home</a>
+</footer>
+</body>
+</html>

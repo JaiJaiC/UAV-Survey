@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UniLab · 仿真与训练栈档案</title>
+<link rel="stylesheet" href="../assets/sim.css">
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="../../index.html" class="home-btn">HOME</a>
+  <span class="crumb"><a href="../index.html">10.Simulators</a> / UniLab</span>
+  <span class="spacer"></span>
+  <a class="navlink" href="../comparison.html">对比表（含 Gazebo）</a>
+  <a class="navlink" href="../sim-training-stack-report.pdf">PDF 报告</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <span class="kicker">Layer 03 · 运行时与异构调度</span>
+    <h1>UniLab<br><span style="font-size:.55em;opacity:.85">瓶颈经常藏在仿真器和算法之间的缝里</span></h1>
+    <p class="lede">
+      过去几年，机器人 RL 的默认答案是「把物理也推到 GPU 上」。UniLab 没有否定这条路线，而是问了一个更系统的问题：
+      训练慢，到底慢在物理 step，还是慢在整条训练回路的等待、搬运和同步？它把 CPU 批量仿真与 GPU 策略学习拆开，
+      用统一运行时管理数据流、缓冲和参数同步，在代表性任务上给出 <strong>3–10×</strong> 的端到端效率提升。
+    </p>
+    <div class="meta-row">
+      <span class="chip accent">THU / SJTU / Motphys 等</span>
+      <span class="chip">arXiv <b>2605.30313</b></span>
+      <span class="chip">CoRL 2026</span>
+      <span class="chip">Apache-2.0</span>
+      <span class="chip warm">训练系统 / 异构执行</span>
+    </div>
+  </div>
+</header>
+
+<div class="article-grid">
+<main class="main-col">
+
+<section id="why">
+  <h2><span class="num">01</span>它把「训练慢」拆成了系统问题</h2>
+  <p>
+    强化学习训练当然包含物理仿真，但整条回路还包括轨迹采样、策略更新、价值函数更新、参数同步、经验缓存、
+    数据搬运、算法依赖和硬件调度。如果仿真器很快但学习器在等数据；如果学习器很快但采样器在等新参数；
+    如果数据在 CPU/GPU 之间搬运的成本很高——单看物理仿真峰值 FPS 就会误导判断。
+  </p>
+  <p>
+    UniLab 的切入点不是「再造一个更快的仿真器」，而是把训练看成一个<strong>生产者–消费者系统</strong>：
+    CPU 侧批量仿真生产数据，GPU 侧学习器消费数据，中间用统一运行时控制缓冲、同步和参数广播。
+    这套视角的价值在于：它把「算法选择」和「执行放置」分开了。
+  </p>
+  <div class="callout idea">
+    <span class="label">一句话定位</span>
+    UniLab 是一篇<strong>训练系统论文</strong>，不是策略优化论文。它最重要的提醒是：
+    机器人 RL 的系统瓶颈，经常藏在仿真器和算法之间的缝里。
+  </div>
+</section>
+
+<section id="arch">
+  <h2><span class="num">02</span>架构：CPU 采样，GPU 学习，中间是运行时</h2>
+  <div class="stack">
+    <div class="layer"><div class="lname">任务配置<span>Hydra</span></div><div class="items">
+      <span class="item blue">Actions</span><span class="item blue">Observations</span><span class="item blue">Rewards</span><span class="item blue">Terminations</span><span class="item blue">Events / Commands</span><span class="item blue">Curricula / Metrics</span>
+    </div></div>
+    <div class="layer"><div class="lname">后端契约<span>SimBackend</span></div><div class="items">
+      <span class="item">MuJoCoUni（CPU 批量）</span><span class="item">MotrixSim（CPU 批量）</span><span class="item">MuJoCo Warp</span><span class="item">Newton</span><span class="item">Isaac Gym</span><span class="item">Genesis（评估）</span>
+    </div></div>
+    <div class="layer"><div class="lname">统一运行时<span>runtime</span></div><div class="items">
+      <span class="item hot">共享内存</span><span class="item hot">环形缓冲</span><span class="item hot">数据流</span><span class="item hot">参数同步</span><span class="item hot">调度</span>
+    </div></div>
+    <div class="layer"><div class="lname">学习器<span>GPU</span></div><div class="items">
+      <span class="item green">PPO（严格同步）</span><span class="item green">APPO（重叠）</span><span class="item green">FastSAC / FlashSAC（replay）</span><span class="item">CUDA / ROCm / MPS / XPU</span>
+    </div></div>
+  </div>
+  <p>
+    论文把算法按「同步约束」组织，而不是按名字罗列：PPO 是最强的 rollout/update 同步；APPO 允许收集与学习重叠，
+    但仍接近 on-policy；FastSAC / FlashSAC 用 replay 进一步放松依赖。这个分类很有洞察力——它说明
+    <strong>算法选择本身就是一种系统调度选择</strong>。
+  </p>
+</section>
+
+<section id="evidence">
+  <h2><span class="num">03</span>证据：3–10× 是怎么来的</h2>
+  <p>
+    论文的受控实验在一台 RTX 4090 + AMD Ryzen 9 9950X3D + 64 GB 内存的工作站上完成，任务覆盖 locomotion、
+    motion tracking、manipulation、manipulation-locomotion，本体覆盖四足、轮足、人形、灵巧手。
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>任务</th><th>算法</th><th>报告提升</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><strong>G1 Flip</strong></td><td>PPO</td><td>3.3×</td><td>严格同步下仍能获益</td></tr>
+        <tr><td><strong>G1 Walk Flat</strong></td><td>FastSAC</td><td>8.4×</td><td>replay + 重叠采集</td></tr>
+        <tr><td><strong>G1 Motion Tracking</strong></td><td>FlashSAC</td><td>11.0×</td><td>论文页给出的代表性上限</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">注：具体数字随硬件、任务、算法与配置变化；「3–10×」是论文的总体口径，不应直接外推为所有任务的承诺。</p>
+  <p>
+    吞吐方面，论文报告 CPU 批量仿真在复杂接触与灵巧操作上并不必然弱于 GPU：例如在 Ryzen 9 9950X3D 上，
+    Go2 任务 MuJoCoUni 约 246k env steps/s，MotrixSim 约 704k；在 Threadripper 9980X 上分别约 916k 与 2.66M。
+    这组数据的意义不是「CPU 比 GPU 快」，而是<strong>CPU 侧的吞吐足以喂饱一个 GPU 学习器</strong>，
+    从而让「异构拆分」在单机工作站上成立。
+  </p>
+</section>
+
+<section id="design">
+  <h2><span class="num">04</span>三个值得借鉴的设计</h2>
+
+  <h3>1. 任务语义只定义一次</h3>
+  <p>
+    UniLab 用 Hydra 的 owner YAML 组织 manager terms，动作、观测、奖励、终止、事件、命令、课程、指标都是可组装的项。
+    换后端、换硬件、换学习器时，任务的环境生命周期不需要重写。这对「同一任务要在多个引擎上做 sim2sim」的团队很有吸引力。
+  </p>
+
+  <h3>2. 后端是一个显式契约，而不是隐式分支</h3>
+  <p>
+    <code>SimBackend</code> 把任务状态、动作、观测相关数据、reset、间隔随机化、地形上下文、回放能力定义成统一接口。
+    这比「在代码里 if backend == ...」要健康得多：物理语义和训练吞吐被分开，新增后端不需要改任务。
+  </p>
+
+  <h3>3. 把「跨平台」当成设计结果，而不是移植工作</h3>
+  <p>
+    论文报告了 Apple macOS、AMD ROCm、Intel XPU 上的训练结果。它没有宣称这些平台和 RTX 4090 绝对等价，
+    而是证明「同一套任务与算法可以在非 CUDA 路径上跑起来」。对高校实验室、小团队和个人开发者，
+    这直接降低了参与门槛。
+  </p>
+</section>
+
+<section id="cost">
+  <h2><span class="num">05</span>边界：它不是万能加速器</h2>
+  <ul>
+    <li><strong>适用范围是「仿真主导 + 可解耦」。</strong> 论文明确说，在严格同步或视觉主导的任务上，CPU/GPU 解耦的收益会变小。</li>
+    <li><strong>只覆盖刚体。</strong> 当前实现聚焦刚体机器人控制，不含可变形体、软体、流体。</li>
+    <li><strong>结论有硬件边界。</strong> 3–10× 是在受控的单 CPU / 单 GPU 工作站上测的，不是极端规模下的峰值吞吐。</li>
+    <li><strong>系统复杂度转移了。</strong> 你不再需要把所有东西塞进 CUDA，但需要理解缓冲、同步、参数广播和 replay 的时序；调错方向的性能问题会更难定位。</li>
+  </ul>
+  <div class="callout warn">
+    <span class="label">不要把 UniLab 读成「GPU 仿真没用」</span>
+    它的结论是「GPU 驻留不是必要条件」，不是「GPU 驻留是错误路线」。在大规模 GPU 集群、复杂视觉任务、
+    已经深度绑定 Isaac 生态的团队里，GPU 驻留仍然是合理甚至更优的选择。
+  </div>
+</section>
+
+<section id="fit">
+  <h2><span class="num">06</span>什么时候该选它</h2>
+  <div class="grid grid-2">
+    <div class="card green">
+      <h3>适合</h3>
+      <ul class="mb0">
+        <li>单机 / 小集群，想在有限 GPU 上提高端到端吞吐</li>
+        <li>刚体 locomotion、motion tracking、manipulation 的 PPO / SAC 训练</li>
+        <li>需要跨 macOS / ROCm / XPU 跑训练</li>
+        <li>想把「仿真后端」和「学习器」解耦，做多引擎 sim2sim</li>
+        <li>已经在用 mjlab / Isaac Lab 的 manager 风格，想换运行时</li>
+      </ul>
+    </div>
+    <div class="card amber">
+      <h3>不适合</h3>
+      <ul class="mb0">
+        <li>视觉主导、渲染密集的任务</li>
+        <li>软体、布料、流体、颗粒等多物理任务</li>
+        <li>需要 GPU 驻留的极大规模并行或集群调度</li>
+        <li>团队不想维护额外的运行时与同步逻辑</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="facts">
+  <h2><span class="num">07</span>事实卡</h2>
+  <dl class="kv">
+    <dt>论文</dt><dd>arXiv:2605.30313，CoRL 2026</dd>
+    <dt>作者机构</dt><dd>THU、SJTU、SII、Motphys、HITSZ、BIT、NEU、SUSTech、TJU、DISCOVER Robotics、HKUST(GZ)、Galbot、NUS 等</dd>
+    <dt>代码</dt><dd><a href="https://github.com/unilabsim/UniLab" target="_blank" rel="noopener">unilabsim/UniLab</a>，Apache-2.0</dd>
+    <dt>核心思路</dt><dd>CPU 批量物理 + GPU 学习器 + 统一运行时（数据移动、缓冲、同步）</dd>
+    <dt>CPU 后端</dt><dd>MuJoCoUni、MotrixSim</dd>
+    <dt>算法</dt><dd>PPO、APPO、FastSAC、FlashSAC</dd>
+    <dt>报告提升</dt><dd>端到端 3–10×（G1 Flip 3.3×、G1 Walk Flat 8.4×、G1 Motion Tracking 11.0×）</dd>
+    <dt>跨平台</dt><dd>Linux CUDA、Apple macOS、AMD ROCm、Intel XPU</dd>
+    <dt>入口</dt><dd><span class="mono">uv run train --algo flashsac --task g1_motion_tracking --sim mjwarp</span></dd>
+  </dl>
+</section>
+
+<section id="links">
+  <h2><span class="num">08</span>资源</h2>
+  <ul>
+    <li><a href="https://arxiv.org/abs/2605.30313" target="_blank" rel="noopener">论文：UniLab: A Heterogeneous Architecture for Robot RL Beyond GPU-Dominant Paradigms</a></li>
+    <li><a href="https://unilabsim.github.io/paper/index.html" target="_blank" rel="noopener">论文项目页（含时序图、吞吐表）</a></li>
+    <li><a href="https://github.com/unilabsim/UniLab" target="_blank" rel="noopener">代码：unilabsim/UniLab</a></li>
+    <li><a href="https://unilabsim.github.io/UniLab-doc/" target="_blank" rel="noopener">文档：UniLab Documentation</a></li>
+    <li><a href="resources.md">本页资源清单（Markdown）</a></li>
+  </ul>
+</section>
+
+<div class="prevnext">
+  <a href="../03.mjlab/index.html">← mjlab</a>
+  <a href="../05.Newton/index.html">下一层：Newton →</a>
+</div>
+
+</main>
+
+<aside class="side-col">
+  <nav class="toc">
+    <h4>On this page</h4>
+    <a href="#why">系统问题</a>
+    <a href="#arch">架构拆解</a>
+    <a href="#evidence">3–10× 的证据</a>
+    <a href="#design">关键设计</a>
+    <a href="#cost">边界</a>
+    <a href="#fit">选型建议</a>
+    <a href="#facts">事实卡</a>
+    <a href="#links">资源</a>
+    <a class="back" href="../index.html">← 10.Simulators</a>
+  </nav>
+</aside>
+</div>
+
+<footer class="footer">
+  UAV-Survey · 10.Simulators / UniLab · 资料截至 2026-10 · <a href="../../index.html">Home</a>
+</footer>
+</body>
+</html>

@@ -94,6 +94,28 @@ LABS = [
         "folder": "3.Lab/CMU-AirLab",
     },
     {
+        "short": "RISL",
+        "full": "CMU — RISLab (Resilient Intelligent Systems Lab)",
+        "accent": "#2dd4bf",
+        "accent_light": "#0d3330",
+        "store_key": "risl_papers",
+        "header_links": [
+            ("🌐 Website", "https://rislab.org/"),
+            ("📂 GitHub", "https://github.com/rislab"),
+            ("📄 Publications", "https://rislab.org/publications.html"),
+            ("💻 Code", "https://rislab.org/code.html"),
+            ("📝 Blog", "https://rislab.org/blog.html"),
+        ],
+        "quick_searches": [
+            "Wennie Tabib resilient aerial robot",
+            "Gaussian mixture model mapping exploration",
+            "quadrotor reinforcement learning differentiable simulation",
+            "decentralized active search aerial robots",
+        ],
+        "research_areas": "Probabilistic GMM mapping, Information-theoretic exploration, Safe/agile navigation, Learning-based control, Subterranean field robotics",
+        "folder": "3.Lab/RISL",
+    },
+    {
         "short": "MIT-ACL",
         "full": "MIT — Aerospace Controls Laboratory",
         "accent": "#4ade80",

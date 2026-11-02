@@ -48,6 +48,11 @@ LABS = {
         "github_orgs": ["castacks"],
         "github_repos": [],
     },
+    "RISL": {
+        "arxiv_keywords": ["Wennie Tabib", "resilient intelligent systems lab", "Gaussian mixture model exploration"],
+        "github_orgs": ["rislab"],
+        "github_repos": ["rislab/depthnav", "rislab/acrorl"],
+    },
     "MIT-ACL": {
         "arxiv_keywords": ["jonathan how", "MIT aerospace controls", "acl mit"],
         "github_orgs": ["mit-acl"],

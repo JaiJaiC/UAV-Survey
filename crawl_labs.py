@@ -141,6 +141,18 @@ LABS = [
         "news_selector": ".news, .post, article",
         "rss_url": None,
     },
+    {
+        "id": "RISL",
+        "folder": "3.Lab/RISL",
+        "arxiv_queries": [
+            'au:"Wennie Tabib"',
+            'au:"Kshitij Goel" AND (all:UAV OR all:quadrotor OR all:exploration OR all:mapping)',
+            'all:"Gaussian mixture model" AND (all:exploration OR all:occupancy OR all:aerial)',
+        ],
+        "news_url": "https://rislab.org/blog.html",
+        "news_selector": "article, .post, .blog-post",
+        "rss_url": None,
+    },
 ]
 
 # Survey topic queries

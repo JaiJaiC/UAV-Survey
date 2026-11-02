@@ -1,6 +1,6 @@
 # College Teams - Research Tracking
 
-Last updated: 2026-07-03
+Last updated: 2026-10-28
 
 ## Tracked Institutions
 
@@ -15,6 +15,7 @@ Last updated: 2026-07-03
 | 7 | Imperial College London | Aerial Robotics Lab | Prof. Mirko Kovac |
 | 8 | ZJU | FAST Lab | Dr. Fei Gao |
 | 9 | BUAA | Reliable Flight Control Group (RFLY) | - |
+| 10 | CMU | Resilient Intelligent Systems Lab (RISLab) | Prof. Wennie Tabib |
 
 ## Tracking Methodology
 

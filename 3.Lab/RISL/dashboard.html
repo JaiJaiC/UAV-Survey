@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CMU — RISLab (Resilient Intelligent Systems Lab) — Research Dashboard</title>
+<style>
+  :root {
+    --accent: #2dd4bf;
+    --accent-light: #0d3330;
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-input: #252836;
+    --text: #e1e4ea;
+    --text-dim: #8b8fa3;
+    --border: #2a2d3a;
+    --tag-bg: #252836;
+    --success: #34d399;
+    --warn: #fbbf24;
+    --info: #60a5fa;
+    --radius: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, var(--bg-card), #1e2130);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .header-inner { max-width: 1400px; margin: 0 auto; }
+  .header h1 { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+  .header .lab-name { font-size: 1rem; color: var(--text-dim); margin-top: 2px; }
+  .header-links { display:flex; gap: 16px; margin-top: 10px; flex-wrap:wrap; }
+  .header-links a {
+    color: var(--text-dim); text-decoration: none; font-size: 0.85rem;
+    padding: 4px 12px; border: 1px solid var(--border); border-radius: 20px;
+    transition: all 0.2s;
+  }
+  .header-links a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Layout ── */
+  .main { max-width: 1400px; margin: 0 auto; padding: 24px 32px; }
+
+  /* ── Stats bar ── */
+  .stats-bar { display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
+  .stat-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 20px; min-width: 120px;
+  }
+  .stat-card .num { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+  .stat-card .lbl { font-size: 0.8rem; color: var(--text-dim); }
+
+  /* ── Tabs ── */
+  .tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid var(--border); }
+  .tab {
+    padding: 10px 20px; cursor: pointer; border: none; background: none;
+    color: var(--text-dim); font-size: 0.9rem; font-weight: 500;
+    border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Panel ── */
+  .panel { display:none; }
+  .panel.active { display:block; }
+
+  /* ── Toolbar ── */
+  .toolbar { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+  .search-box {
+    flex:1; min-width:200px; padding: 10px 16px;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); font-size: 0.9rem;
+    outline: none; transition: border-color 0.2s;
+  }
+  .search-box:focus { border-color: var(--accent); }
+  select {
+    padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); font-size: 0.85rem;
+    cursor: pointer; outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+  .btn {
+    padding: 10px 18px; border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-input); color: var(--text); font-size: 0.85rem;
+    cursor: pointer; transition: all 0.2s; font-weight: 500;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn.danger { border-color: #f87171; color: #f87171; }
+  .btn.danger:hover { background: #f87171; color: #000; }
+
+  /* ── Paper list ── */
+  .paper-list { display:flex; flex-direction:column; gap:8px; }
+  .paper-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+    transition: all 0.2s; cursor: pointer;
+  }
+  .paper-card:hover { border-color: var(--accent); }
+  .paper-card .title {
+    font-weight: 600; font-size: 1rem; margin-bottom: 4px;
+    color: var(--text);
+  }
+  .paper-card .title a { color: inherit; text-decoration: none; }
+  .paper-card .title a:hover { color: var(--accent); }
+  .paper-card .meta { font-size: 0.85rem; color: var(--text-dim); }
+  .paper-card .bottom { display:flex; gap:12px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  .tag {
+    display:inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: 0.75rem; background: var(--tag-bg); color: var(--text-dim);
+  }
+  .tag.status-toread { background: #1e3a5f; color: #60a5fa; }
+  .tag.status-reading { background: #3b2f0e; color: #fbbf24; }
+  .tag.status-read { background: #0f2e1d; color: #34d399; }
+  .tag.status-note { background: #2d1530; color: #c084fc; }
+
+  .paper-actions { margin-left:auto; display:flex; gap:8px; }
+  .paper-actions button {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-dim); padding: 4px 10px; cursor: pointer;
+    font-size: 0.78rem; transition: all 0.2s;
+  }
+  .paper-actions button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
+  .empty-state .icon { font-size:3rem; margin-bottom:12px; }
+
+  /* ── arXiv fetch panel ── */
+  .fetch-form { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+  .fetch-form .search-box { flex:2; }
+  .fetch-results { display:flex; flex-direction:column; gap:6px; max-height:500px; overflow-y:auto; }
+  .fetch-item {
+    display:flex; align-items:center; gap:12px; padding:10px 14px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  .fetch-item .info { flex:1; min-width:0; }
+  .fetch-item .ftitle { font-size:0.9rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fetch-item .fauthors { font-size:0.78rem; color:var(--text-dim); }
+  .fetch-item .fyear { font-size:0.75rem; color:var(--accent); }
+
+  /* ── Add paper form ── */
+  .add-form {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+  }
+  .form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .form-row label { min-width:80px; font-size:0.85rem; color:var(--text-dim); padding-top:10px; }
+  .form-row input, .form-row textarea {
+    flex:1; padding: 10px 14px; background: var(--bg-input);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-size:0.9rem; outline:none; min-width:200px;
+  }
+  .form-row textarea { min-height:80px; resize:vertical; }
+  .form-row input:focus, .form-row textarea:focus { border-color: var(--accent); }
+
+  /* ── Detail modal ── */
+  .modal-overlay {
+    display:none; position:fixed; inset:0; background: rgba(0,0,0,0.7);
+    z-index:200; justify-content:center; align-items:center; padding:20px;
+  }
+  .modal-overlay.show { display:flex; }
+  .modal {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; max-width:700px; width:100%;
+    max-height:80vh; overflow-y:auto;
+  }
+  .modal h3 { font-size:1.2rem; margin-bottom:8px; }
+  .modal .close-btn {
+    float:right; background:none; border:none; color:var(--text-dim);
+    font-size:1.5rem; cursor:pointer; padding:0 8px;
+  }
+  .modal .close-btn:hover { color:var(--text); }
+  .modal .detail-section { margin-top:16px; }
+  .modal .detail-section h4 { font-size:0.85rem; color:var(--text-dim); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  .modal textarea { width:100%; min-height:120px; padding:12px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:0.9rem; resize:vertical; margin-top:8px; }
+  .modal textarea:focus { border-color:var(--accent); outline:none; }
+
+  /* ── Export panel ── */
+  .export-options { display:flex; gap:12px; flex-wrap:wrap; }
+
+  /* ── Responsive ── */
+  @media (max-width:768px) {
+    .header, .main { padding:16px; }
+    .header h1 { font-size:1.3rem; }
+    .paper-actions { margin-left:0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1>RISL</h1>
+    <div class="lab-name">CMU — RISLab (Resilient Intelligent Systems Lab)</div>
+    <div class="header-links">
+      <a href="https://rislab.org/" target="_blank">🌐 Website</a>
+      <a href="https://github.com/rislab" target="_blank">📂 GitHub</a>
+      <a href="https://rislab.org/publications.html" target="_blank">📄 Publications</a>
+      <a href="https://rislab.org/code.html" target="_blank">💻 Code</a>
+      <a href="https://rislab.org/blog.html" target="_blank">📝 Blog</a>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-card"><div class="num" id="statTotal">0</div><div class="lbl">Total Papers</div></div>
+    <div class="stat-card"><div class="num" id="statUnread">0</div><div class="lbl">To Read</div></div>
+    <div class="stat-card"><div class="num" id="statRead">0</div><div class="lbl">Read</div></div>
+    <div class="stat-card"><div class="num" id="statNotes">0</div><div class="lbl">With Notes</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-panel="library">📚 Library</button>
+    <button class="tab" data-panel="fetch">🔍 Fetch arXiv</button>
+    <button class="tab" data-panel="add">➕ Add Paper</button>
+    <button class="tab" data-panel="export">📤 Export</button>
+    <button class="tab" data-panel="crawled">📡 Auto-Crawled</button>
+  </div>
+
+  <!-- Library Panel -->
+  <div class="panel active" id="panel-library">
+    <div class="toolbar">
+      <input type="text" class="search-box" id="searchInput" placeholder="Search by title, author, keyword, notes...">
+      <select id="filterStatus">
+        <option value="all">All Status</option>
+        <option value="to-read">To Read</option>
+        <option value="reading">Reading</option>
+        <option value="read">Read</option>
+      </select>
+      <select id="filterTag">
+        <option value="all">All Tags</option>
+      </select>
+      <select id="sortBy">
+        <option value="added">Sort: Recently Added</option>
+        <option value="year">Sort: Year (newest)</option>
+        <option value="title">Sort: Title A-Z</option>
+      </select>
+    </div>
+    <div class="paper-list" id="paperList"></div>
+    <div class="empty-state" id="emptyState">
+      <div class="icon">📭</div>
+      <div>No papers yet. Fetch from arXiv or add manually!</div>
+    </div>
+  </div>
+
+  <!-- Fetch Panel -->
+  <div class="panel" id="panel-fetch">
+    <div class="toolbar">
+      <div class="fetch-form">
+        <input type="text" class="search-box" id="arxivQuery" placeholder="Search arXiv...">
+        <input type="number" id="arxivMax" value="20" min="1" max="50" style="width:80px; padding:10px; background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-size:0.85rem;">
+        <button class="btn primary" onclick="fetchArxiv()">Search arXiv</button>
+      </div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <strong>Quick search:</strong>
+      <button class="btn" style="font-size:0.78rem;padding:6px 12px;" onclick="document.getElementById('arxivQuery').value='Wennie Tabib resilient aerial robot';fetchArxiv()">Wennie Tabib resilient aerial robot</button> | <button class="btn" style="font-size:0.78rem;padding:6px 12px;" onclick="document.getElementById('arxivQuery').value='Gaussian mixture model mapping exploration';fetchArxiv()">Gaussian mixture model mapping exploration</button> | <button class="btn" style="font-size:0.78rem;padding:6px 12px;" onclick="document.getElementById('arxivQuery').value='quadrotor reinforcement learning differentiable simulation';fetchArxiv()">quadrotor reinforcement learning differentiable simulation</button> | <button class="btn" style="font-size:0.78rem;padding:6px 12px;" onclick="document.getElementById('arxivQuery').value='decentralized active search aerial robots';fetchArxiv()">decentralized active search aerial robots</button>
+    </div>
+    <div class="fetch-results" id="fetchResults">
+      <div class="empty-state"><div class="icon">🔍</div><div>Enter a query to search arXiv</div></div>
+    </div>
+  </div>
+
+  <!-- Add Paper Panel -->
+  <div class="panel" id="panel-add">
+    <div class="add-form">
+      <div class="form-row">
+        <label>Title *</label>
+        <input type="text" id="addTitle" placeholder="Paper title">
+      </div>
+      <div class="form-row">
+        <label>Authors</label>
+        <input type="text" id="addAuthors" placeholder="Author names, comma separated">
+      </div>
+      <div class="form-row">
+        <label>Year</label>
+        <input type="text" id="addYear" placeholder="2026">
+      </div>
+      <div class="form-row">
+        <label>arXiv ID</label>
+        <input type="text" id="addArxivId" placeholder="e.g., 2401.12345">
+      </div>
+      <div class="form-row">
+        <label>URL</label>
+        <input type="text" id="addUrl" placeholder="https://arxiv.org/abs/...">
+      </div>
+      <div class="form-row">
+        <label>Tags</label>
+        <input type="text" id="addTags" placeholder="comma separated: planning, perception, RL">
+      </div>
+      <div class="form-row">
+        <label>Notes</label>
+        <textarea id="addNotes" placeholder="Your notes about this paper..."></textarea>
+      </div>
+      <button class="btn primary" onclick="addPaper()">Add to Library</button>
+    </div>
+  </div>
+
+  <!-- Export Panel -->
+  <div class="panel" id="panel-export">
+    <h3 style="margin-bottom:12px;">Export Library</h3>
+    <div class="export-options">
+      <button class="btn primary" onclick="exportJSON()">Export as JSON</button>
+      <button class="btn" onclick="exportCSV()">Export as CSV</button>
+      <button class="btn" onclick="exportBibTeX()">Export as BibTeX</button>
+    </div>
+    <div style="margin-top:16px;">
+      <h3 style="margin-bottom:12px;">Import</h3>
+      <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
+      <button class="btn" onclick="document.getElementById('importFile').click()">Import JSON File</button>
+      <button class="btn danger" onclick="clearLibrary()" style="margin-left:8px;">Clear All Papers</button>
+    </div>
+  </div>
+
+  <!-- Crawled Papers Panel -->
+  <div class="panel" id="panel-crawled">
+    <div style="margin-bottom:16px;">
+      <h3 style="margin-bottom:8px;">🤖 Auto-Crawled Papers <span style="font-size:0.75rem;color:var(--text-dim);">(refreshed weekly)</span></h3>
+      <p style="font-size:0.82rem;color:var(--text-dim);">Papers automatically fetched from arXiv & Semantic Scholar based on lab research keywords.</p>
+    </div>
+    <div class="paper-list" id="crawledPaperList">
+      <div class="empty-state"><div class="icon">⏳</div><div>Loading crawled papers...</div></div>
+    </div>
+    <div style="margin-top:28px;">
+      <h3 style="margin-bottom:12px;">📰 Lab News <span style="font-size:0.75rem;color:var(--text-dim);">(auto-scraped)</span></h3>
+      <div id="crawledNews">
+        <div class="empty-state"><div class="icon">📡</div><div>Loading news...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<script>
+// ── Paper Store (localStorage) ──
+const STORE_KEY = 'risl_papers';
+
+function getPapers() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch(e) { return []; }
+}
+
+function savePapers(papers) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(papers));
+}
+
+function generateId() {
+  return 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+}
+
+// ── Render ──
+function updateStats() {
+  const papers = getPapers();
+  document.getElementById('statTotal').textContent = papers.length;
+  document.getElementById('statUnread').textContent = papers.filter(p => p.status === 'to-read').length;
+  document.getElementById('statRead').textContent = papers.filter(p => p.status === 'read').length;
+  document.getElementById('statNotes').textContent = papers.filter(p => p.notes && p.notes.trim()).length;
+}
+
+function updateTagFilter() {
+  const papers = getPapers();
+  const tags = new Set();
+  papers.forEach(p => (p.tags || []).forEach(t => tags.add(t)));
+  const sel = document.getElementById('filterTag');
+  sel.innerHTML = '<option value="all">All Tags</option>';
+  [...tags].sort().forEach(t => {
+    sel.innerHTML += `<option value="${t}">${t}</option>`;
+  });
+}
+
+function renderLibrary() {
+  const papers = getPapers();
+  const search = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const statusFilter = document.getElementById('filterStatus')?.value || 'all';
+  const tagFilter = document.getElementById('filterTag')?.value || 'all';
+  const sortBy = document.getElementById('sortBy')?.value || 'added';
+
+  let filtered = papers.filter(p => {
+    if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+    if (tagFilter !== 'all' && !(p.tags || []).includes(tagFilter)) return false;
+    if (search) {
+      const haystack = [p.title, p.authors, p.notes, (p.tags||[]).join(' '), p.arxiv_id].join(' ').toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+
+  if (sortBy === 'year') filtered.sort((a,b) => (b.year||0) - (a.year||0));
+  else if (sortBy === 'title') filtered.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+  else filtered.sort((a,b) => (b.added||0) - (a.added||0));
+
+  const container = document.getElementById('paperList');
+  const empty = document.getElementById('emptyState');
+
+  if (filtered.length === 0) {
+    container.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    container.innerHTML = filtered.map(p => {
+      const statusLabels = {'to-read':'To Read','reading':'Reading','read':'Read'};
+      const statusClass = 'status-' + (p.status || 'toread');
+      return `
+      <div class="paper-card" onclick="openDetail('${p.id}')">
+        <div class="title">
+          <a href="${p.url || '#'}" target="_blank" onclick="event.stopPropagation()">${escHtml(p.title)}</a>
+        </div>
+        <div class="meta">${escHtml(p.authors || 'Unknown')} — ${p.year || 'N/A'}</div>
+        <div class="bottom">
+          <span class="tag ${statusClass}">${statusLabels[p.status] || p.status || 'to-read'}</span>
+          ${(p.tags||[]).map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}
+          ${p.arxiv_id ? `<span class="tag" style="font-family:monospace;">arXiv:${escHtml(p.arxiv_id)}</span>` : ''}
+          <div class="paper-actions">
+            <button onclick="event.stopPropagation(); downloadPdf('${p.id}')" title="Download PDF">📥 PDF</button>
+            <button onclick="event.stopPropagation(); quickStatus('${p.id}','read')" title="Mark read">✅</button>
+            <button onclick="event.stopPropagation(); deletePaper('${p.id}')" title="Delete">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  updateStats();
+  updateTagFilter();
+}
+
+// ── Actions ──
+function addPaper() {
+  const title = document.getElementById('addTitle').value.trim();
+  if (!title) { alert('Title is required!'); return; }
+
+  const papers = getPapers();
+  papers.push({
+    id: generateId(),
+    title: title,
+    authors: document.getElementById('addAuthors').value.trim(),
+    year: document.getElementById('addYear').value.trim(),
+    arxiv_id: document.getElementById('addArxivId').value.trim(),
+    url: document.getElementById('addUrl').value.trim(),
+    tags: document.getElementById('addTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+    notes: document.getElementById('addNotes').value.trim(),
+    status: 'to-read',
+    added: Date.now()
+  });
+  savePapers(papers);
+  renderLibrary();
+  // Clear form
+  ['addTitle','addAuthors','addYear','addArxivId','addUrl','addTags','addNotes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  switchTab('library');
+}
+
+function quickStatus(id, status) {
+  const papers = getPapers();
+  const p = papers.find(p => p.id === id);
+  if (p) { p.status = status; savePapers(papers); renderLibrary(); }
+}
+
+function deletePaper(id) {
+  if (!confirm('Delete this paper?')) return;
+  let papers = getPapers();
+  papers = papers.filter(p => p.id !== id);
+  savePapers(papers);
+  renderLibrary();
+  closeModal();
+}
+
+function downloadPdf(id) {
+  const papers = getPapers();
+  const p = papers.find(p => p.id === id);
+  if (!p) return;
+  let url = '';
+  if (p.arxiv_id) url = `https://arxiv.org/pdf/${p.arxiv_id}.pdf`;
+  else if (p.url && p.url.includes('arxiv.org/abs/')) url = p.url.replace('/abs/','/pdf/') + '.pdf';
+  else if (p.url) url = p.url;
+  if (url) window.open(url, '_blank');
+  else alert('No PDF link available for this paper.');
+}
+
+// ── Detail Modal ──
+function openDetail(id) {
+  const papers = getPapers();
+  const p = papers.find(p => p.id === id);
+  if (!p) return;
+
+  const statusOptions = ['to-read','reading','read'].map(s =>
+    `<option value="${s}" ${p.status===s?'selected':''}>${s==='to-read'?'To Read':s==='reading'?'Reading':'Read'}</option>`
+  ).join('');
+
+  document.getElementById('modalContent').innerHTML = `
+    <button class="close-btn" onclick="closeModal()">×</button>
+    <h3>${escHtml(p.title)}</h3>
+    <div class="meta" style="margin-bottom:12px;">${escHtml(p.authors || 'Unknown authors')} — ${p.year || 'N/A'}</div>
+    ${p.url ? `<div><a href="${p.url}" target="_blank" style="color:var(--accent);">${p.url}</a></div>` : ''}
+    ${p.arxiv_id ? `<div style="margin-top:4px;">arXiv: <code>${p.arxiv_id}</code> | <a href="https://arxiv.org/pdf/${p.arxiv_id}.pdf" target="_blank" style="color:var(--accent);">Download PDF</a></div>` : ''}
+
+    <div class="detail-section">
+      <h4>Status</h4>
+      <select onchange="updateDetailField('${p.id}','status',this.value)" style="width:100%;">
+        ${statusOptions}
+      </select>
+    </div>
+    <div class="detail-section">
+      <h4>Tags</h4>
+      <input type="text" value="${(p.tags||[]).join(', ')}" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);"
+        onchange="updateDetailField('${p.id}','tags',this.value.split(',').map(s=>s.trim()).filter(Boolean))">
+    </div>
+    <div class="detail-section">
+      <h4>Notes</h4>
+      <textarea onchange="updateDetailField('${p.id}','notes',this.value)">${escHtml(p.notes || '')}</textarea>
+    </div>
+    <div style="margin-top:16px; display:flex; gap:8px;">
+      <button class="btn primary" onclick="downloadPdf('${p.id}')">📥 Download PDF</button>
+      <button class="btn danger" onclick="deletePaper('${p.id}')">Delete</button>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+  renderLibrary();
+}
+
+function updateDetailField(id, field, value) {
+  const papers = getPapers();
+  const p = papers.find(p => p.id === id);
+  if (p) { p[field] = value; savePapers(papers); }
+}
+
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ── arXiv Fetch ──
+async function fetchArxiv() {
+  const query = document.getElementById('arxivQuery').value.trim();
+  if (!query) return;
+  const max = parseInt(document.getElementById('arxivMax').value) || 20;
+
+  document.getElementById('fetchResults').innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div>Searching arXiv...</div></div>';
+
+  try {
+    const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${max}&sortBy=submittedDate&sortOrder=descending`;
+    const resp = await fetch(url);
+    const text = await resp.text();
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(text, 'text/xml');
+    const entries = xml.querySelectorAll('entry');
+
+    if (entries.length === 0) {
+      document.getElementById('fetchResults').innerHTML = '<div class="empty-state"><div class="icon">📭</div><div>No results found.</div></div>';
+      return;
+    }
+
+    let html = '';
+    entries.forEach(entry => {
+      const title = entry.querySelector('title')?.textContent?.trim() || 'N/A';
+      const authors = [...entry.querySelectorAll('author name')].map(n => n.textContent.trim()).join(', ');
+      const published = entry.querySelector('published')?.textContent?.trim()?.slice(0,4) || '';
+      const id = entry.querySelector('id')?.textContent?.trim() || '';
+      const arxivId = id.split('/abs/').pop();
+      const summary = (entry.querySelector('summary')?.textContent?.trim() || '').slice(0, 200);
+
+      html += `
+      <div class="fetch-item">
+        <div class="info">
+          <div class="ftitle">${escHtml(title)}</div>
+          <div class="fauthors">${escHtml(authors)}</div>
+          <div style="font-size:0.75rem;color:var(--text-dim);margin-top:2px;">${escHtml(summary)}</div>
+        </div>
+        <div class="fyear">${published}</div>
+        <button class="btn primary" onclick='saveFromArxiv(${JSON.stringify({title,authors,year:published,arxiv_id:arxivId,url:"https://arxiv.org/abs/"+arxivId}).replace(/'/g,"&#39;")})'>➕ Save</button>
+      </div>`;
+    });
+
+    document.getElementById('fetchResults').innerHTML = html;
+  } catch(e) {
+    document.getElementById('fetchResults').innerHTML = `<div class="empty-state"><div class="icon">❌</div><div>Error: ${escHtml(e.message)}</div></div>`;
+  }
+}
+
+function saveFromArxiv(data) {
+  const papers = getPapers();
+  // Check duplicate
+  if (papers.some(p => p.arxiv_id === data.arxiv_id)) {
+    alert('This paper is already in your library!');
+    return;
+  }
+  papers.push({
+    id: generateId(),
+    title: data.title,
+    authors: data.authors,
+    year: data.year,
+    arxiv_id: data.arxiv_id,
+    url: data.url,
+    tags: [],
+    notes: '',
+    status: 'to-read',
+    added: Date.now()
+  });
+  savePapers(papers);
+  renderLibrary();
+  alert('Paper added to library!');
+}
+
+// ── Export ──
+function exportJSON() {
+  const papers = getPapers();
+  const blob = new Blob([JSON.stringify(papers, null, 2)], {type:'application/json'});
+  downloadBlob(blob, 'RISL_papers.json');
+}
+
+function exportCSV() {
+  const papers = getPapers();
+  const header = 'id,title,authors,year,arxiv_id,url,tags,status,notes,added';
+  const rows = papers.map(p => [
+    p.id, csvEscape(p.title), csvEscape(p.authors), p.year||'', p.arxiv_id||'',
+    p.url||'', (p.tags||[]).join(';'), p.status||'to-read', csvEscape(p.notes||''), p.added||''
+  ].join(','));
+  const blob = new Blob([header + '\n' + rows.join('\n')], {type:'text/csv;charset=utf-8'});
+  downloadBlob(blob, 'RISL_papers.csv');
+}
+
+function exportBibTeX() {
+  const papers = getPapers();
+  const entries = papers.map(p => {
+    const key = (p.arxiv_id ? p.arxiv_id : (p.authors||'Unknown').split(',')[0].trim().split(' ').pop() + (p.year||'XXXX')).toLowerCase().replace(/[^a-z0-9]/g,'');
+    const authorBib = (p.authors||'Unknown').split(',').map(a => a.trim()).join(' and ');
+    return `@article{${key},\n  title = {${p.title}},\n  author = {${authorBib}},\n  year = {${p.year||'N/A'}},\n  archivePrefix = {arXiv},\n  eprint = {${p.arxiv_id||''}},\n  url = {${p.url||''}},\n}`;
+  });
+  const blob = new Blob([entries.join('\n\n')], {type:'text/plain;charset=utf-8'});
+  downloadBlob(blob, 'RISL_papers.bib');
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('Not an array');
+      const papers = getPapers();
+      let added = 0;
+      data.forEach(item => {
+        if (item.title && !papers.some(p => p.id === item.id)) {
+          papers.push({...item, id: item.id || generateId(), added: item.added || Date.now()});
+          added++;
+        }
+      });
+      savePapers(papers);
+      renderLibrary();
+      alert(`Imported ${added} papers.`);
+    } catch(err) {
+      alert('Invalid JSON file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearLibrary() {
+  if (confirm('Delete ALL papers? This cannot be undone!')) {
+    localStorage.removeItem(STORE_KEY);
+    renderLibrary();
+  }
+}
+
+// ── Tabs ──
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const tab = document.querySelector(`[data-panel="${name}"]`);
+  if (tab) tab.classList.add('active');
+  const panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+  if (name === 'library') renderLibrary();
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => switchTab(tab.dataset.panel));
+});
+
+// ── Live search ──
+document.addEventListener('DOMContentLoaded', () => {
+  renderLibrary();
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.addEventListener('input', renderLibrary);
+  const filterStatus = document.getElementById('filterStatus');
+  if (filterStatus) filterStatus.addEventListener('change', renderLibrary);
+  const filterTag = document.getElementById('filterTag');
+  if (filterTag) filterTag.addEventListener('change', renderLibrary);
+  const sortBy = document.getElementById('sortBy');
+  if (sortBy) sortBy.addEventListener('change', renderLibrary);
+  // Enter key for search
+  document.getElementById('arxivQuery')?.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') fetchArxiv();
+  });
+  // Load crawled papers
+  loadCrawledPapers();
+  loadCrawledNews();
+});
+
+// ── Inline papers fallback (file:// protocol) ──
+window.__INLINE__ = [];
+function saveInline(i) {
+  const p = window.__INLINE__[i];
+  if (!p) return;
+  const papers = getPapers();
+  if (p.arxiv_id && papers.some(x => x.arxiv_id === p.arxiv_id)) {
+    alert('Already in your library!');
+    return;
+  }
+  papers.push({
+    id: generateId(),
+    title: p.title,
+    authors: p.authors || '',
+    year: p.year || '',
+    arxiv_id: p.arxiv_id || '',
+    url: p.url || '',
+    tags: (p.tags || []).slice(),
+    notes: '',
+    status: 'to-read',
+    added: Date.now()
+  });
+  savePapers(papers);
+  renderLibrary();
+  alert('Saved to library!');
+}
+
+function renderPapersInline(papers) {
+  window.__INLINE__ = papers;
+  const c = document.getElementById('crawledPaperList');
+  if (!papers.length) {
+    c.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div>No papers yet.</div></div>';
+    return;
+  }
+  c.innerHTML = papers.slice(0, 50).map((p, i) => {
+    const badges = [];
+    if (p.journal_ref) badges.push('<span class="tag" style="background:#0d3330;color:#2dd4bf;border:1px solid #2dd4bf44;">' + escHtml(p.journal_ref) + '</span>');
+    (p.tags || []).slice(0, 2).forEach(t => badges.push('<span class="tag">' + escHtml(t) + '</span>'));
+    const pdf = p.arxiv_id
+      ? '<button onclick="event.stopPropagation();window.open(\'https://arxiv.org/pdf/' + p.arxiv_id + '.pdf\',\'_blank\')" title="Download PDF">PDF</button>'
+      : '';
+    return '<div class="paper-card">'
+      + '<div class="title"><a href="' + escHtml(p.url || '#') + '" target="_blank">' + escHtml(p.title) + '</a></div>'
+      + '<div class="meta">' + escHtml(p.authors || 'Unknown') + ' — ' + (p.year || p.date || 'N/A') + '</div>'
+      + '<div class="meta" style="margin-top:6px;font-size:0.82rem;">' + escHtml(p.summary || '') + '</div>'
+      + '<div class="bottom"><span class="tag" style="background:#1e3a5f;color:#60a5fa;">' + escHtml(p.source || 'arxiv') + '</span>'
+      + (p.arxiv_id ? '<span class="tag" style="font-family:monospace;">arXiv:' + escHtml(p.arxiv_id) + '</span>' : '')
+      + badges.join('')
+      + '<div class="paper-actions"><button onclick="event.stopPropagation();saveInline(' + i + ')" title="Save to My Library">Save</button>' + pdf + '</div>'
+      + '</div></div>';
+  }).join('');
+}
+
+// ── Crawled Papers Loader ──
+async function loadCrawledPapers() {
+  try {
+    const resp = await fetch('papers.json');
+    if (!resp.ok) throw new Error('Not found');
+    const papers = await resp.json();
+    const container = document.getElementById('crawledPaperList');
+    if (!papers.length) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div>No crawled papers yet. Check back after the next weekly update!</div></div>';
+      return;
+    }
+    container.innerHTML = papers.slice(0, 50).map(p => {
+      // Journal quality badges
+      let qualityBadges = '';
+      if (p.journal_ccf) qualityBadges += `<span class="tag" style="background:#1a0a0a;color:#ff6b6b;border:1px solid #ff6b6b44;">CCF-${escHtml(p.journal_ccf)}</span>`;
+      if (p.journal_cas) qualityBadges += `<span class="tag" style="background:#1a0a1a;color:#c084fc;border:1px solid #c084fc44;">CAS ${escHtml(p.journal_cas)}</span>`;
+      if (p.journal_if) qualityBadges += `<span class="tag" style="background:#0a0a1a;color:#60a5fa;border:1px solid #60a5fa44;">IF ${p.journal_if}</span>`;
+      if (p.citations) qualityBadges += `<span class="tag" style="background:#0a1a0a;color:#34d399;border:1px solid #34d39944;">📊 ${p.citations}× cited</span>`;
+      if (p.journal) qualityBadges += `<span class="tag">${escHtml(p.journal)}</span>`;
+      if (p.quality_score) qualityBadges += `<span class="tag" style="background:#252836;color:var(--accent);">⭐ ${p.quality_score}</span>`;
+
+      return `
+      <div class="paper-card">
+        <div class="title"><a href="${escHtml(p.url || '#')}" target="_blank">${escHtml(p.title)}</a></div>
+        <div class="meta">${escHtml(p.authors || 'Unknown')} — ${p.year || p.date || 'N/A'}</div>
+        <div class="bottom">
+          <span class="tag" style="background:#1e3a5f;color:#60a5fa;">${p.source||'arxiv'}</span>
+          ${p.arxiv_id ? `<span class="tag" style="font-family:monospace;">arXiv:${escHtml(p.arxiv_id)}</span>` : ''}
+          ${qualityBadges}
+          <div class="paper-actions">
+            <button onclick="event.stopPropagation();addCrawledToLibrary('${escHtml(p.arxiv_id||'')}','${escHtml(p.title).replace(/'/g,"\\'")}','${escHtml(p.authors||'').replace(/'/g,"\\'")}','${p.year||''}','${escHtml(p.url||'').replace(/'/g,"\\'")}','${p.arxiv_id||''}')" title="Save to My Library">💾 Save</button>
+            ${p.arxiv_id ? `<button onclick="event.stopPropagation();window.open('https://arxiv.org/pdf/${p.arxiv_id}.pdf','_blank')" title="Download PDF">📥 PDF</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    const container = document.getElementById('crawledPaperList');
+    if (window.__PAPERS_INLINE__ && window.__PAPERS_INLINE__.length) { renderPapersInline(window.__PAPERS_INLINE__); }
+    else { container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div>Open this page through a local web server (or re-run the crawler) to load papers.json.</div></div>'; }
+  }
+}
+
+function addCrawledToLibrary(arxivId, title, authors, year, url, arxivId) {
+  const papers = getPapers();
+  if (arxivId && papers.some(p => p.arxiv_id === arxivId)) {
+    alert('Already in your library!');
+    return;
+  }
+  papers.push({
+    id: generateId(),
+    title: title,
+    authors: authors,
+    year: year,
+    arxiv_id: arxivId,
+    url: url,
+    tags: [],
+    notes: '',
+    status: 'to-read',
+    added: Date.now()
+  });
+  savePapers(papers);
+  alert('Added to library!');
+}
+
+async function loadCrawledNews() {
+  try {
+    const resp = await fetch('news.json');
+    if (!resp.ok) throw new Error('Not found');
+    const news = await resp.json();
+    const container = document.getElementById('crawledNews');
+    if (!news.length) {
+      container.innerHTML = '<div class="empty-state"><div class="icon">📡</div><div>No recent news. Updates come weekly.</div></div>';
+      return;
+    }
+    container.innerHTML = news.map(n => `
+      <div class="paper-card" style="padding:12px 18px;">
+        <div style="font-weight:500;font-size:0.9rem;">
+          ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" style="color:inherit;text-decoration:none;">${escHtml(n.title)}</a>` : escHtml(n.title)}
+        </div>
+        ${n.date ? `<div style="font-size:0.78rem;color:var(--text-dim);margin-top:4px;">${n.date}</div>` : ''}
+      </div>
+    `).join('');
+  } catch(e) {
+    const container = document.getElementById('crawledNews');
+    container.innerHTML = '<div class="empty-state"><div class="icon">📡</div><div>News data not available yet.</div></div>';
+  }
+}
+
+// ── Helpers ──
+function escHtml(s) {
+  if (!s) return '';
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function csvEscape(s) {
+  if (!s) return '';
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g,'""') + '"';
+  }
+  return s;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+</script>
+
+<script>window.__PAPERS_INLINE__=[{"title":"Learning Agile Intruder Interception using Differentiable Quadrotor Dynamics","authors":"Michael Anoruo, Xiaoyu Tian, Abhishek Rathod, Timothy Naudet, Thomas Canchola, Eric Sturzinger, Kshitij Goel, Wennie Tabib","year":"2026","date":"2026-06-01","arxiv_id":"2607.02472","url":"https://arxiv.org/abs/2607.02472","summary":"Learns a control policy that intercepts an intruder using only the 3D unit direction vector to the intruder and the interceptor state. An analytical policy gradient over differentiable quadrotor dynamics achieves agile interception up to 10 m/s, outperforming point-mass baselines by ~30%.","source":"arxiv","journal_ref":"arXiv preprint arXiv:2607.02472","tags":["Reinforcement Learning","Aerial Interception","Differentiable Simulation","Quadrotor"],"doi":"10.48550/arXiv.2607.02472","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"AcroRL: Learning Aggressive Quadrotor Inversion using Bidirectional Thrust","authors":"Gabriel Rodriguez, Henri Sayag, Abhishek Rathod, John Stecklein, Siddharth Saha, Christopher Barngrover, Wennie Tabib","year":"2026","date":"2026-05-01","arxiv_id":"2605.24301","url":"https://arxiv.org/abs/2605.24301","summary":"Reinforcement learning policies modulate a constant reference trajectory so a bidirectional-thrust quadrotor performs compact, position-constrained inversions, remaining compatible with standard trajectory generation. Reduces position RMSE by 32% and settling time by 57% versus the strongest optimization-based baseline, with hardware RMSE below 0.35 m.","source":"arxiv","journal_ref":"arXiv preprint arXiv:2605.24301","tags":["Reinforcement Learning","Bidirectional Thrust","Aggressive Flight","Quadrotor"],"doi":"10.48550/arXiv.2605.24301","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Quadrotor Navigation using Reinforcement Learning with Privileged Information","authors":"Jonathan Lee, Abhishek Rathod, Kshitij Goel, John Stecklein, Wennie Tabib","year":"2026","date":"2026-05-01","arxiv_id":"2509.08177","url":"https://arxiv.org/abs/2509.08177","summary":"Uses time-of-arrival (ToA) maps as privileged information and a yaw alignment loss so that a learned policy routes around large obstacles, walls and dead-ends where prior learning-based methods fail. 86% success rate in photo-realistic simulation (34% over baselines), and 20 outdoor flights covering 589 m at up to 4 m/s day and night.","source":"arxiv","journal_ref":"IEEE International Conference on Robotics and Automation (ICRA) 2026","tags":["Reinforcement Learning","Navigation","Privileged Information","Sim-to-Real"],"doi":"10.48550/arXiv.2509.08177","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Zero-Shot Metric Depth Estimation via Monocular Visual-Inertial Rescaling for Autonomous Aerial Navigation","authors":"Steven Yang, Xiaoyu Tian, Kshitij Goel, Wennie Tabib","year":"2026","date":"2026-05-01","arxiv_id":"2509.08159","url":"https://arxiv.org/abs/2509.08159","summary":"Proposes lightweight zero-shot rescaling strategies that turn relative monocular depth into metric depth using the sparse 3D feature map of a visual-inertial navigation system, avoiding heavy sensors or domain-specific fine-tuning. Monotonic spline fitting performs best and runs onboard a compute-constrained quadrotor at 15 Hz for collision avoidance.","source":"arxiv","journal_ref":"IEEE International Conference on Robotics and Automation (ICRA) 2026","tags":["Monocular Depth","Visual-Inertial","Collision Avoidance","Zero-Shot"],"doi":"10.48550/arXiv.2509.08159","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Distance and Collision Probability Estimation from Gaussian Surface Models","authors":"Kshitij Goel, Wennie Tabib","year":"2025","date":"2025-10-01","arxiv_id":"2402.00186","url":"https://arxiv.org/abs/2402.00186","summary":"Estimates Euclidean distance, gradient and collision probability between an ellipsoidal robot and an environment modeled as Gaussian surfaces, extending ellipsoid-to-ellipsoid formulations to GMM surfaces with a geometric blending step. Runs within microseconds per ellipsoid pair on embedded CPUs, enabling uncertainty-aware planning in clutter.","source":"arxiv","journal_ref":"IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) 2025","tags":["Gaussian Mixture Model","Collision Probability","Motion Planning","Uncertainty"],"doi":"10.48550/arXiv.2402.00186","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Decentralized Uncertainty-Aware Active Search with a Team of Aerial Robots","authors":"Wennie Tabib, John Stecklein, Caleb McDowell, Kshitij Goel, Felix Jonathan, Abhishek Rathod, Meghan Kokoski, Edsel Burkholder, Brian Wallace, Luis Ernesto Navarro-Serment, Nikhil Angad Bakshi, Tejus Gupta, Norman Papernick, David Guttendorf, Erik E. Kahn, Jessica Kasemer, Jesse Holdaway, Jeff Schneider","year":"2025","date":"2025-07-01","arxiv_id":"2410.08507","url":"https://arxiv.org/abs/2410.08507","summary":"Demonstrates a decentralized active search system that biases trajectories toward additional views of uncertain objects of interest, using stochasticity for coverage when communications are denied and sharing poses, goals and detections when they are available. Finds all a-priori unknown objects with ~3 m mean error at 50-60 m altitude in Bloomingdale, OH field experiments.","source":"arxiv","journal_ref":"IEEE International Symposium on Experimental Robotics (ISER) 2025","tags":["Multi-Robot","Active Search","Decentralized","Uncertainty","Field Robotics"],"doi":"10.48550/arXiv.2410.08507","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Rapid Quadrotor Navigation in Diverse Environments using an Onboard Depth Camera","authors":"Jonathan Lee, Abhishek Rathod, Kshitij Goel, John Stecklein, Wennie Tabib","year":"2024","date":"2024-11-01","arxiv_id":"2411.04326","url":"https://arxiv.org/abs/2411.04326","summary":"Develops a reactive planner over forward-arc motion primitives that exploits a history of RGB-D observations to fly safely close to obstacles, scheduling a safe stopping action every planning round. Thousands of simulations plus deployments in caves and forests yield a 24% success-rate gain over state of the art.","source":"arxiv","journal_ref":"IEEE International Symposium on Safety, Security, and Rescue Robotics (SSRR) 2024 - Best Paper Award","tags":["Agile Flight","Depth Camera","Reactive Planning","Search and Rescue"],"doi":"10.48550/arXiv.2411.04326","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Incremental Multimodal Surface Mapping via Self-Organizing Gaussian Mixture Models","authors":"Kshitij Goel, Wennie Tabib","year":"2023","date":"2023-10-01","arxiv_id":"2309.10900","url":"https://arxiv.org/abs/2309.10900","summary":"Represents the environment as a continuous probabilistic model that reconstructs geometry and intensity at high resolution while compressing the point cloud. A spatial hash map for rapid GMM submap extraction plus relevance/redundancy detection gives an order-of-magnitude speedup over state-of-the-art incremental GMM mapping with a better accuracy-size tradeoff.","source":"arxiv","journal_ref":"IEEE Robotics and Automation Letters (RA-L) 2023","tags":["Gaussian Mixture Model","Surface Mapping","Incremental","Compression"],"doi":"10.1109/LRA.2023.3327670","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"GIRA: Gaussian Mixture Models for Inference and Robot Autonomy","authors":"Kshitij Goel, Wennie Tabib","year":"2023","date":"2023-06-01","arxiv_id":"2307.00071","url":"https://arxiv.org/abs/2307.00071","summary":"Presents the open-source GIRA framework, unifying reconstruction, pose estimation and occupancy modeling with Gaussian mixture models, and contributes GPU-accelerated GMM learning that is 10-100x faster than prior CPU implementations.","source":"arxiv","journal_ref":"IEEE International Conference on Robotics and Automation (ICRA) 2023","tags":["Open-Source","Gaussian Mixture Model","Perception","GPU"],"doi":"10.48550/arXiv.2307.00071","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Probabilistic Point Cloud Modeling via Self-Organizing Gaussian Mixture Models","authors":"Kshitij Goel, Nathan Michael, Wennie Tabib","year":"2023","date":"2023-05-01","arxiv_id":"2302.00047","url":"https://arxiv.org/abs/2302.00047","summary":"Adapts the number of GMM components to scene complexity using a self-organizing principle from information-theoretic learning, removing per-use-case tuning while balancing model fidelity and size across real-world point clouds.","source":"arxiv","journal_ref":"IEEE Robotics and Automation Letters (RA-L) 2023","tags":["Point Cloud","Gaussian Mixture Model","Adaptive Modeling","Mapping"],"doi":"10.1109/LRA.2023.3256923","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Hierarchical Collision Avoidance for Adaptive-Speed Multirotor Teleoperation","authors":"Kshitij Goel, Yves Georgy Daoud, Nathan Michael, Wennie Tabib","year":"2022","date":"2022-11-01","arxiv_id":"2209.08413","url":"https://arxiv.org/abs/2209.08413","summary":"Improves safe motion-primitive teleoperation with a hierarchical collision checker that jointly adapts local map voxel size and maximum vehicle speed at 10 Hz, so operators no longer set speeds by hand and the vehicle can still enter tight spaces. Validated in simulation and real-world flights.","source":"arxiv","journal_ref":"IEEE International Symposium on Safety, Security, and Rescue Robotics (SSRR) 2022 - Best Paper Award","tags":["Teleoperation","Collision Avoidance","Motion Primitives","Adaptive Speed"],"doi":"10.1109/SSRR56537.2022.10018782","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Collaborative Human-Robot Exploration via Implicit Coordination","authors":"Yves Georgy Daoud, Kshitij Goel, Nathan Michael, Wennie Tabib","year":"2022","date":"2022-11-01","arxiv_id":"2209.09294","url":"https://arxiv.org/abs/2209.09294","summary":"Implicitly communicates a region of interest from a helmet-mounted depth camera on the human to the robot, then biases an information-gain exploration objective inside the human-provided viewpoint. The aerial system safely reaches regions the human cannot see or enter; validated in simulation and a motion-capture arena.","source":"arxiv","journal_ref":"IEEE International Symposium on Safety, Security, and Rescue Robotics (SSRR) 2022","tags":["Human-Robot Teaming","Exploration","Implicit Coordination"],"doi":"10.1109/SSRR56537.2022.10018729","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Autonomous Cave Surveying with an Aerial Robot","authors":"Wennie Tabib, Kshitij Goel, John Yao, Curtis Boirum, Nathan Michael","year":"2021","date":"2021-09-01","arxiv_id":"2003.13883","url":"https://arxiv.org/abs/2003.13883","summary":"Surveys caves in total darkness with a depth camera for mapping, a downward-facing camera for state estimation and forward/downward lights. Observations are compressed into Gaussian mixture models while a local occupancy grid feeds a planner that greedily maximizes an information-theoretic objective; deployed in Laurel Caverns and a wild West Virginia cave.","source":"arxiv","journal_ref":"IEEE Transactions on Robotics (T-RO) 2021 - King-Sun Fu Memorial Best Paper Award Honorable Mention","tags":["Subterranean","Exploration","Gaussian Mixture Model","Field Robotics"],"doi":"10.1109/TRO.2021.3104459","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Rapid and High-Fidelity Subsurface Exploration with Multiple Aerial Robots","authors":"Kshitij Goel, Wennie Tabib, Nathan Michael","year":"2021","date":"2021-03-01","arxiv_id":"2012.10788","url":"https://arxiv.org/abs/2012.10788","summary":"Develops communication-efficient distributed perceptual modeling for rapid multi-robot cave exploration, keeping high-fidelity maps compatible with low-bandwidth links. Shows significant exploration-rate gains over state of the art in simulation and in a wild West Virginia cave.","source":"arxiv","journal_ref":"International Symposium on Experimental Robotics (ISER) 2021","tags":["Multi-Robot","Subterranean","Distributed Mapping","Communication-Efficient"],"doi":"10.1007/978-3-030-71151-1_39","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Simultaneous Localization and Mapping of Subterranean Voids with Gaussian Mixture Models","authors":"Wennie Tabib, Nathan Michael","year":"2019","date":"2019-08-01","arxiv_id":"","url":"https://rislab.org/papers/TabMic1908.pdf","summary":"Performs SLAM of subterranean voids with maps represented as Gaussian mixture models, giving a compact probabilistic representation suited to low-bandwidth communication in cave and tunnel exploration.","source":"rislab","journal_ref":"Conference on Field and Service Robotics (FSR) 2019","tags":["SLAM","Gaussian Mixture Model","Subterranean"],"doi":"10.1007/978-981-15-9460-1_13","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Real-time Information-Theoretic Exploration with Gaussian Mixture Model Maps","authors":"Wennie Tabib, Kshitij Goel, John Yao, Curtis Boirum, Nathan Michael","year":"2019","date":"2019-06-01","arxiv_id":"","url":"https://rislab.org/papers/TabGoeYao19060.pdf","summary":"Plans next-best views in real time directly over GMM maps, so information-theoretic exploration operates on a compact continuous representation instead of a dense occupancy grid.","source":"rislab","journal_ref":"Robotics: Science and Systems (RSS) 2019","tags":["Exploration","Information Theory","Gaussian Mixture Model"],"doi":"10.15607/RSS.2019.XV.061","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Variable Resolution Occupancy Mapping using Gaussian Mixture Models","authors":"Cormac O'Meadhra, Wennie Tabib, Nathan Michael","year":"2019","date":"2019-04-01","arxiv_id":"","url":"https://rislab.org/papers/OMeTabMic18120.pdf","summary":"Derives occupancy at varying resolution by sampling from a GMM distribution and ray-tracing to the camera position, avoiding storage of dense multi-resolution occupancy grids while preserving fine structure.","source":"rislab","journal_ref":"IEEE Robotics and Automation Letters (RA-L) 2019","tags":["Occupancy Mapping","Gaussian Mixture Model","Multi-Resolution"],"doi":"10.1109/LRA.2018.2889348","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"On-Manifold GMM Registration","authors":"Wennie Tabib, Cormac O'Meadhra, Nathan Michael","year":"2018","date":"2018-10-01","arxiv_id":"","url":"https://rislab.org/papers/TabOMeMic18100.pdf","summary":"Estimates position and orientation from successive depth or LiDAR observations by treating sensor observations as approximate continuous belief distributions, with an on-manifold GMM registration formulation that outperforms prior art.","source":"rislab","journal_ref":"IEEE Robotics and Automation Letters (RA-L) 2018","tags":["Registration","Gaussian Mixture Model","State Estimation"],"doi":"10.1109/LRA.2018.2856279","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Computationally Efficient Information-Theoretic Exploration of Pits and Caves","authors":"Wennie Tabib, Micah Corah, Nathan Michael, Red Whittaker","year":"2016","date":"2016-10-01","arxiv_id":"","url":"https://rislab.org/papers/TabCorMic16.pdf","summary":"Formulates information-theoretic exploration of pits and caves with computationally efficient approximations, targeting subsurface voids where lighting, geometry and sensing are severely constrained.","source":"rislab","journal_ref":"IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) 2016","tags":["Exploration","Subterranean","Information Theory"],"doi":"10.1109/IROS.2016.7759548","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Efficient Multi-Sensor Exploration Using Dependent Observations and Conditional Mutual Information","authors":"Wennie Tabib, Red Whittaker, Nathan Michael","year":"2016","date":"2016-10-01","arxiv_id":"","url":"https://rislab.org/papers/TabMic16.pdf","summary":"Exploits conditionally dependent sensor observations through conditional mutual information to plan multi-modal exploration, avoiding double-counting of correlated information from heterogeneous sensors.","source":"rislab","journal_ref":"IEEE International Symposium on Safety, Security, and Rescue Robotics (SSRR) 2016","tags":["Exploration","Multi-Sensor","Mutual Information"],"doi":"10.1109/SSRR.2016.7784275","citations":0,"quality_badges":[],"quality_score":0.0},{"title":"Planning Views to Model Planetary Pits Under Transient Illumination","authors":"Heather Jones, Wennie Tabib, William L. Red Whittaker","year":"2015","date":"2015-03-01","arxiv_id":"","url":"https://rislab.org/papers/JonTabWhi15.pdf","summary":"Plans camera views for modeling planetary pits while illumination varies transiently, a precursor to RISLab's later subsurface exploration and cave surveying work.","source":"rislab","journal_ref":"IEEE Aerospace Conference 2015","tags":["View Planning","Planetary Robotics","Subterranean"],"doi":"10.1109/AERO.2015.7119079","citations":0,"quality_badges":[],"quality_score":0.0}];</script>
+</body>
+</html>

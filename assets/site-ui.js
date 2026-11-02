@@ -1,4 +1,4 @@
-/*!
+﻿/*!
  * UAV-Survey — shared page UI (settings button + light/dark theme)
  * Loaded by every sub-page. Self-contained: never depends on the host page CSS.
  */
@@ -114,6 +114,7 @@
     var nav = findNav();
     if (nav) {
       btn.classList.add('uav-in-nav');
+      nav.classList.add('uav-nav-host');
       nav.appendChild(btn);
     } else {
       btn.classList.add('uav-fab');

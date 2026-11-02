@@ -257,186 +257,68 @@ MathJax = {
 <section id="architecture">
   <h2>3. System Architecture</h2>
 
-  <h3>3.1 系统框架</h3>
+  <h3>3.1 系统总览 —— 深度图直接映射成加速度指令</h3>
+  <p>机载端只吃一张 16×12 的池化深度图加少量状态量：CNN 提特征、GRU 记时序，输出的是<strong>期望推力加速度</strong>，而不是电机转速。真正的文章做在训练端——环境本身就是一个可微分的点质量仿真器。</p>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph PERCEPTION["感知层 (Intel RealSense D435i)"]
-      direction LR
-      DEPTH["深度相机 · 15Hz · 16×12 池化"]
-      STATE["状态信息: 目标方向 · 速度估计 · 姿态"]
-    end
-
-    subgraph POLICY["策略网络 (卷积GRU)"]
-      direction LR
-      CNN["CNN编码器: Conv32→64→128 · LeakyReLU"]
-      PROJ["线性投影: 状态→192维 · 融合(逐元素加法)"]
-      GRU["GRU单元 · 隐状态维护 · 时序运动线索提取"]
-      ACTOR["全连接层: 输出期望加速度 + 速度估计"]
-    end
-
-    subgraph PHYSICS["可微分物理仿真 (训练阶段)"]
-      direction LR
-      PMODEL["点质量模型: v_{k+1}=v_k+(a_k+a_{k+1})Δt/2"]
-      DRAG["二次空气阻力 · p_{k+1}=p_k+v_kΔt+0.5a_kΔt²"]
-      FILTER["控制延迟τ+指数平滑α: 卷积响应建模"]
-      RENDER["深度渲染: 姿态外参 → 简单几何体场景"]
-    end
-
-    subgraph CONTROL["飞行控制层 (真实部署)"]
-      direction LR
-      ACCEL["加速度指令 → 期望姿态+总推力"]
-      FC["BetaFlight飞控 · 高频内环跟踪"]
-      MOTOR["1606 3750KV电机 · 3寸桨 · 推重比3.8"]
-    end
-
-    subgraph HARDWARE["硬件平台 (365g · US$21计算机)"]
-      direction LR
-      MANGO["Mango Pi · A53四核1.5GHz · 1GB RAM"]
-      TOWER["Aocoda F7mini飞控 · HAKRC四合一电调"]
-      FRAME["Roma 3寸机架 · 30×65×6mm³"]
-    end
-
-    DEPTH --> CNN
-    STATE --> PROJ
-    CNN --> ACTOR
-    PROJ --> ACTOR
-    GRU --> ACTOR
-    ACTOR -->|"训练: 梯度回传"| PMODEL
-    PMODEL --> DRAG
-    DRAG --> RENDER
-    RENDER -.->|"下一帧渲染"| DEPTH
-    ACTOR -->|"部署: 加速度指令"| ACCEL
-    ACCEL --> FC
-    FC --> MOTOR
-    MOTOR --> FRAME
-
-    RENDER -.->|"loss: 速度匹配+避碰+平滑"| ACTOR
-    FC -.->|"状态反馈"| STATE
-
-    classDef percept fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef policy fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef physics fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef control fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef hw fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
-    class DEPTH,STATE percept
-    class CNN,PROJ,GRU,ACTOR policy
-    class PMODEL,DRAG,FILTER,RENDER physics
-    class ACCEL,FC,MOTOR control
-    class MANGO,TOWER,FRAME hw
+flowchart LR
+  subgraph IN["机载输入"]
+    DEP["深度图<br/>Depth"]
+    STA["状态量<br/>State"]
+  end
+  subgraph POL["策略网络"]
+    CNN["CNN 编码<br/>Conv Net"]
+    GRU["GRU 融合<br/>Recurrent"]
+    ACT["加速度指令<br/>Thrust"]
+  end
+  subgraph SIM["可微分仿真（本文创新）"]
+    DYN["点质量动力学<br/>Physics"]
+  end
+  DEP -->|"16×12"| CNN
+  STA -->|"速度·姿态"| GRU
+  CNN -->|"192 维特征"| GRU
+  GRU -->|"隐状态"| ACT
+  ACT -->|"训练"| DYN
+  DYN -.->|"渲染下一帧"| DEP
+  ACT -->|"部署"| UAV["四旋翼<br/>BetaFlight"]
+  classDef data fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef net fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef phys fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+  classDef fly fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+  class DEP,STA data
+  class CNN,GRU,ACT net
+  class DYN phys
+  class UAV fly
     </pre>
   </div>
+  <p style="font-size:13px;color:var(--text-muted);">配色：<span style="color:#92400e;">橙</span> = 机载输入，<span style="color:#1d4ed8;">蓝</span> = 策略网络，<span style="color:#6d28d9;">紫</span> = 可微分仿真（本文创新），<span style="color:#047857;">绿</span> = 真实平台；实线是前向，虚线是下一帧观测回流。</p>
 
-  <h3>3.2 数据流 —— 训练 + 推理 + 误差回传</h3>
+  <h3>3.2 训练闭环 —— 梯度沿物理模型倒推回网络</h3>
+  <p>点质量动力学、推力延迟与二次阻力都是可微的，所以损失对状态的梯度可以沿仿真时间反向穿过整个物理模型，回到每个时刻的加速度指令，再回到 CNN / GRU 的参数——这就是「解析一阶梯度」取代 RL 采样估计的地方。</p>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph INPUT["输入数据"]
-      direction LR
-      DEPTH_IN["深度图 16×12 · 单帧输入"]
-      VEL_IN["速度估计 v_k · 目标方向"]
-      ATT_IN["姿态估计 · 偏航对齐目标"]
-    end
-
-    subgraph FORWARD["前向传播"]
-      direction LR
-      CNN_FWD["CNN特征提取: 2层卷积→192维"]
-      STATE_FWD["状态编码: 线性投影→192维"]
-      FUSION["特征融合: 逐元素加法"]
-      GRU_FWD["GRU隐状态更新: h_k → h_{k+1}"]
-      OUTPUT["输出: 期望加速度 u_k + 隐式速度估计"]
-    end
-
-    subgraph SIM["可微分仿真 (前向+反向)"]
-      direction LR
-      THRUST_FILT["推力滤波: 延迟τ + 指数平滑α"]
-      DRAG_CALC["空气阻力: 二次阻力模型"]
-      ACC_CALC["加速度: a_k = (u_k_filtered + drag)/m"]
-      INTEGRATE["数值积分: v_{k+1}, p_{k+1}"]
-      LOSS_CALC["Loss: L=λ_v·L_v + λ_c·L_c + λ_a·L_a + λ_j·L_j"]
-    end
-
-    subgraph BACKWARD["反向传播 (时间梯度衰减)"]
-      direction LR
-      LOSS_GRAD["∂L/∂x_K → 从终端反向"]
-      DECAY["时间衰减: ∂x_j/∂x_{j-1} × e^{-τ·Δt}"]
-      PARAM_GRAD["策略参数梯度: ∂L/∂θ ← 链式法则"]
-      UPDATE["梯度下降: θ ← θ - η·∂L/∂θ"]
-    end
-
-    subgraph DEPLOY["真实部署 (推理仅前向)"]
-      direction LR
-      INFER["推理: CNN+GRU → 加速度 · ~15Hz"]
-      FC_CMD["飞控指令: 加速度→姿态+推力"]
-      REAL_FLY["真实飞行: 森林/城市/工厂 · 最速20m/s"]
-    end
-
-    INPUT --> FORWARD
-    FORWARD --> SIM
-    SIM --> BACKWARD
-    BACKWARD -.->|"参数更新"| FORWARD
-    FORWARD --> DEPLOY
-
-    LOSS_CALC -.->|"L_v: 速度匹配 · L_c: softplus避碰"| LOSS_GRAD
-    PARAM_GRAD -.->|"一阶梯度 · 方差 < 零阶"| UPDATE
-    DECAY -.->|"缓解梯度爆炸 · 强调近期监督"| PARAM_GRAD
-
-    classDef inputC fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef forwardC fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef simC fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef backC fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    classDef deployC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class DEPTH_IN,VEL_IN,ATT_IN inputC
-    class CNN_FWD,STATE_FWD,FUSION,GRU_FWD,OUTPUT forwardC
-    class THRUST_FILT,DRAG_CALC,ACC_CALC,INTEGRATE,LOSS_CALC simC
-    class LOSS_GRAD,DECAY,PARAM_GRAD,UPDATE backC
-    class INFER,FC_CMD,REAL_FLY deployC
+flowchart LR
+  DEP["深度图<br/>Depth"] -->|"16×12"| CNN["CNN+GRU<br/>策略网络"]
+  STA["状态量<br/>State"] -->|"速度·姿态"| CNN
+  CNN -->|"加速度 u_k"| SIM["可微分仿真<br/>Physics"]
+  SIM -->|"位姿"| REND["深度渲染<br/>Render"]
+  REND -.->|"下一帧"| DEP
+  SIM -->|"状态轨迹"| LOSS["物理损失<br/>Loss"]
+  LOSS -.->|"∂L/∂x 逐步衰减"| SIM
+  SIM -.->|"∂L/∂u_k"| CNN
+  CNN -.->|"∂L/∂θ"| UPD["参数更新<br/>Adam"]
+  classDef data fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef net fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef phys fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+  classDef grad fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  class DEP,STA data
+  class CNN net
+  class SIM,REND phys
+  class LOSS,UPD grad
     </pre>
   </div>
-
-  <h3>3.3 工作流 —— 从训练到部署的完整管线</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph TRAIN["阶段1: 可微分仿真训练"]
-      direction LR
-      T1["环境构建: 简单几何体 · 随机摆放 · 64并行"] --> T2["前向仿真: 150步/dt=1/15s · 点质量+阻力+延迟"] --> T3["Loss计算: 速度匹配+softplus避碰+平滑"] --> T4["反向传播: BPTT+时间梯度衰减e^{-τt} · 更新θ"]
-    end
-
-    subgraph VAL["阶段2: 仿真验证与消融"]
-      direction LR
-      V1["单智能体测试: 森林/城市/工厂 · 4~22m/s"] --> V2["多智能体测试: 6~8机 · 窄门换位+并行飞行"] --> V3["消融: 梯度衰减τ · GRU vs MLP/LSTM · 点质量vs刚体"] --> V4["基线对比: Ego v.2 · Agile · PPO · Deep-ILC"]
-    end
-
-    subgraph DEPLOY_REAL["阶段3: 真实世界部署"]
-      direction LR
-      R1["硬件集成: Mango Pi+Realsense+F7mini · 365g"] --> R2["零样本迁移: 策略直接部署 · 无微调"] --> R3["高速度测试: 7~20m/s · 稠密森林 · 动态障碍 · 关门/摆锤"] --> R4["集群实验: 6机窄门换位 · 无通信 · 涌现自组织"]
-    end
-
-    subgraph EXTEND["阶段4: 扩展验证与未来"]
-      direction LR
-      E1["无里程计飞行: 仅依赖深度+姿态 · 匹配Vicon性能"] --> E2["Grad-CAM可视化: 障碍物区域激活验证"] --> E3["速度预测: GRU隐式估计 · 平均误差0.78m/s"] --> E4["未来: 大FOV · 刚体模型特技 · 在线阻力标定"]
-    end
-
-    TRAIN -->|"收敛策略"| VAL
-    VAL -->|"最优策略"| DEPLOY_REAL
-    DEPLOY_REAL -->|"验证成功 · NMI 2025"| EXTEND
-
-    T4 -.->|"反馈: 调整损失权重 v,c,a,j"| T3
-    V4 -.->|"反馈: 对比结果·成功率高+速度快"| T2
-    R3 -.->|"反馈: 漂移导致失败"| E1
-    R4 -.->|"反馈: FOV外碰撞"| E4
-
-    classDef trainC fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef valC fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef deployC fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef extC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class T1,T2,T3,T4 trainC
-    class V1,V2,V3,V4 valC
-    class R1,R2,R3,R4 deployC
-    class E1,E2,E3,E4 extC
-    </pre>
-  </div>
+  <p style="font-size:13px;color:var(--text-muted);">配色：<span style="color:#92400e;">橙</span> = 观测，<span style="color:#1d4ed8;">蓝</span> = 策略网络，<span style="color:#6d28d9;">紫</span> = 可微仿真，<span style="color:#be123c;">红</span> = 损失与梯度回传。反向每退一步都乘一个衰减因子，避免长程梯度累积成爆炸。</p>
+  <p>工程上：一次迭代 64 个并行环境 × 150 步（dt = 1/15 s）；部署时同一网络以 15 Hz 深度图推理，无里程计、无建图，实测最高 20 m/s。</p>
 </section>
 
 <!-- 4. TASK -->

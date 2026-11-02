@@ -258,157 +258,70 @@ MathJax = {
 <section id="architecture">
   <h2>3. System Architecture</h2>
 
-  <h3>3.1 System Frame</h3>
+  <h3>3.1 System Frame — 从像素到推力/角速率的四层链</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph PERCEPTION["感知层 — 视觉输入"]
-      direction LR
-      CAM["前视单目相机 · 640×480 · 20fps · FOV 1.047rad"]
-      KCF["KCF在线跟踪器 · 首帧手动框选 · 逐帧输出目标中心坐标"]
+flowchart LR
+    subgraph IN["输入"]
+        CAM["前视单目相机"]:::percept
+        IMU["IMU 姿态"]:::percept
     end
-
-    subgraph VIRTUAL["虚拟相机层 — 动态解耦"]
-      direction LR
-      PROJECT["重投影: 真实图像平面 → 虚拟图像平面 · Xv∥Xe"]
-      DECOUPLE["解耦效果: 特征运动与俯仰/偏航无关 · rv∈R⁴"]
-      JACOBIAN["图像雅可比 Jv · 透视投影方程"]
+    subgraph PER["感知层"]
+        KCF["目标跟踪 KCF"]:::percept
     end
-
-    subgraph CONTROL["控制层 — 控制器设计"]
-      direction LR
-      ERR["改进误差: ei = p - pd · pd=[0,0]ᵀ"]
-      TRANS["平移控制: vvy=k1·vu · vvz=k2·vn · 推力f"]
-      ROLL["滚转控制: ω1 指数稳定 · φd=0"]
-      YAW["偏航阻尼: ω3=kψ(ψ-ψd) · ψd=0"]
+    subgraph VC["虚拟相机层（本文创新）"]
+        PRJ["重投影<br/>虚拟图像平面"]:::novel
+        ERR["图像误差"]:::novel
     end
-
-    subgraph PLATFORM["平台层 — 四旋翼硬件"]
-      direction LR
-      IMU["IMU · 角速度+欧拉角估计"]
-      PX4["Pixhawk自驾仪 · PX4固件"]
-      MOTOR["电机控制信号 · 推力+三轴力矩"]
+    subgraph CTL["控制与执行"]
+        LAW["IBVS 控制律"]:::control
+        PX4["Pixhawk / PX4"]:::platform
     end
-
-    CAM --> KCF
-    KCF --> PROJECT --> DECOUPLE --> JACOBIAN
-    JACOBIAN --> ERR
-    ERR --> TRANS
-    ERR --> ROLL
-    ERR --> YAW
-    TRANS --> MOTOR
-    ROLL --> MOTOR
-    YAW --> MOTOR
-    MOTOR --> PX4
-    IMU --> ROLL
-    IMU --> YAW
-    IMU --> PROJECT
-
-    ROLL -.->|"指数收敛 · eφ→0"| ERR
-    YAW -.->|"偏航稳定 · ψ→0"| DECOUPLE
-    TRANS -.->|"稳定性条件 · vx²+v·vx≤k1"| ERR
+    CAM -->|"图像 640×480"| KCF
+    KCF -->|"像素 (u,v)"| PRJ
+    IMU -->|"滚转角 φ"| PRJ
+    PRJ -->|"虚拟特征 p"| ERR
+    ERR -->|"误差 e"| LAW
+    LAW -->|"推力 f · 角速率 ω"| PX4
 
     classDef percept fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef virtual fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef novel fill:#fff1f2,stroke:#e11d48,stroke-width:3px,color:#be123c
     classDef control fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
     classDef platform fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class CAM,KCF percept
-    class PROJECT,DECOUPLE,JACOBIAN virtual
-    class ERR,TRANS,ROLL,YAW control
-    class IMU,PX4,MOTOR platform
     </pre>
   </div>
+  <p style="color:var(--text-muted); font-size:12.5px; margin:8px 0 18px;">配色：<strong>橙 = 相机 / IMU 与 KCF 跟踪</strong>、<strong>红框 = 本文创新层</strong>、<strong>紫 = 控制律</strong>、<strong>绿 = Pixhawk</strong>。这一层的用处只有一句话：把真实图像平面上的像素重投影到虚拟图像平面（Xv ∥ Xe，只随滚转角转动），特征运动便与俯仰 / 偏航角速率解耦，后面的控制律才好推、才稳。</p>
 
-  <h3>3.2 Dataflow — 从图像到电机指令的闭环数据流</h3>
+  <h3>3.2 Dataflow — 视觉 / 姿态双环闭环</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph IMAGE["图像采集与目标检测"]
-      direction LR
-      FRAME["相机帧 640×480@20fps"] --> DETECT["KCF跟踪器 · 输出(u,v)真实图像坐标"]
-    end
+flowchart LR
+    IMG["相机图像"]:::percept
+    TRK["KCF 跟踪"]:::percept
+    REP["虚拟重投影"]:::novel
+    ERR["图像误差"]:::novel
+    LAW["IBVS 控制律"]:::control
+    DEP["距离估计"]:::novel
+    UAV["四旋翼"]:::platform
+    ATT["IMU 姿态"]:::percept
+    IMG -->|"640×480 · 20 fps"| TRK
+    TRK -->|"像素 (u,v)"| REP
+    ATT -->|"滚转角 φ"| REP
+    REP -->|"虚拟特征 p"| ERR
+    ERR -->|"误差 e"| LAW
+    TRK -->|"像素数 N"| DEP
+    DEP -->|"距离 d"| LAW
+    LAW -->|"f, ω"| UAV
+    UAV -.->|"新图像"| IMG
+    UAV -.->|"φ, θ, ψ"| ATT
 
-    subgraph REPROJ["虚拟相机重投影"]
-      direction LR
-      RPY["IMU提供 φ,θ,ψ 欧拉角"] --> RV["构造旋转矩阵 Rv"]
-      COORD["真实坐标(u,v)"] --> VIRT["虚拟图像平面坐标(vu,vn)"]
-      RV --> VIRT
-    end
-
-    subgraph CTRL["反馈控制计算"]
-      direction LR
-      ECOMP["误差计算: ei=[vu,vn]ᵀ-[0,0]ᵀ"] --> TRANS_CMD["平移指令: vvy=k1vu, vvz=k2vn"]
-      ECOMP --> THRUST["推力计算: f=f(φ,θ,vvz,vn,m,g)"]
-      ECOMP --> ROLL_CMD["滚转指令: ω1=-sφtθ·ω2-cφtθ·ω3-kφeφ"]
-      ROLL_CMD --> OMEGA["角速度指令 ω = [ω1,ω2,ω3]ᵀ"]
-      YAW_CMD["偏航指令: ω3=kψ(ψ-0)"] --> OMEGA
-    end
-
-    subgraph EXEC["执行与状态反馈"]
-      direction LR
-      THRUST --> MOTORS["Pixhawk · 电机PWM"]
-      OMEGA --> MOTORS
-      MOTORS --> QUAD["四旋翼 · m=1.55kg · J=diag{...}"]
-      QUAD --> STATE["状态反馈: ξ,V,φ,θ,ψ,Ω"]
-      STATE --> RPY
-    end
-
-    IMAGE --> REPROJ --> CTRL --> EXEC
-    STATE -.->|"循环: 20Hz视觉+高频IMU"| FRAME
-
-    classDef img fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef reproj fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef ctrl fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef exec fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class FRAME,DETECT img
-    class RPY,RV,COORD,VIRT reproj
-    class ECOMP,TRANS_CMD,THRUST,ROLL_CMD,YAW_CMD,OMEGA ctrl
-    class MOTORS,QUAD,STATE exec
+    classDef percept fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+    classDef novel fill:#fff1f2,stroke:#e11d48,stroke-width:3px,color:#be123c
+    classDef control fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+    classDef platform fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
     </pre>
   </div>
-
-  <h3>3.3 Workflow — 从待命到完成追踪的完整流程</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph INIT["阶段1: 系统初始化与起飞"]
-      direction LR
-      I1["地面待命 · 预检传感器/估计器"] --> I2["Position模式起飞 · 悬停10m高度"] --> I3["切换Offboard模式 · 相机启动"] --> I4["首帧手动框选入侵者 · KCF初始化"]
-    end
-
-    subgraph TRACK["阶段2: 视觉伺服追踪循环"]
-      direction LR
-      T1["KCF逐帧输出目标中心 (u,v)"] --> T2["虚拟相机重投影 → (vu,vn)"] --> T3["计算图像误差 ei = (vu,vn)-(0,0)"] --> T4["控制器输出: 推力f + 角速度ω"]
-    end
-
-    subgraph CONVERGE["阶段3: 逐步逼近目标"]
-      direction LR
-      C1["平移控制引导接近 · vvy=k1vu"] --> C2["距离估计算法: d≈(Ne/N)·de"] --> C3["d < d*时停止前向逼近 · vvx=0"] --> C4["图像误差 ei→0 · 目标居中"]
-    end
-
-    subgraph COMPLETE["阶段4: 追踪完成"]
-      direction LR
-      M1["图像补丁居中 · vu→0, vn→0"] --> M2["距离收敛 · UAV靠近入侵者"] --> M3["追踪目标达成 · 监控/拦截就绪"]
-    end
-
-    INIT -->|"开始追踪"| TRACK
-    TRACK -->|"误差收敛"| CONVERGE
-    CONVERGE -->|"任务完成"| COMPLETE
-
-    T4 -.->|"闭环反馈 · IMU数据"| T1
-    C3 -.->|"停止条件触发"| T4
-    M2 -.->|"距离反馈"| C2
-
-    classDef init fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef track fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef converge fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef complete fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class I1,I2,I3,I4 init
-    class T1,T2,T3,T4 track
-    class C1,C2,C3,C4 converge
-    class M1,M2,M3 complete
-    </pre>
-  </div>
+  <p style="color:var(--text-muted); font-size:12.5px; margin:8px 0 18px;">信号一路向右：图像 → KCF 像素 → 虚拟平面特征 → 误差 → 推力 / 角速率 → 四旋翼；虚线是姿态回测与下一帧图像，20 fps 的视觉与 IMU 姿态构成双环。距离不是测出来的：Alg.1 用目标像素数 N 与相机水平分辨率 Ne 反推，d 小于阈值就把前向速度置零，避免“追上又飞过头”。</p>
 </section>
 
 <!-- ═══════════════ 4. TASK ═══════════════ -->

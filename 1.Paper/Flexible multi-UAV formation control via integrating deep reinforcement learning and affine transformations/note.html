@@ -265,157 +265,69 @@ MathJax = {
 <section id="architecture">
   <h2>3. System Architecture</h2>
 
-  <h3>3.1 System Frame — 两层混合驱动框架总览</h3>
+  <h3>3.1 系统总览 —— 决策层定"去哪"，执行层定"怎么飞"</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph DL["决策层（模型驱动）— 仿射变换 + 应力矩阵"]
-      direction TB
-      NOM["标称编队构型 x"] --> AFF["仿射变换 (A,b)<br/>x'(t) = (A(t) ⊗ I_d) x + [1_N ⊗ I_d] b(t)<br/>旋转 · 缩放 · 剪切 · 平移"]
-      AFF --> STRESS["应力矩阵 Omega 分块<br/>Omega_ll, Omega_lf, Omega_fl, Omega_ff"]
-      STRESS --> PFSTAR["Follower 目标: p_f*(t) = -Omega_ff^{-1} Omega_fl p_l(t)<br/>纯数学计算 — 无需训练"]
-    end
-
-    subgraph EL["执行层（数据驱动）— 每 UAV 一个 PPO-CNN"]
-      direction TB
-      OBS["观测 o_i<br/>LiDAR 270度 x 3帧 (3x512)<br/>+ [v_i, omega_i] + Delta_p_i (极坐标)"]
-      CNN["Conv1D 特征提取<br/>2层: k5s2 / k3s1 · ReLU · 32ch<br/>+ FC(256) ReLU"]
-      CONCAT["特征拼接<br/>LiDAR 特征 + 速度 + 相对目标"]
-      FC["FC(128) + ReLU"]
-      ACTOR["Actor: 高斯分布<br/>mu_v(sigmoid), sigma_v<br/>mu_omega(tanh), sigma_omega"]
-      CRITIC["Critic: V(o_i)"]
-      OBS --> CNN --> CONCAT --> FC
-      FC --> ACTOR
-      FC --> CRITIC
-    end
-
-    subgraph UAVM["UAV 运动学 + 环境"]
-      ACTION["动作: a_i = [v_cmd, omega_cmd]<br/>v in [0, 1.0] m/s<br/>omega in [-1.0, 1.0] rad/s"]
-      KIN["独轮车运动学<br/>x_dot = v cos(psi)<br/>y_dot = v sin(psi)<br/>psi_dot = omega"]
-      ENV["STAGE 仿真器<br/>静态 + 动态 + 复杂障碍物"]
-      ACTION --> KIN --> ENV
-    end
-
-    PFSTAR -->|"p_i*(t) — 目标位置"| OBS
-    ACTOR --> ACTION
-    ENV -.->|"奖励: r_target + r_collision + r_smooth1 + r_smooth2"| CRITIC
-    ENV -.->|"下一状态 o_i' + done 信号"| OBS
-    CRITIC -.->|"GAE 优势估计 · gamma=0.99 · lambda=0.95"| ACTOR
-
-    classDef decision fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef execute fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef uav fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class NOM,AFF,STRESS,PFSTAR decision
-    class OBS,CNN,CONCAT,FC,ACTOR,CRITIC execute
-    class ACTION,KIN,ENV uav
+flowchart LR
+  subgraph IN["机载输入"]
+    LIDAR["LiDAR 三帧扫描"]
+    VEL["自身速度"]
+  end
+  subgraph DEC["决策层 · 模型驱动（本文创新）"]
+    AFF["仿射变换 A, b"]
+    STR["应力矩阵分块"]
+    TGT["各机目标点"]
+  end
+  subgraph EXE["执行层 · 数据驱动"]
+    NET["Conv1D + FC 策略"]
+    ACT["速度指令 v, ω"]
+    SIM["独轮车 + STAGE"]
+  end
+  AFF -->|"目标构型"| STR
+  STR -->|"分块求解"| TGT
+  TGT -->|"相对目标"| NET
+  LIDAR -->|"障碍距离"| NET
+  VEL -->|"速度反馈"| NET
+  NET -->|"动作"| ACT
+  ACT -->|"驱动"| SIM
+  classDef dec fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+  classDef exe fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef plant fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+  class AFF,STR,TGT dec
+  class LIDAR,VEL,NET,ACT exe
+  class SIM plant
     </pre>
   </div>
+  <p><strong>配色</strong>：紫色 = 模型驱动的决策层，蓝色 = 数据驱动的执行层（含其观测），绿色 = 被控对象与仿真器。<strong>本文的创新全在紫色这一层</strong>：它把编队结构写成作用在名义构型上的仿射变换（旋转 / 缩放 / 剪切 / 平移），再用应力矩阵的分块性质把"整个编队的目标形状"翻译成"每架 follower 自己的目标点"。这一步是纯线性代数——不需要训练、不需要中心节点、也不受障碍物数目影响。执行层（PPO-CNN）因此被解放出来，只干一件事：在目标点之间穿插避障。原本互相打架的"保持形状"与"别撞上"，被拆成两个各自可解的层。</p>
 
-  <h3>3.2 Dataflow — 从传感器到执行器的完整数据链路</h3>
+  <h3>3.2 闭环 —— 目标每步重算，策略做反应式决策</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph INPUTS["每 UAV 输入（每个时间步）"]
-      direction LR
-      LIDAR["LiDAR 扫描<br/>270度 FOV · 512条射线<br/>3帧历史堆叠"]
-      STATE["自身状态<br/>线速度 v_i<br/>角速度 omega_i"]
-      TARGET["相对目标位置<br/>Delta_p_i（距离、角度）<br/>p_i* 来自决策层"]
-    end
-
-    subgraph NETWORK["策略网络 pi_theta（所有 UAV 共享权重）"]
-      direction LR
-      CNN1["Conv1D Layer 1<br/>32通道 · k=5 · s=2 · ReLU"]
-      CNN2["Conv1D Layer 2<br/>32通道 · k=3 · s=1 · ReLU"]
-      FC256["FC(256) + ReLU<br/>LiDAR 特征提取完成"]
-      MERGE["特征融合<br/>Concat(LiDAR特征, v, omega, Delta_p)"]
-      FC128["FC(128) + ReLU"]
-      HEAD_A["Actor 头<br/>Linear -> mu_v, log_sigma_v<br/>Linear -> mu_omega, log_sigma_omega"]
-      HEAD_C["Critic 头<br/>Linear -> V(o_i)"]
-    end
-
-    subgraph OUTPUTS["输出 + 训练信号"]
-      direction LR
-      CMD["速度指令<br/>v_cmd in [0, 1.0] m/s<br/>omega_cmd in [-1.0, 1.0] rad/s"]
-      REW["每步奖励<br/>r_target (+15) + r_collision (-15)<br/>+ r_smooth1 + r_smooth2"]
-      GAE["GAE 优势估计<br/>gamma=0.99 · lambda=0.95<br/>T_horizon=8000 · K_epoch=20"]
-    end
-
-    INPUTS --> NETWORK
-    NETWORK --> OUTPUTS
-
-    LIDAR --> CNN1 --> CNN2 --> FC256 --> MERGE
-    STATE --> MERGE
-    TARGET --> MERGE
-    MERGE --> FC128
-    FC128 --> HEAD_A --> CMD
-    FC128 --> HEAD_C --> GAE
-    REW --> GAE
-    GAE -.->|"PPO KL-penalty 更新<br/>lr=5e-5 / 2e-5 · KL_target=15e-4"| FC128
-    CMD -.->|"驱动 UAV 运动学<br/>独轮车模型"| STATE
-
-    classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef network fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef output fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class LIDAR,STATE,TARGET input
-    class CNN1,CNN2,FC256,MERGE,FC128,HEAD_A,HEAD_C network
-    class CMD,REW,GAE output
+flowchart LR
+  STR["应力分块"] -->|"预存子块"| TGT["编队目标点"]
+  TGT -->|"相对目标"| OBS["观测 o_i"]
+  LIDAR["LiDAR 三帧"] -->|"原始扫描"| OBS
+  OBS --> POL["策略 πθ"]
+  POL -->|"动作"| CMD["v_cmd, ω_cmd"]
+  CMD --> SIM["独轮车 + 障碍"]
+  SIM -->|"新状态"| REW["单步奖励"]
+  SIM -.->|"leader 位置"| TGT
+  SIM -.->|"下一帧"| LIDAR
+  REW --> PPO["PPO-KL 更新"]
+  PPO -.->|"更新 θ"| POL
+  classDef dec fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+  classDef obs fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef pol fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef plant fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+  classDef train fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  class STR,TGT dec
+  class LIDAR,OBS obs
+  class POL,CMD pol
+  class SIM plant
+  class REW,PPO train
     </pre>
   </div>
-
-  <h3>3.3 Workflow — 离线训练 + 在线推理全流程</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph PHASE1["阶段1: Stage 1 训练 — 无障碍环境"]
-      direction LR
-      S1_INIT["初始化: PPO 策略 pi_theta<br/>KL-penalty 变体 · lr=5e-5"]
-      S1_ROLLOUT["采样: N 架 UAV 导航至目标<br/>仅 UAV 间互碰避免<br/>无外部障碍物"]
-      S1_UPDATE["PPO 更新: GAE + KL-penalty<br/>每 8000 步批数据 20 轮训练"]
-      S1_CHECK{"奖励 ~90<br/>~70k 迭代？"}
-      S1_INIT --> S1_ROLLOUT --> S1_UPDATE --> S1_CHECK
-      S1_CHECK -->|"否"| S1_ROLLOUT
-    end
-
-    subgraph PHASE2["阶段2: Stage 2 训练 — 复杂障碍环境"]
-      direction LR
-      S2_INIT["加载 Stage 1 checkpoint<br/>lr=2e-5（精调学习率）"]
-      S2_ROLLOUT["采样: 静态圆柱 + 动态障碍物<br/>随机初始位置 · 随机目标分配"]
-      S2_UPDATE["PPO 更新: 同 GAE + KL-penalty<br/>KL_target=15e-4 · 自适应 beta<br/>KL 过大则 beta×2 · 过小则 beta÷2"]
-      S2_CHECK{"奖励 ~115<br/>收敛？"}
-      S2_INIT --> S2_ROLLOUT --> S2_UPDATE --> S2_CHECK
-      S2_CHECK -->|"否"| S2_ROLLOUT
-    end
-
-    subgraph PHASE3["阶段3: 在线推理 — 分布式执行"]
-      direction LR
-      I_INIT["加载训练好的策略 pi_theta<br/>设置 deterministic=True（使用均值）"]
-      I_LOOP["每时间步 per UAV_i:"]
-      I_OBS["1. LiDAR 扫描 -> 获取观测 o_i"]
-      I_TGT["2. 决策层: 计算 p_i*(t) via Eq.(8)"]
-      I_INFER["3. 策略推理: a_i = pi_theta(o_i)"]
-      I_STEP["4. 执行: v_cmd, omega_cmd -> 运动学步进"]
-      I_DONE{"5. 所有 UAV 到达<br/>或超最大步数？"}
-      I_INIT --> I_LOOP
-      I_LOOP --> I_OBS --> I_TGT --> I_INFER --> I_STEP --> I_DONE
-      I_DONE -->|"否"| I_LOOP
-    end
-
-    S1_CHECK -->|"是: 保存 checkpoint"| S2_INIT
-    S2_CHECK -->|"是: 保存最终策略"| I_INIT
-    I_DONE -->|"是"| EVAL["评估: 位置误差<br/>相似性误差 · Avg Jerk<br/>飞行时间 · 碰撞次数"]
-    PHASE2 -.->|"反馈: 收敛慢则调整超参"| PHASE1
-    EVAL -.->|"反馈: 消融实验验证课程设计"| S1_INIT
-
-    classDef phase1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef phase2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef phase3 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef eval fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    class S1_INIT,S1_ROLLOUT,S1_UPDATE,S1_CHECK phase1
-    class S2_INIT,S2_ROLLOUT,S2_UPDATE,S2_CHECK phase2
-    class I_INIT,I_LOOP,I_OBS,I_TGT,I_INFER,I_STEP,I_DONE phase3
-    class EVAL eval
-    </pre>
-  </div>
+  <p>单步闭环里其实叠着三条回路。<strong>实线</strong>是控制回路：LiDAR 三帧（270° FOV、512 束、5 m 量程）+ 自身速度 [v, ω] + 决策层给的相对目标（极坐标下的距离与角度）拼成观测 o_i，策略输出速度指令，经独轮车运动学在 STAGE 中前进一步。<strong>虚线一</strong>是目标重算：每个控制步，follower 用预存的应力分块矩阵和当前 leader 位置重解一次自己的目标点——这是分布式计算，没有中心节点，规模扩大时通信量不增。<strong>虚线二</strong>是训练回路：单步奖励由到目标的进程奖励、碰撞惩罚与两项平滑惩罚相加，进 KL-penalty 版 PPO 更新，再把 θ 下发回策略。课程上分两段：Stage 1 无障碍环境（约 70k 次迭代把奖励推到 90 左右），Stage 2 加载该 checkpoint、学习率降到 2e-5，加入静态圆柱与动态障碍（KL_target = 15e-4），奖励继续爬到约 115。部署时只保留实线与虚线一——训练回路整体离线。</p>
 </section>
 
 <!-- ═══════════════ 4. TASK ═══════════════ -->

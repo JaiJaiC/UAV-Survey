@@ -288,194 +288,67 @@ MathJax = {
 <section id="architecture">
   <h2>3. System Architecture</h2>
 
-  <h3>3.1 系统框架</h3>
+  <h3>3.1 系统总览 —— 只给方向的端到端拦截管线</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph PERCEPT["感知层 · 被动视觉 (推理时)"]
-      direction LR
-      CAM["多相机 360° 覆盖 · 被动 RGB"]
-      DET["目标检测器 (YOLO 类) → 像素坐标"]
-      BEAR["单位方向向量 d̂ ∈ S² (机体/起始帧)"]
-    end
-
-    subgraph STATE["本体状态"]
-      direction LR
-      VEL["线速度 v_t · 3 维"]
-      ROT["旋转矩阵 R_t · 9 维 (body → start frame)"]
-    end
-
-    subgraph POLICY["策略网络 · 192 维 GRU"]
-      direction LR
-      ENC1["Target Encoder: Linear 192 + LayerNorm"]
-      ENC2["State Encoder: Linear 192 + LayerNorm"]
-      SUM["逐元素相加 (B,192)"]
-      GRU["GRUCell · 192 隐单元 · 跨时间积分 bearing"]
-      HEAD["Linear 192 → Linear 4"]
-      ACT["动作: a_cmd (3) + ψ (1)"]
-    end
-
-    subgraph CTRL["低层控制 (机载)"]
-      direction LR
-      PD["PD 姿态/角速率控制器"]
-      MIX["混控矩阵 → 四转子转速指令 Ω_cmd"]
-      LAG["转子一阶延迟 τ_r = 0.0186 s"]
-      THR["二次推力模型: F_i(Ω_i)"]
-    end
-
-    subgraph PHYS["可微分物理 (训练时)"]
-      direction LR
-      RIGID["刚体动力学 [p,v,q,ω] · 阻力 d(v)"]
-      RK4["RK4 定步长积分 Δt_sim = 2.5 ms"]
-      STATE_OUT["下一状态 x_{t+1}"]
-    end
-
-    subgraph LOSS["特权损失 (仅训练时可见真值)"]
-      direction LR
-      LOS["视线对齐: ‖d̂ × v̂_rel‖"]
-      CLOSE["接近速度: d̂ᵀ v_rel"]
-      REG["加速度 / jerk / 限速 / 偏航"]
-      BACK["BPTT → ∇θ L (解析一阶梯度)"]
-    end
-
-    CAM --> DET --> BEAR
-    BEAR --> ENC1
-    VEL --> ENC2
-    ROT --> ENC2
-    ENC1 --> SUM
-    ENC2 --> SUM
-    SUM --> GRU --> HEAD --> ACT
-    ACT --> PD --> MIX --> LAG --> THR --> RIGID
-    RIGID --> RK4 --> STATE_OUT
-    STATE_OUT -.->|"下一控制步"| STATE
-    STATE_OUT --> LOSS
-    LOS --> BACK
-    CLOSE --> BACK
-    REG --> BACK
-    BACK -.->|"参数更新"| POLICY
-
-    classDef percept fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef stateC fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
-    classDef policyC fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef ctrlC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef physC fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef lossC fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    class CAM,DET,BEAR percept
-    class VEL,ROT stateC
-    class ENC1,ENC2,SUM,GRU,HEAD,ACT policyC
-    class PD,MIX,LAG,THR ctrlC
-    class RIGID,RK4,STATE_OUT physC
-    class LOS,CLOSE,REG,BACK lossC
+flowchart LR
+  subgraph PER["感知（推理时）"]
+    CAM["多相机 360°"]
+    DET["目标检测"]
+  end
+  subgraph POL["策略网络（仅方位）"]
+    ENC["双 MLP 编码"]
+    GRU["GRU 192 维"]
+    HEAD["动作头 4 维"]
+  end
+  subgraph PLANT["可微刚体动力学（本文创新）"]
+    PD["PD + 转子延迟"]
+    RIGID["刚体 + RK4"]
+  end
+  PROP["本体状态 v, R"]
+  CAM -->|"图像"| DET
+  DET -->|"仅方向，无距离"| ENC
+  PROP -->|"速度/姿态"| ENC
+  ENC -->|"各 192 维"| GRU
+  GRU -->|"隐状态"| HEAD
+  HEAD -->|"推力 + 偏航"| PD
+  PD -->|"转速指令"| RIGID
+  classDef perc fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef pol fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef phys fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+  classDef state fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
+  class CAM,DET perc
+  class PROP state
+  class ENC,GRU,HEAD pol
+  class PD,RIGID phys
     </pre>
   </div>
+  <p><strong>配色</strong>：橙色 = 推理时的被动视觉，青色 = 本体状态（速度与姿态），蓝色 = 策略网络，紫色 = <strong>本文创新的落点</strong>——不让动力学当"黑箱环境"，而是让整条链路可微。感知只给得出<strong>方向</strong>：360° 相机覆盖 + 检测器把入侵者投到单位球上，得到一条无距离的单位向量。策略把这条方向与本体速度、旋转矩阵分开编码成两个 192 维向量，相加后交给 192 维 GRU——循环状态在时间上积分方向序列，隐式估计入侵者的速度与加速度，这正是"只给方位也能提前量"的来源。输出 4 维（3 维质量归一化推力 + 1 维偏航），由机载 PD 变成转速，再经转子一阶延迟与二次推力模型进入刚体动力学。同一张图在训练时整条可反传，在推理时退化为"相机 + 检测器 + 网络 + PD"。</p>
 
-  <h3>3.2 数据流 —— 前向、损失、BPTT 与部署</h3>
+  <h3>3.2 闭环 —— 前向、特权损失与 BPTT</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph OBS["① 观测构造 (start frame)"]
-      direction LR
-      O1["d̂_t = (p_tgt − p_agt)/‖p_tgt − p_agt‖"]
-      O2["v_t · R_t (body → start)"]
-      O3["o_t = [v_t, R_t, d̂_t] · 3+9+3"]
-    end
-
-    subgraph FWD["② 策略前向 (可微)"]
-      direction LR
-      F1["两个 MLP 编码器 → 各 192 维"]
-      F2["相加 → GRU h_t = f(h_{t−1}, z_t)"]
-      F3["192 隐藏层 + 线性头 → a_cmd, ψ"]
-      F4["PD 控制器 → 期望姿态 + 总推力"]
-    end
-
-    subgraph SIM["③ 可微分动力学 (每控制步 8 个 RK4 子步)"]
-      direction LR
-      S1["Ω̇ = (Ω_cmd − Ω)/τ_r"]
-      S2["F_i = f2 Ω_i² + f1 Ω_i + f0 ; τ = 混控"]
-      S3["v̇ = R(f + d(v))/m − g ẑ ; ω̇ = J⁻¹(τ − ω×Jω)"]
-      S4["RK4 积分 → x_{t+1}"]
-    end
-
-    subgraph LOSS["④ 特权损失 (逐 step)"]
-      direction LR
-      L1["L_align = ‖d̂ × v̂_rel‖"]
-      L2["L_close = d̂ᵀ v_rel"]
-      L3["L_acc + L_jerk + L_vmax + L_yaw"]
-      L4["L_t = Σ λ_i L_i"]
-    end
-
-    subgraph BWD["⑤ BPTT + 更新"]
-      direction LR
-      B1["∂L/∂x_T → 沿 64 步回传"]
-      B2["穿过 RK4 / 阻力 / 转子延迟 (全部可微)"]
-      B3["∂L/∂θ → AdamW + 梯度裁剪 5.0"]
-      B4["学习率 1.64e-3 → 5e-4"]
-    end
-
-    OBS --> FWD --> SIM --> LOSS --> BWD
-    BWD -.->|"θ 更新"| FWD
-    SIM -.->|"冻结已终止的并行环境 · 同步更新"| FWD
-    S4 -.->|"x_{t+1}"| OBS
-
-    classDef obsC fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef fwdC fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef simC fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef lossC fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    classDef bwdC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class O1,O2,O3 obsC
-    class F1,F2,F3,F4 fwdC
-    class S1,S2,S3,S4 simC
-    class L1,L2,L3,L4 lossC
-    class B1,B2,B3,B4 bwdC
+flowchart LR
+  OBS["观测 v, R, 方向"] --> POL["策略网络"]
+  POL -->|"推力 + 偏航"| CMD["动作指令"]
+  CMD --> PD["PD 姿态控制"]
+  PD --> SIM["可微刚体 + RK4"]
+  SIM -.->|"下一状态"| OBS
+  SIM --> LOSS["6 项特权损失"]
+  GT["入侵者真值"] -->|"仅训练可见"| LOSS
+  LOSS --> BPTT["BPTT 梯度"]
+  BPTT -.->|"∇θ 更新"| POL
+  classDef obs fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef pol fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef sim fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+  classDef loss fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  class OBS,GT obs
+  class POL,CMD pol
+  class PD,SIM sim
+  class LOSS,BPTT loss
     </pre>
   </div>
-
-  <h3>3.3 工作流 —— 轨迹池 → 训练 → 评估 → 消融</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph GEN["阶段 0: 评估轨迹池生成 (Algorithm 1)"]
-      direction LR
-      G1["参数曲线 p(s)=c0+R_tilt·h(s)+z(s)ẑ"] --> G2["解析加速度 a(s) · 曲率 κ(s)"]
-      G2 --> G3["可行性: ‖a+gẑ‖ ≤ A_max · a_z ≥ −βg · v²κ ≤ g"]
-      G3 --> G4["拒绝采样 → 最远点选择 → 正反向分裂"]
-    end
-
-    subgraph TRAIN["阶段 1: APG 训练 (512 并行环境)"]
-      direction LR
-      T1["随机初始位姿 (10 m 立方) + 入侵者轨迹采样"] --> T2["64 步 horizon 前向 (Δt_ctrl = 20 ms)"]
-      T2 --> T3["6 项损失求和 · 特权真值"]
-      T3 --> T4["BPTT 回传穿过刚体动力学"]
-      T4 --> T5["1500 次更新 ≈ 49.15 M 步"]
-    end
-
-    subgraph EVAL["阶段 2: 评估 (110,000 个环境)"]
-      direction LR
-      E1["三类轨迹 × 0–4 / 0–10 m/s 速度扫描"] --> E2["成功率 · 回合长度 · 加速度 · jerk"]
-      E2 --> E3["消融: PMD vs Quad · APG vs PPO"]
-      E3 --> E4["成功判据: 距离 ≤ 0.3 m · 12 s 内"]
-    end
-
-    subgraph ANALY["阶段 3: 机理分析"]
-      direction LR
-      A1["控制努力对比 (加速度/jerk)"] --> A2["收敛速度对比 (图 6)"]
-      A2 --> A3["轨迹泛化 (训练椭圆 → 评估螺旋/双纽线)"]
-    end
-
-    GEN --> TRAIN --> EVAL --> ANALY
-    T4 -.->|"损失权重反馈"| T3
-    E3 -.->|"若成功率饱和 → 提高速度范围"| T1
-
-    classDef genC fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef trainC fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef evalC fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef anaC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class G1,G2,G3,G4 genC
-    class T1,T2,T3,T4,T5 trainC
-    class E1,E2,E3,E4 evalC
-    class A1,A2,A3 anaC
-    </pre>
-  </div>
+  <p>训练回路由三段构成。<strong>前向</strong>：20 ms 控制步、64 步 horizon，观测与动作都在"起始帧"里表达，因此策略行为不依赖固定世界坐标系。<strong>特权损失</strong>：6 项全部逐 step 稠密可微——视线漂移、接近速度（平行导引的两条几何量）＋ 加速度、jerk、限速、机头对准四项正则；其中前两项要用入侵者的真实位置与速度，但这份真值<strong>只进损失、不进策略输入</strong>，所以部署时的观测约束是真的。<strong>BPTT</strong>：梯度沿 64 步穿过 RK4、二次阻力与转子延迟一路回到 θ（AdamW、梯度裁剪 5.0）。512 个并行环境同步推进，1500 次更新约 49.15 M 步。两条虚线就是这套"可微物理"的全部要求：下一状态要能回灌成观测，梯度要能穿过每一步动力学回到策略。</p>
 </section>
 
 <!-- 4. TASK -->

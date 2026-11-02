@@ -257,162 +257,72 @@ MathJax = {
 <section id="architecture">
   <h2>3. 系统架构</h2>
 
-  <h3>3.1 整体架构——子系统与层级关系</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">一句话：<strong>把像素变成四元数球面特征，再把“真实图像平面上的可见性”写成 NMPC 的硬约束</strong>，直接解出推力与角速率。两图中<strong>紫色 = 本文创新</strong>：球面特征表示（②）、欠驱动补偿与真实视野约束（①）、距离状态与 TTC 约束（③）；橙色 = 机载传感，绿色 = 执行。</p>
+
+  <h3>3.1 系统总览——球面特征 → 感知 NMPC → 推力与角速率</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph 感知层["感知层：视觉特征提取"]
-      direction LR
-      相机["针孔相机 · 1280x640 px · 30 Hz"]
-      检测["YOLOv5 目标检测器 · 赛门边界框"]
-      特征["球面特征提取 · 像素坐标 ➜ 3D单位向量 · ◆ ➜ 四元数 q"]
-      距离["距离估计 · r = f*d_gate/max(w,h)"]
-    end
-
-    subgraph 控制层["NMPC 层：ACADO + qpOASES 求解器"]
-      direction LR
-      模型["全状态 IBVS 系统模型 · x = [v_w, q_wb, q, r] · u = [c, Omega_b]"]
-      预测["前向预测 · 1.0s 时域 · dt=0.05s · 20 节点"]
-      约束["约束评估 · 执行器限制 · 真实可见性约束 · TTC 约束"]
-      目标["目标函数 · 动作代价 + 感知代价 · 预测姿态旋转补偿"]
-      求解["RTI 方案求解 · 准备阶段线性化 · 反馈阶段 QP · 5-10 ms"]
-    end
-
-    subgraph 执行层["飞行控制层"]
-      direction LR
-      指令["推力 c + 角速率 Omega_b · 直接低层驱动 · 无级联姿态环"]
-      飞控["角速率 PID · PixRacer 飞控 · 跟踪 Omega_b 指令"]
-      电机["电机混合 · 各旋翼推力分配 · 最大推力 20N · 最大角速率 3.0 rad/s"]
-    end
-
-    相机 --> 检测 --> 特征 --> 距离
-    特征 --> 模型
-    距离 --> 模型
-    模型 --> 预测 --> 约束 --> 目标 --> 求解
-    求解 --> 指令 --> 飞控 --> 电机
-    电机 -.->|"状态反馈: v_w, q_wb"| 模型
-    特征 -.->|"视觉反馈: q, r"| 模型
-
-    classDef sensing fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef control fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef actuator fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class 相机,检测,特征,距离 sensing
-    class 模型,预测,约束,目标,求解 control
-    class 指令,飞控,电机 actuator
+flowchart LR
+  subgraph IN["机载感知"]
+    CAM["针孔相机<br/>Pinhole Cam"]
+    ODO["T265 里程计<br/>Odometry"]
+  end
+  subgraph PER["视觉特征（本文创新②）"]
+    DET["门框检测<br/>YOLOv5"]
+    SPH["球面特征<br/>Spherical"]
+  end
+  subgraph MPC["NMPC 控制（本文创新①③）"]
+    OCP["全状态模型<br/>Full Model"]
+    CON["约束评估<br/>Constraints"]
+  end
+  subgraph EXE["执行"]
+    FC["飞控执行<br/>PixRacer"]
+  end
+  CAM -->|"图像 30 Hz"| DET
+  DET -->|"边框"| SPH
+  DET -->|"距离 r"| OCP
+  SPH -->|"四元数"| OCP
+  ODO -->|"位姿"| OCP
+  OCP -->|"预测特征"| CON
+  CON -->|"控制量 u"| FC
+  classDef sensor fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef novel fill:#f0ebfd,stroke:#8b5cf6,stroke-width:3px,color:#6d28d9
+  classDef exec fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+  class CAM,ODO,DET sensor
+  class SPH,OCP,CON novel
+  class FC exec
     </pre>
   </div>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">约束写在真实图像平面（π(q) 落在 s_min 与 s_max 之间），而不是虚拟相机平面——这是与所有虚拟相机类方法的分水岭；距离 r 作为状态逐步传播，预测的特征轨迹才可信。控制量直达角速率环，省掉级联姿态环带来的响应滞后。</p>
 
-  <h3>3.2 数据流——从图像到控制的完整信息传递链</h3>
+  <h3>3.2 可见性闭环——预测特征越界时，用姿态把它拉回来</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph 输入["系统输入"]
-      direction LR
-      视觉目标["视觉目标 · 赛门/地面标记点 · 4个共面点"]
-      参考轨迹["参考轨迹 · 期望位置 p_ref · 期望速度 v_ref · 期望图像坐标 s_ref"]
-    end
-
-    subgraph 感知管线["感知管线"]
-      direction LR
-      原始图像["原始图像 · 752x480(仿真) / 1280x640(实验)"]
-      目标检测["目标检测 · YOLOv5 边界框 · d_gate=75cm 已知"]
-      球面投影["球面投影 · s ➜ mu = K^{-1}s / ||K^{-1}s||"]
-      四元数转换["四元数转换 · mu ➜ 旋转向量 phi ➜ 四元数 q"]
-    end
-
-    subgraph 优化求解["NMPC 最优控制问题"]
-      direction LR
-      前向预测["前向预测 · 1.0s 窗口 · x_{k+1}=f(x_k,u_k)"]
-      约束评估["约束评估 · 可见性: s(q_k)∈[s_min,s_max] · TTC: r_k/r_dot_k · 执行器: u_min<u_k<u_max"]
-      代价累计["代价累计 · 动作代价: 位姿+速度+姿态+输入 · 感知代价: 图像坐标偏差"]
-      QP求解["RTI 求解 · ACADO 代码生成 · qpOASES QP 求解器 · 5-10 ms/次"]
-    end
-
-    subgraph 输出["控制输出"]
-      direction LR
-      推力输出["质量归一化推力 c · 标量 0~20 N"]
-      角速率输出["机体角速率 Omega_b · 3D 向量"]
-      低层驱动["低层执行 · 电机 RPM 指令 · 直接驱动无级联"]
-    end
-
-    视觉目标 --> 原始图像
-    参考轨迹 --> 代价累计
-    原始图像 --> 目标检测 --> 球面投影 --> 四元数转换
-    四元数转换 -->|"q_0, r_0"| 前向预测
-    前向预测 --> 约束评估 --> 代价累计 --> QP求解
-    QP求解 --> 推力输出
-    QP求解 --> 角速率输出
-    推力输出 --> 低层驱动
-    角速率输出 --> 低层驱动
-    低层驱动 -.->|"状态测量: v_w, q_wb, q, r"| 前向预测
-    约束评估 -.->|"可见性违反? ➜ 调整姿态"| 前向预测
-
-    classDef inputC fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef percep fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef opt fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef outC fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class 视觉目标,参考轨迹 inputC
-    class 原始图像,目标检测,球面投影,四元数转换 percep
-    class 前向预测,约束评估,代价累计,QP求解 opt
-    class 推力输出,角速率输出,低层驱动 outC
+flowchart LR
+  IMG["相机图像<br/>Image"]
+  DET["门框检测<br/>YOLOv5"]
+  FEAT["球面特征<br/>Spherical"]
+  PRED["特征预测<br/>Prediction"]
+  VIS["视野判定<br/>Visibility"]
+  MPC["NMPC 求解<br/>Solver"]
+  UAV["四旋翼<br/>Quadrotor"]
+  IMG -->|"30 Hz"| DET
+  DET -->|"框中心"| FEAT
+  FEAT -->|"四元数"| PRED
+  PRED -->|"预测图像坐标"| VIS
+  VIS -->|"越界则约束"| MPC
+  MPC -->|"推力 c, 角速率 ω"| UAV
+  UAV -.->|"下一帧图像"| IMG
+  UAV -.->|"T265 位姿"| PRED
+  classDef sensor fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef novel fill:#f0ebfd,stroke:#8b5cf6,stroke-width:3px,color:#6d28d9
+  classDef exec fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+  class IMG,DET sensor
+  class FEAT,PRED,VIS,MPC novel
+  class UAV exec
     </pre>
   </div>
-
-  <h3>3.3 工作流程——从任务定义到飞行执行的完整管线</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph 阶段1["阶段一：问题设置"]
-      direction LR
-      任务定义["定义视觉伺服任务 · 快速着陆/长距离飞行/动态跟踪 · 设定参考位姿、速度、图像坐标"]
-      配置相机["配置相机与目标 · 着陆用下视相机 · 飞行/跟踪用前视相机 · 目标: 4个共面点/赛门"]
-      设置参数["设置 NMPC 参数 · 时域 1.0s · dt 0.05s · 权重 Q_p Q_v Q_q Q_s R · 可见性边界 · TTC 阈值"]
-    end
-
-    subgraph 阶段2["阶段二：实时 NMPC 循环 (ROS + C++)"]
-      direction LR
-      接收图像["接收图像测量 · YOLOv5 检测赛门/点 · 计算 q 和 r"]
-      更新状态["更新 NMPC 初始状态 · x_0 = [v_w, q_wb, q, r] · 来自 T265 里程计+视觉"]
-      求解OCP["求解 OCP via ACADO RTI · 准备阶段: 在当前估计解处线性化 · 反馈阶段: qpOASES 求解 QP · 5-10 ms"]
-      提取指令["提取第一步控制输入 · u*_0 = [c*, Omega_b*] · 发送至 PixRacer 飞控"]
-      PID跟踪["PID 跟踪角速率 · PixRacer 内环 · 电机混合 · ESC 输出"]
-    end
-
-    subgraph 阶段3["阶段三：约束监控"]
-      direction LR
-      可见性监控["可见性约束是否激活? · 检查 s(q_pred) vs [s_min, s_max] · 特征接近边界 ➜ 限制旋转"]
-      TTC监控["TTC 约束是否激活? · 检查 r/r_dot vs t_c_min · 接近过快 ➜ 平滑减速"]
-      冲突解决["约束冲突解决 · 可见性 vs 动作目标权衡 · 感知权重 Q_s 平衡 aggressiveness"]
-    end
-
-    subgraph 阶段4["阶段四：性能评估"]
-      direction LR
-      TVR计算["TVR 计算 · 目标可见率 = 含有特征的帧数/总帧数 · 目标: 100%"]
-      性能指标["性能指标 · 最大速度 · 最大俯仰/滚转 · 收敛时间 · 跟踪误差 · vs 虚拟相机基线对比"]
-    end
-
-    阶段1 -->|"配置参数"| 阶段2
-    阶段2 -->|"运行时数据"| 阶段3
-    阶段3 -->|"安全保证"| 阶段4
-
-    求解OCP -.->|"预测特征轨迹"| 可见性监控
-    求解OCP -.->|"预测距离"| TTC监控
-    可见性监控 -.->|"限制俯仰/滚转/偏航"| 求解OCP
-    TTC监控 -.->|"限制接近速度"| 求解OCP
-    冲突解决 -.->|"权重自适应"| 求解OCP
-    PID跟踪 --> TVR计算
-    PID跟踪 --> 性能指标
-
-    classDef phase1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef phase2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef phase3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef phase4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class 任务定义,配置相机,设置参数 phase1
-    class 接收图像,更新状态,求解OCP,提取指令,PID跟踪 phase2
-    class 可见性监控,TTC监控,冲突解决 phase3
-    class TVR计算,性能指标 phase4
-    </pre>
-  </div>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">预测 → 判定 → 约束激活 → 重解：一旦预测的特征轨迹逼近图像边界，NMPC 就牺牲一点机动性、用姿态把特征拉回指定区域，这就是 TVR 能做到 100% 的机制。虚线是 30 Hz 的视觉回路与 T265 状态反馈，全程不需要额外传感器。</p>
 </section>
 
 <!-- ═══════════════ 4. TASK ═══════════════ -->

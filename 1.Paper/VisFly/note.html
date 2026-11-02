@@ -315,79 +315,41 @@ MathJax = {
 <section id="architecture">
   <h2>3. 系统架构</h2>
   <h3>3.1 全局架构（论文 Fig. 1 的 Mermaid 重绘）</h3>
-  <p>VisFly 的架构可以概括为"<strong>一条自左向右的仿真流水线 + 一条自上而下的封装栈</strong>"：左侧是四种控制器，中间是可微动力学（驱动单机或多机），右侧是 Habitat-Sim 场景与传感器；整条流水线被裹进黄色的 Gym Wrapper（环境层）与算法层。</p>
+  <p>VisFly 的架构可以概括为"<strong>一条自左向右的仿真流水线</strong>"：动作从四种控制器之一进入，经可微动力学算出位姿，写回 Habitat-Sim 场景渲染出传感器数据，再由 Gym 封装成算法能吃的观测与奖励。核心不在"有哪些模块"，而在于<strong>动力学被写成了 PyTorch 计算图</strong>——这是它和普通仿真器最本质的区别。</p>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph CTRL["🎮 四种控制器（configs/drone/*.json 参数化）"]
-      C1["位置 + 偏航<br/>Position &amp; Yaw"]
-      C2["线速度 + 偏航<br/>Velocity &amp; Yaw"]
-      C3["机体角速率 + 总推力<br/>Bodyrate &amp; Gross Thrust"]
-      C4["单旋翼推力<br/>Single Rotor Thrusts"]
+flowchart LR
+    subgraph CMD["动作接口：四类控制器"]
+      HI["位置 / 速度指令<br/>PS · LV"]
+      LO["推力 / 角速率<br/>SRT · CTBR"]
     end
-
-    subgraph DYN["⚙️ 可微动力学（envs/base/dynamics.py · PyTorch）"]
-      D1["四元数刚体运动学 + 牛顿-欧拉转动<br/>Eq.1 · 批量形状 (3,N)/(4,N)"]
-      D2["二次阻力 + 旋翼推力/力矩分配<br/>Eq.2-3 · B_allocation 4×4"]
-      D3["电机一阶滞后 + 转速-推力二次映射<br/>Eq.4 · Euler / RK4 可切换"]
+    subgraph DYN["可微动力学（本文创新）"]
+      CTL["控制器反解<br/>推力 + 力矩"]
+      MOD["刚体积分<br/>PyTorch 批量"]
     end
-
-    subgraph AGENT["🚁 智能体组织"]
-      A1["单机 Single-Agent<br/>num_agent_per_scene × num_scene"]
-      A2["多机 Multi-Agent<br/>同一场景内互相可见、可碰撞"]
+    subgraph SIM["场景与渲染"]
+      SCN["Habitat-Sim<br/>开源场景数据集"]
+      SEN["RGB / 深度 / IMU"]
     end
-
-    subgraph SCENE["🏠 场景与渲染（utils/SceneManager.py · Habitat-Sim）"]
-      S1["开源真实扫描数据集<br/>HM3D / MP3D / Replica / HSSD"]
-      S2["程序化随机场景<br/>garage + 乱石 / 双墙窄缝 / 降落坪"]
-      S3["传感器：RGB · Depth · Semantic · IMU<br/>64×64 起，可多相机"]
-      S4["CGAL 3D 最近障碍点查询<br/>get_closest_collision_point + 动态 KD-tree"]
+    subgraph API["Gym 封装"]
+      GYM["Gym VecEnv<br/>step / reset"]
+      ALG["学习算法<br/>PPO · SHAC"]
     end
-
-    subgraph GYM["🟨 Gym Wrapper（envs/base/droneGymEnv.py）"]
-      G1["DroneGymEnvsBase / MultiDroneGymEnvsBase<br/>继承 gym.VecEnv · step/reset/observation_space"]
-      G2["任务层：NavigationEnv · MultiNavigationEnv · LandingEnv …<br/>只写 get_reward / get_observation / get_success"]
-    end
-
-    subgraph ALG["🧠 算法层（utils/algorithms · utils/policies）"]
-      L1["PPO（SB3 子类化）· SAC · TD3"]
-      L2["SHAC / BPTT：requires_grad=True<br/>梯度穿过物理引擎"]
-      L3["特征提取器：StateTargetImageExtractor<br/>ResNet / MobileNet / EfficientNet / 自建 CNN / GRU"]
-    end
-
-    C1 --> D1
-    C2 --> D1
-    C3 --> D1
-    C4 --> D1
-    D1 --> D2 --> D3 --> A1
-    A1 --> SCENE
-    A2 --> SCENE
-    D3 --> A2
-    S1 --> S3
-    S2 --> S3
-    S3 --> G1
-    S4 --> G2
-    A1 --> G1
-    G1 --> G2
-    G2 --> L1
-    G2 --> L2
-    L1 --> L3
-    L2 --> L3
-
-    classDef ctrl fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef dyn fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef agent fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
-    classDef scene fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef gym fill:#fff7cc,stroke:#eab308,stroke-width:2px,color:#854d0e
-    classDef alg fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class C1,C2,C3,C4 ctrl
-    class D1,D2,D3 dyn
-    class A1,A2 agent
-    class S1,S2,S3,S4 scene
-    class G1,G2 gym
-    class L1,L2,L3 alg
+    HI -->|"位置 / 速度"| CTL
+    LO -->|"推力 / 角速率"| CTL
+    CTL -->|"四旋翼推力"| MOD
+    MOD -->|"位姿写入场景"| SCN
+    SCN -->|"渲染观测"| SEN
+    SEN -->|"观测字典"| GYM
+    GYM -->|"观测 · 奖励"| ALG
+    ALG -.->|"梯度穿过物理"| MOD
+    classDef base fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef nov fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+    class HI,LO,SCN,SEN,GYM,ALG base
+    class CTL,MOD nov
     </pre>
   </div>
+  <p><strong>怎么读</strong>：<span style="color:#be123c;font-weight:700;">玫红色是本文的创新</span>（PyTorch 写的可微动力学），蓝色是现成组件（Habitat-Sim、Gym、PPO/SHAC）。四种控制器只是"动作语义"的四种写法，不改变下游；最右侧那根<strong>虚线</strong>才是重点——策略损失可以反传穿过整段物理，这是 SHAC/BPTT 一类方法能跑起来的前提（一步之内的完整闭环、以及 CGAL 碰撞查询，都放在 3.3）。</p>
 
   <div class="callout info">
     <div class="callout-title">📖 与论文 Fig. 1 的对应关系</div>
@@ -448,36 +410,28 @@ flowchart TB
     <li><strong>关键实现</strong>：<code>StateTargetImageExtractor</code> 为 <code>state</code>/<code>target</code>/图像各建一条支路（<code>set_mlp_feature_extractor</code> 与 <code>set_cnn_feature_extractor</code>），图像支路可选 <strong>ResNet18/34/50/101、EfficientNet-l/m/s、MobileNet-l/m/s</strong> 或自定义 CNN（<code>channels/kernel/stride/padding</code> 全可配）；另有 <code>set_recurrent_feature_extractor</code> 预留 GRU 接口（对应论文 Fig. 5 的可选循环层）。多机任务用 <code>SwarmStateTargetImageExtractor</code> 额外吃 <code>swarm</code> 支路。</li>
   </ul>
 
-  <h3>3.3 数据流：一步 <code>step()</code> 里发生的 9 件事</h3>
-  <p>上面 3.1 是"系统由什么组成"的静态视图，这里是"一步之内发生了什么"的动态视图。<strong>闭环的关键在图的最下方那一根虚线</strong>：策略参数更新后重新产生动作，回到控制器。<strong>注意 <code>step()</code> 的因果顺序不可交换</strong>——必须先积分再写位姿，先渲染再算碰撞，否则奖励会用到"未来"的观测。</p>
+  <h3>3.3 数据流：一步 <code>step()</code> 的两条回路</h3>
+  <p>上面 3.1 是"系统由什么组成"的静态视图，这里是"一步之内发生了什么"的动态视图。<strong>右侧那两条虚线是两条训练路径</strong>：<code>PPO 更新</code>只改策略参数，<code>SHAC 梯度</code>则穿过物理引擎直接回到动力学——后者才是"可微仿真"的兑现方式。<strong>注意 <code>step()</code> 的因果顺序不可交换</strong>：必须先积分再写位姿，先渲染再算碰撞，否则奖励会用到"未来"的观测。</p>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    P["策略网络 π(a∣o)<br/>输出 4 维动作"] --> N["动作断言 ∈ [-1,1]<br/>droneGymEnv.step"]
-    N --> DN["_de_normalize<br/>映射到物理量纲"]
-    DN --> CT["控制器：CTBR 力矩反解<br/>B_allocation_inv @ [T, τ]"]
-    CT --> MT["电机一阶滞后<br/>ω ← c·ω + (1-c)·ω_des"]
-    MT --> IN["积分器 Euler/RK4<br/>跑 ctrl_dt/dt 个子步"]
-    IN --> ST["写回位姿 + 渲染<br/>SceneManager.set_pose → get_sensor_observations"]
-    ST --> CO["CGAL 最近障碍点<br/>collision_dis / collision_vector"]
-    CO --> RW["奖励 + done<br/>get_reward / get_success / get_failure"]
-    RW --> RS{"done ?"}
-    RS -->|"是"| EX["examine() 单环境异步 reset<br/>场景可同时换 minibatch"]
-    RS -->|"否"| BUF["写入 rollout buffer"]
-    EX --> BUF
-    BUF --> UP["PPO 更新：clip + GAE<br/>或 SHAC 反向穿过物理"]
-    UP -.->|"新参数"| P
-
-    classDef net fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef dyn fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef scene fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
-    classDef rew fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    class P,N net
-    class DN,CT,MT,IN dyn
-    class ST,CO scene
-    class RW,RS,EX,BUF,UP rew
+flowchart LR
+  POL["策略网络"] -->|"4 维动作"| ACT["动作反归一化"]
+  ACT -->|"推力指令"| DYN["动力学积分<br/>张量批量"]
+  DYN -->|"13 维状态"| REN["写回场景并渲染"]
+  REN -->|"RGB / 深度"| OBS["观测字典"]
+  DYN -->|"机体位置"| COL["CGAL 最近障碍"]
+  COL -->|"碰撞距离"| REW["奖励与终止"]
+  OBS -->|"观测"| BUF["rollout 缓冲"]
+  REW -->|"奖励 + done"| BUF
+  BUF -.->|"PPO 更新"| POL
+  BUF -.->|"SHAC 梯度"| DYN
+  classDef base fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef nov fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  class POL,ACT,OBS,REW,BUF base
+  class DYN,COL nov
     </pre>
   </div>
+  <p><strong>怎么读</strong>：玫红色是本文的两个自有环节——可微的动力学积分，以及<b>替掉 Habitat 平面 NavMesh 的 CGAL 三维最近点查询</b>（空中机器人不能用"投影到地面"的距离）。注意碰撞距离是从<strong>位姿</strong>直接算的，不等渲染：这一步决定了奖励是否正确，也决定了训练速度。</p>
 
   <h3>3.4 代码仓库的真实目录、入口与命令</h3>
   <p>仓库根目录即 <code>1.Paper/VisFly/</code>（git commit <code>6ff29bf</code>）。关键目录与文件：</p>

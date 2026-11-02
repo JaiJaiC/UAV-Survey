@@ -257,170 +257,67 @@ MathJax = {
 <section id="architecture">
   <h2>3. System Architecture</h2>
 
-  <h3>3.1 系统总框 —— 感知-估计-控制全链路</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">一句话：<strong>检测框不只给方位，还给出目标张角</strong>；把两者一起伪线性化后送进卡尔曼滤波，就同时得到目标的位置、速度和一个未知的物理尺寸。两图中<strong>紫色 = 本文创新</strong>：测量构造（①）与增广状态伪线性滤波（②）。</p>
+
+  <h3>3.1 系统总览——边界框 → 方位与张角 → 伪线性滤波</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph PERCEPTION["视觉感知层"]
-      direction LR
-      CAM["单目相机 · 机载 · 30fps"]
-      DET["tiny-YOLOv4 目标检测 · mAP>99.5%"]
-      BB["输出: 2D边界框 · 中心点+宽高"]
-    end
-
-    subgraph MEASUREMENT["测量生成层"]
-      direction LR
-      BEARING["方位向量 g: 由中心像素 + 相机内参 · Pinhole模型"]
-      ANGLE["张角 theta: 由边界框尺寸 + 余弦定理 · 对旋转不变"]
-      INVARIANT["相机旋转不变性: theta仅由l和r决定"]
-    end
-
-    subgraph ESTIMATOR["Bearing-Angle 估计器层"]
-      direction LR
-      STATE["状态向量: x = [pT vT l] · 7维增广"]
-      PREDICT["预测: 双积分运动模型 · 恒速加噪"]
-      PLINEAR["伪线性化: Pg正交投影 + r乘变换"]
-      KF["Kalman更新: 6维测量→7维状态 · 伪逆保证数值稳定"]
-    end
-
-    subgraph OUTPUT["估计输出层"]
-      direction LR
-      POS["目标位置 pT · 三维"]
-      VEL["目标速度 vT · 三维"]
-      SIZE["目标物理尺寸 l · 标量 · 缓慢时变"]
-    end
-
-    subgraph CONTROL["运动控制层（可选）"]
-      direction LR
-      PNG["比例导引律 / 距离跟踪控制器"]
-      GIMBAL["云台控制: 目标保持在视野中心"]
-    end
-
-    CAM --> DET --> BB
-    BB --> BEARING
-    BB --> ANGLE
-    INVARIANT --> ANGLE
-    BEARING --> PLINEAR
-    ANGLE --> PLINEAR
-    STATE --> PREDICT --> KF
-    PLINEAR --> KF
-    KF --> POS
-    KF --> VEL
-    KF --> SIZE
-    POS --> PNG
-    VEL --> PNG
-    POS --> GIMBAL
-
-    SIZE -.->|"反馈: l用于下次线性化"| PLINEAR
-    POS -.->|"反馈: r估计用于协方差"| KF
-
-    classDef percep fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef meas fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef estim fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef out fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef ctrl fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    class CAM,DET,BB percep
-    class BEARING,ANGLE,INVARIANT meas
-    class STATE,PREDICT,PLINEAR,KF estim
-    class POS,VEL,SIZE out
-    class PNG,GIMBAL ctrl
+flowchart LR
+  subgraph IN["机载感知"]
+    CAM["单目相机<br/>Monocular"]
+    ODO["自定位<br/>Vicon · RTK"]
+  end
+  subgraph MEAS["测量构造（本文创新①）"]
+    DET["目标检测<br/>tiny-YOLOv4"]
+    BA["方位与张角<br/>Bearing-Angle"]
+  end
+  subgraph EST["伪线性估计（本文创新②）"]
+    PL["伪线性化<br/>Pseudo-Linear"]
+    KF["卡尔曼滤波<br/>Kalman"]
+  end
+  subgraph OUT["输出"]
+    RES["状态输出<br/>States"]
+  end
+  CAM -->|"图像 30 fps"| DET
+  DET -->|"边界框"| BA
+  ODO -->|"相机位姿"| BA
+  BA -->|"6 维测量"| PL
+  PL -->|"线性方程"| KF
+  KF -->|"最优估计"| RES
+  classDef sensor fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef novel fill:#f0ebfd,stroke:#8b5cf6,stroke-width:3px,color:#6d28d9
+  class CAM,ODO,DET sensor
+  class BA,PL,KF novel
     </pre>
   </div>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">张角对相机旋转不变，因此不必再假设“相机只能平移不能旋转”；状态由 6 维扩到 7 维（多一个未知尺寸 ℓ），测量 6 维，用伪逆防止秩亏。整条链路零额外成本——边界框本来就是检测器的标准输出。</p>
 
-  <h3>3.2 数据流 —— 从像素到状态的完整信息链</h3>
+  <h3>3.2 估计闭环——观测器怎么动，才可观？</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph SUB1["图像采集 → 目标检测"]
-      direction LR
-      A1["相机采集 640x480@30fps"] --> A2["tiny-YOLOv4 推理"] --> A3["2D边界框: 中心(x,y) + 宽w + 高h"]
-    end
-
-    subgraph SUB2["像素 → 几何测量"]
-      direction LR
-      B1["中心像素 → g = Rcw·Pcam⁻¹·qpix / |...|"] --> B2["方位向量 g: 含噪声 nu ~ N(0,sigma²g)"]
-      C1["边界框宽/高 + 余弦定理 → theta"] --> C2["张角 theta: 含噪声 w ~ N(0,sigma²w)"]
-    end
-
-    subgraph SUB3["伪线性化: 非线性→线性测量方程"]
-      direction LR
-      D1["方位: Pg·po = Pg·pT + r·Pg·nu"] --> D2["Pg = I - gg^T · 正交投影矩阵"]
-      E1["角度: theta·po = theta·pT - g + r(theta·nu - w·g)"] --> E2["等式两边乘以r解除分母非线性"]
-    end
-
-    subgraph SUB4["Kalman滤波: 预测+更新"]
-      direction LR
-      F1["预测: x⁻=F·x, P⁻=F·P·F^T+Q"] --> F2["更新: K=P⁻H^T(HP⁻H^T+R)⁺"]
-      F2 --> F3["输出: pT, vT, l"]
-    end
-
-    subgraph SUB5["噪声特性与协方差"]
-      direction LR
-      G1["测量噪声: sigma_g=0.01, sigma_w=0.01"] --> G2["过程噪声: Q=diag(0,0,0,sigma²v,...)"]
-      G2 --> G3["协方差: nu = E·diag(sigma²g,sigma²w)·E^T"]
-    end
-
-    A3 --> B1
-    A3 --> C1
-    B2 --> D1
-    C2 --> E1
-    D2 --> F1
-    E2 --> F1
-    F3 --> G1
-    G3 --> F2
-
-    classDef s1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef s2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef s3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef s4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef s5 fill:#fce7f3,stroke:#ec4899,stroke-width:2px,color:#9d174d
-    class A1,A2,A3 s1
-    class B1,B2,C1,C2 s2
-    class D1,D2,E1,E2 s3
-    class F1,F2,F3 s4
-    class G1,G2,G3 s5
+flowchart LR
+  IMG["相机图像<br/>Image"]
+  DET["目标检测<br/>tiny-YOLOv4"]
+  MEAS["方位与张角<br/>Bearing-Angle"]
+  PL["伪线性化<br/>Pseudo-Linear"]
+  KF["伪线性卡尔曼<br/>Kalman"]
+  GUI["追逃制导<br/>Pursuit"]
+  UAV["观测器 MAV<br/>Observer"]
+  IMG -->|"30 fps"| DET
+  DET -->|"边界框"| MEAS
+  MEAS -->|"非线性测量"| PL
+  PL -->|"线性方程"| KF
+  KF -->|"位置·速度·尺寸"| GUI
+  GUI -->|"期望速度"| UAV
+  UAV -.->|"新视角"| IMG
+  UAV -.->|"自身位姿"| MEAS
+  classDef vis fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef novel fill:#f0ebfd,stroke:#8b5cf6,stroke-width:3px,color:#6d28d9
+  class IMG,DET vis
+  class MEAS,PL,KF novel
     </pre>
   </div>
-
-  <h3>3.3 工作流 —— 从离线训练到在线估计的完整工程管线</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph PHASE1["阶段1: 离线数据集自动采集"]
-      direction LR
-      P1["AirSim仿真环境 · Unreal Engine 渲染"] --> P2["自动采集: 随机位置+姿态+背景"] --> P3["17000张标注图像 · mAP=99.5%"]
-    end
-
-    subgraph PHASE2["阶段2: 视觉检测器训练"]
-      direction LR
-      Q1["tiny-YOLOv4 网络训练 · NVIDIA GV100"] --> Q2["目标检测输出: 高精度2D边界框"] --> Q3["部署: 机载计算机 / 地面站"]
-    end
-
-    subgraph PHASE3["阶段3: 在线状态估计"]
-      direction LR
-      R1["相机采集 → YOLO推理 → 边界框"] --> R2["生成方位g和角度theta测量"] --> R3["伪线性化 → Kalman滤波 → 输出pT,vT,l"]
-    end
-
-    subgraph PHASE4["阶段4: 实验验证"]
-      direction LR
-      S1["数值仿真: 3场景×100 Monte Carlo"] --> S2["AirSim仿真: 逼近/跟随/绕圈"] --> S3["真实实验: 手持+地面机器人 → MAV追MAV"]
-    end
-
-    PHASE1 -->|"标注数据集"| PHASE2
-    PHASE2 -->|"部署检测器"| PHASE3
-    PHASE3 -->|"估计结果"| PHASE4
-    PHASE4 -.->|"反馈: 非高斯噪声→调参"| PHASE3
-
-    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class P1,P2,P3 p1
-    class Q1,Q2,Q3 p2
-    class R1,R2,R3 p3
-    class S1,S2,S3 p4
-    </pre>
-  </div>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">闭环的意义全在可观测性：观测器只需运动阶数高于目标（例如沿视线加减速），不必做正交于方位向量的横向机动——这正是传统 bearing-only 方法的死穴。导引“沿视线接近”把新视角喂回测量构造，估计随即收敛。</p>
 </section>
 
 <!-- ═══════════════ 4. TASK ═══════════════ -->

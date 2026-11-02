@@ -363,151 +363,69 @@ MathJax = {
     </div>
   </div>
 
-  <h3>3.1 System Frame</h3>
+  <h3>3.1 System Frame — 四层能量转换链</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph ENERGY["能量采集层 (0.96 g)"]
-      SUN["自然太阳光 · 920 W/m² · 48°入射角"]
-      GAAS["GaAs 薄膜电池 ×2 · 0.48g/片 · 效率30%"]
+flowchart LR
+    subgraph IN["采能层 · 输入"]
+        SUN["自然光"]:::solar
+        PV["GaAs 电池"]:::solar
     end
-
-    subgraph POWER["电力变换层 (1.13 g · 0.568 W)"]
-      INPUT["输入: 4.50 V DC · 开路 6.04 V"]
-      COUPLED["耦合电感 1:50 · 前向反激拓扑 · 86 kHz"]
-      CW["12级 CW 倍压器 · 每级 2C+2D · 升压 900~2000 倍"]
-      OUTPUT["输出: 9.0 kV · 7.09 kV/g 电压质量比"]
+    subgraph POW["电力变换层（本文创新①）"]
+        FF["前向反激变换器"]:::power
+        CW["12 级 CW 倍压"]:::power
     end
-
-    subgraph MOTOR["静电驱动层 (1.52 g · 0.137 W)"]
-      STATOR["定子: 8对正负电极 · 环形交替 · 碳纤维+铝箔"]
-      FIELD["16个周向静电场 · 9 kV 驱动 · 库仑力 F=qE"]
-      ROTOR["转子: 64叶片 · 20μm碳纤维+1μm铝箔 · 玻纤连接环"]
-      BRUSH["电刷: 2mm铝箔 · 软接触电荷转移 · 替代电晕放电"]
+    subgraph MOT["静电推进层（本文创新②）"]
+        STAT["定子电极"]:::motor
+        ROT["转子＋电刷"]:::motor
     end
-
-    subgraph THRUST["气动升力层 (0.44 g)"]
-      PROP["螺旋桨 R=100mm · 最大升力 5.8g · 升重比 2.9"]
-      LIFT["整机 4.21g · 推进1.96+电源2.09+结构0.16"]
+    subgraph OUT["升力层 · 输出"]
+        PROP["螺旋桨"]:::thrust
+        FLY["整机飞行"]:::thrust
     end
-
-    SUN --> GAAS
-    GAAS --> INPUT
-    INPUT --> COUPLED --> CW --> OUTPUT
-    OUTPUT --> STATOR
-    STATOR --> FIELD --> ROTOR --> BRUSH
-    BRUSH --> PROP
-    PROP --> LIFT
-
-    LIFT -.->|"反馈: 1h无衰减 · 不发热"| ROTOR
-    OUTPUT -.->|"效率24.1% · 可优化至58%"| CW
-    ROTOR -.->|"堵转电流≈0 · 本质安全"| FIELD
+    SUN -->|"920 W/m²"| PV
+    PV -->|"4.5 V 直流"| FF
+    FF -->|"1:50 升压"| CW
+    CW -->|"9.0 kV"| STAT
+    STAT -->|"库仑力"| ROT
+    ROT -->|"扭矩"| PROP
+    PROP -->|"升力 5.8 g"| FLY
 
     classDef solar fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
     classDef power fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
     classDef motor fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
     classDef thrust fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef result fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
-    class SUN,GAAS solar
-    class INPUT,COUPLED,CW,OUTPUT power
-    class STATOR,FIELD,ROTOR,BRUSH motor
-    class PROP thrust
-    class LIFT result
     </pre>
   </div>
+  <p style="color:var(--text-muted); font-size:12.5px; margin:8px 0 18px;">配色沿用四层色板：<strong>橙 = 采能</strong>、<strong>蓝 = 电力变换</strong>、<strong>紫 = 静电推进</strong>、<strong>绿 = 气动输出</strong>。中间<strong>蓝、紫两层就是本文的创新</strong>——1.13 g 的千伏电源把 4.5 V 抬到 9 kV，1.52 g 的静电电机再把它换成扭矩；橙、绿两端都是现成部件。</p>
 
-  <h3>3.2 Dataflow — 能量流 + 信号流 + 反馈</h3>
+  <h3>3.2 Dataflow — 一条功率流，两处物理回授</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph OPTICAL["光能 → 电能"]
-      direction LR
-      SUN["太阳光 920 W/m²"] --> PV["GaAs电池×2 · 4.50V · ~0.57W"]
-    end
-
-    subgraph CONV["DC-DC升压 (HVPC 1.13g)"]
-      direction LR
-      MOSFET["MOSFET斩波 86kHz"] --> XFMR["耦合电感 1:50"] --> CWLADDER["12级CW倍增器 900~2000倍"] --> HVOUT["高压输出 9.0kV"]
-    end
-
-    subgraph MOTOR["静电电机 (1.52g)"]
-      direction LR
-      ESTATOR["定子: 16个交替电场 · F=qE"] --> EROTOR["转子+电刷: 64叶片 · 电荷转移"] --> ETORQUE["扭矩: 恒定 · 转速自适应"]
-    end
-
-    subgraph AERO["螺旋桨 + 飞行"]
-      direction LR
-      EPROP["螺旋桨 R=100mm · 升力5.8g · 效率30.7g/W"] --> EFLIGHT["持续飞行 · 1秒起飞 · ≥1小时"]
-    end
-
-    subgraph CONTRAST["对比: 电磁 vs 静电"]
-      EM_MOTOR["电磁电机 SKEYE Pico: 7g · 飞7分钟 · 发热严重"]
-      ES_MOTOR["静电电机(本文): 相同负载 · 室温 · 零发热"]
-    end
-
-    OPTICAL --> CONV --> MOTOR --> AERO
-    AERO --> CONTRAST
-
-    ETORQUE -.->|"电流自调节 · 转速∝负载 · 扭矩恒定"| EROTOR
-    EFLIGHT -.->|"1h耐久 · 电机无温升 · 零衰减"| EROTOR
-    HVOUT -.->|"负载反馈 · 效率24.1%"| CWLADDER
-    EM_MOTOR -.->|"发热严重"| ES_MOTOR
+flowchart LR
+    SUN["自然光"]:::solar
+    PV["GaAs 电池"]:::solar
+    HV["高压电源"]:::power
+    ST["定子电极"]:::motor
+    RT["转子＋电刷"]:::motor
+    PR["螺旋桨"]:::thrust
+    FLY["持续飞行"]:::thrust
+    SUN -->|"920 W/m²"| PV
+    PV -->|"4.5 V · 0.57 W"| HV
+    HV -->|"9.0 kV · 24.1%"| ST
+    ST -->|"库仑力"| RT
+    RT -->|"扭矩 恒定"| PR
+    PR -->|"5.8 g 升力"| FLY
+    PR -.->|"气动负载"| RT
+    RT -.->|"电刷换向"| ST
 
     classDef solar fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef convert fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+    classDef power fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
     classDef motor fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef aero fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef compare fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    class SUN,PV solar
-    class MOSFET,XFMR,CWLADDER,HVOUT convert
-    class ESTATOR,EROTOR,ETORQUE motor
-    class EPROP,EFLIGHT aero
-    class EM_MOTOR,ES_MOTOR compare
+    classDef thrust fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
     </pre>
   </div>
-
-  <h3>3.3 Workflow — 从设计到飞行的完整工程管线</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph DESIGN["阶段1: 系统设计"]
-      direction LR
-      D1["问题定义: <10g MAV · 飞行<10min"] --> D2["驱动选型: 静电 vs 电磁 · F=qE"] --> D3["拓扑选型: 前向反激+CW倍压"] --> D4["参数优化: 4.21g · 升力-功率-质量平衡"]
-    end
-
-    subgraph FAB["阶段2: 制造与组装"]
-      direction LR
-      F1["激光切割: 碳纤维·铝箔·Mylar·柔性PCB"] --> F2["三维组装: 定子+转子+电刷"] --> F3["质控: μm间隙 · 电刷一致性"] --> F4["螺旋桨: R=100mm · 0.44g"]
-    end
-
-    subgraph TEST["阶段3: 测试与验证"]
-      direction LR
-      T1["部件测试: HVPC 86kHz/9kV · 堵转≈0"] --> T2["系留飞行: 升力>自重 · 5.8g@8.5kV"] --> T3["阳光飞行: 北京·920W/m² · 1秒起飞"] --> T4["1h耐久: 零温升 · 零衰减"]
-    end
-
-    subgraph MINI["阶段4: 微型化验证与未来"]
-      direction LR
-      M1["毫米原型: φ8mm·9mg · 10860rpm"] --> M2["性能: 0.97mW · 9.2g/W · 2倍优势"] --> M3["未来: 多旋翼+自主 · 电池24h · HVPC→58%"]
-    end
-
-    DESIGN -->|"设计参数"| FAB
-    FAB -->|"原型机"| TEST
-    TEST -->|"验证成功 · Nature 2024"| MINI
-
-    T4 -.->|"反馈: 优化HVPC效率"| D4
-    T3 -.->|"反馈: 增加载荷1.59g"| D1
-    M2 -.->|"反馈: 制造精度瓶颈"| F2
-
-    classDef design fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef fab fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef testing fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef mini fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class D1,D2,D3,D4 design
-    class F1,F2,F3,F4 fab
-    class T1,T2,T3,T4 testing
-    class M1,M2,M3 mini
-    </pre>
-  </div>
+  <p style="color:var(--text-muted); font-size:12.5px; margin:8px 0 18px;">这条链<strong>没有算法控制回路</strong>（单自由度，横向靠导轨约束），只有两处物理回授（虚线）：桨负载一变，静电电机的转速与电流被动自调节、扭矩近似恒定；转子每转过一个电极，电刷完成一次电荷换向。全链实测：输入 0.57 W、电源效率 24.1%、推进 30.7 g/W、整机 7.6 g/W。</p>
 </section>
 
 <!-- ═══════════════ 4. TASK ═══════════════ -->

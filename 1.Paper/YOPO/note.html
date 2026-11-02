@@ -184,14 +184,7 @@ MathJax = {
 </nav>
 
 <div class="container">
-<!-- NOTE-SKELETON for YOPO
-     paper : You Only Plan Once: A Learning-Based One-Stage Planner With Guidance Learning
-     venue : IEEE Robotics and Automation Letters (RA-L) 2024
-     pdf   : YOPO_RAL2024_YouOnlyPlanOnce.pdf
-     repo  : https://github.com/TJU-Aerial-Robotics/YOPO
-     Replace every FILL marker comment with full Chinese content.
-     Do not modify the CSS (<style>) or the <nav> anchors.
--->
+
 <!-- ═══════════════ 1. 论文信息 ═══════════════ -->
 <section id="info">
   <h2>1. 论文信息</h2>
@@ -284,63 +277,41 @@ MathJax = {
 <!-- ═══════════════ 3. 系统架构 ═══════════════ -->
 <section id="architecture">
   <h2>3. 系统架构</h2>
-  <h3>3.1 全局架构（训练与推理的分岔）</h3>
+  <h3>3.1 系统总览：一次前向走完感知 → 搜索 → 优化</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph SENSE["① 输入层（机体系，维度已降维）"]
-      D["深度图 1×96×160<br/>0–20 m 线性归一化"]
-      S["状态观测 9 维<br/>v(3) + a(3) + 目标方向 g(3)"]
-    end
-
-    subgraph NORM["② 观测归一化 + 基元系变换"]
-      N1["normalize_obs：v/vel_max, a/acc_max, g 截断为单位向量"]
-      N2["prepare_input：x'_ij = R_ij⁻¹ x<br/>按 3×5 网格拼成 9 通道特征"]
-    end
-
-    subgraph BACK["③ 主干 policy/models/backbone.py"]
-      B1["ResNet-18 · conv1 改单通道<br/>layer4 后 1×1 卷积 → 64 通道"]
-    end
-
-    subgraph HEAD["④ 全卷积头 policy/models/head.py"]
-      H1["1×1 Conv 73→256 → ReLU<br/>1×1 Conv 256→256 → ReLU<br/>1×1 Conv 256→10"]
-    end
-
-    subgraph POST["⑤ 输出参数化 yopo_network.forward"]
-      P1["tanh · 前 9 维 → 偏移与末端导数 ∈ (−1,1)"]
-      P2["softplus · 第 10 维 → 代价分数 ≥ 0"]
-    end
-
-    subgraph BRANCH["⑥ 训练 / 推理分岔"]
-      TR["训练：特权真值 ESDF + 完整状态<br/>算 J 与 ∂J/∂y → 反传到权重"]
-      IN["推理：argmin 选基元 → 套偏移 → 解五阶多项式<br/>→ 50 Hz 参考状态 → 几何控制器"]
-    end
-
-    S --> N1 --> N2 --> B1
-    D --> B1
-    B1 --> H1 --> P1
-    H1 --> P2
-    P1 --> TR
-    P2 --> TR
-    P1 --> IN
-    P2 --> IN
-    TR -.->|"AdamW 更新 · 每步一次"| B1
-    IN -.->|"15 Hz 重规划"| D
-
-    classDef s fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
-    classDef n fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef b fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef h fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef p fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef t fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    class D,S s
-    class N1,N2 n
-    class B1 b
-    class H1 h
-    class P1,P2 p
-    class TR,IN t
+flowchart LR
+  subgraph IN["输入（机体系）"]
+    D["深度图<br/>单通道"]
+    S["状态与目标<br/>速度 / 加速度 / 方向"]
+  end
+  subgraph ENC["编码"]
+    N["归一化 + 基元系<br/>变换"]
+    B["ResNet-18 主干"]
+  end
+  subgraph HEAD["预测头（本文创新：锚点 + 偏移）"]
+    H["1×1 卷积头<br/>权重共享"]
+    P["偏移 / 末端导数<br/>/ 分数"]
+  end
+  SEL["argmin 选基元"]
+  POLY["五阶多项式<br/>闭式求解"]
+  CTRL["SE3 几何控制器"]
+  D -->|"深度图"| N
+  S -->|"状态 / 目标"| N
+  N -->|"变换后特征"| B
+  B -->|"特征图"| H
+  H --> P
+  P -->|"候选轨迹"| SEL
+  SEL -->|"最优末端状态"| POLY
+  POLY -->|"参考状态"| CTRL
+  classDef inno fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  classDef base fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
+  class H,P inno
+  class D,S,N,B,SEL,POLY,CTRL base
     </pre>
   </div>
+
+  <p><strong>读法</strong>：整条流水线<strong>只有一个网络、一次前向</strong>。左侧两支输入都是机体系的低维量（深度图 + 速度/加速度/目标方向），所以<strong>不需要位置与姿态</strong>，网络也就不必隐式估计位姿。中间的 ResNet-18 把深度压到与基元网格一一对应的特征图，1×1 卷积头在<strong>每个格子上各吐一份</strong>偏移、末端导数与分数——15 个基元不是 15 个头，而是同一个头在 15 个位置共享权重（红框）。右侧两步就是"后端优化"的全部：<code>argmin</code> 按分数选一条，把偏移加回锚点，解五阶多项式边值问题得到参考状态。配色：<span style="color:#be123c;font-weight:700;">红框是本文创新</span>（锚点 + 偏移的并行预测头），<span style="color:#0f766e;font-weight:700;">青框是通用部件</span>。</p>
 
   <h3>3.2 逐模块拆解（输入 / 输出 / 关键实现 / 仓库路径）</h3>
 
@@ -401,24 +372,27 @@ flowchart TB
     <tr><td><code>rviz -d yopo.rviz</code></td><td>可视化基元、全部预测轨迹、最优轨迹；<code>2D Nav Goal</code> 点击设目标</td></tr>
   </table>
 
-  <h3>3.5 一次训练迭代的数据流（含梯度回流路径）</h3>
+  <h3>3.5 训练回路：guidance learning 的梯度怎么回流</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    A["① 取 batch：depth 16×1×96×160（16 位 PNG/65535）· pos 16×3 · quat 16×4 · 随机 v/a/goal · map_id"]
-    A --> B["② normalize + prepare_input → 9 通道特征"]
-    A --> C["③ body→world：R_wb 旋转 + 平移"]
-    B --> D["④ ResNet-18 → 64×3×5 → 1×1 卷积头 → 10×3×5"]
-    D --> E["⑤ tanh(前 9 维) · softplus(分数) → pred_to_endstate（偏移→极坐标→机体系）"]
-    E --> C
-    C --> F["⑥ 15 条轨迹各算 4 项代价<br/>J = ws·Js + wa·Ja + wc·Jo + wg·Jg"]
-    F --> G["⑦ traj_loss = mean(J)，经 dP→Δ→y 链式反传"]
-    F --> H["⑧ score_loss = SmoothL1(score, J.detach())"]
-    G --> I["⑨ AdamW(lr=1.5e-4) + 梯度裁剪 0.1"]
-    H --> I
-    I -.->|"下一 batch"| A
+flowchart LR
+  BATCH["采样 batch<br/>深度 + 位姿"] -->|"深度 / 状态"| NET["ResNet-18<br/>+ 卷积头"]
+  NET -->|"偏移 + 末端导数"| TRAJ["候选轨迹<br/>末端状态"]
+  NET -->|"分数"| SCORE["分数输出"]
+  TRAJ -->|"轨迹参数"| COST["代价评估<br/>平滑 / 安全 / 目标"]
+  ESDF["ESDF 真值<br/>训练期特权"] -.->|"距离查询"| COST
+  COST -->|"代价梯度"| GRAD["链式反传<br/>（本文创新）"]
+  COST -->|"负代价作标签"| SCORE
+  SCORE -->|"分数损失"| GRAD
+  GRAD -.->|"AdamW 更新"| NET
+  classDef inno fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  classDef base fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
+  class GRAD inno
+  class NET,COST,ESDF,SCORE,TRAJ,BATCH base
     </pre>
   </div>
+
+  <p><strong>这张图是全文最反直觉的一处</strong>：训练<strong>没有标签、没有专家动作、也没有 critic</strong>。网络吐出候选轨迹后，代价评估用只有训练期才有的 ESDF 真值算出平滑 / 安全 / 目标三项代价，再把它对末端状态的<strong>数值梯度</strong>按链式法则一路反传到网络权重（红色节点）——本文称之为 <strong>guidance learning</strong>：它把"经典优化器里的梯度"直接接到"神经网络的反向传播"上。分数分支则是唯一的监督项：以负代价为标签做 SmoothL1 回归（<code>SmoothL1(score, −J)</code>），让网络学会排序；<strong>排序一旦学会，推理时就取代了优化器</strong>——这正是 3.1 里"argmin 选基元"能成立的原因。虚线 <code>ESDF</code> 边标出特权信息的边界：真值只在训练期可用，推理时不可见。</p>
 
   <div class="callout info">
     <div class="callout-title">ℹ️ 训练集与推理输入的"同一性"陷阱</div>

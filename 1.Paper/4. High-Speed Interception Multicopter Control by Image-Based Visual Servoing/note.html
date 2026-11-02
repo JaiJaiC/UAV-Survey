@@ -258,189 +258,75 @@ MathJax = {
 <section id="architecture">
   <h2>3. 系统架构</h2>
 
-  <h3>3.1 整体系统框架</h3>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">本文的架构可以一句话概括：<strong>把图像特征直接变成 SO(3) 上的期望姿态</strong>。整条链路上只有两处是本文自己插进去的——控制几何（SO(3) 共线控制器）与状态估计（DKF 延时观测器），其余都是机载标配硬件与内环飞控。两图中<strong>紫色 = 本文创新</strong>，橙色 = 感知/目标，红色 = 机体执行。</p>
+
+  <h3>3.1 系统总览——机载感知 → DKF → SO(3) 共线控制</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph 硬件层["硬件层 · 拦截多旋翼平台"]
-      direction LR
-      机架["5寸机架 · 推重比约3 · 续航20min"]
-      飞控["Pixhawk Nano V5 · 姿态内环200Hz"]
-      机载计算机["Jetson Xavier NX · DKF+外环50Hz"]
-      相机["前视CSI相机 · 120度FOV · 固联安装"]
-      IMU传感器["机载IMU · 200Hz · 陀螺+加速度计"]
-    end
-
-    subgraph 感知层["感知层 · 目标检测+图像处理"]
-      direction LR
-      颜色识别["颜色识别 · 红色气球/目标 · 30Hz"]
-      图像坐标["归一化图像坐标 · ip = (pxi/foc, pyi/foc)"]
-    end
-
-    subgraph 状态估计层["DKF观测器 · 50Hz 延迟补偿"]
-      direction LR
-      IMU递推["IMU递推 200Hz · 18维状态传播"]
-      状态缓存["历史状态缓存 · D周期滑动窗口"]
-      延迟修正["图像到达 · 回退k-D修正 · 前向传播至k"]
-      估计输出["实时估计输出 · 50Hz · 高于相机30Hz"]
-    end
-
-    subgraph 控制层["共线控制器 · 外环50Hz+内环200Hz"]
-      direction LR
-      外环共线["外环共线控制 50Hz · Barrier Lyapunov · 期望加速度ad"]
-      期望姿态["SO(3)指数映射 · 期望姿态Rd · 仅pitch-roll"]
-      内环姿态["内环姿态控制 200Hz · Frobenius误差 · 角速度bd"]
-      推力映射["推力fd映射 · 饱和约束[0,fm] · 阻力补偿"]
-    end
-
-    subgraph 执行与目标["执行层+目标"]
-      direction LR
-      电机["T-Motor推进系统 · 最大加速度5m/s²"]
-      拦截完成["拦截完成 · pr→0 · 终端速度20m/s"]
-      入侵目标["入侵无人机 · 未知加速度eat · 机动飞行"]
-    end
-
-    相机 --> 颜色识别 --> 图像坐标
-    图像坐标 -->|"延迟D周期(~80ms)"| 延迟修正
-    IMU传感器 --> IMU递推 --> 状态缓存 --> 延迟修正
-    延迟修正 --> 估计输出
-    估计输出 -->|"ip估计+q+vr"| 外环共线
-    外环共线 -->|"ad"| 期望姿态
-    期望姿态 -->|"Rd"| 内环姿态
-    内环姿态 -->|"bd"| 推力映射
-    推力映射 --> 电机
-    电机 --> 拦截完成
-    飞控 --> 内环姿态
-    机载计算机 --> 颜色识别
-    机载计算机 --> 延迟修正
-    机载计算机 --> 外环共线
-    入侵目标 -.->|"视觉观测"| 相机
-    机架 --> 飞控
-
-    拦截完成 -.->|"反馈 · pr收敛验证Lyapunov"| 内环姿态
-    估计输出 -.->|"反馈 · CEP对比统计"| 延迟修正
-
-    classDef 硬件 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef 感知 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef 估计 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef 控制 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef 执行 fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    class 机架,飞控,机载计算机,相机,IMU传感器 硬件
-    class 颜色识别,图像坐标 感知
-    class IMU递推,状态缓存,延迟修正,估计输出 估计
-    class 外环共线,期望姿态,内环姿态,推力映射 控制
-    class 电机,拦截完成,入侵目标 执行
+flowchart LR
+  subgraph IN["机载感知"]
+    CAM["前视单目相机<br/>Monocular"]
+    IMU["惯性测量单元<br/>IMU"]
+    DET["颜色识别<br/>Color Detect"]
+  end
+  subgraph EST["延时观测器（本文创新②）"]
+    DKF["延迟卡尔曼滤波<br/>DKF"]
+  end
+  subgraph CTRL["SO(3) 共线控制（本文创新①）"]
+    OUT["外环共线控制<br/>Collinear"]
+    ATT["内环姿态控制<br/>Attitude"]
+  end
+  subgraph PLANT["执行"]
+    MOT["电机与桨<br/>Pixhawk"]
+  end
+  CAM -->|"图像 30 Hz"| DET
+  DET -->|"像素坐标"| DKF
+  IMU -->|"递推 200 Hz"| DKF
+  IMU -->|"姿态"| ATT
+  DKF -->|"特征估计 50 Hz"| OUT
+  OUT -->|"期望姿态"| ATT
+  ATT -->|"推力 f, 角速率 ω"| MOT
+  classDef sensor fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef novel fill:#f0ebfd,stroke:#8b5cf6,stroke-width:3px,color:#6d28d9
+  classDef exec fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  class CAM,IMU,DET sensor
+  class DKF,OUT,ATT novel
+  class MOT exec
     </pre>
   </div>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">频率对照：图像 30 Hz、延迟约 80 ms → DKF 输出 50 Hz → 外环 50 Hz / 内环 200 Hz。外环负责把目标始终按在 120° 前视视场内（大机动下俯仰可达 50°），内环负责在 20 m/s 量级下跟住参考姿态；相机与 IMU 均固联于机体，无外部定位。</p>
 
-  <h3>3.2 数据流——IMU和图像的异构融合信息流</h3>
+  <h3>3.2 延时补偿闭环——30 Hz 的图像如何驱动 200 Hz 的控制</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph IMU数据["IMU数据 · 200Hz · 高频实时"]
-      direction LR
-      陀螺["陀螺仪 · 角速度增量 · bgyr偏置"] --> 角速度["角速度 wb = gyr - bgyr - ngyr"]
-      加速度计["加速度计 · 速度增量 · bacc偏置"] --> 线加速度["加速度 e_a = ge3 + Reb(a_acc - b_acc - n_acc)"]
-    end
-
-    subgraph 状态递推["状态传播 · 200Hz · 连续递推"]
-      direction LR
-      四元数传播["四元数 q_k = M(Δq_{k-1}) q_{k-1}"]
-      速度传播["速度 v_{r,k} = v_{r,k-1} + (Reb·ab_{k-1} + ge3)Δt"]
-      位置传播["位置 p_{r,k} = p_{r,k-1} + 0.5(v_{r,k-1}+v_{r,k})Δt"]
-      图像传播["图像特征 · IBVS雅可比离散化传播"]
-    end
-
-    subgraph 图像测量["图像测量 · 30Hz · 延迟D周期 · 80ms"]
-      direction LR
-      延迟图像["i p_img,k = i p_{k-D} + n_img"]
-      历史修正["回退修正 · x_{k-D} + K(z_{k-D} - Hx_{k-D|k-D-1})"]
-    end
-
-    subgraph 前向传播["正向传播至当前时刻"]
-      direction LR
-      IMU回放["利用缓存的IMU序列 · 从k-D递推到k"]
-      当前估计["当前最优估计 x_k · 18维 · 高于相机帧率"]
-    end
-
-    subgraph 控制输出["控制指令 · 外环50Hz+内环200Hz"]
-      direction LR
-      图像误差["图像误差 → z1 = 1-n_td^T n_t"]
-      期望加速度["期望加速度 a_d = -k1v_r - k2 z2 - p_r + ..."]
-      角速度推力["角速度 b_d + 推力 f_d · 饱和约束"]
-    end
-
-    角速度 --> 四元数传播
-    线加速度 --> 速度传播
-    速度传播 --> 位置传播
-    四元数传播 --> 图像传播
-    速度传播 --> 图像传播
-    延迟图像 --> 历史修正
-    历史修正 --> IMU回放
-    IMU回放 --> 当前估计
-    当前估计 --> 图像误差
-    图像误差 --> 期望加速度
-    期望加速度 --> 角速度推力
-
-    陀螺 -.->|"200Hz缓存"| IMU回放
-    加速度计 -.->|"200Hz缓存"| IMU回放
-    当前估计 -.->|"滤波残差反馈"| 历史修正
-
-    classDef imu fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef 状态 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef 图像 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef 前传 fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef 输出 fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    class 陀螺,加速度计,角速度,线加速度 imu
-    class 四元数传播,速度传播,位置传播,图像传播 状态
-    class 延迟图像,历史修正 图像
-    class IMU回放,当前估计 前传
-    class 图像误差,期望加速度,角速度推力 输出
+flowchart LR
+  TGT["目标<br/>Target"]
+  IMG["图像测量<br/>Vision"]
+  COR["回退修正<br/>Correction"]
+  REP["IMU 回放<br/>IMU Replay"]
+  EST["特征估计<br/>Estimate"]
+  CON["共线控制器<br/>Collinear"]
+  ATT["内环姿态<br/>Attitude"]
+  UAV["多旋翼<br/>Quadrotor"]
+  TGT -->|"120° FOV"| IMG
+  IMG -->|"延迟 80 ms"| COR
+  COR -->|"修正后状态"| REP
+  REP -->|"递推至当前"| EST
+  EST -->|"当前特征 50 Hz"| CON
+  CON -->|"期望姿态 50 Hz"| ATT
+  ATT -->|"推力 f, 角速率 ω"| UAV
+  UAV -->|"接近拦截"| TGT
+  UAV -.->|"IMU 200 Hz"| REP
+  UAV -.->|"姿态"| ATT
+  classDef vis fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef novel fill:#f0ebfd,stroke:#8b5cf6,stroke-width:3px,color:#6d28d9
+  classDef exec fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  class TGT,IMG vis
+  class COR,REP,EST,CON,ATT novel
+  class UAV exec
     </pre>
   </div>
-
-  <h3>3.3 工作流程——从起飞到拦截的完整执行管线</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph 阶段1["阶段1 · 系统初始化与目标捕获"]
-      direction LR
-      S1["多旋翼起飞 · 升至3m高度 · 开始搜索"] --> S2["相机实时采集 · 30Hz · 120度FOV"] --> S3["颜色识别 · 检测红色目标"] --> S4["获取初始图像坐标 · i p_img"]
-    end
-
-    subgraph 阶段2["阶段2 · DKF状态估计 在线运行"]
-      direction LR
-      E1["IMU 200Hz · 持续递推q+vr+pr+ip"] --> E2["延迟图像到达 · 回退k-D周期"] --> E3["卡尔曼修正 · 更新状态+协方差"] --> E4["正向传播至当前 · 输出最优估计x_k"]
-    end
-
-    subgraph 阶段3["阶段3 · 双层共线拦截控制"]
-      direction LR
-      C1["外环50Hz · 视线误差z1 · Barrier Lyapunov约束"] --> C2["期望加速度a_d · 期望力方向n_fd"] --> C3["SO(3)指数映射 · 期望姿态Rd · tilt旋转"] --> C4["内环200Hz · 角速度控制器 · bd + fd"]
-    end
-
-    subgraph 阶段4["阶段4 · 末端拦截与验证"]
-      direction LR
-      T1["目标锁定FOV中央 · 俯仰角达50度"] --> T2["速度持续增大 · 终端速度20m/s"] --> T3["相对位置pr→0 · Lyapunov稳定性证明"] --> T4["拦截成功 · CEP统计 · 50次HITL+实飞"]
-    end
-
-    阶段1 -->|"i p_img · 延迟80ms"| 阶段2
-    阶段2 -->|"x_k估计 · 50Hz · 高于相机帧率"| 阶段3
-    阶段3 -->|"bd, fd"| 阶段4
-
-    T3 -.->|"反馈 · z1减小维持FOV"| C1
-    T2 -.->|"反馈 · pr持续缩小"| E1
-    T4 -.->|"对比 · CEP_direct=0.408 vs CEP_DKF=0.332"| E3
-
-    classDef 初始化 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef 估计 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef 控制 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef 末端 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class S1,S2,S3,S4 初始化
-    class E1,E2,E3,E4 估计
-    class C1,C2,C3,C4 控制
-    class T1,T2,T3,T4 末端
-    </pre>
-  </div>
+  <p style="color:var(--text-muted); font-size:12px; margin-bottom:8px;">关键在“回退—前推”：延迟 D 周期到达的图像只用于修正 t(k−D) 时刻的历史状态，再用缓存的 IMU 序列前推到当前时刻，于是 200 Hz 的控制回路始终有 50 Hz 的“当前”特征估计可用，而不是盲推。目标短暂出视野时 DKF 继续外推，重新入画后再被修正——HITL 中 CEP 由无 DKF 的 0.408 m 降到 0.332 m。</p>
 </section>
 
 <!-- ═══════════════ 4. 任务定义 ═══════════════ -->

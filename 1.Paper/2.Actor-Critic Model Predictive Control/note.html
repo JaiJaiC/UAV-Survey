@@ -257,161 +257,70 @@ MathJax = {
 <section id="architecture">
   <h2>3. System Architecture</h2>
 
-  <h3>3.1 系统总体框架——AC-MPC 四层架构</h3>
+  <h3>3.1 系统总览 —— Cost Map 学「代价」，diffMPC 出「动作」</h3>
+  <p>整个 Actor 只学一件小事：把 36 维观测映射成二次代价的系数 Q 与 p；真正的动作交给<strong>可微分 MPC</strong> 用已知动力学在线求解——MPC 因此成了策略网络的最后一层，Critic 只在训练时补上长期价值。</p>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph OBS["观测输入层 (36维)"]
-      direction LR
-      OSTATE["飞行器状态 o_quad: 线速度v + 旋转矩阵R → 12维"]
-      OTRACK["赛道观测 o_track: 下N个门四角点相对位置 → 24维"]
-      ONORM["在线归一化: 每训练步计算均值/标准差"]
-    end
-
-    subgraph ACTOR["策略网络层 · Actor (Cost Map + diffMPC)"]
-      direction LR
-      COSTMAP["Neural Cost Map: 2×512 MLP + Sigmoid · 输入观测s_k · 输出Q/p"]
-      QMAT["对角矩阵 Q(s): 状态/控制的二次代价权重 · [0.1, 1e5]"]
-      PVEC["线性向量 p(s): 状态/控制的线性代价项 · [0.1, 1e5]"]
-      DIFFMPC["可微分MPC求解器: iLQR不动点 · 输入约束 u∈U · 前向求解+反向解析梯度"]
-      ACTOUT["控制输出: u_k ~ N(diffMPC, σ^2) 训练 · u_k = diffMPC 部署"]
-    end
-
-    subgraph CRITIC["价值评估层 · Critic"]
-      direction LR
-      VNET["Value Network V_φ(s): 2×512 MLP · 输入观测 · 输出标量V(s)"]
-      ADV["Advantage: A = r + γV(s') - V(s) · GAE平滑 · λ=0.95"]
-      TDERR["TD误差: MSE(V(s), R̂) · 价值函数回归目标"]
-    end
-
-    subgraph ENV["环境交互层"]
-      direction LR
-      TRAINENV["Flightmare仿真器: 简单动力学 · 快速训练"]
-      EVALENV["NeuroBEM高保真仿真: 气动建模 · 风扰评估"]
-      REALENV["真实四旋翼: Agilicious 4s竞速机 · 动捕定位 · 零样本迁移"]
-      REWARD["奖励: 门进度(稠密) + 过门+10(稀疏) + 碰撞-10 + 完赛+10"]
-    end
-
-    OBS --> ACTOR
-    OBS --> CRITIC
-    ACTOUT -->|"u_k 执行"| ENV
-    ENV -->|"s_{k+1}, r_k"| OBS
-    ADV -->|"策略梯度 ∂J/∂θ"| COSTMAP
-    TDERR -->|"价值函数回归"| VNET
-    REWARD -.->|"稀疏+稠密混合奖励"| ADV
-
-    classDef obs fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef actor fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef critic fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef env fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class OSTATE,OTRACK,ONORM obs
-    class COSTMAP,QMAT,PVEC,DIFFMPC,ACTOUT actor
-    class VNET,ADV,TDERR critic
-    class TRAINENV,EVALENV,REALENV env
-    class REWARD obs
+flowchart LR
+  subgraph IN["输入"]
+    OBS["观测 s_k<br/>Observations"]
+    NORM["在线归一化<br/>Normalize"]
+  end
+  subgraph ACT["Actor（本文创新）"]
+    CM["代价图网络<br/>Cost Map"]
+    MPC["可微分 MPC<br/>diffMPC"]
+  end
+  subgraph CRI["Critic（仅训练）"]
+    VNET["价值网络<br/>Critic"]
+  end
+  OBS -->|"原始观测"| NORM
+  NORM -->|"36 维"| CM
+  OBS -->|"36 维"| VNET
+  CM -->|"Q(s), p(s)"| MPC
+  MPC -->|"首步控制"| UAV["四旋翼<br/>Sim / Real"]
+  VNET -.->|"优势 Â"| CM
+  UAV -.->|"s′, r_k"| OBS
+  classDef input fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef actor fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef critic fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+  classDef run fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+  class OBS,NORM input
+  class CM,MPC actor
+  class VNET critic
+  class UAV run
     </pre>
   </div>
+  <p style="font-size:13px;color:var(--text-muted);">配色：<span style="color:#92400e;">橙</span> = 观测输入，<span style="color:#1d4ed8;">蓝</span> = Actor（本文创新），<span style="color:#6d28d9;">紫</span> = Critic，<span style="color:#047857;">绿</span> = 被控对象；实线是前向数据流，虚线是训练期的价值与反馈信号。</p>
 
-  <h3>3.2 数据流——训练循环中的前向传播与梯度反向传播路径</h3>
+  <h3>3.2 数据流与闭环 —— 梯度穿过 MPC 层流回 Cost Map</h3>
+  <p>图 2 只讲一件事：<strong>梯度从哪流回哪</strong>。策略梯度先落在 MPC 的输出上，再由 iLQR 收敛点的 KKT 隐式微分换算成对 Q、p 的梯度，最后才落到 Cost Map 的权重上。这条解析梯度，正是本文与「把 MPC 当黑盒、只做无导数调参」的方法的分界。</p>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph FORWARD["前向传播: 观测 → 动作 (每条轨迹每步执行)"]
-      direction LR
-      F1["观测 s_k: 速度+姿态+门位置 → 36维归一化"] --> F2["Cost Map(s_k) MLP前向 → Q(s_k), p(s_k) → 68维 (N=2)"]
-      F2 --> F3["diffMPC求解: 构建QP → iLQR迭代 → 收敛得 u*_{0:N-1}"]
-      F3 --> F4["取u*_0 + 探索噪声 σ ~ N(0, σ^2) → 施加到环境"]
-      F4 --> F5["环境步进: (s_k, u_k) → s_{k+1}, r_k · 存储到Rollout Buffer"]
-    end
-
-    subgraph BACKWARD["反向传播: 奖励 → Cost Map梯度 (每条轨迹PPO更新时)"]
-      direction LR
-      B1["从Buffer取mini-batch: (s, a, r, s')"] --> B2["计算Advantage: GAE(λ=0.95) · A = Σ(γλ)^t δ_t"]
-      B2 --> B3["PPO-Clip Loss: L = min(r_t·A, clip(r_t, 1±ε)·A) 对θ求导"]
-      B3 --> B4["∂L/∂u*: 标准策略梯度 · 经高斯分布对数概率"]
-      B4 --> B5["∂u*/∂(Q,p): 可微MPC的KKT隐式微分 · 解析计算"]
-      B5 --> B6["∂(Q,p)/∂θ: 标准MLP反向传播 · 更新Cost Map权重"]
-    end
-
-    subgraph CRITIC_UPD["Critic更新: 价值函数回归 (与Actor交替进行)"]
-      direction LR
-      C1["从Buffer计算R̂_k: 折扣累积回报 · R̂ = Σ γ^t r_{k+t}"] --> C2["V_φ(s)前向: 预测状态价值"]
-      C2 --> C3["MSE Loss: (V_φ(s) - R̂)^2 → 反向传播"]
-      C3 --> C4["更新Critic MLP权重 φ · K个epoch"]
-    end
-
-    subgraph DEPLOY_LOOP["部署循环: 零样本Sim-to-Real (训练完成后)"]
-      direction LR
-      D1["固定Cost Map + Critic权重"] --> D2["每步: 观测s_k → Cost Map → Q(s_k), p(s_k)"]
-      D2 --> D3["diffMPC求解: 确定性u*_0 (σ=0) · 在线重规划"]
-      D3 --> D4["真实四旋翼执行 · 最大14m/s · Circle/SplitS赛道"]
-    end
-
-    FORWARD -->|"收集完整Buffer后"| BACKWARD
-    BACKWARD -->|"K epoch后"| CRITIC_UPD
-    CRITIC_UPD -->|"重复N轮直至收敛 ~11.5h"| FORWARD
-    FORWARD -.->|"训练收敛后 · 固定权重"| DEPLOY_LOOP
-
-    classDef forward fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef backward fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef cupd fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef deploy fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class F1,F2,F3,F4,F5 forward
-    class B1,B2,B3,B4,B5,B6 backward
-    class C1,C2,C3,C4 cupd
-    class D1,D2,D3,D4 deploy
+flowchart LR
+  S["观测 s_k<br/>Observations"] -->|"36 维"| CM["代价图网络<br/>Cost Map"]
+  CM -->|"Q(s), p(s)"| MPC["可微分 MPC<br/>diffMPC"]
+  MPC -->|"首步控制"| ENV["四旋翼环境<br/>Flightmare"]
+  ENV -->|"s′, r"| BUF["轨迹缓冲<br/>Rollout"]
+  BUF -->|"GAE"| ADV["优势估计<br/>Critic"]
+  ADV -->|"Â"| LOSS["PPO 损失<br/>Loss"]
+  LOSS -.->|"∂L/∂u"| MPC
+  MPC -.->|"KKT 反传"| CM
+  CM -.->|"∂L/∂θ"| UPD["更新权重<br/>θ"]
+  ENV -.->|"s′ 闭环"| S
+  classDef data fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
+  classDef actor fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  classDef critic fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
+  classDef env fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
+  classDef grad fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  class S,BUF data
+  class CM,MPC actor
+  class ADV critic
+  class ENV env
+  class LOSS,UPD grad
     </pre>
   </div>
-
-  <h3>3.3 工作流程——从系统建模到真实部署的完整工程管线</h3>
-  <div class="mermaid-box">
-    <pre class="mermaid">
-flowchart TD
-    subgraph PHASE1["阶段1: 系统建模与初始化"]
-      direction LR
-      P1A["定义四旋翼动力学: x_{k+1}=f(x_k,u_k) · 13维状态 · 4维控制"] --> P1B["构建QP形式MPC: 对角Q矩阵 · 输入约束u∈U · 无状态约束"]
-      P1B --> P1C["初始化网络: Cost Map MLP(随机) · Critic MLP(随机) · PPO超参数"]
-      P1C --> P1D["配置环境: Flightmare仿真器 · 门赛道生成器 · 碰撞检测"]
-    end
-
-    subgraph PHASE2["阶段2: PPO端到端训练循环"]
-      direction LR
-      P2A["Rollout收集: 运行当前策略π_θ · N步轨迹 · 动作含探索噪声σ"] --> P2B["Compute GAE Advantage: 基于Critic V(s) · λ=0.95 · γ=0.99"]
-      P2B --> P2C["PPO-Clip更新Actor: 反向通过diffMPC → 解析梯度 → 更新Cost Map"]
-      P2C --> P2D["MSE回归更新Critic: V(s)拟合R̂ · K个epoch · 小批量SGD"]
-      P2D --> P2E["观测在线归一化更新: 当前batch均值/标准差 · 适应分布变化"]
-    end
-
-    subgraph PHASE3["阶段3: 高保真评估与鲁棒性验证"]
-      direction LR
-      P3A["NeuroBEM评估: 高保真气动仿真 · 风扰测试 11.5N · OOD初始条件3m³"] --> P3B["Baseline对比: AC-MLP(纯RL) · 跟踪MPC(时间最优参考)"]
-      P3B --> P3C["消融实验: 成功率 · 平均速度 · 风扰恢复 · 时域长度N的影响"]
-      P3C --> P3D["价值函数可视化: V(s)热力图 · MPC预测叠加 · 模式切换验证"]
-    end
-
-    subgraph PHASE4["阶段4: 真实世界零样本部署"]
-      direction LR
-      P4A["提取策略: Cost Map权重θ* · Critic丢弃(仅训练用)"] --> P4B["部署平台: Agilicious 4s竞速机 · 动捕定位 · 机载/外部计算"]
-      P4B --> P4C["实时控制: 50Hz · 每步观测→Cost Map→diffMPC→u*_0 · 确定性策略"]
-      P4C --> P4D["实飞验证: Circle 14m/s · SplitS · 零样本 · 轨迹由动捕记录"]
-    end
-
-    PHASE1 -->|"建模完成"| PHASE2
-    PHASE2 -->|"训练收敛 ~11.5h"| PHASE3
-    PHASE3 -->|"验证通过"| PHASE4
-    P4D -.->|"反馈: 推理延迟 N=2:13.5ms 可实时"| P2C
-    P3D -.->|"反馈: N=5,10 渐近性能提升 训练时间增加"| P2A
-
-    classDef p1 fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef p2 fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef p3 fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef p4 fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class P1A,P1B,P1C,P1D p1
-    class P2A,P2B,P2C,P2D,P2E p2
-    class P3A,P3B,P3C,P3D p3
-    class P4A,P4B,P4C,P4D p4
-    </pre>
-  </div>
+  <p style="font-size:13px;color:var(--text-muted);">配色：<span style="color:#92400e;">橙</span> = 数据，<span style="color:#1d4ed8;">蓝</span> = Actor 前向，<span style="color:#6d28d9;">紫</span> = Critic，<span style="color:#047857;">绿</span> = 环境，<span style="color:#be123c;">红</span> = 损失与梯度回传。实线是采集轨迹时的前向链路，虚线是 PPO 更新时的回传/闭环。</p>
+  <p>工程上：N = 2 时单步 13.5 ms、训练约 11.5 h（时域加长则训练时间随之上升）；部署时丢弃 Critic 与探索噪声，直接用 MPC 的首步解闭环，零样本迁移到 14 m/s 的真机飞行。</p>
 </section>
 
 <!-- ═══════════════ 4. TASK ═══════════════ -->

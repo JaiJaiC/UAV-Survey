@@ -184,14 +184,7 @@ MathJax = {
 </nav>
 
 <div class="container">
-<!-- NOTE-SKELETON for Diffaero
-     paper : DiffAero — A GPU-Accelerated Differentiable Simulation Framework for Efficient Quadrotor Policy Learning
-     venue : arXiv 2509.10247 (2025)
-     pdf   : DiffAero_arXiv2509.10247.pdf
-     repo  : https://github.com/flyingbitac/diffaero
-     Replace every placeholder marker with full Chinese content.
-     Do not modify the CSS (<style>) or the <nav> anchors.
--->
+
 <!-- ═══════════════ 1. 论文信息 ═══════════════ -->
 <section id="info">
   <h2>1. 论文信息</h2>
@@ -310,97 +303,44 @@ MathJax = {
 <section id="architecture">
   <h2>3. 系统架构</h2>
 
-  <p>本节完全以<strong>本地代码仓库</strong>为准（仓库根目录即 <code>Diffaero/</code>，Python 包名为 <code>diffaero</code>）。论文 Fig. 2 给出的是概念图，下面的 Mermaid 图与表格则把它落到<strong>真实的目录、文件与类名</strong>上——这是读懂后续所有公式的前提。</p>
+  <p>本节完全以<strong>本地代码仓库</strong>为准（仓库根目录即 <code>Diffaero/</code>，Python 包名为 <code>diffaero</code>）。论文 Fig. 2 只有三个组件和一条接口——<strong>仿真环境、学习智能体、导出部署</strong>，见下图；真实的目录、文件与类名在 3.2 的表格里。</p>
 
-  <h3>3.1 全局架构（论文 Fig. 2 的代码级重绘）</h3>
+  <h3>3.1 系统总览：三个组件 + 一条 GPU 原生接口</h3>
 
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph CFG["⚙️ 配置装配层 · Hydra"]
-      C1["cfg/config_train.yaml<br/>defaults: algo / env / dynamics / network / sensor / logger"]
-      C2["script/train.py<br/>@hydra.main · allocate_device() · multirun"]
-    end
-
-    subgraph ENV["🌍 环境层 · env/"]
-      E1["env/base_env.py<br/>BaseEnv · _step() · rescale_action()"]
-      E2["env/position_control.py<br/>env/obstacle_avoidance.py<br/>env/racing.py"]
-    end
-
-    subgraph DYN["🧮 动力学层 · dynamics/"]
-      D1["base_dynamics.py<br/>BaseDynamics · GradientDecay · RK4/Euler"]
-      D2["pointmass.py<br/>Continuous / Discrete PointMass"]
-      D3["quadrotor.py + controller.py<br/>QuadrotorModel · RateController"]
-    end
-
-    subgraph SEN["📡 传感器层 · utils/"]
-      S1["sensor.py · Camera / LiDAR<br/>解析光线投射（球/立方体/地面）"]
-      S2["sensor.py · IMU<br/>噪声 + 随机游走漂移"]
-      S3["assets.py · ObstacleManager<br/>基元障碍物 + 最近点查询"]
-    end
-
-    subgraph NET["🧠 网络与智能体 · network/"]
-      N1["networks.py<br/>MLP / CNN / RNN / RCNN"]
-      N2["agents.py<br/>StochasticActor · CriticV<br/>AsymmetricActorCritic"]
-    end
-
-    subgraph ALG["📉 算法层 · algo/"]
-      A1["APG.py（BPTT）<br/>SHAC.py（SHAC / SHA2C）"]
-      A2["PPO.py · MASHAC.py<br/>dreamerv3/（世界模型）"]
-      A3["buffer.py<br/>RolloutBufferSHAC"]
-    end
-
-    subgraph RUN["🚀 运行时 · utils/"]
-      R1["runner.py<br/>TrainRunner / TestRunner"]
-      R2["logger.py<br/>TensorBoard / WandB"]
-      R3["randomizer.py<br/>域随机化 Uniform/Normal"]
-    end
-
-    subgraph DEP["📦 导出部署 · utils/exporter.py"]
-      P1["PolicyExporter<br/>policy.onnx + policy.pt(jit)"]
-      P2["env.export_obs_fn()<br/>obs_fn.onnx"]
-      P3["deploy/ 子模块<br/>ROS + PX4 + Gazebo"]
-    end
-
-    C1 --> C2
-    C2 --> ENV
-    E1 --> E2
-    E1 --> D1
-    D1 --> D2
-    D1 --> D3
-    E1 --> S1
-    E1 --> S2
-    S1 --> S3
-    C2 --> NET
-    N1 --> N2
-    N2 --> ALG
-    A3 --> A1
-    A3 --> A2
-    ALG --> R1
-    R1 --> R2
-    R3 -.-> E2
-    R1 --> DEP
-    P1 --> P3
-    P2 --> P3
-
-    classDef cfg fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#4b5563
-    classDef env fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
-    classDef dyn fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef sen fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef net fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef alg fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    classDef run fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    classDef dep fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
-    class C1,C2 cfg
-    class E1,E2 env
-    class D1,D2,D3 dyn
-    class S1,S2,S3 sen
-    class N1,N2 net
-    class A1,A2,A3 alg
-    class R1,R2,R3 run
-    class P1,P2,P3 dep
+flowchart LR
+  subgraph SIM["仿真环境 · 全 GPU（本文创新）"]
+    TASK["飞行任务<br/>定位/避障/竞速"]
+    DYN["可微动力学<br/>4 种模型"]
+    SEN["射线投射传感器<br/>深度/LiDAR/IMU"]
+  end
+  subgraph IF["统一接口（本文创新）"]
+    GYM["Gym-like 接口<br/>双信号 · 零拷贝"]
+  end
+  subgraph AGT["学习智能体"]
+    NET["网络骨干<br/>MLP/CNN/RNN"]
+    ALG["学习算法<br/>PPO/SHAC/BPTT"]
+  end
+  subgraph DEP["导出部署"]
+    ONNX["ONNX 导出<br/>策略 + 观测函数"]
+  end
+  TASK -->|"初始状态/目标"| DYN
+  DYN -->|"状态 s"| SEN
+  SEN -->|"观测 o"| GYM
+  GYM -->|"观测张量"| NET
+  GYM -->|"样本 + 奖励"| ALG
+  NET -.->|"动作 a"| DYN
+  ALG -.->|"梯度更新"| NET
+  NET -->|"导出策略"| ONNX
+  classDef inno fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  classDef base fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
+  class DYN,SEN,GYM inno
+  class TASK,NET,ALG,ONNX base
     </pre>
   </div>
+
+  <p><strong>读法</strong>：横向是一条数据路径——任务给出初始状态与目标，动力学推进一步，传感器把状态渲染成观测，经 Gym-like 接口以<strong>同卡张量</strong>交给智能体；策略输出的动作（虚线）直接回到动力学继续推演，算法只负责用这批样本更新权重。配色：<span style="color:#be123c;font-weight:700;">红框是本文的创新落点</span>（全 GPU 的可微动力学、射线投射渲染，以及把它们接到智能体的零拷贝接口），<span style="color:#0f766e;font-weight:700;">青框是通用部件</span>（任务、网络、算法、导出）。<strong>一句话机制</strong>：因为红框三个模块全是 PyTorch 算子，"渲染 → 观测 → 动作 → 动力学"整条链可被一次 <code>backward()</code> 走穿——这才是它相对 Aerial Gym / OmniDrones 的差别，而不是 GPU 上跑得快而已。</p>
 
   <h3>3.2 模块逐层拆解（输入 / 输出 / 关键实现 / 代码位置）</h3>
 
@@ -420,71 +360,28 @@ flowchart TB
     <tr><td><strong>导出部署</strong></td><td><code>utils/exporter.py</code><br><code>script/export.py</code></td><td>actor → <code>policy.onnx</code> / TorchScript</td><td><code>PolicyExporter</code> 把"$[-1,1]$ 原始输出 → 反归一化 → 局部系转世界系 → 期望加速度 → 姿态四元数指令"整条后处理<strong>一起导出</strong>，输出三个量：<code>action</code>、<code>quat_xyzw_cmd</code>、<code>acc_norm</code>；RNN/RCNN 额外带 <code>hidden_in/hidden_out</code>。</td></tr>
   </table>
 
-  <h3>3.3 单步数据流：从观测到梯度</h3>
+  <h3>3.3 单步闭环：两个信号怎样回到网络</h3>
 
   <div class="mermaid-box">
     <pre class="mermaid">
 flowchart LR
-    subgraph OBS["① 观测"]
-      O1["get_observations()<br/>TensorDict: state + perception(H×W)"]
-      O2["get_state()<br/>全状态（含 30×3 最近点 + 深度）"]
-    end
-
-    subgraph ACT["② 推演"]
-      A1["actor(obs)<br/>μθ(o), σθ(o)"]
-      A2["tanh 采样 u ∈ [-1,1]^3"]
-    end
-
-    subgraph SCALE["③ 动作映射"]
-      B1["rescale_action(u)<br/>min + (max-min)(u+1)/2"]
-      B2["a_thrust_cmd（局部系）<br/>xy∈[-20,20] · z∈[0,40] m/s²"]
-    end
-
-    subgraph PHYS["④ 物理步进"]
-      C1["dynamics.step()<br/>RK4 · n_substeps=1 · dt=0.0333"]
-      C2["update_state()<br/>vel EMA · 加速度迟滞 · 姿态反解"]
-    end
-
-    subgraph SENSE["⑤ 感知"]
-      S1["sensor(): 追迹 16×9 / LiDAR 5×36<br/>depth = 1 - d/d_max"]
-    end
-
-    subgraph LOSS["⑥ 双通道信号"]
-      L1["total_loss（可微）<br/>→ ∂loss/∂u"]
-      L2["total_reward（detach）<br/>→ 供 RL / critic"]
-    end
-
-    subgraph UPD["⑦ 更新"]
-      U1["buffer.add(loss, sample, logprob, value)"]
-      U2["actor_loss.backward()<br/>梯度穿过整条 rollout"]
-      U3["update_actor() / update_critic()"]
-    end
-
-    O1 --> A1 --> A2 --> B1 --> B2 --> C1 --> C2
-    C2 --> S1 --> L1
-    C2 --> L2
-    L1 --> U1
-    L2 --> U1
-    U1 --> U2 --> U3
-    O2 -.->|"非对称 critic（SHA2C）"| U3
-    U3 -.->|"新参数"| A1
-
-    classDef obs fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
-    classDef act fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef scale fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e40af
-    classDef phys fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef sense fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef loss fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    classDef upd fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class O1,O2 obs
-    class A1,A2 act
-    class B1,B2 scale
-    class C1,C2 phys
-    class S1 sense
-    class L1,L2 loss
-    class U1,U2,U3 upd
+  OBS["观测<br/>state + perception"] -->|"o_t"| ACT["actor 采样<br/>tanh 高斯"]
+  ACT -->|"动作 u"| PHYS["可微动力学<br/>RK4 步进"]
+  PHYS -->|"下一步状态"| SEN["射线投射<br/>深度图"]
+  PHYS -->|"位置 / 速度"| LOSS["可微损失<br/>loss 权重表"]
+  PHYS -->|"同一状态"| REW["标量奖励<br/>detach 后"]
+  LOSS -->|"标量 loss"| UPD["参数更新<br/>backward"]
+  REW -->|"奖励目标"| UPD
+  SEN -.->|"下一帧观测"| OBS
+  UPD -.->|"反传穿物理图"| ACT
+  classDef inno fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  classDef base fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
+  class PHYS,SEN,LOSS inno
+  class OBS,ACT,REW,UPD base
     </pre>
   </div>
+
+  <p><strong>这张图只画一步，但把最关键的设计点钉住了</strong>：同一个状态经 <code>loss_and_reward()</code> <strong>同时产出两个信号</strong>——可微的 <code>total_loss</code>（权重表 <code>loss_weights</code>）与 <code>.detach()</code> 后的标量 <code>total_reward</code>（权重表 <code>reward_weights</code>）。前者让梯度沿 <code>UPD → ACT</code> 的虚线<strong>穿过整个物理图</strong>（<code>APG</code> / <code>BPTT</code> / <code>SHAC</code> 能工作的前提，红框即承载梯度的模块）；后者只作为 RL 的标量目标（PPO 用），<code>SHA2C</code> 则两者兼用。另一条虚线 <code>SEN -.-> OBS</code> 就是闭环本身：渲染出的下一帧观测回到 actor 输入。</p>
 
   <div class="callout warn">
     <div class="callout-title">⚠ 一个容易读错的细节：<code>loss</code> 与 <code>reward</code> 是<strong>同一组物理量的两种符号约定</strong></div>

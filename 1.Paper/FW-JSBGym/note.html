@@ -184,14 +184,7 @@ MathJax = {
 </nav>
 
 <div class="container">
-<!-- NOTE-SKELETON for FW-JSBGym
-     paper : Model-Free versus Model-Based Reinforcement Learning for Fixed-Wing UAV Attitude Control Under Varying Wind Conditions
-     venue : ICINCO 2024
-     pdf   : FWJSBGym_ICINCO2024_ModelFreeVsModelBased.pdf
-     repo  : https://github.com/Akkodis/FW-JSBGym
-     Replace every FILL marker comment with full Chinese content.
-     Do not modify the CSS (<style>) or the <nav> anchors.
--->
+
 <!-- ═══════════════ 1. 论文信息 ═══════════════ -->
 <section id="info">
   <h2>1. 论文信息</h2>
@@ -296,64 +289,39 @@ MathJax = {
     <strong>③ <code>environment.yml</code> 不完整。</strong>列了 <code>jsbsim/torch/matplotlib/plotly/seaborn/pandas</code>，但<strong>缺 <code>gymnasium</code> 与 <code>omegaconf</code></strong>，而 <code>jsbsim_env.py</code> 第 1 行就 <code>import gymnasium</code>、第 12 行 <code>from omegaconf import DictConfig</code>。照 yml 建环境会缺包。
   </div>
 
-  <h3>3.2 全局架构</h3>
+  <h3>3.2 系统总览：一套环境，四种控制器</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TB
-    subgraph EXT["🔌 不在本仓库"]
-      FC["FW-FlightControl · jsbsim 分支<br/>PPO / SAC / TD-MPC2 · 训练循环 · 超参 yaml"]
-    end
-    subgraph CFG["⚙️ 物理数据"]
-      FDM["fdm_descriptions/x8.xml · engine · systems"]
-      IC["initial_conditions/x8_basic_ic.xml<br/>600 m · 17 m/s"]
-      TRIM["trim/ · trim_points_x8.yaml"]
-    end
-    subgraph SIM["🛩️ 仿真封装"]
-      JSB["jsb_simulation.py · 138 行<br/>Simulation 包装 FGFDMExec"]
-      PRP["utils/jsbsim_properties.py · 425 行<br/>BoundedProperty(min,max)"]
-      CONV["utils/conversions.py<br/>props2si · euler2quaternion"]
-    end
-    subgraph ENV["🎮 环境层"]
-      BASE["jsbsim_env.py · 800 行<br/>JSBSimEnv(gym.Env, ABC)"]
-      ATMO["set_atmosphere() L308-481<br/>常值风 / Dryden 湍流 / 离散阵风"]
-      TASK["jsbsim_task.py · 78 行<br/>observation_deque · action_hist"]
-    end
-    subgraph TASKS["🎯 任务层（MDP 定义）"]
-      NOVA["ACBohnNoVaTask · 12 维 / 2 维动作<br/>空速交 PI(kp=0.5, ki=0.1)"]
-      IERR["ACBohnNoVaIErrTask · 14 维<br/>+ 积分误差（论文配置）"]
-      VAR["vanilla.py · 10 个消融变体"]
-      ORACLE["...WindOracleTask · 17 维<br/>+ 真实风分量"]
-    end
-    subgraph OUT["📊 输出"]
-      TEL["遥测 CSV + 风/湍流分量"]
-      PLOT["PlotVisualizer 四联图"]
-      WGT["models/icinco/**.pt"]
-    end
-    FC -->|"gym.make"| TASK
-    FDM --> JSB
-    IC --> JSB
-    TRIM --> FC
-    JSB --> BASE
-    PRP --> BASE
-    CONV --> BASE
-    BASE --> ATMO
-    BASE --> TASK
-    TASK --> NOVA --> IERR --> ORACLE
-    NOVA --> VAR
-    BASE --> TEL --> PLOT
-    PLOT --> WGT
-    classDef ext fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#4b5563
-    classDef sim fill:#e6faf8,stroke:#14b8a6,stroke-width:2px,color:#0f766e
-    classDef env fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef task fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    classDef out fill:#e6f7ee,stroke:#10b981,stroke-width:2px,color:#047857
-    class FC ext
-    class FDM,IC,TRIM,JSB,PRP,CONV sim
-    class BASE,ATMO,TASK env
-    class NOVA,IERR,VAR,ORACLE task
-    class TEL,PLOT,WGT out
+flowchart LR
+  subgraph CTRL["控制算法（本文对比）"]
+    PID["PID 基准"]
+    MF["无模型 RL<br/>PPO / SAC"]
+    MB["基于模型 RL<br/>TD-MPC（首用）"]
+  end
+  subgraph ENV["仿真环境 · JSBSim"]
+    SURF["舵面执行机构<br/>二阶限幅"]
+    FDM["JSBSim 六自由度<br/>常值风 / 湍流 / 阵风"]
+    OBS["观测与奖励<br/>有界属性集"]
+  end
+  REF["姿态参考<br/>nominal / hard"]
+  MET["评估指标<br/>RMSE · Act Fluct"]
+  REF -->|"姿态设定"| PID
+  REF -->|"姿态设定"| MF
+  REF -->|"姿态设定"| MB
+  PID -->|"舵面指令"| SURF
+  MF -->|"舵面指令"| SURF
+  MB -->|"首动作"| SURF
+  SURF -->|"偏转 / 油门"| FDM
+  FDM -->|"气动状态"| OBS
+  OBS -->|"跟踪误差"| MET
+  classDef inno fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  classDef base fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  class MB,MET inno
+  class SURF,FDM,OBS base
     </pre>
   </div>
+
+  <p><strong>读法</strong>：整张图只有一个自变量——<strong>谁来出舵面指令</strong>；右端只有一条仿真管线，中间是四种控制器共享的同一套 MDP。<strong>四种控制器看到的观测、奖励、风场、初始条件完全一致</strong>，这才是论文结论可比的前提；图中未画出的是，agent、训练循环与超参都在另一个仓库（<code>FW-FlightControl</code>）。配色：<span style="color:#be123c;font-weight:700;">红框是本文真正新增的两处</span>——把 TD-MPC 首次接到固定翼姿态控制（此前只有 PPO/SAC 这类无模型方法被验证过），以及 Act Fluct 这一动作抖振指标；<span style="color:#1d4ed8;font-weight:700;">蓝框是环境侧通用部件</span>。</p>
 
   <h3>3.3 模块要点</h3>
   <p><strong>① 双频架构。</strong><code>agent_frequency</code>（控制器，100 Hz）与 <code>fdm_frequency</code>（物理积分）解耦，<code>sim_steps_after_agent_action = fdm//agent</code>；<code>step()</code> 先 <code>apply_action()</code> 再跑 N 次 <code>sim.run_step()</code>。论文中两者相同（dt=0.01 s），但设计允许"控制器 50 Hz + 物理 200 Hz"这类真机配置。</p>
@@ -365,40 +333,29 @@ flowchart TB
     论文 §4.2 的状态清单在这里被翻译成 <strong>14 个 <code>BoundedProperty</code> 的有序元组</strong>，而<strong>顺序就是观测向量的索引顺序</strong>——必须与 FW-FlightControl 里网络输入层的假设严格一致，否则训练静默失效。这也是 <code>vanilla.py</code> 每加一个状态都要重调 <code>self.observation_space = self.get_observation_space()</code> 的原因。
   </div>
 
-  <h3>3.4 单步数据流</h3>
+  <h3>3.4 单步闭环：抖振在哪两处被抑制</h3>
   <div class="mermaid-box">
     <pre class="mermaid">
-flowchart TD
-    A["agent 输出 (δa^c, δe^c) ∈ [-1,1]²"] --> B["ACBohnNoVaTask.step()<br/>update_action_avg() 近 N 步均值入观测"]
-    B --> C["JSBSimEnv.step()"]
-    C --> D{"curr_step == 250<br/>且 gust.enable?"}
-    D -->|"是"| E["gust_start()<br/>随机方向 · gust_start=1"]
-    D -->|"否"| F["fcs_pos_hist.append()"]
-    E --> F
-    F --> G["apply_action()<br/>写 fcs/aileron-cmd-norm 等"]
-    G --> H["覆写版 apply_action<br/>PI 环(Va_ref=60 kph) → throttle_cmd"]
-    H --> I["内层积分 for fdm//agent 次<br/>steps_left -= 1 · current_step += 1"]
-    I --> J["conversions.props2si()<br/>euler2quaternion()"]
-    J --> K["update_errors()<br/>e = ref − state · I ← I + e·dt"]
-    K --> L["observe_state()<br/>按 state_prps 取 14 个属性"]
-    L --> M["get_reward()<br/>R = −Σ clip(|e|/ζ, 0, c)"]
-    M --> N{"is_truncated?"}
-    N -->|"steps_left ≤ 0"| O["truncated：飞满 20 s"]
-    N -->|"obs 越界"| P["truncated：JSBSim 发散"]
-    N -->|"否"| Q["返回 obs, R, False, False, info"]
-    O --> R["telemetry + plot_viz.plot()"]
-    P --> R
-    Q --> A
-    classDef agent fill:#fef7ed,stroke:#f59e0b,stroke-width:2px,color:#92400e
-    classDef env fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
-    classDef wind fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
-    classDef sim fill:#f0ebfd,stroke:#8b5cf6,stroke-width:2px,color:#6d28d9
-    class A agent
-    class B,C,F,G,H env
-    class D,E wind
-    class I,J,K,L,M,N,O,P,Q,R sim
+flowchart LR
+  POL["策略网络<br/>PPO / SAC / TD-MPC"] -->|"舵面指令"| SURF["舵面与油门<br/>二阶限幅"]
+  SURF -->|"偏转 / 油门"| FDM["JSBSim 积分<br/>叠加风场"]
+  FDM -->|"状态"| OBS["观测<br/>有界属性集"]
+  OBS -->|"s_t"| POL
+  FDM -->|"跟踪误差"| REW["奖励<br/>截断负误差"]
+  POL -.->|"相邻指令差"| AVP["AVP 惩罚<br/>奖励项"]
+  AVP -->|"并入奖励"| REW
+  REW -->|"r_t"| UPD["策略更新"]
+  POL -.->|"动作序列"| CAPS["CAPS 正则<br/>策略损失项"]
+  CAPS -->|"并入损失"| UPD
+  UPD -.->|"新参数"| POL
+  classDef inno fill:#ffeaf0,stroke:#f43f5e,stroke-width:2px,color:#be123c
+  classDef base fill:#e8f0fe,stroke:#3b82f6,stroke-width:2px,color:#1d4ed8
+  class AVP,CAPS inno
+  class POL,SURF,FDM,OBS,REW,UPD base
     </pre>
   </div>
+
+  <p><strong>这张图与 3.2 的差别是"时间"</strong>：3.2 画组件，这张画<strong>一个控制步的闭环</strong>——策略出舵面指令 → 执行机构（二阶、限幅）→ JSBSim 推进一步 → 观测与奖励回到策略。两条从策略出发的虚线是本文接入的两个抑振手段，<strong>作用点不同</strong>：<code>AVP</code> 改<strong>奖励</strong>（把相邻动作差的均值当作惩罚并入 <code>R_t</code>），<code>CAPS</code> 改<strong>策略损失</strong>（相邻动作的条件协方差项并入 PPO/SAC 的 loss）。这解释了为什么 CAPS 对 TD-MPC 原理上无效：TD-MPC 的动作由 MPPI 采样得出、不直接来自策略先验，<code>CAPS</code> 没有可惩罚的对象。</p>
 
   <h3>3.5 一个回合的时序</h3>
   <table>

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event-Based Obstacle Sensing and Avoidance for an UAV through DRL (CICAI 2022) — Guanzheng Wang Notes</title>
+<script>
+MathJax = { tex:{inlineMath:[['$','$']],displayMath:[['$$','$$']],tags:'ams'}, options:{enableMenu:false} };
+</script>
+<script src="../../../../assets/vendor/mathjax-tex-svg-full.js" async></script>
+<script src="../../../../assets/vendor/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'neutral',securityLevel:'loose',flowchart:{useMaxWidth:false,htmlLabels:true,nodeSpacing:44,rankSpacing:60,padding:10}});</script>
+<style>
+  :root{
+    --bg:#f6f8fb;--surface:#fff;--line:#dfe5ee;--ink:#172033;--muted:#64748b;
+    --blue:#2563eb;--green:#059669;--amber:#d97706;--rose:#e11d48;--violet:#7c3aed;--cyan:#0891b2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",Roboto,Arial,sans-serif;line-height:1.72}
+  nav{position:sticky;top:0;z-index:90;display:flex;gap:4px;align-items:center;flex-wrap:wrap;padding:9px 20px;background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+  nav a{font-size:12px;font-weight:600;color:#475569;text-decoration:none;padding:4px 8px;border-radius:5px}
+  nav a:hover{background:#dbeafe;color:#1d4ed8}
+  nav .home{color:#ea580c;border:1px solid #fb923c;font-weight:800}
+  nav .brand{font-weight:800;font-size:12.5px;margin:0 8px;color:#0f172a}
+  .container{max-width:1100px;margin:0 auto;padding:24px 20px 56px}
+  section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 26px;margin-bottom:18px;box-shadow:0 1px 3px rgba(15,23,42,.04);scroll-margin-top:54px}
+  h1{font-size:22px;line-height:1.4;margin-bottom:8px}
+  h2{font-size:18px;margin-bottom:16px}
+  h3{font-size:15px;margin:20px 0 8px;color:#1e293b}
+  h4{font-size:13.5px;margin:16px 0 6px}
+  p,li,td,th{font-size:14px;color:#334155}
+  p{margin-bottom:8px}
+  ul,ol{margin:6px 0 12px 22px}
+  li{margin-bottom:4px}
+  code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 5px;font-size:12.5px;font-family:Consolas,monospace}
+  table{width:100%;border-collapse:collapse;margin:10px 0 14px;font-size:13.5px}
+  th{background:#f1f5f9;text-align:left;padding:8px 11px;border:1px solid #e2e8f0;font-weight:700}
+  td{padding:7px 11px;border:1px solid #e2e8f0;vertical-align:top}
+  tr:nth-child(even) td{background:#fafbfc}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;margin:3px 5px 3px 0;background:#dbeafe;color:#1d4ed8}
+  .tag.g{background:#d1fae5;color:#047857}.tag.a{background:#fef3c7;color:#92400e}
+  .tag.r{background:#ffe4e6;color:#be123c}.tag.p{background:#ede9fe;color:#6d28d9}
+  .tag.c{background:#cffafe;color:#0f766e}.tag.n{background:#f1f5f9;color:#475569}
+  .callout{border-left:4px solid var(--blue);background:#eff6ff;border-radius:0 8px 8px 0;padding:13px 17px;margin:11px 0;font-size:13.5px;color:#1e3a5f}
+  .callout.tip{border-color:var(--green);background:#ecfdf5;color:#064e3b}
+  .callout.warn{border-color:var(--amber);background:#fffbeb;color:#78350f}
+  .callout.danger{border-color:var(--rose);background:#fff1f2;color:#7f1d1d}
+  .callout.idea{border-color:var(--violet);background:#f5f3ff;color:#3b1f7e}
+  .callout b{color:#0f172a}
+  .callout .ct{display:block;font-weight:800;font-size:12.5px;margin-bottom:4px}
+  .formula{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin:11px 0;overflow-x:auto}
+  .formula .eq{display:inline-block;font-size:11.5px;font-weight:800;color:#1d4ed8;background:#dbeafe;padding:2px 8px;border-radius:4px;margin-bottom:6px}
+  .formula .note{margin-top:9px;padding-top:9px;border-top:1px dashed #e2e8f0;font-size:12.5px;color:#64748b;line-height:1.65}
+  mjx-container[display="true"]{font-size:112%!important;margin:8px 0!important}
+  .mermaid-box{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:11px 0;overflow-x:auto;text-align:center}
+  .fig{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin:14px 0}
+  .fig .cap{font-size:12px;color:#64748b;margin-top:8px}
+  .fig img{display:block;width:100%;height:auto;border:1px solid #e2e8f0;border-radius:6px;background:#fff}
+  .series{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+  .series .t{font-size:12px;font-weight:800;margin-bottom:7px}
+  .series a{display:inline-block;font-size:11.5px;font-weight:700;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:3px 8px;margin:2px 4px 2px 0;text-decoration:none}
+  .series a:hover,.series a.on{color:#1d4ed8;background:#dbeafe;border-color:#bfdbfe}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
+  .lead{color:var(--muted);font-size:13px;margin-bottom:14px}
+</style>
+<link rel="stylesheet" href="../../../../assets/site-ui.css">
+<script src="../../../../assets/site-ui.js" defer></script>
+</head>
+<body>
+
+<nav>
+  <a class="home" href="../../index.html">🏠 HOME</a>
+  <span class="brand">Guanzheng Wang · 6203</span>
+  <a href="#info">1. 论文信息</a>
+  <a href="#insight">2. 核心洞察</a>
+  <a href="#architecture">3. 系统架构</a>
+  <a href="#task">4. 任务定义</a>
+  <a href="#challenge">5. 挑战分析</a>
+  <a href="#method">6. 方法公式</a>
+  <a href="#principles">7. 仿真器专题</a>
+  <a href="#figures">8. 图表解读</a>
+  <a href="#flaw">9. 不足扩展</a>
+  <a href="#motivation">10. 动机推导</a>
+  <a href="#takeaway">11. 关键启示</a>
+</nav>
+
+<div class="container">
+
+<div class="series">
+  <div class="t">📖 Guanzheng Wang · 6 篇笔记阅读顺序</div>
+  <a href="../6206/index.html">6206 硕士论文（2021）</a>
+  <a class="on" href="../6203/index.html">6203 事件相机 CICAI（2022）</a>
+  <a href="../6205/index.html">6205 仿射编队 AST（2025）</a>
+  <a href="../6204/index.html">6204 空中拦截 AIHCIR（2025）</a>
+  <a href="../6202/index.html">6202 UDR 避碰 US（2026）</a>
+  <a href="../6201/index.html">6201 时间最优 JAI（2026）</a>
+  <a href="../../sim-stack.html">🛠 仿真器选择图谱</a>
+  <a href="../../index.html">Index</a>
+</div>
+
+<!-- ══════════ 1 ══════════ -->
+<section id="info">
+  <h1>Event-Based Obstacle Sensing and Avoidance for an UAV Through Deep Reinforcement Learning</h1>
+  <p class="lead">事件相机 + 变分自编码器 + PPO：直接处理"事件流"而非"事件帧"的高速感知规避</p>
+  <table>
+    <tr><td style="width:96px"><strong>作者</strong></td><td><strong>Xinyu Hu</strong>（胡新宇，第一作者）、<strong>Zhihong Liu</strong>（刘志宏，通讯）、<strong>Xiangke Wang</strong>（王祥科）、<strong>Lingjie Yang</strong>（杨凌杰）、<strong>Guanzheng Wang</strong>（王冠政，第五作者）</td></tr>
+    <tr><td><strong>单位</strong></td><td>国防科技大学（National University of Defense Technology, Changsha）</td></tr>
+    <tr><td><strong>会议</strong></td><td>CICAI 2022（第二届中国人工智能学会国际会议），Springer LNAI 13606, pp. 402–413；DOI: 10.1007/978-3-031-20503-3_32（全文收录于本地 <code>978-3-031-20503-3.pdf</code> 论文集第 402–413 页）</td></tr>
+    <tr><td><strong>一句话</strong></td><td>事件相机能以微秒级响应亮度变化，天生适合高速避障；但事件流是<b>稀疏、异步、长度不定</b>的，不能像图像那样直接喂 CNN。本文用<b>事件上下文编码网络（ECEN，含 VAE）</b>把任意长度的事件流压成 1024 维潜向量，再交给 PPO 输出连续速度指令；数据在 <b>AirSim + Unreal Engine 4</b> 里用 RRT* 自动采集，最终在 AirSim 中做到实时避障，成功率优于离散动作的基线。</td></tr>
+  </table>
+  <div style="margin-top:9px">
+    <span class="tag">Event Camera</span>
+    <span class="tag p">VAE / ECEN</span>
+    <span class="tag g">PPO（连续动作）</span>
+    <span class="tag c">AirSim + UE4</span>
+    <span class="tag a">event-sim 插件</span>
+    <span class="tag n">RRT* 数据采集</span>
+  </div>
+</section>
+
+<!-- ══════════ 2 ══════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <div class="callout idea">
+    <span class="ct">🎯 核心洞察：不要"攒帧"，要"读流"</span>
+    绝大多数事件相机 + 学习的做法是把事件累积成"事件帧"（event frame），再当普通图像处理。但这等于<b>把事件相机最宝贵的两个特性扔掉了</b>：微秒级时间分辨率（被帧率重新量化）与稀疏性（被稠密化）。本文坚持<b>对每一个事件直接运算</b>，用 PointNet/EventNet 式的点集特征 + Transformer 时间聚合 + VAE 降维，得到与事件流长度无关的固定维潜向量。好处是<b>可以适应任意控制频率</b>——事件来得快就多算，来得慢就少算，而不是被固定帧率卡死。
+  </div>
+  <div class="callout tip">
+    <span class="ct">第二层洞察：把"感知"与"决策"分成两段训练，各自用最合适的工具</span>
+    感知段（ECEN）用<b>自监督</b>：VAE 的 decoder 要重建事件图，encoder 因此必须保留几何信息——不需要人工标注。决策段用<b>PPO</b>：固定 ECEN 权重，只训 actor-critic。这样 RL 的样本效率问题被隔离在一个低维潜空间里，而不是让 RL 直接啃原始事件流。
+  </div>
+
+  <h3>2.1 创新点拆解</h3>
+  <table>
+    <tr><th>创新点</th><th>做法</th><th>解决什么</th></tr>
+    <tr><td><strong>① 直接处理事件流</strong></td><td>输入单个事件序列（长度可变），而非累积帧；时间维度用 Transformer 聚合</td><td>保留微秒级时间分辨率与稀疏性；可适应变控制频率</td></tr>
+    <tr><td><strong>② ECEN（事件上下文编码网络）</strong></td><td>三组 dense 层 → 1024 维时空特征 → 两层卷积 → 潜向量；decoder 用三层卷积重建事件图</td><td>把任意长度事件流压成定长、平滑、连续的表示，作为 RL 的观测</td></tr>
+    <tr><td><strong>③ 连续动作空间 PPO</strong></td><td>输出 $[v_x,v_y]$ 二维连续速度，替代基线的离散动作</td><td>离散动作无法平滑调整，高速场景下抖动大；连续动作显著提升平均奖励（50 → 190）</td></tr>
+    <tr><td><strong>④ 全流程在 AirSim 中自采集</strong></td><td>用 RRT* 控制无人机在仿真走廊中飞 100 次，采集 100 条事件流；AirSim 的 <code>event-sim</code> 由两张连续 RGB 图算事件</td><td>免去真实事件相机的昂贵采集；同时保留 UE4 的光照/材质真实性</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 3 ══════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 感知—决策两段式管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph SIM["AirSim + Unreal Engine 4"]
+      SCENE["长走廊场景 >100 m<br/>密集障碍"]
+      RGB["RGB 相机<br/>连续两帧 → 事件"]
+      EV["event-sim（Python）<br/>ΔL ≥ C 生成事件<br/>64×64 · TOL=0.1"]
+    end
+    subgraph PER["感知段 · 自监督（ECEN）"]
+      P1["事件流 E_τ = {e_k}"]
+      P2["dense×3 → 1024 维时空特征"]
+      P3["Transformer 时间聚合"]
+      P4["Conv×2 → 潜向量 z"]
+      P5["decoder: Conv×3 重建事件图"]
+    end
+    subgraph POL["决策段 · PPO"]
+      S["观测 = z(t), z(t−1), z(t−2)"]
+      A["actor-critic MLP"]
+      OUT["a = [vx, vy] 连续"]
+    end
+    SCENE --> RGB --> EV --> P1 --> P2 --> P3 --> P4
+    P4 --> S --> A --> OUT
+    P4 -.->|"重建损失"| P5
+    OUT -->|"速度指令"| SCENE
+    classDef s fill:#fef7ed,stroke:#f59e0b,color:#92400e
+    classDef p fill:#f5f3ff,stroke:#8b5cf6,color:#6d28d9
+    classDef d fill:#ecfdf5,stroke:#10b981,color:#047857
+    class SCENE,RGB,EV s
+    class P1,P2,P3,P4,P5 p
+    class S,A,OUT d
+    </pre>
+  </div>
+
+  <h3>3.2 数据采集与训练流程</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    R["RRT* 规划安全路径"] --> F["无人机沿路径飞行<br/>（AirSim）"]
+    F --> E["采集事件流<br/>100 次飞行 → 100 条流"]
+    E --> T1["训练 ECEN（自监督 VAE）"]
+    T1 --> FIX["冻结 encoder 权重"]
+    FIX --> T2["PPO 训练 actor-critic<br/>500 episodes"]
+    T2 --> V["验证：不同长度事件流<br/>（1000–4000 事件）实时性"]
+    classDef a fill:#e8f0fe,stroke:#3b82f6,color:#1d4ed8
+    classDef b fill:#ecfdf5,stroke:#10b981,color:#047857
+    class R,F,E a
+    class T1,FIX,T2,V b
+    </pre>
+  </div>
+</section>
+
+<!-- ══════════ 4 ══════════ -->
+<section id="task">
+  <h2>4. 任务定义</h2>
+  <div class="formula">
+    <span class="eq">事件生成模型（DVS 原理）</span>
+    $$ L(x,y,t)-L(x,y,t-\Delta t)\ \ge\ p\,C \;\Longrightarrow\; \text{在该像素生成事件 } e_k=(x_k,y_k,t_k,p_k) $$
+    $$ E_\tau=\{e_k\}_{k=1}^{N}=\{(x_k,y_k,t_k,p_k)\}_{k=1}^{N} $$
+    <div class="note">
+      <strong>$L$</strong> = 对数亮度&nbsp;|&nbsp;<strong>$C$</strong> = 阈值（本文 <code>TOL=0.1</code>）&nbsp;|&nbsp;<strong>$p\in\{-1,1\}$</strong> = 极性（亮度变亮/变暗）&nbsp;|&nbsp;
+      <strong>$E_\tau$</strong> = 一段事件流，长度 $N$ 可变——这正是后续网络必须"与长度无关"的原因。
+    </div>
+  </div>
+  <table>
+    <tr><th>要素</th><th>内容</th></tr>
+    <tr><td><strong>输入</strong></td><td>连续三帧潜向量 $z_t,z_{t-1},z_{t-2}$（每帧来自一段事件流的编码）</td></tr>
+    <tr><td><strong>输出</strong></td><td>$[v_x,v_y]$ 二维连续速度指令</td></tr>
+    <tr><td><strong>奖励</strong></td><td>$r=r_g+r_c$：$r_g$ 为到达奖励（距离 &lt; 1 m 得 $r_{arrival}$，否则按距离减少量给 $k_d$）；$r_c$ 为碰撞惩罚——<b>碰撞状态由 AirSim 的回调直接给出</b>（原文："it depends on the callback from Airsim"）</td></tr>
+    <tr><td><strong>场景</strong></td><td>边长 &gt;100 m 的长走廊，密集障碍；起点/终点区域明确；目标区域到达即成功</td></tr>
+    <tr><td><strong>对照</strong></td><td>discrete baseline（同代码同超参的离散动作版）、discrete proposed（改奖励）、continuous proposed（改连续动作 + 新奖励）</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 5 ══════════ -->
+<section id="challenge">
+  <h2>5. 挑战分析</h2>
+  <div class="callout warn">
+    <span class="ct">为什么"事件相机 + RL"比"RGB + RL"难</span>
+    <b>① 数据结构不规整。</b>事件流是 $(x,y,t,p)$ 的四元组集合，长度随场景动态变化（1000～4000 个事件），没有"图像"的网格结构，标准 CNN 用不上。<br>
+    <b>② 稀疏性悖论。</b>攒成帧能稠密化，但会丢掉微秒级时序；不攒帧则输入维度不定，且大部分像素为空。<br>
+    <b>③ 仿真支持差。</b>主流仿真器（Gazebo/Stage）<b>没有事件相机模型</b>；必须靠"渲染两张连续 RGB → 差分生成事件"的近似（AirSim 的 <code>event-sim</code>），这要求渲染器足够真实。<br>
+    <b>④ 奖励稀疏 + 高速。</b>高速飞行下回合短、碰撞惩罚强，探索极难；本文靠"接近增量"奖励和 500 回合预算才训起来。
+  </div>
+  <h3>5.1 为什么必须用 AirSim / Unreal，而不能用 Stage 或 Gazebo</h3>
+  <div class="callout danger">
+    <span class="ct">这是全篇最关键的仿真器论点</span>
+    <b>事件相机测量的是"亮度变化"，因此它需要<u>真实的光照与材质</u>。</b>Stage 是 2D 栅格（无光照），Gazebo 的 OGRE 渲染在材质与光照真实性上远不及 UE4——用它们生成的"事件"会与真实事件相机的统计特性相差极大。<br><br>
+    换句话说：<b>仿真器的选择由传感器模态决定。</b>做 LiDAR 避障时（6202/6205）用 Stage 最划算，因为 LiDAR 只关心几何；做事件相机时，几何够用但<b>光度不够</b>，必须上 UE4。这条判据可以直接迁移到任何"传感器驱动的仿真器选型"。
+  </div>
+</section>
+
+<!-- ══════════ 6 ══════════ -->
+<section id="method">
+  <h2>6. 方法与核心公式</h2>
+
+  <h3>6.1 ECEN：把变长事件流压成定长潜向量</h3>
+  <div class="formula">
+    <span class="eq">编码—解码（VAE 结构）</span>
+    $$ z=\mathrm{Enc}_\phi(E_\tau),\qquad \hat E=\mathrm{Dec}_\psi(z),\qquad
+    \mathcal{L}_{\text{VAE}}=\mathbb{E}\big[\lVert \hat E-E_\tau\rVert^2\big]+\beta\,\mathrm{KL}\big(q_\phi(z\mid E_\tau)\,\Vert\,p(z)\big) $$
+    <div class="note">
+      <strong>$E_\tau$</strong> 长度可变（1000–4000 事件）&nbsp;|&nbsp;<strong>$z$</strong> 定长潜向量，作为 RL 的观测&nbsp;|&nbsp;
+      <strong>$\mathrm{KL}$ 项</strong>让潜空间平滑连续——这对 RL 很关键：相邻时刻的观测不会突变，策略学起来稳定&nbsp;|&nbsp;
+      <strong>重建项</strong>提供自监督信号，不需要人工标注"哪里是障碍"。
+    </div>
+  </div>
+
+  <h3>6.2 PPO 目标（含 KL 自适应惩罚）</h3>
+  <div class="formula">
+    <span class="eq">Algorithm 1 的核心式</span>
+    $$ J^{PPO}(\theta)=J^{\theta_k}(\theta)-\beta\,\mathrm{KL}(\theta,\theta_k),\qquad
+    J^{\theta_k}(\theta)\approx\sum_{(s_t,a_t)}\mathrm{ratio}\cdot A^{\theta_k}(a_t,s_t) $$
+    $$ \mathrm{ratio}=\frac{p_\theta(a_t\mid s_t)}{p_{\theta_k}(a_t\mid s_t)}\ \text{并裁剪到}\ [1-\epsilon,\,1+\epsilon] $$
+    <div class="note">
+      <strong>$\beta$</strong> 随实际 KL 自适应调整（"adaptive penalty coefficient on KL divergence"）；<strong>$\epsilon$</strong> = clip range。
+      算法流程：交互采 $\{s_t,a_t,r_t\}$ → 算优势 → 每 $n_{step}$ 步做 $n_{epoch}$ 轮更新 → 若 KL 超 target 则提前 break。
+    </div>
+  </div>
+
+  <h3>6.3 AirSim 事件相机参数（Table 1）</h3>
+  <table>
+    <tr><th>参数</th><th>取值</th><th>含义</th></tr>
+    <tr><td>Resolution</td><td><b>64 × 64</b></td><td>极低分辨率——因为事件本身就是稀疏点集，高分辨率只会增加计算量</td></tr>
+    <tr><td>TOL（阈值 $C$）</td><td><b>0.1</b></td><td>对数亮度变化超过 0.1 才触发事件；越小事件越密</td></tr>
+    <tr><td>$N_{max}$</td><td>单像素最大事件数</td><td>防止单个像素刷爆事件数</td></tr>
+    <tr><td>$N_e(u)$</td><td>$\min\big(N_{max},\ \Delta L(u)/TOL\big)$</td><td>像素 $u$ 处的事件总数</td></tr>
+    <tr><td>时间戳</td><td>$t=t_{prev}+N_e(u)\Delta T$</td><td>由事件数反推时间——<b>这正是"异步"的体现</b></td></tr>
+  </table>
+  <table>
+    <tr><th>训练配置</th><th>取值</th></tr>
+    <tr><td>数据量</td><td>100 次飞行 → 100 条事件流（用 RRT* 保证飞行安全）</td></tr>
+    <tr><td>策略训练</td><td>PPO（Stable-Baselines3），500 episodes，三组对照同超参</td></tr>
+    <tr><td>硬件</td><td>Intel i9-12900K + NVIDIA RTX 3090</td></tr>
+    <tr><td>结果（平均回合奖励）</td><td>discrete baseline ≈<b>50</b> → discrete proposed ≈<b>135</b> → continuous proposed ≈<b>190</b></td></tr>
+    <tr><td>开源</td><td>代码与数据集：<code>gitcode.net/weixin_40807529/event-based_nav_saa</code></td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 7 ══════════ -->
+<section id="principles">
+  <h2>7. 仿真器专题——AirSim + UE4：为什么要"贵"的那一个</h2>
+  <p class="lead">这是六篇里<b>唯一必须用高保真渲染</b>的工作，也是他仿真器谱系里最"反直觉"的一个选择——因为在 6201/6205 里，渲染恰恰是被关掉的。</p>
+
+  <h3>7.1 为什么选 AirSim</h3>
+  <table>
+    <tr><th>理由</th><th>具体</th></tr>
+    <tr><td><strong>事件相机需要光度真实</strong></td><td>事件是亮度变化的函数。UE4 的 PBR 材质、全局光照、动态阴影，让"两张连续 RGB 的差分"接近真实事件相机的输出分布。这是 Gazebo/Stage 给不了的。</td></tr>
+    <tr><td><strong>有现成的事件相机插件</strong></td><td>AirSim 用 Python 从两张连续 RGB 计算事件，封装为 <code>event-sim</code> 扩展包，分辨率与 TOL 可调——不用自己写传感器模型。</td></tr>
+    <tr><td><strong>碰撞检测可直接调用</strong></td><td>奖励里的 $r_c$ 直接来自 AirSim 的碰撞状态回调（原文："depends on the callback from Airsim"），免去自己写碰撞查询。</td></tr>
+    <tr><td><strong>场景可编辑</strong></td><td>长走廊 + 密集障碍的 scene 在 UE 编辑器里搭，比 Gazebo 的 SDF 拼装直观得多。</td></tr>
+    <tr><td><strong>Python API 友好</strong></td><td>与 SB3/RL 循环的胶水成本低。</td></tr>
+  </table>
+
+  <h3>7.2 好在哪</h3>
+  <ul>
+    <li><b>传感器真实性最高</b>：对"感知型"研究（事件相机、视觉、深度），渲染真实性直接决定结论能否外推。</li>
+    <li><b>端到端闭环</b>：采集 → 训练 → 验证都在同一个 AirSim 世界，无需跨仿真器迁移（对比 6202 的双栈）。</li>
+    <li><b>可复现的开源栈</b>：AirSim（已归档但代码可得）+ event-sim + SB3，论文还给了代码与数据集地址。</li>
+  </ul>
+
+  <h3>7.3 有什么问题</h3>
+  <div class="callout danger">
+    <span class="ct">最根本的一条：训练与验证在同一个仿真器、甚至同一个场景里</span>
+    论文的验证实验"使用的仿真设置（硬件、初始化、参数）与训练环境完全相同"——这意味着<b>测的是拟合能力，不是泛化能力</b>。对事件相机这种"仿真到现实落差极大"的传感器，这恰恰是最需要检验的地方。
+  </div>
+  <table>
+    <tr><th>问题</th><th>说明</th><th>影响</th></tr>
+    <tr><td><strong>① 无 sim-to-real</strong></td><td>全部实验在 AirSim 内；没有真实事件相机数据，也没有真实事件相机在环测试</td><td>★★★★★ 事件相机的仿真-现实差距（噪声、阈值漂移、 refractory period）是公认最大的，论文完全未触及</td></tr>
+    <tr><td><strong>② 事件模型是近似的</strong></td><td>用"两张连续 RGB 差分"生成事件，本质是<b>帧率采样的近似</b>，丢掉了真实 DVS 的异步性与微秒精度</td><td>★★★★ 那么"直接处理事件流"的主张在仿真里其实并未真正被检验——仿真事件仍来自帧</td></tr>
+    <tr><td><strong>③ 训练/验证同场景</strong></td><td>同一走廊、同一初始化</td><td>★★★★ 无法排除过拟合</td></tr>
+    <tr><td><strong>④ 2D 动作 + 定高</strong></td><td>动作只有 $[v_x,v_y]$，无高度控制</td><td>★★★ 事件相机的价值在高速机动，而定高飞行限制了这个价值</td></tr>
+    <tr><td><strong>⑤ 数据量小</strong></td><td>100 条事件流；ECEN 的训练数据规模有限</td><td>★★★ 潜空间的泛化性受限，换场景很可能失效</td></tr>
+  </table>
+  <div class="callout warn">
+    <span class="ct">一句话总结</span>
+    <b>用"贵"的 AirSim + UE4 换传感器的光度真实性，用"帧差分"近似换实现成本，用"同场景验证"换干净的对照。</b>代价是——这篇论文证明了"方法可行"，但没有证明"方法在真实事件相机上可行"。
+  </div>
+</section>
+
+<!-- ══════════ 8 ══════════ -->
+<section id="figures">
+  <h2>8. 图表解读</h2>
+  <div class="fig">
+    <img src="figures/overview.png" alt="CICAI 2022 p.405 — Fig.1 任务设置（设备与 AirSim 场景）">
+    <div class="cap">本地论文集 PDF 第 415 页（章节页 405）直接渲染：<b>Fig. 1 "Task setting of SAA"</b>——左侧为设备（四旋翼 + 事件相机），右侧为 AirSim/UE4 中的长走廊任务场景（起点区、终点区、密集障碍，红色虚线为期望路径）。这一张图说明了"事件相机装在什么平台上、在什么世界里学"。图片来自本地 PDF，无外部素材。</div>
+  </div>
+  <h3>8.1 三组对照的读法</h3>
+  <table>
+    <tr><th>方法</th><th>改了什么</th><th>平均回合奖励</th><th>说明</th></tr>
+    <tr><td>discrete baseline</td><td>原始方法（离散动作 + 原奖励）</td><td>≈50</td><td>论文称"only 25 percent of the desired one"</td></tr>
+    <tr><td>discrete proposed</td><td>只改奖励（Eq.3）</td><td>≈135</td><td>奖励整形贡献 +85</td></tr>
+    <tr><td>continuous proposed</td><td>再改连续动作空间</td><td>≈190</td><td>动作空间贡献 +55</td></tr>
+  </table>
+  <div class="callout">
+    <span class="ct">这张"阶梯"说明了两件事</span>
+    （1）<b>奖励整形是性价比最高的一步</b>（+85），动作空间是第二步（+55）——顺序也符合"先定义对的目标，再扩大动作自由度"的常识。<br>
+    （2）但注意：<b>三组都用了同一份 ECEN</b>。所以这个对比只证明了"决策层"的改进，没有证明"事件流编码"本身的价值——缺一个"直接用事件帧 + CNN"的对照。这是本文实验设计最大的缺口。
+  </div>
+</section>
+
+<!-- ══════════ 9 ══════════ -->
+<section id="flaw">
+  <h2>9. 不足与扩展方向</h2>
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><b>缺"事件流 vs 事件帧"的关键对照</b>：全文最核心的主张（直接处理流优于攒帧）没有被直接实验验证。</li>
+    <li><b>同场景训练与测试</b>：没有跨场景泛化实验（不同走廊宽度、不同障碍密度、不同光照）。</li>
+    <li><b>无真实事件相机</b>：没有 DAVIS/DVS 实测数据，无法评估仿真事件的真实性。</li>
+    <li><b>动作空间只有平面速度</b>：没有姿态/高度，无法体现事件相机在高速机动中的优势。</li>
+  </ul>
+  <h3>9.2 值得深挖的方向</h3>
+  <ol>
+    <li><b>补一个"帧 vs 流"的消融</b>：同一 ECEN 容量下，输入换成事件帧 + 同等参数量的 CNN，比较成功率与延迟——这是能把论文从"可行"提升到"有说服力"的最小改动。</li>
+    <li><b>事件仿真器的真实性校准</b>：用真实 DVS 数据（如 RPG 的 event camera dataset）标定 TOL、噪声率、refractory period，再回头看策略是否还成立。</li>
+    <li><b>把"流"的优势用在控制频率上</b>：论文提到"可适应变控制频率"，但没有做实验。设计一个"控制频率 100 Hz vs 1 kHz"的对照，才能证明这个特性有价值。</li>
+    <li><b>与 6201 的"渲染可关"结合</b>：训练前期关渲染用廉价几何仿真学"往哪飞"，后期开渲染学"事件长什么样"——两阶段能省下大量 UE 渲染时间。</li>
+  </ol>
+</section>
+
+<!-- ══════════ 10 ══════════ -->
+<section id="motivation">
+  <h2>10. 动机推导</h2>
+  <div class="callout idea">
+    <span class="ct">一句话动机</span>
+    想让无人机在高速下避障，传统相机 30–60 Hz 的采样太慢、动态范围太窄；事件相机快得多，但它的输出<b>不是图像</b>——所以要么改造数据（攒帧，丢掉优势），要么改造网络（直接读流，保住优势）。本文选了后者。
+  </div>
+  <h3>10.1 推导链</h3>
+  <ol>
+    <li><b>痛点</b>：高速飞行 → 需要高时间分辨率感知 → 传统帧相机的运动模糊与低动态范围成为瓶颈。</li>
+    <li><b>工具</b>：事件相机（DVS）微秒级响应、高动态范围、低功耗——天生适合高速避障。</li>
+    <li><b>障碍</b>：事件流是变长稀疏点集，CNN 无法直接用；攒成帧又会把时间分辨率退回到帧率。</li>
+    <li><b>解法</b>：用"点集编码（dense/PointNet 思路）+ Transformer 时间聚合 + VAE 降维"得到定长潜向量，让下游 RL 只面对低维连续观测。</li>
+    <li><b>验证</b>：在 AirSim（唯一能提供真实光度的开源仿真器）里用 RRT* 采数据、PPO 训策略，逐级消融"奖励 → 动作空间"。</li>
+  </ol>
+</section>
+
+<!-- ══════════ 11 ══════════ -->
+<section id="takeaway">
+  <h2>11. 关键启示</h2>
+  <h3>11.1 方法论</h3>
+  <ul>
+    <li><b>仿真器选型的第一问是"传感器需要什么"</b>：几何 → Stage/Gazebo 足够；光度 → 必须 UE/AirSim。这条判据比"哪个仿真器更先进"有用得多。</li>
+    <li><b>感知与决策分开训</b>：自监督学表示、RL 学策略。这样 RL 的样本效率问题被限制在低维潜空间里。</li>
+    <li><b>消融要有"阶梯"</b>：奖励 → 动作空间逐级加，每一步的增益都可见（+85 / +55）。</li>
+  </ul>
+  <h3>11.2 可直接迁移</h3>
+  <ul>
+    <li><b>变长观测的编码</b>：VAE + KL 正则让潜空间平滑，这个技巧对任何"异步/变长传感器"（事件、雷达点云、异步 IMU）都适用。</li>
+    <li><b>用 RRT* 做数据采集</b>：比随机飞更高效，且保证样本覆盖安全飞行区域——采集阶段的"专家"不必是最终策略。</li>
+    <li><b>碰撞回调当奖励</b>：仿真器自带的碰撞检测是最可靠的稀疏信号源，比自算几何更快更稳。</li>
+  </ul>
+  <h3>11.3 在他仿真器谱系中的位置</h3>
+  <table>
+    <tr><th>维度</th><th>本篇（2022）</th><th>对比</th></tr>
+    <tr><td>传感器</td><td>事件相机（需要光度真实）</td><td>6202/6205 用 LiDAR（只需几何真实）</td></tr>
+    <tr><td>渲染</td><td><b>必须开</b>（UE4）</td><td>6201 训练时<b>关渲染</b>以加速</td></tr>
+    <tr><td>仿真器</td><td>AirSim（物理 + 渲染一体）</td><td>6201 把物理（JSBSim）与渲染（UE）拆开</td></tr>
+    <tr><td>验证策略</td><td>同仿真器同场景</td><td>6202 跨仿真器（Stage→Gazebo）</td></tr>
+  </table>
+  <p class="lead">这四条差异恰好说明了同一作者在不同任务下的<b>仿真器决策逻辑：由传感器决定保真度需求，由训练预算决定并行方式，由可信度需求决定要不要第二套仿真器。</b></p>
+</section>
+
+<footer>
+  Paper Notes · Guanzheng Wang · 6203 · CICAI 2022, LNAI 13606, pp. 402–413 · DOI 10.1007/978-3-031-20503-3_32 · 依据本地论文集 PDF 整理
+</footer>
+</div>
+</body>
+</html>

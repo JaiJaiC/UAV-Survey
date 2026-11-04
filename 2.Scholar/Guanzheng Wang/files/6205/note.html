@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flexible multi-UAV formation control via DRL + affine transformations (AST 2025) — Guanzheng Wang Notes</title>
+<script>
+MathJax = { tex:{inlineMath:[['$','$']],displayMath:[['$$','$$']],tags:'ams'}, options:{enableMenu:false} };
+</script>
+<script src="../../../../assets/vendor/mathjax-tex-svg-full.js" async></script>
+<script src="../../../../assets/vendor/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'neutral',securityLevel:'loose',flowchart:{useMaxWidth:false,htmlLabels:true,nodeSpacing:44,rankSpacing:60,padding:10}});</script>
+<style>
+  :root{
+    --bg:#f6f8fb;--surface:#fff;--line:#dfe5ee;--ink:#172033;--muted:#64748b;
+    --blue:#2563eb;--green:#059669;--amber:#d97706;--rose:#e11d48;--violet:#7c3aed;--cyan:#0891b2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",Roboto,Arial,sans-serif;line-height:1.72}
+  nav{position:sticky;top:0;z-index:90;display:flex;gap:4px;align-items:center;flex-wrap:wrap;padding:9px 20px;background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+  nav a{font-size:12px;font-weight:600;color:#475569;text-decoration:none;padding:4px 8px;border-radius:5px}
+  nav a:hover{background:#dbeafe;color:#1d4ed8}
+  nav .home{color:#ea580c;border:1px solid #fb923c;font-weight:800}
+  nav .brand{font-weight:800;font-size:12.5px;margin:0 8px;color:#0f172a}
+  .container{max-width:1100px;margin:0 auto;padding:24px 20px 56px}
+  section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 26px;margin-bottom:18px;box-shadow:0 1px 3px rgba(15,23,42,.04);scroll-margin-top:54px}
+  h1{font-size:22px;line-height:1.4;margin-bottom:8px}
+  h2{font-size:18px;margin-bottom:16px}
+  h3{font-size:15px;margin:20px 0 8px;color:#1e293b}
+  h4{font-size:13.5px;margin:16px 0 6px}
+  p,li,td,th{font-size:14px;color:#334155}
+  p{margin-bottom:8px}
+  ul,ol{margin:6px 0 12px 22px}
+  li{margin-bottom:4px}
+  code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 5px;font-size:12.5px;font-family:Consolas,monospace}
+  table{width:100%;border-collapse:collapse;margin:10px 0 14px;font-size:13.5px}
+  th{background:#f1f5f9;text-align:left;padding:8px 11px;border:1px solid #e2e8f0;font-weight:700}
+  td{padding:7px 11px;border:1px solid #e2e8f0;vertical-align:top}
+  tr:nth-child(even) td{background:#fafbfc}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;margin:3px 5px 3px 0;background:#dbeafe;color:#1d4ed8}
+  .tag.g{background:#d1fae5;color:#047857}.tag.a{background:#fef3c7;color:#92400e}
+  .tag.r{background:#ffe4e6;color:#be123c}.tag.p{background:#ede9fe;color:#6d28d9}
+  .tag.c{background:#cffafe;color:#0f766e}.tag.n{background:#f1f5f9;color:#475569}
+  .callout{border-left:4px solid var(--blue);background:#eff6ff;border-radius:0 8px 8px 0;padding:13px 17px;margin:11px 0;font-size:13.5px;color:#1e3a5f}
+  .callout.tip{border-color:var(--green);background:#ecfdf5;color:#064e3b}
+  .callout.warn{border-color:var(--amber);background:#fffbeb;color:#78350f}
+  .callout.danger{border-color:var(--rose);background:#fff1f2;color:#7f1d1d}
+  .callout.idea{border-color:var(--violet);background:#f5f3ff;color:#3b1f7e}
+  .callout b{color:#0f172a}
+  .callout .ct{display:block;font-weight:800;font-size:12.5px;margin-bottom:4px}
+  .formula{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin:11px 0;overflow-x:auto}
+  .formula .eq{display:inline-block;font-size:11.5px;font-weight:800;color:#1d4ed8;background:#dbeafe;padding:2px 8px;border-radius:4px;margin-bottom:6px}
+  .formula .note{margin-top:9px;padding-top:9px;border-top:1px dashed #e2e8f0;font-size:12.5px;color:#64748b;line-height:1.65}
+  mjx-container[display="true"]{font-size:112%!important;margin:8px 0!important}
+  .mermaid-box{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:11px 0;overflow-x:auto;text-align:center}
+  .fig{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin:14px 0}
+  .fig .cap{font-size:12px;color:#64748b;margin-top:8px}
+  .fig img{display:block;width:100%;height:auto;border:1px solid #e2e8f0;border-radius:6px;background:#fff}
+  .series{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+  .series .t{font-size:12px;font-weight:800;margin-bottom:7px}
+  .series a{display:inline-block;font-size:11.5px;font-weight:700;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:3px 8px;margin:2px 4px 2px 0;text-decoration:none}
+  .series a:hover,.series a.on{color:#1d4ed8;background:#dbeafe;border-color:#bfdbfe}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
+  .lead{color:var(--muted);font-size:13px;margin-bottom:14px}
+</style>
+<link rel="stylesheet" href="../../../../assets/site-ui.css">
+<script src="../../../../assets/site-ui.js" defer></script>
+</head>
+<body>
+
+<nav>
+  <a class="home" href="../../index.html">🏠 HOME</a>
+  <span class="brand">Guanzheng Wang · 6205</span>
+  <a href="#info">1. 论文信息</a>
+  <a href="#insight">2. 核心洞察</a>
+  <a href="#architecture">3. 系统架构</a>
+  <a href="#task">4. 任务定义</a>
+  <a href="#challenge">5. 挑战分析</a>
+  <a href="#method">6. 方法公式</a>
+  <a href="#principles">7. 仿真器专题</a>
+  <a href="#figures">8. 图表解读</a>
+  <a href="#flaw">9. 不足扩展</a>
+  <a href="#motivation">10. 动机推导</a>
+  <a href="#takeaway">11. 关键启示</a>
+</nav>
+
+<div class="container">
+
+<div class="series">
+  <div class="t">📖 Guanzheng Wang · 6 篇笔记阅读顺序</div>
+  <a href="../6206/index.html">6206 硕士论文（2021）</a>
+  <a href="../6203/index.html">6203 事件相机 CICAI（2022）</a>
+  <a class="on" href="../6205/index.html">6205 仿射编队 AST（2025）</a>
+  <a href="../6204/index.html">6204 空中拦截 AIHCIR（2025）</a>
+  <a href="../6202/index.html">6202 UDR 避碰 US（2026）</a>
+  <a href="../6201/index.html">6201 时间最优 JAI（2026）</a>
+  <a href="../../sim-stack.html">🛠 仿真器选择图谱</a>
+  <a href="../../index.html">Index</a>
+</div>
+
+<!-- ══════════ 1 ══════════ -->
+<section id="info">
+  <h1>Flexible multi-UAV formation control via integrating deep reinforcement learning and affine transformations</h1>
+  <p class="lead">模型-数据混合驱动：仿射变换保"形"，DRL 保"命"——可伸缩、可剪切的多机柔性编队</p>
+  <table>
+    <tr><td style="width:96px"><strong>作者</strong></td><td><strong>Yunhao Liu</strong>（刘云浩，第一作者）、<strong>Zhihong Liu</strong>（刘志宏，通讯）、<strong>Guanzheng Wang</strong>（王冠政）、<strong>Chao Yan</strong>（闫超，南航）、<strong>Xiangke Wang</strong>（王祥科）、<strong>Zhiping Huang</strong>（黄志平）</td></tr>
+    <tr><td><strong>单位</strong></td><td>国防科技大学 智能科学学院；南京航空航天大学 自动化学院（Chao Yan）</td></tr>
+    <tr><td><strong>期刊</strong></td><td>Aerospace Science and Technology 157 (2025) 109812；DOI: 10.1016/j.ast.2024.109812；2024-08-20 投稿 / 2024-12-01 接收 / 2024-12-05 在线（PDF 分类标签为 <em>Review</em>）</td></tr>
+    <tr><td><strong>一句话</strong></td><td>把编队控制拆成两层：<b>决策层</b>用仿射变换（旋转/平移/缩放/剪切）解析地算出每个 follower 的时变目标点，保证编队"形不变、可伸缩"；<b>执行层</b>用 PPO 在 LiDAR 感知下学会"既不撞、又尽量保持编队"的速度指令。在 <b>STAGE</b> 仿真器中与 A-F / L-b / ORCA 三类 SOTA 对比，三种障碍场景均显著更优，并可扩展到更大编队。</td></tr>
+  </table>
+  <div style="margin-top:9px">
+    <span class="tag">Multi-UAV</span>
+    <span class="tag p">Affine formation</span>
+    <span class="tag g">Model-data hybrid</span>
+    <span class="tag c">STAGE simulator</span>
+    <span class="tag a">PPO + 课程学习</span>
+    <span class="tag n">270° 2D LiDAR</span>
+  </div>
+  <p class="lead" style="margin-top:10px">同一篇论文在 Chao Yan 名下也有一份笔记：<a href="../../../Chao%20Yan/files/2918/index.html">Chao Yan/2918</a>（视角不同，可对照阅读）。</p>
+</section>
+
+<!-- ══════════ 2 ══════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <div class="callout idea">
+    <span class="ct">🎯 核心洞察：编队的"形"可以用数学保证，编队的"命"才需要学习</span>
+    传统编队控制（领航-跟随、虚拟结构、刚性图）把"保持构型"做成硬约束——在密集障碍中这种硬约束<b>与避障直接冲突</b>：要么为了保形撞上去，要么为了躲避撕裂编队。作者的解耦是：<b>决策层不规定绝对位置，只规定"一族可容许的构型"</b>（仿射变换 $(\mathbf{A}(t),\mathbf{b}(t))$ 可以随时缩放、旋转、剪切）；<b>执行层只负责在该族内的可行目标点上做到安全可达</b>。于是"灵活编队"= 用仿射自由度换取避障空间，而不是放弃编队。
+  </div>
+  <div class="callout tip">
+    <span class="ct">第二层洞察：仿射编队的可扩展性来自"只让 leader 知道变换"</span>
+    理想情况下所有 UAV 都知道 $(\mathbf{A}(t),\mathbf{b}(t))$，但这要求全局同步。作者用<b>分布式 leader-follower + 应力矩阵（stress matrix）</b>：只有 leader 需要知道当前仿射变换，follower 的位置由 $\bar{\boldsymbol\Omega}_{ff}^{-1}\bar{\boldsymbol\Omega}_{fl}\mathbf{P}_l$ 唯一确定——<b>通信与计算随 follower 数量分摊，而不是集中到一个中心节点</b>。这让"编队规模扩大"在结构上就可行。
+  </div>
+
+  <h3>2.1 创新点拆解</h3>
+  <table>
+    <tr><th>创新点</th><th>做法</th><th>解决什么</th></tr>
+    <tr><td><strong>① 模型-数据混合两层架构</strong></td><td>决策层：仿射变换 + 应力矩阵（解析）；执行层：PPO（学习）</td><td>纯解析法在未知障碍下无法反应；纯 DRL 无法保证构型。分层让"保证"和"适应"各归其位</td></tr>
+    <tr><td><strong>② 时变目标的解析计算</strong></td><td>$\mathbf{P}_f^*(t)=-\bar{\boldsymbol\Omega}_{ff}^{-1}\bar{\boldsymbol\Omega}_{fl}\mathbf{P}_l(t)$，follower 目标随 leader 实时更新</td><td>编队不再是"固定点集"，而是随环境伸缩的流形——这是"flexible"的数学含义</td></tr>
+    <tr><td><strong>③ 两阶段课程学习训练</strong></td><td>阶段 1：无障碍环境学基础导航 + 机间避碰；阶段 2：加载权重，换复杂障碍场景继续训</td><td>直接在复杂场景训练收敛慢且奖励低（论文给了 Without_CL 对照曲线）；课程把"学会飞"和"学会躲"分开</td></tr>
+    <tr><td><strong>④ 与三类 SOTA 的统一对比</strong></td><td>A-F（纯解析仿射）、L-b（纯学习）、ORCA（反应式）＋ 本文</td><td>证明"混合"优于"任一纯方案"，而不只是优于弱基线</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 3 ══════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 两层架构与信息流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph DEC["决策层 · 模型驱动（解析）"]
+      AFF["仿射变换 (A(t), b(t))<br/>旋转 / 平移 / 缩放 / 剪切"]
+      STR["应力矩阵 Ω̄ = Ω ⊗ I_d<br/>分块：Ω̄ll, Ω̄lf, Ω̄fl, Ω̄ff"]
+      TGT["follower 时变目标<br/>P*_f = −Ω̄ff⁻¹ Ω̄fl P_l"]
+    end
+    subgraph EXE["执行层 · 数据驱动（PPO）"]
+      OBS["观测：3×512 LiDAR(270°,5m)<br/>+ 目标极坐标 + 上一步动作"]
+      NET["策略网络 π_θ / 价值网络 V_φ"]
+      ACT["动作 a = [v, ω]<br/>v∈(0,1), ω∈(−1,1)"]
+    end
+    subgraph ENV["环境 · STAGE"]
+      UAV["多机 + 静态障碍<br/>（灰色圆柱）"]
+      MET["评价：成功率 / 碰撞次数 / 编队误差 / 到达时间"]
+    end
+    AFF --> STR --> TGT --> OBS
+    OBS --> NET --> ACT --> UAV
+    UAV --> MET
+    UAV -->|"LiDAR 回波"| OBS
+    MET -.->|"奖励 r = rg + rc + rw + ra"| NET
+    classDef d fill:#e8f0fe,stroke:#3b82f6,color:#1d4ed8
+    classDef e fill:#f5f3ff,stroke:#8b5cf6,color:#6d28d9
+    classDef v fill:#fef7ed,stroke:#f59e0b,color:#92400e
+    class AFF,STR,TGT d
+    class OBS,NET,ACT e
+    class UAV,MET v
+    </pre>
+  </div>
+
+  <h3>3.2 仿射变换族：编队的"可伸缩骨架"</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    N["标称构型 P*"] --> R["旋转<br/>整体转向"]
+    N --> S["缩放<br/>整体扩张/收缩"]
+    N --> H["剪切<br/>斜向变形"]
+    R --> C["当前可行构型族"]
+    S --> C
+    H --> C
+    C --> Q{"障碍出现？"}
+    Q -->|"是"| SQ["沿可行方向变形<br/>（如横向压缩通过窄缝）"]
+    Q -->|"否"| K["恢复标称构型"]
+    classDef n fill:#ecfdf5,stroke:#10b981,color:#047857
+    classDef q fill:#fef3c7,stroke:#f59e0b,color:#92400e
+    class N,R,S,H,C n
+    class Q,SQ,K q
+    </pre>
+  </div>
+  <p class="lead">这张图解释了"flexible formation"到底 flexible 在哪：<b>不是放弃编队，而是在保序/保连通的前提下改变形状</b>。穿越窄通道时横向压缩、绕过障碍时整体剪切——编队拓扑不变，几何可变。</p>
+</section>
+
+<!-- ══════════ 4 ══════════ -->
+<section id="task">
+  <h2>4. 任务定义</h2>
+  <div class="formula">
+    <span class="eq">Eq.(10)–(15) — 带约束的 POMDP 目标</span>
+    $$ \arg\min_{\pi_\theta}\ \mathbb{E}\Big[\sum_t g\big(\cdot\big)\Big]\quad\text{s.t.}\;\;
+    \lVert p_i^t-p_j^t\rVert\ge R_d,\;\; \lVert p_i^t-B_k\rVert\ge R_d,\;\; p_i^t=g_i^t $$
+    $$ p_i^t=p_i^{t-1}+\Delta t\,v_i^t[\cos\phi_i^t,\sin\phi_i^t]^{\!\top},\qquad \phi_i^t=\phi_i^{t-1}+\Delta t\,\omega_i^t $$
+    <div class="note">
+      <strong>$R_d$</strong> = 安全半径&nbsp;|&nbsp;<strong>$B_k$</strong> = 第 $k$ 个障碍&nbsp;|&nbsp;<strong>$g_i^t$</strong> = 由决策层给出的时变目标&nbsp;|&nbsp;
+      <strong>运动学</strong>为单轨（unicycle）模型——这是执行层的物理假设，也是它与真实旋翼动力学的差距所在。
+    </div>
+  </div>
+  <table>
+    <tr><th>要素</th><th>内容</th></tr>
+    <tr><td><strong>观测</strong></td><td>$o^i_t=\{o^i_z,o^i_g,o^i_v\}$：$o^i_z\in\mathbb{R}^{3\times512}$（<b>3 帧连续 2D 激光</b>，视场 <b>270°</b>，量程 <b>5 m</b>，每帧 512 个距离值）；$o^i_g$ 目标相对位置（<b>极坐标</b>：距离 + 角度）；$o^i_v=[v^i_t,\omega^i_t]$ 当前动作反馈</td></tr>
+    <tr><td><strong>动作</strong></td><td>$a^i_t=[v^i_t,\omega^i_t]$，$v\in(0,1)$、$\omega\in(-1,1)$（归一化速度级）</td></tr>
+    <tr><td><strong>奖励</strong></td><td>$r^i_t=r^i_g+r^i_c+r^i_w+r^i_a$：目标（到达 + 接近增量）、碰撞、角速度抑制（$|\omega|&gt;0.7$ 才罚）、<b>航向惩罚</b>（防"锯齿路径过拟合"）</td></tr>
+    <tr><td><strong>场景</strong></td><td>STAGE 中三类：静态障碍（含已知棱柱 + 未知障碍）、动态障碍、不同规模编队；每方法每场景 50 次实验统计</td></tr>
+    <tr><td><strong>基线</strong></td><td>A-F（仿射编队解析法，单轨控制率）、L-b（学习式编队，LiDAR 视场统一改为 270° 保证公平）、ORCA（反应式避碰 + 仿射，已做工程适配）</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 5 ══════════ -->
+<section id="challenge">
+  <h2>5. 挑战分析</h2>
+  <div class="callout warn">
+    <span class="ct">刚性约束 vs 未知障碍：这是编队控制的根本矛盾</span>
+    <b>① 结构冲突。</b>编队要求成员保持相对位置；避障要求成员可以随时分开。二者在密集障碍中<b>数学上不可同时满足</b>——除非允许"构型本身变形"。<br>
+    <b>② 未知与动态障碍。</b>论文明确设定"环境中有静态与动态障碍，UAV 必须依靠机载传感器实时感知"——这意味着决策层不能预先规划，只能在线变形。<br>
+    <b>③ 观测的高维与局部性。</b>3×512 = 1536 维 LiDAR + 目标极坐标 + 动作反馈；而每架只看得到 5 m 内的局部世界。<br>
+    <b>④ 训练的样本效率。</b>论文实测：直接在复杂场景训练，奖励收敛值明显低于两阶段课程（Without_CL 曲线）；总训练耗时约 24 小时（Ubuntu 20.04 / 32 GB / RTX 3090）。
+  </div>
+</section>
+
+<!-- ══════════ 6 ══════════ -->
+<section id="method">
+  <h2>6. 方法与核心公式</h2>
+
+  <h3>6.1 仿射变换与应力矩阵（决策层）</h3>
+  <div class="formula">
+    <span class="eq">Eq.(6)(7)(8) — 领航-跟随下的仿射编队</span>
+    $$ \bar{\boldsymbol\Omega}=\boldsymbol\Omega\otimes\mathbf{I}_d,\qquad
+    \bar{\boldsymbol\Omega}=\begin{bmatrix}\bar{\boldsymbol\Omega}_{ll}&\bar{\boldsymbol\Omega}_{lf}\\ \bar{\boldsymbol\Omega}_{fl}&\bar{\boldsymbol\Omega}_{ff}\end{bmatrix} $$
+    $$ \mathbf{P}_f^*(t)=-\,\bar{\boldsymbol\Omega}_{ff}^{-1}\,\bar{\boldsymbol\Omega}_{fl}\,\mathbf{P}_l(t) $$
+    <div class="note">
+      <strong>$\boldsymbol\Omega$</strong> = 标称构型的应力矩阵（stress matrix），$\otimes$ 为 Kronecker 积&nbsp;|&nbsp;
+      <strong>$\mathbf{P}_l,\mathbf{P}_f$</strong> = leader / follower 位置堆叠&nbsp;|&nbsp;
+      <strong>核心性质</strong>：$\bar{\boldsymbol\Omega}\mathbf{P}^*=\mathbf{0}$，因此只需控制 leader 的位置，follower 的目标位置就被<b>唯一确定</b>——且这个映射对仿射变换 $(\mathbf{A}(t),\mathbf{b}(t))$ 是等变的。&nbsp;|&nbsp;
+      <strong>为什么"只让 leader 知道变换"够用</strong>：follower 只需知道自己的目标 $\mathbf{P}_f^*(t)$，它由 leader 位置线性组合而来，不需要知道 $\mathbf{A},\mathbf{b}$ 本身。
+    </div>
+  </div>
+
+  <h3>6.2 奖励设计（执行层）</h3>
+  <div class="formula">
+    <span class="eq">Eq.(16)–(20) — 四项奖励</span>
+    $$ r^i_t=r^i_g+r^i_c+r^i_w+r^i_a $$
+    $$ r^i_g=\begin{cases}r_a,&\lVert p_i^t-g_i^t\rVert&lt;0.1\\ \omega_g\big(\lVert p_i^{t-1}-g_i^t\rVert-\lVert p_i^t-g_i^t\rVert\big),&\text{otherwise}\end{cases} $$
+    $$ r^i_w=\omega_w|\omega_i^t|\ \ (|\omega_i^t|>0.7),\qquad
+    r^i_a=\begin{cases}(0.3-H)/D,&H&lt;0.3\\ (-0.1H)/D,&\text{otherwise}\end{cases} $$
+    <div class="note">
+      <strong>$r_g$</strong>：到达半径 0.1，外加接近增量（把稀疏变稠密）&nbsp;|&nbsp;
+      <strong>$r_w$</strong>：只在角速度超 0.7 时罚——死区惩罚，避免正常转弯被惩罚&nbsp;|&nbsp;
+      <strong>$r_a$（航向惩罚）</strong>：$H$ = 当前航向与目标方向的夹角绝对值。这一项专门治"<b>过拟合避障</b>"——即在无障碍处也走锯齿。设计上是一个分段函数：夹角小（&lt;0.3）时给"正/小"的鼓励，夹角大时按比例罚。
+    </div>
+  </div>
+
+  <h3>6.3 两阶段课程学习</h3>
+  <table>
+    <tr><th>阶段</th><th>场景</th><th>目标</th><th>论文给出的结果</th></tr>
+    <tr><td>阶段 1</td><td>无障碍</td><td>基础导航 + 机间避碰（把邻居 UAV 当作动态障碍）</td><td>约 70,000 次迭代后平均奖励稳定在 <b>≈90</b></td></tr>
+    <tr><td>阶段 2</td><td>复杂障碍（随机生成灰色圆柱）</td><td>在保持编队的同时避障</td><td>快速收敛到 <b>≈115</b>（起点已高于阶段 1，说明迁移有效）</td></tr>
+    <tr><td>对照</td><td>直接复杂场景训练（Without_CL）</td><td>—</td><td>也能收敛，但<b>最终奖励显著更低</b></td></tr>
+  </table>
+  <table>
+    <tr><th>PPO 超参（Table 1，节选）</th><th>取值</th></tr>
+    <tr><td>$\gamma$ / $\lambda$（GAE）</td><td>0.99 / 0.95</td></tr>
+    <tr><td>回合长度 $T_{max}$ / 训练轮数 $E_\pi$</td><td>8000 / 20</td></tr>
+    <tr><td>KL 目标 / 熵系数 $\xi$</td><td>15e-4 / 50.0</td></tr>
+    <tr><td>学习率（策略 / 价值）</td><td>5e-5（阶段 1）、2e-5（阶段 2）/ 1e-3</td></tr>
+    <tr><td>裁剪相关 $\alpha$ / $\beta_{high}$ / $\beta_{low}$</td><td>2.0 / 1.5 / 0.5</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 7 ══════════ -->
+<section id="principles">
+  <h2>7. 仿真器专题——为什么全篇只用 STAGE</h2>
+  <p class="lead">与 6201（JSBSim）和 6202（Stage + Gazebo 双栈）不同，这篇论文<b>训练和实验都在 STAGE 里做</b>，没有第二套仿真器。这是一个明确的取舍，值得单独分析。</p>
+
+  <h3>7.1 为什么选 STAGE</h3>
+  <table>
+    <tr><th>理由</th><th>具体</th></tr>
+    <tr><td><strong>任务本身是 2D 的</strong></td><td>观测是 2D LiDAR（270°/5 m/512 点），动作是 $[v,\omega]$，运动学是单轨——<b>问题定义里就没有 z 轴</b>。用 3D 仿真器是纯浪费。</td></tr>
+    <tr><td><strong>需要大量随机场景</strong></td><td>三类障碍场景 × 50 次重复 × 多种编队规模，还要做课程学习的两阶段训练。STAGE 的 2D 射线投射 + 批量实例让这个实验矩阵在 24 小时内可完成。</td></tr>
+    <tr><td><strong>与对比方法同域</strong></td><td>A-F、L-b、ORCA 都在同一 STAGE 场景里跑——<b>这篇论文的对比是干净的同域对比</b>（不像 6202 那边训练/验证跨域）。</td></tr>
+    <tr><td><strong>可视化与调试</strong></td><td>STAGE 能直接输出 top-down 视图（Fig.7 就是），便于看编队形状变化，这对"柔性编队"这种几何性结论特别重要。</td></tr>
+  </table>
+
+  <h3>7.2 好在哪</h3>
+  <ul>
+    <li><b>实验内部一致性最强</b>：训练、调参、对比、消融、规模化全在同一物理假设下——所有结论不受"仿真域切换"污染。</li>
+    <li><b>公平性可保证</b>：论文甚至把 L-b 的 LiDAR 视场从 180° 统一改成 270° 以匹配自己的设定。这种细节说明作者对"同条件对比"是有意识的。</li>
+    <li><b>几何结论可靠</b>：柔性编队的收益本质是几何的（能否通过窄缝、能否保持拓扑），2D 平面恰好是检验几何的最佳维度。</li>
+  </ul>
+
+  <h3>7.3 有什么问题（这篇的短板最明显）</h3>
+  <div class="callout danger">
+    <span class="ct">最严重的一条：整篇论文没有走出 2D 运动学</span>
+    单轨模型 + 2D LiDAR + STAGE，意味着<b>没有姿态动力学、没有高度、没有气动、没有传感器噪声</b>。对于一个声称"复杂障碍环境下多机编队"的方法，这三点缺失使得结论的适用范围被严格限制在"平面移动机器人"级别。多旋翼在真实编队飞行中的滚转/俯仰耦合、高度保持误差、下洗气流，全都没有进入模型。
+  </div>
+  <table>
+    <tr><th>问题</th><th>说明</th><th>影响</th></tr>
+    <tr><td><strong>① 无 3D / 无姿态</strong></td><td>单轨运动学；编队的"剪切"只在平面内发生</td><td>★★★★★ 真实多旋翼的三维编队（高度分层、立体包围）无法验证</td></tr>
+    <tr><td><strong>② 无 sim-to-real 与真机</strong></td><td>论文结论止于 STAGE 仿真</td><td>★★★★ 同组 2021 年硕士论文（6206）有真机，这篇没有——反而退了一步</td></tr>
+    <tr><td><strong>③ STAGE 的传感器是理想射线</strong></td><td>5 m 量程、无噪声、无反射率；3 帧历史用于捕捉动态</td><td>★★★ 5 m 量程对 $v\le1$ m/s 够用，但对真实多旋翼（几 m/s）远远不够</td></tr>
+    <tr><td><strong>④ 障碍只有圆柱</strong></td><td>场景中障碍是随机生成的灰色圆柱（2D 即圆）</td><td>★★ 对"复杂障碍"的宣称需要更多形状（墙、L 形、窄缝）支撑</td></tr>
+    <tr><td><strong>⑤ 速度尺度偏小</strong></td><td>$v\in(0,1)$ 归一化速度，5 m LiDAR、0.1 m 到达半径</td><td>★★ 结论能否按比例放大到 5–10 m/s 的实用速度未验证</td></tr>
+  </table>
+  <div class="callout warn">
+    <span class="ct">一句话总结</span>
+    <b>用"全篇同域 2D"换实验的干净与公平，用"仿射分解"换编队的可伸缩。</b>代价是这篇论文的结论只能承诺到"平面移动机器人级别的柔性编队"，离多旋翼真机编队还有一整个三维与动力学。
+  </div>
+</section>
+
+<!-- ══════════ 8 ══════════ -->
+<section id="figures">
+  <h2>8. 图表解读</h2>
+  <div class="fig">
+    <img src="figures/overview.png" alt="AST 2025 p.8 — Fig.7 STAGE 训练环境与 Fig.8 两阶段奖励曲线">
+    <div class="cap">本地 PDF 第 8 页直接渲染（刊页 8）：上部 <b>Fig. 7 "Training environment in STAGE simulator"</b>——(a) 阶段 1 无障碍、(b) 阶段 2 加入灰色圆柱障碍，星号为各机目标；下部 <b>Fig. 8 两阶段奖励曲线</b>（stage1(CL) / stage2(CL) / Without_CL）；右栏为 Table 1 的 PPO 超参。一页之内同时给出了"环境长什么样"和"课程学习有没有用"。图片来自本地 PDF，无外部素材。</div>
+  </div>
+  <h3>8.1 Fig.8 的三个关键读数</h3>
+  <table>
+    <tr><th>曲线</th><th>行为</th><th>说明什么</th></tr>
+    <tr><td>stage1(CL)</td><td>约 70,000 次迭代后稳定在 ≈90</td><td>无障碍下"会飞 + 不撞队友"已学会</td></tr>
+    <tr><td>stage2(CL)</td><td>从阶段 1 的终点继续，快速收敛到 ≈115</td><td>迁移有效：已有能力被复用，不是从零开始</td></tr>
+    <tr><td>Without_CL</td><td>收敛更快但最终值显著更低（明显低于 115）</td><td><b>课程学习的价值不在"收敛快"，而在"收敛到更高性能"</b>——这是一个容易被误读的点</td></tr>
+  </table>
+  <div class="callout">
+    <span class="ct">为什么 Without_CL 反而收敛更快？</span>
+    直接在大场景训练时，策略更容易陷入"保守局部最优"：稍微学会躲就停在那里，奖励很快稳定（曲线平滑），但性能天花板低。两阶段课程先建立"敢往前走"的行为，再学"如何躲"，最终能到更高的奖励。这也解释了为什么 RL 论文里"收敛快"经常不是好指标。
+  </div>
+</section>
+
+<!-- ══════════ 9 ══════════ -->
+<section id="flaw">
+  <h2>9. 不足与扩展方向</h2>
+  <h3>9.1 局限性</h3>
+  <ul>
+    <li><b>运动学而非动力学</b>：单轨模型下"剪切/缩放"是瞬时几何，真实多旋翼的变形需要时间与能量，编队变形的<b>暂态</b>（谁先动、会不会互撞）完全没有建模。</li>
+    <li><b>决策层与执行层解耦的代价</b>：决策层假设 follower 能精确到达 $\mathbf{P}_f^*(t)$，但执行层是概率策略、会滞后。论文没有量化"跟踪误差是否破坏仿射不变性"。</li>
+    <li><b>通信假设</b>：leader 位置需要广播给 follower；论文未讨论丢包/延迟对 $\mathbf{P}_f^*$ 的影响。</li>
+    <li><b>对比的规模有限</b>：规模化实验只验证"编队完整性"，未给大规模下的成功率/时间曲线。</li>
+  </ul>
+  <h3>9.2 值得深挖的方向</h3>
+  <ol>
+    <li><b>把仿射自由度交给学习</b>：目前 $(\mathbf{A}(t),\mathbf{b}(t))$ 是人为设定/规则生成的。若用第二个策略网络输出"该缩多少、该剪多少"，则是真正的<b>分层 RL</b>（高层选构型、低层执行），比现在的"解析上层 + 学习下层"更灵活。</li>
+    <li><b>动力学可行性约束</b>：在决策层加"变形速率上限"（由旋翼推力/姿态限制导出），让 $\mathbf{P}_f^*(t)$ 本身可跟踪。</li>
+    <li><b>三维仿射</b>：把 $\mathbf{A}\in\mathbb{R}^{3\times3}$ 用起来（高度分层），这是现成的数学推广，工程价值明确。</li>
+    <li><b>与 6202 的 UDR 结合</b>：用 UDR 补 LiDAR 盲区，让"看不见的队友"不再破坏编队——两篇论文的技术正好互补。</li>
+  </ol>
+</section>
+
+<!-- ══════════ 10 ══════════ -->
+<section id="motivation">
+  <h2>10. 动机推导</h2>
+  <div class="callout idea">
+    <span class="ct">一句话动机</span>
+    编队控制的死结是"保形"与"避障"互斥——那就别让"形"是固定的：<b>用一族可容许的仿射构型替代一个固定形状</b>，让"保形"变成"保拓扑"，剩下的安全交给学习。
+  </div>
+  <h3>10.1 推导链</h3>
+  <ol>
+    <li><b>观察</b>：现有编队方法（领航-跟随 / 虚拟结构 / 刚性图）在密集障碍中要么撞、要么散；ORCA 类反应式方法能避障但不保形。</li>
+    <li><b>分解</b>：把问题拆成"构型该长什么样"（几何）与"怎么飞过去"（控制）两件事。</li>
+    <li><b>第一步</b>：几何用仿射变换参数化——旋转/平移/缩放/剪切，四个自由度足以覆盖"通过窄缝、绕开障碍、整体转向"。</li>
+    <li><b>第二步</b>：控制用 DRL 学——因为障碍未知、需要在线反应，解析法写不出通用控制律。</li>
+    <li><b>第三步</b>：用应力矩阵保证"只要 leader 到位，follower 目标就唯一确定"，把分布式可行性做进数学结构里。</li>
+  </ol>
+</section>
+
+<!-- ══════════ 11 ══════════ -->
+<section id="takeaway">
+  <h2>11. 关键启示</h2>
+  <h3>11.1 方法论</h3>
+  <ul>
+    <li><b>"模型负责保证，学习负责适应"</b>——这是混合驱动最清晰的表述。哪一部分必须可证明，就用解析；哪一部分必须能应对未知，就用学习。</li>
+    <li><b>课程学习的指标要选对</b>：本文的 Without_CL 收敛更快但性能更低，提醒我们别把"收敛速度"当成唯一指标。</li>
+    <li><b>公平对比要落到细节</b>：为了公平把基线的 LiDAR 视场从 180° 改成 270°，这类"不起眼"的处理往往是审稿人最看重的。</li>
+  </ul>
+  <h3>11.2 可直接迁移</h3>
+  <ul>
+    <li><b>分层架构</b>：任何"全局结构 + 局部反应"的任务（编队、围捕、覆盖）都可以用"解析层给可行目标集合 + 学习层在集合内选动作"。</li>
+    <li><b>应力矩阵</b>：$\bar{\boldsymbol\Omega}_{ff}^{-1}\bar{\boldsymbol\Omega}_{fl}$ 这套"由部分节点推全体"的线性结构，可用于任何"部分可观 + 拓扑约束"的协同问题。</li>
+    <li><b>航向惩罚 $r_a$</b>：治"避障过拟合"的通用招数——在无障碍处给朝向奖励，防止策略学会无意义的抖动。</li>
+  </ul>
+  <h3>11.3 同组脉络</h3>
+  <table>
+    <tr><th>工作</th><th>关系</th></tr>
+    <tr><td><a href="../6206/index.html">6206 硕士论文（2021）</a></td><td>提供"PX4 SITL + ROS + 真机"的工程底座与避碰策略</td></tr>
+    <tr><td><a href="../6202/index.html">6202 UDR（2026）</a></td><td>同一 Stage + PPO 栈；UDR 解决"看不见队友"，本篇解决"保持队形"</td></tr>
+    <tr><td><a href="../../../Chao%20Yan/files/2918/index.html">Chao Yan/2918</a></td><td>同一论文的另一份笔记视角</td></tr>
+  </table>
+</section>
+
+<footer>
+  Paper Notes · Guanzheng Wang · 6205 · Aerospace Science and Technology 157 (2025) 109812 · DOI 10.1016/j.ast.2024.109812 · 依据本地 PDF 全文整理
+</footer>
+</div>
+</body>
+</html>

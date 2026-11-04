@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Learning minimum-time flight control for fixed-wing UAVs (JAI 2026) — Guanzheng Wang Notes</title>
+<script>
+MathJax = { tex:{inlineMath:[['$','$']],displayMath:[['$$','$$']],tags:'ams'}, options:{enableMenu:false} };
+</script>
+<script src="../../../../assets/vendor/mathjax-tex-svg-full.js" async></script>
+<script src="../../../../assets/vendor/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'neutral',securityLevel:'loose',flowchart:{useMaxWidth:false,htmlLabels:true,nodeSpacing:44,rankSpacing:60,padding:10}});</script>
+<style>
+  :root{
+    --bg:#f6f8fb;--surface:#fff;--line:#dfe5ee;--ink:#172033;--muted:#64748b;
+    --blue:#2563eb;--green:#059669;--amber:#d97706;--rose:#e11d48;--violet:#7c3aed;--cyan:#0891b2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",Roboto,Arial,sans-serif;line-height:1.72}
+  nav{position:sticky;top:0;z-index:90;display:flex;gap:4px;align-items:center;flex-wrap:wrap;padding:9px 20px;background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+  nav a{font-size:12px;font-weight:600;color:#475569;text-decoration:none;padding:4px 8px;border-radius:5px}
+  nav a:hover{background:#dbeafe;color:#1d4ed8}
+  nav .home{color:#ea580c;border:1px solid #fb923c;font-weight:800}
+  nav .brand{font-weight:800;font-size:12.5px;margin:0 8px;color:#0f172a}
+  .container{max-width:1100px;margin:0 auto;padding:24px 20px 56px}
+  section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 26px;margin-bottom:18px;box-shadow:0 1px 3px rgba(15,23,42,.04);scroll-margin-top:54px}
+  h1{font-size:23px;line-height:1.35;margin-bottom:8px}
+  h2{font-size:18px;margin-bottom:16px}
+  h3{font-size:15px;margin:20px 0 8px;color:#1e293b}
+  h4{font-size:13.5px;margin:16px 0 6px}
+  p,li,td,th{font-size:14px;color:#334155}
+  p{margin-bottom:8px}
+  ul,ol{margin:6px 0 12px 22px}
+  li{margin-bottom:4px}
+  code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 5px;font-size:12.5px;font-family:Consolas,monospace}
+  table{width:100%;border-collapse:collapse;margin:10px 0 14px;font-size:13.5px}
+  th{background:#f1f5f9;text-align:left;padding:8px 11px;border:1px solid #e2e8f0;font-weight:700}
+  td{padding:7px 11px;border:1px solid #e2e8f0;vertical-align:top}
+  tr:nth-child(even) td{background:#fafbfc}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;margin:3px 5px 3px 0;background:#dbeafe;color:#1d4ed8}
+  .tag.g{background:#d1fae5;color:#047857}.tag.a{background:#fef3c7;color:#92400e}
+  .tag.r{background:#ffe4e6;color:#be123c}.tag.p{background:#ede9fe;color:#6d28d9}
+  .tag.c{background:#cffafe;color:#0f766e}.tag.n{background:#f1f5f9;color:#475569}
+  .callout{border-left:4px solid var(--blue);background:#eff6ff;border-radius:0 8px 8px 0;padding:13px 17px;margin:11px 0;font-size:13.5px;color:#1e3a5f}
+  .callout.tip{border-color:var(--green);background:#ecfdf5;color:#064e3b}
+  .callout.warn{border-color:var(--amber);background:#fffbeb;color:#78350f}
+  .callout.danger{border-color:var(--rose);background:#fff1f2;color:#7f1d1d}
+  .callout.idea{border-color:var(--violet);background:#f5f3ff;color:#3b1f7e}
+  .callout b{color:#0f172a}
+  .callout .ct{display:block;font-weight:800;font-size:12.5px;margin-bottom:4px}
+  .formula{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin:11px 0;overflow-x:auto}
+  .formula .eq{display:inline-block;font-size:11.5px;font-weight:800;color:#1d4ed8;background:#dbeafe;padding:2px 8px;border-radius:4px;margin-bottom:6px}
+  .formula .note{margin-top:9px;padding-top:9px;border-top:1px dashed #e2e8f0;font-size:12.5px;color:#64748b;line-height:1.65}
+  mjx-container[display="true"]{font-size:112%!important;margin:8px 0!important}
+  .mermaid-box{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:11px 0;overflow-x:auto;text-align:center}
+  .fig{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin:14px 0}
+  .fig .cap{font-size:12px;color:#64748b;margin-top:8px}
+  .fig img{display:block;width:100%;height:auto;border:1px solid #e2e8f0;border-radius:6px;background:#fff}
+  .cmp{display:flex;gap:12px;flex-wrap:wrap;margin:11px 0}
+  .cmp>div{flex:1;min-width:250px;border:1px solid var(--line);border-radius:8px;padding:14px;background:#fafbfc}
+  .cmp h4{margin-top:0}
+  .series{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+  .series .t{font-size:12px;font-weight:800;margin-bottom:7px}
+  .series a{display:inline-block;font-size:11.5px;font-weight:700;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:3px 8px;margin:2px 4px 2px 0;text-decoration:none}
+  .series a:hover,.series a.on{color:#1d4ed8;background:#dbeafe;border-color:#bfdbfe}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
+  .lead{color:var(--muted);font-size:13px;margin-bottom:14px}
+</style>
+<link rel="stylesheet" href="../../../../assets/site-ui.css">
+<script src="../../../../assets/site-ui.js" defer></script>
+</head>
+<body>
+
+<nav>
+  <a class="home" href="../../index.html">🏠 HOME</a>
+  <span class="brand">Guanzheng Wang · 6201</span>
+  <a href="#info">1. 论文信息</a>
+  <a href="#insight">2. 核心洞察</a>
+  <a href="#architecture">3. 系统架构</a>
+  <a href="#task">4. 任务定义</a>
+  <a href="#challenge">5. 挑战分析</a>
+  <a href="#method">6. 方法公式</a>
+  <a href="#principles">7. 仿真器专题</a>
+  <a href="#figures">8. 图表解读</a>
+  <a href="#flaw">9. 不足扩展</a>
+  <a href="#motivation">10. 动机推导</a>
+  <a href="#takeaway">11. 关键启示</a>
+</nav>
+
+<div class="container">
+
+<div class="series">
+  <div class="t">📖 Guanzheng Wang · 6 篇笔记阅读顺序</div>
+  <a href="../6206/index.html">6206 硕士论文（2021）</a>
+  <a href="../6203/index.html">6203 事件相机 CICAI（2022）</a>
+  <a href="../6205/index.html">6205 仿射编队 AST（2025）</a>
+  <a href="../6204/index.html">6204 空中拦截 AIHCIR（2025）</a>
+  <a href="../6202/index.html">6202 UDR 避碰 US（2026）</a>
+  <a class="on" href="../6201/index.html">6201 时间最优 JAI（2026）</a>
+  <a href="../../sim-stack.html">🛠 仿真器选择图谱</a>
+  <a href="../../index.html">Index</a>
+</div>
+
+<!-- ══════════ 1 ══════════ -->
+<section id="info">
+  <h1>Learning minimum-time flight control for fixed-wing UAVs in three-dimensional space with high-fidelity 6-DOF dynamics</h1>
+  <p class="lead">三维空间固定翼无人机时间最优飞行控制：高保真 6-DOF 动力学 + 强化学习</p>
+  <table>
+    <tr><td style="width:96px"><strong>作者</strong></td><td><strong>Guanzheng Wang</strong>（王冠政，第一作者）、<strong>Xiangke Wang</strong>（王祥科）、<strong>Xiaoxin Li</strong>（李晓鑫）、<strong>Zhihong Liu</strong>（刘志宏，通讯）、<strong>Zhiqiang Miao</strong>（缪志强）</td></tr>
+    <tr><td><strong>单位</strong></td><td>国防科技大学 智能科学学院（Wang/X. Wang/Li/Liu）；装备状态感知与智能保障全国重点实验室（Wang/X. Wang/Li/Liu）；湖南大学 电气与信息工程学院（Miao）</td></tr>
+    <tr><td><strong>期刊</strong></td><td>Journal of Automation and Intelligence（KeAi/ Elsevier），2026, Vol. 5, pp. 126–138；DOI: 10.1016/j.jai.2025.11.007；2025-07-29 投稿 / 2025-11-23 接收</td></tr>
+    <tr><td><strong>类型</strong></td><td>Research article（开放获取 + 代码开源 <code>github.com/running-mars/OpenFlight</code>）</td></tr>
+    <tr><td><strong>一句话</strong></td><td>把固定翼的控制层级从"速度级（外环 + PID）"推进到"执行器级（副翼/升降舵/油门）"，在 <strong>JSBSim 6-DOF 高保真动力学</strong>里用 PPO 直接学时间最优飞行：64 个 500 m 目标点平均 20.24 s 到达，比速度级 PPO 快 22.0%，比改进 Dubins 曲线快 27.6%，且首次在固定翼时间最优任务上做到执行器级端到端控制。</td></tr>
+  </table>
+  <div style="margin-top:9px">
+    <span class="tag">Fixed-wing UAV</span>
+    <span class="tag p">Minimum-time flight</span>
+    <span class="tag g">Actuator-level control</span>
+    <span class="tag c">JSBSim 6-DOF</span>
+    <span class="tag a">PPO</span>
+    <span class="tag n">Stable-Baselines3</span>
+    <span class="tag">OpenFlight</span>
+  </div>
+</section>
+
+<!-- ══════════ 2 ══════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <h3>2.1 两个洞察</h3>
+  <div class="callout idea">
+    <span class="ct">🎯 洞察一：时间最优的瓶颈不在算法，而在"控制层级"</span>
+    传统做法是 RL 输出速度/航向指令，再由 PID 或自驾仪跟踪。但<b>两层控制天然带来三段损耗</b>：指令限幅（为了安全飞行留出的裕度）、跟踪滞后（外环以为已到位、内环还在追）、误差累积。论文的实验把这一点量化了——同样用 PPO，执行器级 20.24 s vs 速度级 25.94 s，<b>22% 的时间差距几乎全部来自被 PID 抹掉的机动性</b>（转向半径、角速度、爬升-空速耦合）。所以"解锁机动性"的正确做法不是换更强的 RL 算法（A2C/TD3/SAC 都试了），而是<b>换控制接口</b>。
+  </div>
+  <div class="callout idea">
+    <span class="ct">🎯 洞察二：高保真与训练吞吐可以解耦——物理用 JSBSim，视觉用 Unreal，且渲染可关</span>
+    高保真仿真器的代价主要在渲染而不在动力学。这篇工作把两者拆开：<b>JSBSim 负责 6-DOF 数值积分（气动系数来自风洞 + CFD）</b>，<b>Unreal Engine 只负责可视化</b>，并且"<b>训练时可关闭渲染引擎以加速</b>"（Fig. 1 图注原文）。这不是工程小技巧，而是决定了能不能在 16 个并行环境 × 2×10<sup>6</sup> 步的预算内完成训练——同期的 Isaac/Unreal 全渲染方案在同一预算下很难跑完固定翼长时程回合（40 s × 30 Hz = 1200 步/回合）。
+  </div>
+
+  <h3>2.2 创新点拆解</h3>
+  <table>
+    <tr><th>创新点</th><th>具体做法</th><th>它真正解决的问题</th></tr>
+    <tr><td><strong>① 执行器级控制（ALC）</strong></td><td>策略网络直接输出 $c_a$（副翼）、$c_e$（升降舵）、$c_t$（油门），去掉自驾仪/PID 中间层</td><td>速度级控制无法表达"大角速度 + 低空速 + 急转"这类极限机动；ALC 让策略自己发现欠驱动强耦合下的最优 maneuvers</td></tr>
+    <tr><td><strong>② 统一 POMDP 框架下的 VLC/ALC 对照</strong></td><td>同一奖励、同一终止条件、同一算法库（SB3），只换动作空间与观测维度</td><td>让"层级选择"成为唯一变量——这是能得出"22% 提升来自控制层级"这一结论的实验设计前提</td></tr>
+    <tr><td><strong>③ 高保真 6-DOF + 可开关渲染的仿真栈</strong></td><td>JSBSim（Skywalker X8 气动模型）+ Gym 封装 + SB3 <code>SubprocVecEnv</code>（16 进程）+ 可选 UE5 渲染</td><td>用"轻训练 / 重验证"的双模式，把仿真器的保真度和吞吐从对立变成可调</td></tr>
+    <tr><td><strong>④ 与 Dubins / MPC 的强基线对比</strong></td><td>改进三维 Dubins（14/20/26 m/s 三档巡航）+ 单轨模型 MPC（SLSQP，10 步 / 0.33 s 预测域，30 Hz）</td><td>证明 RL 的收益不是"打败了弱基线"：ALC 也略胜 MPC（20.24 s vs 25.50 s）</td></tr>
+  </table>
+
+  <h3>2.3 与同类工作的位置</h3>
+  <p>固定翼 RL 控制此前基本停在<b>姿态内环</b>（pitch/roll）或<b>航向 + 高度外环</b>：Richter 用 DQN/DDQN 做离散动作的姿态控制；Chowdhury &amp; Keshmiri、Bøhn 等用 PPO/SAC 直接控舵面但目标是"稳定跟踪"而非"最短时间"，且 Bøhn 的工作已上真机。本文的差异点是<b>把优化目标换成时间</b>——一旦目标变成 min $t_f$，策略就必须榨干耦合动力学（转弯时降速、俯冲换速度），这正是 ALC 相对 VLC 的优势区间。</p>
+</section>
+
+<!-- ══════════ 3 ══════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 训练/验证双模式仿真栈（本文最值得记的结构）</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph PHYS["物理层 · JSBSim 6-DOF"]
+      X8["Skywalker X8 气动模型<br/>风洞 + CFD 系数 · x8.xml"]
+      FDM["FGFDMExec 数值积分<br/>sim_frequency_hz = 30"]
+      ATMO["大气 / 重力 / 推力模型"]
+    end
+    subgraph WRAP["封装层 · Gym + OpenFlight"]
+      ENV["gym.Env: airgym:jsbsim-uni-uav-sample-v1/v2/v3"]
+      VEC["SB3 SubprocVecEnv · num_envs = 16"]
+      NORM["观测归一化<br/>ψ/2π · tanh(α·d) · ω/4π"]
+    end
+    subgraph VIS["可视层 · 可选"]
+      UE["Unreal Engine 5 渲染<br/>（训练可关闭）"]
+      AIR["AirSim 1.8.1 通道<br/>（开源仓库默认）"]
+    end
+    subgraph ALG["学习层 · Stable-Baselines3"]
+      PPO["PPO（主）"]
+      OTH["A2C / TD3 / SAC（对照）"]
+    end
+    X8 --> FDM --> ENV
+    ATMO --> FDM
+    ENV --> VEC --> PPO
+    ENV --> OTH
+    FDM -.-> UE
+    FDM -.-> AIR
+    PPO -->|"θ 更新"| ENV
+    classDef phys fill:#fef7ed,stroke:#f59e0b,color:#92400e
+    classDef wrap fill:#e8f0fe,stroke:#3b82f6,color:#1d4ed8
+    classDef vis fill:#f5f3ff,stroke:#8b5cf6,color:#6d28d9
+    classDef alg fill:#ecfdf5,stroke:#10b981,color:#047857
+    class X8,FDM,ATMO phys
+    class ENV,VEC,NORM wrap
+    class UE,AIR vis
+    class PPO,OTH alg
+    </pre>
+  </div>
+
+  <h3>3.2 两种控制层级的数据流</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph VLC["VLC · 速度级（6 维观测）"]
+      direction TB
+      O1["o = [ψg, dh, dv, va, vz, ωz]"] --> N1["归一化"] --> P1["MLP 64-64-ReLU"] --> A1["a = [ωz, vc, va]"] --> AP["自驾仪 / PID"] --> S1["舵面 + 油门"]
+    end
+    subgraph ALC["ALC · 执行器级（11 维观测）"]
+      direction TB
+      O2["o = [ψg, dh, dv, va, vz, θ, φ, ψ, ωx, ωy, ωz]"] --> N2["归一化"] --> P2["MLP 64-64-ReLU"] --> A2["a = [ca, ce, ct]"] --> S2["直接驱动舵面 + 油门"]
+    end
+    S1 --> J["JSBSim 状态推进"]
+    S2 --> J
+    J --> R["r = k1Δdh + k2Δdv + k3Δψg"]
+    J --> T{"终止条件？<br/>到达 30 m / 高度越界 / 超时 40 s / 角速率过大"}
+    T -->|"否"| O1
+    T -->|"否"| O2
+    classDef v fill:#e8f0fe,stroke:#3b82f6,color:#1d4ed8
+    classDef a fill:#ecfdf5,stroke:#10b981,color:#047857
+    classDef j fill:#fef7ed,stroke:#f59e0b,color:#92400e
+    class O1,N1,P1,A1,AP,S1 v
+    class O2,N2,P2,A2,S2 a
+    class J,R,T j
+    </pre>
+  </div>
+  <p class="lead">注意 ALC 的动作不做反归一化（网络输出本身就落在 $[-1,1]$，油门 $[0,1]$），论文明确把这点当作优势：<b>少一层映射 = 少一份延迟与累积误差</b>。</p>
+</section>
+
+<!-- ══════════ 4 ══════════ -->
+<section id="task">
+  <h2>4. 任务定义</h2>
+  <div class="formula">
+    <span class="eq">Eq.(1) — 时间最优飞行的约束优化形式</span>
+    $$ \min_{a_t} \; t_f \quad \text{s.t.}\quad s_{t+1}\sim T(s_t,a_t),\;\; h \ge h_{\min},\;\; \lVert p(t_f)-p_g\rVert \le d_r $$
+    <div class="note">
+      <strong>$t_f$</strong> = 到达目标的飞行时间（被最小化的量）&nbsp;|&nbsp;
+      <strong>$T$</strong> = 由 JSBSim 6-DOF 积分给出的状态转移（非解析、非简化质点模型）&nbsp;|&nbsp;
+      <strong>$h_{\min}$</strong> = 最低飞行高度约束 &nbsp;|&nbsp;
+      <strong>$d_r = 30$ m</strong> = 到达判定半径 &nbsp;|&nbsp;
+      论文强调：约束不写进奖励，而是<b>通过回合终止条件</b>（高度越界 / 超时 / 角速度过大）隐式施加——这避免了奖励项之间量级打架。
+    </div>
+  </div>
+
+  <table>
+    <tr><th>类别</th><th>VLC（速度级）</th><th>ALC（执行器级）</th></tr>
+    <tr><td><strong>观测</strong></td><td>6 维：[$\psi_g, d_h, d_v, v_a, v_z, \omega_z$]</td><td>11 维：[$\psi_g, d_h, d_v, v_a, v_z, \theta, \phi, \psi, \omega_x, \omega_y, \omega_z$]（多了三轴姿态与两轴角速度）</td></tr>
+    <tr><td><strong>动作</strong></td><td>3 维：[$\omega_z$ 期望偏航角速率, $v_c$ 爬升率, $v_a$ 空速] → 自驾仪</td><td>3 维：[$c_a$ 副翼, $c_e$ 升降舵, $c_t$ 油门]，$c_a,c_e\in[-1,1]$，$c_t\in[0,1]$</td></tr>
+    <tr><td><strong>目标</strong></td><td colspan="2">从原点正上方 100 m 出发，飞抵半径 30 m 内的目标点，飞行时间最短；目标点在两球壳间按 $r\sim U(d_i\pm50)$、$\theta\sim U(1.41,1.73)$、$\phi\sim U(-\pi,\pi)$ 随机采样</td></tr>
+    <tr><td><strong>评测</strong></td><td colspan="2">64 个方向 × 高度 20–180 m 的固定目标点（水平 500 m），统计平均到达时间与标准差；另取 $(-300,-400,-180)$ m 一个"转弯+爬升+直飞"典型点做稳定性分析</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 5 ══════════ -->
+<section id="challenge">
+  <h2>5. 挑战分析——为什么难</h2>
+  <div class="callout warn">
+    <span class="ct">四个耦合难点</span>
+    <b>① 欠驱动 + 强耦合</b>：固定翼只有 3 个执行器却要控制 6 自由度，转弯必须靠滚转产生侧向力、爬升必须用动能换势能。策略要学的是"用速度/高度交换换时间"这种非直觉策略。<br>
+    <b>② 时间最优的代价函数不可微且病态</b>：$t_f$ 只有在回合结束才出现，若直接用作奖励则极端稀疏。论文的处理是把 $t_f$ 转成<b>每步势函数</b>（距离/高度/航向偏差的增量加权），再用"超时终止"兜住时间约束。<br>
+    <b>③ 早停陷阱</b>：ALC 直接控舵面时，网络初期极易发散——论文因此额外加了一条"任一轴角速度 &gt; 10 rad/s 即终止"，否则训练早期几乎全是翻滚坠机样本。<br>
+    <b>④ 保真度 vs 吞吐</b>：40 s 回合 × 30 Hz = 1200 步，还要 16 并行 × 2×10<sup>6</sup> 步。若每一步都渲染，训练时间会被渲染而不是物理主导。
+  </div>
+
+  <h3>5.1 现有方法为什么不够</h3>
+  <table>
+    <tr><th>方法</th><th>做法</th><th>为什么不够</th></tr>
+    <tr><td>改进三维 Dubins + PID</td><td>解析最短路径 + 定速巡航（14/20/26 m/s）+ PID 跟踪</td><td>定速假设与真实动力学冲突：高速时低空目标够不到、低速时高空目标够不到（爬升率与空速耦合）。表 1 中 26 m/s 与 14 m/s 两组出现"未在 50 s 内到达"，标准差高达 13.73</td></tr>
+    <tr><td>MPC（单轨模型，SLSQP）</td><td>0.33 s 预测域、10 步、30 Hz、代价 = 位置误差 + 控制量</td><td>为了实时性必须用简化运动学模型，丢掉姿态与气动耦合；结果 25.50 s，仅略优于 VLC（25.94 s），明显慢于 ALC（20.24 s）</td></tr>
+    <tr><td>RL 姿态内环（DQN/DDQN）</td><td>离散动作控制 pitch/roll</td><td>离散动作空间限制机动精度；且目标只是姿态跟踪，没有时间概念</td></tr>
+    <tr><td>RL 外环（PPO/SAC 控航向高度）</td><td>输出速度/航向指令给自驾仪</td><td>自驾仪的安全裕度与跟踪滞后把机动性"吃掉"了，无法逼近时间最优</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 6 ══════════ -->
+<section id="method">
+  <h2>6. 方法与核心公式</h2>
+
+  <h3>6.1 6-DOF 刚体动力学（JSBSim 内部积分的对象）</h3>
+  <div class="formula">
+    <span class="eq">Eq.(2)(3) — 平动与转动</span>
+    $$ m\dot{\mathbf{v}} + \boldsymbol{\omega}\times m\mathbf{v} = \mathbf{F},\qquad \mathbf{F}=\mathbf{F}_a+\mathbf{F}_g+\mathbf{F}_t $$
+    $$ \mathbf{I}\dot{\boldsymbol{\omega}} + \boldsymbol{\omega}\times \mathbf{I}\boldsymbol{\omega} = \mathbf{M} $$
+    <div class="note">
+      <strong>$\mathbf{F}_a$</strong> 气动力（升力/阻力/侧力，由迎角 $\alpha_a$、侧滑角 $\beta_s$ 与舵面偏度决定）&nbsp;|&nbsp;
+      <strong>$\mathbf{F}_g$</strong> 重力&nbsp;|&nbsp;<strong>$\mathbf{F}_t$</strong> 推力（油门 $c_t$ → 转速 → 推力）&nbsp;|&nbsp;
+      <strong>$\mathbf{I}$</strong> 惯性张量，<strong>$\mathbf{M}$</strong> 气动力矩 + 舵面控制力矩。
+      气动系数来自 <b>Skywalker X8 风洞实验 + CFD</b>，不是手册估计值——这是"高保真"三个字的实际含义。
+    </div>
+  </div>
+
+  <h3>6.2 奖励：把"最短时间"变成每步密集信号</h3>
+  <div class="formula">
+    <span class="eq">Eq.(12) — 三项增量奖励</span>
+    $$ r_t = k_1\,\Delta d_h + k_2\,\Delta d_v + k_3\,\Delta\psi_g,\qquad (k_1,k_2,k_3)=(0.25,\,1,\,20) $$
+    <div class="note">
+      <strong>$\Delta d_h,\Delta d_v,\Delta\psi_g$</strong> = 水平距离、垂直距离、航向偏差的<b>逐步减少量</b>——接近目标就给正奖励，远离给负奖励&nbsp;|&nbsp;
+      <strong>为什么用增量而不是势函数本身</strong>：增量形式天然"零和"，不会因为目标远近而改变奖励尺度，策略不会被"飞得远就奖励大"误导&nbsp;|&nbsp;
+      <strong>权重设计原则（论文原话）</strong>：只要求三项的绝对值量级接近，避免小项被大项淹没——$k_3=20$ 远大于 $k_1=0.25$，正是因为航向偏差的数值范围（弧度）比距离（百米）小两个量级。
+    </div>
+  </div>
+  <div class="callout tip">
+    <span class="ct">刻意不使用稀疏奖励</span>
+    论文明确写："我们避免使用稀疏奖励……这些情况（越界、到达）交由<b>终止条件</b>管理。" 这是一个值得抄的工程决策：<b>把"约束"和"目标"分开放</b>——约束进终止条件（硬边界，不可交易），目标进奖励（软引导，可优化）。混在一起时，策略会学会"用违规换奖励"。
+  </div>
+
+  <h3>6.3 观测归一化</h3>
+  <div class="formula">
+    <span class="eq">Eq.(8)(13) — 消除量纲差异</span>
+    $$ o_n[1]=\psi_g/2\pi,\quad o_n[2]=\tanh(\alpha_1 d_h),\quad o_n[3]=\tanh(\alpha_2 d_v),\quad o_n[4]=\tanh(\alpha_3(v_a-\beta_1)),\quad o_n[5]=\tanh(\alpha_4 v_z) $$
+    $$ o_n[i]=o[i]/2\pi\;(i=6,7,8),\qquad o_n[j]=o[j]/4\pi\;(j=9,10,11) $$
+    <div class="note">
+      距离/速度用 <strong>tanh 饱和压缩</strong>（远处近处都可用，且不会因为某一维特别大而主导演网络），角度用 <strong>除以 $2\pi$/$4\pi$</strong> 线性归一。这比"全部 z-score"更适合有物理边界的量。
+    </div>
+  </div>
+
+  <h3>6.4 训练配置（可复现的最小信息集）</h3>
+  <table>
+    <tr><th>项目</th><th>取值</th><th>说明 / 为什么</th></tr>
+    <tr><td>仿真器</td><td><strong>JSBSim</strong>（+ Gym 封装）</td><td>6-DOF、气动表驱动；谱系来自 <code>Gor-Ren/gym-jsbsim</code>，本工作重写为 <code>OpenFlight</code></td></tr>
+    <tr><td>控制频率</td><td>30 Hz（<code>sim_frequency_hz=30</code>）</td><td>与 MPC 基线一致，保证公平对照</td></tr>
+    <tr><td>并行环境</td><td>16（<code>SubprocVecEnv</code>）</td><td>多进程而非 GPU 批量——JSBSim 是 CPU 单线程 C++ 积分，只能靠进程并行</td></tr>
+    <tr><td>算法</td><td>PPO（主）+ A2C/TD3/SAC</td><td>SB3 统一实现、统一超参，5 次独立训练（T0–T4）报一致性</td></tr>
+    <tr><td>收敛预算</td><td>≈ $2\times10^{6}$ 步，奖励约 180</td><td>VLC 四种算法全部收敛；ALC 只有 PPO 稳定（A2C 坠机、SAC 到不了目标）</td></tr>
+    <tr><td>网络</td><td>2×FC(64) + ReLU</td><td>作者称经预实验在"表达力 / 训练效率"间折中，避免过拟合</td></tr>
+    <tr><td>渲染</td><td>Unreal Engine 5，训练时可关闭</td><td>训练关渲染、验证开渲染（Fig. 2 即为 UE5 多机并行可视化）</td></tr>
+    <tr><td>机型</td><td>Skywalker X8（飞翼）</td><td>风洞 + CFD 气动系数；论文自述策略是"为这一机型定制"，跨机型需重训/微调</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 7 ══════════ -->
+<section id="principles">
+  <h2>7. 仿真器专题——为什么是 JSBSim（+ Unreal），好在哪，坑在哪</h2>
+  <p class="lead">这一节是本笔记的重点：把"用什么仿真器 / 为什么 / 好在哪 / 有什么问题"讲清楚，并与同期主流方案对照。</p>
+
+  <h3>7.1 为什么是 JSBSim 而不是 Isaac / MuJoCo / Gazebo / AirSim</h3>
+  <table>
+    <tr><th>候选</th><th>被放弃/被采用的原因</th></tr>
+    <tr><td><strong>Isaac Gym / Isaac Lab</strong></td><td>GPU 张量化批量仿真对<b>多旋翼/人形</b>极强，但对<b>固定翼 6-DOF + 气动表 + 长时程（1200 步/回合）</b>并不划算：JSBSim 的 6-DOF 积分是 CPU 单线程 C++，16 进程即可跑满多核；而 Isaac 的优势（万级并行、GPU 物理）在这里用不上，反而带来平台绑定与部署复杂度。论文没有用，也没有讨论。</td></tr>
+    <tr><td><strong>Gazebo（+ PX4 SITL）</strong></td><td>作者自己的另一条主线（6202、6206）就是 Gazebo + PX4 SITL，用于<b>多旋翼多机验证</b>。但 Gazebo 的固定翼气动需要自己写插件（JSBSim 有现成 FDM 与成熟气动表格式），且 SITL 时钟受实时性约束，不适合 2×10<sup>6</sup> 步训练。</td></tr>
+    <tr><td><strong>AirSim / Unreal</strong></td><td><b>被采用但只用于视觉</b>：开源仓库里保留 AirSim 1.8.1 + UE 通道做可视化与画面采集；论文 Fig.1 明确写"渲染引擎可禁用"。也就是说 AirSim 在这里不是物理仿真器，而是"可选显示器"。</td></tr>
+    <tr><td><strong>MuJoCo / PyBullet</strong></td><td>缺固定翼气动模型与成熟 6-DOF 气动数据格式；要自己实现气动表插值，等于重造 JSBSim。</td></tr>
+    <tr><td><strong>JSBSim（采用）</strong></td><td>航空界事实标准 FDM：<code>.xml</code> 气动/推力/质量配置、<code>FGFDMExec</code> 数值积分、可脚本化初始条件、Python 绑定。X8 模型可直接由风洞/CFD 系数填表。<b>关键：它是"纯动力学"，没有渲染、没有 ROS、没有场景——因此极快，且极易嵌进 Gym 循环。</b></td></tr>
+  </table>
+
+  <h3>7.2 好在哪（可迁移的经验）</h3>
+  <ul>
+    <li><strong>动力学与渲染解耦</strong>：训练只跑 JSBSim（无渲染），验证/展示才挂 Unreal。这是"既高保真又跑得动"的唯一现实路径——保真度花在物理上，预算省在像素上。</li>
+    <li><strong>Gym 接口 + SB3 向量化</strong>：<code>gym.make("airgym:jsbsim-uni-uav-sample-v2")</code> + <code>SubprocVecEnv(16)</code>，换算法只需换 SB3 的一行——这让"同一奖励、同一终止、四种算法"的严格对照成为可能（也正是发现"只有 PPO 能扛 ALC"的前提）。</li>
+    <li><strong>气动数据的外部化</strong>：X8 的系数放在 <code>x8.xml</code>，换机型 = 换一个 xml（理论上）。这让方法学上"可复现"、工程上"可迁移"。</li>
+    <li><strong>代码开源 + 单机可跑</strong>：<code>OpenFlight</code> 在本仓库 <a href="../../../../1.Paper/OpenFlight/note.html">1.Paper/OpenFlight</a> 有完整代码与笔记，不需要 GPU 集群即可复现训练曲线。</li>
+  </ul>
+
+  <h3>7.3 有什么问题（诚实清单）</h3>
+  <table>
+    <tr><th>问题</th><th>具体表现</th><th>影响</th></tr>
+    <tr><td><strong>① 无风 / 无湍流 / 无传感器噪声</strong></td><td>论文通篇未提风场、阵风、气动参数摄动或状态估计误差；观测直接取自 JSBSim 真值状态</td><td>★★★★ 真机上的气动不确定性正是固定翼最难的部分；"仿真里 20.24 s"不能外推为"真机 20.24 s"</td></tr>
+    <tr><td><strong>② 无域随机化 / 无 sim-to-real</strong></td><td>没有域随机化（DR）、没有系统辨识、没有真机实验；作者在结论里承认策略"专为 X8 定制"，跨平台需重训</td><td>★★★★★ 这是本文最大的空白：控制层级降到执行器级后，对模型误差的敏感性反而更高（PID 曾经提供的那点鲁棒性被去掉了）</td></tr>
+    <tr><td><strong>③ 单机单任务、回合短</strong></td><td>只有点到点、无障碍、无其他飞行器；40 s 回合上限</td><td>★★★ 无法证明在障碍/编队/对抗场景下仍成立（作者列为 future work）</td></tr>
+    <tr><td><strong>④ 吞吐仍受 CPU 限制</strong></td><td>JSBSim 单线程；16 进程已是桌面级上限；2×10<sup>6</sup> 步 × 5 次训练 × 4 种算法的实验矩阵不便宜</td><td>★★★ 想扩到视觉输入（渲染必须开）时，这套栈会立刻撞墙</td></tr>
+    <tr><td><strong>⑤ 版本与资产一致性</strong></td><td>论文正文/图注说 UE5，开源仓库实际是 AirSim 1.8.1（UE4 时代）；渲染只是可选项，二者不一致会让复现者困惑</td><td>★★ 复现时以仓库为准；写论文时应显式给出 AirSim/UE 版本</td></tr>
+    <tr><td><strong>⑥ 基线强度可再提高</strong></td><td>MPC 用单轨模型（为实时性让步）；Dubins 是解析路径不是最优控制；缺少"动力学可行的时间最优轨迹"（如基于 collocation 的 OCP）作为上界</td><td>★★ 20.24 s 距真正的时间最优下界还有多少？没有回答</td></tr>
+  </table>
+  <div class="callout warn">
+    <span class="ct">一句话总结这套仿真器的取舍</span>
+    <b>用"纯动力学、无渲染、可脚本化"的 JSBSim 换训练吞吐，用"渲染可开关"的 Unreal 换展示效果，用"单一机型 + 无扰动"换干净的对照实验。</b> 代价是把 sim-to-real 的全部风险留给了未来工作。
+  </div>
+</section>
+
+<!-- ══════════ 8 ══════════ -->
+<section id="figures">
+  <h2>8. 图表解读</h2>
+  <div class="fig">
+    <img src="figures/overview.png" alt="JAI 2026 p.130 — Fig.2 UE5 并行仿真与训练细节">
+    <div class="cap">本地 PDF 第 5 页（刊页 130）直接渲染：上半为 §3.7 训练细节正文，下半 <b>Fig. 2 "Parallel simulation of multiple UAVs and visualization based on UE5"</b>——多架 X8 在同一 UE5 场景中并行飞行，用于验证"渲染可关、动力学常开"的训练-验证双模式。图片来自本地 PDF，无外部素材。</div>
+  </div>
+  <h3>8.1 表 1 的读法（平均到达时间 / 标准差，单位 s，目标水平 500 m）</h3>
+  <table>
+    <tr><th>方法</th><th>设置</th><th>平均时间</th><th>Std</th><th>解读</th></tr>
+    <tr><td>Dubins</td><td>14 m/s</td><td>35.36</td><td>4.08</td><td>低速够不到高空点（升力不足），部分超时</td></tr>
+    <tr><td>Dubins</td><td>20 m/s</td><td>27.94</td><td>4.19</td><td>唯一全部可达的定速档</td></tr>
+    <tr><td>Dubins</td><td>26 m/s</td><td>32.32</td><td>13.73</td><td>高速够不到低空点；方差爆炸说明"定速假设"彻底失效</td></tr>
+    <tr><td>MPC</td><td>单轨 + SLSQP</td><td>25.50</td><td>3.94</td><td>略胜 VLC，但输给 ALC</td></tr>
+    <tr><td>VLC · A2C</td><td>速度级</td><td>29.98</td><td>4.22</td><td>最差 RL</td></tr>
+    <tr><td>VLC · TD3</td><td>速度级</td><td>25.89</td><td>5.33</td><td>与 PPO 接近</td></tr>
+    <tr><td>VLC · SAC</td><td>速度级</td><td>28.24</td><td>4.44</td><td>—</td></tr>
+    <tr><td>VLC · PPO</td><td>速度级</td><td>25.94</td><td>1.39</td><td>方差最小，最稳</td></tr>
+    <tr><td>ALC · A2C</td><td>执行器级</td><td>—</td><td>—</td><td><b>坠机</b>，被排除</td></tr>
+    <tr><td>ALC · TD3</td><td>执行器级</td><td>26.08</td><td>1.36</td><td>比 VLC 略差——说明 ALC 不是"自动更快"</td></tr>
+    <tr><td>ALC · SAC</td><td>执行器级</td><td>50.00</td><td>0.0</td><td><b>全部超时</b>，未能到达</td></tr>
+    <tr style="background:#fef3c7"><td><strong>ALC · PPO</strong></td><td>执行器级</td><td><strong>20.24</strong></td><td><strong>1.36</strong></td><td><b>最快且最稳</b>：比 VLC-PPO 快 22.0%、比 Dubins(20 m/s) 快 27.6%</td></tr>
+  </table>
+  <div class="callout">
+    <span class="ct">这张表最重要的一行不是最好那行，而是 ALC·TD3（26.08）</span>
+    如果 ALC 天然优于 VLC，那 TD3 也该更快。它没有——说明<b>"执行器级"只是把上界打开了，能不能吃到红利取决于算法是否稳</b>。同一任务下 SAC/A2C 直接崩，PPO 独活，这不是巧合：裁剪式策略更新对"高方差、强耦合、易发散"的执行器级控制更友好。
+  </div>
+</section>
+
+<!-- ══════════ 9 ══════════ -->
+<section id="flaw">
+  <h2>9. 不足与扩展方向</h2>
+  <h3>9.1 论文自述的边界</h3>
+  <ul>
+    <li>只针对 <b>Skywalker X8</b> 训练，策略是机型定制的；换平台需用新气动参数重训或二次微调。</li>
+    <li>只做<b>点到点</b>，无静态障碍、无动态威胁、无风。</li>
+    <li>未做真机验证；未讨论状态估计（真机上 $v_a$、$\omega$、$\alpha$ 都带噪声）。</li>
+  </ul>
+  <h3>9.2 我会追问的三件事</h3>
+  <ol>
+    <li><b>时间最优下界在哪里？</b>用直接配点法（collocation）解同一 6-DOF 模型的 OCP，得到 $t_f^*$ 后，才能判断 20.24 s 是"接近最优"还是"还差一截"。这是把 RL 结果"学术化"的最短路径。</li>
+    <li><b>去掉 PID 后，鲁棒性从哪来？</b>PID 曾提供隐式的鲁棒性；ALC 把它拿掉了。补法有三条：域随机化（气动系数 ±10%、质量/惯量扰动）、观测噪声注入、在奖励或终止条件里加"姿态安全包线"。哪条代价最小值得做对比实验。</li>
+    <li><b>能否用"残差控制"两头都要？</b>以 MPC 或 L1 自适应为基准控制器，RL 只学残差——既保留闭环鲁棒性，又拿回机动性。这是固定翼 RL 最现实的工程路线。</li>
+  </ol>
+  <h3>9.3 从仿真器角度的扩展</h3>
+  <ul>
+    <li><b>升级物理</b>：JSBSim → 支持阵风/湍流模型（Dryden/von Karman），或在 JSBSim 外挂大气扰动；进一步可用 CFD 预计算的非线性气动数据表（大迎角失速区）。</li>
+    <li><b>升级吞吐</b>：若要加视觉或大规模并行，转向 GPU 张量化栈（见 <a href="../../../../10.Simulators/comparison.html">10.Simulators 对比</a>）——但固定翼气动表在 GPU 上要自己重写。</li>
+    <li><b>升级验证</b>：sim2sim（JSBSim → Gazebo/PX4 固定翼 SITL）+ 硬件在环，是在真机之前必须补的一环。</li>
+  </ul>
+</section>
+
+<!-- ══════════ 10 ══════════ -->
+<section id="motivation">
+  <h2>10. 动机推导</h2>
+  <div class="callout idea">
+    <span class="ct">一句话动机</span>
+    固定翼的"时间最优"本质是榨干欠驱动耦合动力学，而<b>只要 RL 输出的是速度/航向指令，PID 就先把机动性砍掉一截</b>——那为什么不直接让网络控舵面和油门，同时用足够高保真的 6-DOF 模型保证学到的动作在物理上成立、用可关渲染的仿真栈保证训练跑得完？
+  </div>
+  <h3>10.1 推导链</h3>
+  <ol>
+    <li><b>现象</b>：现有固定翼 RL 工作都在内环/外环做"跟踪"，没有人以 $t_f$ 为目标；而固定翼的极限性能恰恰体现在急转、俯冲加速这类"不跟踪任何参考"的机动上。</li>
+    <li><b>归因</b>：限制来自两类东西——(a) 控制接口（外环 + PID 的双层结构），(b) 仿真保真度（简化质点模型学不出气动耦合）。</li>
+    <li><b>解法</b>：(a) → 执行器级动作空间；(b) → JSBSim 6-DOF + 风洞/CFD 气动系数。</li>
+    <li><b>控制变量</b>：把 VLC 与 ALC 放进同一 POMDP、同一奖励、同一算法库，只改动作空间——于是"层级"成了唯一变量，22% 的提升才有说服力。</li>
+    <li><b>兜底</b>：训练初期 ALC 极易发散，用"角速度 &gt; 10 rad/s 终止"和"5 次独立训练"来证明结论不是随机种子幸运。</li>
+  </ol>
+  <h3>10.2 如果是我会怎么改进这个 idea</h3>
+  <ul>
+    <li>把"时间最优"改成"时间-能量帕累托"：真实任务很少只关心时间，一条帕累托前沿比单一 20.24 s 更有工程价值。</li>
+    <li>引入<b>课程式目标距离</b>（100 m → 500 m → 1 km），并用同一策略零样本外推，检验"时间最优"是否真的学到了泛化策略而不只是过拟合 64 个目标点。</li>
+    <li>用<b>可达性分析</b>（reachability / viability kernel）给出"哪些目标在 40 s 内物理可达"的先验，替代目前靠 Dubins 试出来的边界。</li>
+  </ul>
+</section>
+
+<!-- ══════════ 11 ══════════ -->
+<section id="takeaway">
+  <h2>11. 关键启示</h2>
+  <h3>11.1 方法论</h3>
+  <ul>
+    <li><b>先问"瓶颈在接口还是在算法"。</b>这篇论文的收益几乎全部来自换控制接口；A2C/TD3/SAC 与 PPO 的差异是二阶效应。</li>
+    <li><b>约束进终止、目标进奖励。</b>把硬边界（高度、角速度、超时）做成 episode termination，奖励只留密集的引导项——比把二者揉进奖励稳定得多。</li>
+    <li><b>用"同一框架下只改一个变量"的方式立论。</b>VLC vs ALC 的同奖励、同算法、同终止对照，比"我们的方法比基线好"有力得多。</li>
+  </ul>
+  <h3>11.2 可直接迁移到我的课题</h3>
+  <ul>
+    <li><b>仿真器选型</b>：固定翼 → JSBSim（纯动力学、气动表驱动、CPU 便宜）；多旋翼多机 → Stage（快）+ Gazebo/PX4 SITL（真）；视觉 → AirSim/UE 或 Isaac。参见 <a href="../../sim-stack.html">他本人的仿真器选择图谱</a>。</li>
+    <li><b>Gym 封装 + SB3 向量化</b>是"低成本做严谨对照实验"的模板：<code>SubprocVecEnv</code> + 统一超参 + 5 个种子。</li>
+    <li><b>渲染可关</b>这一条几乎可以无脑套用到任何"高保真仿真 + RL 训练"的场景。</li>
+    <li><b>代码即论文</b>：开源 <code>OpenFlight</code> 让"16 并行 / 30 Hz / x8.xml"这些关键数字可核对——写作时把仓库地址放进正文是很划算的做法。</li>
+  </ul>
+  <h3>11.3 值得追踪的参考</h3>
+  <table>
+    <tr><th>文献</th><th>为什么重要</th></tr>
+    <tr><td>Rennie, <em>gym-jsbsim</em>（GitHub）</td><td>本文仿真栈的直接上游；理解 JSBSim 的 Python 封装与 Gym 接口设计</td></tr>
+    <tr><td>Bøhn et al., PPO/SAC 固定翼姿态控制 + 真机验证</td><td>把 RL 固定翼真正飞起来的少数工作；对照本文"无真机"的空白</td></tr>
+    <tr><td>Chowdhury &amp; Keshmiri, PPO 直接控舵面</td><td>执行器级控制的先行者，但目标不是时间最优</td></tr>
+    <tr><td>Eckstein, <em>Markov-Pilot</em>（DDPG 自驾仪）</td><td>另一条"用 RL 替代自驾仪"的路线，可与 ALC 对照</td></tr>
+  </table>
+</section>
+
+<footer>
+  Paper Notes · Guanzheng Wang · 6201 · Journal of Automation and Intelligence 5 (2026) 126–138 · DOI 10.1016/j.jai.2025.11.007 · 依据本地 PDF 全文整理
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reliable Collision Avoidance for Small UAVs via DRL with UDR (Unmanned Systems 2026) — Guanzheng Wang Notes</title>
+<script>
+MathJax = { tex:{inlineMath:[['$','$']],displayMath:[['$$','$$']],tags:'ams'}, options:{enableMenu:false} };
+</script>
+<script src="../../../../assets/vendor/mathjax-tex-svg-full.js" async></script>
+<script src="../../../../assets/vendor/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'neutral',securityLevel:'loose',flowchart:{useMaxWidth:false,htmlLabels:true,nodeSpacing:44,rankSpacing:60,padding:10}});</script>
+<style>
+  :root{
+    --bg:#f6f8fb;--surface:#fff;--line:#dfe5ee;--ink:#172033;--muted:#64748b;
+    --blue:#2563eb;--green:#059669;--amber:#d97706;--rose:#e11d48;--violet:#7c3aed;--cyan:#0891b2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",Roboto,Arial,sans-serif;line-height:1.72}
+  nav{position:sticky;top:0;z-index:90;display:flex;gap:4px;align-items:center;flex-wrap:wrap;padding:9px 20px;background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+  nav a{font-size:12px;font-weight:600;color:#475569;text-decoration:none;padding:4px 8px;border-radius:5px}
+  nav a:hover{background:#dbeafe;color:#1d4ed8}
+  nav .home{color:#ea580c;border:1px solid #fb923c;font-weight:800}
+  nav .brand{font-weight:800;font-size:12.5px;margin:0 8px;color:#0f172a}
+  .container{max-width:1100px;margin:0 auto;padding:24px 20px 56px}
+  section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 26px;margin-bottom:18px;box-shadow:0 1px 3px rgba(15,23,42,.04);scroll-margin-top:54px}
+  h1{font-size:23px;line-height:1.35;margin-bottom:8px}
+  h2{font-size:18px;margin-bottom:16px}
+  h3{font-size:15px;margin:20px 0 8px;color:#1e293b}
+  h4{font-size:13.5px;margin:16px 0 6px}
+  p,li,td,th{font-size:14px;color:#334155}
+  p{margin-bottom:8px}
+  ul,ol{margin:6px 0 12px 22px}
+  li{margin-bottom:4px}
+  code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:1px 5px;font-size:12.5px;font-family:Consolas,monospace}
+  table{width:100%;border-collapse:collapse;margin:10px 0 14px;font-size:13.5px}
+  th{background:#f1f5f9;text-align:left;padding:8px 11px;border:1px solid #e2e8f0;font-weight:700}
+  td{padding:7px 11px;border:1px solid #e2e8f0;vertical-align:top}
+  tr:nth-child(even) td{background:#fafbfc}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;margin:3px 5px 3px 0;background:#dbeafe;color:#1d4ed8}
+  .tag.g{background:#d1fae5;color:#047857}.tag.a{background:#fef3c7;color:#92400e}
+  .tag.r{background:#ffe4e6;color:#be123c}.tag.p{background:#ede9fe;color:#6d28d9}
+  .tag.c{background:#cffafe;color:#0f766e}.tag.n{background:#f1f5f9;color:#475569}
+  .callout{border-left:4px solid var(--blue);background:#eff6ff;border-radius:0 8px 8px 0;padding:13px 17px;margin:11px 0;font-size:13.5px;color:#1e3a5f}
+  .callout.tip{border-color:var(--green);background:#ecfdf5;color:#064e3b}
+  .callout.warn{border-color:var(--amber);background:#fffbeb;color:#78350f}
+  .callout.danger{border-color:var(--rose);background:#fff1f2;color:#7f1d1d}
+  .callout.idea{border-color:var(--violet);background:#f5f3ff;color:#3b1f7e}
+  .callout b{color:#0f172a}
+  .callout .ct{display:block;font-weight:800;font-size:12.5px;margin-bottom:4px}
+  .formula{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin:11px 0;overflow-x:auto}
+  .formula .eq{display:inline-block;font-size:11.5px;font-weight:800;color:#1d4ed8;background:#dbeafe;padding:2px 8px;border-radius:4px;margin-bottom:6px}
+  .formula .note{margin-top:9px;padding-top:9px;border-top:1px dashed #e2e8f0;font-size:12.5px;color:#64748b;line-height:1.65}
+  mjx-container[display="true"]{font-size:112%!important;margin:8px 0!important}
+  .mermaid-box{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin:11px 0;overflow-x:auto;text-align:center}
+  .fig{background:#fafbfc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin:14px 0}
+  .fig .cap{font-size:12px;color:#64748b;margin-top:8px}
+  .fig img{display:block;width:100%;height:auto;border:1px solid #e2e8f0;border-radius:6px;background:#fff}
+  .cmp{display:flex;gap:12px;flex-wrap:wrap;margin:11px 0}
+  .cmp>div{flex:1;min-width:250px;border:1px solid var(--line);border-radius:8px;padding:14px;background:#fafbfc}
+  .cmp h4{margin-top:0}
+  .series{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px}
+  .series .t{font-size:12px;font-weight:800;margin-bottom:7px}
+  .series a{display:inline-block;font-size:11.5px;font-weight:700;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:3px 8px;margin:2px 4px 2px 0;text-decoration:none}
+  .series a:hover,.series a.on{color:#1d4ed8;background:#dbeafe;border-color:#bfdbfe}
+  footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
+  .lead{color:var(--muted);font-size:13px;margin-bottom:14px}
+</style>
+<link rel="stylesheet" href="../../../../assets/site-ui.css">
+<script src="../../../../assets/site-ui.js" defer></script>
+</head>
+<body>
+
+<nav>
+  <a class="home" href="../../index.html">🏠 HOME</a>
+  <span class="brand">Guanzheng Wang · 6202</span>
+  <a href="#info">1. 论文信息</a>
+  <a href="#insight">2. 核心洞察</a>
+  <a href="#architecture">3. 系统架构</a>
+  <a href="#task">4. 任务定义</a>
+  <a href="#challenge">5. 挑战分析</a>
+  <a href="#method">6. 方法公式</a>
+  <a href="#principles">7. 仿真器专题</a>
+  <a href="#figures">8. 图表解读</a>
+  <a href="#flaw">9. 不足扩展</a>
+  <a href="#motivation">10. 动机推导</a>
+  <a href="#takeaway">11. 关键启示</a>
+</nav>
+
+<div class="container">
+
+<div class="series">
+  <div class="t">📖 Guanzheng Wang · 6 篇笔记阅读顺序</div>
+  <a href="../6206/index.html">6206 硕士论文（2021）</a>
+  <a href="../6203/index.html">6203 事件相机 CICAI（2022）</a>
+  <a href="../6205/index.html">6205 仿射编队 AST（2025）</a>
+  <a href="../6204/index.html">6204 空中拦截 AIHCIR（2025）</a>
+  <a class="on" href="../6202/index.html">6202 UDR 避碰 US（2026）</a>
+  <a href="../6201/index.html">6201 时间最优 JAI（2026）</a>
+  <a href="../../sim-stack.html">🛠 仿真器选择图谱</a>
+  <a href="../../index.html">Index</a>
+</div>
+
+<!-- ══════════ 1 ══════════ -->
+<section id="info">
+  <h1>Reliable Collision Avoidance for Small UAVs via Deep Reinforcement Learning with Unified Data Representation</h1>
+  <p class="lead">统一数据表示（UDR）：把"邻居位置"投影成 LiDAR 距离读数，让小型多旋翼集群在感知盲区下可靠避碰</p>
+  <table>
+    <tr><td style="width:96px"><strong>作者</strong></td><td><strong>Guanzheng Wang</strong>（王冠政，第一作者）、<strong>Xiangke Wang</strong>（王祥科）、<strong>Zhihong Liu</strong>（刘志宏）、<strong>Yunhao Liu</strong>（刘云浩）、<strong>Xiaoxin Li</strong>（李晓鑫）</td></tr>
+    <tr><td><strong>单位</strong></td><td>国防科技大学 智能科学学院（长沙）</td></tr>
+    <tr><td><strong>期刊</strong></td><td>Unmanned Systems（World Scientific），2026 在线发表，pp. 1–12；DOI: 10.1142/S2301385026500500；ISSN 2301-3850（本笔记依据 EBSCO 全文预印版 PDF）</td></tr>
+    <tr><td><strong>一句话</strong></td><td>不等价地"把 LiDAR 和通信数据拼起来"，而是<b>把邻居的位置合成成假的 LiDAR 回波，写进同一张距离图像</b>——观测维度不变（512）、语义一致、无需额外特征层；在 Stage 里用 12 进程 CTDE 训 10 万回合，再在 <b>PX4 SITL + Gazebo</b> 中验证：交错飞行场景成功率 100%（基线 PPO-LiDAR 仅 53.3%），复杂街区 100%（基线 71.7%）。</td></tr>
+  </table>
+  <div style="margin-top:9px">
+    <span class="tag">Multi-UAV</span>
+    <span class="tag g">UDR</span>
+    <span class="tag p">POMDP</span>
+    <span class="tag c">Stage（训练）</span>
+    <span class="tag a">Gazebo + PX4 SITL（验证）</span>
+    <span class="tag n">PPO / Stable-Baselines3</span>
+    <span class="tag r">Sensor blind zone</span>
+  </div>
+</section>
+
+<!-- ══════════ 2 ══════════ -->
+<section id="insight">
+  <h2>2. 核心洞察与创新点</h2>
+
+  <div class="callout idea">
+    <span class="ct">🎯 核心洞察：多模态融合的正确姿势不是"拼接"，而是"投影到同一模态"</span>
+    小型旋翼机的 2D LiDAR 装在顶部/前部，机体自身会遮挡视线；加上飞行中的姿态波动，<b>邻近 UAV 经常只被扫到一部分、甚至完全扫不到</b>（Fig.1(b)）。直觉做法是把"最近邻位置"作为一个额外输入拼到观测向量后面（PPO-Concat）——但这引入了<b>两类语义不一致</b>：维度/量纲不一致（512 维距离图像 + 2 维坐标），以及"距离图像上的空 vs 坐标上的有"的逻辑冲突。作者的洞察是：<b>既然两者本质都是"到某方向的距离"，就把通信得到的邻居位置<u>渲染</u>成 LiDAR 回波</b>——在邻居所在角度区间内，把距离值替换为 $\min(o_l, d_s)$。这样观测维度、语义、网络结构全都不用改，只把"盲区"补上了。
+  </div>
+  <div class="callout tip">
+    <span class="ct">为什么这一步能带来 20% 的奖励提升（而不只是几个百分点）</span>
+    因为 POMDP 下 Critic/Actor 学的是"观测 → 动作 → 后果"的映射。<b>同一个观测若对应两种截然不同的真实状态（前面是墙 / 前面是友机），网络只能学到"平均最优"</b>——而平均最优在避碰任务里等于"两边都不安全"。UDR 把"友机"这个隐变量显式写进观测，等于把 POMDP 往 MDP 推了一步，采样效率自然上去。
+  </div>
+
+  <h3>2.1 创新点拆解</h3>
+  <table>
+    <tr><th>创新点</th><th>做法</th><th>解决什么</th></tr>
+    <tr><td><strong>① UDR 数据融合</strong></td><td>三步：原始数据获取 → 生成模拟 LiDAR 读数 → 按角度区间融合（<code>o_l[is:ie] = min(o_l, ds)</code>）</td><td>补传感器盲区，同时<b>不增加观测维度</b>（仍 512 点），避免"高维 + 异质"带来的训练困难</td></tr>
+    <tr><td><strong>② 量化了"拼接式融合"的失败</strong></td><td>设 PPO-Concat 基线（LiDAR 特征 + 最近邻位置）；结果训练奖励不如纯 LiDAR 的 PPO-LiDAR</td><td>给出一个可复用的负面结论：<b>异质观测直接拼接会降低采样效率</b>，不是信息越多越好</td></tr>
+    <tr><td><strong>③ 分层仿真验证</strong></td><td>Stage 训练（快） → Gazebo + PX4 SITL 验证（真）；两套场景不同（训练含随机障碍，验证为交错飞行 / 城市街区）</td><td>同时回答"学得会"和"迁得动"两个问题——这是本文在方法论上比多数 DRL 避碰论文严谨的地方</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 3 ══════════ -->
+<section id="architecture">
+  <h2>3. 系统架构</h2>
+
+  <h3>3.1 UDR 的生成管线</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph SENSE["① 原始数据"]
+      LID["2D LiDAR 扫描<br/>大 HFOV · 512 点"]
+      COM["通信：邻居 UAV 位置"]
+    end
+    subgraph GEN["② 合成 LiDAR 读数"]
+      NB{"邻居判定<br/>‖p0−pi‖₂ 小于 Rs+Rl"}
+      DS["ds = d10 − Rs<br/>合成距离"]
+      ANG["α = 2·atan2(Rs, d10)<br/>融合角度区间"]
+    end
+    subgraph FUSE["③ 数据融合"]
+      IDX["起止索引 is = ξs/γ·Nb，ie = ξe/γ·Nb"]
+      MIN["o_l[is:ie] = min(o_l, ds)"]
+    end
+    subgraph POL["④ 策略"]
+      OBS["观测 = 3 帧 UDR + 目标相对位置 + 速度"]
+      CNN["Conv1D 32ch(k5) → Conv1D 32ch(k3) → FC256 → FC128"]
+      ACT["a = [vx, ωz]"]
+    end
+    LID --> MIN
+    COM --> NB --> DS --> MIN
+    NB --> ANG --> IDX --> MIN
+    MIN --> OBS --> CNN --> ACT
+    classDef s fill:#fef7ed,stroke:#f59e0b,color:#92400e
+    classDef g fill:#e8f0fe,stroke:#3b82f6,color:#1d4ed8
+    classDef f fill:#ecfdf5,stroke:#10b981,color:#047857
+    classDef p fill:#f5f3ff,stroke:#8b5cf6,color:#6d28d9
+    class LID,COM s
+    class NB,DS,ANG g
+    class IDX,MIN f
+    class OBS,CNN,ACT p
+    </pre>
+  </div>
+
+  <h3>3.2 训练与验证的两套仿真器</h3>
+  <div class="mermaid-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph TRAIN["训练侧 · Stage（2.5D 多机器人仿真器）"]
+      T1["12 架 UAV · 12 个独立进程<br/>mpi4py 通信"]
+      T2["主进程：收集经验 → 经验池 → 更新参数 → 广播"]
+      T3["PPO（SB3 默认超参）· 100,000 episodes"]
+    end
+    subgraph VALID["验证侧 · PX4 SITL + Gazebo"]
+      V1["PX4 固件：底层控制"]
+      V2["Gazebo：动力学 / 场景渲染 / 传感器"]
+      V3["ROS topic & service（MAVROS）"]
+      V4["XTDrone 开源工程"]
+    end
+    T1 --> T2 --> T3
+    T3 -->|"策略权重 actor"| V1
+    V1 --> V2 --> V3
+    V3 -->|"LiDAR 数据 topic"| V1
+    classDef t fill:#e8f0fe,stroke:#3b82f6,color:#1d4ed8
+    classDef v fill:#fef7ed,stroke:#f59e0b,color:#92400e
+    class T1,T2,T3 t
+    class V1,V2,V3,V4 v
+    </pre>
+  </div>
+  <p class="lead">注意结构：<b>训练时完全不碰 Gazebo，验证时完全不碰 Stage</b>。两套仿真器各司其职，中间只传一份策略权重——这是作者在多篇工作中反复使用的"轻训练 / 重验证"范式（见 6205、6201）。</p>
+</section>
+
+<!-- ══════════ 4 ══════════ -->
+<section id="task">
+  <h2>4. 任务定义</h2>
+  <div class="formula">
+    <span class="eq">POMDP 五元组 + 分布式架构</span>
+    $$ \langle \mathcal{S}, \Omega, \mathcal{A}, \mathcal{R}, \mathcal{P} \rangle,\qquad \max_\pi \; \mathbb{E}\Big[\textstyle\sum_{t}\gamma^t r_t\Big],\qquad \pi \text{ 在全部 UAV 间共享} $$
+    <div class="note">
+      <strong>共享策略</strong>：所有 UAV 同构、无领航者、分布式执行——参数共享既提升样本效率，也让集群规模可扩展&nbsp;|&nbsp;
+      <strong>执行时</strong>只用 Actor（各机本地推理），<strong>训练时</strong>集中聚合经验（CTDE）——部署无中心节点。
+    </div>
+  </div>
+  <table>
+    <tr><th>要素</th><th>内容</th></tr>
+    <tr><td><strong>观测 $o_t$</strong></td><td>三部分：$o_t^l$（<b>3 帧连续 UDR</b>，降采样到 512 点，用于捕捉障碍运动趋势）＋ $o_t^g$（目标相对位置）＋ $o_t^v$（体坐标系下 $v_x$ 与 $\omega_z$）</td></tr>
+    <tr><td><strong>动作 $a_t$</strong></td><td>$[v_x, \omega_z]$，$v_x\in[0,1]$ m/s，$\omega_z\in[-1,1]$ rad/s——<b>速度级</b>（不是推力/角速率级）</td></tr>
+    <tr><td><strong>奖励</strong></td><td>$r^t = r_g^t + r_c^t + r_\omega^t$：目标奖励（到达 + 接近增量）、碰撞惩罚（碰撞后<b>重置到初始位置</b>）、角速度平滑惩罚</td></tr>
+    <tr><td><strong>成功判据</strong></td><td>到达目标（半径 $R_g$）且全程无碰撞（机-机距离 ≤ $2R_s$ 或 机-障碍 ≤ $R_s$ 即判定碰撞）</td></tr>
+    <tr><td><strong>场景</strong></td><td>训练：Stage 中带随机障碍的复杂场景；验证 Part 1：6 架分两组交错飞行 + 9 个 Φ1 m 圆柱；Part 2：复杂城市街区（多种建筑形状）</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 5 ══════════ -->
+<section id="challenge">
+  <h2>5. 挑战分析</h2>
+  <div class="callout warn">
+    <span class="ct">三个真实难点（都不是"算法不够强"）</span>
+    <b>① 感知盲区是物理的，不是算法的。</b>小型旋翼机 LiDAR 装在顶部，机体遮挡 + 姿态波动 + 高度漂移，导致邻近 UAV 只能被部分扫描。这个问题在<b>仿真里就存在</b>（Fig.1(b)），不是仿真到现实的落差。<br>
+    <b>② 多模态信息的"表达不一致"。</b>距离图像是稠密、有序、同量纲的；邻居坐标是稀疏、无序、异量纲的。直接拼接会让网络把"某个方向没有回波"和"那个方向有友机但坐标很大"当成互斥证据。<br>
+    <b>③ 稀疏奖励 + 高维观测。</b>512×3 帧的输入 + 只有"到达/碰撞"两种稀疏事件，必须靠奖励整形（接近增量 + 平滑项）才能训起来。
+  </div>
+  <h3>5.1 基线为什么不行</h3>
+  <table>
+    <tr><th>基线</th><th>做法</th><th>为什么失败</th></tr>
+    <tr><td>PPO-LiDAR</td><td>只用原始 LiDAR 帧</td><td>看不到友机 → 交错飞行场景成功率仅 <b>53.3%</b>；城市街区 71.7%（碰撞点集中在机-机相遇）</td></tr>
+    <tr><td>PPO-Concat</td><td>LiDAR 特征 + 最近邻 UAV 位置拼接</td><td>信息更多但<b>训练奖励反而低于纯 LiDAR</b>；成功率 76.7% / 83.3%。原因：观测语义不一致 → 网络学到矛盾的关联</td></tr>
+    <tr><td>NH-ORCA</td><td>非完整约束 ORCA（模型驱动、有避碰保证）</td><td>交错场景 100% 但<b>耗时更长</b>（26.70 s vs 26.09 s）；城市街区因难以处理复杂不规则未知障碍被排除；且 ORCA 不保证到达（可能死锁）</td></tr>
+    <tr><td>PPO-UDR（本文）</td><td>把邻居位置投影进 LiDAR</td><td>两场景均 100%，时间方差最小（0.17 / 0.56）</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 6 ══════════ -->
+<section id="method">
+  <h2>6. 方法与核心公式</h2>
+
+  <h3>6.1 邻居判定</h3>
+  <div class="formula">
+    <span class="eq">Eq.(3) — 何时需要融合</span>
+    $$ \lVert p_0 - p_i \rVert_2 &lt; R_s + R_l $$
+    <div class="note">
+      <strong>$R_s$</strong> = UAV 安全半径&nbsp;|&nbsp;<strong>$R_l$</strong> = LiDAR 最大测距。
+      含义：只有当邻居进入"安全半径 + LiDAR 量程"之和以内，两者才可能在 LiDAR 视场里发生重叠，融合才有意义——避免了不必要的通信与计算。
+    </div>
+  </div>
+
+  <h3>6.2 核心三步：合成读数 → 定角度区间 → 取最小值</h3>
+  <div class="formula">
+    <span class="eq">Eq.(4)(5)(6)(10) — UDR 的数学形式</span>
+    $$ d_{10}=\lVert p_1-p_0\rVert_2,\qquad d_s=d_{10}-R_s $$
+    $$ \alpha = 2\,\mathrm{atan2}(R_s,\,d_{10}),\qquad \xi_s=\gamma+\beta-\tfrac12\alpha,\quad \xi_e=\gamma+\beta+\tfrac12\alpha $$
+    $$ o_l[i_s{:}i_e] = \min\big(o_l[i_s{:}i_e],\; d_s\big) $$
+    <div class="note">
+      <strong>$d_s$</strong> = 把邻居球面"最近点"当作回波距离——即 $\text{机心距离}-$ 安全半径&nbsp;|&nbsp;
+      <strong>$\alpha$</strong> = 邻居在 LiDAR 上张开的视角（由安全半径与距离决定，近则大、远则小）&nbsp;|&nbsp;
+      <strong>$\gamma$</strong> = LiDAR 水平视场角，<strong>$\beta$</strong> = 从 $p_0$ 指向 $p_1$ 的方位角，<strong>$\xi$</strong> = 融合角度&nbsp;|&nbsp;
+      <strong>$\min(\cdot)$</strong> = 关键的一步：<b>只覆盖"比原有回波更近"的角度</b>——若该方向本来就有更近的墙，保留墙（墙才是真障碍）；若原来是空的（远距离/无穷），则填入 $d_s$。这在几何上等价于"把邻居当成一个凸起贴到距离图像上"。
+    </div>
+  </div>
+  <div class="callout tip">
+    <span class="ct">这个设计的三个好处</span>
+    <b>维度不变</b>（512 点，与纯 LiDAR 完全一致，可直接复用网络与超参）；<b>语义一致</b>（都是"该方向多远有东西"）；<b>遮挡自洽</b>（$\min$ 保证不会用友机覆盖更近的真实障碍）。
+  </div>
+
+  <h3>6.3 奖励与网络</h3>
+  <div class="formula">
+    <span class="eq">Eq.(14)–(17) — 三项奖励</span>
+    $$ r^t = r_g^t + r_c^t + r_\omega^t,\qquad
+    r_g^t=\begin{cases} r_a, & \lVert p_i^t-g_i\rVert_2&lt;R_g\\ k_g\big(\lVert p_i^{t-1}-g_i\rVert_2-\lVert p_i^t-g_i\rVert_2\big), & \text{otherwise}\end{cases} $$
+    $$ r_c^t=\begin{cases} r_c, & \lVert p_i^t-p_j^t\rVert_2\le 2R_s \ \text{or}\ \lVert p_i^t-B_n\rVert_2\le R_s\\ 0,&\text{otherwise}\end{cases},\qquad
+    r_\omega^t=\begin{cases}-k_\omega(|\omega_z|-\omega_m),& |\omega_z|>\omega_m\\ 0,&\text{otherwise}\end{cases} $$
+    <div class="note">
+      <strong>$r_g$</strong>：到达奖励 + <b>接近增量</b>（把稀疏到达奖励变稠密）&nbsp;|&nbsp;
+      <strong>$r_c$</strong>：碰撞惩罚，且碰撞后<b>重生在初始位置</b>（一种"软重置"回合终止）&nbsp;|&nbsp;
+      <strong>$r_\omega$</strong>：角速度超阈值才罚——省能 + 平滑，属于"死区惩罚"而非全程正则。
+    </div>
+  </div>
+  <table>
+    <tr><th>网络/训练项</th><th>取值</th></tr>
+    <tr><td>Actor/Critic 结构</td><td>Conv1D(32, k=5) → Conv1D(32, k=3) → FC(256) → FC(128) → 输出（Actor 2 维 / Critic 1 维标量）</td></tr>
+    <tr><td>预处理</td><td>LiDAR 帧降采样到 512 点；连送 3 帧以捕捉动态</td></tr>
+    <tr><td>算法</td><td>PPO（KL 自适应惩罚系数），<b>沿用 SB3 默认超参</b>以保证公平比较</td></tr>
+    <tr><td>并行</td><td>Stage 中 12 架 UAV / 12 进程，mpi4py 主从聚合（A3C/MADDPG 式 CTDE）</td></tr>
+    <tr><td>训练量 / 硬件</td><td>100,000 回合；AMD 5950X + RTX 3090；验证机：i9-9900KF + RTX 2080 + 64 GB</td></tr>
+    <tr><td>推理时延</td><td><b>2.9 ms</b>（1000 次推理均值，6 进程并行）；UDR 生成复杂度 $O(n)$</td></tr>
+  </table>
+</section>
+
+<!-- ══════════ 7 ══════════ -->
+<section id="principles">
+  <h2>7. 仿真器专题——Stage 训练 + Gazebo 验证，为什么这么配</h2>
+  <p class="lead">这篇是他仿真器策略最"教科书"的一篇：<b>2.5D 便宜仿真器负责学习，高保真 ROS/PX4 仿真器负责验收</b>。</p>
+
+  <h3>7.1 为什么训练用 Stage</h3>
+  <table>
+    <tr><th>理由</th><th>具体</th></tr>
+    <tr><td><strong>吞吐</strong></td><td>Stage 是 2.5D 多机器人仿真器（ROS <code>stage_ros</code>）：场景是 2D 占据栅格 + 射线投射，没有 3D 渲染、没有刚体动力学积分。10 万回合 × 12 进程，用桌面 CPU 就能完成。若换 Gazebo/PX4 SITL，单是 SITL 的实时时钟就把训练锁死在 $1\times$ 实时。</td></tr>
+    <tr><td><strong>任务本身是 2D 的</strong></td><td>动作是 $[v_x,\omega_z]$，观测是单层 LiDAR 距离图像——<b>任务的下界就是 2D</b>。用 3D 仿真器去学 2D 策略，是在为用不到的自由度付钱。</td></tr>
+    <tr><td><strong>可并行</strong></td><td>12 个独立进程各自跑一个 Stage 实例 + mpi4py 通信，等价于"12 个 actor 共享一个 learner"；Stage 无图形界面，进程内即可 headless 运行。</td></tr>
+    <tr><td><strong>受控的负面因素</strong></td><td>训练场景"带各种障碍"以提高泛化，但刻意保持与验证场景不同——避免在同一环境里训练+测试的乐观偏差。</td></tr>
+  </table>
+
+  <h3>7.2 为什么验证必须换 Gazebo + PX4 SITL</h3>
+  <ul>
+    <li><b>补上 Stage 缺的三件事</b>：真实旋翼动力学（PX4 的姿态/位置环）、传感器物理（LiDAR 噪声、量程、遮挡）、场景真实感（城市街区建筑）。</li>
+    <li><b>把"策略"接到真实飞控栈上</b>：验证时策略输出的是速度指令，经 MAVROS → PX4 → 电机，这条链路与真机完全一致——这是 sim-to-real 最有信息量的中间一步（比纯 Gazebo 回放强得多）。</li>
+    <li><b>可直接复用生态</b>：基于 <a href="https://github.com/robin-shaun/XTDrone" target="_blank" rel="noopener">XTDrone</a>（作者团队的开源工程），Gazebo/PX4/ROS/MAVROS 的胶水代码不用自己写。</li>
+  </ul>
+
+  <h3>7.3 这套组合的问题</h3>
+  <div class="callout danger">
+    <span class="ct">最要命的一条：训练域与验证域的"物理落差"被当作泛化来宣传</span>
+    Stage 里飞机是<b>运动学质点</b>（给定 $v_x,\omega_z$ 直接位姿积分），Gazebo 里是<b>带姿态动力学的真实旋翼</b>。于是"Stage 训练 → Gazebo 100% 成功"同时混入了两种效应：<b>(a) 策略真的泛化了</b>，<b>(b) Stage 的运动学比 Gazebo 更"听话"</b>。论文没有做消融来分离二者（例如：把同一策略放到 Stage 的验证场景里跑，或把 Gazebo 的动力学换成质点模型再跑）。
+  </div>
+  <table>
+    <tr><th>问题</th><th>说明</th><th>影响</th></tr>
+    <tr><td><strong>① 完全没有 3D</strong></td><td>动作、观测、运动学全部是平面的；Stage 也没有高度维</td><td>★★★★ 论文自述为局限；而"高度漂移导致 LiDAR 漏检友机"这个真实痛点，恰恰<b>只能在 3D 里发生、也只能在 3D 里解决</b></td></tr>
+    <tr><td><strong>② 通信理想化</strong></td><td>邻居位置假设即时可得、无丢包、无延迟、无通信半径限制</td><td>★★★★ UDR 的全部收益建立在"能拿到邻居位置"上；若通信退化，$d_s$ 会失真，$\min$ 融合可能<b>制造虚假障碍</b>（比没有更糟）</td></tr>
+    <tr><td><strong>③ Stage 的 LiDAR 是理想射线</strong></td><td>无噪声、无反射率、无多回波；而 Gazebo 里也未加噪声模型</td><td>★★★ 2.9 ms 推理时延是真的，但"感知可靠性"没有被噪声压力测试</td></tr>
+    <tr><td><strong>④ 验证样本量小</strong></td><td>每个方法每场景 10 次重复实验</td><td>★★ 100% 与 83.3% 在 n=10 下差异显著，但 100% 与 100% 的"时间差 1.6%"不显著</td></tr>
+    <tr><td><strong>⑤ 无真机</strong></td><td>与作者 2021 硕士论文（6206，含真机多机飞行）形成对比——这条线后来停在了 SITL</td><td>★★★★ 团队有真机能力却没上，通常意味着"真机上 UDR 依赖的通信/定位精度不达标"</td></tr>
+  </table>
+  <div class="callout warn">
+    <span class="ct">一句话总结</span>
+    <b>用 Stage 换 10 万回合的训练量，用 Gazebo+PX4 换一次可信的验收，用"2D 假设"换干净的问题定义。</b>代价是把 3D、通信退化、感知噪声这三件真机上最难的事全部推给了未来工作。
+  </div>
+</section>
+
+<!-- ══════════ 8 ══════════ -->
+<section id="figures">
+  <h2>8. 图表解读</h2>
+  <div class="fig">
+    <img src="figures/overview.png" alt="Unmanned Systems 2026 p.6 — Fig.3 UDR 网络与 Stage 训练环境">
+    <div class="cap">本地 PDF 第 6 页直接渲染：<b>Fig. 3</b>——左侧是决策网络（LiDAR 测量 × 邻居位置 → UDR → Conv1D×2 → FC → 动作/价值），右侧是 <b>Stage 仿真器</b>里的训练场景（UAV、LiDAR 量程圈、障碍物）。这一张图同时说明了"融合发生在观测层而非网络层"和"训练在 2.5D 里进行"。图片来自本地 PDF，无外部素材。</div>
+  </div>
+  <h3>8.1 表 2 的读法（成功率 / 平均时间 s）</h3>
+  <table>
+    <tr><th>方法</th><th>Env-1 交错飞行</th><th></th><th>Env-2 城市街区</th><th></th></tr>
+    <tr><th></th><th>SR</th><th>Time (Std)</th><th>SR</th><th>Time (Std)</th></tr>
+    <tr><td>NH-ORCA</td><td>100%</td><td>26.70 (0.64)</td><td>—（不适用）</td><td>—</td></tr>
+    <tr><td>PPO-LiDAR</td><td>53.3%</td><td>27.15 (0.91)</td><td>71.7%</td><td>89.25 (4.93)</td></tr>
+    <tr><td>PPO-Concat</td><td>76.7%</td><td>26.14 (0.87)</td><td>83.3%</td><td><b>84.46 (0.67)</b></td></tr>
+    <tr style="background:#fef3c7"><td><strong>PPO-UDR</strong></td><td><strong>100%</strong></td><td><strong>26.09 (0.17)</strong></td><td><strong>100%</strong></td><td>85.84 (0.56)</td></tr>
+  </table>
+  <div class="callout">
+    <span class="ct">两条容易被忽略的信息</span>
+    <b>(1) 时间几乎不受益，收益全在成功率。</b>UDR 相对 PPO-Concat 在城市街区只慢 1.6%（85.84 vs 84.46），但成功率高出 16.7 个百分点——说明 UDR 换来的是<b>可靠性</b>而不是<b>效率</b>，这与论文标题里的 "Reliable" 一致。
+    <b>(2) 方差是关键证据。</b>UDR 的标准差 0.17 / 0.56 远小于基线的 0.91 / 4.93——这说明策略行为更一致，而不是"运气好跑出了几次 100%"。
+  </div>
+</section>
+
+<!-- ══════════ 9 ══════════ -->
+<section id="flaw">
+  <h2>9. 不足与扩展方向</h2>
+  <h3>9.1 论文自述</h3>
+  <ul>
+    <li>只处理<b>二维平面</b>的点到点导航，未考虑三维动作空间。</li>
+    <li>未考虑<b>通信范围与时延</b>的影响。</li>
+    <li>未来工作：把 UDR 扩展到不同传感器与通信体制；向上层任务（巡逻、动态监测、搜救）延伸。</li>
+  </ul>
+  <h3>9.2 我会追问的三件事</h3>
+  <ol>
+    <li><b>UDR 在通信失效时会不会比不用更糟？</b>$\min$ 融合假设"邻居位置是准的"。若位置有 0.5 m 误差或 200 ms 延迟，合成的回波会落在错误角度——<b>错误信息的危害大于缺失信息</b>。应做"位置噪声 + 延迟 + 丢包"的鲁棒性曲线，并设计置信度加权的融合（例如按邻居位置不确定度扩大 $\alpha$）。</li>
+    <li><b>能不能在 Stage 里就加 3D？</b>把高度作为一维状态、用多层 LiDAR 的"伪 2.5D"（相当于 6201 里的 3 层环向感知思路），成本远低于换 Gazebo，却能覆盖"高度漂移导致漏检"的问题。</li>
+    <li><b>为什么不在 Gazebo 里训练？</b>值得给一个量化对比：Gazebo+PX4 SITL 下的样本吞吐是多少 episodes/hour？如果只慢 5 倍而不是 50 倍，"训练-验证同域"可能更划算——这是本文没有提供的工程决策依据。</li>
+  </ol>
+  <h3>9.3 扩展方向</h3>
+  <ul>
+    <li><b>观测层</b>：UDR 的推广形式——任何"稀疏结构化信息"（视觉检测框、雷达点、ADS-B 航迹）都可以投影成"伪距离/伪像素"，本质是<b>把异质信息编码进同一传感器的物理模型</b>。</li>
+    <li><b>融合层</b>：把固定角度区间 $\alpha$ 换成"按位置协方差加权的概率占据栅格"，天然处理通信不确定性。</li>
+    <li><b>验证层</b>：补 sim2sim（Stage→Gazebo）的<b>同场景</b>对照 + 真机 3~6 架，才能把"Reliable" 坐实。</li>
+  </ul>
+</section>
+
+<!-- ══════════ 10 ══════════ -->
+<section id="motivation">
+  <h2>10. 动机推导</h2>
+  <div class="callout idea">
+    <span class="ct">一句话动机</span>
+    多机避碰的瓶颈不在策略网络，而在<b>“我看不到你”</b>——LiDAR 有盲区、机体有遮挡、姿态还在漂；既然通信能拿到邻居位置，那就别把它当"额外输入"拼上去，而是<b>把它渲染成 LiDAR 该有的样子</b>，让网络永远只处理一种观测。
+  </div>
+  <h3>10.1 推导链</h3>
+  <ol>
+    <li><b>观察</b>：纯 LiDAR 的 DRL 避碰在<b>机-机</b>相遇时成功率崩掉（53.3%），而机-障碍避碰尚可。</li>
+    <li><b>归因</b>：不是网络不够大，是观测里<b>没有友机</b>这个信息（POMDP 的隐变量）。</li>
+    <li><b>第一次尝试（失败）</b>：把邻居坐标拼到观测后面 → 成功率上去了一点（76.7%）但训练更慢、奖励更低。原因：两类数据语义不一致。</li>
+    <li><b>关键转折</b>：问"LiDAR 本来会怎么表示一个友机？"——它会返回一个<b>距离</b>。那就人为构造这个距离，写回距离图像。</li>
+    <li><b>验证</b>：同一网络、同一超参、同一训练量下，成功率 53.3% → 100%，方差 0.91 → 0.17。</li>
+  </ol>
+  <h3>10.2 方法论上的可迁移点</h3>
+  <ul>
+    <li><b>"表达一致性 &gt; 信息量"</b>：融合多源信息时，先问"能否映射到已有传感器的物理模型"，再考虑加分支/加特征。</li>
+    <li><b>先跑一个"拼接基线"</b>：证明"朴素融合无效"，你的"聪明融合"才有说服力（本文的 PPO-Concat 就是这个角色）。</li>
+    <li><b>训练器与验证器分离</b>，并且<b>场景也要分离</b>——同域训练+测试是最常见的自欺。</li>
+  </ul>
+</section>
+
+<!-- ══════════ 11 ══════════ -->
+<section id="takeaway">
+  <h2>11. 关键启示</h2>
+  <h3>11.1 方法论</h3>
+  <ul>
+    <li><b>把异质信息投影到同一物理模态</b>，而不是在网络里做晚期融合——对算力受限的机载部署尤其重要（无额外分支、无额外延迟，实测 2.9 ms）。</li>
+    <li><b>可靠性指标要看方差，不只看均值。</b>成功率 + 时间标准差一起报，才说得清"稳"。</li>
+    <li><b>轻训练 / 重验证</b>的双仿真器范式，是资源有限时最务实的组合。</li>
+  </ul>
+  <h3>11.2 可直接迁移</h3>
+  <ul>
+    <li>若做<b>视觉</b>多机避碰：把邻居位置投影成"图像上的一个虚拟目标框/深度斑"，比拼接位姿向量更符合 CNN 的归纳偏置。</li>
+    <li>若做<b>雷达/激光</b>：UDR 的 $\min$ 融合是标准占据栅格更新的特例，可直接接到 costmap。</li>
+    <li>若做 <b>sim-to-real</b>：先补"同场景 Stage↔Gazebo 对照"，再上真机——这一条能挡掉大部分审稿人质疑。</li>
+  </ul>
+  <h3>11.3 同组工作脉络</h3>
+  <table>
+    <tr><th>工作</th><th>关系</th></tr>
+    <tr><td><a href="../6206/index.html">6206 硕士论文（2021）</a></td><td>本线的源头：分布式（无通信）→ HEBA 人类经验加速 → 邻居通信 → 注意力选通信对象；含真机多机实验</td></tr>
+    <tr><td><a href="../6205/index.html">6205 AST 2025 仿射编队</a></td><td>同一 Stage 训练栈 + PPO，把避碰扩展到编队保持</td></tr>
+    <tr><td><a href="../6201/index.html">6201 JAI 2026 时间最优</a></td><td>仿真器思路的"另一极"：从 2.5D 便宜仿真转向 JSBSim 高保真 6-DOF</td></tr>
+  </table>
+</section>
+
+<footer>
+  Paper Notes · Guanzheng Wang · 6202 · Unmanned Systems (2026) · DOI 10.1142/S2301385026500500 · 依据本地 EBSCO 全文 PDF 整理
+</footer>
+</div>
+</body>
+</html>

@@ -6,6 +6,34 @@
 (function () {
   'use strict';
 
+  /* ---------- 0. favicon, for pages whose own <head> has none ---------- */
+  (function () {
+    if (document.querySelector('link[rel~="icon"]')) return;
+    var self = document.currentScript, i, all;
+    if (!self) {
+      all = document.getElementsByTagName('script');
+      for (i = all.length - 1; i >= 0; i--) {
+        if ((all[i].src || '').indexOf('site-ui.js') !== -1) { self = all[i]; break; }
+      }
+    }
+    if (!self || !self.src) return;
+    var base = self.src.replace(/[?#].*$/, '').replace(/[^/]*$/, '');   // .../assets/
+    var siteRoot = base.replace(/assets\/$/, '');                        // .../ (repo root)
+    var head = document.head || document.getElementsByTagName('head')[0];
+    if (!head) return;
+    function add(rel, type, sizes, file) {
+      var l = document.createElement('link');
+      l.rel = rel;
+      if (type) l.type = type;
+      if (sizes) l.sizes = sizes;
+      l.href = siteRoot + file;
+      head.appendChild(l);
+    }
+    add('icon', 'image/png', '32x32', 'favicon-mono-32.png');
+    add('icon', 'image/svg+xml', 'any', 'favicon-mono.svg');
+    add('apple-touch-icon', '', '180x180', 'apple-touch-icon.png');
+  })();
+
   var KEY = 'theme';                       // shared with the home page toggle
   var root = document.documentElement;
 

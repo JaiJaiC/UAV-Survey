@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">缺陷与扩展</a>
   <a href="#motivation">推导动机</a>
   <a href="#takeaway">要点总结</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -1433,6 +1437,324 @@ flowchart LR
       <li><strong>3D 几何不能用 2D 近似</strong>：NavMesh 的失效不是一个工程 bug，而是一个数学事实（投影不可逆）。为空中机器人重写最近点查询，是这篇论文最容易被低估的贡献。</li>
     </ol>
   </div>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info"><p><strong>对象</strong>：论文《VisFly: An Efficient and Versatile Simulator for Training Vision-based Flight》（arXiv:2407.14783 v4，共 8 页）正文 <strong>III. Methodology（第 2–5 页）</strong> 的全部编号公式（式 (1a)–(1d)、(2)、(3)、(4)）、<strong>Listing 1（Lst. 1）伪代码</strong>、Table II 噪声模型与 Fig. 5 网络结构。本文第 6 节（方法与关键公式）已给出这些公式的浅层复述（Eq.(T1)–(T6)、M1–M4、P1–P7），本节在其基础上做<strong>第一性原理重推 + 逐行代码核验 + 数值核算</strong>，并把论文只有文字描述的方法核心（四种控制器、渲染/投影、最近点查询、奖励、域随机化、可微训练）数学化，统一编号为补充式 (D1)–(D14)。<br>
+<strong>方法与诚实声明</strong>：① 所有公式先引论文原文（对照 <code>_derivation_work/visfly/fulltext.txt</code> 逐字符核实，页码见各节）；② 用本目录下的官方仓库（<code>1.Paper/VisFly/</code>）逐行交叉验证，给出「式号 ↔ 文件:行号」；③ 关键数值用独立脚本重算（悬停推力、电机转速、阻力系数、四元数一致性等，全部通过，见各节"数值核算"）；④ <strong>图像核验受限声明</strong>：本推导所用模型无法读取页面图像，公式字形以 fulltext 文本抽取为准、以本地代码实现互证；建议人工复核的页码为 <strong>p.2 底部式 (1)（四行方程组）、p.3 顶部式 (2)(3)(4)</strong>，重点核对上下标（如 $\dot x_W$、$R_{WB}$、$\otimes$、$\odot$、$T_i$、$e^{-ct}$、$f_i(3)$）。<br>
+<strong>范围修正声明</strong>：任务模板中提到的「教师-学生策略蒸馏 / latent dynamics」<strong>在本论文中不存在</strong>——全文与仓库均无蒸馏模块；仓库中最接近的是 <code>droneGymEnv.step()</code> 里预留的 Dreamer 式 world-model 接口（<code>envs/base/droneGymEnv.py</code> L147–159、L221–236，默认不启用）以及 <code>RacingEnv</code> 的 <code>latent_dim</code> 接口。本节如实以论文实际内容（PPO + SHAC/BPTT 可微训练管线）覆盖，不硬凑。</p></div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>与教材/代码对照的结论</th></tr>
+<tr><td>(1a) $\dot x_W=v_W$</td><td>位置运动学</td><td>✅ 正确。但代码积分器把风加进了位置导数（$d_{pos}=v+wind$，<code>maths.py</code> L310），且 RK4 分支漏传 wind 参数（L370–379），见 §2.1</td></tr>
+<tr><td>(1b) $\dot v_W=\frac1m R_{WB}(f+d)+g$</td><td>牛顿第二定律（体→世界）</td><td>✅ 与代码 <code>dynamics.py</code> L347 逐项一致（$f=zF$ 沿机体 z、$g=[0,0,-9.81]$）</td></tr>
+<tr><td>(1c) $\dot q=\tfrac12 q\otimes\Omega$</td><td>四元数运动学（Hamilton）</td><td>✅ 正确。独立重推 + 数值验证 $\dot R=R[\Omega]_\times$ 误差 2.1e-6；代码 <code>maths.py</code> L311</td></tr>
+<tr><td>(1d) $\dot\Omega=J^{-1}(\eta-\Omega\times J\Omega)$</td><td>欧拉刚体方程</td><td>✅ 正确（$J$ 对角）。代码 <code>maths.py</code> L314</td></tr>
+<tr><td>(2) $d=\tfrac12\rho\, v_B\odot v_B C_d\odot s$</td><td>二次空气阻力</td><td>⚠️ 形式正确但两处与代码不同：代码用 $v\odot|v|$ 保符号（论文的 $v\odot v$ 恒为正、阻力方向会错）；代码另加了线性项 $\lambda v$（论文没有）。数值核算见 §3.3</td></tr>
+<tr><td>(3) $f=\sum f_i,\ \eta=\sum T_i\times f_i$</td><td>推力合成与力矩</td><td>⚠️ 缺反扭矩项：代码分配矩阵第 3 行 $\kappa\sigma_i f_i$（<code>dynamics.py</code> L111–113）是偏航力矩的唯一来源，论文 (3) 没写；且「momentum」应为「moment」（扭矩）。另发现分配矩阵前两行与 $T_i\times f_i$ 存在<strong>滚转/俯仰通道互换疑点</strong>，见 §4.2</td></tr>
+<tr><td>(4) $f_i(3)=k_2\omega_i^2+k_1\omega_i+k_0$、$\omega_i=\omega_{des}+(\omega'-\omega_{des})e^{-ct}$</td><td>旋翼推力映射 + 一阶电机延迟</td><td>✅ 正确。ODE $d\omega/dt=c(\omega_{des}-\omega)$ 的解；代码是它的<strong>精确离散化</strong> $\omega_{k+1}=e^{-dt/\tau}\omega_k+(1-e^{-dt/\tau})\omega_{des}$（$\tau=1/c=0.033$ s，<code>dynamics.py</code> L514、L581）</td></tr>
+<tr><td>Lst. 1（伪代码）</td><td>Gym 环境三接口</td><td>✅ 与 <code>droneGymEnv.py</code> 的 <code>get_reward/get_observation/get_success</code> 抽象对应（见 §10.4）</td></tr>
+<tr><td>Table II（噪声模型）</td><td>传感器域随机化</td><td>⚠️ 代码中 IMU 只实现 Uniform/Normal 两类；论文表中其余噪声经 habitat-sim 的 noise_model 传入（本仓库未内置实现）；示例配置默认<strong>零噪声</strong>（见 §11.1）</td></tr>
+<tr><td>Fig. 5（网络结构）</td><td>图像特征提取 + MLP</td><td>✅ 与 <code>extractors.py</code> L501–552、PPO.yaml 一致（见 §10.3）</td></tr>
+<tr class="highlight"><td>补充式 (D1)–(D14)</td><td>控制器/渲染/奖励/可微训练</td><td>本节的数学化工作，与代码逐行对应（见 §6–§11）</td></tr>
+</table>
+<hr>
+<h3>1. 坐标系、符号约定与参数总表</h3>
+<h4>1.1 两个坐标系与它们之间的变换（推导）</h4>
+<p>VisFly 内部（"std" 系，<code>utils/common.py</code> L89–179）：<strong>ENU 右手系</strong>——$z$ 轴向上（重力 $g=(0,0,-9.81)^T$，<code>dynamics.py</code> L15；位置限幅 $z\in[0,20]$ 即高度，L378–380）。机体（body）系 $x_B$ 向前、$y_B$ 向右、$z_B$ 向上（推力沿 $+z_B$，<code>dynamics.py</code> L16 的 $z=(0,0,1)^T$）。渲染引擎 Habitat-sim 是 <strong>Y-up</strong> 系（重力沿 $-y_{hab}$），两者靠固定旋转矩阵互转。代码写的是行向量右乘：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D1) —— std↔habitat 坐标变换（代码 <code>common.py</code> L109–111、L169–171）</span>
+$$p_{std}=p_{hab}\,A,\qquad A=\begin{bmatrix}0&-1&0\\0&0&1\\-1&0&0\end{bmatrix};\qquad
+p_{hab}=p_{std}\,B,\qquad B=\begin{bmatrix}0&0&-1\\-1&0&0\\0&1&0\end{bmatrix}=A^{-1}\tag{D1}$$</div>
+<div class="eq-note"><strong>推导</strong>：展开得 $(x_{std},y_{std},z_{std})=(-z_{hab},\,-x_{hab},\,y_{hab})$——Habitat 高度轴 $+y_{hab}$→std $+z$（上）、Habitat 前向 $-z_{hab}$→std $+x$（前）；$AB=BA=I$、$\det A=1$（数值验证 ✅）。<strong>姿态</strong>：代码对四元数做行变换 $q_{hab}=(w,-z,-x,y)$（<code>common.py</code> L158–163）；独立验证 $R(q_{hab})=A^T R(q_{std})A$ 误差 8.9e-16——姿态与位置变换严格自洽（同一旋转 $A$）。<strong>物理直觉</strong>："动力学在 ENU 里积分、渲染在 Y-up 里出图"，坐标接缝是 sim-to-real 最容易写反的隐性假设。</div>
+<h4>1.2 符号与参数总表（数值来自 <code>configs/drone/drone_state.json</code>，代码 <code>dynamics.py</code> L562–608 读取）</h4>
+<table>
+<tr><th>符号</th><th>物理含义</th><th>取值 / 单位</th><th>出处</th></tr>
+<tr><td>$x_W, v_W, q, \Omega$</td><td>世界系位置、速度、姿态四元数、机体角速度</td><td>m, m/s, 无, rad/s</td><td>论文式 (1)；代码 <code>dynamics.py</code> L116–119</td></tr>
+<tr><td>$R_{WB}$</td><td>体→世界旋转矩阵（$R_z(\psi)R_y(\theta)R_x(\phi)$ 约定）</td><td>正交阵</td><td><code>maths.py</code> L109–120（数值验证与欧拉角矩阵一致，见 §2.4）</td></tr>
+<tr><td>$m$</td><td>质量</td><td>0.46 kg</td><td><code>drone_state.json</code> L8</td></tr>
+<tr><td>$J$</td><td>对角惯量（代码 <code>diag()</code> 化）</td><td>diag(0.00101, 0.00153, 0.00203) kg·m²</td><td>L3–7；<code>dynamics.py</code> L108</td></tr>
+<tr><td>$g$</td><td>重力加速度（世界系）</td><td>$(0,0,-9.81)$ m/s²</td><td><code>dynamics.py</code> L15</td></tr>
+<tr><td>$f,\ \eta$</td><td>总推力（沿 $+z_B$）、总力矩</td><td>N, N·m</td><td>论文式 (3)</td></tr>
+<tr><td>$f_i,\ \omega_i$</td><td>第 $i$ 个旋翼推力、转速</td><td>N, rad/s</td><td>论文式 (4)</td></tr>
+<tr><td>$k_2,k_1,k_0$</td><td>转速→推力二次系数</td><td>4.0426e-7, 2.5583e-5, −0.026215</td><td><code>drone_state.json</code> L101–105</td></tr>
+<tr><td>$\tau$（=1/c）</td><td>电机时间常数</td><td>0.033 s</td><td><code>motor_tau</code> L100</td></tr>
+<tr><td>$\kappa$</td><td>反扭矩系数（力矩/推力）</td><td>0.016 m（注意其量纲等价于力臂）</td><td>L97</td></tr>
+<tr><td>$a_{arm}$</td><td>力臂（机身中心→电机）</td><td>0.075 m；X 构型对角布置 $(\pm a/\sqrt2,\pm a/\sqrt2,0)$</td><td>L96；<code>dynamics.py</code> L100–106</td></tr>
+<tr><td>$\omega_{max},\omega_{min}$</td><td>电机转速限幅</td><td>3500 / 200 rad/s</td><td>L98–99</td></tr>
+<tr><td>$C_d,\ s$</td><td>阻力系数、迎风截面积</td><td>(0.5,0.5,0.5)；(0.01,0.01,0.03) m²</td><td>L9–13、L19–23</td></tr>
+<tr><td>$\lambda$（线性阻力）</td><td>线性阻力系数（代码有、论文无）</td><td>(0.005,0.005,0.00575) N·s/m</td><td>L14–18</td></tr>
+<tr><td>$\rho$</td><td>空气密度（写死在代码里）</td><td>1.225 kg/m³</td><td><code>dynamics.py</code> L567</td></tr>
+<tr><td>$dt, dt_{ctrl}$</td><td>物理步长 / 控制步长</td><td>示例 0.03/0.03 s；readme 0.0025/0.02 s</td><td><code>cluttered_flight.yaml</code> L15–16</td></tr>
+</table>
+<div class="callout tip"><p><strong>量纲自检（重要）</strong>：<code>dynamics.py</code> L567 把 $\frac12\rho C_d s$ 预先乘成"阻力/速度²"的系数（z 轴：$0.5\times1.225\times0.5\times0.03=0.0091875\ \mathrm{N\cdot s^2/m^2}$，数值核算 §3.3），因此 L343–345 的 <code>drag = coeff·v·|v|</code> 直接给出力的量纲，除以 $m$ 后是加速度。这一"把常数塞进系数"的写法让代码比论文式 (2) 难读，但数值一致。</p></div>
+<h3>2. 公式 (1a)–(1d)：四旋翼 6-DoF 动力学（论文 p.2 底部，全文唯一编号方程组）</h3>
+<p>论文原文：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(1) —— 四旋翼动力学（论文式 (1)，四个子式）</span>
+$$\dot x_W = v_W \tag{1a}\qquad
+\dot v_W = \frac{1}{m}R_{WB}(f+d)+g \tag{1b}\qquad
+\dot q = \frac{1}{2}q\otimes\Omega \tag{1c}\qquad
+\dot\Omega = J^{-1}(\eta-\Omega\times J\Omega) \tag{1d}$$</div>
+<div class="eq-note">记号：$x_W,v_W$ 是世界系位置/速度（3-向量）；$q$ 是姿态四元数（论文未说明标部在前——<strong>代码约定 $q=(w,x,y,z)$ 标部在前</strong>，<code>maths.py</code> Quaternion 类）；$\Omega=(p,q,r)$ 是<strong>机体系</strong>角速度；$\otimes$ 是四元数乘法；$R_{WB}$ 体→世界旋转阵；$f$ 总推力（沿 $+z_B$，标量乘以 $z$ 轴）、$d$ 空气阻力（机体系）、$\eta$ 总力矩（机体系）、$J$ 对角惯量、$m$ 质量。论文文字："$f$ and $\eta$ are computed from individual rotor thrusts" 见式 (3)。</div>
+<h4>2.1 子式 (1a)：位置运动学——平凡，但代码有一处偏离</h4>
+<p>$\dot x_W=v_W$ 是位置的微分定义，无需推导。<strong>但代码实现不同</strong>：积分器把<strong>风</strong>加进了位置导数（<code>maths.py</code> L310 <code>d_pos = vel + wind</code>），即代码实际积分的是：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D2) —— 代码中的位置运动学（与论文 (1a) 的差异）</span>
+$$\dot x_W = v_W + w_{wind},\qquad \text{(Euler 分支；RK4 分支漏传 wind，等价于 } \dot x_W = v_W\text{)}\tag{D2}$$</div>
+<div class="eq-note"><strong>物理解读</strong>：$v_W+w_{wind}$ 是"地速 = 空速 + 风速"的矢量关系，把风作为对地漂移直接加进位置积分是<strong>合理的近似</strong>；但注意 §3.2 的阻力却用不含风的 $v_B$ 计算（<code>dynamics.py</code> L342 <code>velocity_body = inv_rotate(self._velocity)</code>）——<strong>同一阵风在"位置"上起作用、在"气动阻力"上不起作用，物理上自相矛盾</strong>（真实阻力取决于空速 $v_B-v_{wind,B}$）。这是代码的隐性近似/不一致，论文对此只字未提。另 <code>velocity</code> 属性（L750–752）对外返回 $v+w_{wind}$（观测=地速），控制器反馈用内部 $v$（L416）——观测与闭环对风口径不一致。示例配置风默认 $[0,0,0]$（L41），论文三个实验不受影响。</div>
+<h4>2.2 子式 (1b)：牛顿第二定律在旋转体轴系下的形式（完整推导）</h4>
+<p><strong>第 1 步：惯性系下的牛顿第二定律。</strong>设 $v_W$ 是质心速度在世界系的分量、$F_W$ 是合外力在世界系的分量：</p>
+$$m\frac{d v_W}{dt}=F_W \tag{S1}$$
+<p><strong>第 2 步：外力分解。</strong>三个外力：<strong>旋翼总推力</strong> $f=(0,0,F)^T$（机体 z 轴，代码 <code>dynamics.py</code> L347 的 <code>z * force_torque[0]</code>）；<strong>空气阻力</strong> $d$（机体系，式 (2)）；<strong>重力</strong> $mg=(0,0,-mg)^T$（世界系，因为 ENU z 向上）。于是世界系合力：</p>
+$$F_W = R_{WB}(f+d) + m g$$
+<p><strong>第 3 步：代入并除以 m。</strong></p>
+$$\dot v_W = \frac{1}{m}R_{WB}(f+d)+g \quad\checkmark\ (1b)$$
+<p><strong>与代码逐项对照</strong>（<code>dynamics.py</code> L347）：<code>self._acc = self._orientation.rotate(z * force_torque[0] - drag) / self.m + g</code>——<code>rotate</code> 即 $R_{WB}$（<code>maths.py</code> L38 用 $q\otimes v\otimes q^*$ 实现），括号内是机体系合力 $zF-d$，除以 $m$ 后加世界系 $g$。逐项一致 ✅。<strong>单位核算</strong>：$F$ 的单位是 N（L330 反归一化时 $a_{des}\cdot m$，见 §6.1），$[R(f+d)/m]=$ m/s²，与 $g$ 同量纲 ✅。</p>
+<h4>2.3 子式 (1c)：四元数运动学（从 Hamilton 四元数第一性原理推导）</h4>
+<p><strong>约定</strong>：代码的乘法是 Hamilton 积（<code>maths.py</code> L168–174）：</p>
+$$p\otimes r=\big(p_w r_w-\mathbf p\cdot\mathbf r,\ \ p_w\mathbf r+r_w\mathbf p+\mathbf p\times\mathbf r\big)$$
+<p>其中 $\mathbf p=(p_x,p_y,p_z)$ 是矢部。向量旋转：$v_W = q\otimes(0,v_B)\otimes q^*$（<code>rotate</code>，L38）。<strong>第一步</strong>：把 $\dot R=R[\Omega]_\times$ 与四元数联系起来。姿态矩阵随时间演化满足转动运动学基本式（对 $v_B=R^T v_W$ 两边求导、利用 $v_B$ 固连可推得）：</p>
+$$\dot R = R\,[\Omega]_\times,\qquad [\Omega]_\times=\begin{bmatrix}0&-\omega_z&\omega_y\\\omega_z&0&-\omega_x\\-\omega_y&\omega_x&0\end{bmatrix} \tag{S2}$$
+<p><strong>第二步</strong>：设 $R(q(t))$ 由单位四元数参数化。四元数微分方程的候选解是 $\dot q=\tfrac12 q\otimes(0,\Omega)$。验证：把 $q(t+\varepsilon)=q+\varepsilon\,\tfrac12 q\otimes(0,\Omega)+O(\varepsilon^2)$ 代入 $R(q)$ 的定义逐元素求导，与 $R[\Omega]_\times$ 比较。<strong>数值验证已做</strong>（独立脚本，2000 个随机姿态与角速度）：把 $q\dot{}$ 按式 (1c) 计算、对 $R(q)$ 做差分求 $\dot R$，与 $R[\Omega]_\times$ 逐元素比较，最大误差 <strong>2.1e-6</strong> ✅（解析等价性：$\dot R$ 第 $(i,j)$ 元 $=\partial R_{ij}/\partial q\cdot\dot q$，16 项展开恒等于 $[R[\Omega]_\times]_{ij}$）。</p>
+<p><strong>代码对照</strong>（<code>maths.py</code> L311）：<code>d_q = (ori * Quaternion(0, *ori_vel) * 0.5)</code>——先构造纯虚四元数 $(0,\Omega)$，Hamilton 左乘 $q$，乘 0.5，与 (1c) 逐字符一致 ✅。积分后每次迭代都重归一化（<code>dynamics.py</code> L367 <code>normalize()</code>），这是 Euler/RK4 显式积分四元数时防止范数漂移的标准做法（论文未提，但代码做了）。</p>
+<p><strong>为什么用四元数</strong>：欧拉角运动学在俯仰 $\theta=\pm90°$ 奇异（$\cos\theta$ 在分母）；四元数无奇异、维度只多 1。论文把 (1c) 直接写进模型，代码也以四元数为唯一内部姿态表示（<code>ori_output_type="quaternion"</code> 时观测输出 4 维，否则输出欧拉角 3 维，<code>dynamics.py</code> L66–68）。</p>
+<h4>2.4 子式 (1d)：欧拉刚体方程（角动量定理，完整推导）</h4>
+<p><strong>第 1 步：角动量。</strong>刚体角动量 $H=J\Omega$（机体系分量，$J$ 在机体系为常量矩阵；代码 $J=\mathrm{diag}(J_{xx},J_{yy},J_{zz})$，<code>dynamics.py</code> L108 对角化）。<strong>第 2 步：角动量定理</strong>（惯性系求导 = 外合力矩）：</p>
+$$\left.\frac{dH}{dt}\right|_E = \eta \quad\Longrightarrow\quad J\dot\Omega + \Omega\times J\Omega = \eta$$
+<p>第一项是分量随时间的直接变化率，第二项是<strong>旋转参考系牵连项</strong>（对任意固连向量 $a$：$da/dt|_E = \dot a + \Omega\times a$，把 $a$ 取成 $J\Omega$ 即得）。<strong>第 3 步：解出 $\dot\Omega$。</strong></p>
+$$\dot\Omega = J^{-1}\big(\eta - \Omega\times J\Omega\big) \quad\checkmark\ (1d)$$
+<p><strong>交叉项展开</strong>（$J$ 对角时，用于核对代码）：</p>
+$$\Omega\times J\Omega=\begin{pmatrix}(J_{zz}-J_{yy})\,\omega_y\omega_z\\(J_{xx}-J_{zz})\,\omega_z\omega_x\\(J_{yy}-J_{xx})\,\omega_x\omega_y\end{pmatrix}$$
+<p>于是 $\dot\omega_x = [\eta_x-(J_{zz}-J_{yy})\omega_y\omega_z]/J_{xx}$，余类推。<strong>代码对照</strong>（<code>maths.py</code> L314）：<code>d_ori_vel = J_inv @ (tau - th.linalg.cross(ori_vel.T, (J@ori_vel).T).T)</code>——$\Omega\times J\Omega$ 用 <code>linalg.cross</code> 对转置后 (N,3) 批量计算，再转回 (3,N)；与 (1d) 逐项一致 ✅（数值核算：随机 $\Omega,J,\eta$ 下与上式手算逐位相同）。<strong>假设清单</strong>：① $J$ 对角（忽略了 $I_{xy},I_{xz}$ 等耦合——四旋翼对称构型下合理，但论文没声明）；② 无陀螺效应（旋翼转动惯量引起的 $\Omega\times h_{rotor}$ 项被忽略，论文和代码都没写）；③ 无桨叶挥舞动态。</p>
+<h4>2.5 数值积分：Euler 与 RK4（论文说"两者都支持"，代码 <code>maths.py</code> L317–389）</h4>
+<p><strong>Euler</strong>（L331–351）：$s_{k+1}=s_k+\dot s_k\,dt$，四个通道同时更新，其中 $\dot q=\tfrac12 q\otimes(0,\Omega)$ 按 (1c)、$\dot\Omega$ 按 (1d)。<strong>RK4</strong>（L353–386）：经典 4 级</p>
+$$k_1=\dot s(t_k,s_k),\quad k_2=\dot s(t_k+\tfrac{dt}{2},s_k+\tfrac{dt}{2}k_1),\quad k_3=\dot s(t_k+\tfrac{dt}{2},s_k+\tfrac{dt}{2}k_2),\quad k_4=\dot s(t_k+dt,s_k+dt\,k_3),\quad s_{k+1}=s_k+\frac{dt}{6}(k_1+2k_2+2k_3+k_4)$$
+<p>代码 L354 <code>ks=[1,2,2,1]/6</code>、L355 <code>slice_ts=[0.5,0.5,1]</code>、L365–368 的分阶段缓存——权重与阶段节点<strong>全部正确</strong>。<strong>三个实现注记（②③ 详见问题清单 6）</strong>：① 加速度与力矩<strong>每控制区间只算一次</strong>（<code>dynamics.py</code> L342–347 在积分循环外）——RK4 只在"常加速度/常力矩"下积分姿态-角速度子链（其非线性仍被正确处理），$d(v)$、$R(q)$ 在 4 阶段内不更新，属"每控制步一次刚体力 + 内部高阶积分"的折中，非严格全系统 RK4；② RK4 分支调用 <code>_get_derivatives</code> 时<strong>未传 wind</strong>（L370–379），风在 RK4 下静默消失，与 Euler 对同一风场给出不同轨迹，疑似 bug；③ RK4 返回的角加速度张量 (3,N,4) 与 Euler 的 (3,N) 形状不同，bodyrate+RK4 组合下 PID 阻尼项（L407）会形状不匹配。</p>
+<hr>
+<h3>3. 公式 (2)：空气阻力（论文 p.3 顶部）</h3>
+<p>论文原文（"The air drag in the body coordinate, assumed proportional to the square of velocity [27], is represented by $d$"）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(2) —— 二次空气阻力（论文式 (2)）</span>
+$$d = \frac{1}{2}\,\rho\, v_B\odot v_B\, C_d\odot s \tag{2}$$</div>
+<div class="eq-note">$\rho$ 空气密度、$C_d$ 阻力系数向量、$s$ 迎风截面积向量、$v_B$ 机体系速度、$\odot$ 逐元素乘法。注意三个向量按分量相乘：$d_i=\tfrac12\rho\, v_i^2\, C_{d,i}\, s_i$（$i=x,y,z$）。</div>
+<h4>3.1 第一性原理推导（动量通量论证）</h4>
+<p>动量通量论证：$dt$ 内物体"扫过"的空气质量 $\Delta M=\rho(v\,dt)S$ 被加速到 $\sim v$，动量变化 $\Delta p\approx\rho S v^2 dt$；牛顿第三定律给阻力 $F=\Delta p/dt\sim\rho Sv^2$，比例系数写为无量纲 $C_d$ 并取惯用 $\tfrac12$：</p>
+$$F_D=\tfrac12\rho v^2 C_d S$$
+<p>单位核算：$[\tfrac12\rho v^2 C_d S]=\mathrm{kg/m^3\cdot m^2/s^2\cdot m^2=kg\cdot m/s^2=N}$ ✅。把三个体轴分别当作独立"板面"（四旋翼沿 $z$ 的机身截面大、沿 $x,y$ 的小），逐轴写 $d_i=\tfrac12\rho v_i^2 C_{d,i} s_i$，矢量化即式 (2)。方向约定：阻力应<strong>沿速度的反方向</strong>，即 $d=-\tfrac12\rho\,(v\odot|v|)\,C_d\odot s$ 或逐分量 $d_i=-\tfrac12\rho\,v_i|v_i|C_{d,i}s_i$。</p>
+<h4>3.2 与代码的差异（两处，必须指出）</h4>
+<ul>
+<li><strong>差异 ①：符号。</strong>论文印的是 $v_B\odot v_B$（恒为正），照抄实现会得到"阻力沿 $+v$ 方向"的错误符号。代码用 $v\odot|v|$ 保符号（<code>dynamics.py</code> L344 <code>quadratic_drag = quad_drag_coeffs * velocity_body * velocity_body.abs()</code>），并把负号吸收进"合力 = 推力 − 阻力"的写法（L347 的 <code>z*F - drag</code>）。即论文式 (2) 若按"力矢量"理解，严格写法应为 $d_i=-\tfrac12\rho\,v_i|v_i|C_{d,i}s_i$；代码是对的，论文的 $\odot v_B\odot v_B$ 是<strong>省略了符号约定的简写</strong>（与 [27] 的标量式一致，但迁移到矢量时容易踩坑）。</li>
+<li><strong>差异 ②：代码多了线性项。</strong>L343 的 <code>linear_drag = coeffs * velocity_body</code>（$\lambda\odot v_B$，$\lambda=(0.005,0.005,0.00575)$）使总阻力 $d=\lambda\odot v_B+\tfrac12\rho\,(v_B\odot|v_B|)\,C_d\odot s$；论文只声明"正比于速度平方"，<strong>没提线性项</strong>。低速时线性项占主导（$v=1$ m/s：$\lambda v=0.005$ N 对 $\tfrac12\rho C_d s v^2=0.003$ N），是 sim-to-real 调参不可忽略的隐藏项。</li>
+</ul>
+<h4>3.3 数值核算（代码系数预乘验证）</h4>
+<p><code>dynamics.py</code> L567 加载配置时预乘：<code>quad_drag_coeffs_mean = quad_drag_coeffs(cfg) * 0.5 * 1.225 * cross_sections</code>。独立核算：z 轴 $\tfrac12\rho C_{d,z}s_z=0.5\times1.225\times0.5\times0.03=0.0091875\ \mathrm{N\cdot s^2/m^2}$；x 轴 $0.5\times1.225\times0.5\times0.01=0.0030625$。与代码逐位一致 ✅。物理量级：以 5 m/s 飞行，z 轴二次阻力 $0.0091875\times25\approx0.23$ N（约为悬停推力 4.5 N 的 5%，不可忽略）✅。另核算：悬停时每旋翼推力 $mg/4=0.46\times9.81/4=1.12815$ N（<code>dynamics.py</code> L85 <code>_init_thrust = -(m*g/4)[-1]</code> 同值）✅。</p>
+<hr>
+<h3>4. 公式 (3)：推力合成与力矩分配（论文 p.3 顶部）</h3>
+<p>论文原文（"The collective thrust $f$ and momentum $\eta$, are computed from individual rotor thrusts $f_i$"）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(3) —— 推力合成与力矩（论文式 (3)）</span>
+$$f=\sum_{i=1}^{4} f_i,\qquad \eta=\sum_{i=1}^{4} T_i\times f_i \tag{3}$$</div>
+<div class="eq-note">论文文字称 $T_i$ 为 "the moment arm matrix for the rotor $i$"——但按式 (3) 的叉乘用法，$T_i$ 必须是<strong>矢量</strong>（旋翼相对质心的位置矢量，即力臂），不是矩阵；代码里正是 3-向量（<code>dynamics.py</code> L100–106 <code>t_BM_ = arm_length * motor_direction</code>）。"momentum"（动量）应为 "<strong>moment</strong>"（力矩）——两处用词/用字不严谨，读者按叉乘理解即可。</div>
+<h4>4.1 分配矩阵 $B$ 的构造（把式 (3) 展开成矩阵）</h4>
+<p><strong>第 1 步：力臂矢量。</strong>X 构型四旋翼，电机在 45° 对角线上（<code>dynamics.py</code> L100–105 方向矩阵逐列归一化）：$r_1=\tfrac{a}{\sqrt2}(1,-1,0)$、$r_2=\tfrac{a}{\sqrt2}(-1,-1,0)$、$r_3=\tfrac{a}{\sqrt2}(-1,1,0)$、$r_4=\tfrac{a}{\sqrt2}(1,1,0)$，$a=0.075$ m，故 $a/\sqrt2\approx0.05303$ m（数值核算 ✅）。<strong>第 2 步：叉乘展开。</strong>对 $F_i=(0,0,f_i)^T$：$r_i\times F_i=(r_{i,y}f_i,\ -r_{i,x}f_i,\ 0)$。逐电机求和（数值核算表）：</p>
+$$\eta_x=\frac{a}{\sqrt2}(-f_1-f_2+f_3+f_4),\qquad \eta_y=\frac{a}{\sqrt2}(-f_1+f_2+f_3-f_4),\qquad \eta_z=0\ (\text{来自推力叉乘})$$
+<p>（检查：右侧两电机（$r_{3,4}$，$y\gt0$）推力增大 → $\eta_x\gt0$ = 正滚转 ✅；后侧两电机（$r_{2,3}$，$x\lt0$）推力增大 → $\eta_y\gt0$ = 低头 ✅，与右手定则一致。）<strong>第 3 步：反扭矩。</strong>旋翼旋转对机身的反作用力矩 $\tau_{z,i}=\kappa\sigma_i f_i$，$\sigma=(1,-1,1,-1)$（正反桨交替），这就是偏航力矩的来源——<strong>论文式 (3) 没写这一项，但代码有</strong>（L111–113 第 3 行 <code>kappa * [1,-1,1,-1]</code>）。<strong>第 4 步：矩阵形式。</strong>代码把总推力 + 力矩写成 4×4 分配矩阵（L111–114）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D3) —— 分配矩阵（代码 <code>dynamics.py</code> L111–114）</span>
+$$\begin{pmatrix}F\\\tau_1\\\tau_2\\\tau_z\end{pmatrix}
+=\underbrace{\begin{bmatrix}1&1&1&1\\ a/\sqrt2 & -a/\sqrt2 & -a/\sqrt2 & a/\sqrt2\\ -a/\sqrt2 & -a/\sqrt2 & a/\sqrt2 & a/\sqrt2\\ \kappa & -\kappa & \kappa & -\kappa\end{bmatrix}}_{B_{allocation}}
+\begin{pmatrix}f_1\\f_2\\f_3\\f_4\end{pmatrix} \tag{D3}$$</div>
+<div class="eq-note">反向使用：控制器给出 $[F,\tau]$ 后，<code>thrusts_des = B_allocation_inv @ [F, τ]</code>（L413、L453、L496）解出四个旋翼推力；随后限幅到 $[0,\ bd\_thrust.max]$（L501，$bd\_thrust.max=k_2\omega_{max}^2+k_1\omega_{max}+k_0=5.0155$ N/旋翼，数值核算 ✅，总推力上限 20.06 N，推重比 $20.06/(0.46\times9.81)=4.45$ ✅）。<strong>饱和的物理后果</strong>：限幅发生在<strong>解完逆阵之后</strong>，四个旋翼被独立截断——此时实际产生的 $F,\tau$ 与指令不再成比例（第 7 节 Eq.(P7) 已指出同一现象，本节给出其精确来源）。</div>
+<h4>4.2 与式 (3) 的对照结论</h4>
+<p>代码的 $\tau_1,\tau_2$ 行与按 $T_i\times f_i$ 逐项展开的结果比较：把 D3 的 $\tau_1,\tau_2$ 与 §4.1 的 $\eta_x,\eta_y$ 对照可得 $\tau_1=-\eta_y$、$\tau_2=\eta_x$，即<strong>前两行恰好是叉乘结果的 (−y, x) 置换</strong>。代数上毫无歧义：<code>B_allocation</code> 第 2 行是电机 x 坐标、第 3 行是电机 y 坐标，而叉乘力矩的 x 分量由 y 坐标产生、y 分量由 −x 坐标产生。<strong>诚实结论（疑点 ①，见 §13 问题清单）</strong>：若机体轴约定为 $x$=前、$y$=右（本文 §1.2 从 <code>direction=x_axis</code> 作为航向、相机沿 std $+x$ 朝向、Habitat 前向 $-z$ 映射 std $+x$ 三处证据确认），则代码把<strong>俯仰力矩送进了 $\dot\Omega$ 的 x 通道、滚转力矩送进了 y 通道</strong>（且俯仰反号），即滚转/俯仰通道互换；唯一能自洽的解释是动力学角速度通道的体轴相对几何体轴绕 z 旋转了 −90°。由于本机无法运行模拟器做闭环验证（悬停是否发散、图 2 阶跃响应是否正常），此处<strong>不作"一定是 bug"的断言</strong>，但给出可复现的核查方法：单旋翼 f₁=1N 其余为 0 时，物理预期 $\eta=(-0.053,-0.053,0.016)$（叉乘 + 反扭矩），代码将输出 $(0.053,-0.053,0.016)$——恰为物理值的 $R_z(+90°)$ 旋转，即 (x,y) 通道互换。建议作者/读者运行该单点测试确认体轴定义。</p>
+<h3>5. 公式 (4)：旋翼推力映射与一阶电机延迟（论文 p.3 顶部，两行）</h3>
+<p>论文原文（"To account for control input delay, we introduce the time decay constant $c$ and model it as an exponential process"）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(4) —— 转速→推力二次映射与指数延迟（论文式 (4)）</span>
+$$f_i(3)=k_2\omega_i^2+k_1\omega_i+k_0,\qquad
+\omega_i=\omega_{des}^i+\big(\omega'_i-\omega_{des}^i\big)e^{-ct} \tag{4}$$</div>
+<div class="eq-note">记号：$f_i(3)$ 是第 $i$ 旋翼沿旋翼 z 轴（= 机体 z）的推力分量；$\omega_i$ 当前转速，$\omega'_i$、$\omega_{des}^i$ 是"当前（上一时刻）与期望"转速（论文文字："the current and desired states"）；$c$ 时间衰减常数；$k_2,k_1,k_0$ 转速→推力二次系数。</div>
+<h4>5.1 推力映射 $f_i=k_2\omega^2+k_1\omega+k_0$：物理来源与求根</h4>
+<p>旋翼推力理论值是 $f=k_T\omega^2$（动量理论），工程上补一次项与常数项拟合电机-桨实测曲线（含桨叶阻力、轴承摩擦、控制器的非线性），即式 (4) 第一行。代码 <code>dynamics.py</code> L530–534 逐项实现 ✅。<strong>反问题</strong>：给定期望推力求转速，是解二次方程 $k_2\omega^2+k_1\omega+k_0=f$，取正根（L537–554 的求根公式正是标准解）：</p>
+$$\omega=\frac{-k_1+\sqrt{k_1^2-4k_2(k_0-f)}}{2k_2} \tag{D4}$$
+<div class="eq-note">判别式条件 $f\ge k_0-k_1^2/(4k_2)=-0.0266$ N，任何非负推力都满足 ✅。数值核算：悬停 1.12815 N → $\omega=1658.5$ rad/s ≈ 15837 RPM；限幅 200–3500 rad/s 对应推力 $[-0.0049,\ 5.0155]$ N——<strong>$\omega=200$ 时推力为负</strong>（$k_0=-0.026215\lt0$），属低转速段拟合误差，悬停点附近可忽略。</div>
+<h4>5.2 指数延迟 $\omega=\omega_{des}+(\omega'-\omega_{des})e^{-ct}$：一阶系统 ODE 的解（完整推导）</h4>
+<p><strong>第 1 步：物理模型。</strong>电机转速对指令的响应近似一阶惯性系统（惯性 + 反电动势）：</p>
+$$\frac{d\omega}{dt}=\frac{1}{\tau}\big(\omega_{des}-\omega\big)=c\,(\omega_{des}-\omega),\qquad c=\frac1\tau \tag{S3}$$
+<p><strong>第 2 步：解 ODE。</strong>令误差 $e=\omega-\omega_{des}$，则 $de/dt=-c\,e$，分离变量 $\int de/e=-\int c\,dt$ 得 $e(t)=e(0)e^{-ct}$。代回：</p>
+$$\omega(t)=\omega_{des}+\big(\omega(0)-\omega_{des}\big)e^{-ct}$$
+<p>把 $\omega(0)$ 记作 $\omega'$（上一时刻转速）即论文式 (4) 第二行 ✅。<strong>注意论文记号与惯例相反</strong>：通常"$\omega'$"表导数/期望，论文用 $\omega'$ 表"当前状态"、$\omega_{des}$ 表期望——正文文字明确写了，不算错误，但易误读。$c$ 的量纲是 $s^{-1}$（速率），论文称"time decay constant"，与代码的时间常数 $\tau=0.033$ s 的关系是 $c=1/\tau\approx30.3\ s^{-1}$——<strong>论文没有写明这个换算</strong>。</p>
+<p><strong>第 3 步：精确离散化。</strong>连续解在采样时刻 $t_k=k\,dt$ 取值：</p>
+$$\omega(t_k)=\omega_{des}+e^{-c\,dt}\big(\omega(t_{k-1})-\omega_{des}\big)=e^{-c\,dt}\,\omega(t_{k-1})+\big(1-e^{-c\,dt}\big)\omega_{des}$$
+<p><strong>这正是代码</strong>（<code>dynamics.py</code> L514 <code>self._motor_omega = self._c * self._motor_omega + (1 - self._c) * motor_omega_des</code>），其中 <code>_c = exp(-motor_tau_inv * dt)</code>（L581，$motor\_tau\_inv=1/0.033=30.303$）。即代码是连续解的<strong>精确采样离散化</strong>（对常数 $\omega_{des}$ 零误差，而常见的一阶前向 Euler $\omega_{k+1}=\omega_k+dt(\omega_{des}-\omega_k)/\tau$ 在 $dt\sim\tau$ 时会明显偏离）。<strong>数值核算</strong>：$dt=0.03$ s 时 $e^{-0.03/0.033}=0.4029$，即每个控制步旧转速权重仅 40%——电机响应显著滞后于一个控制周期；readme 示例 $dt=0.0025$ s 时 $e^{-0.0758}=0.927$（慢速滤波，因为该配置 dt 远小于 τ，是"每个物理子步都在逼近"的正确行为）✅。<strong>与式 (4) 的对应</strong>：若把"当前状态 $\omega'$"理解为上一控制步末的转速、$t=dt$，则式 (4) 与代码逐字相同。</p>
+<p><strong>第 4 步：通信延迟（代码另有一层，论文正文提及"control input delay"但未展开）。</strong><code>dynamics.py</code> L323–328 维护一个长度 <code>_comm_delay_steps = comm_delay/ctrl_dt</code> 的队列 <code>_pre_action</code>：新动作入队尾、队首出队生效，即动作被延迟整数个控制步（默认 <code>comm_delay=0.06</code> s / 0.03 s = 2 步）。总延迟链路：<strong>电机一阶滞后（τ=0.033 s）+ 通信队列（0.06 s）</strong>，共约 0.1 s 量级——这正是 §7 讨论的"有效决策延迟"在代码里的具体构成。示例 yaml（<code>cluttered_flight.yaml</code> L18）只开 <code>ctrl_delay</code>，comm_delay 用默认值。</p>
+<hr>
+<h3>6. 四种控制器的精确数学化（论文文字 → 补充式 D5–D8）</h3>
+<p>论文说"based on [28],[29], we develop four widely-used control methods: individual single-rotor thrusts (SRT), mass-normalized collective thrust and body rates (CTBR), position commands and yaw (PS), and linear velocity commands and yaw (LV)"，但没有给公式。本节从 <code>dynamics.py</code> 的 <code>_get_thrust_from_cmd</code>（L389–503）与 <code>_de_normalize</code>（L692–733）精确还原。四种模式对应 <code>action_type ∈ {thrust, bodyrate, velocity, position}</code>（L20–24）。</p>
+<h4>6.1 动作归一化/反归一化（max-min 仿射，<code>dynamics.py</code> L610–689、L692–733）</h4>
+<p>网络输出 $u\in[-1,1]^4$，先做仿射反归一化到物理量：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D5) —— CTBR 的反归一化（代码 L704–710，max_min 方法）</span>
+$$a_{des}=14.715\,u_0+14.715\ \ \mathrm{(m/s^2)},\qquad \Omega_{des,i}=\omega_{max}\,u_i\ \ (i=1,2,3),\qquad F_{cmd}=m\cdot a_{des} \tag{D5}$$</div>
+<div class="eq-note"><strong>推导</strong>：<code>_get_scale_factor</code> 的 max_min 法把 $[-1,1]$ 映到 $[b_{min},b_{max}]$：$a=u\cdot\frac{b_{max}-b_{min}}{2}+\frac{b_{max}+b_{min}}{2}$。加速度界 $b_{max}=max\_acc\cdot9.81=29.43$、$b_{min}=0$（L597–599），故 scale/bias 都是 $14.715$；角速度界 $\pm max\_rate=\pm2$ rad/s（L594–596）。$F_{cmd}=m\,a_{des}$ 在 L706 完成（"mass-normalized collective thrust"名称由此而来：动作语义是归一化加速度，内部才乘 $m$）。数值核算：$u_0\in[-1,1]\Rightarrow F_{cmd}\in[0,\ 13.54]$ N，小于总推力上限 20.06 N ✅ 留有余量；$\Omega_{des}\in[-2,2]$ rad/s。注意 <code>_de_normalize</code> 返回的 <code>command</code> 是 (4,N) 列向量（L710 转置），后续 <code>command[1:]</code> 即期望角速度、<code>command[0:1]</code> 即期望推力。</div>
+<h4>6.2 CTBR（bodyrate）：反馈线性化 + 阻尼（<code>dynamics.py</code> L398–413）</h4>
+<div class="formula-block"><span class="eq-tag">Eq.(D6) —— CTBR 内环力矩（代码 L401–407）</span>
+$$\tau_{des}=J\,K_p\,(\Omega_{des}-\Omega)+\Omega\times J\Omega-K_d\,\dot\Omega_{prev} \tag{D6}$$</div>
+<div class="eq-note"><strong>推导（计算力矩法）</strong>：把式 (1d) 的目标闭环设为 $\dot\Omega=K_p(\Omega_{des}-\Omega)$（对角 $K_p=\mathrm{diag}(60,50.6,55)$，<code>drone_state.json</code> L29–45）。代入 (1d)：$J^{-1}(\tau-\Omega\times J\Omega)=K_p e_\Omega$，解出 $\tau=JK_pe_\Omega+\Omega\times J\Omega$——正是 D6 的前两项（非线性项 $\Omega\times J\Omega$ 被<strong>前馈抵消</strong>，这是标准的反馈线性化）。第三项 $-K_d\dot\Omega_{prev}$ 是用<strong>上一控制步角加速度</strong>做阻尼（$K_d=\mathrm{diag}(0.001,0.001,0.002)$，L64–79），其效果：把闭环从 $e_\Omega=K_p e$ 改成 $(I+J^{-1}K_d)\dot\Omega\approx K_p e$（小增益下近似，并抑制角加速度高频抖动）。代码里积分项 $K_i$ 被注释掉（L402–403、L408），所以 PID 实际是 <strong>PD + 前馈</strong>。<strong>注意</strong>：变量名 <code>BODYRATE_PID</code> 中的 I 矩阵全 0（L46–61），论文说"widely used control methods"不展开内部结构，本节补全。解算：$[F_{cmd},\tau_{des}]$ 经 $B_{allocation}^{-1}$ 得到四个旋翼推力（L413），再进入电机延迟（§5）与分配矩阵（§4）。</div>
+<h4>6.3 PS / LV：几何控制器（SE(3) 姿态误差，<code>dynamics.py</code> L414–496，理论出处论文 [28]）</h4>
+<p>LV（velocity 模式）与 PS（position 模式）共用同一姿态合成结构，仅期望加速度来源不同：</p>
+$$\text{LV:}\quad a_{des}=K_{v,p}\,(v_{cmd}-v),\qquad \text{PS:}\quad v_{des}=K_{p,d}\,(p_{cmd}-p),\quad a_{des}=K_{v,d}\,(v_{des}-v)$$
+<p>（数值：$K_{v,p}=3.0$、$K_{p,d}=0.25$、$K_{v,d}=0.7$，<code>drone_state.json</code> L86–94；代码 L416、L456–457 使用的正是这两个"d 槽位"存比例增益的写法——<strong>命名易误导，增益语义要以代码为准</strong>）。<strong>第 1 步：期望合力</strong> $F_{des}=m(a_{des}-g)$（L417，补偿重力）。<strong>第 2 步：期望姿态三轴</strong>（L437–442）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D7) —— 期望旋转矩阵的构造（代码 L437–442；同 PS 模式 L472–477）</span>
+$$b_3=\frac{F_{des}}{\|F_{des}\|},\qquad c_1=(\cos\psi_{des},\ \sin\psi_{des},\ 0)^T,\qquad b_2=\frac{b_3\times c_1}{\|b_3\times c_1\|},\qquad b_1=b_2\times b_3,\qquad R_{des}=[b_1\ b_2\ b_3] \tag{D7}$$</div>
+<div class="eq-note"><strong>推导</strong>：四旋翼推力沿机体 $z$ 轴，故机体 $z$ 轴必须对齐合力方向 → $b_3$；期望偏航给出机头投影 $c_1$；$b_2=b_3\times c_1$（右手系，与 $b_3$ 正交）；$b_1=b_2\times b_3$ 补齐。这正是 Lee-Leok-McClamroch [28] 几何控制里 $R_d$ 的标准构造。<strong>偏航来源</strong>：LV 是"速度方向偏航" $\psi_{des}=\mathrm{atan2}(v_y,v_x)$（L423–427，静止时保持当前偏航），PS 直接用指令偏航（L461）。<strong>第 3 步：姿态误差</strong>（L447–448、L482–483）：</div>
+$$m=\frac12\big(R_{des}^T R-R^T R_{des}\big),\qquad e_R=(\ m_{[1,2]},\ -m_{[0,2]},\ m_{[0,1]}\ )^T=\frac12\big(R_{des}^T R-R^T R_{des}\big)^{\vee}$$
+<p><strong>推导（v 形映射）</strong>：$R_e=R_{des}^T R$ 为姿态误差；当 $R_e\approx I$ 时旋转向量 $\approx$ 其斜对称部分 $\tfrac12(R_e-R_e^T)$，$\vee$ 映射（叉乘矩阵之逆）即 $e_R=\frac12(R_e-R_e^T)^\vee$。代码 $m=\tfrac12(R_{des}^TR-R^TR_{des})$ 正是该斜对称阵，取独立元素 $(m_{21},m_{02},m_{10})$ 得旋转向量。角速度误差 $e_\Omega=R_{des}^TR\,[0,0,\dot\psi_{des}]^T-\Omega$（L450、L485–488）。<strong>第 4 步：力矩</strong>（L451、L489–494）：</p>
+$$\tau_{des}=J\big(K_p e_R+1.2\,K_p\,e_\Omega\big)-\Omega\times J\Omega-K_d\,\dot\Omega_{prev}\qquad(\text{PS});\qquad \tau_{des}=J\,K_p(e_R+e_\Omega)-\underbrace{\Omega\times\Omega}_{=0}\qquad(\text{LV})$$
+<p>与 CTBR 同构：几何误差代替角速度误差 + 前馈抵消。LV 分支的 <code>-cross(Ω,Ω)</code> 恒为 0（L451），是无害冗余。最后 $gross\_thrust=F_{des}\cdot b_3$（L435、L470，即合力在机体 z 的投影，几何控制的标准推力律），与 $\tau_{des}$ 一起解分配矩阵。</p>
+<h4>6.4 SRT（thrust 模式）的现状（诚实说明）</h4>
+<p>论文称 SRT = "individual single-rotor thrusts"。代码 <code>action_type="thrust"</code> 的路径（L398–399、L712–714）把动作<strong>只取第 1 列</strong>反归一化为单值推力（<code>command[:, :1]</code>），而 Gym 层声明动作空间为 4 维（<code>droneGymEnv.py</code> L110–111），且后续 <code>B_allocation @ thrusts</code> 需要 (4,N) 形状——两者矛盾，<strong>该模式在本快照中看起来未完成</strong>（与 <code>_normalize</code> 注释"This function is used only for ROS node"吻合，L271–275）。结论：SRT 是论文宣称支持的接口，但仓库当前实现不完整，<strong>不可直接使用</strong>（静态代码审查结论，未运行验证）。</p>
+<hr>
+<h3>7. 渲染管线：针孔相机与图像/深度/分割生成（数学化，论文 §III.B 文字）</h3>
+<p>论文把渲染完全委托给 Habitat-sim（fork 版，见 <code>readme.md</code> L62–74），本仓库只负责：① 把动力学状态经 (D1) 变换后写进渲染器的 agent 位姿（<code>droneEnv.py</code> L376–377 → <code>SceneManager.set_pose</code> L336–347）；② 组装相机规格（<code>SceneManager.py</code> L1021–1033：<code>CameraSensorSpec</code>，分辨率 64×64、默认相机偏移 <code>position=[0,0,-0.2]</code>、降落任务俯仰 −90° 即<strong>垂直向下</strong>）；③ 收图（<code>droneEnv.py</code> L296–331）。真正光栅化在 habitat-sim 的 C++ 里（子模块未随本快照克隆，<code>.gitmodules</code> 指向 <code>github.com/Fanxing-LI/habitat-sim</code>）。下面给出该管线背后的几何，并在数值上把"64×64 能否看见 0.5 m 的降落方块"算出来。</p>
+<h4>7.1 世界→相机→像素（针孔模型推导）</h4>
+<p><strong>第 1 步：相机外参。</strong>世界系点 $p_W$（std ENU）先经 (D1) 转到 Habitat 系 $p_H$，再由 agent 位姿转到相机系。记相机系与 std 机体系的外参为 $(R_{CB},t_{CB})$（默认 $t_{CB}=(0,0,-0.2)$、$R_{CB}$ 由 <code>orientation</code> 给出，降落任务 $R_{CB}=R_x(-\pi/2)$）。合起来 $p_C=R_{CB}\,R_{BW}(p_W-x_W)+t_{CB}$。<strong>第 2 步：透视投影。</strong>相机系 $z$ 轴为光轴（Habitat 的 OpenGL 约定：相机看向 $-z$，但投影公式只依赖 $z$ 深度），像平面坐标：</p>
+$$x_{ndc}=\frac{X_C}{Z_C}\cdot\frac{1}{\tan(\theta_{hfov}/2)},\qquad y_{ndc}=\frac{Y_C}{Z_C}\cdot\frac{1}{\tan(\theta_{vfov}/2)}$$
+<p><strong>第 3 步：像素坐标。</strong>$u=(x_{ndc}+1)\cdot W/2$、$v=(1-y_{ndc})\cdot H/2$；等价焦距（像素）$f_x=\frac{W/2}{\tan(\theta_{hfov}/2)}$。Habitat 默认 $\theta_{hfov}=90°$、$W=64$ → <strong>$f_x=32$ px</strong>（数值核算 ✅）。<strong>数值例子（降落任务）</strong>：0.5 m 见方降落区在 $h=2.5$ m 正下方占 $32\times0.5/2.5=6.4$ px——<strong>只有约 41 个像素（$6.4^2$）</strong>，阈值分割的中心估计对噪声与自身位姿误差极敏感（§9.3 给出完整数学），这也是降落训练耗时最长（1.7 h）的直接原因。</p>
+<h4>7.2 深度与语义的生成语义（Habitat-sim 约定）</h4>
+<ul>
+<li><strong>深度</strong>：每像素输出沿光轴到最近表面的距离（米，float）。Habitat 对"打不中任何几何"的像素输出 0，<strong>VisFly 在收图后把 0 统一替换为 20 m</strong>（<code>droneEnv.py</code> L306、L322–323 <code>np.where(obs==0, 20, obs)</code>）——即"背景=20 m"。这一处理论文没写，但它决定了深度观测的<strong>动态范围语义</strong>（背景不是 ∞ 而是 20），对把深度当网络输入的训练有实际影响。</li>
+<li><strong>RGB</strong>：0–255 uint8，VisFly 只取前 3 通道（<code>droneEnv.py</code> L308–309 <code>[..., :3]</code>，Habitat 的 RGBA→RGB）。</li>
+<li><strong>语义分割</strong>：每像素对象 ID（uint8，0–255，<code>droneGymEnv.py</code> L97–101）。论文 Table II 给语义图也配了 Normal/Poisson/Salt&amp;Pepper/Speckle 噪声——语义图加高斯噪声在物理上不成立（ID 是离散的），这里应理解为"加在渲染输出上的像素级扰动用于域随机化"，论文没做说明。</li>
+</ul>
+<div class="callout tip"><p><strong>吞吐量核算（Table I / Fig. 4 声明）</strong>：$10^4$ FPS × 100 agents × 4096 px = $4.1\times10^9$ px/s 的深度吞吐，落在消费级 GPU 深度光栅化 $10^9$–$10^{10}$ px/s 量级内，声明<strong>量级自洽</strong>；但该数字是<strong>深度图</strong> FPS（Table I 脚注明说 64×64 <em>depth</em>），摘要/引言却写 "rendering color images at 64×64"——<strong>sensor 类型不一致</strong>（问题清单 ⑨）。三个训练任务每 agent 每步只渲染一张 64×64 图（导航/穿缝=深度、降落=RGB），训练吞吐核算见 §10.1。</p></div>
+<h3>8. 最近障碍点查询与碰撞检测的数学化（论文 §III.B 文字 → D9–D10）</h3>
+<p>论文说：Habitat 为地面机器人预计算的 NavMesh 把 3D 物体投影到地面、只给 2D 距离，不适合空中机器人；VisFly 因此在修改版 habitat-sim 里用 CGAL 实现了"不发生碰撞前提下的最近障碍点查询"。本仓库 Python 侧的调用与后处理在 <code>SceneManager.py</code> L402–497。</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D8) —— 最近点查询（<code>SceneManager.py</code> L440–445）</span>
+$$p_{hit}=\arg\min_{p\in S_{mesh}}\|p-x\|,\qquad d(x,S)=\|p_{hit}-x\|,\qquad \text{受限于}\ \|p-x\|\le R_{sens}\ (敏感半径 10 m) \tag{D8}$$</div>
+<div class="eq-note">$S_{mesh}$ 是场景全部静态网格（+ 可选动态物体，<code>is_object_collidable</code> 时每步更新动态 KD 树，L398–399）。这是"点到网格最小距离"问题，CGAL 的 AABB 树/最近点查询在 $O(\log n)$（分层包围盒剪枝）内近似求解；而 NavMesh 的 2D 投影等价于把优化变量 $p$ 限制在地面平面 $z=0$ 上取最小——<strong>对空中的点 $x$，投影后的"最近距离"与真实 3D 距离可以任意大</strong>（第 10 节 Eq.(F4) 已论证不可逆，此处给出其计算几何表述：投影算子的核是整个竖直线，信息丢失）。<strong>碰撞判定</strong>（<code>droneEnv.py</code> L364–367）：</div>
+$$\text{collision}=\big[\ d(x,S)\lt r_{uav}\ \big],\qquad r_{uav}=0.1\ \text{m（默认）}$$
+<p><strong>多机扩展</strong>（<code>SceneManager.py</code> L447–461）：multi-drone 模式下把"距最近障碍点"与"距最近同伴"取小：$d_i=\min(d(x_i,S),\ \min_{j\ne i}\|x_j-x_i\|)$，并把对应点作为 $p_{hit}$——这就是论文"parallelized agents 忽略互相碰撞、multi-agent 包含互撞"在代码里的精确实现（同场景多机才进入该分支）。<strong>沿速度的离散扫掠</strong>（可选 <code>col_refine_steps&gt;0</code>，L425–438）：在 $[0,dt_{refine}]$ 内取 $N$ 个时刻 $p_k=x+v\,t_k$（$t_k=k\,dt_{refine}/N$）逐个查询，返回所有命中点——这是对"连续碰撞检测（CCD）"的<strong>离散近似</strong>，速度越快、步数越少，漏检概率越大；示例配置未启用（默认 0 步）。</p>
+<hr>
+<h3>9. 三个训练任务的奖励与成功判据：逐项数学化（论文 §IV + 代码）</h3>
+<h4>9.1 任务一：杂乱环境导航（<code>envs/NavigationEnv.py</code>，训练 0.73 h）</h4>
+<p>论文说"garage scene filled with random stones of the density of $0.15/\mathrm{m^3}$"。<strong>石头生成数学</strong>（<code>utils/datasets/datasets.py</code> L322–390）：车库边界 $[0,-7,0]$–$[18,7,5]$（L279–280），体积 $18\times14\times5=1260\ \mathrm{m^3}$，数量 $N=\lfloor V\cdot\rho\rfloor=\lfloor 1260\times0.15\rfloor=189$ 块（数值核算 ✅）。位置用 <strong>Mitchell best-candidate</strong> 采样（L90–132）：逐点从 $k=80$ 个均匀候选里取"距已有点集最远"者：</p>
+$$p_i=\arg\max_{c\in\{c_1,\dots,c_k\}\sim U(\mathrm{bounds})}\ \min_{j\lt i}\|c-p_j\| \tag{D9}$$
+<p>这近似泊松盘采样（抑制聚堆），复杂度 $O(N^2k)$。<strong>姿态</strong>（L361–370）：$q=( \sqrt{u_1}\cos 2\pi u_3,\ \sqrt{1-u_1}\sin 2\pi u_2,\ \sqrt{1-u_1}\cos 2\pi u_2,\ \sqrt{u_1}\sin 2\pi u_3 )$，$u\sim U(0,1)\cdot\theta_{rot}$——<strong>范数为 1 的单位四元数，但不是 SO(3) 上的 Haar 均匀采样</strong>（均匀 $u_1$ 并不产生均匀轴角分布；且 $\theta_{rot}\gt1$ 时 $\sqrt{1-u_1}$ 会取到虚数），是工程近似（问题清单 ⑪）。缩放 $1+U(0,1)\cdot scale\_rand$（L373–374）。<strong>奖励函数</strong>（"For VisFly Manuscript" 注释，L85–99）逐项：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D10) —— 导航奖励（代码 <code>NavigationEnv.py</code> L85–99，论文无公式）</span>
+$$r=\underbrace{0.01\cdot\min\Big(10,\ \frac{v\cdot(t-x)}{\|t-x\|}\Big)}_{(a)\ \text{沿目标方向速度}}
+-\underbrace{0.01\cdot\Big[\max\big(\theta_{th},\ \arccos\frac{d\cdot v}{\|v\|}\big)-\theta_{th}\Big]}_{(b)\ \text{航向-速度夹角（10° 死区）}}
+-\underbrace{10^{-5}\|q-q_0\|}_{(c)}
+-\underbrace{0.002\|v\|}_{(d)}
+-\underbrace{0.002\|\Omega\|}_{(e)}
+-\underbrace{\frac{0.01}{d_{col}+0.2}}_{(f)}
+-\underbrace{0.005\cdot\mathrm{relu}(1-d_{col})\cdot\mathrm{relu}\Big(\frac{c\cdot v}{d_{col}}\Big)}_{(g)}
++\underbrace{\mathbb{1}_{success}\cdot(M-t_{step})\cdot0.1\cdot\Big(0.2+\frac{0.8}{1+\|v\|}\Big)}_{(h)} \tag{D10}$$</div>
+<div class="eq-note">符号：$t=(9,0,1)$ 目标、$d$ 机头方向（机体 x 轴）、$q_0=(1,0,0,0)$、$d_{col}$ 最近障碍距离、$c=p_{hit}-x$ 指向障碍点矢量、$\theta_{th}=\pi/18$、$M=256$。<strong>逐项解读</strong>：(a) $v\cdot\hat n$ 是速度在目标方向的方向导数（逼近速率），10 m/s 截断防刷分；(b) $\arccos(d\cdot v/\|v\|)$ 为机头-速度夹角，减 10° 死区后惩罚，<strong>鼓励机头朝运动方向</strong>——"direction=x_axis 即航向"的又一代码证据；(f) $1/(d+0.2)$ 斥力场（+0.2 防奇点）；(g) 仅 $d_{col}\lt1$ m 时激活，罚"朝障碍飞"的分量 $\mathrm{relu}(c\cdot v)/d_{col}$；(h) 成功奖 = 剩余步数 × 速度折减（越快到越先拿）。<strong>成功判据</strong>（L81–82）：$\|x-t\|\le0.5$ m。<strong>初始状态</strong>（<code>cluttered_flight.yaml</code> L4–9 + <code>randomization.py</code> L156–157）：$x=1$ m（half=0 固定）、$y\sim U(-2,2)$、$z\sim U(0.5,2.5)$（语义 $mean+(2u-1)\cdot half$；第 4 节表格写 $U(0,2)$ 与之略有出入，x 实为固定值 1，以本节为准）。<strong>观测</strong>（L70–74）：13 维状态 + 64×64 深度 + 3 维目标；48 并行智能体（yaml L2）。</div>
+<h4>9.2 任务二：协同穿缝（<code>envs/MultiNavigationEnv.py</code>，训练 1.1 h）</h4>
+<p>3 机 × 24 场景 = 72 智能体（<code>crossing.yaml</code> L2–3）；目标按行排开 $(13,-2,1.5),(13,0,1.5),(13,2,1.5)$（L45–48）。<strong>成功判据</strong>（L112）：$x\gt10$ m（越过门洞平面即可，不要求到达目标点附近——与导航任务"0.5 m 半径"判据不同，论文没写这一点）。<strong>奖励</strong>（L137–145）与 D10 同构，仅 (h) 项系数变为 $0.5+0.5/(1+\|v\|)$；<strong>观测</strong>（L77–103）在导航基础上加 <code>swarm</code>：其余 2 机的 13 维状态拼接（$(n_{agent}-1)\times13$ 维），"observing the states of other agents"的精确形式。<strong>多机碰撞</strong>：同场景内机间距离参与 §8 的取小逻辑——协作避让正是通过 (f)(g) 两项中 $d_{col}$ 包含机间距离实现的，无需额外奖励项。</p>
+<h4>9.3 任务三：降落（<code>envs/LandingEnv.py</code>，训练 1.7 h）——黑色方块中心的完整数学</h4>
+<p>论文说："The quadrotor calculates the center of the 0.5×0.5 m² black rectangle in its field of view via threshold segmentation, strives to keep it centered, and incorporates it into its observation." 代码（L30–35）把相机固定为<strong>垂直向下</strong>（orientation $[-\pi/2,0,0]$）、64×64 RGB。<strong>第 1 步：阈值分割</strong>（L73）：</p>
+$$B_{ij}=\big[\ \tfrac13(R_{ij}+G_{ij}+B_{ij})\lt70\ \big]\ \in\{0,1\}^{64\times64}$$
+<p><strong>第 2 步：一阶矩（质心）</strong>（L75，<code>scipy.ndimage.center_of_mass</code>）：</p>
+$$c_x=\frac{\sum_{i,j} i\,B_{ij}}{\sum_{i,j}B_{ij}},\qquad c_y=\frac{\sum_{i,j} j\,B_{ij}}{\sum_{i,j}B_{ij}}$$
+<p><strong>推导</strong>：把 $B$ 看成质量分布，$c$ 是重心（一阶矩/零阶矩）；对理想矩形目标，$c$ 精确落在其几何中心（对称性），因此"重心=中心"不需要二阶信息。<strong>第 3 步：归一化与居中</strong>（L75–76）：观测 $target=c/64-0.5\in[-0.5,0.5]^2$，$(0,0)$ 表示目标在画面中心。<strong>第 4 步：视线丢失处理</strong>（L77–79）：若 $\sum B=0$（无黑色像素）则 $c$ 为 NaN，代码用<strong>上一帧中心</strong>替代——注意这与 <code>get_failure</code>（L65–67，检测 NaN）的组合存在边界问题：首帧即丢失时 <code>_pre_centers=None</code> 会触发 <code>None[i]</code> 异常（疑点 ⑫）。<strong>奖励</strong>（L105–118）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D11) —— 降落奖励（代码 <code>LandingEnv.py</code> L105–118）</span>
+$$r=0.2\,\min\Big(1,\ 1.25-\|c\|_2\Big)-0.2\,\|(q_x,q_y)\|-0.02\|v\|-0.01\|\Omega\|+0.1\,\min(1,\tfrac{3-z}{3})\cdot2+\underbrace{2\cdot\mathbb{1}_{success}\cdot\frac{10+(M-t_{step})}{1+2\|v\|}}_{(i)} \tag{D11}$$</div>
+<div class="eq-note">逐项：$0.2(1.25-\|c\|)$ 把方块保持在画面中心（$\|c\|\le\sqrt2/2\approx0.707$，故 $1.25-\|c\|\ge0.543\gt0$ 恒正，数值核算 ✅——该项是"越居中奖励越大"）；$-0.2\|(q_x,q_y)\|$ 惩罚滚转/俯仰偏离水平（用四元数矢部的 x,y 分量近似姿态误差，$\|(q_x,q_y)\|\le1$）；$(3-z)/3$ 是"高度越低奖励越大"的线性项（$z\in[0,3]$ 截断）；(i) 成功奖随剩余步数线性增大、随速度折减。<strong>成功判据</strong>（L94–100，论文未给阈值）：$z\le0.2$ m 且 $|x-2|,|y-0|\le0.3$ m 且 $\|v\|\le0.3$ m/s——即判定框 $0.6\times0.6$ m，<strong>比 0.5×0.5 m 的目标方块每边宽 0.05 m</strong>；论文只说"lands safely on the landing area"，未写这些阈值（问题清单 ⑩ 附带说明）。<strong>观测</strong>：13 维状态 + 64×64 RGB + 2 维目标中心。</div>
+<h3>10. 训练管线：PPO / GAE / 可微路径（SHAC-BPTT）与网络结构（数学化，论文 §IV + Lst. 1 + Fig. 5）</h3>
+<h4>10.1 论文声明与真实超参数的对照（"Most of the hyper-parameters of PPO are set to default values"）</h4>
+<table>
+<tr><th>超参数</th><th>SB3 默认值</th><th>本仓库 <code>alg_cfgs/cluttered_flight/PPO.yaml</code></th><th>是否"默认"</th></tr>
+<tr><td>learning_rate</td><td>3e-4</td><td>5e-5</td><td>❌ 改了（小 6 倍）</td></tr>
+<tr><td>n_steps</td><td>2048</td><td>256</td><td>❌ 改了（= 一整条 episode）</td></tr>
+<tr><td>n_epochs / clip_range / gamma / gae_lambda / ent_coef / vf_coef / max_grad_norm</td><td>10 / 0.2 / 0.99 / 0.95 / 0.0 / 0.5 / 0.5</td><td>同左</td><td>✅</td></tr>
+<tr><td>batch_size</td><td>64</td><td>25600</td><td>❌（48 智能体 × 256 步 = 12288 转移，SB3 会把 batch 截到 buffer 大小）</td></tr>
+<tr class="highlight"><td>ortho_init</td><td>True</td><td>False</td><td>❌（策略网络随机初始化）</td></tr>
+</table>
+<p>结论：论文的"大多数为默认值"大体成立，但 <strong>lr、n_steps、batch_size、ortho_init 四处并非默认</strong>；其中 n_steps=256 与 max_episode_steps=256 相等，意味着<strong>每轮 rollout 恰好是一整条轨迹</strong>（第 6 节 Eq.(M3) 已指出），GAE 的截断效应最小。总步数 1e7（yaml L34），48 智能体并行，0.73 h → <strong>3805 步/秒（总）、79 步/秒/智能体</strong>（数值核算 ✅），即每个智能体每秒完成约 2.4 秒的模拟时间（ctrl_dt=0.03 s）——"实时比"约 2.4:1。</p>
+<h4>10.2 PPO 目标与 GAE（与代码逐行对照，深化第 6 节 M2/M3）</h4>
+<p>裁剪目标（<code>utils/algorithms/PPO.py</code> L223–262）：</p>
+$$L=\mathbb E\Big[\min\big(r_t(\theta)\hat A_t,\ \mathrm{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat A_t\big)-c_{vf}\big(V(s_t)-\hat R_t\big)^2+c_e\,H[\pi]\Big],\qquad r_t=\frac{\pi_\theta(a|s)}{\pi_{old}(a|s)}$$
+<p>优势归一化在 L217–219（$\hat A\leftarrow(\hat A-\bar A)/(\sigma_A+10^{-8})$，与 SB3 一致）；价值目标 $\hat R_t$ 是 GAE 的 TD(λ) 返回（<code>utils/algorithms/common.py</code> L119–132）：</p>
+$$\delta_t=r_t+\gamma V(s_{t+1})(1-d_t)-V(s_t),\qquad \hat A_t=\delta_t+\gamma\lambda(1-d_t)\hat A_{t+1},\qquad \hat R_t=\hat A_t+V(s_t) \tag{D12}$$
+<p><strong>推导要点</strong>（为何 $\hat R_t=\hat A_t+V(s_t)$ 自洽）：把 $\hat A_t$ 展成 $\delta$ 的幂级数 $\hat A_t=\sum_{k\ge0}(\gamma\lambda)^k\delta_{t+k}$，代入 $\delta_{t+k}=r_{t+k}+\gamma V_{t+k+1}-V_{t+k}$ 对齐 $\gamma$ 幂次：$V(s_t)$ 系数为 1、$r_{t+k}$ 系数为 $\gamma^k[\lambda^k-\lambda^{k-1}]$、$V$ 高阶项抵消——即 TD(λ) 望远镜求和 $\hat R_t=(1-\lambda)\sum_k\lambda^kG_t^{(k)}$。代码 L130–132 两行实现（逆向累加 GAE 后 <code>returns = advantages + values</code>）。</p>
+<h4>10.3 策略网络（Fig. 5 ↔ <code>utils/policies/extractors.py</code>）</h4>
+<p>特征提取器 <code>StateTargetImageExtractor</code>（L699–724，示例配置经 <code>exps/examples/run.py</code> L35 别名解析）：深度图 1×64×64 过 <code>create_cnn</code>（L525–536，默认通道 [6,12,18]、核 [5,3,3]、stride 1、padding 0，来自 L527–531）——特征图尺寸 $64\to60\to58\to56$，末层 56×56×18=56448 维展平后经 MLP 到 128 维；state(13)→[128,64]→64、target(3)→[128,64]→64；拼接 128+64+64=<strong>256 维</strong>，再分 pi/vf 各 [64,64] 的 MLP，动作头 4 维 Tanh（$\times[-1,1]$）。穿缝任务用 <code>SwarmStateTargetImageExtractor</code>（L726），在 state 旁多一个 swarm(2×13) 分支。第一层 $56448\times128\approx7.2$M 参数——<strong>网络参数大头在"深度图展平层"</strong>，这也解释了为何读 readme 时建议用 backbone（resnet18 等，L502–524 支持）来压缩。</p>
+<h4>10.4 Lst. 1 伪代码逐行解读（论文 Lst. 1）</h4>
+<pre class="code-block"><code>class DroneGymEnvsBase:                # 对应 envs/base/droneGymEnv.py（VecEnv 子类）
+  @abstract method
+  def get_reward()      return reward   # 用户只实现奖励（如 NavigationEnv.get_reward）
+  @abstract method
+  def get_observation() return observation  # 用户只实现观测组装（含视觉预处理）
+  @abstract method
+  def get_success()     return is_success   # 用户只实现成功判据（DroneGymEnvsBase.step 自动组装 done）
+class DroneNavigationEnvs(DroneGymEnvsBase)
+  def get_reward()      ... return r_distance+r_speed-r_collision   # 示意：距离+速度−碰撞
+  def get_observation() ... return state+vision+target              # 状态+视觉+目标
+  def get_sucess()      ... return status_reach_the_target          # 注意拼写 get_sucess（论文原文笔误）
+Lst. 1  Mocular class design  # 应为 Modular（论文排版笔误）</code></pre>
+<p>数学上，Lst. 1 描述的是一个<strong>模板方法模式</strong>：环境基类在 <code>step()</code> 里固定执行「动力学→渲染→观测→碰撞→奖励→done 组装→自动复位」（<code>droneGymEnv.py</code> L141–218），用户只注入三个映射 $R(s,a)$、$O(s)$、$S(s)$。done 的精确逻辑（L188–193）：</p>
+$$\text{done}_t=\text{success}\lor\text{failure}\lor\text{out\_of\_bounds}\lor(\text{collision 且开启碰撞复位})\lor(t\ge M) \tag{D13}$$
+<p>值得注意：<strong>碰撞默认触发 episode 终止</strong>（<code>is_collision_reset=True</code>，L35 默认参数）——这与导航奖励里"接近障碍惩罚 + 碰撞终止"的组合共同塑造了避障行为；而穿缝任务 <code>get_done</code> 被覆写为全 False（<code>MultiNavigationEnv.py</code> L105–109），仅靠 success/failure 终止（<code>get_failure</code> 来自基类的碰撞），是"协作任务不因单机撞停而整局结束"的设计。</p>
+<h4>10.5 可微路径：SHAC / BPTT 的解析策略梯度（<code>utils/algorithms/shac.py</code>，论文 §III.A 声称的"analytical gradients"）</h4>
+<p>论文只说"PyTorch's computational graph also enables the computation of analytical gradients through back-propagation…can be directly integrated into model-based RL frameworks [24]"，未给公式。仓库的 <code>shac.py</code>（Short-Horizon Actor-Critic）给出精确实现。每轮：在<strong>不 detach 的计算图</strong>里展开 $H=32$ 步（L63 默认 horizon=32，L215–255）：</p>
+$$L_{actor}=-\sum_{t=0}^{H-1}\gamma^t\,\mathbb{1}_{not\_done_t}\Big[r_t+\gamma\,V_{target}(s_{t+1})\cdot\mathbb{1}_{\{(done_t\lor t=H-1)\,\land\,\neg episode\_done_t\}}\Big] \tag{D14}$$
+<div class="eq-note"><strong>推导/解读</strong>：截断时域的<strong>解析目标</strong>——轨迹奖励折扣和，仅时域末端用目标价值网络 bootstrap（$V_{target}$，polyak 软更新 $\theta'\leftarrow(1-\tau)\theta'+\tau\theta$，$\tau=0.005$，L277）。折扣递推（L246）：$discount_t=discount_{t-1}\cdot\gamma\cdot\neg done_t+done_t$（done 后下一步从 γ 重新开始，配合环境自动复位）。$\partial L/\partial\theta_{actor}$ 经 $s_{t+1}=F(s_t,\pi(s_t))$ 的可微动力学链回传——<strong>论文 §III.A "analytical gradients offer more precise descent directions" 的实现</strong>；仓库提供 BPTT（<code>BPTT.py</code>，$is\_BP\_value=False$，价值不进图）与 SHAC（$is\_BP\_value=True$）两变体。梯度裁剪 0.5（L260）、价值 MSE 更新 5 次（L268–275）。<strong>诚实说明</strong>：论文三个示例任务<strong>没有用</strong>这条可微路径（<code>run.py</code> L30–32 只有 PPO 别名）；可微动力学在论文里是"能力声明 + 配套仓库实现"，其端到端收益由后续工作（APG、StableTracker 等，readme L76–81）证明。断图位置（第 7 节 Eq.(P2)）：观测进 critic 前 detach（L238），rollout buffer 全存 detach 副本（L248–254），梯度只沿"动作→动力学→奖励→actor"流动。</div>
+<hr>
+<h3>11. 域随机化与 sim-to-real 的精确数学（论文 §III.D + Table II）</h3>
+<h4>11.1 Table II 噪声模型 → 具体分布</h4>
+<ul>
+<li><strong>IMU（状态噪声）</strong>：代码只支持 Uniform / Normal 两类（<code>droneEnv.py</code> L99–112），分别对应 $s_{obs}=s+\epsilon$，$\epsilon\sim U(\mu-h/2,\ \mu+h/2)$（<code>type.py</code> L37–38 <code>(rand-0.5)*half+mean</code>）或 $\epsilon\sim\mathcal N(\mu,\sigma^2)$（L57–58）；加噪后<strong>四元数部分重归一化</strong>（<code>droneEnv.py</code> L119–120）。<strong>注意两处 Uniform 语义不一致</strong>：状态随机化器（<code>randomization.py</code> L156）用 $(2u-1)\cdot half$（宽度 $2\cdot half$），而 type.py 的 Uniform 用 $(u-0.5)\cdot half$（宽度 $half$）——同一名字两种语义（问题清单 ⑧）。</li>
+<li><strong>RGB/深度/语义</strong>：论文表 II 的 Normal、Poisson、Salt&amp;Pepper、Speckle、Redwood 全部经 habitat-sim 的 <code>noise_model</code> 接口生效（<code>SceneManager.py</code> L1030–1032 直接把配置传给 <code>CameraSensorSpec</code>），数学定义（均非本仓库实现）：高斯 $I'=I+\mathcal N(0,\sigma^2)$；泊松 $I'\sim\mathrm{Poisson}(\lambda I)$（光子噪声）；椒盐以概率 $p$ 置 0/255；乘性散斑 $I'=I(1+\mathcal N(0,\sigma^2))$；Redwood 是 Choi et al. [35] 的深度相关误差模型。</li>
+<li><strong>诚实说明</strong>：示例三个 yaml <strong>都没有配 noise_kwargs</strong>，默认零噪声（<code>droneEnv.py</code> L100–106 的 IMU 默认 half=0）；即论文三个实验的"域随机化"实际只体现在<strong>初始状态随机化 + 多场景采样</strong>上，传感器噪声管线是提供而未启用的（问题清单 ⑦）。</li>
+</ul>
+<h4>11.2 初始状态随机化与避障复位（<code>utils/randomization.py</code> L64–96）</h4>
+$$p_0\sim U(p_\mu-h,\ p_\mu+h),\qquad q_0=\mathrm{Quat}_{zyx}(r,p,y),\ r,p,y\sim U(\theta_\mu-\theta_h,\theta_\mu+\theta_h)\quad(\text{同理 } v_0,\Omega_0)$$
+<p>随后<strong>拒绝采样</strong>：若初始点在障碍内（以 $r_{check}=1.0$ m 为半径查询，L77），重新采样直到不碰撞；循环只在上限 100 次时打印警告而<strong>不退出</strong>（L92–93）——极端密集场景下可能长时间循环（问题清单 ⑬）。<strong>多场景并行</strong>（论文"scenes are treated as datasets, allowing them to be sampled and shuffled"）：<code>num_scene&gt;1</code> 时智能体摊到多个场景（<code>droneEnv.py</code> L73–84），场景路径来自 <code>ChildrenPathDataset</code>（<code>utils/datasets/datasets.py</code> L446–455 的 Dataset 子类），支持 shuffle——穿缝任务 24 个场景（<code>crossing.yaml</code> L3）即此机制。</p>
+<hr>
+<h3>12. 交叉验证总表（论文 ↔ 代码 ↔ 独立数值核算）</h3>
+<table>
+<tr><th>论文</th><th>代码位置（本仓库）</th><th>独立验证结论</th></tr>
+<tr><td>(1a) $\dot x_W=v_W$</td><td><code>maths.py</code> L310（+wind）、L344</td><td>✅ 本体正确；代码加风、RK4 漏风（§2.1）</td></tr>
+<tr><td>(1b) $\dot v_W=\frac1m R_{WB}(f+d)+g$</td><td><code>dynamics.py</code> L347</td><td>✅ 逐项一致（§2.2）</td></tr>
+<tr><td>(1c) $\dot q=\frac12 q\otimes\Omega$</td><td><code>maths.py</code> L311（Hamilton 积 L168–174）</td><td>✅ 数值验证 $\dot R=R[\Omega]_\times$ 误差 2.1e-6（§2.3）</td></tr>
+<tr><td>(1d) $\dot\Omega=J^{-1}(\eta-\Omega\times J\Omega)$</td><td><code>maths.py</code> L314</td><td>✅ 逐项一致（§2.4）</td></tr>
+<tr><td>(2) $d=\frac12\rho v_B\odot v_B C_d\odot s$</td><td><code>dynamics.py</code> L343–345、L567</td><td>⚠️ 代码用 $v|v|$ + 线性项；预乘系数 0.0091875 数值吻合（§3.3）</td></tr>
+<tr><td>(3) $f=\sum f_i,\ \eta=\sum T_i\times f_i$</td><td><code>dynamics.py</code> L100–114</td><td>⚠️ 代码多反扭矩行 $\kappa\sigma_i f_i$；前两行与叉乘存在轴对应疑点（§4.2）</td></tr>
+<tr><td>(4) 推力映射 + 指数延迟</td><td><code>dynamics.py</code> L514、L530–554、L581</td><td>✅ 精确离散化；悬停 $\omega=1658$ rad/s、$c=30.3\ s^{-1}$ 数值吻合（§5.2）</td></tr>
+<tr><td>10,000 FPS @64×64（Table I/Fig. 4）</td><td>—（渲染在 fork 的 habitat-sim C++ 内）</td><td>✅ 量级自洽：$4.1\times10^9$ px/s（§7.2）；摘要"color"与表注"depth"不一致（问题⑨）</td></tr>
+<tr><td>石头密度 0.15 /m³</td><td><code>datasets.py</code> L322–358</td><td>✅ $1260\times0.15=189$ 块；best-candidate 采样（§9.1）</td></tr>
+<tr><td>0.73 / 1.1 / 1.7 h 训练</td><td><code>exps/examples/*.yaml</code>（1e7 步、48/72/12 智能体）</td><td>✅ 导航 3805 步/s、79 步/s/agent 自洽（§10.1）；另两任务总步数未公开，无法独立核算</td></tr>
+<tr><td>PPO "默认超参"</td><td><code>PPO.py</code> L177–262 + <code>PPO.yaml</code></td><td>⚠️ lr/n_steps/batch_size/ortho_init 非默认（§10.1）</td></tr>
+<tr><td>CTBR 动作、四种控制器</td><td><code>dynamics.py</code> L389–503</td><td>✅ CTBR/PS/LV 完整数学化（D5–D7）；SRT 不完整（§6.4）</td></tr>
+<tr><td>Lst. 1 三接口</td><td><code>droneGymEnv.py</code> L141–218</td><td>✅ 对应；两处排版笔误（Mocular/sucess，§10.4）</td></tr>
+</table>
+<hr>
+<h3>13. 问题清单（按严重程度；未发现问题的条目明说不凑数）</h3>
+<ol>
+<li><strong>【疑点·待运行验证】分配矩阵滚转/俯仰通道疑似互换</strong>（§4.2）：<code>B_allocation</code> 第 2、3 行分别是电机 x、y 坐标，产生的是 $(-\eta_y,\eta_x)$ 而非 $(\eta_x,\eta_y)$；与"$x$=前、$y$=右"的体轴约定（§1.2 三处证据）不自洽。单点测试法已给出（单旋翼 1 N 时物理预期 $(-0.053,-0.053,0.016)$、代码将给 $(0.053,-0.053,0.016)$，恰为 $R_z(+90°)$ 旋转即 (x,y) 通道互换）。因无法在本机运行模拟器，不作定论。</li>
+<li><strong>【不一致】式 (2) 的 $v_B\odot v_B$ 恒为正</strong>（§3.2）：照抄实现阻力方向会反；代码用 $v\odot|v|$ 修正。论文矢量写法有歧义（标量式 [27] 无此问题）。</li>
+<li><strong>【不一致】代码阻力多一项线性项 $\lambda v$</strong>（§3.2），论文只声明"正比于速度平方"，未提及。</li>
+<li><strong>【不一致】式 (3) 缺反扭矩项</strong>（§4.1）：偏航力矩完全来自 $\kappa\sigma_i f_i$，论文 $\eta=\sum T_i\times f_i$ 不含它；"momentum"应为"moment"。</li>
+<li><strong>【不一致】风在位置积分里起作用、在阻力/控制器反馈里不起作用</strong>（§2.1）：观测速度含风、闭环速度不含风、阻力不用空速——同一物理量三处待遇不同。</li>
+<li><strong>【疑似 bug】RK4 分支调用 <code>_get_derivatives</code> 未传 wind</strong>（<code>maths.py</code> L370–379）：RK4 与 Euler 对风给出不同轨迹；另 RK4 分支返回的角加速度张量形状 (3,N,4) 与 Euler 的 (3,N) 不同，bodyrate+RK4 组合下 PID 阻尼项会形状不匹配（§2.5）。</li>
+<li><strong>【声明强度问题】示例任务默认零传感器噪声</strong>（§11.1）：三个 yaml 无 noise_kwargs，论文 Table II 的噪声管线未在三个实验里启用，"sim-to-real"的实验证据实际只来自状态/场景随机化。</li>
+<li><strong>【代码问题】两处 Uniform 语义不一致</strong>（§11.1）：<code>type.py</code> 宽度 $half$，<code>randomization.py</code> 宽度 $2\cdot half$；配置里同一 <code>half</code> 字段在两条路径下分布不同。</li>
+<li><strong>【论文内部不一致】摘要说 64×64 "color images"、Table I 脚注说 "64×64 depth images"</strong>（§7.2）：两个数字（10,000 FPS）对应不同传感器，不能互换引用。</li>
+<li><strong>【未写明的阈值】降落成功判据 $z\le0.2$ m、$|xy|误差\le0.3$ m、$\|v\|\le0.3$ m/s 论文均未给出</strong>（§9.3）；0.5×0.5 m 是目标方块尺寸，判定框实际 0.6×0.6 m。</li>
+<li><strong>【近似】石头姿态采样不是 SO(3) 均匀分布</strong>（§9.1），且 $\theta_{rot}\gt1$ 时公式会失效；不影响论文结论但影响"随机场景"的分布均匀性声明。</li>
+<li><strong>【边界问题】降落首帧丢失目标时 <code>_pre_centers=None</code> 会异常</strong>（§9.3，<code>LandingEnv.py</code> L77–79 与 L65–67 的组合）；未运行验证，标注为静态审查结论。</li>
+<li><strong>【代码问题】拒绝采样循环无硬上限</strong>（§11.2，<code>randomization.py</code> L78–93）：超过 100 次只警告不退出，极端密集场景可能卡死。</li>
+<li><strong>【配置问题】<code>drone_d435i.json</code> 缺 <code>max_acc</code> 键</strong>：<code>dynamics.load()</code> L598 必读该键，加载该配置会 KeyError；且其 <code>max_rate=1.0</code> 与 <code>drone_state.json</code> 的 2.0 不同——该文件在本快照中不可直接使用。</li>
+<li><strong>【接口问题】SRT（thrust 模式）实现不完整</strong>（§6.4）：4 维动作空间与 1 维反归一化、4 维分配矩阵不匹配，静态审查下无法正常运行。</li>
+<li><strong>【未发现实质问题】</strong>式 (1a)(1b)(1c)(1d) 本体、式 (4)、Lst. 1 逻辑、四元数约定（Hamilton 右乘、标部在前）、RK4 权重与节点、std↔habitat 变换、悬停/推力/阻力数值——均与独立核算一致，不硬凑问题。</li>
+</ol>
+<hr>
+<h3>14. 建议人工复核清单（图像核验受限声明）</h3>
+<ul>
+<li><strong>公式字形</strong>：p.2 底部式 (1)（核对 $R_{WB}$ 下标、$\otimes$、$J^{-1}$）；p.3 顶部式 (2)(3)(4)（核对 $\odot$、$T_i$、$e^{-ct}$、$f_i(3)$ 的 (3) 上标）——本推导以 fulltext 抽取 + 代码互证为准。</li>
+<li><strong>图 2 阶跃响应</strong>：若图 2 中 PS/LV 响应正常，则问题清单第 1 条（滚转/俯仰通道）大概率可排除或降级；若响应呈 90° 耦合，则坐实。这是闭环保真度最高的判据。</li>
+<li><strong>图 6 轨迹方向</strong>：导航轨迹的机头朝向可进一步佐证体轴约定（$x$=前）。</li>
+<li><strong>Fig. 4 的 FPS 曲线</strong>：核对 256×256 时的 6000 FPS 声明（本推导只能做量级核算，无法读图）。</li>
+<li><strong>论文 Lst. 1</strong>：核对 <code>get_sucess</code> 拼写与 <code>Mocular</code> 是否为 PDF 渲染假象（fulltext 抽取显示如此）。</li>
+</ul>
 </section>
 
 <footer>📄 Paper Notes · SJTU ViSYS Lab · arXiv 2407.14783 (2024) · VisFly — VisFly: An Efficient and Versatile Simulator for Training Vision-based Flight · MathJax + Mermaid Rendering</footer>

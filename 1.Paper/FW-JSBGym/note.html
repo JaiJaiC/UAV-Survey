@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">缺陷与扩展</a>
   <a href="#motivation">推导动机</a>
   <a href="#takeaway">要点总结</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -1153,6 +1157,541 @@ flowchart TB
     <strong>② 但这优势完全建立在"模型能学准"上</strong>：环境一旦随机（湍流）或非平稳（阵风），确定性模型退化为条件均值甚至失去意义，TD-MPC 的优势消失、甚至被最保守的 PPO 反超。<br>
     <strong>③ 而所有 RL 方法（MF 与 MB）都有共同的、被长期忽视的代价</strong>：动作抖振比 PID 高 1–2 个数量级，且现有手段（AVP/CAPS）只能压到 PID 的 7 倍，压不下去。
   </div>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info">
+<p><strong>对象</strong>：ICINCO 2024 论文（arXiv:2409.17896，14 页，无附录）的<strong>全部 20 个编号公式（式 (1)–(20)，含子式）</strong>与全部算法（PID、PPO、SAC、TD-MPC/MPPI、AVP、CAPS——论文以文字/表格描述、未给伪代码，本节补全）。<strong>方法</strong>：① 从牛顿-欧拉方程、四元数代数、贝尔曼方程等第一性原理<strong>独立重推</strong>；② 用本地仓库 <code>fw_jsbgym/</code>（<code>x8.xml</code>、<code>aerodynamics.py</code>、<code>jsbsim_env.py</code>、<code>ac_bohn_nova.py</code> 等）<strong>逐行交叉验证</strong>；③ 逐式<strong>数值核算</strong>（配平升力、惯性特征值、奖励裁剪边界、指标量纲界等，全部手算可复现，清单见 §17.3）；④ 明确标出<strong>错误、符号冲突、与代码不一致</strong>处（§16.2）。</p>
+</div>
+<div class="callout warn">
+<div class="callout-title">⚠️ 三条诚实声明（阅读本节前必读）</div>
+<ol>
+<li><strong>图像核对受限</strong>：本模型无法读页面图像；公式原文以 <code>fulltext.txt</code> + arXiv 官方 HTML（<a href="https://arxiv.org/html/2409.17896v1">arxiv.org/html/2409.17896v1</a>，含逐式 LaTeX，已逐条核对式 (1)–(20)）双重互证。建议人工复核页码：<strong>p4 式 (3)、p5 式 (6)(9)、p8 式 (18)(19)(20)</strong>。</li>
+<li><strong>仓库快照时间</strong>：本地 checkout 是 2026-03-27 上游 main 快照（<code>SOURCE.txt</code>），<strong>比论文新 1.5 年、个别实现已漂移</strong>（阵风触发步数不同，见 §15.2 的 Eq.(D13) 注）。论文的算法/评测代码在 <strong>FW-FlightControl 仓库</strong>，<strong>不在本地</strong>——算法侧只能对照论文 Table 3/4/5 + CleanRL/TD-MPC2 官方默认值；环境侧（FDM/奖励/状态）与本地代码逐行对照。</li>
+<li><strong>与笔记 §6 的关系</strong>：§6 已有公式速览（编号 Eq.(A)–(C)、Eq.(1')–(38)），本节<strong>一律用论文原始式号 (1)–(20)</strong>，引用笔记自身编号处显式标注。§6 未展开的推导（四元数矩阵、CAME 分量式 $C_1..C_9$、$R_w^b$ 矩阵乘法、MPPI 权重、TOLD 损失）本节全部补全。</li>
+</ol>
+</div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th style="width:10%;">公式</th><th style="width:36%;">内容</th><th>与教材/代码对照的结论</th></tr>
+<tr><td>(1)(2)</td><td>位置/姿态运动学（四元数）</td><td>✅ 正确（B&amp;M 标准形式），式 (2) 矩阵逐元素重推一致。小瑕：第二行首元 $\omega$ 未加粗</td></tr>
+<tr><td>(3)</td><td>质心平动方程（牛顿方程）</td><td>⚠️ <strong>印刷缺括号</strong>：打印 $m\dot v+\omega\times v$ 量纲不一致，应为 $m(\dot v+\omega\times v)$</td></tr>
+<tr><td>(4)</td><td>角动量方程（欧拉方程）</td><td>✅ 正确。论文未给分量式，本节补全 $C_1..C_9$ 并与 <code>aerodynamics.py</code> L28–36 逐项一致</td></tr>
+<tr><td>(5)(7)</td><td>相对风/相对角速率</td><td>✅ 正确</td></tr>
+<tr><td>(6)</td><td>风分解</td><td>❌ <strong>符号错误</strong>：右端把风向量写成 $[u_r,v_r,w_r]^T$，而它们是式 (5) 的<strong>相对速度</strong>分量；按字面读，式 (8)(9) 变成「用风速算空速/迎角」</td></tr>
+<tr><td>(8)</td><td>空速</td><td>✅ 正确</td></tr>
+<tr><td>(9)</td><td>迎角/侧滑角</td><td>❌ <strong>印刷错误</strong>：打印 $\alpha=\tan^{-1}(u_r/w_r)$，应为 $\mathrm{atan2}(w_r,u_r)$（arXiv LaTeX 核实）；照抄得 $90^\circ-\alpha$</td></tr>
+<tr><td>(10)</td><td>风轴→体轴气动力</td><td>✅ 正确（$+Y$ 约定）。$R_w^b=R_y(-\alpha)R_z(\beta)$ 独立重推并逐项验算</td></tr>
+<tr><td>(11)(12)</td><td>气动力/力矩系数</td><td>✅ 函数依赖与 <code>x8.xml</code> L301–692 逐一对应；$C_L,C_D$ 在 FDM 中为<strong>非线性查表</strong>（Gryte CFD）</td></tr>
+<tr><td>(13)(14)</td><td>姿态误差/积分误差</td><td>✅ 与 <code>ac_bohn_nova.py</code> L107–108、L288–289 逐行一致（含 $dt=0.01$）</td></tr>
+<tr><td>(15)</td><td>奖励函数</td><td>✅ 结构一致。核算：nominal 下 clip 上界<strong>永不生效</strong>；仅 hard 滚转误差 &gt;94.5° 时生效（§10.1）</td></tr>
+<tr><td>(16)</td><td>RL 目标</td><td>✅ 标准。$\gamma=0.99$ → 有效时域 $1/(1-\gamma)=100$ 步 = 1 s 飞行</td></tr>
+<tr><td>(17)</td><td>TD-MPC 轨迹回报</td><td>✅ 抽象正确。核算：终端 $Q$ 权重 97.03，是时域内部分的 32.7 倍</td></tr>
+<tr><td>(18)</td><td>Act Fluct 指标</td><td>⚠️ 定义自洽（归一化指令下 $\xi\in[0,2]$）；Table 7 数值直读超界，须按表头 ×10⁻² 解读（§13.1 穷举三种读法）</td></tr>
+<tr><td>(19)</td><td>AVP 惩罚</td><td>✅ 结构正确（含排版粘连瑕疵）。发现：$c_*$ 调参使最大总惩罚<strong>恒为 1.0</strong>（§13.2）</td></tr>
+<tr><td>(20)</td><td>CAPS 正则</td><td>⚠️ 两个歧义：$\|\cdot\|_2$ 范数 vs 平方；$N(s_t,0.01)$ 的 0.01 是方差还是标准差（§13.3）</td></tr>
+<tr class="highlight"><td>补充式 D0–D14</td><td>旋转矩阵、Dryden、执行器、PID、PPO/SAC/TOLD/MPPI、阵风剖面等</td><td>论文未编号/仅文字描述，本节按标准文献补全并标注出处与假设</td></tr>
+</table>
+<hr>
+<h3>1. 坐标系、符号约定与单位体系（公共前提）</h3>
+<ul>
+<li><strong>惯性系 $\{n\}$（NED）</strong>：$x_n$ 北、$y_n$ 东、$z_n$ <strong>向下</strong>；重力 $g_n=(0,0,g)^T$。</li>
+<li><strong>机体系 $\{b\}$</strong>：原点在重心，$x_b$ 前、$y_b$ 右、$z_b$ 下；右旋系（$x_b\times y_b=z_b$ ✓）。速度 $v=(u,v,w)^T$、角速度 $\omega=(p,q,r)^T$。</li>
+<li><strong>风轴系 $\{w\}$</strong>：$x_w$ 沿相对气流（空速）方向；由 §7.1 反推 $R_w^b=R_y(-\alpha)R_z(\beta)$。</li>
+<li><strong>符号方向的三个「反直觉」点（均已验算）</strong>：$q&gt;0\Rightarrow$抬头（证：机头点速度 $q\hat y_b\times\hat x_b=-q\hat z_b$ 向上）；$p&gt;0\Rightarrow$右翼下沉右滚（右翼尖速度 $p\hat x_b\times\hat y_b=p\hat z_b$ 向下）；$r&gt;0\Rightarrow$机头右偏。与 JSBSim <code>p,q,r-rad_sec</code> 语义一致。</li>
+<li><strong>速度几何</strong>：$u=V_a\cos\alpha\cos\beta,\ v=V_a\sin\beta,\ w=V_a\sin\alpha\cos\beta$（先绕 $y_b$ 转 $-\alpha$ 再绕 $z_b$ 转 $\beta$）。反解 $\alpha=\mathrm{atan2}(w,u)$、$\beta=\sin^{-1}(v/V_a)$。物理检查：平飞且抬头 $\theta&gt;0$ 时 $w=+V_a\sin\theta&gt;0$（$z_b$ 向下），故 $\alpha=\theta$——与常识一致，§6 将用它证明式 (9) 印反。</li>
+<li><strong>单位</strong>：论文 SI（$m=3.3640$ kg、$S=0.75$ m²、$b=2.10$ m、$c=0.3571$ m、$\rho=1.156$ kg/m³、$I=\{1.2290,0.1702,0.8808\}$、$I_{xz}=0.9343$ kg·m²，<code>x8.xml</code> L32–56）；JSBSim 内核英制（slug/ft/lbf），<code>conversions.props2si()</code> 每步换算。交叉验证先比结构再比换算后的数值。</li>
+</ul>
+<hr>
+<h3>2. 公式 (1)–(2)：位置与姿态运动学</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 位置运动学（论文式号 1）</span>
+$$\dot p=R^n_b(q)\,v \tag{1}$$
+<div class="eq-note">
+<strong>$p=[x,y,z]^T$</strong> NED 位置 [m] &nbsp;|&nbsp; <strong>$R^n_b(q)$</strong> 机体→NED 旋转矩阵（正交）。<strong>推导（一步）</strong>：位置在惯性系的导数 = 速度在惯性系的分量，$\dot p=v_n=R^n_b\,v_b$。JSBSim 内核在 ECEF/地理坐标积分位置，env 只读结果（<code>jsbsim_properties.py</code> L40–87）——式 (1) 是论文层面的运动学表述。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 姿态运动学（四元数，论文式号 2）</span>
+$$\dot q=\frac12\begin{bmatrix}0&amp;-\omega^{T}\\ \omega&amp;-S(\omega)\end{bmatrix}q,\qquad
+S(\omega)=\begin{bmatrix}0&amp;-r&amp;q\\ r&amp;0&amp;-p\\ -q&amp;p&amp;0\end{bmatrix} \tag{2}$$
+<div class="eq-note">
+<strong>$q=[q_0,q_x,q_y,q_z]^T$</strong> 单位四元数 &nbsp;|&nbsp; <strong>$S(\omega)$</strong> 叉乘矩阵（$S(\omega)x=\omega\times x$）。<strong>推导</strong>：姿态旋转 $v_n=q\otimes v_b\otimes q^{*}$（Hamilton 约定），对固连向量求导得 $\dot q=\tfrac12 q\otimes(0,\omega)$；右乘矩阵：$(a_0,\mathbf a)\otimes(0,\omega)=(-\mathbf a\cdot\omega,\ a_0\omega+\mathbf a\times\omega)$ → $\operatorname{Mat}_R(0,\omega)=[[0,-\omega^T],[\omega,-S(\omega)]]$，与式 (2) 逐元素一致 ✅。<strong>自洽性</strong>：该矩阵反对称 → $q^T\dot q=0$ → $\|q\|$ 守恒 ✓。<strong>代码</strong>：<code>conversions.py</code> L144–183 <code>euler2quaternion()</code> 是 z-y-x 序标准合成（<code>qw=cr·cp·cy+sr·sp·sy; qx=sr·cp·cy−cr·sp·sy; …</code>），同 Hamilton 约定。<strong>小瑕</strong>：arXiv LaTeX 中矩阵第二行首元写成未加粗 $\omega$（第一行为 $\mathbf\omega^T$），纯排版。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D0) —— 机体→NED 旋转矩阵（补充式，论文未写出）</span>
+$$R^n_b(q)=\begin{bmatrix}
+q_0^2+q_x^2-q_y^2-q_z^2 &amp; 2(q_xq_y-q_0q_z) &amp; 2(q_xq_z+q_0q_y)\\
+2(q_xq_y+q_0q_z) &amp; q_0^2-q_x^2+q_y^2-q_z^2 &amp; 2(q_yq_z-q_0q_x)\\
+2(q_xq_z-q_0q_y) &amp; 2(q_yq_z+q_0q_x) &amp; q_0^2-q_x^2-q_y^2+q_z^2
+\end{bmatrix}$$
+<div class="eq-note">
+由 $v_n=q\otimes v_b\otimes q^{*}$ 展开（$R=2\mathbf q\mathbf q^T+(q_0^2-\|\mathbf q\|^2)I+2q_0[\mathbf q]_\times$）。式 (6) 用 $R^b_n(q)=R^n_b(q)^{T}$；欧拉角等价形式（z-y-x 序）第三行 $(-s\theta,\ c\theta s\phi,\ c\theta c\phi)$ 供 §3.2 互证。</div>
+</div>
+<hr>
+<h3>3. 公式 (3)：质心平动方程——<strong>印刷缺括号</strong></h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 牛顿方程（论文式号 3，按论文原样引用）</span>
+$$m\dot v+\omega\times v=R^n_b(q)^{T}\,m g_n+F_{prop}+F_{aero} \tag{3}$$
+<div class="eq-note">
+<strong>原样指出问题</strong>：打印左侧 $m\dot v+\omega\times v$ 的<strong>量纲不一致</strong>（$m\dot v$ 是 N，$\omega\times v$ 是 m/s²，不能相加；右侧全是 N）。正确形式（B&amp;M 教材）应为 $m(\dot v+\omega\times v)$。这是排版漏括号（arXiv LaTeX 确无括号），不是物理错误；本笔记 §6.1 改写为 $m\dot v+\omega\times(mv)$，数学等价（$m$ 标量），属同类「沉默修正」，此处挑明。</div>
+</div>
+<h4>3.1 第一性原理重推（正确形式）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3a) —— 正确形式与分量展开</span>
+$$m(\dot v+\omega\times v)=F_b,\qquad F_b=R^n_b(q)^{T}mg_n+F_{prop}+F_{aero},\qquad
+\omega\times v=(qw-rv,\ ru-pw,\ pv-qu)^T$$
+$$\dot u=rv-qw+\tfrac1m(F_{g,x}+F_{prop,x}+F_{aero,x})\qquad\dot v=pw-ru+\tfrac1m(F_{g,y}+F_{aero,y})\qquad\dot w=qu-pv+\tfrac1m(F_{g,z}+F_{aero,z})$$
+<div class="eq-note">
+<strong>推导</strong>：惯性系牛顿定律 $m\,dV/dt|_n=F_{\text{总}}$；转动参考系求导定理 $\left.\frac{da}{dt}\right|_n=\left.\frac{da}{dt}\right|_b+\omega\times a$ 代入得式 (3a)。$\omega\times v$ 是<strong>牵连（科氏）项</strong>不是外力：机体系在旋转，分量求导必须补坐标系转动效应。（推力只有 $x$ 分量，§8。）JSBSim 内核正积分 $v_{UVWdot}=F/m-\omega\times v$，与修正后式 (3) 一致。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3b) —— 重力在机体轴的分量（欧拉角形式，互证用）</span>
+$$F_g=R^b_n(q)\,mg_n=mg\,(-\sin\theta,\ \cos\theta\sin\phi,\ \cos\theta\cos\phi)^T$$
+<div class="eq-note">
+<strong>推导</strong>：$R^b_n=R_x(-\phi)R_y(-\theta)R_z(-\psi)$，取第三列乘 $mg$：$R_y(-\theta)(0,0,g)^T=(-g\sin\theta,0,g\cos\theta)^T$，再 $R_x(-\phi)$ 得结果 ✓。<strong>物理检查</strong>：抬头 $\theta&gt;0$ → $F_{g,x}=-mg\sin\theta&lt;0$ 向后拉 ✓；机翼水平 → $F_{g,z}=mg\cos\theta$ ✓。与 §1 的符号约定自洽。</div>
+</div>
+<div class="callout tip">
+<div class="callout-title">✅ 式 (3) 结论</div>
+物理内容（$m(\dot v+\omega\times v)$）正确、与 JSBSim 一致；唯一问题是<strong>打印漏括号</strong>。照抄实现只要把 $\omega\times v$ 也乘 $m$ 就对了，但按字面做量纲推导会立刻卡住。</div>
+<hr>
+<h3>4. 公式 (4)：欧拉方程 + CAME 分量展开（论文未给分量式，本节补全）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4) —— 欧拉方程（论文式号 4）</span>
+$$I\,\dot\omega+\omega\times I\omega=M_{prop}+M_{aero} \tag{4}$$
+<div class="eq-note">
+<strong>$I$</strong> 机体系惯性矩阵 [kg·m²]（固连机体，常值）。<strong>推导</strong>：角动量 $H=I\omega$，惯性系角动量定理 $dH/dt|_n=M_{ext}$，再用转动参考系求导定理：$dH/dt|_b+\omega\times H=M_{ext}$ → 式 (4) ✓。<strong>注意</strong>：论文没给 $M_{prop}$ 表达式（§8 论证代码中 $M_{prop}=0$），也没给分量式——下面补全。</div>
+</div>
+<h4>4.1 对称性假设、惯性矩阵与特征值（数值发现）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4a) —— x8 惯性矩阵（x8.xml L52–55）与主惯量（本节独立计算）</span>
+$$I=\begin{bmatrix}I_{xx}&amp;0&amp;-I_{xz}\\0&amp;I_{yy}&amp;0\\-I_{xz}&amp;0&amp;I_{zz}\end{bmatrix}=\begin{bmatrix}1.2290&amp;0&amp;-0.9343\\0&amp;0.1702&amp;0\\-0.9343&amp;0&amp;0.8808\end{bmatrix},\qquad
+\lambda(I)=\{2.005,\ 0.1702,\ 0.1046\}\ \text{kg·m}^2$$
+<div class="eq-note">
+<strong>正定性</strong>：$\Gamma=I_{xx}I_{zz}-I_{xz}^2=0.2096&gt;0$ ✓。<strong>特征值（独立计算）</strong>：x-z 块 $\lambda=(2.1098\pm\sqrt{4.4513-0.8384})/2=\{2.0053,0.1045\}$，加 $I_{yy}=0.1702$。<strong>物理含义（重要）</strong>：体轴 $I_{xx}=1.2290$ 具有误导性——最小主惯量仅 <strong>0.1046</strong>（主轴在 x-z 平面、与 $x_b$ 约成 50.3°），纯滚转有效惯量 $\Gamma/I_{zz}=0.238$。$I_{xz}=0.9343$ 异常大（后掠飞翼质量分布远离体轴）→ <strong>滚转-偏航强耦合（Dutch roll 的定量来源）</strong>，印证论文 cross-couplings 论断与笔记 §6.1 的观察。</div>
+</div>
+<h4>4.2 CAME 分量式完整推导（第一性原理）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4b)(4c) —— 陀螺耦合项与 CAME 标量方程</span>
+$$I\omega=(I_{xx}p-I_{xz}r,\ I_{yy}q,\ -I_{xz}p+I_{zz}r)^T,\qquad
+\omega\times I\omega=\begin{pmatrix}qr(I_{zz}-I_{yy})-I_{xz}pq\\ I_{xz}(p^2-r^2)+pr(I_{xx}-I_{zz})\\ pq(I_{yy}-I_{xx})+I_{xz}qr\end{pmatrix}$$
+$$I_{xx}\dot p-I_{xz}\dot r=\bar L-\big[qr(I_{zz}-I_{yy})-I_{xz}pq\big]\quad
+I_{yy}\dot q=M-\big[I_{xz}(p^2-r^2)+pr(I_{xx}-I_{zz})\big]\quad
+-I_{xz}\dot p+I_{zz}\dot r=N-\big[pq(I_{yy}-I_{xx})+I_{xz}qr\big]$$
+<div class="eq-note">
+<strong>推导</strong>：$\omega\times I\omega$ 逐分量（$q(-I_{xz}p+I_{zz}r)-rI_{yy}q$ 等三项）合并同类项即得。（$\bar L,M,N$ 为滚转/俯仰/偏航<strong>力矩</strong>，⚠️ 与升力 $L$ 撞符号，沿用教材记法 $\bar L$。）<strong>物理</strong>：$pq,pr,qr,p^2-r^2$ 项=飞机同时绕两轴旋转时第三轴受力矩——大角速率下不可忽略，PID 按轴独立设计失效的物理根源。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4d) —— 解出 $\dot p,\dot q,\dot r$（标准 S&amp;L 教材形式）</span>
+$$\dot p=(C_1r+C_2p)q+C_3\bar L+C_4N,\qquad \dot q=C_5pr-C_6(p^2-r^2)+C_7M,\qquad \dot r=(C_8p-C_2r)q+C_4\bar L+C_9N$$
+$$C_1=\frac{(I_{yy}-I_{zz})I_{zz}-I_{xz}^2}{\Gamma},\ C_2=\frac{(I_{xx}-I_{yy}+I_{zz})I_{xz}}{\Gamma},\ C_3=\frac{I_{zz}}{\Gamma},\ C_4=\frac{I_{xz}}{\Gamma},\ C_5=\frac{I_{zz}-I_{xx}}{I_{yy}},\ C_6=\frac{I_{xz}}{I_{yy}},\ C_7=\frac1{I_{yy}},\ C_8=\frac{(I_{xx}-I_{yy})I_{xx}+I_{xz}^2}{\Gamma},\ C_9=\frac{I_{xx}}{\Gamma}$$
+<div class="eq-note">
+<strong>推导</strong>：$\dot q$ 由第二式直接解出；$\dot p,\dot r$ 是系数矩阵 $[[I_{xx},-I_{xz}],[-I_{xz},I_{zz}]]$（行列式 $\Gamma$）的 2×2 线性方程组，Cramer 法则：$\dot p=\frac{I_{zz}[\bar L+I_{xz}pq-qr(I_{zz}-I_{yy})]+I_{xz}[N+pq(I_{xx}-I_{yy})-I_{xz}qr]}{\Gamma}$，$pq$ 项系数 $=C_2$ ✓、$qr$ 项系数 $=C_1$ ✓；$\dot r$ 式同理（$qr$ 项系数 $-C_2$ ✓ 交叉对称）。</div>
+</div>
+<h4>4.3 数值代入与代码逐行对照</h4>
+<p>$\Gamma=0.2096$；$C_1=-7.151,\ C_2=8.646,\ C_3=4.203,\ C_4=4.458,\ C_5=-2.046,\ C_6=5.490,\ C_7=5.875,\ C_8=10.37,\ C_9=5.863$（全部由 §4.2 的公式代入 $I_{xx}=1.2290,I_{yy}=0.1702,I_{zz}=0.8808,I_{xz}=0.9343$ 算出）。代码 <code>aerodynamics.py</code> 的 gamma 系数与之一一对应：L28 <code>gamma</code>=$\Gamma$；L30 <code>gamma2</code>=−$C_1$、L29 <code>gamma1</code>=$C_2$、L31 <code>gamma3</code>=$C_3$、L32 <code>gamma4</code>=$C_4$、L33–35 <code>gamma5..7</code>=$C_5,C_6,C_7$、L35 <code>gamma7</code>=$C_8$、L36 <code>gamma8</code>=$C_9$ ✓。</p>
+<div class="callout info">
+<div class="callout-title">🔗 CAME 在代码中的真实用途</div>
+<code>aerodynamics.py</code> 不直接积分式 (4)（由 JSBSim 内核解 $vPQRdot=I^{-1}(M-\omega\times I\omega)$），而是用这些常数构造<strong>线性化横侧向传递函数</strong>：L99–111 合并惯性耦合与气动阻尼，如 <code>Cpp = gamma3*Clp + gamma4*Cnp</code>（L99）——正是 $\dot p$ 方程中 $p$ 的阻尼系数（$\dot p=\dots+\bar qSb(C_3C_{l_p}+C_4C_{n_p})\frac{b}{2V_a}p+\dots$，$C_{l_p},C_{n_p}$ 见 §7）。由此得 <code>a_roll1=−½ρVa²Sb·Cpp·(b/2Va)</code>（L116–117）、<code>a_roll2=½ρVa²Sb·Cpda</code>（L118）并用于解析调参（L152–191）。<strong>即：式 (4) 的分量结构直接体现在仓库的增益计算里，逐符号对得上。</strong></div>
+<hr>
+<h3>5. 公式 (5)–(7)：相对风与 Dryden 湍流</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5) —— 相对风速（论文式号 5）</span>
+$$v_r^b=v_g^b-v_w^b \tag{5}$$
+<div class="eq-note">
+<strong>$v_r^b$</strong> 飞机相对<strong>空气</strong>的速度 &nbsp;|&nbsp; <strong>$v_g^b$</strong> 相对地面的速度 &nbsp;|&nbsp; <strong>$v_w^b$</strong> 风速在机体轴的分量。<strong>推导</strong>：速度合成 $v_{\text{机/地}}=v_{\text{机/气}}+v_{\text{气/地}}$ 移项。气动力只「看得见」$v_r$——风进入气动模型的唯一通道。三项同量纲 [m/s] ✓。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(6) —— 风分解（论文式号 6，按原样引用，含符号错误）</span>
+$$v_w^b=R^b_n(q)\,v_{w_s}^n+v_{w_g}^b=\begin{bmatrix}u_r\\v_r\\w_r\end{bmatrix} \tag{6}$$
+<div class="eq-note">
+<strong>前半正确</strong>：$v_{w_s}^n$ 惯性系<strong>常值风</strong>（实验 0/7/15/23 m/s），$v_{w_g}^b$ 机体轴<strong>湍流</strong>（Dryden 随机过程），$R^b_n$ 把常值风旋到机体系。❌ <strong>等式右端错误</strong>：$[u_r,v_r,w_r]^T$ 按式 (5)(8)(9) 的用法是<strong>相对速度 $v_r^b$</strong> 的分量，而左端是<strong>风速 $v_w^b$</strong>。按字面读，式 (8)(9) 变成「用风速算空速/迎角」——无风时 $V_a=0$，荒谬。正确写法：$v_r^b=v_g^b-v_w^b=[u_r,v_r,w_r]^T$，或把风分量改名 $(u_w,v_w,w_w)$。B&amp;M 教材中 $(u_r,v_r,w_r)$ 一贯指相对速度，论文张冠李戴（arXiv LaTeX 核实）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(7) —— 相对角速率（论文式号 7）</span>
+$$\omega_r^b=\omega^b-\omega_w^b=\begin{bmatrix}p_r\\q_r\\r_r\end{bmatrix} \tag{7}$$
+<div class="eq-note">
+<strong>$\omega_w^b$</strong> 湍流附加的<strong>旋转</strong>角速率（Dryden 模型不只推飞机平移，还造成角速度扰动）。式 (7) 正确 ✓。<strong>代码</strong>：JSBSim 的 <code>p-rad_sec</code> 是<strong>总</strong>角速率、<code>p-aero-rad_sec</code> 是<strong>气动</strong>（相对空气）角速率（<code>jsbsim_properties.py</code> L103–108），差即 $\omega_w^b$。气动系数表（§7）用的是 aero 速率，与式 (11)(12) 自变量 $p_r,q_r,r_r$ 一致 ✓；<strong>但状态向量里代码给 agent 的是总速率</strong>（§10.2）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D1) —— Dryden 谱成形滤波器（补充式，MIL-F-8785C 标准）</span>
+$$H_u(s)=\sigma_u\sqrt{\frac{2L_u}{\pi V}}\frac{1}{1+\frac{L_u}{V}s},\qquad
+H_v(s)=\sigma_v\sqrt{\frac{3L_v}{\pi V}}\frac{1+\frac{\sqrt3L_v}{V}s}{\left(1+\frac{L_v}{V}s\right)^2},\qquad
+H_w(s)=\sigma_w\sqrt{\frac{3L_w}{\pi V}}\frac{1+\frac{\sqrt3L_w}{V}s}{\left(1+\frac{L_w}{V}s\right)^2}$$
+<div class="eq-note">
+白噪声经上式滤波得湍流分量：低频段匹配 Dryden 经验谱、<strong>有限相关时间</strong>（$L/V$ 为特征时间尺度）。$\sigma$ 湍流强度（MIL 规范按 20 ft 处风速 $W_{20}$ 分级，$\sigma_w=0.1\,W_{20}$）。<strong>代码</strong>：<code>jsbsim_env.py</code> L387–412 把 severity 映射为 JSBSim milspec 参数：light→<code>turb_type=3</code>、<code>w20=25 fps</code>（7.62 m/s）；moderate→50 fps（15.24）；severe→75 fps（22.86）——与 Table 8 的 7.6/15.25/22.86 逐值一致 ✅。<strong>平稳性</strong>：Dryden 输出是平稳过程，存在「时间平均 MDP」——论文 §6.3 说湍流比阵风「好处理」的数学支点（§15.2 的 Eq.(D14) 对照）。</div>
+</div>
+<hr>
+<h3>6. 公式 (8)–(9)：空速、迎角、侧滑角——<strong>式 (9) 分子分母写反</strong></h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(8)(9) —— 空速与气流角（论文式号 8、9，式 (9) 按原样引用）</span>
+$$V_a=\sqrt{u_r^2+v_r^2+w_r^2} \tag{8}$$
+$$\alpha=\tan^{-1}\left(\frac{u_r}{w_r}\right),\qquad \beta=\sin^{-1}\left(\frac{v_r}{V_a}\right) \tag{9}$$
+<div class="eq-note">
+<strong>式 (8) 正确</strong> ✅：相对速度的欧氏模（<code>velocities/vt-*</code>，<code>jsbsim_properties.py</code> L110–113；初始 16.67 m/s=60 km/h，<code>x8_basic_ic.xml</code> L6）。<strong>式 (9) 的 β 正确</strong> ✅（定义自动保证 $\beta\in[-\pi/2,\pi/2]$）。<strong>式 (9) 的 α 印错</strong> ❌：正确标准定义为 $\alpha=\tan^{-1}(w_r/u_r)$，严格写 $\mathrm{atan2}(w_r,u_r)$（四象限、主值 $(-\pi,\pi]$）。</div>
+</div>
+<h4>6.1 为什么式 (9) 一定错了（三步独立论证）</h4>
+<ol>
+<li><strong>几何推导</strong>：§1 已证 $u=V_a\cos\alpha\cos\beta,\ w=V_a\sin\alpha\cos\beta$ → $w/u=\tan\alpha$，反解必为 $\tan^{-1}(w/u)$；论文的 $u/w$ 是 $\cot\alpha$。</li>
+<li><strong>数值反例</strong>：配平点（<code>trim_points_x8.yaml</code>）$\alpha_{trim}=2.207^\circ$：$u_r=16.97$、$w_r=0.654$ → 按论文式 $\tan^{-1}(16.97/0.654)=87.8^\circ$（荒谬）；按正确式 $=2.207^\circ$ ✓。</li>
+<li><strong>与仿真器自相矛盾</strong>：JSBSim 内部按标准定义算 <code>aero/alpha-rad</code>（atan2，用含风修正的速度，等价相对速度），env 直接读取（L114）。照论文式实现会与仿真器冲突。</li>
+</ol>
+<div class="callout warn">
+<div class="callout-title">⚠️ 与式 (6) 错误的叠加效应</div>
+式 (6) 把 $(u_r,v_r,w_r)$ 误赋给风向量 + 式 (9) 分子分母写反，叠加后按字面实现的读者会得到「$\alpha=$ 风速方向与机体 z 轴的夹角」。本笔记 §6.2 曾注「记号值得留意」，本节给出完整判定：<strong>两处均为印刷级错误，仿真器实现本身正确</strong>（气动系数用 JSBSim 的 <code>alpha-rad/beta-rad</code>）。建议人工复核 p5 原图。</div>
+<hr>
+<h3>7. 公式 (10)–(12)：气动力/力矩与风轴→体轴变换</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(10) —— 风轴气动力转体轴（论文式号 10）</span>
+$$F_{aero}=R^b_w(\alpha,\beta)\begin{bmatrix}-D\\ Y\\ -L\end{bmatrix} \tag{10}$$
+<div class="eq-note">
+<strong>$D,Y,L$</strong> 风轴系阻力、侧力、升力 [N]。<strong>符号约定</strong>：$x_w$ 沿空速 → 阻力（与空速反向）是 $-D$；$z_w$ 朝下 → 升力（向上）是 $-L$；侧力取 <strong>$+Y$</strong>（B&amp;M 约定，要求 $C_{Y_\beta}&lt;0$ 才物理正确，§7.2 验证）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D2) —— 风轴→体轴旋转矩阵（补充式，独立推导）</span>
+$$R^b_w(\alpha,\beta)=R_y(-\alpha)\,R_z(\beta)=\begin{bmatrix}c\alpha\,c\beta&amp;-c\alpha\,s\beta&amp;-s\alpha\\ s\beta&amp;c\beta&amp;0\\ s\alpha\,c\beta&amp;-s\alpha\,s\beta&amp;c\alpha\end{bmatrix}$$
+<div class="eq-note">
+<strong>推导</strong>：要求 $v_b=R^b_w(V_a,0,0)^T$ 与 $v_b=V_a(\cos\alpha\cos\beta,\sin\beta,\sin\alpha\cos\beta)^T$ 一致：先 $R_z(\beta)(V_a,0,0)^T=(V_ac\beta,V_as\beta,0)^T$，再 $R_y(-\alpha)$ 得 $(V_ac\alpha c\beta,\ V_as\beta,\ V_as\alpha c\beta)^T$ ✓。<strong>正交性</strong>：$R^w_b=(R^b_w)^T=R_z(-\beta)R_y(\alpha)$。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(10a) —— 式 (10) 矩阵乘法展开（独立计算）</span>
+$$R_z(\beta)\begin{pmatrix}-D\\Y\\-L\end{pmatrix}=\begin{pmatrix}-Dc\beta-Ys\beta\\-Ds\beta+Yc\beta\\-L\end{pmatrix}\quad\Longrightarrow\quad
+F_{aero}=\begin{pmatrix}-D\,c\alpha c\beta-Y\,c\alpha s\beta+L\,s\alpha\\ -D\,s\beta+Y\,c\beta\\ D\,s\alpha c\beta+Y\,s\alpha s\beta-L\,c\alpha\end{pmatrix}$$
+<div class="eq-note">
+<strong>逐步</strong>：$F_x=c\alpha(-Dc\beta-Ys\beta)-s\alpha(-L)$、$F_y=-Ds\beta+Yc\beta$、$F_z=-s\alpha(-Dc\beta-Ys\beta)+c\alpha(-L)$。<strong>物理检查</strong>：① $\beta=0$：$F_x=-Dc\alpha+Ls\alpha,\ F_z=Ds\alpha-Lc\alpha$——抬头时升力向前投影 ✓；② 右侧滑 $\beta&gt;0$：$F_y\approx Y-Ds\beta$，$Y=C_{Y_\beta}\beta\bar qS$、$C_{Y_\beta}=-0.2239&lt;0$ → $F_y&lt;0$ 向左推、$\beta$ 减小 → <strong>航向静稳定</strong> ✓；③ 平飞小 $\alpha$：$F_x\approx-D,\ F_z\approx-L$ ✓。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(11)(12) —— 气动力/力矩（论文式号 11、12）</span>
+$$\begin{bmatrix}D\\Y\\L\end{bmatrix}=\frac12\rho V_a^2 S\begin{bmatrix}C_D(\alpha,\beta,q_r,\delta_e)\\ C_Y(\beta,p_r,r_r,\delta_a)\\ C_L(\alpha,q_r,\delta_e)\end{bmatrix} \tag{11}\qquad
+M_{aero}=\frac12\rho V_a^2 S\begin{bmatrix}b\,C_l(\beta,p_r,r_r,\delta_a)\\ c\,C_m(\alpha,q_r,\delta_e)\\ b\,C_n(\beta,p_r,r_r,\delta_a)\end{bmatrix} \tag{12}$$
+<div class="eq-note">
+<strong>$\bar q=\tfrac12\rho V_a^2$</strong> 动压 [Pa] &nbsp;|&nbsp; <strong>$S=0.75$ m²、$b=2.10$ m、$c=0.3571$ m</strong>（$c=S/b$ ✓）。<strong>量纲</strong>：$\tfrac12\rho V_a^2 SC$ = N ✓；力矩乘参考臂 $b,c$ → N·m ✓。<strong>每个系数的自变量不同</strong>（升降舵改阻力、副翼改侧力）——「轴间耦合」的数学表达；$C_l$ 与 $C_n$ 共享 $(\beta,p_r,r_r,\delta_a)$ 且<strong>无方向舵</strong> → Dutch roll 耦合 + 偏航欠驱动（只能靠 adverse yaw）。</div>
+</div>
+<h4>7.1 与 x8.xml 气动系数逐项对照（Gryte 2018 数据）</h4>
+<table>
+<tr><th>论文系数</th><th>x8.xml 实现（函数→因子，L301–692）</th><th>数值（L304–340）</th></tr>
+<tr><td>$C_D(\alpha,\beta,q_r,\delta_e)$</td><td>查表 $C_D(\alpha)$（L429–458，含 $C_{D_0}$）+ $C_{D_\beta}|\beta|$ + $C_{D_{\beta2}}\beta^2$ + $C_{D_q}\frac{c}{2V_a}q_{aero}$ + $C_{D_e}|\delta_e|$</td><td>0.0197 / 0.0791 / 1.0555 / −0.0058 / 0.1478 / 0 / 0.0633</td></tr>
+<tr><td>$C_Y(\beta,p_r,r_r,\delta_a)$</td><td>$C_{Y_\beta}\beta$ + $C_{Y_p}\frac{b}{2V_a}p_{aero}$ + $C_{Y_r}\frac{b}{2V_a}r_{aero}$ + $C_{Y_{\delta a}}\delta_{a,eff}$</td><td>−0.2239 / −0.1374 / 0.0839 / 0.0433</td></tr>
+<tr><td>$C_L(\alpha,q_r,\delta_e)$</td><td>查表 $C_L(\alpha)$（L358–386，含 $C_{L_0}$）+ $C_{L_q}\frac{c}{2V_a}q_{aero}$ + $C_{L_{\delta e}}\delta_e$</td><td>0.0867 / 4.0203 / 3.87 / 0.2781</td></tr>
+<tr><td>$C_l(\beta,p_r,r_r,\delta_a)$</td><td>$C_{l_\beta}\beta$ + $C_{l_p}\frac{b}{2V_a}p_{aero}$ + $C_{l_r}\frac{b}{2V_a}r_{aero}$ + $C_{l_{\delta a}}\delta_{a,eff}$</td><td>−0.0849 / −0.4042 / 0.0555 / 0.1202</td></tr>
+<tr><td>$C_m(\alpha,q_r,\delta_e)$</td><td>$C_{m_0}$ + $C_{m_\alpha}\alpha$ + $C_{m_q}\frac{c}{2V_a}q_{aero}$ + $C_{m_{\delta e}}\delta_e$</td><td>0.0227 / −0.4629 / −1.3012 / −0.2292</td></tr>
+<tr><td>$C_n(\beta,p_r,r_r,\delta_a)$</td><td>$C_{n_\beta}\beta$ + $C_{n_p}\frac{b}{2V_a}p_{aero}$ + $C_{n_r}\frac{b}{2V_a}r_{aero}$ + $C_{n_{\delta a}}\delta_{a,eff}$</td><td>0.0283 / 0.0044 / −0.072 / −0.00339</td></tr>
+</table>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D3) —— 配平升力核算（独立数值验证）</span>
+$$\bar q=\tfrac12\rho V_a^2=\tfrac12\times1.156\times16.98^2=166.7\ \text{Pa},\qquad
+C_L^{req}=\frac{mg}{\bar qS}=\frac{3.364\times9.81}{166.7\times0.75}=0.264$$
+<div class="eq-note">
+<strong>对照</strong>：升力表在 $\alpha=2.207^\circ$ 处插值 $0.1119+3.898\times0.0386=0.262$，加 $C_{L_{\delta e}}\delta_e=0.2781\times0.0406=0.0113$ → $C_L\approx0.273$，与配平所需 0.264 差 3.5%（在遗留配平点近似误差内）——<strong>量级与符号一致</strong>，「气动力=动压×面积×系数」链条数值正确。$C_L(\alpha)$ 是 −90°..+90° 的 CFD 查表（$\alpha\approx0$ 处斜率≈3.9 rad⁻¹），hard 参考（±30° 俯仰）正是这张表的非线性区。</div>
+</div>
+<div class="callout warn">
+<div class="callout-title">⚠️ 两处需说明的差异</div>
+<ol>
+<li><strong>Gryte 原始参数 vs XML</strong>：<code>x8_param.txt</code>（Gryte MATLAB 导出）$C_{m_0}=0.018$、$C_{m_\alpha}=-0.2524$（另有 $C_{m_{fp}}=-0.2168$），而 <code>x8.xml</code> 用 0.0227 / −0.4629——XML 是仓库作者重新整定的单斜率拟合（$C_{m_{fp}}$ 并入），<strong>与 Gryte 原文非逐值一致</strong>；其余系数与 <code>x8_param.txt</code> 逐值吻合。</li>
+<li><strong>JSBSim 内部风轴→体轴旋转无法逐符号核对</strong>：<code>external/</code> 为空、JSBSim C++ 源码不在 checkout（环境仅依赖 pip 包 <code>jsbsim==1.2.3.dev1</code>，<code>environment.yml</code> L259）。式 (10) 与 JSBSim 的一致性由物理极限、配平核算、系数依赖结构三方面互证。</li>
+</ol>
+</div>
+<hr>
+<h3>8. 推力与推进（论文 §3.2.3，无编号式）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D4) —— 线性推力模型（论文 §3.2.3 文字式）</span>
+$$F_{prop}=[T_p,\ 0,\ 0]^T,\qquad T_p=C\,\delta_t,\qquad C=5.9\ \text{N},\qquad \delta_t\in[0,1]$$
+<div class="eq-note">
+<strong>物理</strong>：螺旋桨在尾部、轴线与 $x_b$ 对齐 → 推力只有 $x$ 分量。<strong>量级核算</strong>：配平巡航阻力 ≈ $\bar qS\,C_D\approx166.7\times0.75\times0.0236=2.95$ N → 满油门 5.9 N ≈ 2 倍巡航阻力，量级合理。<strong>❌ 与仓库 FDM 对不上账</strong>：<code>x8.xml</code> L97–125 的发动机是 <code>electric800W.xml</code>（L9：<code>&lt;power unit="WATTS"&gt;8.0&lt;/power&gt;</code>，8 W 电机）+ <code>direct.xml</code> 直连推进器；$5.9\ \text{N}\times16.7\ \text{m/s}\approx99$ W ≫ 声明的 8 W。<strong>诚实结论</strong>：$C=5.9$ 的来源无法从本地核实（论文说「simplified model」，但 FDM 里既没有 5.9 也没有 800 W，只有 8 W）；JSBSim 直连推进器的推力律需其 C++ 源码才能定案。另：式 (4) 出现 $M_{prop}$ 但论文无表达式——由 XML（发动机位于 CG，L99–102 零坐标、L104–106 零姿态）可推 $M_{prop}=0$；螺旋桨反扭矩/陀螺力矩<strong>未建模亦未说明</strong>。</div>
+</div>
+<div class="callout danger">
+<div class="callout-title">🔧 纠正本笔记 §6.3 的一处误读</div>
+§6.3 说「<code>prop_x8.txt</code>（20 KB 推力表）说明 FDM 层其实用查表」——<strong>经逐行检查，<code>prop_x8.txt</code> 不是推力表</strong>：它是 497 行的 <strong>JSBSim 属性名清单</strong>（每行「属性路径 (读写标志)」，如 <code>propulsion/engine/thrust-lbs (R)</code>，L285），不含任何数值。真实推进配置是 8 W 电机 + direct 推进器（见上）。</div>
+<hr>
+<h3>9. 执行器动力学（论文 §3.3，无编号式 → 补充式 D5）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D5) —— 舵面二阶伺服与限幅（由 x8.xml 逐参数复原）</span>
+$$\frac{\delta(s)}{\delta^c(s)}=\frac{\omega_0^2}{s^2+2\zeta\omega_0 s+\omega_0^2}=\frac{10000}{s^2+141.42\,s+10000},\qquad
+|\delta|\le30^{\circ}=0.5235\ \text{rad},\qquad |\dot\delta|\le200^{\circ}/s=3.491\ \text{rad/s}$$
+<div class="eq-note">
+<strong>与 XML 逐参数对照</strong>：升降舵 <code>second_order_filter</code>（L163–172）系数 <code>c1=0,c2=0,c3=10000,c4=1,c5=141.4213562,c6=10000</code> → JSBSim 通式 $G(s)=\frac{c_1s^2+c_2s+c_3}{c_4s^2+c_5s+c_6}$ → $\omega_0=100$ rad/s ✓、$\zeta=0.7071=1/\sqrt2$ ✓（巴特沃斯，带宽≈15.9 Hz）。<strong>限幅</strong>：<code>aerosurface_scale</code>（L153–161）增益 0.01745 → 归一化 ±1 ↔ ±30°；<code>clipto</code> ±0.5235 rad（L174–181）✓。<strong>速率限存疑</strong>：<code>actuator rate_limit=3.49066</code>（L219–223，=200°/s）所在块作者自注 <em>"Not sure it's doing anything"</em>，其输出随后被滤波器输出覆盖——是否真正生效<strong>存疑</strong>，论文「rate-limited」与实现之间存在未闭合缺口（§13.1 旁证）。<strong>油门</strong>：<code>lag_filter c1=5</code>（L291–295）→ 一阶滞后 $\dot\delta_t=c_1(\delta^c_t-\delta_t)$ → $\tau=1/c_1=0.2$ s ✓ 与论文 $T=0.2$ 一致（lag_filter 系数=时间常数的<strong>倒数</strong>）。舵面（≈0.014 s）比油门快约 14 倍。</div>
+</div>
+<div class="callout tip">
+<div class="callout-title">📐 一个被论文忽略的执行器事实</div>
+±200°/s 在 100 Hz 下意味着<strong>每步最多 2°</strong>：指令从 −1 阶跃到 +1（60°），实际舵面要 0.3 s 才到位。这对 §13 的 Act Fluct 是致命语境：<strong>指标若测「指令」而非「实际舵面」，读数会显著夸大真实磨损</strong>。</div>
+<hr>
+<h3>10. 公式 (13)–(15)：MDP 状态、误差与奖励</h3>
+<p><strong>MDP 五元组</strong>（论文 §4.2）：动作 $a=(\delta_a^c,\delta_e^c)\in[-1,1]^2$（油门归空速 PI 管）；状态 14 维 $s=[\phi,\theta,V_a,p_r,q_r,r_r,\alpha,\beta,e_\phi,e_\theta,I_{e_\phi},I_{e_\theta},\delta^c_a|_{t-1},\delta^c_e|_{t-1}]$；转移 $P(s_{t+1}|s_t,a_t)=T(s_t,a_t)$；奖励式 (15)；折扣 $\gamma=0.99$。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(13)(14) —— 姿态误差与积分误差（论文式号 13、14）</span>
+$$e_\phi=\phi^d-\phi \tag{13a}\qquad e_\theta=\theta^d-\theta \tag{13b}\qquad
+I_{e_*}\leftarrow I_{e_*}+e_*\cdot dt,\quad *\in\{\phi,\theta\},\quad dt=0.01\ \text{s} \tag{14}$$
+<div class="eq-note">
+<strong>代码逐字一致</strong>：<code>ac_bohn_nova.py</code> L107–108 <code>roll_err = target_roll_rad − roll_rad</code> ✓；L288–289 <code>roll_integ_err = 1.00*roll_integ_err + roll_err*0.01</code> ✓（前向欧拉积分，单位 rad·s）。<strong>重置</strong>：回合开始/目标切换清零（代码 L277–278、L301–303）✓。<strong>疑点</strong>：① 误差<strong>未做角度缠绕</strong>（$\phi=+170^\circ,\phi^d=-170^\circ$ 时误差 340° 而非 −20°）——±60° 参考下无碍；② 积分误差无界（hard 满回合上界 $2000\times2.09\times0.01\approx41.9$ rad·s）。<strong>积分项的作用</strong>：配平舵偏不为零（§7.1 的 $\delta_e=0.0406$），纯比例有稳态误差，积分项消除之；给 RL 观测积分误差=给策略一个「记忆接口」。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(15) —— 奖励函数（论文式号 15，含参数子式）</span>
+$$R_\phi=\mathrm{clip}\left(\frac{|\phi-\phi^d|}{\zeta_\phi},\ 0,\ c_\phi\right)\quad R_\theta=\mathrm{clip}\left(\frac{|\theta-\theta^d|}{\zeta_\theta},\ 0,\ c_\theta\right)\quad R_t=-(R_\phi+R_\theta),\qquad
+\zeta_\phi=3.3,\ \zeta_\theta=2.25,\ c_\phi=c_\theta=0.5$$
+<div class="eq-note">
+<strong>量纲</strong>：$|e_\phi|$ [rad] 除以 $\zeta_\phi$ [rad] → 无量纲 ✓。$\zeta_\phi=3.3$ rad≈189°、$\zeta_\theta=2.25$ rad≈129°——「软缩放」（误差=$\zeta$ 时罚 1 分），不是归一到 1。$\zeta$ 比值 $3.3/2.25=1.467$ vs 误差范围比 $90^\circ/50^\circ=1.8$——近似成比例但不精确。代码：<code>ac_bohn_nova.py</code> L198–226 <code>r_roll = np.clip(abs(roll_err)/scaling, 0.0, clip_max)</code> 同构 ✓（scaling/clip_max 值在 FW-FlightControl 配置，本地不可见）。$R_t\in[-1,0]$，无正奖励、无成功事件（<code>jsbsim_env.py</code> L622–626 <code>is_terminated</code> 恒 False）——纯跟踪型 MDP。</div>
+</div>
+<h4>10.1 裁剪上界何时生效（论文未说，独立计算）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(15a) —— 裁剪生效条件</span>
+$$R_\phi\ \text{触及 }0.5 \iff |e_\phi|&gt;\zeta_\phi c_\phi=1.65\ \text{rad}\ (94.5^\circ);\qquad R_\theta\ \text{触及 }0.5 \iff |e_\theta|&gt;1.125\ \text{rad}\ (64.5^\circ)$$
+<div class="eq-note">
+按 Table 2 核算：nominal 滚转 $|e_\phi|\le90^\circ$=1.571 rad → $R_\phi\le0.476&lt;0.5$ <strong>永不触及</strong>；hard 滚转 $|e_\phi|\le120^\circ$=2.094 rad → 当 $|e_\phi|&gt;94.5^\circ$ 时触及 ✅；俯仰最大误差 50°/60° → <strong>永不触及</strong>。<strong>含义</strong>：论文「每个分量裁剪到 0.5 使最小总奖励 −1」只在 hard 滚转大误差时兑现；<strong>nominal 训练里 clip 上界是死代码</strong>，起作用的只有 $\zeta$ 缩放。</div>
+</div>
+<h4>10.2 论文状态列表 vs 代码状态列表（3 处差异）</h4>
+<table>
+<tr><th style="width:30%;">论文 §4.2</th><th style="width:38%;">代码 <code>ac_bohn_nova.py</code> L34–49 + L248</th><th>判定</th></tr>
+<tr><td>$\phi,\theta$；$V_a$；$\alpha,\beta$</td><td><code>roll_rad, pitch_rad</code>；<code>airspeed_kph</code>（km/h）；<code>alpha_rad, beta_rad</code></td><td>一致</td></tr>
+<tr><td>$\omega_r=[p_r,q_r,\textbf{w}_r]$ 相对角速率</td><td><code>p,q,r_radps</code>（<strong>总</strong>角速率）</td><td>⚠️ ① 第三分量 $w_r$ 是笔误（应为 $r_r$）；② 论文「相对」、代码「总」</td></tr>
+<tr><td>$e_\phi,e_\theta$；$I_{e_\phi},I_{e_\theta}$</td><td><code>roll_err, pitch_err</code>；<code>roll_integ_err, pitch_integ_err</code>（L248 追加）</td><td>一致</td></tr>
+<tr><td>$\delta^c_a|_{t-1},\delta^c_e|_{t-1}$ 上一拍动作</td><td><code>aileron_avg, elevator_avg</code>（近 N 拍均值，L43–44）或 <code>aileron_cmd, elevator_cmd</code>（L45–46）</td><td>⚠️ 均值分支含近 N 拍；指令分支读到的是<strong>本拍已施加的</strong> $\delta^c_t$（先 <code>apply_action</code> 后 <code>observe_state</code>，<code>jsbsim_env.py</code> L526→L545），与「上一拍」差一拍</td></tr>
+</table>
+<div class="callout info">
+<div class="callout-title">📌 差异的性质</div>
+三处差异不改变「14 维 Box 空间」的总体结构，且 obs_hist_size（历史帧数，FW-FlightControl 配置）可能进一步掩盖时序差异。但这说明<strong>论文文字是「设计意图」、代码是「实际交付」</strong>：严格按论文文字复现（相对速率+上一拍动作）会得到与官方代码不同的观测分布。</div>
+<hr>
+<h3>11. 公式 (16) 与 MF-RL 目标函数（PPO/SAC，论文只给引用 → 补充式）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(16) —— RL 最优策略目标（论文式号 16）</span>
+$$\pi^{*}=\arg\max_{\pi}\ \mathbb{E}_{\tau\sim\pi}\left[\sum_{t=0}^{\infty}\gamma^t R_t(s_t,a_t)\right] \tag{16}$$
+<div class="eq-note">
+<strong>推导链</strong>：轨迹分布 $P(\tau)=\rho_0(s_0)\prod_t\pi(a_t|s_t)P(s_{t+1}|s_t,a_t)$，目标为期望折扣累计回报。<strong>数值事实</strong>：$\gamma=0.99$ → 有效时域 $1/(1-\gamma)=100$ 步 = <strong>1 s 飞行</strong>；$\gamma^{500}=0.0066$——5 s 前的奖励权重不足 1%。这个 MDP 本质是「1 秒记忆」的近视优化：只要未来 1 s 内能换更小误差，任何高频动作都「划算」——理解抖振的钥匙。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D6) —— PPO-Clip + GAE（补充式，Schulman 2017 + CleanRL）</span>
+$$L^{CLIP}(\theta)=\hat{\mathbb E}_t\Big[\min\big(\rho_t(\theta)\hat A_t,\ \mathrm{clip}(\rho_t(\theta),1-\epsilon,1+\epsilon)\hat A_t\big)\Big],\quad \rho_t=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)},\quad \epsilon=0.2$$
+$$\hat A_t=\sum_{l=0}^{\infty}(\gamma\lambda)^l\delta_{t+l},\qquad \delta_t=r_t+\gamma V(s_{t+1})-V(s_t),\qquad \lambda=0.95$$
+<div class="eq-note">
+<strong>推导要点</strong>：策略梯度定理 $\nabla J=\mathbb E[\nabla\log\pi\cdot A]$ 的重要性采样形式是 $\rho_t\hat A_t$；无约束时 $\rho_t$ 可任意大 → 策略崩溃，TRPO 用 KL 约束、PPO 用 clip 压进 $[0.8,1.2]$。GAE(λ) 是 n 步优势的指数平均：$\lambda=1$ 退化为蒙特卡洛（高方差低偏置）、$\lambda=0$ 退化为 TD(0)，0.95 取近蒙特卡洛端。<strong>总损失</strong>（CleanRL）：$L=L^{CLIP}-c_1L^{VF}+c_2S[\pi_\theta]$，$c_1=0.5$、$c_2=0.01$（Table 3 的 value fn coef / entropy coef）。<strong>表 3 数值疑点</strong>：Batch size 12228：$2048\times6=12288$；12228 不能被 6（=2038）也不能被 32（=381.75）整除——<strong>几乎可断定是 12288 的换位笔误</strong>。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D7) —— SAC 最大熵目标（补充式，Haarnoja 2018 + CleanRL）</span>
+$$J_Q=\mathbb E\Big[\big(Q_\theta(s,a)-(r+\gamma(\bar Q(s',a')-\alpha\log\pi_\phi(a'|s')))\big)^2\Big],\qquad
+J_\pi=\mathbb E\big[\alpha\log\pi_\phi(a|s)-Q_\theta(s,\pi_\phi(s))\big],\qquad \alpha=0.2\ (\text{固定})$$
+<div class="eq-note">
+<strong>推导要点</strong>：在 Q 学习目标上追加熵奖励 $r+\alpha\mathcal H(\pi)$ → 软贝尔曼算子（最大熵 RL 固定点）。<strong>表 4 对应</strong>：entropy reg 0.2 = 固定温度 $\alpha$（CleanRL 默认，非自动调节）；Q-LR 1e-3 / policy LR 3e-4；双 Q + 目标网络 $\tau=5\times10^{-3}$ 每步更新；策略每 2 步更新；buffer 1e6、batch 256、seed 5000；noise clip 0.5（目标 Q 动作噪声截断）。<strong>论文选 SAC 的理由</strong>：$J_\pi$ 的 $Q-\alpha\log\pi$ 形式与 TD-MPC 策略目标（§12 的 Eq.(D9) 策略项）同构，对比更干净。</div>
+</div>
+<hr>
+<h3>12. 公式 (17) 与 TD-MPC：TOLD、损失与 MPPI（本节最深）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(17) —— 候选轨迹回报：终端价值 + 时域内累计（论文式号 17）</span>
+$$\phi_\Gamma\triangleq\mathbb E_{\Gamma}\Big[\underbrace{\gamma^{H}Q_\Theta(z_H,a_H)}_{\text{终端价值}}+\underbrace{\sum_{t=0}^{H-1}\gamma^{t}R_\Theta(z_t,a_t)}_{\text{时域 }H\text{ 内累计}}\Big] \tag{17}$$
+<div class="eq-note">
+<strong>$z_t$</strong> 潜状态（TOLD 编码器输出） &nbsp;|&nbsp; <strong>$Q_\Theta,R_\Theta$</strong> 学到的价值/奖励模型 &nbsp;|&nbsp; <strong>$H=3$</strong> 规划视界。<strong>推导（回报截断恒等式）</strong>：
+$$\sum_{t=0}^{\infty}\gamma^t r_t=\sum_{t=0}^{H-1}\gamma^t r_t+\gamma^{H}\underbrace{\sum_{k=0}^{\infty}\gamma^{k}r_{H+k}}_{\approx\,Q_\Theta(z_H,a_H)}$$
+尾巴由学到的 $Q$ 一次性估掉——普通 MPC 在 $H$ 步截断（尾巴=0/人工终端代价），TD-MPC 用值函数补尾巴。<strong>权重核算（独立计算）</strong>：时域内 $\sum_{t=0}^{2}\gamma^t=2.9701$；尾巴 $\gamma^3/(1-\gamma)=0.9703/0.01=97.03$——<strong>尾巴是时域内的 32.7 倍</strong>：性能 97% 押在 $Q_\Theta$ 精度上，3 步规划只提供未来 0.03 s 的精细化修正；也解释了随机环境下 $Q$ 学不准时 TD-MPC 整体塌方（§12.2 的条件均值论证）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D8) —— TOLD 五个组件（补充式，Hansen 2022/2024，论文文字描述）</span>
+$$h_\Theta:\ s\mapsto z\qquad d_\Theta:\ (z,a)\mapsto \hat z'\qquad R_\Theta:\ (z,a)\mapsto \hat r\qquad Q_\Theta:\ (z,a)\mapsto \hat q\qquad \pi_\Theta:\ z\mapsto a$$
+<div class="eq-note">
+<strong>$h_\Theta$</strong> 编码器（14 维状态→潜状态） &nbsp;|&nbsp; <strong>$d_\Theta$</strong> 确定性潜动力学 &nbsp;|&nbsp; <strong>$R_\Theta,Q_\Theta,\pi_\Theta$</strong> 奖励/价值/策略（$\pi_\Theta$ 输出 Tanh 高斯）。<strong>离线训练</strong>：buffer（1e6）采 H=3 片段按式 (D9) 更新；<strong>在线规划</strong>：$z_0=h(s_t)$，潜空间滚动 $d_\Theta$ 预测、$R_\Theta$ 算回报、$Q_\Theta$ 算终端价值——全程不碰 JSBSim。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D9) —— TOLD 训练损失（补充式，TD-MPC2 形式；论文仅文字描述）</span>
+$$\mathcal L=\underbrace{0.1\sum_t\big\|R_\Theta(z_t,a_t)-r_t\big\|^2}_{\text{奖励模型}}+\underbrace{0.1\sum_t\big\|Q_\Theta(z_t,a_t)-y_t\big\|^2}_{\text{价值（贝尔曼误差）}}+\underbrace{20\sum_t\big\|d_\Theta(z_t,a_t)-\mathrm{sg}(h_\Theta(s_{t+1}))\big\|^2}_{\text{潜一致性（动力学）}}-\mathbb E\big[Q_\Theta(z,\pi_\Theta(z))-\alpha\log\pi_\Theta\big]$$
+$$y_t=\sum_{i=0}^{n-1}\gamma^i\hat r_{t+i}+\gamma^{n}\bar Q(z_{t+n},\bar\pi(z_{t+n}))\ (\text{n 步 TD 目标，temporal coef }0.5\text{ 做 TD-λ 混合})$$
+<div class="eq-note">
+<strong>逐项解读</strong>：① 奖励回归（reward coef 0.1）；② 价值贝尔曼误差，TD 目标 = n 步回报 + 目标网络 bootstrap（$\tau=0.01$），「temporal coef 0.5」是 TD-MPC2 的 $\lambda$：1 步与 H 步目标按 λ 指数混合（与 GAE 同构的偏差-方差权衡）；③ <strong>一致性权重 20 = 奖励/价值项的 200 倍</strong>——潜空间「编码→前向→重编码」必须自洽（$\mathrm{sg}$ 防编码器塌缩）。<strong>为什么这决定随机环境失效（定量论证）</strong>：转移随机时，MSE 最优前向模型是<strong>条件均值</strong> $d^*(z,a)=\mathbb E[z'|z,a]$；规划器沿条件均值滚动，$H$ 步后分布被压成一条「平均轨迹」——论文 "on-average robust policy" 的精确含义。一致性权重 20 把模型钉死在「确定性预测精度」上，环境越随机目标越失真。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D10)(D11) —— MPPI：自由能目标 → 指数权重 → 高斯更新（补充式，Williams 2015 + TD-MPC2）</span>
+$$q^{*}=\arg\min_{q}\ \mathbb E_{q}\big[\phi_\Gamma\big]+\lambda\,\mathrm{KL}(q\,\|\,q_{ref}),\ \lambda=0.5\quad\Longrightarrow\quad
+w_i=\frac{\exp(\phi_{\Gamma_i}/\lambda)}{\sum_j\exp(\phi_{\Gamma_j}/\lambda)},\qquad
+\mu\leftarrow\sum_i w_i a^{(i)}_0,\quad \Sigma\leftarrow\sum_i w_i(a^{(i)}_0-\mu)(a^{(i)}_0-\mu)^T$$
+<div class="eq-note">
+<strong>推导</strong>：对 $q$ 变分（$\sum q=1$ 乘子约束），一阶条件 $\log q^{*}\propto\log q_{ref}-\phi_\Gamma/\lambda$ → 指数权重（回报是「负代价」，指数里取 $+\phi/\lambda$；与笔记 §7.2 的 Eq.(26)–(27) 同一推导的两面）。<strong>温度 $\lambda=0.5$</strong>：回报差 0.5 → 权重差 $e$ 倍。所有实验共用 $\lambda=0.5$——确定性（hard）与随机（湍流/阵风）同温度，湍流下参考分布本应更宽、权重应更钝，这是「自适应温度」改进的定量依据。<strong>完整流程（Fig.1 的 1→2→3 展开）</strong>：迭代 6 轮：从 $\mathcal N(\mu_k,\sigma_k^2I)$ 采样 <strong>512</strong> 动作 + <strong>24</strong> 条策略先验轨迹；每条滚动 $H=3$ 步按式 (17) 算 $\phi_\Gamma$；取 <strong>64</strong> 精英按上式更新 $\mu,\Sigma$（只更新第一步动作的分布）；6 轮后采样执行。<strong>计算量（独立核算）</strong>：$6\times(512+24)=3216$ 轨迹 × 3 步 = <strong>9648 次潜动力学前向/控制步</strong>，100 Hz 下 ≈96.5 万次模型评估/秒。<strong>为何采样而非梯度</strong>：舵面硬限幅 + MLP 黑箱，采样天然处理非光滑约束；精英+先验混合（24/536=4.5%）保证不脱离已学策略（TD-MPC2 关键改动）。</div>
+</div>
+<hr>
+<h3>13. 公式 (18)–(20)：Act Fluct、AVP、CAPS</h3>
+<h4>13.1 公式 (18)：Act Fluct——定义正确，Table 7 数值存在单位/尺度疑点</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(18) —— 动作抖振指标（论文式号 18）</span>
+$$\xi(\pi)=\frac12\sum_{j\in\{a,e\}}\frac1E\sum_{n=1}^{E}\left[\frac1T\sum_{t=1}^{T}\big|\delta_j|_t-\delta_j|_{t-1}\big|\right] \tag{18}$$
+<div class="eq-note">
+<strong>符号</strong>：$j\in\{a,e\}$ 副翼/升降舵 &nbsp;|&nbsp; $E$ 评估回合数 &nbsp;|&nbsp; $T$ 每回合步数（2000） &nbsp;|&nbsp; $\delta_j$ 舵面位置（正文说 "actuator positions"；式 (19) 对指令显式用 $\delta^c$ 上标、式 (18) 无上标——<strong>记号上区分「位置」与「指令」</strong>）。<strong>含义</strong>：先回合内时间平均、再跨回合平均、再跨通道平均——单位「每步舵面位移」。<strong>量纲界</strong>：归一化指令 $[-1,1]$ → $|\Delta\delta|\le2$，$\xi\in[0,2]$；实际位置（rad）且 ±200°/s 限速生效 → $|\Delta\delta|\le0.0349$ rad/步，$\xi\in[0,0.0349]$。</div>
+</div>
+<div class="callout warn">
+<div class="callout-title">⚠️ Table 7 数值的三种读法（穷举分析）</div>
+<p>Table 7 的 Act Fluct 列打印值 0.07～13.78；表头「Nominal/Hard Refs (x10−2)」横跨 RMSE 与 Act Fluct 两列（RMSE 列已确认须按 ×10⁻² 读作弧度：4.20×10⁻² rad=2.4°）。对 Act Fluct 列：</p>
+<ol>
+<li><strong>读法 R1（原值直读）</strong>：任何单位都不可能——归一化指令界 [0,2] 被 4.37/10.07/13.78 打破；位置（rad）界 0.035 更被远远打破。❌</li>
+<li><strong>读法 R2（×10⁻²）</strong>：归一化指令 → 0.0007…0.12 ∈ [0,2] ✓；位置（rad）→ TD-MPC 的 4.37×10⁻²=0.0437 rad/步 &gt; 限速上界 0.0349 ✗——<strong>除非速率限真如 §9 所述未生效</strong>（二阶滤波器自身最大摆速 $\approx0.455\omega_n\delta_{max}\approx48$ rad/s ≫ 3.49，此时 0.0437 可行）。</li>
+<li><strong>读法 R3（原值 + 位置单位取度）</strong>：限速生效时 $|\Delta|\le2^\circ$/步被 4.37 打破 ✗；限速失效时 13.78 要求全程满摆速，不自然。</li>
+</ol>
+<p><strong>结论</strong>：唯一自洽读法是 <strong>R2（×10⁻²）</strong>——Table 7 的 Act Fluct 列与 RMSE 共用 ×10⁻² 因子，论文未注明，<strong>属写作单位歧义</strong>（笔记 §6.9 直读原值得到的比值结论不受影响，绝对值解读偏 100 倍）。$\delta$ 是「指令」还是「位置」<strong>本地无法定案</strong>：论文文字与式 (19) 记号对比指向位置，仓库 <code>jsbsim_env.py</code> L521–523 的 <code>fcs_pos_hist</code> 是 rad 实际位置，但评测代码在 FW-FlightControl（不在本地）。建议人工复核 p8 式 (18) 与 Table 7 表头。无论哪种读法，论文的<strong>全部比值结论尺度不变</strong>。</p>
+</div>
+<h4>13.2 公式 (19)：AVP——结构正确 + 一个论文未明说的设计不变量</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(19) —— AVP 奖励（论文式号 19）</span>
+$$R_\delta=\mathrm{clip}\left(\frac{\tfrac12\sum_{j\in\{a,e\}}\big|\delta^c_j|_t-\delta^c_j|_{t-1}\big|}{\zeta_\delta},\ 0,\ c_\delta\right),\qquad
+R^{AVP}_t=-(R_\phi+R_\theta+R_\delta),\qquad
+\zeta_\phi=3.3,\ \zeta_\theta=2.25,\ \zeta_\delta=2$$
+<div class="eq-note">
+<strong>数值核算</strong>：分子 $\tfrac12\sum_j|\Delta\delta^c_j|\in[0,2]$（两通道、每通道 $|\Delta|\le2$），除 $\zeta_\delta=2$ → 自变量 ∈[0,1]，再裁 $c_\delta$。<strong>调参矩阵</strong>：TD-MPC/SAC 用 $c_\phi=c_\theta=0.25,c_\delta=0.5$；PPO 用 $c_\phi=c_\theta=0.45,c_\delta=0.1$。<strong>发现的隐藏不变量</strong>：$0.25+0.25+0.5=1.0$ 与 $0.45+0.45+0.1=1.0$——两组调参都使<strong>最大单步总惩罚恰好 = 1.0</strong>（与基础奖励同预算）。加 AVP 不是「追加」惩罚而是「重新分配」预算；代码 <code>ac_bohn_nova.py</code> L211–212 显式断言 clip_max 之和 ≠1.0 时打 WARNING——不变量在代码里有痕迹、论文里没说明。<strong>这解释 Table 7 三个现象</strong>：① PPO+AVP 的 Act Fluct 1.98→13.78——$c_\delta=0.1$ 时平滑项最多值 0.1，优化器优先跟踪、放弃平滑；② TD-MPC+AVP 的 RMSE 反而变好（3.81→3.58）——不是「平滑促进跟踪」，是奖励景观整体重标定；③ AVP 把 SAC/TD-MPC 抖振压 8–20 倍——$c_\delta=0.5$ 给了平滑项实打实 50% 预算。<strong>排版瑕疵</strong>（p8）：arXiv 渲染出现 <code>δc a|t−1RAVP</code> 粘连串（$\delta^c_a|_{t-1}$ 右半边与 $R^{AVP}$ 标签粘连），建议人工复核原图。</div>
+</div>
+<h4>13.3 公式 (20)：CAPS——两个歧义 + 对 TD-MPC 无效的结构性论证</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(20) —— CAPS 损失（论文式号 20）</span>
+$$L_{CAPS}(\pi_\Theta)=\lambda_{TS}L_{TS}(\pi_\Theta)+\lambda_{SS}L_{SS}(\pi_\Theta),\qquad
+L_{TS}=\|\pi_\Theta(s_t)-\pi_\Theta(s_{t+1})\|_2,\qquad
+L_{SS}=\|\pi_\Theta(s_t)-\pi_\Theta(\hat s_t)\|_2,\ \hat s_t\sim\mathcal N(s_t,0.01)$$
+<div class="eq-note">
+<strong>两个歧义（诚实标注）</strong>：① $\|\cdot\|_2$ 是 L2 范数还是平方范数——CAPS 原论文（Mysore 2021）用范数，打印的「∥·∥2」下标按惯例是范数，但无法从 fulltext/arXiv HTML 完全排除平方写法，建议人工复核 p8；② $\mathcal N(s_t,0.01)$ 的 0.01 是方差还是标准差未说明（CAPS 原文的加性噪声通常读标准差）。<strong>推导要点</strong>：$L_{TS}$ 一阶近似 $\approx\|\frac{\partial\pi}{\partial s}(s_{t+1}-s_t)\|$——策略的<strong>时序 Lipschitz 正则</strong>；$L_{SS}$ 惩罚状态噪声下的输出差。论文只用时序项（$\lambda_{TS}=0.05$），理由「保留状态空间高响应性」。<strong>对 TD-MPC 无效的结构性论证</strong>：执行动作 $a^*$ 是 MPPI 加权样本（Eq.(D11)），$\pi_\Theta$ 只贡献 24/536=4.5% 候选——即使 $\pi_\Theta$ 被正则成完美平滑，$a^*$ 仍由 95.5% 的高斯样本决定：<strong>正则化了一个不直接决定输出的函数</strong>。论文实证（CAPS 让先验平滑但规划输出不平滑）与此结构完全吻合。</div>
+</div>
+<hr>
+<h3>14. 算法与训练流程逐行解读（论文未给伪代码，本节补全）</h3>
+<h4>14.1 算法 A：PID + 空速 PI（论文 §4.1 + Table 1）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D12) —— PID 控制律（补充式，离散实现）</span>
+$$\delta^c(t)=k_p e(t)+k_i I_e(t)+k_d\frac{e(t)-e(t-1)}{dt},\qquad I_e(t)=I_e(t-1)+e(t)\,dt,\qquad dt=0.01$$
+<div class="eq-note">
+<strong>Table 1</strong>：滚转 $k_p=1.5,k_i=0.1,k_d=0.1$；俯仰 $k_p=-2,k_i=-0.3,k_d=-0.1$；空速 PI $k_{pV}=0.5,k_{iV}=0.1$（油门，参考 60 km/h，所有控制器共用——<code>ac_bohn_nova.py</code> L71–74, L96–98）。<strong>俯仰增益全负的必然性（定量推导）</strong>：$C_{m_{\delta e}}=-0.2292&lt;0$（§7.1）→ 正升降舵=低头力矩：$\ddot\theta=(\bar qSc/I_{yy})C_{m_{\delta e}}\delta_e=(166.7\times0.75\times0.3571/0.1702)\times(-0.2292)\,\delta_e=-60.15\,\delta_e$ rad/s²。要求 $e_\theta&gt;0$（需抬头）时 $\ddot\theta&gt;0$，必须 $\delta_e&lt;0$ → $k_p&lt;0$ ✓。<strong>回路带宽估算（独立计算）</strong>：俯仰 $\ddot\theta\approx-60.15\times(-2)e_\theta$ → $\sqrt{120.3}\approx11$ rad/s≈1.7 Hz；滚转用有效惯性（§4.1）：$\dot p\approx\bar qSb\,C_3C_{l_{\delta a}}\delta_a=262.6\times(4.203\times0.1202)\delta_a=132.7\,\delta_a$，$k_p=1.5$ → $\dot p\approx199e_\phi$ → ≈14 rad/s≈2.2 Hz。<strong>两带宽远高于参考切换频率、低于舵机带宽 15.9 Hz</strong>——PID 在 nominal 下好用的结构原因；hard 参考进入气动非线性区后线性增益失效，RMSE 退化 4.8 倍。</div>
+</div>
+<h4>14.2 算法 B/B′：PPO / SAC 训练循环（CleanRL 映射，Table 3/4）</h4>
+<pre class="code-block"><code>算法 B（PPO）：
+1  初始化策略 π_θ（高斯头，动作 [-1,1]²）与价值 V_φ
+2  for 迭代 in 1..ceil(750000/(2048×6)):           # 每迭代 12288 步
+3      6 个并行 JSBSim 环境 rollout 各 2048 步 → 存 (s,a,r,s')
+4      算 GAE 优势 Â_t（γ=0.99, λ=0.95）与回报目标
+5      for epoch:  for minibatch in 32 份:          # minibatch=384
+6          最大化 L_CLIP − 0.5·L_VF + 0.01·熵（LR 3e-4）
+
+算法 B′（SAC）：
+1  初始化 π_φ（Tanh 高斯）、双 Q 与目标网络 Q̄（τ=5e-3）
+2  前 5000 步随机动作填 buffer（1e6）              # seed steps
+3  for t in 1..750000:
+4      执行 a~π_φ(s)；每步采 256 条：
+5        Q 更新 J_Q（双 Q 取 min，noise clip 0.5，Q-LR 1e-3）
+6        每 2 步策略更新 J_π（policy LR 3e-4，α=0.2 固定）
+7        每步软更新 Q̄ ← τQ + (1−τ)Q̄</code></pre>
+<div class="eq-note">
+<strong>自洽核算</strong>：每迭代 $2048\times6=12288$ 步 → 总迭代 $750000/12288\approx61$ 次策略更新 ✓；minibatch 32 → 每份 384 条 ✓（12288/32）。Table 3 的 12228 疑点见 §11。</div>
+<h4>14.3 算法 C：TD-MPC 训练 + 规划（论文 §4.2.2 + Fig.1 + Table 5）</h4>
+<pre class="code-block"><code>算法 C（TD-MPC2 风格）：
+训练：
+1  初始化 h,d,R,Q,π 与目标网络 Q̄,π̄（τ=0.01）
+2  前 10000 步随机动作填 buffer（1e6）              # seed steps=10000
+3  for t in 1..750000:
+4      执行 a = MPPI_plan(s)；存 (s,a,r,s')
+5      每步采 256 条 H=3 片段最小化 Eq.(D9)：
+6        0.1‖RΘ−r‖² + 0.1‖QΘ−y‖² + 20‖d−sg(h)‖² + 策略项（SAC 式，LR 3e-4）
+规划（每控制步，Fig.1 的 1→2→3）：
+1  z0 = h(s)；μ,Σ ← 上一步分布
+2  for k in 1..6:                                   # MPPI Iterations
+3      采样 512 个 a~N(μ,σ²I) + 24 条 πΘ 先验轨迹
+4      潜空间滚动 d 共 H=3 步，按 Eq.(17) 算 φΓ
+5      取 64 精英，按 Eq.(D10) 权重更新 μ,Σ         # 温度 0.5
+6  从 N(μ,Σ) 采样 a* 执行第一步；分布传下一控制步</code></pre>
+<div class="eq-note">
+<strong>与 Fig.1 对应</strong>：1)=仿真+回报（步 3–4）、2)=重要性采样更新高斯（步 5）、3)=采样执行（步 6）。<strong>每步计算量</strong>：$6\times536\times3=9648$ 次潜动力学前向（§12）。<strong>循环依赖</strong>：规划用到的 $d,R,Q$ 每步更新，规划器在「追赶」移动目标——能工作的前提是模型更新远慢于规划频率（750k 步内缓慢收敛）。</div>
+<hr>
+<h3>15. 实验协议与数值核算（§5–§6 全部数字验算）</h3>
+<h4>15.1 训练预算自洽性</h4>
+<p>$375\times2000=750{,}000$ = Table 3/4/5 的 "Total timesteps 750k" ✓；$2000\times0.01=20$ s、$1/0.01=100$ Hz（与式 (14) 的 $dt$ 同一个数）✓；5 次运行 = <code>models/icinco/</code> 每配置恰好 5 个 .pt（种子 1/2164/2989/4508/6930）✓；初始 600 m、16.67 m/s（=60 km/h≈论文 17 m/s）、姿态 0（<code>x8_basic_ic.xml</code> L6,L11–14）✓；RTX A6000 与环境配置（CUDA 12.4，<code>environment.yml</code>）相符 ✓。</p>
+<p><strong>参考分类</strong>（Table 2）：nominal 滚转 ±45°、俯仰 ±25°；hard 滚转 $[-60°,-45°]\cup[45°,60°]$、俯仰 $[-30°,-25°]\cup[25°,30°]$。风实验固定 nominal 参考（隔离「难度」与「扰动」）。<strong>未说明项</strong>：回合内<strong>参考何时切换、切换几次</strong>（目标调度器在 FW-FlightControl，本地不可见）——复现缺口，建议向作者确认。</p>
+<h4>15.2 风场等级（Table 8）与代码映射（逐值核对）</h4>
+<table>
+<tr><th>等级</th><th>常值风 (m/s)</th><th>湍流 W20 (m/s)</th><th>阵风 (m/s)</th><th>代码 <code>jsbsim_env.py</code> 对应值</th></tr>
+<tr><td>OFF</td><td>0</td><td>0</td><td>0</td><td>L347–350 / L389–392 / L421–423 全零 ✓</td></tr>
+<tr><td>Light</td><td>7</td><td>7.6</td><td>7</td><td>25.2 kph=7（L352）；<code>w20=25 fps</code>=7.62（L395）；阵风 7.0（L425）✓</td></tr>
+<tr><td>Moderate</td><td>15</td><td>15.25</td><td>15</td><td>54 kph=15；50 fps=15.24；15.0 ✓</td></tr>
+<tr><td>Severe</td><td>23</td><td>22.86</td><td>23</td><td>82.8 kph=23；75 fps=22.86；23.0 ✓</td></tr>
+</table>
+<p>训练期：常值风幅值 $U[0,23]$ m/s、方向均匀采样（代码 L456–473 用「压扁立方」：z 分量限 ±0.1——论文 §6.2 说「sampled uniformly in [−1,1]」，<strong>对垂直分量的限制属轻微不一致</strong>）。湍流/阵风训练时与常值风同 severity 开启（L386–437）。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D13) —— 余弦阵风时间剖面（补充式，JSBSim cosine-gust）</span>
+$$v_g(t)=\frac{V_{max}}2\left(1-\cos\frac{\pi t}{T_1}\right)\ (t\in[0,T_1]);\qquad v_g=V_{max}\ (t\in[T_1,T_1+T_2]);\qquad v_g(t)=\frac{V_{max}}2\left(1+\cos\frac{\pi(t-T_1-T_2)}{T_3}\right)$$
+<div class="eq-note">
+$T_1=0.25$ s、$T_2=0.5$ s、$T_3=0.25$ s（总 1 s），与论文 §6.2.2 一致，代码 L416–437 同参数 ✓。<strong>触发时刻不一致（仓库漂移）</strong>：论文「每回合两次，步 500 与 1500」（5 s/15 s）；当前代码 L516–518 仅在 <code>current_step==250</code> 触发一次——<strong>本 checkout 是 2026-03 快照、论文实验代码在 FW-FlightControl</strong>，以论文文字为准。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D14) —— 阵风为何把 MDP 变成 PO-MDP（补充式，论文 §6.2.2 论证的数学化）</span>
+$$P(s_{t+1}|s_t,a_t)\ \text{不存在唯一分布}\ \Longleftrightarrow\ \exists g_t\notin s_t:\ P(s_{t+1}|s_t,a_t,g_t)\neq P(s_{t+1}|s_t,a_t,g'_t)$$
+<div class="eq-note">
+<strong>论证</strong>：阵风相位 $g_t$（是否在吹、剖面哪一段）<strong>不进入观测</strong>（14 维状态无风分量），而 $s_{t+1}$ 强依赖 $g_t$ → 同一 $(s_t,a_t)$ 在不同实验给不同 $s_{t+1}$（论文原话的例子）。形式上，边缘化 $P(s_{t+1}|s_t,a_t)=\sum_gP(g|s_t)P(s_{t+1}|s_t,a_t,g)$ 虽可行，但 $g$ 序列<strong>非平稳相关</strong>（只在 500/1500 步附近出现）→ 边缘化后的转移概率随时间漂移 → MDP 平稳性公理被破坏，正确容器是 PO-MDP（或 multi-model MDP，论文引 Steimle 2021）。<strong>与湍流对比</strong>：Dryden 平稳（§5），边缘化后得良定义「时间平均 MDP」——论文「turbulence can be dealt with more simply than gusts」的数学内容。<strong>PPO 抗阵风更好的解释</strong>：clip 把每次更新限制在信赖域，矛盾梯度（阵风前后两个「模式」给相反方向）不会单次击穿策略；SAC 的软贝尔曼与 TD-MPC 的一致性损失都会把矛盾目标「平均」进同一函数近似器。</div>
+</div>
+<h4>15.3 Table 6/7 关键数字的比值核算（验证论文定性措辞）</h4>
+<table>
+<tr><th>论文措辞</th><th>数字</th><th>核算</th><th>判定</th></tr>
+<tr><td>"only TD-MPC performing slightly better"（nominal，对 PID）</td><td>3.81 vs 4.20</td><td>9.3%</td><td>✅ 措辞与效应量匹配</td></tr>
+<tr><td>"significant advantage of TD-MPC"（hard）</td><td>9.10 vs PPO 15.78 / SAC 11.15 / PID 20.10</td><td>1.73× / 1.23× / 2.21×</td><td>✅</td></tr>
+<tr><td>"hard … all RL methods clearly outperform PID"</td><td>PID 20.10 vs 最好 9.10</td><td>PID 退化 4.79×；TD-MPC 退化 2.39×</td><td>✅</td></tr>
+<tr><td>AVP "reducing it by at least an order of magnitude"</td><td>TD-MPC 4.37→0.54；SAC 10.07→0.50、12.00→1.20</td><td>8.1× / 20× / 10×</td><td>✅（8.1× 略低于 10×，措辞边界）</td></tr>
+<tr><td>AVP for PPO "drastic increase"</td><td>1.98→13.78（nominal）</td><td>7.0× 上升</td><td>✅</td></tr>
+<tr><td>RL 抖振 vs PID</td><td>0.07 vs 1.98/4.37/10.07</td><td>28× / 62× / 144×</td><td>✅「1–2 个数量级」（与 ×10⁻² 歧义无关）</td></tr>
+<tr><td>RMSE 单位</td><td>4.20×10⁻²</td><td>弧度=2.4°（合理）；度=0.042°（荒谬）</td><td>✅ 弧度</td></tr>
+</table>
+<hr>
+<h3>16. 交叉验证总表与问题清单</h3>
+<h4>16.1 论文公式 ↔ 代码 ↔ 独立验证 总表</h4>
+<table>
+<tr><th style="width:9%;">论文</th><th style="width:44%;">代码位置（本地 checkout）</th><th>独立验证</th></tr>
+<tr><td>(1)</td><td>JSBSim 内核积分位置；env 只读（<code>jsbsim_properties.py</code> L40–87）</td><td>✅ $R^b_n=(R^n_b)^T$ 反演式 (6)</td></tr>
+<tr><td>(2)</td><td><code>conversions.py</code> L144–183（欧拉→四元数，同约定）</td><td>✅ $q^T\dot q=0$ 保模；矩阵逐元素重推一致</td></tr>
+<tr><td>(3)</td><td>JSBSim 内核 $v_{UVWdot}=F/m-\omega\times v$</td><td>⚠️ 缺括号；修正形式与内核一致</td></tr>
+<tr><td>(4)</td><td><code>aerodynamics.py</code> L28–36（gamma1–8）、L99–111（耦合阻尼合成）</td><td>✅ 逐项代数核对 + 特征值 {2.005, 0.170, 0.105}</td></tr>
+<tr><td>(5)(7)</td><td><code>jsbsim_properties.py</code> L103–115（total vs aero 速率）</td><td>✅</td></tr>
+<tr><td>(6)</td><td><code>jsbsim_env.py</code> L439–444（常值风 NED + 湍流分别注入）</td><td>❌ 右端 $[u_r,v_r,w_r]$ 张冠李戴</td></tr>
+<tr><td>(8)(9)</td><td>JSBSim <code>aero/alpha-rad</code>（atan2）、<code>velocities/vt-*</code></td><td>✅ (8)；❌ (9) 分子分母写反（87.8° vs 2.2° 反例）</td></tr>
+<tr><td>(10)(11)(12)</td><td><code>x8.xml</code> L301–692（轴函数与系数表、非线性升/阻力表）</td><td>✅ 依赖结构逐一对应；配平 $C_L$ 0.264≈0.273；§7.2 极限检查</td></tr>
+<tr><td>(13)(14)</td><td><code>ac_bohn_nova.py</code> L107–108、L288–289</td><td>✅ 逐字一致（含 dt、目标切换清零）</td></tr>
+<tr><td>(15)</td><td><code>ac_bohn_nova.py</code> L198–226（结构；数值在 FW-FlightControl 配置）</td><td>✅ + clip 生效边界核算（§10.1）</td></tr>
+<tr><td>(16)</td><td>算法层（FW-FlightControl；CleanRL 标准实现）</td><td>✅ 有效时域 100 步核算</td></tr>
+<tr><td>(17)</td><td>算法层（TD-MPC2 官方实现；Table 5 与其默认一致）</td><td>✅ 尾巴/时域权重 97.03/2.97 核算</td></tr>
+<tr><td>(18)</td><td>env 提供 <code>fcs_pos_hist</code>（rad 位置，L521–523）；评测在 FW-FlightControl</td><td>⚠️ Table 7 须按 ×10⁻² 读；「指令 vs 位置」无法定案</td></tr>
+<tr><td>(19)</td><td><code>ac_bohn_nova.py</code> L209–222（actvar 分支结构同构）</td><td>✅ + 预算不变量 1.0</td></tr>
+<tr><td>(20)</td><td>算法层（FW-FlightControl）</td><td>⚠️ $\|\cdot\|_2$ 与 $N(s,0.01)$ 两歧义</td></tr>
+</table>
+<h4>16.2 论文问题清单（按严重程度）</h4>
+<ol>
+<li><strong>【错误】式 (9) 迎角分子分母写反</strong>（p5）：应为 $\mathrm{atan2}(w_r,u_r)$。数值反例：配平 $\alpha=2.2^\circ$ 按打印式得 87.8°。（arXiv LaTeX 已核实，建议再人工看 p5。）</li>
+<li><strong>【等式错误】式 (6) 把相对速度分量误赋给风向量</strong>（p5）：$v_w^b=\dots=[u_r,v_r,w_r]^T$ 应为 $v_r^b=\dots$。与第 1 条叠加，按字面实现会把「风速方向」当迎角。</li>
+<li><strong>【印刷缺括号】式 (3)</strong>（p4）：$m\dot v+\omega\times v$ 量纲不一致，应为 $m(\dot v+\omega\times v)$。</li>
+<li><strong>【笔误】§4.2 状态列表</strong>：$\omega_r=[p_r,q_r,w_r]^T$ 第三分量应为 $r_r$。</li>
+<li><strong>【描述与实现不符】状态定义</strong>：论文说观测含「相对角速率」与「上一拍动作」；代码给<strong>总</strong>角速率 + 「近 N 拍均值」或「本拍已施加指令」（§10.2）。</li>
+<li><strong>【数值疑点】Table 3 Batch size 12228</strong>：$2048\times6=12288$；12228 不被 32 或 6 整除，疑似换位笔误。</li>
+<li><strong>【单位歧义】Table 7 Act Fluct 列</strong>：直读违反式 (18) 理论界，须按 ×10⁻²；论文未注明（§13.1）。</li>
+<li><strong>【排版瑕疵】式 (19)</strong>（p8）：$\delta^c_a|_{t-1}$ 与 $R^{AVP}$ 粘连。</li>
+<li><strong>【歧义】式 (20)</strong>：$\|\cdot\|_2$ 范数 vs 平方；0.01 方差 vs 标准差。</li>
+<li><strong>【无法核实】推力 $T_p=C\delta_t$、$C=5.9$ N</strong>：FDM 是 8 W 电机，5.9 N×17 m/s≈100 W ≫ 8 W；$C$ 来源不明（JSBSim 直连推进器源码不在本地）。</li>
+<li><strong>【描述与实现不符】执行器速率限制</strong>：论文「rate-limited」；<code>x8.xml</code> L219 的 <code>rate_limit</code> 所在块作者自注 "Not sure it's doing anything"，输出被滤波器覆盖——是否生效存疑（§13.1 R2 旁证）。</li>
+<li><strong>【仓库漂移】阵风触发</strong>：论文=步 500/1500 两次；当前代码=步 250 一次（L516–518）。方向采样：论文 [−1,1] 均匀，代码 z 限 ±0.1。</li>
+<li><strong>【未说明】参考切换调度</strong>（FW-FlightControl 中）；$M_{prop}$ 无表达式（由 XML 推 =0，螺旋桨反扭矩未建模未说明）。</li>
+<li><strong>【代码内部不一致】x8.xml vs Gryte 原始参数</strong>：$C_{m_0}$ 0.0227 vs 0.018、$C_{m_\alpha}$ −0.4629 vs −0.2524（+独立 $C_{m_{fp}}$=−0.2168）——XML 为二次整定；其余系数逐值吻合。</li>
+<li><strong>【需修正既有笔记】</strong>：§6.3「<code>prop_x8.txt</code> 是推力表」不成立（实为属性名清单）；§6.9 Act Fluct 绝对值解读漏 ×10⁻²（比值结论不受影响）。</li>
+</ol>
+<hr>
+<h3>17. 验证材料清单与建议人工复核项</h3>
+<h4>17.1 本推导用到的材料</h4>
+<ul>
+<li><strong>论文</strong>：<code>_derivation_work/fw-jsbgym/fulltext.txt</code>（14 页抽取）；arXiv HTML <code>https://arxiv.org/html/2409.17896v1</code>（式 (1)–(20) 逐条核对）；页面图像 <code>pages/page-001..014.png</code>（本模型无图像能力，未读）。</li>
+<li><strong>代码</strong>：<code>x8.xml</code>、<code>aerodynamics.py</code>、<code>ac_bohn_nova.py</code>、<code>ac_bohn.py</code>、<code>jsbsim_env.py</code>、<code>jsbsim_properties.py</code>、<code>conversions.py</code>、<code>x8_basic_ic.xml</code>、<code>trim_points_x8.yaml</code>、<code>x8_param.txt</code>、<code>environment.yml</code>（行号引用见各节）。</li>
+<li><strong>实验产物</strong>：<code>fw_jsbgym/models/icinco/</code> 按配置/种子归档的 .pt（文件名含 2024-05/06 与种子 1/2164/2989/4508/6930，印证 5 次运行）。</li>
+</ul>
+<h4>17.2 建议人工复核（按优先级）</h4>
+<ol>
+<li><strong>p5 式 (9)</strong>：确认 $\tan^{-1}$ 分数线上下确为 $u_r/w_r$（本节判定依据是 arXiv LaTeX）。</li>
+<li><strong>p5 式 (6)</strong>：确认等式最右端确为 $[u_r,v_r,w_r]^T$。</li>
+<li><strong>p4 式 (3)</strong>：确认 $m$ 只乘 $\dot v$（无括号）。</li>
+<li><strong>p8 式 (18)(19)(20) 与 Table 7 表头</strong>：$\|\cdot\|$ 上下标、AVP 粘连、×10⁻² 覆盖范围。</li>
+<li><strong>p7 Table 3</strong>：Batch size 12228 还是 12288。</li>
+<li><strong>FW-FlightControl（jsbsim 分支）</strong>：Act Fluct 的 $\delta$ 取 <code>fcs_pos_hist</code>（位置 rad）还是归一化指令、是否 ×10⁻²；参考切换调度；奖励权重配置 3.3/2.25/0.5。</li>
+</ol>
+<h4>17.3 独立数值核算清单（全部可手算复现）</h4>
+<pre class="code-block"><code>① 惯性特征值：det(I−λ)=0 → {2.005, 0.1702, 0.1046} kg·m²（§4.1）
+② C1..C9：Γ=0.2096，C1=−7.151, C2=8.646, C3=4.203, C4=4.458, C5=−2.046, C6=5.490, C7=5.875, C8=10.37, C9=5.863（§4.3）
+③ 配平升力：q̄=166.7 Pa，CL_req=0.264 vs 表插值≈0.273（§7.1）
+④ 奖励裁剪边界：|e_φ|>1.65 rad 才触及 0.5；nominal 永不触及（§10.1）
+⑤ 有效时域：1/(1−γ)=100 步=1 s（§11）
+⑥ 终端价值权重：γ³/(1−γ)=97.03 vs 时域内 2.9701 → 32.7 倍（§12）
+⑦ MPPI 计算量：6×536×3=9648 次潜动力学前向/控制步（§12）
+⑧ AVP 预算不变量：0.25+0.25+0.5=0.45+0.45+0.1=1.0（§13.2）
+⑨ Act Fluct 理论界：[0,2]（归一化指令）/ [0,0.0349]（rad+限速）→ Table 7 必须 ×10⁻²（§13.1）
+⑩ PID 带宽：俯仰 √120.3≈11 rad/s、滚转 √199≈14 rad/s（§14.1）
+⑪ 比值核算：9.3% / 1.73× / 2.21× / 4.79× / 8.1–20× / 7.0× / 28–144×（§15.3）</code></pre>
 </section>
 
 <footer>📄 Paper Notes · David Olivares, Pierre Fournier, Pavan Vasishta, Julien Marzat · ICINCO 2024 · FW-JSBGym — Model-Free versus Model-Based Reinforcement Learning for Fixed-Wing UAV Attitude Control Under Varying Wind Conditions · MathJax + Mermaid Rendering</footer>

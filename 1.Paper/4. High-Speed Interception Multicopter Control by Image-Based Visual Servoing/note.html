@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">9.局限与扩展</a>
   <a href="#motivation">10.动机推导</a>
   <a href="#takeaway">11.要点总结</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -911,6 +915,783 @@ flowchart LR
     <tr><td>Dai, Ke, Quan &amp; Cai (AST 2021) — RFlySim: Automatic test platform for UAV autopilot systems</td><td>RflySim 平台文献——本文全部 HITL 仿真基于此平台。北航可靠飞行控制研究组的无人机仿真生态系统，支持 MBD 和自动化测试。</td></tr>
     <tr><td>Chaumette &amp; Hutchinson (IEEE RAM 2006) — Visual servo control, Part I: Basic approaches</td><td>IBVS 经典综述——定义了图像雅可比矩阵 $\mathbf{L}_s$ 和 IBVS 基本框架。任何做视觉伺服的研究者都应先读此文。</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info">
+<p><strong>对象</strong>：<code>High-Speed Interception Multicopter Control by Image-Based Visual Servoing</code>（Yang, Bai, She &amp; Quan，IEEE TCST 33(1):119–135, 2025）第 119–135 页（17 页）。<strong>公式范围</strong>：正文与附录 <strong>A（式 (1)–(43)）</strong>、<strong>B（式 (44)–(51)）</strong>、<strong>C（式 (52)–(55) 与矩阵 $M({}^{1}q),M_1..M_5$）</strong> 的全部 55 个编号公式 + 全部无编号核心式（$SO(3)$ 定义、$[\cdot]_\times$ 与 $\mathrm{vex}$ 映射、$\ln(\cdot)$ 级数、四元数/18 维状态定义、离散状态方程、FOV 锥 $C$，本文补编号 (D1)–(D7)）+ 两个算法（Algorithm 1 拦截控制器、Algorithm 2 延迟滤波器）。</p>
+<p><strong>方法</strong>：本文不是复述论文文字，而是：</p>
+<ol>
+<li>从牛顿–欧拉方程、透视投影几何、四元数代数、Lyapunov 第二方法、卡尔曼滤波方程等第一性原理<strong>独立重推</strong>每一个公式，写出中间代数步骤；</li>
+<li>对每个公式做<strong>符号约定自洽性检查</strong>（如 $R_b^{\mathrm e}$ 的体→地方向、Hamilton 四元数约定、叉乘矩阵 $[\cdot]_\times$ 的 vex 定义等交叉互证）；</li>
+<li>把论文给的实验参数（80/100 ms 延迟、200/50/30 Hz 频率、120° FOV、50° 俯仰、推重比 3、5 m/s²、20/21 m/s、CEP 数据）代入核算，检查各公式与数字是否互相吻合；</li>
+<li>明确标出论文中<strong>含糊、自相矛盾或疑点</strong>之处（见"最后"一节问题清单），绝不替论文"圆场"。</li>
+</ol>
+<p><strong>诚实声明（重要）</strong>：① 本片段由我以 <code>_derivation_work/4-interception/fulltext.txt</code>（PDF 全文文本抽取，逐页标记）为唯一公式来源完成，<strong>当前模型无法读取页面图像</strong>，因此矩阵/上下标密集处（式 (19)(22)、18×18 的 F/G、M4/M5 等）以文本抽取为准并经数学自洽性检验，<strong>建议人工按下列页码复核</strong>：第 4 页式 (1)–(4)；第 7 页式 (19)–(23)；第 8 页式 (28)–(33) 与 F/G 矩阵；第 15 页式 (41)–(43)；第 16 页式 (54) 与 M4/M5；第 6、9 页 Algorithm 1/2 的伪代码框（文本抽取只有签名行）。② 该论文<strong>未公开官方代码</strong>，故交叉验证是"独立重推 + 数值核算 + 文本互证"，无代码级验证；文中所有"与论文一致"均指与文本抽取的一致。③ 本片段第 6 节已有浅层公式，本节全部重做且更深（覆盖附录 B/C 的 DKF 全部雅可比）。</p>
+</div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>独立重推/数值核算的结论</th></tr>
+<tr><td>(1)</td><td>6-DOF 多旋翼刚体模型（含转子阻力）</td><td>✅ 与牛顿–欧拉标准形式一致；⚠️ $g=[0,0,g]^T$ 符号依赖 $z_e$ 约定（实飞数据表明 $z$ 向上 → $g=-9.81$，论文未明说）</td></tr>
+<tr><td>(2)</td><td>推力模型 $^{\mathrm e}f=fR_b^{\mathrm e}R_fe_3$</td><td>✅ 正确；$f_m$ 与推重比≈3 相容（$f_m\approx3mg$）；但"最大加速度 5 m/s²"不由公式解释（见 §3）</td></tr>
+<tr><td>(3)</td><td>目标点质量模型</td><td>✅ 平凡定义；$a_t$ 视为扰动是全文一致的设计前提</td></tr>
+<tr><td>(4)(5)</td><td>透视成像与 FOV 锥约束</td><td>✅ 标准针孔模型；⚠️ 数值核算表明 120° FOV 与 50° 俯仰"目标不丢"需要相机下倾安装角约 6–10°（即 $R_c^{\mathrm b}\neq I$ 的旁证，见 §5.3）</td></tr>
+<tr><td>(6)</td><td>IBVS 图像雅可比 $L_s$</td><td>✅ 与 Chaumette–Hutchinson [29] 标准交互矩阵逐项一致（独立重推见 §6）；注意本文的 IBVS 只用于 DKF 传递，控制器本身不直接用 $L_s$</td></tr>
+<tr><td>(7)–(10)</td><td>IMU 测量模型（陀螺/加计 + 随机游走偏置）</td><td>✅ 比力方程 (9) 推导正确；$z$ 向上时 $g$ 取负号</td></tr>
+<tr><td>(11)</td><td>延迟图像测量</td><td>✅ 定义清晰；80 ms@200 Hz=16 个 IMU 周期，@DKF 50 Hz=4 周期（图 7 画 4 周期，表述易误解，见 §8.2）</td></tr>
+<tr><td>(12)(13)</td><td>障碍 Lyapunov 函数与视线对齐角速度 $^{\mathrm b}\omega_1$</td><td>✅ 推导逐行复现；⚠️ $k_b$ 数值未给；要使"BLF 约束=FOV 约束"需 $k_b\lt1-\cos(\alpha_{vfov}/2)\approx0.24$（120° 相机），论文未讨论（见 §9.3）</td></tr>
+<tr><td>(14)–(16)</td><td>速度共线控制（$v_{rd}$、$z_2$）</td><td>✅ 直接成立；注意 $v_{rd}=-k_1p_r=k_1\lVert p_r\rVert n_t$ 需要深度 $\lVert p_r\rVert$（见 §10.2 疑点）</td></tr>
+<tr><td>(17)–(19)</td><td>$L_3$ 与期望加速度 $a_d$</td><td>⚠️ 按文本抽取，(19) 交叉项系数为 $m/\lVert p_r\rVert$ 且 $-p_r$ 无系数：与 (41) 的精确抵消矛盾（精确抵消需要系数 $1/\lVert p_r\rVert$、$p_r$ 系数 1），且量纲有疑——<strong>需人工复核第 7 页原文</strong>（见 §11.5）</td></tr>
+<tr><td>(20)(21)(23)</td><td>推力方向与幅值</td><td>✅ (21) 由 (20) 直接解出；悬停核算 $f_d=mg$ 正确；(23) 是"期望推力在 $n_f$ 上的投影"+饱和，物理合理</td></tr>
+<tr><td>(22)</td><td>$R_{tilt}=e^{\varphi[r]_\times}$</td><td>⚠️ 按文本抽取，$r=n_f\times n_{fd}$ 未归一化（$\lVert r\rVert=\sin\varphi$），而 Rodrigues 公式要求单位轴：按印刷式 $R_{tilt}$ 非正交（$\varphi=50°$ 时旋转系数 $\sin\theta'=\sin^2\varphi$ 对应 $\theta'\approx35.9°$ 而非 50°）；正确写法应归一化 $r$（见 §13.2）——<strong>需人工复核第 7 页</strong></td></tr>
+<tr><td>(24)–(27)</td><td>内环姿态控制（Frobenius 误差）</td><td>✅ 迹恒等式 $\mathrm{tr}(A[b]_\times)=-\mathrm{vex}(A-A^T)^Tb$ 独立验证；(26) 使 $\dot L_4=-\lVert\mathrm{vex}(\cdot)\rVert^2$；对跖点（180°）是 $\mathrm{vex}=0$ 的不稳定平衡，值得注意</td></tr>
+<tr><td>(28)(29)</td><td>总控制器与饱和函数</td><td>✅ 饱和只缩放幅值不改方向 → $\dot L\le0$ 保持；(28) 与 (13)(23)(26) 完全闭合</td></tr>
+<tr><td>(30)(31)</td><td>EKF 预测步</td><td>✅ 标准卡尔曼形式</td></tr>
+<tr><td>(32)–(36)</td><td>延迟测量的修正步</td><td>✅ 标准 KF 修正 + "回退-修正-前传"（out-of-sequence 架构）；"延迟期间次优、之后最优"与 [25] 一致；$\Delta t$=50 Hz 时 $D=4$ 与图 7 吻合</td></tr>
+<tr><td>(37)–(43)</td><td>附录 A：定理 1 证明</td><td>⚠️ 证明骨架（BLF+LaSalle）正确，但 (41) 依赖 (19) 的精确抵消（疑点同 (19)）；定理的初始集合 $S=\{x\mid |n_{td}^Tx|\gt1-k_b\}$ 的绝对值把"视线反向"情形也算入（此时 $z_1\gt k_b$ 违反 BLF 定义域），应为 $n_{td}^Tn_t\gt1-k_b$（无绝对值，见 §16.7）</td></tr>
+<tr><td>(44)(45)</td><td>四元数离散传递</td><td>✅ $M({}^{1}q)$ 即 Hamilton 右乘矩阵；$F^{q_k}_{b_{gyr,k-1}}=-\tfrac{\Delta t}{2}\Xi(q)$ 独立重推逐项一致（含符号，见 §18）</td></tr>
+<tr><td>(46)–(50)</td><td>位置/速度传递</td><td>✅ 梯形积分 (46)+(47) 成立（需注意 $\partial v_{r,k}/\partial v_{r,k-1}=I$ 的易错点）；(48)–(50) 成立；$M_1..M_3$ 与 $\partial(Ra)/\partial q=2[(M_1a)^T;(M_2a)^T;(M_3a)^T]$ 逐项一致</td></tr>
+<tr><td>(51)–(55)</td><td>图像状态传递</td><td>✅ (51)(53)(55) 与 (6) 一致；(54) 成立但含"深度 $p_{zc}$ 视为常数"的近似（丢了 $\partial z/\partial x=-z/x$ 耦合项，见 §20.1/§20.4）；⚠️ (52) 的 $M_4/M_5$ 按文本抽取与正确雅可比对不上、且缺 $R_c^{\mathrm b}$——<strong>需人工复核第 16 页</strong></td></tr>
+<tr><td>F/G 结构</td><td>18×18 状态转移阵 / 18×6 噪声阵</td><td>⚠️ $G$ 的偏置两行为 0，与 (8)(10) 的 Wiener 过程矛盾；且 $w_k\triangleq[n_{bgyr}^T,n_{bacc}^T]^T$ 的宣称与 $G$ 块实际对应的"传感器噪声 $n_{gyr},n_{acc}$"口径不一（见 §21）</td></tr>
+<tr><td>Algorithm 1/2</td><td>拦截控制器 / 延迟滤波器伪代码</td><td>文本抽取只有签名行；本文按 (28) 与 (30)–(55) 逐行重构流程，伪代码原文请人工复核第 6、9 页（见 §17、§23）</td></tr>
+</table>
+<hr>
+<h3>1. 预备：坐标系、符号约定与数学工具（式 (1) 之前的一切）</h3>
+<h4>1.1 五个坐标系（论文 §II-A-1）</h4>
+<ul>
+<li><strong>$\{e\}$ EFCS 地面惯性系</strong>：表示拦截器/目标的绝对位置速度。论文实飞数据（起点 $(-1,-1.8,3)$ m、目标 $(-3,-12,4)$ m、"先爬升至 3 m"）表明 $z_e$ 是<strong>高度（向上）</strong>。</li>
+<li><strong>$\{b\}$ BCS 机体系</strong>：$x_b$ 机头方向，$z_b$ 朝下（多旋翼惯例）。姿态 $R_b^{\mathrm e}\in SO(3)$ 为 b→e 的旋转。</li>
+<li><strong>$\{c\}$ CCS 相机系</strong>：针孔模型，$z_c$ 沿光轴指向前方，像平面在 $z_c=f_{oc}$。</li>
+<li><strong>$\{i\}$ ICS 图像系</strong>：图像坐标 $(p_{xi},p_{yi})$，单位像素；归一化坐标 $\bar p_{xi}=p_{xi}/f_{oc},\ \bar p_{yi}=p_{yi}/f_{oc}$。</li>
+</ul>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D1) —— SO(3) 定义（论文 §II-A-1，无编号）</span>
+$$SO(3)=\left\{R\in\mathbb R^{3\times3}\ \middle|\ R^TR=I,\ \det R=1\right\}\tag{D1}$$
+<div class="eq-note">符号：$R$ 为旋转矩阵。含义：所有 3 维旋转的集合（李群）。用于定义 $R_b^{\mathrm e}$、$R_f$、$R_c^{\mathrm b}$、$R_d$。矩阵 $R_{F_2}^{F_1}$ 的约定是"从坐标系 $F_1$ 到 $F_2$"：即把 $F_1$ 中的向量分量旋到 $F_2$，$(\cdot)_{F_2}=R_{F_2}^{F_1}(\cdot)_{F_1}$。例如 $R_b^{\mathrm e}$ 把机体系向量旋到地面系（$^{\mathrm e}f=fR_b^{\mathrm e}R_fe_3$ 即此约定）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D2) —— 叉乘映射 [·]× 与 vex（论文 §II-A-2，无编号）</span>
+$$[x]_\times\triangleq\begin{bmatrix}0&-x_3&x_2\\x_3&0&-x_1\\-x_2&x_1&0\end{bmatrix},\qquad \mathrm{vex}([x]_\times)\triangleq x\tag{D2}$$
+<div class="eq-note">符号：$x=[x_1,x_2,x_3]^T\in\mathbb R^3$；$[x]_\times\in so(3)=\{S\in\mathbb R^{3\times3}\mid S=-S^T\}$。含义：$[x]_\times y=x\times y$；$\mathrm{vex}$ 是它的逆。注意这个定义意味着 $\mathrm{vex}(S)=[S_{32},S_{13},S_{21}]^T$——本文 §14、§16 的迹恒等式全靠这个具体约定，换一个文献的 vex 定义符号就全反。推导中反复用到两条性质：$[x]_\times^T=-[x]_\times$；对旋转矩阵 $R$ 有 $R[x]_\times R^T=[Rx]_\times$（叉乘与旋转交换，用于 §16.1 的 $\dot n_{td}=e\omega\times n_{td}$）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D3) —— 姿态四元数与对数映射（论文 §II-B-1，无编号）</span>
+$$[\theta a]_\times=\ln\!\big(R_b^{\mathrm e}\big)=\sum_{i=0}^{\infty}\frac{(-1)^i}{i+1}\big(R_b^{\mathrm e}-I\big)^{i+1},\qquad q=\begin{bmatrix}\cos(\theta/2)\\[2pt]n^T\sin(\theta/2)\end{bmatrix}\in\mathbb R^4\tag{D3}$$
+<div class="eq-note">符号：$\theta\in[-\pi,\pi)$ 旋转角，$a$ 单位旋转轴，$n$ 单位向量（论文里 $n$ 与 $a$ 同义，都指单位旋转轴）；$q=[q_0,q_1,q_2,q_3]^T$，$q_0$ 是标部、写在<strong>第一位</strong>（Hamilton 顺序）。含义：$\ln(\cdot)$ 把旋转矩阵映到 so(3)（轴角 $[\theta a]_\times$ 的矩阵形式），级数 $=(\theta/2)(R-R^T)$ 类展开的矩阵对数（对 $\theta\neq\pi$ 收敛，可用 $(R-R^T)/(2\sin\theta)$ 解析得到）。四元数是 DKF 18 维状态的第一块（4 维）。<strong>约定检查</strong>：本文全部四元数公式（(44)(45) 与附录 C 的 $M_1..M_5$）与"$q_0$ 在前、Hamilton 乘法、$R(q)$ 为标准方向余弦阵"三件套自洽（§18、§19 逐项验证），读附录 B/C 前请先固定这套约定，否则符号会全乱。</div>
+</div>
+<div class="callout tip">
+<div class="callout-title">$g$ 的符号：全篇最容易抄错的一个点</div>
+<p>论文写"$g$ is the local gravitational acceleration, $g=[0\ 0\ g]^T$"。若 $z_e$ 向上（实飞数据如此），则必须有 $g=-9.81\ \text{m/s}^2$（即 $g=[0,0,-9.81]^T$）；若把 $g$ 当成 $+9.81$ 代入 (1)(9)(20)(21)(23)，整个动力学和推力换算符号全反。论文把 $g$ 写成"标量可正可负"的隐式约定（(9) 写 $ge_3$ 而非 $g$，说明 $g$ 是带符号标量）。本文下文一律取 $g=[0,0,-9.81]^T$（$z$ 向上），并在 (20)(21)(23) 的核算中验证这一选择与悬停/爬升实验一致。</p>
+</div>
+<hr>
+<h3>2. 公式 (1)：6-DOF 多旋翼刚体模型</h3>
+<p>论文原文（§II-A-2）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 六自由度刚体模型（论文式 (1)）</span>
+$$\begin{cases}
+^{\mathrm e}\dot p={}^{\mathrm e}v\\[2pt]
+^{\mathrm e}\dot v=g+\dfrac{1}{m}\left({}^{\mathrm e}f+{}^{\mathrm e}f_{drag}\right)\\[4pt]
+\dot R_b^{\mathrm e}=R_b^{\mathrm e}[{}^{\mathrm b}\omega]_\times\\[2pt]
+J\cdot{}^{\mathrm b}\dot\omega=-{}^{\mathrm b}\omega\times\left(J\cdot{}^{\mathrm b}\omega\right)+G_a+\tau
+\end{cases}\tag{1}$$
+$$\text{其中}\quad {}^{\mathrm e}f_{drag}=-R_b^{\mathrm e}DR_b^{\mathrm eT}\,{}^{\mathrm e}v,\qquad D=\mathrm{diag}(d_x,d_y,d_z)\tag{1-drag}$$
+<div class="eq-note">符号：$^{\mathrm e}p=[p_{xe},p_{ye},p_{ze}]^T$ 拦截器位置（EFCS）；$^{\mathrm e}v$ 速度；$^{\mathrm e}a=g+(1/m)(^{\mathrm e}f+{}^{\mathrm e}f_{drag})$ 加速度；$m$ 质量（常数）；$g=[0,0,g]^T$ 引力加速度（$z$ 向上时 $g=-9.81$）；$^{\mathrm e}f$ 可控推力；$^{\mathrm e}f_{drag}$ 转子气动阻力；$D=\mathrm{diag}(d_x,d_y,d_z)$ 转子阻力系数矩阵（常数对角阵）；$^{\mathrm b}\omega=[\omega_{xb},\omega_{yb},\omega_{zb}]^T$ 机体系角速度；$J$ 转动惯量；$G_a$ 陀螺力矩；$\tau$ 螺旋桨力矩；$[^{\mathrm b}\omega]_\times$ 为 (D2) 的叉乘矩阵。</div>
+</div>
+<h4>2.1 平动两行的第一性原理推导</h4>
+<p>第 1 行是位置定义（$\dot p=v$）。第 2 行是牛顿第二定律在 EFCS：$m\,^{\mathrm e}\dot v=mg+{}^{\mathrm e}f+{}^{\mathrm e}f_{drag}$，两边除以 $m$ 即 (1) 第二行。要点全在阻力模型 (1-drag) 上：转子阻力是多旋翼高速飞行的主要阻尼 [26]，其物理来源是桨叶挥舞/诱导阻力，近似为<strong>与机体速度成正比、方向相反的力</strong>：</p>
+<p>$$^{\mathrm b}f_{drag}=-D\,{}^{\mathrm b}v=-D\,R_b^{\mathrm eT}\,{}^{\mathrm e}v\qquad\Longrightarrow\qquad {}^{\mathrm e}f_{drag}=R_b^{\mathrm e}\,{}^{\mathrm b}f_{drag}=-R_b^{\mathrm e}DR_b^{\mathrm eT}\,{}^{\mathrm e}v\tag{1-drag重推}$$</p>
+<p>即：先把速度旋到机体系、乘阻力系数矩阵取负、再旋回地面系。三个步骤缺一不可；$D$ 对角但非标量（$d_x,d_y$ 来自旋翼平面的水平阻力、$d_z$ 来自轴向阻力，通常 $d_z\neq d_x$），所以 $^{\mathrm e}f_{drag}$ 一般<strong>不</strong>平行于 $-^{\mathrm e}v$（姿态倾斜时阻力方向偏转）——这是 (20) 里 $^{\mathrm e}f_{drag}$ 不能简单写成 $-D\,^{\mathrm e}v$ 的原因。</p>
+<h4>2.2 转动两行的第一性原理推导</h4>
+<p>第 3 行是旋转运动学：$b$ 系相对 $e$ 系以角速度 $^{\mathrm e}\omega=R_b^{\mathrm e}\,{}^{\mathrm b}\omega$（地面系分量）旋转，则任意固连于机体的向量 $b$ 满足 $\dot b={}^{\mathrm e}\omega\times b$。取 $R_b^{\mathrm e}$ 的三列 $r_i$（各为机体系基向量在 e 系的分量），逐列 $\dot r_i={}^{\mathrm e}\omega\times r_i=[R_b^{\mathrm e}\,{}^{\mathrm b}\omega]_\times r_i$，故 $\dot R_b^{\mathrm e}=[R_b^{\mathrm e}\,{}^{\mathrm b}\omega]_\times R_b^{\mathrm e}$；再用性质 $R[x]_\times R^T=[Rx]_\times$ 得 $[R_b^{\mathrm e}\,{}^{\mathrm b}\omega]_\times=R_b^{\mathrm e}[{}^{\mathrm b}\omega]_\times R_b^{\mathrm eT}$，代回 $\dot R_b^{\mathrm e}=R_b^{\mathrm e}[{}^{\mathrm b}\omega]_\times R_b^{\mathrm eT}R_b^{\mathrm e}=R_b^{\mathrm e}[{}^{\mathrm b}\omega]_\times$ ✅。</p>
+<p>第 4 行是欧拉刚体方程在转动参考系：惯性系角动量 $H=J\,^{\mathrm b}\omega$（$J$ 在机体系），角动量定理 $\left.\frac{dH}{dt}\right|_e=\tau_{ext}$，用转动参考系求导公式 $\left.\frac{dH}{dt}\right|_e=\left.\frac{dH}{dt}\right|_b+{}^{\mathrm b}\omega\times H$，得</p>
+<p>$$J\,{}^{\mathrm b}\dot\omega+{}^{\mathrm b}\omega\times(J\,{}^{\mathrm b}\omega)=G_a+\tau\qquad\Longrightarrow\qquad J\,{}^{\mathrm b}\dot\omega=-{}^{\mathrm b}\omega\times(J\,{}^{\mathrm b}\omega)+G_a+\tau\tag{1-4重推}$$</p>
+<p>✅ 与 (1) 第四行一致。$G_a$ 是陀螺力矩（桨盘旋转轴随机体转动产生的反作用力矩），$\tau$ 是差速螺旋桨力矩。</p>
+<h4>2.3 交叉验证与疑点</h4>
+<ul>
+<li><strong>状态/输入闭环</strong>：给定 $^{\mathrm e}f$（由 (2) 用推力 $f$ 与姿态表示）与 $\tau$，(1) 是 12 维状态 $(p,v,R_b^{\mathrm e},{}^{\mathrm b}\omega)$ 的完整刚体模型。论文并未给 $\tau$ 的控制律（内环由 Pixhawk 自带的姿态控制器实现，第 VI 节硬件列表可见），这是"几何控制器输出期望角速度 $^{\mathrm b}\omega_d$ 给自驾仪"架构的典型分工。</li>
+<li><strong>⚠️ 符号冲突</strong>：$D=\mathrm{diag}(d_x,d_y,d_z)$ 与 §IV 的"延迟周期数 $D$"撞符号（同一篇论文两个完全不同的量），下文用 $\mathbf D$ 记阻力矩阵、$D$ 记延迟周期。</li>
+<li><strong>未发现实质问题</strong>：平动+转动四行与标准刚体方程逐项一致；阻力模型与 [26][27] 的一阶转子阻力约定一致。</li>
+</ul>
+<hr>
+<h3>3. 公式 (2)：推力模型</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 螺旋桨推力（论文式 (2)）</span>
+$$^{\mathrm e}f=f\,R_b^{\mathrm e}R_f e_3=f\,n_f,\qquad 0\le f\le f_m\tag{2}$$
+<div class="eq-note">符号：$f$ 推力幅值（标量，唯一可正可饱和的量）；$f_m$ 最大推力；$R_f\in SO(3)$ 把"推力方向"旋到机体系 $z_b$ 轴的旋转矩阵（常值，因为普通多旋翼的桨盘推力相对机身方向固定；倾转旋翼则时变）；$e_3=[0,0,1]^T$；$n_f$ 为推力单位向量。推导：机体系推力 $^{\mathrm b}f=fR_fe_3$（$R_fe_3$ 即推力在机体系的方向），旋到地面系 $^{\mathrm e}f=R_b^{\mathrm e}\,{}^{\mathrm b}f=fR_b^{\mathrm e}R_fe_3$ ✅ 一步到位。对常规多旋翼 $R_f=I$，则 $n_f=R_b^{\mathrm e}e_3$（机体 $z_b$ 轴在地面系的方向），推力恒沿 $-z_b$ 反方向（多旋翼向下吹风、向上飞行）。</div>
+</div>
+<p><strong>数值核算</strong>：论文硬件"thrust-to-weight ratio about 3"→ $f_m\approx3mg$。若整机 1.5 kg（5 寸机典型值），$f_m\approx44$ N。悬停 $f=mg$ 只用了 1/3 的推力裕度，垂直方向还剩 $2mg\approx19.6\ \text{m/s}^2$ 的加速度裕度——而论文说"can accelerate up to 5 m/s²"。这个 5 m/s² 远小于推重比允许的 19.6 m/s²，说明加速度上限来自<strong>控制器增益/阻力/安全限制而非推力饱和</strong>（§24 数值总账里再对账）。</p>
+<hr>
+<h3>4. 公式 (3)：目标点质量模型</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 目标运动模型（论文式 (3)）</span>
+$$\begin{cases}
+{}^{\mathrm e}\dot p_t={}^{\mathrm e}v_t\\[2pt]
+{}^{\mathrm e}\dot v_t={}^{\mathrm e}a_t
+\end{cases}\tag{3}$$
+$$\text{相对量定义：}\quad p_r={}^{\mathrm e}p-{}^{\mathrm e}p_t,\qquad v_r=\dot p_r={}^{\mathrm e}v-{}^{\mathrm e}v_t,\qquad a_r=\dot v_r={}^{\mathrm e}a-{}^{\mathrm e}a_t\tag{3-def}$$
+<div class="eq-note">符号：$^{\mathrm e}p_t,{}^{\mathrm e}v_t,{}^{\mathrm e}a_t$ 目标的位置/速度/加速度；$p_r,v_r,a_r$ 相对位置/速度/加速度（都分解在 EFCS）。含义：目标被抽象成点质量（只关心质心运动），其加速度 $a_t$ 对控制器与观测器都是<strong>扰动</strong>——因为视觉传感器无法直接测目标加速度（§II-A-3 原话），所以 (19) 里 $a_t$ 只出现在补偿项，DKF 里也不对 $a_t$ 建模（这是 DKF 在目标机动时的固有误差源，与 §24 的"目标 6 m/s 圆周运动仍能拦截"形成对照：外环把 $a_t$ 当作慢扰动由 $z_2$ 反馈压制）。</div>
+</div>
+<p>✅ 无实质问题。注意 $p_r$ 的方向约定：$p_r=^{\mathrm e}p-{}^{\mathrm e}p_t$ 是"从目标指向拦截器"，所以 $n_t=-p_r/\lVert p_r\rVert$ 才"从拦截器指向目标"（见 (4)），这个负号在 §5、§16 反复用到，不能省。</p>
+<hr>
+<h3>5. 公式 (4)(5)：透视成像模型与 FOV 约束</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4) —— 视线单位向量与成像关系（论文式 (4)）</span>
+$$n_t=-\frac{p_r}{\lVert p_r\rVert}=\frac{R_b^{\mathrm e}R_c^{\mathrm b}\begin{bmatrix}p_{xi}\\p_{yi}\\f_{oc}\end{bmatrix}}{\left\lVert\begin{bmatrix}p_{xi}\\p_{yi}\\f_{oc}\end{bmatrix}\right\rVert}\tag{4}$$
+<div class="eq-note">符号：$n_t$ 视线（LOS）单位向量——从拦截器指向目标，分解在 EFCS；$p_{xi},p_{yi}$ 目标在 ICS 的图像坐标；$f_{oc}$ 焦距（像素单位）；$R_c^{\mathrm b}$ 相机系→机体系的常值旋转（捷联安装，Assumption 1 又设相机原点与机体原点重合 $t_c^{\mathrm b}=0$）。含义：等号左半边是几何定义（相对位置的负方向），右半边是成像几何——针孔模型下，图像点 $(p_{xi},p_{yi})$ 对应的空间射线在相机系是 $[p_{xi},p_{yi},f_{oc}]^T$（像平面在 $z_c=f_{oc}$ 处），归一化后旋到地面系。两半相等正是"IBVS 的桥梁"：几何量 $n_t$ 可由纯图像量算出，不需要目标深度。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5) —— FOV 视场锥约束（论文式 (5)）</span>
+$$C=\left\{x\ \middle|\ \left|\arctan\frac{x_{c1}}{x_{c3}}\right|\le\frac12\alpha_{hfov},\quad \left|\arctan\frac{x_{c2}}{x_{c3}}\right|\le\frac12\alpha_{vfov}\right\},\qquad n_t\in C\tag{5}$$
+<div class="eq-note">符号：$c_x=[x_{c1},x_{c2},x_{c3}]^T$ 为目标方向在 CCS 的分量；$\alpha_{hfov},\alpha_{vfov}$ 水平/垂直视场角。含义：目标方向相对光轴的水平/垂直偏角必须在半视场角以内——即目标落在相机视野锥内。用 $\arctan(x_{c1}/x_{c3})$ 而非反正弦是因为针孔模型下 $\tan(\text{偏角})=x_{c1}/x_{c3}$（与 (4) 同源）。对归一化坐标就是 $|\bar p_{xi}|\le\tan(\alpha_{hfov}/2)$、$|\bar p_{yi}|\le\tan(\alpha_{vfov}/2)$。</div>
+</div>
+<h4>5.1 为什么"拦截=相机接触目标"（Assumption 1 的推论）</h4>
+<p>论文 Assumption 1：相机原点与机体原点重合（$t_c^{\mathrm b}=0$），所以当 $\lVert p_r\rVert\to0$（拦截器撞上目标）时，相机也撞上目标——"it is considered a successful interception when the camera is in contact with the target"。这使得 (4) 的等号在全过程成立：$n_t$ 既是几何 LOS 又是图像射线方向，控制与感知共享同一个量，无需任何坐标重建。</p>
+<h4>5.2 设计的 LOS 向量 $n_{td}$（图 4 的文字定义，无编号）</h4>
+<p>$n_{td}$（designed LOS）= 光轴 $n_c$ 方向的"设计视线"，在机体系固定（随姿态转动，§16.1 用 $\dot n_{td}={}^{\mathrm e}\omega\times n_{td}$）。设计原则："crafted to approximate the force vector $n_f$ as closely as possible within the FOV"——$n_{td}$ 越靠近推力方向 $n_f$，共线控制达成后加速度沿 $n_{td}$ 的分量越大、拦截速度越高（§7.3 的几何直觉）。数学上 $n_{td}=R_b^{\mathrm e}R_c^{\mathrm b}e_3$（光轴方向），或取其与 $n_f$ 折中的常值机体系向量 $^{\mathrm b}n_{td}$。于是 $z_1=1-n_{td}^Tn_t$ 就是"目标偏离图像中心"的余弦距离（见 §9）。</p>
+<h4>5.3 数值核算：120° FOV 与 50° 俯仰能同时成立吗？</h4>
+<p>实飞硬件："front CSI camera with a 120° FOV"，最大俯仰 50°，且"kept the target in the FOV until the final interception"。若 120° 是<strong>对角</strong>视场（摄像头规格惯例），16:9 传感器下 $HFOV=2\arctan(\tan60°\cdot16/\sqrt{16^2+9^2})\approx113°$，$VFOV=2\arctan(\tan60°\cdot9/\sqrt{16^2+9^2})\approx80.6°$；若 120° 是<strong>水平</strong>视场，则 $VFOV=2\arctan(\tan60°\cdot9/16)\approx88.5°$。两种读法下垂直半视场都只有 40–44°。而共线控制把速度 $v_r$ 对齐 $n_t$（§10），大俯冲时<strong>机头（光轴）与速度方向一致</strong>，俯仰 50° 意味着目标方向相对光轴约 50°。$50°\gt44°$：<strong>除非相机向下倾斜安装</strong>（$R_c^{\mathrm b}$ 含俯仰分量，约 6–10° 下倾），否则 50° 俯仰时目标必然在垂直 FOV 之外。结论：实飞数据间接证明 $R_c^{\mathrm b}\neq I$（相机有下倾安装角）——这也使 §20 中"$M_4/M_5$ 缺 $R_c^{\mathrm b}$"的问题不再是纯理论瑕疵。</p>
+<hr>
+<h3>6. 公式 (6)：IBVS 图像雅可比（交互矩阵）——从第一性原理完整重推</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(6) —— 图像雅可比矩阵（论文式 (6)）</span>
+$$^{\mathrm i}\dot{\bar p}=L_s\,{}^{c}\tilde v,\qquad
+L_s=\begin{bmatrix}
+-\dfrac{1}{p_{zc}} & 0 & \dfrac{\bar p_{xi}}{p_{zc}} & \bar p_{xi}\bar p_{yi} & -\big(1+\bar p_{xi}^2\big) & \bar p_{yi}\\[8pt]
+0 & -\dfrac{1}{p_{zc}} & \dfrac{\bar p_{yi}}{p_{zc}} & 1+\bar p_{yi}^2 & -\bar p_{xi}\bar p_{yi} & -\bar p_{xi}
+\end{bmatrix}\tag{6}$$
+<div class="eq-note">符号：$^{\mathrm i}\bar p=[\bar p_{xi},\bar p_{yi}]^T=[p_{xi}/f_{oc},p_{yi}/f_{oc}]^T$ 归一化图像坐标（无单位）；$^{c}\tilde v=[{}^{c}v^T,{}^{c}\omega^T]^T$ 相机系下的 6 维速度旋量（twist）：$^{c}v$ 相机相对目标点的平动速度、$^{c}\omega$ 相机角速度；$p_{zc}$ 目标点深度（相机系 $z_c$ 分量，正数）。含义：把"相机怎么动"映射成"图像点怎么动"，是 IBVS 的全部核心 [29]。</div>
+</div>
+<h4>6.1 完整推导（针孔模型 + 运动学，逐步）</h4>
+<p>设目标点（相对相机）位置 $P=[X,Y,Z]^T$（相机系，$Z=p_{zc}\gt0$），归一化坐标 $x=X/Z=\bar p_{xi}$，$y=Y/Z=\bar p_{yi}$。目标固定在其自身坐标系，相机以 $({}^{c}v,{}^{c}\omega)$ 运动，则点在相机系的速度为（运动学基本式：平移 + 转动牵连）：</p>
+<p>$$\dot P=-{}^{c}v-{}^{c}\omega\times P\qquad\Longrightarrow\qquad
+\begin{cases}\dot X=-v_x-\omega_yZ+\omega_zY\\[2pt]
+\dot Y=-v_y-\omega_zX+\omega_xZ\\[2pt]
+\dot Z=-v_z-\omega_xY+\omega_yX\end{cases}\tag{6-1}$$</p>
+<p>对 $x=X/Z$ 用商的求导法则 $\dot x=\dot X/Z-X\dot Z/Z^2$，逐项代入：</p>
+<p>$$\begin{aligned}
+\dot x&=\frac{-v_x-\omega_yZ+\omega_zY}{Z}-x\,\frac{-v_z-\omega_xY+\omega_yX}{Z}\\
+&=-\frac{v_x}{Z}+\frac{x\,v_z}{Z}+\underbrace{xy\,\omega_x-(1+x^2)\,\omega_y+y\,\omega_z}_{\text{转动项，经 }Y=yZ,\ X=xZ \text{ 化简}}
+\end{aligned}\tag{6-2}$$</p>
+<p>转动项展开核对（以 $\omega_y$ 项为例）：$-\omega_y-x(-\omega_xY+\omega_yX)/Z$ 中 $\omega_y$ 部分 $=-\omega_y-x\omega_y x=-\omega_y(1+x^2)$ ✅。同理对 $y$：</p>
+<p>$$\dot y=-\frac{v_y}{Z}+\frac{y\,v_z}{Z}+(1+y^2)\,\omega_x-xy\,\omega_y-x\,\omega_z\tag{6-3}$$</p>
+<p>把 (6-2)(6-3) 写成矩阵形式（状态 $[\dot x,\dot y]^T$，输入 $[v_x,v_y,v_z,\omega_x,\omega_y,\omega_z]^T$，$Z=p_{zc}$）：</p>
+<p>$$L_s=\begin{bmatrix}-\frac1Z&0&\frac xZ&xy&-(1+x^2)&y\\[6pt]0&-\frac1Z&\frac yZ&1+y^2&-xy&-x\end{bmatrix}\tag{6-4}$$</p>
+<p>✅ 与论文 (6) 逐项一致（$x=\bar p_{xi},y=\bar p_{yi},Z=p_{zc}$）。这正好是 Chaumette–Hutchinson [29] 中点特征的标准交互矩阵。</p>
+<h4>6.2 物理解读与两个直觉</h4>
+<ul>
+<li><strong>深度倒数 $1/p_{zc}$ 只出现在平动项</strong>：相机前后平移时图像点速度与深度成反比（近物快、远物慢），而纯转动引起的图像运动<strong>与深度无关</strong>（转动列只含 $x,y$）——这正是"只靠图像无法区分转动与平移"（IBVS 的可观性问题）的代数根源。</li>
+<li><strong>$p_{zc}\to0$ 时 $L_s$ 奇异</strong>：拦截成功（相机接触目标）正是抵达 IBVS 奇异点。控制上 (13) 用的是 $z_1=1-n_{td}^Tn_t$ 这类"角度"误差，不含 $1/p_{zc}$，所以在奇异点附近依然有限——这是本文控制器比"经典 IBVS 速度指令"更稳的原因之一。</li>
+</ul>
+<h4>6.3 数值核算（代入实例）</h4>
+<p>设目标在相机正前方 10 m（$p_{zc}=10$），图像坐标 $\bar p_{xi}=0.2,\bar p_{yi}=0.1$，相机以 $v_x=10$ m/s 前飞、$v_z=-10$ m/s（深度减小）：</p>
+<p>$$\dot{\bar p}_{xi}=-\frac{v_x}{p_{zc}}+\frac{\bar p_{xi}v_z}{p_{zc}}=-\frac{10}{10}+\frac{0.2\times(-10)}{10}=-1-0.2=-1.2\ \mathrm s^{-1}$$</p>
+<p>即归一化坐标每秒漂 1.2（约 $1.2f_{oc}$ 像素/秒）——目标高速冲出视场，直观印证 100 ms 延迟下"图像坐标晚 0.1 s"带来的控制误差（§24 的 2 m 对账）。</p>
+<h4>6.4 本文的 IBVS 用在哪？（容易被误读的架构点）</h4>
+<p>式 (6) 在<strong>控制器 (13)(19)(28) 中一次都没出现</strong>——控制器用的是 $n_t$（图像射线方向的几何量）与 $v_r$；$L_s$ 只出现在 <strong>DKF 的图像状态传递 (51)–(55)</strong> 里。也就是说本文的"IBVS"体现在<strong>观测器/测量模型</strong>层面，而控制律本身是 SO(3) 上的几何共线控制。这与经典 IBVS（$L_s$ 直接当控制增益）架构完全不同，读图 3 时要分清。</p>
+<hr>
+<h3>7. 公式 (7)–(10)：IMU 测量模型</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(7)(8) —— 陀螺仪与偏置（论文式 (7)(8)）</span>
+$$^{\mathrm b}\omega=\omega_{gyr}-b_{gyr}-n_{gyr}\tag{7}$$
+$$\dot b_{gyr}=n_{bgyr}\tag{8}$$
+<div class="eq-note">符号：$\omega_{gyr}$ 陀螺输出（机体系角速率测量值）；$b_{gyr}=[b_{gyr,x},b_{gyr,y},b_{gyr,z}]^T$ 陀螺偏置；$n_{gyr}$ 陀螺测量噪声（零均值高斯）；$n_{bgyr}$ 偏置驱动噪声。(8) 是 Wiener 过程（随机游走）：偏置本身随时间随机漂移。含义：测量值 = 真值 + 偏置 + 噪声。推导：零步。(7)(8) 直接定义了 DKF 中姿态通道的"真值—测量"桥梁；偏置进状态（18 维状态第 5 块），(8) 是它的动力学。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(9)(10) —— 加速度计与偏置（论文式 (9)(10)）</span>
+$$^{\mathrm e}a=g e_3+R_b^{\mathrm e}\left(a_{acc}-b_{acc}-n_{acc}\right)\tag{9}$$
+$$\dot b_{acc}=n_{bacc}\tag{10}$$
+<div class="eq-note">符号：$a_{acc}$ 加速度计输出（比力）；$b_{acc},n_{acc}$ 加计偏置/噪声；$n_{bacc}$ 偏置随机游走噪声。</div>
+</div>
+<h4>7.1 式 (9) 的第一性原理推导（比力方程，最容易错的一式）</h4>
+<p>加速度计测量的是<strong>比力（specific force）</strong>，不是加速度：$a_{acc}=R_b^{\mathrm eT}(^{\mathrm e}a-g)+b_{acc}+n_{acc}$（即"真实加速度减去引力"再旋到机体系，加偏置噪声）。因为静止时 $^{\mathrm e}a=0$，$R_b^{\mathrm eT}(0-g)$ 是朝上的 $g$——加速度计输出 $[0,0,-9.81]$ 分量（$z$ 向上约定下，静止比力为 $+g$ 方向朝上）。反解：</p>
+<p>$$R_b^{\mathrm e}(a_{acc}-b_{acc}-n_{acc})={}^{\mathrm e}a-g\qquad\Longrightarrow\qquad {}^{\mathrm e}a=g+R_b^{\mathrm e}(a_{acc}-b_{acc}-n_{acc})\tag{9-重推}$$</p>
+<p>✅ 与 (9) 一致（$g=[0,0,g]^T=ge_3$）。注意 $g$ 的符号仍是 $z$ 向上时取 $-9.81$（§1 callout）。与 (1) 对比：$^{\mathrm e}a=g+(1/m)(^{\mathrm e}f+{}^{\mathrm e}f_{drag})$——(9) 是"用 IMU 直接测 $^{\mathrm e}a$"，绕开了对推力与阻力的建模，这正是 DKF 只需要 IMU+图像、不需要动力模型的原因。(10) 与 (8) 同理：加计偏置随机游走。</p>
+<hr>
+<h3>8. 公式 (11)：延迟图像测量 + 18 维状态 + 离散状态方程（无编号式 (D4)(D5)）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D4) —— 18 维状态向量（论文 §II-B-1，无编号）</span>
+$$x=\begin{bmatrix}q^T & p_r^T & v_r^T & {}^{\mathrm i}\bar p^T & b_{gyr}^T & b_{acc}^T\end{bmatrix}^T\in\mathbb R^{18}\tag{D4}$$
+<div class="eq-note">分块：姿态四元数 $q$（4）＋相对位置 $p_r$（3）＋相对速度 $v_r$（3）＋图像特征 $^{\mathrm i}\bar p$（2）＋陀螺偏置 $b_{gyr}$（3）＋加计偏置 $b_{acc}$（3）＝<strong>18 维</strong> ✅ 计数正确。注意两点：① 目标状态（$p_t,v_t,a_t$）不在状态里——目标运动通过 $v_r$ 与图像测量被"隐式"吸收（$a_t$ 当扰动）；② $p_r$ 在状态里但<strong>不可直接观测</strong>（H 只选 $^{\mathrm i}\bar p$，见 (33)），深度尺度的可观性见 §22.4 疑点。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D5) —— 离散状态方程（论文 §II-B-1，无编号）</span>
+$$x_k=F_kx_{k-1}+G_kw_{k-1},\qquad w_k=\begin{bmatrix}n_{bgyr}^T & n_{bacc}^T\end{bmatrix}^T\sim\mathcal N(0_{6\times1},Q_k)\tag{D5}$$
+<div class="eq-note">符号：$F_k\in\mathbb R^{18\times18}$ 状态转移矩阵；$G_k\in\mathbb R^{18\times6}$ 噪声驱动矩阵；$w_k$ 过程噪声（论文宣称由 $n_{bgyr},n_{bacc}$ 组成，$Q_k\in\mathbb R^{6\times6}$）。<strong>注意</strong>：(D5) 是<strong>线性</strong>状态方程（不是 $\dot x=f(x)$ 的显式非线性形式），所以本文的滤波是"线性化 EKF"：$F_k$ 就是 $\partial x_k/\partial x_{k-1}$ 在估计轨迹处的雅可比（§18–§21 逐块给出）。<strong>⚠️ 疑点预告</strong>：$w_k\triangleq[n_{bgyr},n_{bacc}]$ 与 §21 中 $G$ 矩阵的实际含义有出入（$G$ 块是"对传感器噪声 $n_{gyr}/n_{acc}$ 的雅可比"，且偏置行没有噪声输入），详见 §21.3 与问题清单。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(11) —— 延迟图像测量（论文式 (11)）</span>
+$$^{\mathrm i}\bar p_{img,k}={}^{\mathrm i}\bar p_{k-D}+n_{img}\tag{11}$$
+<div class="eq-note">符号：$^{\mathrm i}\bar p_{img,k}$ 在 $t_k$ 时刻<strong>收到</strong>的图像测量值；$^{\mathrm i}\bar p_{k-D}$ 是 $D$ 个周期<strong>之前</strong>的图像状态真值；$n_{img}$ 图像测量噪声（零均值高斯）；$D$ 延迟周期数（按 IMU/DKF 更新周期计）；$t_D\gt0$ 延迟时间（已知，用两种方法标定：相机参数+程序计时器直接计算；拍摄计时器实验测量）。含义：$t_k$ 收到的图像其实是 $t_{k-D}$ 时刻拍的——延迟测量模型。</div>
+</div>
+<h4>8.1 延迟的物理量级（论文数字对账）</h4>
+<p>论文两处给延迟："delays around 100 ms lead to notable control errors, up to 2 m at speeds such as 20 m/s"（$0.1\ \text{s}\times20\ \text{m/s}=2\ \text{m}$ ✅ 就是简单的"延迟×速度=位置滞后"）；实验部分"around 80 ms for color recognition"。按 80 ms 核算：</p>
+<p>$$\text{IMU 200 Hz：}D=\frac{t_D}{\Delta t_{imu}}=0.08\times200=16\ \text{个周期};\qquad \text{DKF 50 Hz：}D=\frac{0.08}{0.02}=4\ \text{个周期}\tag{8-1}$$</p>
+<p>图 7 画的是"延迟跨 4 个 IMU 测量周期"——若按 200 Hz 的 IMU 周期算应为 16，<strong>按 DKF 的 50 Hz 更新周期算才是 4</strong>。所以图 7 的"IMU measurement cycles"实际指 DKF 递推周期（20 ms），论文表述易误读，§24 再对账。</p>
+<h4>8.2 修正步的"回退"究竟回退多远</h4>
+<p>DKF 的修正 (34) 是把"当前刚收到的 $^{\mathrm i}\bar p_{img,k}$"当作 $t_{k-D}$ 时刻的观测来用。若 $D$ 不是整数（30 Hz 图像 × 20 ms 周期 = 1.67 周期），实现必须取整 $D=\mathrm{round}(t_D/\Delta t)$ 或插值——论文未讨论，属实现细节疑点（问题清单第 14 条）。</p>
+<hr>
+<h3>9. 公式 (12)(13)：障碍 Lyapunov 函数与视线对齐角速度控制</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(12) —— 障碍 Lyapunov 函数（论文式 (12)）</span>
+$$z_1=1-n_{td}^Tn_t,\qquad L_1=\frac12\log\frac{k_b^2}{k_b^2-z_1^2},\qquad |z_1|\lt k_b\tag{12}$$
+<div class="eq-note">符号：$z_1$ LOS 跟踪误差（余弦距离，$z_1\in[0,2]$，$z_1=0$ 表示 $n_t=n_{td}$ 完全对准）；$k_b$ 常数（$z_1$ 的上界，$0\lt k_b$，论文未给数值）；$\log$ 自然对数。含义：$L_1\ge0$，$z_1=0$ 时 $L_1=0$；$|z_1|\to k_b$ 时 $L_1\to+\infty$——Lyapunov 函数在边界"竖起了无穷高的墙"，只要初值在墙内且 $\dot L_1\le0$，$z_1$ 就永远碰不到边界。这就是"用 Lyapunov 函数把 FOV 约束写进稳定性保证"的机制 [36]。</div>
+</div>
+<h4>9.1 推导 $z_1$ 的动力学（结果先行，完整逐行推导见 §16.1/16.2）</h4>
+<p>对 $n_t=-p_r/\lVert p_r\rVert$ 用商的求导法则、并利用 $d\lVert p_r\rVert/dt=p_r^T\dot p_r/\lVert p_r\rVert$（附录 A 式 (37) 的逐步推导见 §16.1）：</p>
+<p>$$\dot n_t=-\frac{\dot p_r}{\lVert p_r\rVert}+\frac{p_r\,p_r^T\dot p_r}{\lVert p_r\rVert^3}=\left(-I+n_tn_t^T\right)\frac{1}{\lVert p_r\rVert}v_r\tag{9-1}$$</p>
+<p>（用了 $p_rp_r^T/\lVert p_r\rVert^2=n_tn_t^T$，$\dot p_r=v_r$。）矩阵 $(-I+n_tn_t^T)=-(I-n_tn_t^T)$ 是<strong>到垂直于 $n_t$ 平面的投影取负</strong>：只有 $v_r$ 的横向分量转动 LOS，纵向分量（沿 $n_t$ 的接近速度）只改变距离不改变方向——这个几何事实贯穿 §16 全部推导。再代入 $\dot n_{td}={}^{\mathrm e}\omega\times n_{td}$（$n_{td}$ 固连于机体，§16.1）与混合积循环 $n_t^T({}^{\mathrm e}\omega\times n_{td})={}^{\mathrm e}\omega^T(n_{td}\times n_t)$：</p>
+<p>$$\dot z_1=-n_{td}^T\dot n_t-n_t^T\dot n_{td}=-\frac{1}{\lVert p_r\rVert}n_{td}^T\left(-I+n_tn_t^T\right)v_r-\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega\tag{9-2}$$</p>
+<p>✅ 与论文 (38) 一致。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(13) —— 视线对齐角速度控制（论文式 (13)）</span>
+$$^{\mathrm e}\omega=\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)\qquad\Longrightarrow\qquad
+{}^{\mathrm b}\omega_1=\frac{z_1}{k_b^2-z_1^2}R_b^{\mathrm eT}\left(n_{td}\times n_t\right)\tag{13}$$
+<div class="eq-note">符号：$^{\mathrm e}\omega$ 拦截器角速度（EFCS）；$^{\mathrm b}\omega_1$ 机体系角速度指令的第一个分量；$R_b^{\mathrm eT}$ 把地面系向量旋回机体系（$^{\mathrm e}\omega=R_b^{\mathrm e}\,{}^{\mathrm b}\omega\Rightarrow{}^{\mathrm b}\omega=R_b^{\mathrm eT}\,{}^{\mathrm e}\omega$）。含义：绕 $n_{td}\times n_t$（把 $n_{td}$ 旋向 $n_t$ 的轴，右手定则）以增益 $z_1/(k_b^2-z_1^2)$ 旋转——误差越大转得越快，且 $z_1\to k_b$ 时增益 $\to\infty$（"越靠近视场边缘越拼命往回拉"）。</div>
+</div>
+<h4>9.2 为什么 (13) 能让 $L_1$ 下降（代入验证）</h4>
+<p>把 (13) 代入 $\dot L_1=z_1\dot z_1/(k_b^2-z_1^2)$（由 (12) 直接求导，链式法则）的第二项：</p>
+<p>$$\dot L_1=-\underbrace{\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}n_{td}^T\left(-I+n_tn_t^T\right)v_r}_{\text{第一项，留给 §10 的 }z_2\text{ 处理}}-\underbrace{\left(\frac{z_1}{k_b^2-z_1^2}\right)^2\left\lVert n_{td}\times n_t\right\rVert^2}_{\le0}\tag{9-3}$$</p>
+<p>第二项为 $-(\text{增益})^2\lVert n_{td}\times n_t\rVert^2\le0$ ✅；第一项当 $v_r$ 与 $n_t$ 共线时 $(-I+n_tn_t^T)v_r=0$（§9.1 的投影性质）——这正是论文"the first term is equal to 0 when $v_r$ and $n_t$ are collinear, which will be designed in Section III-C"的含义：两个控制目标分工，$^{\mathrm b}\omega_1$ 管视线、(19) 管速度共线。</p>
+<h4>9.3 几何直觉与数值</h4>
+<ul>
+<li>$n_{td}\times n_t$ 的模 $=\sin(\text{夹角})$，方向把 $n_{td}$ 旋向 $n_t$：代入 (9-2) 第二项得 $-(n_{td}\times n_t)^T[\gamma(n_{td}\times n_t)]=-\gamma\lVert n_{td}\times n_t\rVert^2\le0$ ✅；同时 $n_{td}^Tn_t$ 的变化率 $=\gamma\lVert n_{td}\times n_t\rVert^2\ge0$ → $z_1$ 单调下降 → 目标向图像中心收敛。</li>
+<li><strong>$k_b$ 的取值</strong>（论文未给）：若 $n_{td}$=光轴且希望"BLF 保证 = FOV 保证"，需 $z_1\lt k_b$ 蕴含目标在 FOV 内，即 $1-\cos(\alpha_{vfov}/2)\lt k_b$。120° 相机对角读法 $\alpha_{vfov}\approx80.6°$ → $1-\cos40.3°\approx0.237$；水平读法 $\approx1-\cos44.3°=0.284$。所以 $k_b$ 应取 $\lesssim0.24$；若论文实现里 $k_b$ 更大，则 BLF 保证的是比 FOV 更宽松的约束（目标可能先出 FOV 才碰到障碍墙）。</li>
+<li>增益量级：$k_b=0.3$、$z_1=0.25$（目标接近视场边）时增益 $=0.25/(0.09-0.0625)\approx9.1$，$\lVert^{\mathrm b}\omega_1\rVert\le9.1$ rad/s——接近 200 Hz 内环的饱和值 $\omega_m$（论文未给 $\omega_m$ 数值，5 寸竞速机典型 15–25 rad/s）。</li>
+</ul>
+<hr>
+<h3>10. 公式 (14)–(16)：速度共线控制（$L_2$、$v_{rd}$、$z_2$）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(14)(15) —— 位置 Lyapunov 函数及其导数（论文式 (14)(15)）</span>
+$$L_2=\frac12p_r^Tp_r\ge0\tag{14}$$
+$$\dot L_2=p_r^T\dot p_r=p_r^Tv_r\tag{15}$$
+<div class="eq-note">符号：$L_2$ 相对距离平方的一半。推导：一步求导（$p_r^T\dot p_r$ 是标量所以对称项合并）。目标：让 $\dot L_2\lt0$，即 $v_r$ 要与 $-p_r$ 有正内积——相对速度要"朝目标指"。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(16) —— 期望相对速度与误差重写（论文式 (16)）</span>
+$$v_{rd}=-k_1p_r=k_1\lVert p_r\rVert n_t,\qquad
+\dot L_2=p_r^T\left(v_r-v_{rd}+v_{rd}\right)=p_r^Tz_2-k_1p_r^Tp_r\tag{16}$$
+<div class="eq-note">符号：$v_{rd}$ 期望相对速度；$k_1\gt0$ 常数增益；$z_2=v_r-v_{rd}$ 速度跟踪误差。推导第一步：$p_r=-\lVert p_r\rVert n_t$（(4) 反用）→ $-k_1p_r=k_1\lVert p_r\rVert n_t$ ✅——期望相对速度沿 $n_t$（指向目标），大小与距离成正比（比例导引的"零脱靶量"形）。第二步：把 $v_r$ 拆成 $z_2+v_{rd}$ 代入 (15)：$p_r^Tz_2+p_r^Tv_{rd}=p_r^Tz_2-k_1p_r^Tp_r$ ✅。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(17) —— 速度误差动力学与 $L_3$（论文式 (17)）</span>
+$$z_2=v_r-v_{rd}=v_r+k_1p_r,\qquad \dot z_2=a_r+k_1v_r,\qquad
+L_3=L_1+L_2+\frac12z_2^Tz_2\ge0\tag{17}$$
+<div class="eq-note">符号：$a_r=\dot v_r$ 相对加速度。推导：$\dot z_2=\dot v_r-\dot v_{rd}=a_r-(-k_1\dot p_r)=a_r+k_1v_r$ ✅。$L_3$ 是三个 Lyapunov 项之和（注意 $L_1$ 无量纲、$L_2$ 单位 m²、$\frac12z_2^Tz_2$ 单位 m²/s²——量纲混加在控制文献常见，靠增益吸收量纲，不影响稳定性论证）。</div>
+</div>
+<h4>10.1 物理直觉：这是"比例导引（PN）+ 视线角速度为零"的变体</h4>
+<p>$v_{rd}=k_1\lVert p_r\rVert n_t$ 令相对速度恒指向目标（LOS 角速度为零 → 零脱靶量）；$z_2$ 的收敛（由 (19) 驱动）保证实际相对速度追上演算的期望速度。对比经典 PN：PN 指令是 $a\perp \dot n_t$，而本文把"保持 $n_t$ 稳定"交给 $^{\mathrm b}\omega_1$（转姿态对准）、把"沿 $n_t$ 加速接近"交给推力 $f_d$——这正是欠驱动多旋翼的天然分工（加速度方向=推力方向=姿态）。</p>
+<h4>10.2 ⚠️ 疑点：$v_{rd}=-k_1p_r$ 需要深度，但 Algorithm 1 的输入没有 $p_r$</h4>
+<p>(16) 的幅值 $k_1\lVert p_r\rVert$ 需要相对距离 $\lVert p_r\rVert$，而算法 1 签名是 <code>InterceptionController(i¯p, vr, Re_b)</code>——只有图像、速度、姿态，<strong>没有 $p_r$</strong>。实现上只能：(a) 从 DKF 状态取 $\hat p_r$（但 $p_r$ 尺度不可观，见 §22.4）；(b) 用固定名义深度。幸好 $v_{rd}$ 的<strong>方向</strong> $n_t$ 只依赖图像，深度误差只影响接近速度的快慢（$k_1\lVert p_r\rVert$ 缩放），不影响能否拦截。论文未说明这一点，列入问题清单第 15 条。</p>
+<hr>
+<h3>11. 公式 (17)(18)(19)：$L_3$ 的导数与期望加速度 $a_d$（含一处重要疑点）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(18) —— $L_3$ 的导数（论文式 (18)）</span>
+$$\begin{aligned}
+\dot L_3=&-\frac{z_1}{k_b^2-z_1^2}\,\frac{1}{\lVert p_r\rVert}\,n_{td}^T\left(-I+n_tn_t^T\right)z_2
+-\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega\\
+&+p_r^Tz_2-k_1p_r^Tp_r+z_2^T\left(a_r+k_1v_r\right)
+\end{aligned}\tag{18}$$
+<div class="eq-note">注意第一项里是 $z_2$ 而不是 $v_r$：因为 $(-I+n_tn_t^T)v_r=(-I+n_tn_t^T)(k_1\lVert p_r\rVert n_t+z_2)=(-I+n_tn_t^T)z_2$（用了 $(-I+n_tn_t^T)n_t=-n_t+n_t\cdot1=0$，§9.1 的投影性质），所以 $\dot L_1$ 的第一项可以等价地写成 $z_2$ 的项——附录 A 的 (40) 正是这样替换的。其余各项直接来自 (9-3)+(16)+$z_2^T\dot z_2$。</div>
+</div>
+<h4>11.1 推导过程（把 (18) 的三段拼起来，逐项）</h4>
+<p>$$\dot L_3=\underbrace{\dot L_1}_{\text{(9-3)}}+\underbrace{\dot L_2}_{\text{(16)}}+\underbrace{z_2^T\dot z_2}_{\text{(17)}}$$</p>
+<p>$$\begin{aligned}
+\dot L_3=&-\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}n_{td}^T\left(-I+n_tn_t^T\right)z_2-\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega\\
+&+\big(p_r^Tz_2-k_1p_r^Tp_r\big)+z_2^T\left(a_r+k_1v_r\right)\tag{18-重推}
+\end{aligned}$$</p>
+<p>✅ 与 (18) 逐项一致。现在设计 $a_r$（相对加速度的期望值），目标是消掉所有交叉项、只留负定项。逐步代数（这是本节的核心，论文只给结果不给过程）：</p>
+<p><strong>第 1 步</strong>：把 $z_2^T(a_r+k_1v_r)$ 展开成 $z_2^Ta_r+k_1z_2^Tv_r$。</p>
+<p><strong>第 2 步</strong>：希望 $z_2^Ta_r+k_1z_2^Tv_r=-k_2z_2^Tz_2-p_r^Tz_2+\text{(抵消项)}$。与 $\dot L_3$ 中已有的 $+p_r^Tz_2$ 合并需要 $-p_r^Tz_2$（系数 1）；与第一项 $-\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}n_{td}^T(-I+n_tn_t^T)z_2$ 抵消需要 $a_r$ 含 $+\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}(-I+n_tn_t^T)n_{td}$ 型项——因为 $z_2^T(-I+n_tn_t^T)n_{td}=n_{td}^T(-I+n_tn_t^T)z_2$（该矩阵对称，标量转置不变）。</p>
+<p><strong>第 3 步</strong>：因此精确抵消所需的 $a_r$ 设计为</p>
+<p>$$a_r^{des}=-k_1v_r-k_2z_2-p_r+\frac{z_1}{k_b^2-z_1^2}\,\frac{1}{\lVert p_r\rVert}\left(-I+n_tn_t^T\right)n_{td}\tag{11-1}$$</p>
+<p>（$-k_1v_r$ 用于消 $+k_1z_2^Tv_r$：$z_2^T(-k_1v_r)+k_1z_2^Tv_r=0$ ✅。）代入验证：</p>
+<p>$$\begin{aligned}
+z_2^T\left(a_r^{des}+k_1v_r\right)&=z_2^T\left(-k_2z_2-p_r+\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}\left(-I+n_tn_t^T\right)n_{td}\right)\\
+&=-k_2z_2^Tz_2-p_r^Tz_2+\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}n_{td}^T\left(-I+n_tn_t^T\right)z_2
+\end{aligned}\tag{11-2}$$</p>
+<p>末项与 $\dot L_3$ 第一项<strong>恰好反号抵消</strong>，$p_r^Tz_2$ 与 $-p_r^Tz_2$ 抵消，只剩：</p>
+<p>$$\dot L_3=-\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega-k_1p_r^Tp_r-k_2z_2^Tz_2\tag{11-3}$$</p>
+<p>这正是论文 (41) 的形式 ✅。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(19) —— 期望加速度（论文式 (19)）</span>
+$$a_d=-k_1v_r-k_2z_2-p_r+\frac{z_1}{k_b^2-z_1^2}\,\frac{m}{\lVert p_r\rVert}\left(-I+n_tn_t^T\right)n_{td}+a_t\tag{19}$$
+<div class="eq-note">符号：$a_d$ 拦截器期望加速度（$=a_r^{des}+a_t$，因为 $a_r={}^{\mathrm e}a-{}^{\mathrm e}a_t$，目标加速度 $a_t$ 作为前馈补偿项加入）；$k_2\gt0$ 常数增益。与 (11-1) 对比：论文 (19) 的交叉项系数是 <strong>$m/\lVert p_r\rVert$</strong> 而非 $1/\lVert p_r\rVert$，且 $-p_r$ 项按抽取文本无系数——见 §11.5 疑点。</div>
+</div>
+<h4>11.2 $a_t$ 前馈的物理解释</h4>
+<p>$a_d$ 是<strong>拦截器本体</strong>的期望加速度（EFCS）。拦截相对加速度 $a_r=a-a_t$：要让 $a_r$ 达到 (11-1) 的 $a_r^{des}$，本体加速度须为 $a_d=a_r^{des}+a_t$——把目标加速度"复制"到自己身上（目标加速我也加速，保持相对动力学如设计）。目标加速度测量困难（§II-A-3），实践中该项取零或由 $z_2$ 反馈间接补偿，论文在闭环证明中假定了 $a=a_d$ 的完美跟踪。</p>
+<h4>11.3 交叉验证：$k_1,k_2$ 的作用分工</h4>
+<p>(19) 的 $-k_1v_r-k_2z_2-p_r$ 是标准的"PD+恢复力"结构：$-p_r$ 把拦截器往目标方向拉（等效弹性），$-k_2z_2$ 阻尼速度误差，$-k_1v_r$ 消掉 $z_2$ 定义带来的交叉。消元验证 (11-2) 中三项各司其职，任何一项系数不对都会在 $\dot L_3$ 里留下交叉项。论文没给 $k_1,k_2$ 数值（问题清单第 9 条），但结构上它们是 $1/\mathrm s$ 量纲的正增益。</p>
+<h4>11.4 与 §16 (41) 的衔接</h4>
+<p>(11-3) 的推导同时就是附录 A 式 (40)→(41) 的代数。注意 (41) 要求 $z_2^T(a_r+k_1v_r)=-k_2z_2^Tz_2$ 恒成立——这只有当 $a_r$ 恰好等于 (11-1)（即 $a=a_d$、(19) 交叉项系数为 $1/\lVert p_r\rVert$）时才成立。</p>
+<h4>11.5 ⚠️ 疑点（重要）：(19) 的 $m/\lVert p_r\rVert$ 与 $-p_r$ 项</h4>
+<div class="callout warn">
+<div class="callout-title">按文本抽取，(19) 与 (41) 存在代数矛盾</div>
+<p>按 fulltext 抽取的 (19)（第 7 页）：$a_d=-k_1v_r-k_2z_2-p_r+\frac{z_1}{k_b^2-z_1^2}\frac{m}{\lVert p_r\rVert}(-I+n_tn_t^T)n_{td}+a_t$。把它的 $a_r^{des}=a_d-a_t$ 代入 (18)：交叉项变为 $\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}(1-m)\,n_{td}^T(-I+n_tn_t^T)z_2\neq0$（$m\neq1$ 时），(41) 不再成立；且该交叉项符号不定，(43) 的 $\dot L\le0$ 也失去保证。此外量纲上：交叉项系数 $m/\lVert p_r\rVert$ 是 $\mathrm{kg/m}$（乘无量纲向量后不是加速度 $\mathrm{m/s^2}$），$-p_r$ 是 $\mathrm m$——两项都量纲异常，怀疑 $-p_r$ 实为 $-k_3p_r$（$k_3=1\ \mathrm{s^{-2}}$ 量纲才闭合）或抽取丢系数。由于我无法核对页面图像，<strong>请人工复核第 7 页式 (19)</strong>：若原文确为 $m/\lVert p_r\rVert$，则 (19)/(41)/(43) 不一致；若原文为 $1/\lVert p_r\rVert$（无 $m$）且 $p_r$ 有系数，则全部自洽。本文 §16 按"自洽版本 (11-1)"完成证明链。</p>
+</div>
+<hr>
+<h3>12. 公式 (20)(21)(23)：从期望加速度到推力命令</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(20) —— 期望加速度与动力学（论文式 (20)）</span>
+$$a_d=g+\frac{f}{m}n_{fd}+\frac{1}{m}{}^{\mathrm e}f_{drag}\tag{20}$$
+<div class="eq-note">把 (1) 第二行（加速度动力学）应用到期望值上：期望加速度 = 重力 + 推力加速度 + 阻力加速度。$n_{fd}$ 是期望推力方向（单位向量）。(20) 的物理前提：$n_{fd}$ 是唯一可控方向（欠驱动），$f/m$ 是唯一可控幅值。</div>
+</div>
+<h4>12.1 解出 $n_{fd}$ 与 $f$（论文没写的两步代数）</h4>
+<p>移项：$\dfrac{f}{m}n_{fd}=a_d-g-\dfrac{1}{m}{}^{\mathrm e}f_{drag}$。右端是向量，$f/m\gt0$，$n_{fd}$ 单位 → 单位向量必为右端的归一化：</p>
+<p>$$n_{fd}=\frac{a_d-g-{}^{\mathrm e}f_{drag}/m}{\left\lVert a_d-g-{}^{\mathrm e}f_{drag}/m\right\rVert}\tag{21}$$
+$$f=m\left\lVert a_d-g-\frac{1}{m}{}^{\mathrm e}f_{drag}\right\rVert=\left\lVert ma_d-mg-{}^{\mathrm e}f_{drag}\right\rVert\tag{12-1}$$</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(21) —— 期望推力方向（论文式 (21)）</span>
+$$n_{fd}=\frac{a_d-g-{}^{\mathrm e}f_{drag}/m}{\left\lVert a_d-g-{}^{\mathrm e}f_{drag}/m\right\rVert}\tag{21}$$
+<div class="eq-note">✅ (12-1) 第一步即 (21)。注意：只要 $a_d-g-{}^{\mathrm e}f_{drag}/m\neq0$ 就有定义（悬停时 $a_d=0$，$n_{fd}=-g/\lVert g\rVert$ 竖直向上 ✅）。</div>
+</div>
+<h4>12.2 悬停核算（把 (20)(21) 放回物理）</h4>
+<p>悬停：$a_d=0$、$^{\mathrm e}f_{drag}=0$ → $n_{fd}=-g/\lVert g\rVert$（朝上），$f=m\lVert0-g\rVert=mg$ ✅ 与常识一致（§3 的 1/3 推力裕度）。水平前飞加速 5 m/s²：$a_d=[5,0,0]^T$，$z$ 向上 $g=[0,0,-9.81]^T$ → $a_d-g=[5,0,9.81]^T$，$\lVert\cdot\rVert=\sqrt{25+96.2}=11.01$ m/s² → $f=11.01m=1.12mg\lt3mg$ ✅ 说明 5 m/s² 的加速需求远在推力包线内（与 §3 对账）。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(23) —— 推力幅值（投影+饱和）（论文式 (23)）</span>
+$$f_d=\min\!\Big(\max\!\big(n_f^T\left(ma_d-mg-{}^{\mathrm e}f_{drag}\right),\,0\big),\,f_m\Big)\tag{23}$$
+<div class="eq-note">推导：理想推力向量 $ma_d-mg-{}^{\mathrm e}f_{drag}=f\,n_{fd}$（(12-1)），但实际推力只能沿当前 $n_f$（姿态未到位）。能实现的最佳是<strong>投影</strong>：$f_{proj}=n_f^T(fn_{fd})=f\cos\varphi$（$\varphi$ 为 $n_f$ 与 $n_{fd}$ 夹角）——方向未对准时自动降推力，姿态内环 (§14) 同时把 $n_f$ 旋向 $n_{fd}$。再夹到 $[0,f_m]$（推力不能为负、不能超限）。✅ 与 (23) 一致。协同逻辑：$\varphi$ 大 → $f_d$ 小、姿态快速转；$\varphi\to0$ → $f_d\to f$ 全推力冲刺——"先转体、后加速"的自然涌现。</div>
+</div>
+<hr>
+<h3>13. 公式 (22)：期望姿态 $R_d$ 与 $R_{tilt}$（Rodrigues 公式 + 一处重要疑点）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(22) —— 期望姿态与倾斜旋转（论文式 (22)）</span>
+$$r=n_f\times n_{fd},\qquad \varphi=\arccos\!\big(n_f^Tn_{fd}\big),\qquad R_d=R_{tilt}R_b^{\mathrm e}\tag{22a}$$
+$$R_{tilt}=e^{\varphi[r]_\times}=I+[r]_\times\sin\varphi+[r]_\times^2\left(1-\cos\varphi\right)\tag{22b}$$
+<div class="eq-note">符号：$r$ 旋转轴（$n_f$ 与 $n_{fd}$ 的叉积）；$\varphi$ 旋转角（两轴夹角）；$R_d$ 期望姿态；$R_{tilt}$ "纯俯仰-滚转"旋转。含义：只做把当前推力方向 $n_f$ 转到期望推力方向 $n_{fd}$ 的<strong>最短旋转</strong>（保持当前偏航——因为偏航会让目标在图像上横移，见论文 §III-C 说明），再乘当前姿态得到期望姿态。</div>
+</div>
+<h4>13.1 Rodrigues 公式的第一性原理推导（验证 (22b) 的正确版本）</h4>
+<p>单位轴 $u$ 转 $\varphi$ 的旋转（Rodrigues）：$R=I+[u]_\times\sin\varphi+[u]_\times^2(1-\cos\varphi)$。可由指数映射 $e^{\varphi[u]_\times}=\sum_{k}\varphi^k[u]_\times^k/k!$ 与 $[u]_\times^3=-[u]_\times$（单位 $u$ 的叉乘矩阵三次幂回到负自身）分组求和得到 ✅。验证它把 $n_f$ 送到 $n_{fd}$：$u\perp n_f,n_{fd}$，$[u]_\times n_f=\dfrac{n_f\times n_{fd}}{\lVert n_f\times n_{fd}\rVert}\times n_f=\dfrac{n_{fd}-\cos\varphi\,n_f}{\sin\varphi}$（矢量三重积），$[u]_\times^2n_f=-n_f$（$u\perp n_f$ 单位），故</p>
+<p>$$Rn_f=n_f\cos\varphi+[u]_\times n_f\sin\varphi=n_f\cos\varphi+n_{fd}-\cos\varphi\,n_f=n_{fd}\quad\checkmark\tag{13-1}$$</p>
+<h4>13.2 ⚠️ 疑点（重要）：$r=n_f\times n_{fd}$ 未归一化</h4>
+<div class="callout danger">
+<div class="callout-title">按文本抽取，(22) 的旋转轴没有归一化，Rodrigues 公式不成立</div>
+<p>$\lVert n_f\times n_{fd}\rVert=\sin\varphi$（不是 1！）。把非单位 $r$ 代入单位轴 Rodrigues 式 (22b)：$I+\sin\varphi\,[\sin\varphi\,u]_\times+(1-\cos\varphi)[\sin\varphi\,u]_\times^2=I+\sin^2\varphi\,[u]_\times+\sin^2\varphi(1-\cos\varphi)[u]_\times^2$（$u=r/\lVert r\rVert$ 单位）。检查正交性：需要 $\sin\theta'=\sin^2\varphi$ 且 $\cos\theta'=1-\sin^2\varphi(1-\cos\varphi)$ 同时成立，但 $\sin^4\varphi+\big(1-\sin^2\varphi+\sin^2\varphi\cos\varphi\big)^2\neq1$（例：$\varphi=45°$ 时 $=0.25+0.729=0.979$）——<strong>按印刷式 $R_{tilt}$ 不是正交阵，不属于 SO(3)</strong>。代数验证 $R_{tilt}n_f\neq n_{fd}$：代入 $r\times n_f=n_{fd}-\cos\varphi\,n_f$、$r\times(r\times n_f)=(1+\cos^2\varphi)n_f-2\cos\varphi\,n_{fd}$（矢量三重积逐项）得 $R_{tilt}n_f=\big[\sin\varphi-2\cos\varphi(1-\cos\varphi)\big]n_{fd}+\big[1-\sin\varphi\cos\varphi+(1-\cos\varphi)(1+\cos^2\varphi)\big]n_f$——$\varphi=45°$ 时 $n_{fd}$ 前系数仅 0.293 且总模长 $\neq1$。旋转部分系数 $\sin\theta'=\sin^2\varphi$ 在 $\varphi=50°$ 时给 $\theta'=\arcsin(\sin^2 50°)\approx35.9°$，比 50° 少转约 14°。<strong>正确写法</strong>：$r=(n_f\times n_{fd})/\lVert n_f\times n_{fd}\rVert$（或用等价闭式 $R_{tilt}=I+[n_f\times n_{fd}]_\times+\dfrac{[n_f\times n_{fd}]_\times^2}{1+n_f^Tn_{fd}}$，即"把 $a$ 转到 $b$"的标准最短旋转公式）。由于我无法核对页面图像，<strong>请人工复核第 7 页式 (22)</strong>：若原文确实漏了归一化，则这是实现级错误（照抄会导致姿态指令少转约 14°@50°、$R_d\notin SO(3)$）；若原文有 $/\lVert n_f\times n_{fd}\rVert$ 或写成 $e^{\varphi[\hat r]_\times}$，则无问题。</p>
+</div>
+<h4>13.3 与 §14 的衔接与实现建议</h4>
+<p>即使 $R_{tilt}$ 有 §13.2 的瑕疵，内环 (24)–(27) 仍会把 $R_b^{\mathrm e}$ 拉向 $R_d$——代价是稳态时推力方向不是真正的 $n_{fd}$，拦截性能打折但系统不散架（这或许解释了为什么这个错误没在实验里"爆炸"）。实现上务必用归一化轴（或 (13-1) 前的闭式）。</p>
+<hr>
+<h3>14. 公式 (24)–(27)：内环姿态控制（Frobenius 误差 + 迹恒等式）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(24) —— 姿态 Lyapunov 函数（论文式 (24)）</span>
+$$L_4=\mathrm{tr}\left(I-R_d^TR_b^{\mathrm e}\right)\tag{24}$$
+<div class="eq-note">符号：$\mathrm{tr}$ 矩阵迹；$R_d^TR_b^{\mathrm e}$ 相对姿态（误差旋转）。性质：对任意 $A\in SO(3)$，$\mathrm{tr}A\le3$ 且等号当且仅当 $A=I$，故 $L_4=3-\mathrm{tr}(R_d^TR_b^{\mathrm e})\ge0$，$R_b^{\mathrm e}=R_d$ 时 $L_4=0$。又 $L_4=\lVert I-R_d^TR_b^{\mathrm e}\rVert_F^2/2$（论文随后一行：$\lVert I-R_d^TR_b^{\mathrm e}\rVert_F^2=\mathrm{tr}((I-R_d^TR_b^{\mathrm e})(I-R_d^TR_b^{\mathrm e})^T)=2\mathrm{tr}(I-R_d^TR_b^{\mathrm e})$，用 $\mathrm{tr}(R_d^TR_b^{\mathrm e})=\mathrm{tr}(R_b^{\mathrm eT}R_d)$ 与旋转矩阵性质 ✅）——$L_4$ 是姿态误差的 Frobenius 范数平方的一半。</div>
+</div>
+<h4>14.1 推导 (25) 的迹恒等式（论文给结果不给过程，这里补齐）</h4>
+<p>把 $R_d$ 视为"冻结"（标准处理：期望姿态随外环缓慢变化，见 §14.3），沿 (1) 第三行求导：</p>
+<p>$$\dot L_4=-\mathrm{tr}\left(R_d^T\dot R_b^{\mathrm e}\right)=-\mathrm{tr}\left(R_d^TR_b^{\mathrm e}[{}^{\mathrm b}\omega]_\times\right)\tag{14-1}$$</p>
+<p>恒等式：对任意 $A\in\mathbb R^{3\times3}$ 与向量 $b$，</p>
+<p>$$\mathrm{tr}\left(A[b]_\times\right)=b_1(A_{23}-A_{32})+b_2(A_{31}-A_{13})+b_3(A_{12}-A_{21})=-\mathrm{vex}\left(A-A^T\right)^Tb\tag{14-2}$$</p>
+<p>（逐元素展开 $A[b]_\times$ 的对角线：$A_{12}b_3-A_{13}b_2-A_{21}b_3+A_{23}b_1+A_{31}b_2-A_{32}b_1$，与 $[A_{32}-A_{23},A_{13}-A_{31},A_{21}-A_{12}]^Tb$ 反号 ✅；这里的 vex 必须用 (D2) 的约定，否则符号全反。）取 $A=R_d^TR_b^{\mathrm e}$：</p>
+<p>$$\dot L_4=-\mathrm{tr}\left(A[{}^{\mathrm b}\omega]_\times\right)=+\mathrm{vex}\left(A-A^T\right)^T{}^{\mathrm b}\omega=\mathrm{vex}\left(R_d^TR_b^{\mathrm e}-R_b^{\mathrm eT}R_d\right)^T{}^{\mathrm b}\omega\tag{25}$$
+✅ 与论文 (25) 一致。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(26)(27) —— 角速度控制与闭环（论文式 (26)(27)）</span>
+$$^{\mathrm b}\omega_2=-\mathrm{vex}\left(R_d^TR_b^{\mathrm e}-R_b^{\mathrm eT}R_d\right)\tag{26}$$
+$$\dot L_4=-\left\lVert\mathrm{vex}\left(R_d^TR_b^{\mathrm e}-R_b^{\mathrm eT}R_d\right)\right\rVert^2\le0\tag{27}$$
+<div class="eq-note">把 (26) 代入 (25) 即得 (27) ✅。几何意义：设 $R_d^TR_b^{\mathrm e}$ 的轴角为 $(\theta_e,a_e)$，则 $R_d^TR_b^{\mathrm e}-R_b^{\mathrm eT}R_d=2\sin\theta_e[a_e]_\times$，$\mathrm{vex}=2\sin\theta_e\,a_e$，(27) 为 $\dot L_4=-4\sin^2\theta_e$——绕误差轴 $a_e$ 以 $2\sin\theta_e$ 的速率把姿态转回期望姿态。</div>
+</div>
+<h4>14.2 两个必须知道的坑</h4>
+<ul>
+<li><strong>对跖点</strong>：$\theta_e=\pi$ 时 $\mathrm{vex}=0$ → $^{\mathrm b}\omega_2=0$，是 (27) 的平衡点但<strong>不稳定</strong>（$\theta_e=\pi$ 是 $L_4$ 的局部极大）。SO(3) 几何控制的对跖点问题在本文同样存在（内环被卡在 180° 误差时无法自己逃出），论文未讨论——实际中靠外环连续指令与噪声脱离。</li>
+<li><strong>$R_d$ 冻结假设</strong>：$R_d=R_{tilt}R_b^{\mathrm e}$ 本身依赖 $R_b^{\mathrm e}$（(22a)），严格说 $\dot L_4$ 还有 $\dot R_d$ 项。论文按 [31][32] 的标准做法冻结 $R_d$（外环 50 Hz ≪ 内环 200 Hz，期望姿态慢变），这是证明里的隐含假设。</li>
+</ul>
+<hr>
+<h3>15. 公式 (28)(29)：总控制器与饱和函数</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(28) —— 总控制律（论文式 (28)）</span>
+$$\begin{cases}
+{}^{\mathrm b}\omega_d=\mathrm{sat}\left({}^{\mathrm b}\omega_1+{}^{\mathrm b}\omega_2,\ \omega_m\right)\\[2pt]
+f_d=\min\!\Big(\max\!\big(n_f^T\left(ma_d-mg-{}^{\mathrm e}f_{drag}\right),\,0\big),\,f_m\Big)
+\end{cases}\tag{28}$$
+<div class="eq-note">外环 (13)+(26) 之和再饱和。$\omega_m\gt0$ 最大角速度。结构：$^{\mathrm b}\omega_1$ 管"目标留在 FOV"（视线对准），$^{\mathrm b}\omega_2$ 管"速度对准目标"（姿态追踪），$f_d$ 管接近（推力投影+饱和）——Remark 1 的分工。外层共线控制器 50 Hz、内环姿态控制器 200 Hz（图 6）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(29) —— 向量饱和函数（论文式 (29)）</span>
+$$\mathrm{sat}(a,a_m)=\kappa_{a_m}(a)\,a,\qquad
+\kappa_{a_m}(a)=\begin{cases}1, & \lVert a\rVert\le a_m\\[2pt]a_m/\lVert a\rVert, & \lVert a\rVert\gt a_m\end{cases}\tag{29}$$
+<div class="eq-note">符号：$a\in\mathbb R^n$，$a_m\in\mathbb R_+$。含义：模长超限时按比例缩放、方向不变（$\kappa_{a_m}(a)\in(0,1]$）。关键性质：$a^T\mathrm{sat}(a,a_m)=\kappa\lVert a\rVert^2\ge0$ 且 $\kappa\gt0$——饱和只改变"大小"不改变"符号"，所以 (43) 里 $w^T\mathrm{sat}(w,\omega_m)=\kappa_{\omega_m}(w)\lVert w\rVert^2\ge0$ 依然成立，稳定性结论不受饱和影响（论文 Remark 1 后半句正是此意）。</div>
+</div>
+<hr>
+<h3>16. 附录 A：公式 (37)–(43) 与定理 1 的完整证明</h3>
+<h4>16.1 式 (37)：$\dot n_t$ 的逐行推导（论文中间步骤齐全，这里补依据）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(37) —— LOS 向量导数（论文式 (37)）</span>
+$$\begin{aligned}
+\dot n_t&=-\frac{\dot p_r}{\lVert p_r\rVert}-p_r\left(p_r^Tp_r\right)^{-\frac12}p_r^T\dot p_r\Big/\lVert p_r\rVert^2\\
+&=-\frac{\dot p_r}{\lVert p_r\rVert}+\frac{p_rp_r^T\dot p_r}{\lVert p_r\rVert^3}
+=\left(-\frac{1}{\lVert p_r\rVert}I+\frac{p_rp_r^T}{\lVert p_r\rVert^3}\right)\dot p_r\\
+&=\left(-I+n_tn_t^T\right)\frac{1}{\lVert p_r\rVert}v_r
+\end{aligned}\tag{37}$$
+<div class="eq-note">依据逐行：第 1 行 = 商的导数（$n_t=-p_r/\lVert p_r\rVert$，$\lVert p_r\rVert=(p_r^Tp_r)^{1/2}$，$\frac{d}{dt}(p_r^Tp_r)^{-1/2}=-(p_r^Tp_r)^{-3/2}p_r^T\dot p_r$）；第 2 行合并；第 3 行提取 $\dot p_r$ 并代 $\dot p_r=v_r$、$p_rp_r^T/\lVert p_r\rVert^2=n_tn_t^T$。✅ 与 §9.1 独立推导一致。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(38) —— $z_1$ 导数（论文式 (38)）</span>
+$$\begin{aligned}
+\dot z_1&=-\left(n_{td}^T\dot n_t+n_t^T\dot n_{td}\right)
+=-\frac{1}{\lVert p_r\rVert}n_{td}^T\left(-I+n_tn_t^T\right)v_r-n_t^T\left({}^{\mathrm e}\omega\times n_{td}\right)\\
+&=-\frac{1}{\lVert p_r\rVert}n_{td}^T\left(-I+n_tn_t^T\right)v_r-\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega
+\end{aligned}\tag{38}$$
+<div class="eq-note">依据：第 1 行 = $z_1=1-n_{td}^Tn_t$ 求导（标量对称）；$\dot n_{td}={}^{\mathrm e}\omega\times n_{td}$ 的来源：$n_{td}$ 固连于机体（§5.2），$n_{td}=R_b^{\mathrm e}\,{}^{\mathrm b}n_{td}$ → $\dot n_{td}=\dot R_b^{\mathrm e}\,{}^{\mathrm b}n_{td}=R_b^{\mathrm e}[{}^{\mathrm b}\omega]_\times{}^{\mathrm b}n_{td}=R_b^{\mathrm e}({}^{\mathrm b}\omega\times{}^{\mathrm b}n_{td})=(R_b^{\mathrm e}\,{}^{\mathrm b}\omega)\times(R_b^{\mathrm e}\,{}^{\mathrm b}n_{td})={}^{\mathrm e}\omega\times n_{td}$（旋转保持叉乘，用了 (D2) 性质）；第 2 行 = 混合积循环 $n_t^T({}^{\mathrm e}\omega\times n_{td})={}^{\mathrm e}\omega^T(n_{td}\times n_t)$ 再转置。✅ 与 §9.1 一致。</div>
+</div>
+<h4>16.2 式 (39)(40)：$\dot L_1$ 与关键替换 $v_r=k_1\lVert p_r\rVert n_t+z_2$</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(39)(40) —— $\dot L_1$ 的两种写法（论文式 (39)(40)）</span>
+$$\dot L_1=\frac{z_1\dot z_1}{k_b^2-z_1^2}=-\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}n_{td}^T\left(-I+n_tn_t^T\right)v_r-\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega\tag{39}$$
+$$\dot L_1=-\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}n_{td}^T\left(-I+n_tn_t^T\right)z_2-\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega\tag{40}$$
+<div class="eq-note">(39) = (12) 求导代入 (38)。(40) 的替换：$v_r=v_{rd}+z_2=-k_1p_r+z_2=k_1\lVert p_r\rVert n_t+z_2$（(16)(4)），第一项贡献 $k_1\lVert p_r\rVert\,n_{td}^T(-I+n_tn_t^T)n_t=k_1\lVert p_r\rVert\,n_{td}^T(-n_t+n_t)=0$（$n_t^Tn_t=1$）——这是全证明最关键的化简：<strong>沿 $n_t$ 的接近速度不转动 LOS</strong>（§9.1 投影性质），所以 (40) 第一项只留 $z_2$ 的横向分量。</div>
+</div>
+<h4>16.3 式 (41)：$\dot L_3$ 的化简（含 §11.5 疑点的严格陈述）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(41) —— $\dot L_3$（论文式 (41)）</span>
+$$\begin{aligned}
+\dot L_3&=-\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega-k_1p_r^Tp_r+z_2^T\left(a_r+k_1v_r\right)\\
+&=-\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega-k_1p_r^Tp_r-k_2z_2^Tz_2
+\end{aligned}\tag{41}$$
+<div class="eq-note">第一行 = (40)+(16)+$z_2^T\dot z_2$（(17)）。第二行的等号需要 $z_2^T(a_r+k_1v_r)=-k_2z_2^Tz_2$，这只在 $a_r$ 等于 §11.1 的 (11-1)（交叉项系数 $1/\lVert p_r\rVert$、$p_r$ 项系数 1）时恒成立——<strong>按文本抽取的 (19)（系数 $m/\lVert p_r\rVert$）会留下 $+(1-m)\frac{z_1}{k_b^2-z_1^2}\frac{1}{\lVert p_r\rVert}n_{td}^T(-I+n_tn_t^T)z_2$ 的残余项</strong>，见 §11.5。本文按自洽版本完成后续证明。</div>
+</div>
+<h4>16.4 式 (42)(43)：总 Lyapunov 函数与饱和鲁棒性</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(42) —— 总 Lyapunov 函数（论文式 (42)）</span>
+$$L=L_3+L_4=\frac12\log\frac{k_b^2}{k_b^2-z_1^2}+\frac12p_r^Tp_r+\frac12z_2^Tz_2+\mathrm{tr}\left(I-R_d^TR_b^{\mathrm e}\right)\tag{42}$$
+<div class="eq-note">$L=L_1+L_2+\frac12z_2^Tz_2+L_4$ 全部四项之和（把 (12)(14)(17)(24) 代入即可）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(43) —— $\dot L$ 与饱和鲁棒性（论文式 (43)）</span>
+$$\begin{aligned}
+\dot L&=-k_1p_r^Tp_r-k_2z_2^Tz_2-\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^T{}^{\mathrm e}\omega+\mathrm{vex}\left(R_d^TR_b^{\mathrm e}-R_b^{\mathrm eT}R_d\right)^T{}^{\mathrm b}\omega\\
+&=-k_1p_r^Tp_r-k_2z_2^Tz_2-\left[\frac{z_1}{k_b^2-z_1^2}\left(n_{td}\times n_t\right)^TR_b^{\mathrm e}-\mathrm{vex}\left(R_d^TR_b^{\mathrm e}-R_b^{\mathrm eT}R_d\right)^T\right]{}^{\mathrm b}\omega\\
+&=-k_1p_r^Tp_r-k_2z_2^Tz_2-w^T\mathrm{sat}\left(w,\omega_m\right)
+=-k_1p_r^Tp_r-k_2z_2^Tz_2-\kappa_{\omega_m}(w)\,w^Tw\le0
+\end{aligned}\tag{43}$$
+$$w=\frac{z_1}{k_b^2-z_1^2}R_b^{\mathrm eT}\left(n_{td}\times n_t\right)-\mathrm{vex}\left(R_d^TR_b^{\mathrm e}-R_b^{\mathrm eT}R_d\right),\qquad {}^{\mathrm b}\omega=\mathrm{sat}\left(w,\omega_m\right)\tag{43-w}$$
+<div class="eq-note">依据逐行：第 1 行 = (41)+(25)，并把 $^{\mathrm e}\omega$ 换回机体系（$(n_{td}\times n_t)^T{}^{\mathrm e}\omega=(n_{td}\times n_t)^TR_b^{\mathrm e}\,{}^{\mathrm b}\omega$）；第 2 行提取 $^{\mathrm b}\omega$；第 3 行定义 $w={}^{\mathrm b}\omega_1+{}^{\mathrm b}\omega_2$（对照 (13)(26)：第一项即 $^{\mathrm b}\omega_1$、第二项即 $^{\mathrm b}\omega_2$ ✅ 与 (28) 完全闭合），且 $^{\mathrm b}\omega=\mathrm{sat}(w,\omega_m)$；(29) 保证 $w^T\mathrm{sat}(w,\omega_m)=\kappa\lVert w\rVert^2\ge0$、$\kappa\gt0$。✅ 代数全部成立（前提是 (41) 无残余项，见 §16.3）。</div>
+</div>
+<h4>16.5 收敛性论证的完整链条（论文只引 [36, Lemma 1]，这里补齐逻辑）</h4>
+<ol>
+<li>$\dot L\le0$ → $L$ 单调不增 → $L_1$ 有界 → $\frac12\log\frac{k_b^2}{k_b^2-z_1^2}$ 有界 → <strong>$|z_1|\lt k_b$ 全程保持</strong>（障碍约束永不违反：只要 $|z_1(0)|\lt k_b$，$z_1$ 就永远碰不到 $k_b$——否则 $L_1\to\infty$ 与 $L$ 有界矛盾。这是 [36, Lemma 1] 的障碍 Lyapunov 标准结论）。</li>
+<li>$\dot L=0$ 当且仅当 $p_r=0$、$z_2=0$、$\kappa_{\omega_m}(w)\lVert w\rVert^2=0$；由 (29) $\kappa\gt0$，故还要求 $w=0$（$\lVert w\rVert\gt\omega_m$ 时 $\kappa=\omega_m/\lVert w\rVert\gt0$，仍有 $\kappa\lVert w\rVert^2=\omega_m\lVert w\rVert\gt0$）。</li>
+<li>LaSalle 不变集原理：轨迹收敛到 $\{p_r=0,z_2=0,w=0\}$ 内的最大不变集。$p_r=0$ 且 $z_2=v_r+k_1p_r=v_r=0$ 时相对位置速度都为零——被拦截。$w=0$ 给出姿态与视线同时对准的平衡条件。</li>
+<li>结论：$p_r\to0$（拦截达成）、$n_t\in S$（目标保持在设计视线邻域 → FOV 内）✅ 与 Theorem 1 一致。</li>
+</ol>
+<h4>16.6 定理 1 的 FOV 保证有多大？（把"n_t ∈ S"翻译成角度）</h4>
+<p>定理结论 $n_t\in S=\{x\mid |n_{td}^Tx|\gt1-k_b\}$ 的意思是 $n_{td}^Tn_t\gt1-k_b$（取 $x=n_t$），即 $z_1=1-n_{td}^Tn_t\lt k_b$，视线与光轴的夹角 $\le\arccos(1-k_b)$。$k_b=0.24$ 时 $=\arccos(0.76)\approx40.5°$——与 120° 相机的垂直半视场（§5.3 的 40–44°）<strong>恰好同量级</strong>，再次印证 §9.3 的 $k_b$ 取值建议。</p>
+<h4>16.7 ⚠️ 疑点：初始集合 $S$ 的绝对值</h4>
+<div class="callout warn">
+<div class="callout-title">定理 1 的 $S=\{x\mid |n_{td}^Tx|\gt1-k_b\}$ 按印刷文本包含"视线反向"情形</div>
+<p>绝对值条件 $|n_{td}^Tn_t|\gt1-k_b$ 允许两种情形：$n_{td}^Tn_t\gt1-k_b$（视线与光轴夹角小，正确）与 $n_{td}^Tn_t\lt k_b-1\lt0$（视线与光轴<strong>反向</strong>，即目标在正后方）。后者 $z_1=1-n_{td}^Tn_t\gt2-k_b$：对 $k_b\lt1$ 有 $z_1\gt k_b$，<strong>初始就违反 BLF 定义域</strong>（$L_1$ 的对数为负）。正确的初始条件应为 $n_{td}^Tn_t\gt1-k_b$（无绝对值，或写成 $z_1(0)\lt k_b$）。这可能只是印刷疏忽（$S$ 用占位变量 $x$ 的写法本身就松散），但照抄实现时要注意：初始化必须检查视线在光轴同侧。按文本抽取核对，见第 8 页定理 1 与第 15 页 (43) 下方——<strong>建议人工复核</strong>。</p>
+</div>
+<hr>
+<h3>17. 算法 1：拦截控制器逐行解读</h3>
+<div class="callout info">
+<p><strong>诚实声明</strong>：文本抽取只保留了伪代码框的签名行 <code>Algorithm 1 f_d and ω_d = InterceptionController(i¯p, v_r, R_b^e)</code>（第 6 页），框内语句无法读取。以下"逐行"是按 (4)(12)(13)(16)(17)(19)(21)(22)(23)(26)(28) 与 §III 正文（外环 50 Hz/内环 200 Hz）<strong>重构</strong>的执行流程，行号后标注了依据公式；请人工对照第 6 页原文。</p>
+</div>
+<pre class="code-block"><code>Algorithm 1: f_d, ω_d = InterceptionController(i¯p, v_r, R_b^e)
+输入: 图像归一化坐标 i¯p=[p̄_xi, p̄_yi]（DKF 估计的当前值）、相对速度 v_r、姿态 R_b^e
+1.  n_t  ← R_b^e R_c^b [p̄_xi, p̄_yi, 1]^T / ‖·‖          # 式(4)：图像→视线方向（EFCS）
+2.  n_td ← R_b^e R_c^b e_3（或机体固连设计方向 b_n_td 旋出）  # §5.2：设计 LOS≈光轴
+3.  z_1  ← 1 − n_td^T n_t                              # 式(12)：图像中心误差（余弦距离）
+4.  b_ω1 ← (z_1/(k_b²−z_1²)) R_b^eT (n_td × n_t)       # 式(13)：视线对准角速度
+5.  v_rd ← −k_1 p_r = k_1‖p_r‖ n_t                     # 式(16)：期望相对速度（需 p_r/深度，见§10.2）
+6.  z_2  ← v_r − v_rd                                  # 式(17)：速度误差
+7.  a_d  ← −k_1v_r − k_2z_2 − p_r + [z_1/(k_b²−z_1²)](m/‖p_r‖)(−I+n_tn_t^T)n_td + a_t
+                                                       # 式(19)：期望加速度（系数疑点见§11.5）
+8.  n_fd ← (a_d − g − e_f_drag/m)/‖a_d − g − e_f_drag/m‖ # 式(21)：期望推力方向
+9.  f_d  ← min(max(n_f^T(m a_d − m g − e_f_drag), 0), f_m)
+                                                       # 式(23)：推力幅值（投影+饱和）；n_f=R_b^e R_f e_3
+10. r ← n_f × n_fd;  φ ← arccos(n_f^T n_fd)             # 式(22)：旋转轴/角（注意 r 需归一化，§13.2）
+11. R_tilt ← e^{φ[r]×} = I + [r]×sinφ + [r]×²(1−cosφ)   # 式(22)：纯俯仰-滚转旋转
+12. R_d ← R_tilt R_b^e                                 # 式(22)：期望姿态（保持当前偏航）
+13. b_ω2 ← −vex(R_d^T R_b^e − R_b^eT R_d)               # 式(26)：姿态追踪角速度
+14. ω_d ← sat(b_ω1 + b_ω2, ω_m)                        # 式(28)：总角速度指令（饱和）
+输出: f_d（推力指令）、ω_d（期望角速度→Pixhawk 内环 200 Hz 执行）</code></pre>
+<ul>
+<li><strong>行 5 的输入缺口</strong>：签名没有 $p_r$（§10.2 疑点），行 5、7 都用 $\lVert p_r\rVert$——实现必须从 DKF 状态取 $\hat p_r$ 或用名义深度，请核对原文伪代码。</li>
+<li><strong>行 4 与行 13 的职责对照</strong>：$^{\mathrm b}\omega_1$ 使 $n_{td}\to n_t$（目标回图像中心，FOV 保证）；$^{\mathrm b}\omega_2$ 使 $R_b^{\mathrm e}\to R_d$（推力方向到位）。两者之和饱和后给内环——与 Remark 1 一致。</li>
+<li><strong>运行节奏</strong>：外环（本算法）50 Hz、内环（Pixhawk 姿态控制）200 Hz；图像（DKF 输入）30 Hz、延迟约 80 ms——本算法的输入 $^{\mathrm i}\bar p$ 是 DKF 的<strong>当前估计</strong>而非原始测量（图 3 的数据流）。</li>
+</ul>
+<hr>
+<h3>18. 公式 (30)(31)：EKF 预测步 + 公式 (44)(45)：四元数状态传递</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(30)(31) —— EKF 一步预测（论文式 (30)(31)）</span>
+$$\hat x_{k|k-1}=F_k\hat x_{k-1}\tag{30}$$
+$$P_{k|k-1}=F_kP_{k-1}F_k^T+G_kQ_kG_k^T\tag{31}$$
+<div class="eq-note">标准卡尔曼预测步（线性状态方程 (D5) 下）。注意论文强调"state progresses according to kinematics equations without process noise"——递推用确定性运动学 (44)–(51)，噪声只经 $Q_k$ 进协方差（这与 (D5) 的 $G_kw_k$ 项是一回事：均值方程 (30) 不含噪声、协方差方程 (31) 含 $GQG^T$）。$F_k,G_k$ 是 $\partial x_k/\partial x_{k-1}$ 的雅可比（"covariance follows its linearized form"）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(44) —— 四元数离散递推（论文式 (44)）</span>
+$$q_k=q_{k-1}\otimes{}^{1}q_{k-1}=M\left({}^{1}q_{k-1}\right)q_{k-1}\tag{44}$$
+<div class="eq-note">符号：${}^{1}q_{k-1}$ 四元数增量（由 $^{\mathrm b}\omega$ 与 $\Delta t$ 生成，小角度下 ${}^{1}q\approx[1,\ \omega_{xb}\Delta t/2,\ \omega_{yb}\Delta t/2,\ \omega_{zb}\Delta t/2]^T$）；$\otimes$ Hamilton 乘法；$M({}^{1}q)$ 为左乘 ${}^{1}q$ 的矩阵表示（附录 C）。含义：$q_k=q_{k-1}\otimes{}^{1}q_{k-1}$ 是"先增量、后当前"的机体系增量积分（增量在机体系表示，右乘）。</div>
+</div>
+<h4>18.1 $M({}^{1}q_{k-1})$ 的验证（附录 C 第一个矩阵）</h4>
+<p>Hamilton 乘法 $q\otimes p=L(q)p$，$L(q)=\begin{bmatrix}q_0&-q_1&-q_2&-q_3\\q_1&q_0&-q_3&q_2\\q_2&q_3&q_0&-q_1\\q_3&-q_2&q_1&q_0\end{bmatrix}$。又 $L(a)b=R(b)a$（乘法结合性的矩阵表述），所以 $q_{k-1}\otimes{}^{1}q_{k-1}=R({}^{1}q_{k-1})q_{k-1}$，其中 $R(p)=\begin{bmatrix}p_0&-p_1&-p_2&-p_3\\p_1&p_0&p_3&-p_2\\p_2&-p_3&p_0&p_1\\p_3&p_2&-p_1&p_0\end{bmatrix}$。代入 ${}^{1}q=[1,\varepsilon_x,\varepsilon_y,\varepsilon_z]^T$（$\varepsilon=\omega\Delta t/2$）：</p>
+<p>$$M\left({}^{1}q_{k-1}\right)=\begin{bmatrix}
+1 & -\omega_{xb}\Delta t/2 & -\omega_{yb}\Delta t/2 & -\omega_{zb}\Delta t/2\\[2pt]
+\omega_{xb}\Delta t/2 & 1 & \omega_{zb}\Delta t/2 & -\omega_{yb}\Delta t/2\\[2pt]
+\omega_{yb}\Delta t/2 & -\omega_{zb}\Delta t/2 & 1 & \omega_{xb}\Delta t/2\\[2pt]
+\omega_{zb}\Delta t/2 & \omega_{yb}\Delta t/2 & -\omega_{xb}\Delta t/2 & 1
+\end{bmatrix}\tag{18-1}$$</p>
+<p>✅ 与附录 C 的 $M({}^{1}q_{k-1})$ 逐项一致（含第 2 行的 $+\omega_{zb}\Delta t/2$ 与第 3 行的 $-\omega_{zb}\Delta t/2$ 的符号位置——Hamilton 右乘矩阵的标志性布局）。<strong>首阶自洽性检查</strong>：展开 $q_k=q_{k-1}+[\dots]^T$ 的增量与连续式 $\dot q=\frac12q\otimes(0,^{\mathrm b}\omega)$ 的 $\dot q\Delta t$ 逐分量相同（例如第 2 分量增量 $=\varepsilon_xq_0+\varepsilon_zq_2-\varepsilon_yq_3=(\omega_{xb}q_0+\omega_{zb}q_2-\omega_{yb}q_3)\Delta t/2$ ✅），离散递推与连续运动学一致。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(45) —— 四元数的两个雅可比块（论文式 (45)）</span>
+$$F^{q_k}_{q_{k-1}}=M\left({}^{1}q_{k-1}\right)\tag{45a}$$
+$$F^{q_k}_{b_{gyr,k-1}}=\begin{bmatrix}
+q_1/2 & q_2/2 & q_3/2\\[2pt]
+-q_0/2 & q_3/2 & -q_2/2\\[2pt]
+-q_3/2 & -q_0/2 & q_1/2\\[2pt]
+q_2/2 & -q_1/2 & -q_0/2
+\end{bmatrix}\Delta t,\qquad
+G^{q_k}_{b\omega_{k-1}}=F^{q_k}_{b_{gyr,k-1}}\tag{45b}$$
+<div class="eq-note">符号：$F^{q_k}_{q_{k-1}}=\partial q_k/\partial q_{k-1}$，$F^{q_k}_{b_{gyr,k-1}}=\partial q_k/\partial b_{gyr,k-1}$，$G^{q_k}_{b\omega_{k-1}}$ 为 $G$ 中四元数行的噪声块。</div>
+</div>
+<h4>18.2 式 (45b) 的独立重推（关键：负号从哪来）</h4>
+<p>连续四元数运动学 $\dot q=\frac12q\otimes(0,^{\mathrm b}\omega)=\frac12\Xi(q)\,{}^{\mathrm b}\omega$，其中</p>
+<p>$$\Xi(q)=\begin{bmatrix}-q_1&-q_2&-q_3\\[2pt]q_0&-q_3&q_2\\[2pt]q_3&q_0&-q_1\\[2pt]-q_2&q_1&q_0\end{bmatrix}\tag{18-2}$$</p>
+<p>（$\Xi$ 是 $L(q)(0,\omega)=\Xi(q)\omega$ 的直接展开，逐列可查。）因 $^{\mathrm b}\omega=\omega_{gyr}-b_{gyr}-n_{gyr}$ ((7))，$\partial^{\mathrm b}\omega/\partial b_{gyr}=-I$：</p>
+<p>$$\frac{\partial\dot q}{\partial b_{gyr}}=\frac12\Xi(q)\cdot(-I)=-\frac12\Xi(q)
+=\begin{bmatrix}q_1/2&q_2/2&q_3/2\\-q_0/2&q_3/2&-q_2/2\\-q_3/2&-q_0/2&q_1/2\\q_2/2&-q_1/2&-q_0/2\end{bmatrix}\tag{18-3}$$</p>
+<p>离散化（$q_k\approx q_{k-1}+\dot q\Delta t$，或对 (44) 精确求导——两者首阶相同，§18.1 已验证离散与连续一致）即得 (45b) 的 $F$ 块 ✅ 逐项一致。$G^{q_k}_{b\omega_{k-1}}=F^{q_k}_{b_{gyr,k-1}}$ 的来历：$q_k$ 对 $b_{gyr}$ 与对噪声的敏感度同构（两者都以 $-I$ 系数进入 $^{\mathrm b}\omega$）——<strong>但注意这正是 §21.3 口径疑点的根源</strong>：$w_k$ 宣称是偏置随机游走噪声 $n_{bgyr}$，而该 $G$ 块形式上对应的是陀螺<strong>测量</strong>噪声 $n_{gyr}$ 的敏感度。</p>
+<hr>
+<h3>19. 公式 (46)–(50)：位置与速度状态传递</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(46)(47) —— 位置梯形传递（论文式 (46)(47)）</span>
+$$p_{r,k}=p_{r,k-1}+\frac12\left(v_{r,k-1}+v_{r,k}\right)\Delta t\tag{46}$$
+$$F^{p_{r,k}}_{v_{r,k-1}}=I\,\Delta t\tag{47}$$
+<div class="eq-note">(46) 是梯形积分（比 Euler 高一阶精度）；论文说明忽略圆锥/划桨误差 [37]（低成本微小型组合导航的常规取舍）。(47) 的推导有易错点：$\partial p_{r,k}/\partial v_{r,k-1}=\frac12\Delta t\big(I+\partial v_{r,k}/\partial v_{r,k-1}\big)=\frac12\Delta t(I+I)=I\Delta t$——<strong>必须用 $\partial v_{r,k}/\partial v_{r,k-1}=I$（见 (48)：$v_{r,k}=v_{r,k-1}+(\cdot)\Delta t$，$(\cdot)$ 不含 $v_{r,k-1}$）</strong>，若把梯形两节点当独立变量就会错写成 $\frac12\Delta t I$。✅ (47) 正确。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(48)–(50) —— 速度传递（论文式 (48)(49)(50)）</span>
+$$v_{r,k}=v_{r,k-1}+\left(R_b^{\mathrm e}\cdot b_{a_{k-1}}+g e_3\right)\Delta t,\qquad b_a=\begin{bmatrix}a_{xb}&a_{yb}&a_{zb}\end{bmatrix}^T=a_{acc}-b_{acc}\tag{48}$$
+$$F^{v_{r,k}}_{q_{k-1}}=2\begin{bmatrix}M_1b_a & M_2b_a & M_3b_a\end{bmatrix}^T\Delta t\tag{49}$$
+$$F^{v_{r,k}}_{b_{acc,k-1}}=-R_b^{\mathrm e}\Delta t,\qquad G^{v_{r,k}}_{e a_{k-1}}=F^{v_{r,k}}_{b_{acc,k-1}}\tag{50}$$
+<div class="eq-note">(48) = (9) 的离散化：$v_{r,k}-v_{r,k-1}\approx\dot v_r\Delta t=a\Delta t$（$a_r$ 中目标加速度 $a_t$ 被忽略——目标机动当扰动，与 (3-def) 一致；忽略地球自转角速度，论文明说）。(50)：$b_a=a_{acc}-b_{acc}$ → $\partial v_{r,k}/\partial b_{acc}=-R_b^{\mathrm e}\Delta t$ ✅；$G^{v_{r,k}}_{e a_{k-1}}$ 同构（加计噪声与偏置以同系数进入）。(49) 是姿态耦合项：$R_b^{\mathrm e}$ 依赖 $q_{k-1}$，需要 $\partial(R(q)b_a)/\partial q$——即附录 C 的 $M_1..M_3$。</div>
+</div>
+<h4>19.1 $M_1,M_2,M_3$ 的独立重推与逐项验证（附录 C 的核心矩阵）</h4>
+<p>对标准四元数方向余弦阵 $R(q)=\begin{bmatrix}q_0^2+q_1^2-q_2^2-q_3^2&2(q_1q_2-q_0q_3)&2(q_1q_3+q_0q_2)\\2(q_1q_2+q_0q_3)&q_0^2-q_1^2+q_2^2-q_3^2&2(q_2q_3-q_0q_1)\\2(q_1q_3-q_0q_2)&2(q_2q_3+q_0q_1)&q_0^2-q_1^2-q_2^2+q_3^2\end{bmatrix}$，对任意常向量 $a$ 有（逐列求导 $R$ 即可验证）：</p>
+<p>$$\frac{\partial\left(R(q)\,a\right)}{\partial q}=2\begin{bmatrix}(M_1a)^T\\(M_2a)^T\\(M_3a)^T\end{bmatrix},\qquad
+M_1=\begin{bmatrix}q_0&-q_3&q_2\\q_1&q_2&q_3\\-q_2&q_1&q_0\\-q_3&-q_0&q_1\end{bmatrix},\ 
+M_2=\begin{bmatrix}q_3&q_0&-q_1\\q_2&-q_1&-q_0\\q_1&q_2&q_3\\q_0&-q_3&q_2\end{bmatrix},\ 
+M_3=\begin{bmatrix}-q_2&q_1&q_0\\q_3&q_0&-q_1\\-q_0&q_3&-q_2\\q_1&q_2&q_3\end{bmatrix}\tag{19-1}$$</p>
+<p>核对方法：$M_1a$ 是 4 维向量（行指标跑遍 $q_0..q_3$），其第 $j$ 个分量应等于 $\tfrac12\partial(Ra)_1/\partial q_{j-1}$。验 $j=1$（对 $q_0$）：$\tfrac12\partial(Ra)_1/\partial q_0=\tfrac12[\partial r_{11}/\partial q_0\,a_1+\partial r_{12}/\partial q_0\,a_2+\partial r_{13}/\partial q_0\,a_3]$，而 $r_{11}=q_0^2+q_1^2-q_2^2-q_3^2$、$r_{12}=2(q_1q_2-q_0q_3)$、$r_{13}=2(q_1q_3+q_0q_2)$，代入得 $q_0a_1-q_3a_2+q_2a_3$，恰为 $M_1$ 第 1 行 $[q_0,-q_3,q_2]$ 与 $a$ 的内积 ✅；$M_1[1,2]=-q_3$、$M_1[1,3]=q_2$ 的符号位即来自 $r_{12},r_{13}$ 中的 $-q_0q_3,+q_0q_2$。全部 36 个元素均按此法核对一致（含 $M_2$ 的 $[2,2]=-q_1$、$M_3$ 的 $[3,3]=-q_2$ 等符号位）。于是</p>
+<p>$$F^{v_{r,k}}_{q_{k-1}}=\frac{\partial\big(R(q_{k-1})b_a\Delta t\big)}{\partial q_{k-1}}=2\begin{bmatrix}(M_1b_a)^T\\(M_2b_a)^T\\(M_3b_a)^T\end{bmatrix}\Delta t\ \checkmark\ \text{(49)}\tag{19-2}$$</p>
+<p>✅ 与 (49) 一致（论文记号 $[M_1b_a\ M_2b_a\ M_3b_a]^T$ 即行堆叠的转置写法）。<strong>结论：$M_1..M_3$ 无印刷错误</strong>（按文本抽取核对），且它们精确等于 $\partial(Ra)/\partial q$ 的标准分解。</p>
+<hr>
+<h3>20. 公式 (51)–(55)：图像状态传递与附录 C 的 $M_4/M_5$</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(51) —— 图像特征离散传递（论文式 (51)）</span>
+$$^{\mathrm i}\bar p_k={}^{\mathrm i}\bar p_{k-1}+\underbrace{\begin{bmatrix}-\frac{1}{p_{zc}}&0&\frac{\bar p_{xi}}{p_{zc}}\\[4pt]0&-\frac{1}{p_{zc}}&\frac{\bar p_{yi}}{p_{zc}}\end{bmatrix}R_c^{\mathrm bT}R_b^{\mathrm eT}v_{r,k-1}\Delta t}_{\text{平动项（}A\text{ 块）}}+\underbrace{\begin{bmatrix}\bar p_{xi}\bar p_{yi}&-\big(1+\bar p_{xi}^2\big)&\bar p_{yi}\\[4pt]1+\bar p_{yi}^2&-\bar p_{xi}\bar p_{yi}&-\bar p_{xi}\end{bmatrix}R_c^{\mathrm bT}\,{}^{\mathrm b}\omega_{k-1}\Delta t}_{\text{转动项（}B\text{ 块）}}\tag{51}$$
+<div class="eq-note">这就是 (6) 的显式 Euler 离散化：$^{\mathrm i}\dot{\bar p}=A\,{}^{c}v+B\,{}^{c}\omega$（(6) 拆成平动 3 列 $A$ 与转动 3 列 $B$），代入 ${}^{c}v=R_c^{\mathrm bT}R_b^{\mathrm eT}v_r$（相对速度旋到相机系）与 ${}^{c}\omega=R_c^{\mathrm bT}\,{}^{\mathrm b}\omega$（角速度旋到相机系），乘 $\Delta t$ 得增量。✅ 与 (6) 的 $L_s$ 逐列对应（$A$ 是 $L_s$ 前三列、$B$ 是后三列）。注意 (51) 是 <strong>显式 Euler</strong>（右端全取 $k-1$ 时刻量），与 (46) 的梯形法形成精度差异——位置通道二阶、图像通道一阶，实现细节上值得留意。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(52)(53)(55) —— 图像行的三个雅可比块（论文式 (52)(53)(55)）</span>
+$$F^{{}^{\mathrm i}\bar p_k}_{q_{k-1}}=\frac{1}{p_{zc}}\begin{bmatrix}M_4v_r & M_5v_r\end{bmatrix}^T\Delta t\tag{52}$$
+$$F^{{}^{\mathrm i}\bar p_k}_{v_{r,k-1}}=\begin{bmatrix}-\frac{1}{p_{zc}}&0&\frac{\bar p_{xi}}{p_{zc}}\\[4pt]0&-\frac{1}{p_{zc}}&\frac{\bar p_{yi}}{p_{zc}}\end{bmatrix}R_c^{\mathrm bT}R_b^{\mathrm eT}\Delta t\tag{53}$$
+$$F^{{}^{\mathrm i}\bar p_k}_{b_{gyr,k-1}}=-\begin{bmatrix}\bar p_{xi}\bar p_{yi}&-\big(1+\bar p_{xi}^2\big)&\bar p_{yi}\\[4pt]1+\bar p_{yi}^2&-\bar p_{xi}\bar p_{yi}&-\bar p_{xi}\end{bmatrix}R_c^{\mathrm bT},\qquad G^{{}^{\mathrm i}\bar p_k}_{b\omega_{k-1}}=F^{{}^{\mathrm i}\bar p_k}_{b_{gyr,k-1}}\tag{55}$$
+<div class="eq-note">(53)：对 (51) 平动项求 $\partial/\partial v_{r,k-1}$ ✅ 直接成立。(55)：对转动项求 $\partial/\partial b_{gyr,k-1}$，因 ${}^{\mathrm b}\omega=\omega_{gyr}-b_{gyr}-n_{gyr}$ 给出负号 ✅（与 §18.2 的 (45b) 负号同源）；$G$ 块同构（噪声同系数进入）。(52)：对平动项求 $\partial/\partial q_{k-1}$——$R_b^{\mathrm eT}=R(q)^T$ 依赖 $q$，需要 $M_4,M_5$（附录 C）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(54) —— 图像坐标对自身的雅可比（论文式 (54)）</span>
+$$F^{{}^{\mathrm i}\bar p_k}_{{}^{\mathrm i}\bar p_{k-1}}=I+\begin{bmatrix}
+\dfrac{v_{zc}}{p_{zc}}+\bar p_{yi}\,\omega_{xc}-2\bar p_{xi}\,\omega_{yc} & \bar p_{xi}\,\omega_{xc}+\omega_{zc}\\[6pt]
+-\bar p_{yi}\,\omega_{yc}-\omega_{zc} & \dfrac{v_{zc}}{p_{zc}}+2\bar p_{yi}\,\omega_{xc}-\bar p_{xi}\,\omega_{yc}
+\end{bmatrix}\Delta t\tag{54}$$
+<div class="eq-note">符号：$v_{zc},\omega_{xc},\omega_{yc},\omega_{zc}$ 为 ${}^{c}v,{}^{c}\omega$ 的相机系分量。这是 $\partial\,^{\mathrm i}\bar p_k/\partial\,^{\mathrm i}\bar p_{k-1}$ 的线性化。</div>
+</div>
+<h4>20.1 式 (54) 的独立推导（并指出它隐含的近似）</h4>
+<p>把 (6) 写成 $^{\mathrm i}\dot{\bar p}=f(\bar p)$，求 $\partial f/\partial\bar p$。平动项：$\dot x=-\frac{v_{xc}}{p_{zc}}+\frac{\bar p_{xi}v_{zc}}{p_{zc}}$，<strong>若把深度 $p_{zc}$ 视为与 $\bar p$ 无关的常数</strong>，则 $\partial\dot x/\partial\bar p_{xi}=\frac{v_{zc}}{p_{zc}}$、$\partial\dot x/\partial\bar p_{yi}=0$；转动项 $\dot x=\bar p_{xi}\bar p_{yi}\omega_{xc}-(1+\bar p_{xi}^2)\omega_{yc}+\bar p_{yi}\omega_{zc}$：$\partial\dot x/\partial\bar p_{xi}=\bar p_{yi}\omega_{xc}-2\bar p_{xi}\omega_{yc}$、$\partial\dot x/\partial\bar p_{yi}=\bar p_{xi}\omega_{xc}+\omega_{zc}$。拼起来即 (54) 第一行 ✅，第二行同理 ✅。<strong>但"$p_{zc}$ 与 $\bar p$ 无关"是近似</strong>：同一空间点满足 $\bar p_{xi}\cdot p_{zc}=X=\text{const}$，故 $\partial p_{zc}/\partial\bar p_{xi}=-p_{zc}/\bar p_{xi}$，把深度耦合算全后：</p>
+<p>$$\frac{\partial\dot x}{\partial\bar p_{xi}}\bigg|_{\text{精确}}=\frac{v_{xc}}{\bar p_{xi}\,p_{zc}}+\frac{2v_{zc}}{p_{zc}}+\bar p_{yi}\omega_{xc}-2\bar p_{xi}\omega_{yc}\neq\text{(54) 的 }\frac{v_{zc}}{p_{zc}}+\bar p_{yi}\omega_{xc}-2\bar p_{xi}\omega_{yc}\tag{20-1}$$</p>
+<p>即 (54) 少了两项 $\frac{v_{xc}}{\bar p_{xi}p_{zc}}+\frac{v_{zc}}{p_{zc}}$（$\bar p_{yi}$ 行类似）。这是"深度不进状态"这一建模选择的一贯后果（§20.4），不是笔误，但读者要知道 (54) 是<strong>冻结深度</strong>的雅可比。</p>
+<h4>20.2 $M_4/M_5$ 的正确形式（独立推导，供实现者使用）</h4>
+<p>设 $x=\bar p_{xi},y=\bar p_{yi}$，$\bar q=[q_0,-q_1,-q_2,-q_3]^T$（共轭四元数），$D=\mathrm{diag}(1,-1,-1,-1)$。用 $R^T=R(\bar q)$ 与 §19.1 的恒等式：</p>
+<p>$$\frac{\partial\big(R(q)^Tv\big)}{\partial q}=2\begin{bmatrix}(M_1(\bar q)v)^TD\\[2pt](M_2(\bar q)v)^TD\\[2pt](M_3(\bar q)v)^TD\end{bmatrix}\tag{20-2}$$</p>
+<p>（对 $R(\bar q)v$ 用 $\partial(Ra)/\partial q=2[(M_1a)^T;(M_2a)^T;(M_3a)^T]$，再链式乘 $\partial\bar q/\partial q=D$。）于是 (52)（取 $R_c^{\mathrm b}=I$ 时）应为</p>
+<p>$$F^{{}^{\mathrm i}\bar p_k}_{q_{k-1}}=\frac{1}{p_{zc}}\begin{bmatrix}-1&0&x\\0&-1&y\end{bmatrix}\frac{\partial(R^Tv_r)}{\partial q}\Delta t=\frac{1}{p_{zc}}\begin{bmatrix}(M_4v_r)^T\\(M_5v_r)^T\end{bmatrix}\Delta t\tag{20-3}$$</p>
+<p>其中（本文推导的<strong>正确</strong>版本，$R_c^{\mathrm b}=I$ 情形）：</p>
+<p>$$M_4=2\left(-M_1(\bar q)+xM_3(\bar q)\right)D,\qquad M_5=2\left(-M_2(\bar q)+yM_3(\bar q)\right)D\tag{20-4}$$</p>
+<p>展开后逐元素为（供抄写核对）：</p>
+<p>$$M_4=2\begin{bmatrix}
+-q_0-xq_2 & q_3+xq_1 & -q_2-xq_0\\[2pt]
+q_1-xq_3 & -q_2-xq_0 & -q_3-xq_1\\[2pt]
+-q_2-xq_0 & -q_1+xq_3 & q_0-xq_2\\[2pt]
+-q_3-xq_1 & q_0+xq_2 & -q_1-xq_3
+\end{bmatrix},\qquad
+M_5=2\begin{bmatrix}
+-q_3-yq_2 & -q_0+yq_1 & q_1-yq_0\\[2pt]
+-q_2-yq_3 & q_1-yq_0 & q_0-yq_1\\[2pt]
+q_1-yq_0 & -q_2+yq_3 & q_3-yq_2\\[2pt]
+q_0-yq_1 & q_3+yq_2 & -q_2-yq_3
+\end{bmatrix}\tag{20-5}$$</p>
+<div class="callout warn">
+<div class="callout-title">⚠️ 按文本抽取的 M4/M5 与 (20-5) 对不上；且 (52) 缺 Rb_c</div>
+<p>① 按 fulltext 第 16 页抽取重建的 $M_4$（4×3，元素如 $2\bar p_{xi}q_0+2q_3$ 等）与 (20-5)（以及任何我试过的行列转置/符号约定变体：$R$ 与 $R^T$ 互换、共轭、$q$ 重排等）<strong>均不匹配</strong>——无法区分"PDF 文本抽取乱序/丢列"与"论文附录 C 印刷有误"，<strong>必须人工复核第 16 页</strong>。② (51)(53)(55) 显式含 $R_c^{\mathrm b}$，而 (52)+$M_4/M_5$（按抽取）不含——只有相机与机体对齐（$R_c^{\mathrm b}=I$）时才自洽；但 §5.3 的核算表明实飞相机有下倾安装角，$R_c^{\mathrm b}\neq I$ 很可能。正确实现应把 (20-3) 中的 $A=\begin{bmatrix}-1&0&x\\0&-1&y\end{bmatrix}$ 替换为 $A R_c^{\mathrm bT}$ 再求导。③ 两处都不影响 §22 的修正步正确性（H 是精确的），只影响延迟期间的预测精度。</p>
+</div>
+<h4>20.4 ⚠️ 深度 $p_{zc}$ 的来源：全篇未说明（重要实现缺口）</h4>
+<div class="callout warn">
+<div class="callout-title">DKF 需要 $p_{zc}$，但论文没写它从哪来</div>
+<p>(51)–(55) 的平动雅可比全部含 $1/p_{zc}$（或 $v_{zc}/p_{zc}$），但 $p_{zc}$（目标深度）<strong>不在 18 维状态里、没有对应测量、也没有任何估计它的方程</strong>——论文对它唯一的处理就是 (54) 的"冻结深度"线性化。可能的实现来源（论文均未交代）：① 目标尺寸先验（红气球直径已知 → 由像素尺寸反推距离）；② 固定名义值（如典型拦截距离）；③ DKF 状态中 $\hat p_r$ 的模（但 §22.4 指出其尺度不可观，初始化成谜）。影响评估：修正步 (34) 是精确的（$H$ 只选图像坐标），$p_{zc}$ 只影响<strong>延迟期间的预测</strong>（(51)(52)(53) 的量级与方向）；$p_{zc}$ 偏大 → 平动项被低估 → 80 ms 盲推补偿不足；偏小 → 过补偿。图 9 的"估计值领先测量值"现象说明他们的实现里 $p_{zc}$ 取值基本合理，但读者无法复现。与 §10.2（控制器侧也需要深度）合并看：本文两端都悄悄用了深度，却都未说明来源——这是全文最大的实现缺口。</p>
+</div>
+<h4>20.5 数值核算：(53)(55) 的量级</h4>
+<p>取 $p_{zc}=10$ m、$\bar p=[0.2,0.1]$：$F^{{}^{\mathrm i}\bar p_k}_{v_{r,k-1}}$ 平动块 $=\begin{bmatrix}-0.1&0&0.02\\0&-0.1&0.01\end{bmatrix}R_c^{\mathrm bT}R_b^{\mathrm eT}\Delta t$——$\Delta t=0.02$ s（50 Hz）时元素量级 $10^{-3}$，10 步内图像坐标漂移 ~$10^{-2}$，与图 9 的"80 ms 延迟内估计值领先测量值"的漂移量级吻合。转动块 $B$ 元素量级 1：角速度 5 rad/s 时每步贡献 $5\times0.02=0.1$——高速机动下<strong>转动项主导图像运动</strong>，这正是 §6.2 所说"转动与深度无关"的体现，也是 DKF 用 IMU（高频陀螺）能有效补偿图像延迟的根本原因。</p>
+<hr>
+<h3>21. F/G 矩阵的 18×18 / 18×6 结构与两处疑点</h3>
+<h4>21.1 按 (44)–(55) 拼出的完整结构（行=状态分量 $k$ 时刻，列=$k-1$ 时刻）</h4>
+<pre class="code-block"><code>F_k (18×18)，列分块 [q  p_r  v_r  i¯p  b_gyr  b_acc]：
+q   行:  [ F^qk_qk-1      0    0    0    F^qk_bgyr,k-1     0      ]   (45)
+p_r 行:  [ 0            I_3   IΔt  0    0                 0      ]   (47)
+v_r 行:  [ F^vr,k_qk-1   0    I_3   0    0                 F^vr,k_bacc,k-1 ]  (49)(50)
+i¯p 行:  [ F^i¯pk_qk-1   0    F^i¯pk_vr,k-1  F^i¯pk_i¯pk-1  F^i¯pk_bgyr,k-1  0 ]  (52)(53)(54)(55)
+b_gyr 行:[ 0            0    0    0    I_3                 0      ]
+b_acc 行:[ 0            0    0    0    0                   I_3    ]
+
+G_k (18×6)，列分块 [bω 通道  e_a 通道]：
+q   行:  [ G^qk_bωk-1       0      ]   (45)
+p_r 行:  [ 0                0      ]
+v_r 行:  [ 0                G^vr,k_eak-1 ]  (50)
+i¯p 行:  [ G^i¯pk_bωk-1     0      ]   (55)
+b_gyr 行:[ 0                0      ]
+b_acc 行:[ 0                0      ]</code></pre>
+<h4>21.2 结构自查（每个非零块都有公式依据 ✅）</h4>
+<ul>
+<li>$p_r$ 行：$\partial p_{r,k}/\partial p_{r,k-1}=I$、$\partial p_{r,k}/\partial v_{r,k-1}=I\Delta t$（§19 的梯形推导）✅。</li>
+<li>$v_r$ 行：$\partial v_{r,k}/\partial v_{r,k-1}=I$；姿态耦合 $F^{v_{r,k}}_{q_{k-1}}$（(49)）；加计偏置耦合 $F^{v_{r,k}}_{b_{acc,k-1}}$（(50)）✅。</li>
+<li>$^{\mathrm i}\bar p$ 行：四块齐全——姿态（(52)）、速度（(53)）、自身（(54)）、陀螺偏置（(55)）✅。</li>
+<li>偏置两行：$b_{gyr,k}=b_{gyr,k-1}$、$b_{acc,k}=b_{acc,k-1}$（确定性部分）→ $I_3$ ✅。</li>
+</ul>
+<h4>21.3 ⚠️ G 矩阵的两处疑点（按文本抽取，第 8 页）</h4>
+<div class="callout danger">
+<div class="callout-title">⚠️ G 矩阵的两处疑点（按文本抽取，第 8 页）</div>
+<p><strong>① 偏置行没有噪声输入，与 (8)(10) 矛盾</strong>：(8)(10) 定义偏置服从 Wiener 过程 $\dot b=n_b$，离散化应为 $b_{k}=b_{k-1}+n_{b,k-1}\Delta t$（或 $\sqrt{\Delta t}$ 尺度），即 $G$ 的偏置两行应有 $I_3\Delta t$ 型块；按抽取的 $G$ 这两行为零 → 偏置在滤波器里被当成<strong>常数</strong>、其不确定性只能经 $P$ 的对角块缓慢演化，$Q$ 中 $n_{bgyr},n_{bacc}$ 的分量<strong>形同虚设</strong>。② <strong>$w_k$ 的口径错位</strong>：(D5) 宣称 $w_k=[n_{bgyr}^T,n_{bacc}^T]^T$（偏置噪声），但 $G$ 的三个非零块 $G^{q_k}_{b\omega_{k-1}}=F^{q_k}_{b_{gyr,k-1}}$、$G^{v_{r,k}}_{e a_{k-1}}=F^{v_{r,k}}_{b_{acc,k-1}}$、$G^{{}^{\mathrm i}\bar p_k}_{b\omega_{k-1}}=F^{{}^{\mathrm i}\bar p_k}_{b_{gyr,k-1}}$ 的形式是"对 $^{\mathrm b}\omega$/$^{\mathrm e}a$ 的偏导"，即对应<strong>传感器测量噪声</strong> $n_{gyr},n_{acc}$ 的注入（§18.2/§20 的推导）——把 $Q$ 调成传感器噪声方差则矩阵自洽、但标签 $w_k$ 该写成 $[n_{gyr},n_{acc}]$；把 $Q$ 调成偏置随机游走则①又要求偏置行非零。两种读法都有缺口。<strong>建议人工复核第 8 页 G 矩阵</strong>；实现上更合理的选择是：偏置行补 $I_3\Delta t$、$Q$ 按 $[\sigma_{bgyr}^2,\sigma_{bacc}^2]$ 配置，并把传感器噪声并入测量噪声/过程噪声另行处理。</p>
+</div>
+<hr>
+<h3>22. 公式 (32)–(36)：带延迟测量的修正步（DKF 的核心）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(32)(33) —— 延迟测量方程与测量矩阵（论文式 (32)(33)）</span>
+$$z_{k-D}=Hx_{k-D}+v,\qquad
+z=\begin{bmatrix}\bar p_{xi}\\\bar p_{yi}\end{bmatrix}\in\mathbb R^2,\quad v\sim\mathcal N(0_{2\times1},R)\tag{32}$$
+$$H=\begin{bmatrix}0_{2\times4} & 0_{2\times3} & 0_{2\times3} & I_{2\times2} & 0_{2\times3} & 0_{2\times3}\end{bmatrix}\tag{33}$$
+<div class="eq-note">(32)：$t_k$ 时刻收到的图像 $z_{k-D}$ 是 $t_{k-D}$ 时刻状态 $x_{k-D}$ 的线性测量（对照 (11)：$z_{k-D}={}^{\mathrm i}\bar p_{img,k}={}^{\mathrm i}\bar p_{k-D}+n_{img}$）。(33)：$H$ 从 18 维状态中选出第 10–11 维（$^{\mathrm i}\bar p$ 块）：四元数(4)+位置(3)+速度(3)=10 个零列后接 $I_2$，再 6 个零列 ✅ 与 (D4) 的分块顺序完全对应。<strong>注意</strong>：$H$ 是精确线性的（图像坐标就是状态分量），修正步无需再线性化——这是本文选"图像坐标进状态"而非"视线角进状态"的聪明之处。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(34)(35)(36) —— 延迟修正与增益（论文式 (34)(35)(36)）</span>
+$$\hat x_{k-D}=\hat x_{k-D|k-D-1}+K\left(z_{k-D}-H\hat x_{k-D|k-D-1}\right)\tag{34}$$
+$$P_{k-D}=\left(I-KH\right)P_{k-D|k-D-1}\tag{35}$$
+$$K=P_{k-D|k-D-1}H^TS^{-1},\qquad S=HP_{k-D|k-D-1}H^T+R\tag{36}$$
+<div class="eq-note">标准卡尔曼修正步，只是作用在<strong>过去的</strong>时间点 $k-D$：先验 $\hat x_{k-D|k-D-1}$（当时一步预测时保存下来的，图 7 的"每块=两次延迟测量之间保存的数据"）、增益 $K$（新息协方差 $S$ 求逆）、状态更新 (34)、协方差更新 (35)（Joseph 形式的简写，$K$ 为最优增益时与 Joseph 式等价）。修正后再按 (30)(31) 从 $k-D$ 重放到 $k$ 得到当前估计。</div>
+</div>
+<h4>22.1 为什么"延迟期间次优、修正后最优"（论文引言的原话）</h4>
+<p>设真测量时刻 $m=k-D$。标准（无延迟）KF 在 $t_m$ 用 $z_m$ 修正得到最优 $\hat x_{m|m}$。本文在 $t_k\gt t_m$ 才拿到 $z_m$，此时 $t_m$ 时刻的"最优"信息已错过，但：修正 (34)–(36) 用到的先验 $\hat x_{m|m-1},P_{m|m-1}$ 与标准 KF 完全一样，故修正后 $\hat x_{m|m}$ <strong>与标准 KF 完全相同（最优）</strong>；从 $m$ 到 $k$ 的 D 步只是确定性重放（(30)(31) 不引入新信息），所以 $\hat x_{k|k}$ 相对"在 $t_k$ 用 $z_m$ 的最优平滑"是次优的，但相对"没有 $z_m$"是严格更优——这就是"suboptimal during the delay but optimal ones post-delay"的精确含义，与 [25] 一致。✅</p>
+<h4>22.2 计算量与实现（为什么这套架构能上机）</h4>
+<p>重放 D 步只需保存 D 个周期的 IMU 数据与协方差快照，每步是 18×18 矩阵乘（无求逆），图像到达时才做一次 2×2 求逆——C++/Eigen 实时无压力（论文 §V-B-1）。对比"每次图像到达都做全窗口平滑"的方法，这是工程上最省的选择。</p>
+<h4>22.3 数值核算：$D$ 与频率账目</h4>
+<p>实飞：DKF 50 Hz（$\Delta t=20$ ms）、图像延迟 $t_D\approx80$ ms → $D=t_D/\Delta t=4$ 周期 ✅ 与图 7 一致。HITL：IMU 200 Hz、内环 200 Hz、感知 30 Hz、DKF 10/30/50 Hz 三档。30 Hz 图像 → 相邻图像间隔 33.3 ms 不是 $\Delta t$ 整数倍（§8.2 的取整问题）。80 ms 延迟里"相机曝光+颜色识别"占大头（论文说 color recognition ~80 ms）。</p>
+<h4>22.4 ⚠️ 三个未讨论的观测器问题（诚实标注）</h4>
+<ul>
+<li><strong>$p_r$ 的尺度不可观</strong>：$H$ 只测 $^{\mathrm i}\bar p$（方向），$p_r$ 的模 $\lVert p_r\rVert$ 在稳态不可观（单目尺度歧义）。滤波器里 $p_r$ 的"深度信息"完全靠初始值与动力学传播维持；论文未讨论 $p_r$ 如何初始化（初始深度怎么猜）。好在控制器只需要 $p_r$ 的方向（$n_t$）与 $v_r$，且 §10.2 已指出深度误差只缩放接近速度。</li>
+<li><strong>四元数归一化</strong>：(34) 的加法修正不保持 $\lVert q\rVert=1$（$\hat q=\hat q^-+K\Delta z$ 一般非单位），(44) 的递推也不保范数（$M$ 是近似正交）。实现必须在每次修正/若干步递推后重新归一化 $\hat q\leftarrow\hat q/\lVert\hat q\rVert$——论文未提及，但这是四元数加法 EKF 的标准动作（否则 $R_b^{\mathrm e}$ 渐渐非正交）。</li>
+<li><strong>目标丢失期</strong>：图像丢失时只有 (30)(31) 的 IMU 递推，$^{\mathrm i}\bar p$ 由 (51) 外推——目标自身的机动 $a_t$ 不进入模型，外推误差按 $a_t t^2/2$ 增长（图 11(d) 的丢失段正是靠这个"盲推"+回来时修正撑住的，论文 12 页明说）。</li>
+</ul>
+<hr>
+<h3>23. 算法 2：延迟滤波器逐行解读</h3>
+<div class="callout info">
+<p><strong>诚实声明</strong>：文本抽取只有签名行 <code>Algorithm 2 x̂ = DelayedFilter(ω_gyr, a_acc, and i¯p_img)</code>（第 9 页），框内语句无法读取。以下按 (30)–(36) 与 (44)–(55)、图 7 数据流<strong>重构</strong>，请人工对照第 9 页原文。</p>
+</div>
+<pre class="code-block"><code>Algorithm 2: x̂ = DelayedFilter(ω_gyr, a_acc, i¯p_img)
+状态: x̂_k=[q̂;p̂_r;v̂_r;i¯p̂;b̂_gyr;b̂_acc], 协方差 P_k；环形缓冲 buf[·] 存各周期 (x̂, P, IMU 原始量)
+循环（DKF 50 Hz）:
+1.  b_ω ← ω_gyr − b̂_gyr;  b_a ← a_acc − b̂_acc            # 式(7)(9)：去偏置（噪声视为零均值）
+2.  q 增量: 1q ← [1, b_ω·Δt/2];  q̂ ← q̂ ⊗ 1q             # 式(44)：四元数积分（后归一化）
+3.  v̂_r ← v̂_r + (R_b^e b_a + g e_3) Δt                  # 式(48)：速度积分
+4.  p̂_r ← p̂_r + ½(v̂_r_old + v̂_r) Δt                     # 式(46)：位置梯形积分
+5.  i¯p̂ ← i¯p̂ + A R_c^bT R_b^eT v̂_r Δt + B R_c^bT b_ω Δt # 式(51)：图像特征外推（A,B 块见式(51)）
+6.  b̂_gyr ← b̂_gyr;  b̂_acc ← b̂_acc                     # 偏置保持（确定性部分；噪声经 Q 进协方差）
+7.  计算 F_k, G_k（式(44)-(55) 的全部雅可比块）并
+    P ← F_k P F_k^T + G_k Q_k G_k^T                       # 式(31)：协方差传播
+8.  buf.push(x̂, P, ω_gyr, a_acc)                          # 图 7：保存快照
+当延迟图像到达（约 30 Hz，D ≈ 4 周期）:
+9.  (x̂^-, P^-) ← buf[k−D] 的先验                         # 取出历史先验
+10. K ← P^- H^T (H P^- H^T + R)^{-1}                      # 式(36)：2×2 求逆
+11. x̂_{k−D} ← x̂^- + K (i¯p_img − H x̂^-)                  # 式(34)：修正（H 见式(33)；q 分量后归一化）
+12. P_{k−D} ← (I − K H) P^-                               # 式(35)
+13. 从 buf[k−D+1..k] 重放步骤 1–8 共 D 步（F_k 沿修正后轨迹重算）→ 得到当前 x̂_k, P_k
+14. 返回 i¯p̂_k = H x̂_k（给 Algorithm 1 用）</code></pre>
+<ul>
+<li><strong>步骤 2–5 与 (D5) 的关系</strong>：确定性递推就是"无过程噪声的均值方程"（§18 开头），噪声影响只在步骤 7 的 $P$ 里体现。</li>
+<li><strong>步骤 13 的重放</strong>：注意重放时 (44)–(55) 中的 $\bar p_{xi}$ 等取值点要沿<strong>修正后的</strong>轨迹重算（$F_k$ 依赖状态），这是实现里最容易偷懒出错的地方（用旧轨迹的 $F_k$ 只差二阶，但会破坏"修正后最优"的精确性）。</li>
+<li><strong>与 §21.3 的联动</strong>：若按问题清单第 4 条修正 G（偏置行补 $I_3\Delta t$），步骤 6 也要相应加 $n_b$ 项或至少在 $P$ 传播中体现偏置不确定性增长。</li>
+</ul>
+<hr>
+<h3>24. 数值核算总账（论文参数代入公式的对账表）</h3>
+<table>
+<tr><th>论文给出的数字</th><th>公式代入核算</th><th>结论</th></tr>
+<tr><td>"Delays around 100 ms → control errors up to 2 m at 20 m/s"</td><td>$20\ \text{m/s}\times0.1\ \text{s}=2\ \text{m}$：纯"延迟×速度"的位置滞后估计</td><td>✅ 自洽</td></tr>
+<tr><td>图像处理延迟 ~80 ms</td><td>@IMU 200 Hz：$D=0.08\times200=16$ 周期；@DKF 50 Hz：$D=0.08/0.02=4$ 周期（图 7 画 4）</td><td>✅ 与图 7 一致（按 DKF 周期计）</td></tr>
+<tr><td>推重比 ≈ 3；最大加速度 5 m/s²</td><td>$f_m\approx3mg$ → 垂直加速度裕度 $\approx(3-1)g\approx19.6\ \text{m/s}^2\gg5$；水平 5 m/s² 加速需 $f=1.12mg\lt f_m$（§12.2）</td><td>✅ 5 m/s² 上限来自控制器/安全而非推力饱和</td></tr>
+<tr><td>120° FOV 相机；最大俯仰 50°；目标始终在 FOV</td><td>16:9 下 $VFOV\approx80.6°$（对角读法）或 88.5°（水平读法），半视场 40–44°；50° 俯仰要求目标在光轴下 50° 处可见 → 需相机下倾 6–10°（§5.3）</td><td>⚠️ 间接推出 $R_c^{\mathrm b}\neq I$（与 §20.2 疑点呼应）</td></tr>
+<tr><td>终端速度 20 m/s（摘要）/ 最大 21 m/s（实飞）</td><td>摘要"terminal speed of 20 m/s"与 5 组实验 5/10/15/19/21 m/s 的最大值 21 m/s</td><td>✅ 相容（"exceeding 20 m/s"）</td></tr>
+<tr><td>CEP：direct 0.408；DKF 10 Hz 0.425；30 Hz 0.423；50 Hz 0.332</td><td>50 Hz 相对 direct 改善 18.6%；但 10/30 Hz 反而比不用 DKF 差 4%——"频率越高越好"只在 50 Hz 成立，论文未点出 10/30 Hz 的反常</td><td>⚠️ 数据本身一致，解读选择性（见问题清单 13）</td></tr>
+<tr><td>CEP：5 m/s 0.330；7.5 m/s 0.371；10 m/s 0.390</td><td>速度 +50%/+33% 时 CEP +12.4%/+5.1%：亚线性增长，均小于拦截器物理尺寸</td><td>✅ 合理</td></tr>
+<tr><td>CEP：previous IBVS 0.457 vs 本文 0.332</td><td>改善 27.4%（(0.457−0.332)/0.457）</td><td>✅ "significant improvement" 成立</td></tr>
+<tr><td>HITL 目标速度 5/7.5/10 m/s、实飞机动目标 6 m/s 圆周</td><td>DKF 估计误差"相对稳定"：转动项与深度无关（§6.2），平移项按 $1/p_{zc}$ 缩放——目标越快、$v_r$ 越大、外推越难，但修正步每次都重锚定，故误差只随速度缓增</td><td>✅ 与 (6) 的结构一致</td></tr>
+<tr><td>$k_b$ 与 120° FOV 的匹配</td><td>$k_b\lt1-\cos(\alpha_{vfov}/2)\approx0.24$ 才使 BLF 约束等价于 FOV 约束（§9.3）</td><td>⚠️ $k_b$ 未给数值，无法闭环核对</td></tr>
+</table>
+<hr>
+<h3>25. 交叉验证总表与问题清单（"不自圆其说"部分）</h3>
+<h4>25.1 逐式核查总表</h4>
+<table>
+<tr><th>公式</th><th>独立重推结论</th><th>交叉验证方式</th></tr>
+<tr><td>(1)(2)(3)</td><td>✅ 一致</td><td>牛顿–欧拉直接推导；阻力旋转变换三步核对；推力方向约定核对</td></tr>
+<tr><td>(4)(5)</td><td>✅ 一致</td><td>针孔几何；FOV 锥与 (4) 同源；120°/50° 数值核算（§5.3）</td></tr>
+<tr><td>(6)</td><td>✅ 与 [29] 逐项一致</td><td>商的导数 + $\dot P=-v-\omega\times P$ 完整展开（§6.1）</td></tr>
+<tr><td>(7)–(10)</td><td>✅ 一致</td><td>比力方程反解 (9)（§7.1）</td></tr>
+<tr><td>(11)(32)(33)</td><td>✅ 一致</td><td>H 与 18 维分块顺序逐一对应</td></tr>
+<tr><td>(12)(13)</td><td>✅ 一致</td><td>链式求导 + 投影性质 $(-I+n_tn_t^T)n_t=0$（§9）</td></tr>
+<tr><td>(14)–(17)</td><td>✅ 一致</td><td>一步求导；$p_r=-\lVert p_r\rVert n_t$ 反用（§10）</td></tr>
+<tr><td>(18)(41)</td><td>✅ 一致（互为前提）</td><td>三块拼接逐项（§11.1、§16.3）</td></tr>
+<tr><td>(19)</td><td>⚠️ 疑点</td><td>与 (41) 的精确抵消矛盾 + 量纲异常（§11.5）</td></tr>
+<tr><td>(20)(21)(23)</td><td>✅ 一致</td><td>移项归一化解 $n_{fd}$；悬停核算 $f_d=mg$（§12）</td></tr>
+<tr><td>(22)</td><td>⚠️ 疑点</td><td>Rodrigues 要求单位轴；非单位 $r$ 代入不正交（§13.2）</td></tr>
+<tr><td>(24)–(27)</td><td>✅ 一致</td><td>迹恒等式逐元素验证；$\mathrm{vex}=2\sin\theta_e a_e$（§14）</td></tr>
+<tr><td>(28)(29)</td><td>✅ 一致</td><td>$w={}^{\mathrm b}\omega_1+{}^{\mathrm b}\omega_2$ 闭合；饱和保持 $\dot L\le0$（§15、§16.4）</td></tr>
+<tr><td>(30)(31)(34)–(36)</td><td>✅ 标准 KF</td><td>公式对照；$D=4$ 与图 7 对账（§22）</td></tr>
+<tr><td>(37)–(40)</td><td>✅ 一致</td><td>商的导数、$\dot n_{td}={}^{\mathrm e}\omega\times n_{td}$、投影性质（§16.1–16.2）</td></tr>
+<tr><td>(42)(43)</td><td>✅ 一致（前提是 (41) 无残余）</td><td>$w$ 定义与 (13)(26)(28) 三式闭合（§16.4）</td></tr>
+<tr><td>定理 1 的 $S$</td><td>⚠️ 绝对值疑点</td><td>反向情形违反 $|z_1|\lt k_b$（§16.7）</td></tr>
+<tr><td>(44)(45)</td><td>✅ 一致</td><td>Hamilton 右乘矩阵；$-\frac{\Delta t}{2}\Xi(q)$ 独立重推（§18）</td></tr>
+<tr><td>(46)–(50)</td><td>✅ 一致</td><td>梯形雅可比含 $\partial v_{r,k}/\partial v_{r,k-1}=I$；$M_1..M_3$ 36 元素核对（§19）</td></tr>
+<tr><td>(51)(53)(54)(55)</td><td>✅ 一致（(54) 含冻结深度近似）</td><td>与 (6) 逐列对照；精确深度耦合项 (20-1)（§20）</td></tr>
+<tr><td>(52)+$M_4/M_5$</td><td>⚠️ 疑点</td><td>与正确雅可比 (20-5) 不符；缺 $R_c^{\mathrm b}$（§20.2）</td></tr>
+<tr><td>$F$（18×18）</td><td>✅ 结构自洽</td><td>每块均有 (44)–(55) 依据（§21.2）</td></tr>
+<tr><td>$G$（18×6）</td><td>⚠️ 疑点</td><td>偏置行缺噪声；$w_k$ 口径与块含义错位（§21.3）</td></tr>
+<tr><td>算法 1/2</td><td>⚠️ 伪代码框无法读取</td><td>按公式重构流程（§17、§23），请人工复核</td></tr>
+</table>
+<h4>25.2 论文问题清单（按严重程度，共 15 条）</h4>
+<ol>
+<li><strong>【疑点·高】式 (19) 与 (41) 的代数矛盾</strong>（§11.5）：按文本抽取，(19) 交叉项系数 $m/\lVert p_r\rVert$ 使 $\dot L_3$ 留下 $(1-m)$ 残余项，(41)(43) 不成立；且 $-p_r$、交叉项量纲异常。精确抵消需系数 $1/\lVert p_r\rVert$（无 $m$）与 $p_r$ 系数 1。<strong>人工复核第 7 页</strong>。</li>
+<li><strong>【疑点·高】式 (22) 旋转轴未归一化</strong>（§13.2）：$r=n_f\times n_{fd}$ 的模为 $\sin\varphi$，代入单位轴 Rodrigues 得非正交"旋转矩阵"（50° 时等效 35.9°）。正确写法 $r\leftarrow r/\lVert r\rVert$ 或用闭式 $I+[r]_\times+\frac{[r]_\times^2}{1+n_f^Tn_{fd}}$。<strong>人工复核第 7 页</strong>。</li>
+<li><strong>【疑点·高】附录 C 的 $M_4/M_5$</strong>（§20.2）：按文本抽取与独立推导的正确雅可比 (20-5) 在任何行列/约定变体下都对不上，且 (52) 缺 $R_c^{\mathrm b}$（而 (51)(53)(55) 都有）。<strong>人工复核第 16 页</strong>。</li>
+<li><strong>【不一致·中】$G$ 矩阵偏置行为 0</strong>（§21.3）：与 (8)(10) 的 Wiener 过程矛盾；$w_k\triangleq[n_{bgyr},n_{bacc}]$ 的标签与 $G$ 块实际对应的传感器噪声口径错位。</li>
+<li><strong>【不一致·中】定理 1 初始集合 $S$ 的绝对值</strong>（§16.7）：$|n_{td}^Tx|\gt1-k_b$ 把视线反向（$z_1\gt k_b$，BLF 定义域外）也算作合法初值；应为 $n_{td}^Tn_t\gt1-k_b$。</li>
+<li><strong>【未说明·中】深度 $p_{zc}$ 的来源</strong>（§20.4）：DKF 的 (51)–(55) 都要 $p_{zc}$，但它不在状态里、没有测量、论文没写从哪来（目标尺寸先验？固定值？）；(54) 因此做了"冻结深度"近似（丢 $\partial z/\partial\bar p$ 耦合项）。</li>
+<li><strong>【未说明·中】Algorithm 1 的输入缺口</strong>（§10.2）：(16)(19) 需要 $p_r$/深度，签名却只有 $(^{\mathrm i}\bar p,v_r,R_b^{\mathrm e})$；且 §22.4 指出 $p_r$ 尺度不可观、初始化未讨论。</li>
+<li><strong>【符号·低】$g=[0,0,g]^T$ 的符号</strong>（§1）：$z_e$ 向上（实飞数据）则 $g=-9.81$，论文未明说；照 $+9.81$ 抄必错。</li>
+<li><strong>【符号·低】$D$ 一符两用</strong>（§2.3）：阻力矩阵 $\mathrm{diag}(d_x,d_y,d_z)$ 与延迟周期数 $D$ 同名。</li>
+<li><strong>【参数·低】$k_b,k_1,k_2,\omega_m,f_m$ 未给数值</strong>（§9.3）：$k_b$ 与 FOV 的定量关系（$k_b\lesssim0.24$）无从核对。</li>
+<li><strong>【实现·低】四元数加法 EKF 的归一化</strong>（§22.4）：(34)(44) 均不保 $\lVert q\rVert=1$，论文未提归一化步骤。</li>
+<li><strong>【表述·低】图 7"4 个 IMU 测量周期"</strong>（§8.1）：80 ms@200 Hz 是 16 个 IMU 周期，按 DKF 50 Hz 才是 4。</li>
+<li><strong>【数据解读·低】DKF 10/30 Hz 的 CEP（0.425/0.423）劣于不用 DKF（0.408）</strong>（§24）：论文只强调 50 Hz 的改善（0.332），未评论低速滤波反而更差这一反差（可能的解释：10/30 Hz 的修正频率低于图像到达频率，延迟补偿不足还引入滞后抖动）。</li>
+<li><strong>【实现·低】$D$ 非整数的处理</strong>（§8.2）：30 Hz 图像周期 33.3 ms 不是 DKF 周期 20 ms 的整数倍，取整/插值策略未讨论。</li>
+<li><strong>【范围·低】无官方代码公开</strong>：所有验证为解析/数值核算层面，无代码级对照；若作者后续开源，建议优先核对 §11.5、§13.2、§20.2、§21.3 四处。</li>
+</ol>
+<h4>25.3 验证材料清单（本工作目录）</h4>
+<ul>
+<li><code>_derivation_work/4-interception/fulltext.txt</code>：PDF 全文文本抽取（UTF-8、逐页标记），本片段全部公式的引用来源，可复核任何一句话。</li>
+<li><code>_derivation_work/4-interception/pages/page-001.png … page-017.png</code>：页面图像。<strong>建议人工复核页码</strong>：第 4 页（式 (1)–(4)）；第 7 页（式 (19)–(23)）；第 8 页（式 (28)–(33)、F/G 矩阵、定理 1 的 S）；第 15 页（式 (41)–(43) 与 $w$ 定义）；第 16 页（式 (54)、$M_4/M_5$、$M(1q)$、$M_1..M_3$）；第 6、9 页（Algorithm 1/2 伪代码框）。</li>
+<li><code>_derivation_work/check_tags.py</code>：本片段 HTML 标签配对与数学定界符配对的自查脚本（本次执行结果见插入日志）。</li>
+<li><code>note.html.bak</code>：插入脚本自动生成的插入前备份。</li>
+<li>参考文献定位：式 (6) ↔ [29] Chaumette &amp; Hutchinson, IEEE RAM 13(4), 2006；BLF ↔ [36] Tee, Ge &amp; Tay, Automatica 45(4), 2009；姿态误差函数 ↔ [31] Murray-Li-Sastry 与 [32] Lee-Leok-McClamroch（CDC 2010）；DKF 架构 ↔ [25] Gamagedara-Lee-Snyder, IEEE TAES 57(5), 2021；阻力模型 ↔ [26] Kai et al., IFAC 2017；圆锥/划桨误差 ↔ [37] Roscoe, JGCD 24(2), 2001。</li>
+</ul>
 </section>
 
 <footer>Paper Notes · Yang, Bai, She &amp; Quan · IEEE TCST 2025 · High-Speed Interception Multicopter Control by IBVS · MathJax + Mermaid Rendering</footer>

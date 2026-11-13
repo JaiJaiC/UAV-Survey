@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">缺陷与扩展</a>
   <a href="#motivation">推导动机</a>
   <a href="#takeaway">要点总结</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -861,6 +865,355 @@ flowchart LR
     <tr><td>Schulman et al. (2017) — Proximal policy optimization algorithms. <em>arXiv:1707.06347</em></td><td>PPO 原始论文——理解为什么 PPO 在 ALC 任务中独家成功的关键：clipped surrogate objective 提供的 trust-region 约束在高度敏感的动作空间中是不可替代的</td></tr>
     <tr><td>Song et al. (2023) — Reaching the limit in autonomous racing: Optimal control versus reinforcement learning. <em>Sci. Robot.</em> 8(82), eadg1462</td><td>从另一个角度探讨"RL vs 最优控制"的极限问题——在四旋翼竞速中，RL 能否达到最优控制的性能边界？本文（OpenFlight）加入了 MPC 作为对比，但 MPC 使用的是简化模型。如果用全 6-DOF 非线性 MPC（如 ACADO/iLQR），结果会如何？这是一个开放的对比问题</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info"><p><strong>对象</strong>：<em>Learning minimum-time flight control for fixed-wing UAVs in three-dimensional space with high-fidelity 6-DOF dynamics</em>（OpenFlight，J. Automation and Intelligence，DOI 10.1016/j.jai.2025.11.007，Journal Pre-proof，20 页）。<strong>公式范围</strong>：正文全部编号公式 (1)–(13)（§3.1–§3.6），加上 Fig.1 的网络结构、§3.2/§3.7/§4.2 中以文字描述但无编号的核心方法（JSBSim 气动模型、PPO/A2C/TD3/SAC、底层 PID 链、MPC、3D Dubins），本节把它们全部数学化。<strong>方法</strong>：本文不是复述论文文字，而是：</p><ol><li>从牛顿–欧拉方程、转动参考系运动学、庞特里亚金极小值原理（PMP）、HJB 方程、势函数 reward shaping 理论等第一性原理<strong>独立重推</strong>每个公式；</li><li>用论文官方开源仓库（<code>running-mars/OpenFlight</code>，本机副本在 <code>1.Paper\OpenFlight\OpenFlight\</code>，下同）<strong>逐行交叉验证</strong>，所有「代码 L 行」均指该仓库文件；</li><li>把 Table 1 的全部数值（22.0%、27.6%、时间下界等）代入核算；</li><li>明确标出论文中<strong>自相矛盾、与代码不一致或符号约定陷阱</strong>之处（见「最后」节问题清单），绝不替论文圆场。</li></ol><p><strong>诚实声明（公式原文的核对方式）</strong>：本推导所用公式原文来自两份<strong>独立的 PDF 文本抽取</strong>——工作目录的 <code>_derivation_work\openflight\fulltext.txt</code> 与本次新建的 <code>pdftext.txt</code>（pypdf 抽取），两份在全部 13 个公式上逐字符一致。生成本节的模型<strong>不具备图像输入能力</strong>，无法直接阅读 <code>pages\page-001.png</code>…<code>page-020.png</code>，因此矩阵/分式的<strong>排版结构</strong>未能逐像素核对；建议人工复核以下页码：<strong>PDF 第 5 页</strong>（式 (1)–(6)，其中式 (6) 的 3×3 矩阵元素排列最关键）、<strong>第 6 页</strong>（式 (7)–(12)）、<strong>第 7 页</strong>（式 (13) 与 Fig.1）。凡下文判定为「印刷错误」处，均以「两份文本抽取一致 + 代数推导不自洽」双条件为据，并已尽量与代码互证。</p></div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table><tr><th>公式</th><th>内容</th><th>结论（推导 + 代码 + 数值三重对照）</th></tr>
+<tr class="highlight"><td>(1)</td><td>最短时间飞行问题</td><td>✅ 约束值与代码一致（$h_{\min}=10$ m、$d_r=30$ m、时限 40 s）。⚠️ 自称 POMDP 但观测是状态的确定性函数（实际是 MDP）；决策变量写成 $\min_{a_t}t_f$ 记号不规范</td></tr>
+<tr><td>(2)(3)</td><td>6-DOF 牛顿–欧拉方程</td><td>✅ 标准形式正确；独立推导与 JSBSim 求解结构一致。⚠️ 未给分量形式、惯性矩阵数值与坐标约定</td></tr>
+<tr><td>(4)</td><td>力/力矩分解</td><td>✅ 成立。⚠️ 论文列出推力力矩 $\boldsymbol M_t$，但所用模型推力过重心且无推力线角，实际 $\boldsymbol M_t=0$</td></tr>
+<tr class="highlight"><td>(5)(6)</td><td>风轴→体轴气动力变换</td><td>✅ 矩阵代数正确：$\boldsymbol R_b^w=R_y(-\alpha_a)R_z(-\beta_s)$（已逐元素验证）。⚠️ <strong>隐含侧滑角约定 $\beta_s=-\sin^{-1}(v/V)$，与标准/JSBSim 约定反号</strong>——照抄式 (6) 而用标准 $\beta$ 计算会得到侧力反号（陷阱，详见 §4.3）</td></tr>
+<tr><td>(7)(8)</td><td>VLC 观测与归一化</td><td>✅ 归一化系数与代码逐项一致（$\alpha_1..\alpha_4=0.01,0.02,0.05,0.1$，$\beta_1=20$）。⚠️ 代码中分量顺序为 $[\psi_g,d_h,d_v,\omega_z,v_a,v_z]$ 与式 (7) 不同；<strong>note 第 6 节的「Δψ/2、ψ̇/4」是笔误，正确为 $\psi_g/(2\pi)$、$\omega_z/(4\pi)$</strong></td></tr>
+<tr class="highlight"><td>(9)(10)</td><td>VLC 动作与反归一化</td><td>❌ <strong>式 (9) 与式 (10) 自相矛盾</strong>：式 (9) 写 $\boldsymbol a=[\omega_z,v_c,v_a]$，但式 (10) 的 $\boldsymbol a_d[2]=6\boldsymbol a[2]+20$ 是空速映射（代码证实 $\boldsymbol a[2]$ 是空速），正确顺序应为 $[\omega_z,v_a,v_c]$。⚠️ $\alpha_5=0.5$（偏航缩放）在发布代码中不存在——代码把 $a[0]$ 当作「航向偏差×180°」送入航向 PI 环。note 第 6 节的 Eq.(6) 同样把 $v_c$ 与 $v_a$ 标反了</td></tr>
+<tr><td>(11)(12)</td><td>ALC 观测与归一化</td><td>✅ 归一化（姿态 $/2\pi$、角速率 $/4\pi$）与代码逐项一致。⚠️ $\theta$ 标 (roll)、$\phi$ 标 (pitch) 与航空惯例相反；代码顺序 [pitch, roll, yaw] 与论文错位（归一化相同，无功能影响）</td></tr>
+<tr class="highlight"><td>(13)</td><td>奖励函数</td><td>✅ 与代码逐项一致（$k_1=0.25,k_2=1,k_3=20$）。<strong>深层推导</strong>：$r_t$ 是势函数 $\Phi=0.25d_h+d_v+20|\psi_g|$ 的差分 $r_t=\Phi(s_{t-1})-\Phi(s_t)$，未折扣收益路径无关；「最短时间」完全靠折扣 $\gamma$ 涌现（§8 给出完整推导与 $\approx$180 数值验算）</td></tr>
+<tr><td>Fig.1 网络</td><td>2×64 FC + ReLU</td><td>✅ 与 <code>network/p2p3d_net.py</code> 逐行一致（SB3 再外接 actor/critic 头）</td></tr>
+<tr><td>算法</td><td>PPO/A2C/TD3/SAC、MPC、Dubins、PID 链</td><td>论文无伪代码；本节给出 PPO 完整推导、其余按论文文字 + 代码重建（重建处均如实标注假设）</td></tr>
+<tr><td>Table 1</td><td>平均飞行时间</td><td>✅ 22.0% 与 27.6% 两个百分数验算通过；PPO-ALC 20.24 s 距运动学时间下界 $(500-30)/26=18.1$ s 仅差 12%（§13.3）</td></tr>
+</table>
+<hr>
+<h3>1. 坐标系、符号与系统总表（后面推导全部依赖它）</h3>
+<h4>1.1 三个坐标系</h4>
+<ul><li><strong>NED 地面系</strong> $F_N$：$x$ 北、$y$ 东、$z$ <strong>向下</strong>。论文所有「坐标」均在此系（例如目标 $(-300,-400,-180)$ m 表示北 −300、东 −400、<strong>高度 180 m</strong>）。代码里 <code>get_local_position_m()</code> 返回 $[x_{\text{北}},\ y_{\text{东}},\ z_{\text{高度(向上)}}]$，即 $z_{\text{NED}}=-z_{\text{代码}}$。</li><li><strong>机体系</strong> $F_B$：$x_B$ 前、$y_B$ 右、$z_B$ 下，右旋。线速度分量 $(u,v,w)$、角速度分量 $(p,q,r)$。</li><li><strong>风轴系</strong> $F_W$：$x_W$ 沿相对风速（真空速）方向，$y_W,z_W$ 由式 (6) 反推（§4.1 给出构造），$\alpha_a$ 迎角、$\beta_s$ 侧滑角。</li></ul>
+<h4>1.2 Skywalker X8 模型参数（<code>x8\x8.xml</code>，Gryte et al. 2018 风洞数据）</h4>
+<table><tr><th>符号</th><th>含义</th><th>取值</th><th>单位</th></tr>
+<tr><td>$m$</td><td>空机质量</td><td>3.3640</td><td>kg</td></tr>
+<tr><td>$S$</td><td>机翼参考面积</td><td>0.75</td><td>m²</td></tr>
+<tr><td>$b$</td><td>翼展</td><td>2.10</td><td>m</td></tr>
+<tr><td>$\bar c$</td><td>平均气动弦长</td><td>0.3571</td><td>m</td></tr>
+<tr><td>$I_{xx}, I_{yy}, I_{zz}$</td><td>转动惯量</td><td>1.2290 / 0.1702 / 0.8808</td><td>kg·m²</td></tr>
+<tr><td>$I_{xz}$</td><td>交叉惯量（飞翼后掠显著不为零）</td><td>0.9343</td><td>kg·m²</td></tr>
+<tr><td>$\delta_e,\delta_a$</td><td>升降舵/副翼偏转范围</td><td>±30°（±0.52 rad）</td><td>rad</td></tr>
+<tr><td>$P_{\text{max}}$</td><td>电机功率（<code>electric800W.xml</code> 声明值）</td><td><strong>8.0</strong>（⚠️ 疑点，见问题清单 7）</td><td>W</td></tr>
+</table>
+<p>⚠️ note 第 6 节写「Skywalker X8 约 2.5 kg」，与模型文件的 3.364 kg 不符；论文正文未给出质量数值，本文按模型文件 3.364 kg 核算。</p>
+<h4>1.3 论文符号总表（§3 各公式）</h4>
+<table><tr><th>符号</th><th>含义</th><th>单位/取值</th></tr>
+<tr><td>$t_f,\ T(s_t,a_t)$</td><td>总飞行时间；6-DOF 状态转移（由 JSBSim 数值积分实现）</td><td>s；—</td></tr>
+<tr><td>$h, h_{\min}, d_r$</td><td>高度（NED 的 $-z$）；最低高度 10 m；到达距离阈值 30 m</td><td>m</td></tr>
+<tr><td>$\boldsymbol p_g, \boldsymbol p(t_f)$</td><td>目标位置；终止时刻位置</td><td>m</td></tr>
+<tr><td>$\boldsymbol v,\boldsymbol \omega,\boldsymbol F,\boldsymbol M,\boldsymbol I$</td><td>速度、角速度、合力、合力矩、惯性张量</td><td>m/s、rad/s、N、N·m、kg·m²</td></tr>
+<tr><td>$D,Y,L$</td><td>风轴系阻力、侧力、升力（$\boldsymbol F_a=\boldsymbol R_b^w[-D,\,Y,\,-L]^T$）</td><td>N</td></tr>
+<tr><td>$\alpha_a,\beta_s$</td><td>迎角、侧滑角</td><td>rad</td></tr>
+<tr><td>$\psi_g, d_h, d_v$</td><td>航向偏差（wrap 到 $(-\pi,\pi]$）、水平距离、高度差（观测中带符号；奖励中取绝对值）</td><td>rad、m、m</td></tr>
+<tr><td>$v_a, v_z, \omega_z$</td><td>空速（代码用 $u$）、NED 垂向速度（向下为正）、体轴偏航角速率 $r$</td><td>m/s、m/s、rad/s</td></tr>
+<tr><td>$\theta,\phi,\psi,\omega_x,\omega_y$</td><td>姿态角与角速率（论文标注 $\theta$=roll、$\phi$=pitch，⚠️ 反惯例，见 §7）</td><td>rad、rad/s</td></tr>
+<tr><td>$c_a,c_e,c_t$</td><td>副翼、升降舵指令（±1）；油门（0–1）</td><td>—</td></tr>
+<tr><td>$\alpha_1..\alpha_7,\beta_1$</td><td>归一化/反归一化系数：0.01, 0.02, 0.05, 0.1, 0.5, 6, 3；$\beta_1=20$ m/s</td><td>—</td></tr>
+<tr><td>$k_1,k_2,k_3$</td><td>奖励权重 0.25 / 1 / 20</td><td>—</td></tr>
+<tr><td>$\gamma,\varepsilon,\lambda$</td><td>折扣（SB3 默认 0.99）、PPO clip（0.2）、GAE 参数（0.95）</td><td>—</td></tr>
+<tr><td>$d_i$</td><td>训练目标采样基准距离 500 m；$r\sim U(d_i-50,d_i+50)$</td><td>m</td></tr>
+</table>
+<hr>
+<h3>2. 公式 (1)：最短时间飞行问题（POMDP 形式化 → 时间最优控制的 PMP/HJB 结构）</h3>
+<p>论文原文（PDF 第 5 页，两份文本抽取一致）：</p>
+<p>$$\min_{a_t}\; t_f \qquad \text{s.t.}\quad s_{t+1}\sim T(s_t,a_t),\quad h\ge h_{\min},\quad \|\boldsymbol p(t_f)-\boldsymbol p_g\|\le d_r \tag{1}$$</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 最短时间飞行问题（论文式 (1)）</span>
+$$\min_{a_t}\; t_f \quad \mathrm{s.t.}\quad s_{t+1}\sim T(s_t,a_t),\quad h\ge h_{\min},\quad \|\boldsymbol p(t_f)-\boldsymbol p_g\|\le d_r$$
+<div class="eq-note"><strong>符号</strong>：$t_f$ 总飞行时间；$a_t$ 时刻 $t$ 的动作；$s_t$ 状态；$T(s_t,a_t)$ 6-DOF 状态转移（JSBSim 以 30 Hz 步进 $\Delta t=1/30$ s 数值积分实现）；$h_{\min}=10$ m（代码为 $10&lt;h&lt;190$，上限 190 在式 (1) 中未写）；$d_r=30$ m 到达阈值；$\boldsymbol p_g$ 目标点。<strong>约束取值的代码对照</strong>：<code>jsbsim_p2p3d_unienv.py</code> L135–142（$z&lt;10$ 或 $z&gt;190$ 终止、距离 $&lt;30$ 到达、$t&gt;40$ s 超时）与 <code>navp2p_v1_test.py</code> L43–44（评估用 30 m / 50 s）。<strong>与式 (13) 的连接</strong>：论文明说「优化目标用于指导奖励设计，安全约束主要通过训练中的终止条件学习」——即式 (1) 不直接求解，而是被 §8 的 shaped reward + 终止条件「翻译」成 POMDP 回报最大化问题。</div>
+</div>
+<h4>2.1 论文的 POMDP 七元组与该问题的对应</h4>
+<p>论文定义 $\langle S,A,T,R,\Omega,O,\gamma\rangle$：$S$ 状态集、$A$ 动作集、$T(s_t,a_t)$ 状态转移、$R(s_t,a_t)$ 即时奖励、$\Omega$ 观测集、$O(o_t|s_{t+1},a_t)$ 观测概率、$\gamma\in[0,1)$ 折扣。本文的对应：$s_t$ = 6-DOF 状态（JSBSim 内部 12 维：位置 3 + 欧拉角 3 + $u,v,w$ 3 + $p,q,r$ 3）；$a_t$ = VLC 的 $[\omega_z,v_a,v_c]$ 或 ALC 的 $[c_a,c_e,c_t]$；$T$ = 式 (2)(3) + 运动学的数值积分；$R$ = 式 (13)；$\Omega$ = 式 (7)/(11) 的观测。</p>
+<h4>2.2 第一性原理对照：把式 (1) 写成标准时间最优控制，看它缺了什么</h4>
+<p>时间最优控制的标准形式（状态 $\dot x=f(x,u)$、控制约束 $u\in\mathcal U$、自由末端时间）：</p>
+<p>$$J=\int_0^{t_f} 1\,dt=t_f \qquad \text{终值约束}\quad \psi\big(x(t_f)\big)\le 0 \quad(\text{即 } h\ge h_{\min},\ \|p-p_g\|\le d_r)$$</p>
+<p><strong>庞特里亚金极小值原理（PMP）</strong>：构造哈密顿函数 $H(x,u,\lambda,\lambda_0)=\lambda_0\cdot 1+\boldsymbol\lambda^T f(x,u)$，其中 $\lambda_0\in\{0,1\}$（正规 $\lambda_0=1$）：</p>
+<p>$$\dot{\boldsymbol\lambda}=-\frac{\partial H}{\partial x}\quad(\text{协态方程}),\qquad u^*(t)=\arg\min_{u\in\mathcal U} H(x,u,\lambda)\quad(\text{极小值条件})$$</p>
+<p>$$\text{自由末端时间横截条件：}\quad H\big(x(t_f),u(t_f),\lambda(t_f)\big)=0,\qquad \lambda(t_f)\ \bot\ \text{终值约束流形}$$</p>
+<p><strong>物理解读</strong>：时间最优控制的哈密顿量里 $\lambda_0\cdot 1$ 这一项就是「时间本身有代价」的数学表达；$H(t_f)=0$ 意味着到达目标时「继续飞」已不再产生任何收益——这正是「最短时间」与「最短路径」的本质区别（后者哈密顿不含常数项）。<strong>切换结构</strong>：对线性于控制的系统（如 Dubins 车辆 $\dot\psi=\omega,|\omega|\le\omega_{\max}$），$H$ 对 $\omega$ 线性 ⇒ 极小值条件给出 bang-bang 切换 $\omega^*\in\{-\omega_{\max},+\omega_{\max}\}$（Dubins 曲线由最大曲率圆弧与直线段拼接）。固定翼的 $f$ 对舵面非线性（气动力与 $\alpha,\beta$ 耦合），一般不退化为有限次切换，这正是式 (1) 无法解析解而需要 RL 数值逼近的原因之一。</p>
+<p><strong>HJB 联系</strong>：时间最优值函数 $V(x)=\min_u\{\Delta t+V(x+f(x,u)\Delta t)\}$，令 $\Delta t\to0$ 得（HJB 方程）</p>
+<p>$$0=\min_{u\in\mathcal U}\Big[1+\nabla V(x)^T f(x,u)\Big]\quad\Longrightarrow\quad\min_{u}\nabla V(x)^T f(x,u)=-1$$</p>
+<p>即值函数沿最优轨迹的下降率恒为 1（$V$= 剩余最短时间）。<strong>与 RL 的桥接</strong>：§8 将证明本文式 (13) 的奖励不是 $-1$ 型时间惩罚，而是势函数差分；「时间最优」在 RL 里是通过折扣 $\gamma$ 间接编码的——这是本文方法与教科书时间最优控制之间最值得注意的差异。</p>
+<h4>2.3 疑点与问题标注</h4>
+<ul><li><strong>【表述】「POMDP」名不副实</strong>：环境中观测 $\boldsymbol o_t$ 是状态 $s_t$ 的确定性函数（<code>_get_obs</code> 无任何噪声），$O(o_t|s_{t+1},a_t)$ 实际是 Dirac 分布，问题退化为 MDP。论文未在任何实验中加入观测噪声（摘要中的「atmospheric disturbances」并未出现在 §3 的环境设定里）。</li><li><strong>【记号】$\min_{a_t} t_f$ 不规范</strong>：最优化的决策变量应是策略 $\pi$（或整个动作序列 $a_0,\dots,a_{t_f}$），单时刻动作 $a_t$ 不能决定 $t_f$；且 $t_f$ 本身随机（转移是随机的）。严格写法：$\min_\pi \mathbb E[t_f]$。</li><li><strong>【遗漏】式 (1) 未写出全部实际约束</strong>：代码中的高度上限 190 m、40 s 时限、ALC 的 $|\omega_i|\le 10$ rad/s 角速率约束（<code>jsbsim_p2p3d_alc_unienv.py</code> L152）都不在式 (1) 中——论文用一句「Additional constraints … can be easily incorporated」带过，但 $|h|\le190$ 与角速率约束恰恰是训练中实际生效的硬约束。</li><li><strong>【未赋值】$\gamma$</strong>：POMDP 定义只说 $0\le\gamma&lt;1$，正文与代码都没有给出取值；本文按 SB3 默认 $\gamma=0.99$ 展开 §8 的推导（代码确实未设置 gamma）。</li></ul>
+<hr>
+<h3>3. 公式 (2)(3)：6-DOF 牛顿–欧拉动力学（含分量展开与 X8 数值代入）</h3>
+<p>论文原文（PDF 第 5 页）：</p>
+<p>$$m\dot{\boldsymbol v}+\boldsymbol\omega\times m\boldsymbol v=\boldsymbol F \tag{2}\qquad \boldsymbol I\dot{\boldsymbol\omega}+\boldsymbol\omega\times \boldsymbol I\boldsymbol\omega=\boldsymbol M \tag{3}$$</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2)(3) —— 平移与旋转运动方程（论文式 (2)(3)）</span>
+$$m\dot{\boldsymbol v}+\boldsymbol\omega\times(m\boldsymbol v)=\boldsymbol F,\qquad \boldsymbol I\dot{\boldsymbol\omega}+\boldsymbol\omega\times(\boldsymbol I\boldsymbol\omega)=\boldsymbol M$$
+<div class="eq-note"><strong>符号</strong>：$m$ 质量（模型 3.364 kg）；$\boldsymbol v=(u,v,w)^T$ 机体系线速度；$\boldsymbol\omega=(p,q,r)^T$ 机体系角速度；$\boldsymbol F$ 合力（式 (4)）；$\boldsymbol I$ 惯性张量；$\boldsymbol M$ 合力矩。注意 $\dot{\boldsymbol v}$ 是<strong>分量直接求导</strong>（$\dot u,\dot v,\dot w$），旋转参考系的牵连效应由 $\boldsymbol\omega\times$ 项单独给出——这是把牛顿第二定律从惯性系「搬」到机体系的关键一步。</div>
+</div>
+<h4>3.1 第一性原理推导（转动参考系求导）</h4>
+<p>牛顿第二定律只在惯性系成立：$m\,d\boldsymbol V/dt|_E=\boldsymbol F$。任意矢量 $\boldsymbol b$ 在转动参考系中的求导关系（运动学基本定理）：</p>
+<p>$$\left.\frac{d\boldsymbol b}{dt}\right|_E=\left.\frac{d\boldsymbol b}{dt}\right|_B+\boldsymbol\omega\times\boldsymbol b \quad\Longrightarrow\quad m(\dot{\boldsymbol v}+\boldsymbol\omega\times\boldsymbol v)=\boldsymbol F \quad\checkmark (2)$$</p>
+<p>展开叉积（$\boldsymbol\omega\times\boldsymbol v=(qw-rv,\ ru-pw,\ pv-qu)^T$）得分量形式：</p>
+<p>$$\dot u=rv-qw+\frac{F_x}{m},\qquad \dot v=pw-ru+\frac{F_y}{m},\qquad \dot w=qu-pv+\frac{F_z}{m}$$</p>
+<p>其中 $rv-qw$ 等<strong>不是力</strong>，而是机体旋转带来的牵连（科氏）加速度项——飞机转弯时它们把线速度分量在各体轴间「搬运」，这正是「平动与转动强耦合」的第一个来源。</p>
+<p>角动量定理同样处理：机体系下角动量 $\boldsymbol H=\boldsymbol I\boldsymbol\omega$，</p>
+<p>$$\left.\frac{d\boldsymbol H}{dt}\right|_E=\left.\frac{d\boldsymbol H}{dt}\right|_B+\boldsymbol\omega\times\boldsymbol H=\boldsymbol M\quad\Longrightarrow\quad \boldsymbol I\dot{\boldsymbol\omega}+\boldsymbol\omega\times(\boldsymbol I\boldsymbol\omega)=\boldsymbol M\quad\checkmark (3)$$</p>
+<p>设惯性张量（对称面假设 $I_{xy}=I_{yz}=0$，$I_{xz}\ne0$ 保留——X8 是后掠飞翼，此项大）：</p>
+<p>$$\boldsymbol I=\begin{bmatrix}I_{xx}&amp;0&amp;-I_{xz}\\0&amp;I_{yy}&amp;0\\-I_{xz}&amp;0&amp;I_{zz}\end{bmatrix}\ \xrightarrow{\text{X8 数值}}\ \begin{bmatrix}1.2290&amp;0&amp;-0.9343\\0&amp;0.1702&amp;0\\-0.9343&amp;0&amp;0.8808\end{bmatrix}\ \text{kg·m}^2$$</p>
+<p>展开得三个标量方程（推导：$\boldsymbol I\boldsymbol\omega=(I_{xx}p-I_{xz}r,\ I_{yy}q,\ -I_{xz}p+I_{zz}r)^T$，再做叉积，逐项整理）：</p>
+<p>$$I_{xx}\dot p-I_{xz}\dot r=\big[qr(I_{yy}-I_{zz})+I_{xz}pq\big]+M_x$$</p>
+<p>$$I_{yy}\dot q=\big[pr(I_{zz}-I_{xx})+I_{xz}(p^2-r^2)\big]+M_y$$</p>
+<p>$$-I_{xz}\dot p+I_{zz}\dot r=\big[pq(I_{xx}-I_{yy})-I_{xz}qr\big]+M_z$$</p>
+<p><strong>数值核算（把 X8 参数代入，检查量级）</strong>：X8 的 $I_{xz}/I_{yy}=5.5$，交叉项极大。稳态盘旋（$\dot p=\dot q=\dot r=0$，$p=q=0$，$r=\dot\psi$）时前两式退化为 $0\approx 0+M_x$、$0\approx 0+M_y$——即协调盘旋要求侧向力矩平衡；第三式给出 $M_z\approx I_{xz}\dot r\cdot 0+I_{xz}qr$…代入数值可验证交叉惯量项在 1 rad/s 量级的偏航速率下贡献 $\sim 0.9$ N·m 量级的耦合力矩，与气动力矩（动压 $\bar qS\bar c\approx 245\times0.75\times0.357\approx 66$ N·m × 系数 0.1 量级 ≈ 7 N·m）同量级——<strong>这就是「强耦合」的定量来源，也是简化质点模型（MPC 所用）看不到的东西</strong>。</p>
+<h4>3.2 状态维数与 JSBSim 的实现</h4>
+<p>式 (2)(3) 只是 12 维状态中的 6 个方程（$u,v,w,p,q,r$）；另外 6 个是位置（NED 积分）与姿态运动学（欧拉角或四元数）。JSBSim 内部用四元数存姿态、以欧拉角（yaw-pitch-roll 顺序）输出。论文说「numerically integrates the dynamics model」但<strong>未说明积分器</strong>：代码 <code>jsbsimlib.py</code> L32 只设 <code>sim_frequency_hz=30</code>（$\Delta t=1/30$ s），未设置积分方案 ⇒ JSBSim 用默认积分器。<strong>JSBSim 现版默认</strong>（[FGPropagate.h 源码](https://raw.githubusercontent.com/JSBSim-Team/jsbsim/refs/heads/master/src/models/FGPropagate.h)）：速率用 <strong>Adams-Bashforth 二阶</strong>、位置用 <strong>Trapezoidal</strong>——<strong>note 第 6 节说「RK4 求解」没有依据</strong>（论文与代码均未启用 RK4）。</p>
+<h4>3.3 欠驱动与「为什么任务难」的数学表述</h4>
+<p>控制通道只有 3 个（$c_a,c_e,c_t$：副翼、升降舵、油门；X8 是飞翼，<strong>无方向舵</strong>），而刚体有 6 个自由度。侧向通道没有直接力：转弯必须 bank-to-turn（滚转 → 升力水平分量 → 向心加速度），其稳态转弯半径由</p>
+<p>$$\rho=\frac{v^2}{g\tan\phi}$$</p>
+<p>决定（推导：升力水平分量 $L\sin\phi=mv^2/\rho$、垂向平衡 $L\cos\phi=mg$，两式相除）。这就是「速度–滚转–半径」耦合链：想转小弯 → 大 $\phi$；而大 $\phi$ 需要更大升力 → 更大 $\alpha$ → 更多阻力 → 需要油门补偿 → 但大油门又推高速度增大半径。ALC 的全部优势（§13.3 数值）都源于策略学会了在这条耦合链上做协调，而 PID 的饱和阈值（§12）把 VLC 锁在了大半径区。</p>
+<div class="callout tip"><p><strong>对 note 第 6 节公式组 B 的补充</strong>：该节引用的正是本文式 (2)(3)（矢量形式一致 ✅）。本节补上了：分量展开、X8 惯量矩阵的数值代入、交叉惯量的量级核算、以及「RK4」说法的纠正。</p></div>
+<h3>4. 公式 (4)–(6)：力/力矩分解与风轴→体轴气动力变换（含矩阵逐元素推导）</h3>
+<p>论文原文（PDF 第 5 页）：</p>
+<p>$$\boldsymbol F=\boldsymbol F_a+\boldsymbol F_g+\boldsymbol F_t,\qquad \boldsymbol M=\boldsymbol M_a+\boldsymbol M_t \tag{4}$$</p>
+<p>$$\boldsymbol F_a=\boldsymbol R_b^w(\alpha_a,\beta_s)\begin{bmatrix}-D\\Y\\-L\end{bmatrix} \tag{5}$$</p>
+<p>$$\boldsymbol R_b^w(\alpha_a,\beta_s)=\begin{bmatrix}\cos\alpha_a\cos\beta_s&amp;\cos\alpha_a\sin\beta_s&amp;-\sin\alpha_a\\-\sin\beta_s&amp;\cos\beta_s&amp;0\\\cos\beta_s\sin\alpha_a&amp;\sin\alpha_a\sin\beta_s&amp;\cos\alpha_a\end{bmatrix} \tag{6}$$</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4)(5)(6) —— 力分解与风轴旋转矩阵（论文式 (4)–(6)）</span>
+$$\boldsymbol F=\boldsymbol F_a+\boldsymbol F_g+\boldsymbol F_t,\quad \boldsymbol M=\boldsymbol M_a+\boldsymbol M_t,\qquad \boldsymbol F_a=\boldsymbol R_b^w(\alpha_a,\beta_s)\,[-D,\ Y,\ -L]^T$$
+<div class="eq-note"><strong>符号</strong>：$\boldsymbol F_a$ 气动力、$\boldsymbol F_g$ 重力、$\boldsymbol F_t$ 推力；$\boldsymbol M_a$ 气动力矩、$\boldsymbol M_t$ 推力矩；$D,Y,L$ 风轴系阻力/侧力/升力；$\alpha_a$ 迎角、$\beta_s$ 侧滑角；$\boldsymbol R_b^w$ 风轴→体轴旋转矩阵。<strong>符号冲突提醒</strong>：$L$ 既是升力（式 (5)）又常被用作滚转力矩记号（§3 用 $M_x$ 回避了冲突）；论文对 $\boldsymbol M$ 的分量没有再命名。</div>
+</div>
+<h4>4.1 式 (6) 矩阵的完整推导（构造风轴系 → 验证乘法 → 反推 $\beta_s$ 约定）</h4>
+<p><strong>第 1 步：确定矩阵是哪两个旋转的乘积。</strong> 试算 $R_y(-\alpha)R_z(-\beta)$：</p>
+<p>$$R_y(-\alpha)R_z(-\beta)=\begin{bmatrix}c\alpha&amp;0&amp;-s\alpha\\0&amp;1&amp;0\\s\alpha&amp;0&amp;c\alpha\end{bmatrix}\begin{bmatrix}c\beta&amp;s\beta&amp;0\\-s\beta&amp;c\beta&amp;0\\0&amp;0&amp;1\end{bmatrix}=\begin{bmatrix}c\alpha c\beta&amp;c\alpha s\beta&amp;-s\alpha\\-s\beta&amp;c\beta&amp;0\\s\alpha c\beta&amp;s\alpha s\beta&amp;c\alpha\end{bmatrix}$$</p>
+<p><strong>与式 (6) 逐元素一致</strong> ✅（$c=\cos,s=\sin$）。<strong>第 2 步：验证它是正交阵</strong>：行内积两两为零（如行 1·行 2 $= -c\alpha c\beta s\beta+c\alpha s\beta c\beta=0$）、每行模为 1（如行 1²$=c^2\alpha(c^2\beta+s^2\beta)+s^2\alpha=1$）⇒ 它确是一个旋转矩阵 ✅。<strong>第 3 步：几何构造（反推坐标系定义）</strong>：要求风轴 $x_W$ 沿速度方向。第 1 列是 $\hat x_W$ 在机体系的坐标：</p>
+<p>$$\hat x_W=R_y(-\alpha)R_z(-\beta)\,\hat e_1=(c\alpha c\beta,\ -s\beta,\ s\alpha c\beta)^T\ \Rightarrow\ \boldsymbol v_B=V(c\alpha c\beta,\ -s\beta,\ s\alpha c\beta)$$</p>
+<p>即体→风为 $R_z(\beta)R_y(\alpha)$（先绕 $y_B$ 转 $+\alpha$ 把 $x_B$ 转到速度在对称面的投影上，再绕新的 $z$ 转 $+\beta$ 消侧滑——代 $v_B$ 验算：$R_y(\alpha)v_B=V(c\beta,-s\beta,0)$，再 $R_z(\beta)$ 得 $V(1,0,0)$ ✅）。</p>
+<h4>4.2 式 (4)×(5)×(6) 的逐项展开（气动力分量显式）</h4>
+<p>$$\boldsymbol F_a=\boldsymbol R_b^w\begin{bmatrix}-D\\Y\\-L\end{bmatrix}=\begin{bmatrix}-Dc\alpha c\beta+Yc\alpha s\beta+Ls\alpha\\D s\beta+Yc\beta\\-Ds\alpha c\beta+Ys\alpha s\beta-Lc\alpha\end{bmatrix}$$</p>
+<p><strong>物理直觉验证</strong>：① $\alpha&gt;0$（抬头）时升力贡献 $+Ls\alpha$ 前向分量、$-Lc\alpha$ 向上分量（$z_B$ 向下，负号即向上）✅；阻力贡献 $-Ds\alpha c\beta$ 向下 ✅。② $\beta=0$ 时 $F_y=Y$，即论文的侧力 $Y$ 正向沿 $y_W\approx y_B$（右侧）。③ 迎角为 0 时 $\boldsymbol F_a=(-Dc\beta,\,Ds\beta+Yc\beta,\,-L)$ 与直观一致 ✅。</p>
+<h4>4.3 符号约定陷阱（本节最重要的结论）</h4>
+<p>由 4.1 的第 1 列得 $\boldsymbol v_B/V=(c\alpha c\beta,\ -s\beta,\ s\alpha c\beta)$，即论文式 (6) 隐含的侧滑角定义是</p>
+<p>$$\beta_s=-\sin^{-1}\frac{v}{V}\qquad(\text{OpenFlight 式 (6) 隐含})$$</p>
+<p>而航空教科书与 JSBSim 的标准约定是 $\beta=\sin^{-1}(v/V)$（$v=+V\sin\beta$，正侧滑 = 风从右前方来）。两者<strong>差一个符号</strong>：OpenFlight 式 (6) 就是标准矩阵 $R_y(-\alpha)R_z(\beta)$ 做 $\beta\to-\beta$ 替换的结果（等价于把风轴 $y_W$ 轴翻转）。</p>
+<div class="callout danger"><p><strong>实现警告</strong>：若照抄式 (5)(6) 实现仿真，但 $\beta$ 用标准公式 $\beta=\sin^{-1}(v/V)$ 计算（JSBSim 内部正是这么做的），则 $\boldsymbol F_a$ 的 $y$ 分量 $Ds\beta+Yc\beta$ 的符号与论文意图相反，侧力/偏航力矩全部反号。论文没有在式 (6) 附近声明其 $\beta_s$ 符号约定——这是一个真实的「照抄实现会翻车」点。两份文本抽取给出的矩阵排列完全一致，且该矩阵恰等于 $R_y(-\alpha)R_z(-\beta)$ 这一「自然」形式，故矩阵本身可信；<strong>但仍建议对照 PDF 第 5 页人工复核矩阵的第 2 列符号</strong>（本模型无法读图）。</p></div>
+<div class="callout idea"><p><strong>与 NeuralPlane 附录 A 的对比（跨论文交叉验证）</strong>：NeuralPlane 式 (6) 的 $[T_{BW}]=R_y(-\alpha)R_z(-\beta)$ 展开为 $\begin{bmatrix}c\alpha c\beta&amp;-c\alpha s\beta&amp;-s\alpha\\s\beta&amp;c\beta&amp;0\\s\alpha c\beta&amp;-s\alpha s\beta&amp;c\alpha\end{bmatrix}$，且其式 (7) 用 $v=+V\sin\beta$（自洽）。OpenFlight 式 (6) 与其唯一区别是 $\beta$ 相关元素的符号（第 2 列、第 1 行第 2 元素），即两篇论文的 $\beta$ 约定相反。两文同源于 JSBSim 生态，此处差异值得注意。</p></div>
+<h4>4.4 「高保真」的具体化：把 x8.xml 的气动模型写成数学（无编号式 (D1)–(D3)）</h4>
+<p>论文说「aerodynamic coefficients derived from wind tunnel experiments」但没给系数。模型文件 <code>x8\x8.xml</code>（数据来自 Gryte et al. 2018 风洞 + CFD）给出完整系数，其数学形式为（JSBSim 约定：$C_{Lq}$ 乘 $q\bar c/(2V)$，$C_{lp}$ 乘 $pb/(2V)$，等等；$\bar q=\tfrac12\rho V^2$ 动压，$S$ 机翼面积，$\bar c$ 弦长，$b$ 翼展）：</p>
+<p>$$C_L=0.0867+4.0203\,\alpha+3.87\,\frac{q\bar c}{2V}+0.2781\,\delta_e \tag{D1}$$</p>
+<p>$$C_D=0.0197+0.0791\,\alpha+1.0555\,\alpha^2-0.0058\,|\beta|+0.1478\,\beta^2+0.0633\,|\delta_e| \tag{D2}$$</p>
+<p>$$C_Y=-0.2239\,\beta-0.1374\,\frac{pb}{2V}+0.0839\,\frac{rb}{2V}+0.0433\,\delta_a$$</p>
+<p>$$C_l=-0.0849\,\beta-0.4042\,\frac{pb}{2V}+0.0555\,\frac{rb}{2V}+0.1202\,\delta_a \tag{D3}$$</p>
+<p>$$C_m=0.0227-0.4629\,\alpha-1.3012\,\frac{q\bar c}{2V}-0.2292\,\delta_e,\qquad C_n=0.0283\,\beta+0.0044\,\frac{pb}{2V}-0.072\,\frac{rb}{2V}+0.1202\,\delta_a$$</p>
+<p>力与力矩：$D=\bar qS C_D$，$Y=\bar qS C_Y$，$L=\bar qS C_L$，$M_x=\bar qS b\,C_l$，$M_y=\bar qS\bar c\,C_m$，$M_z=\bar qS b\,C_n$（JSBSim 单位制内部为 ft/slug 系，XML 系数为无量纲）。<strong>数值核算（平飞配平点）</strong>：$m g=3.364\times9.81=33.0$ N；$V=20$ m/s 时 $\bar q=0.5\times1.225\times400=245$ Pa，需 $C_L=33/(245\times0.75)=0.180$ ⇒ $\alpha_{\text{trim}}=(0.180-0.0867)/4.0203=0.0232$ rad $=1.33°$ ✅ 合理。</p>
+<div class="callout warn"><p><strong>「高保真」的边界（诚实说明）</strong>：D1–D3 是风洞数据的<strong>一阶（线性）拟合 + 个别二次项</strong>——$C_L$ 对 $\alpha$ 是直线（$C_{L\alpha}=4.02$/rad 无失速平台），模型<strong>没有失速、没有大迎角非线性、没有地面效应</strong>。所以「high-fidelity」是相对质点/单车模型而言（确实是 6-DOF + 风洞系数），不是 CFD 级保真度。论文 §2 批评前人用「simplified particle motion models」，自己用的是「linear aerodynamics on 6-DOF」——梯度属实，但读者不应误解为全非线性气动。</p></div>
+<h4>4.5 疑点</h4>
+<ul><li><strong>【实质】$\boldsymbol M_t=0$</strong>：x8.xml 中电机与 thrusters 都在 $(0,0,0)$（重心位置），推力沿 $x_B$ 且无推力线角 ⇒ 推力对重心的力矩恒为 0。论文式 (4) 写 $M=M_a+M_t$ 是通用写法，但本模型里 $M_t\equiv 0$，未说明。</li><li><strong>【电机功率】<code>electric800W.xml</code> 声明 <code>power=8.0 W</code></strong>：文件名是 800 W，JSBSim direct thruster 的推力 $T=P/V$——8 W 在 20 m/s 下只有 0.4 N，远小于阻力（$D=\bar qSC_D\approx245\times0.75\times0.02\approx3.7$ N），<strong>飞机根本飞不起来</strong>；若按 800 W 则 $T=40$ N（推重比 ≈1.2，合理）。该值疑似从 gym-jsbsim 谱系继承的笔误（原仓库该文件路径已不可考，见问题清单 7）。论文未给出推力参数，无法最终定性。</li><li><strong>【单位】</strong>式 (5)(6) 用 SI 记号，但 JSBSim 内部是 ft/slug 制（代码 <code>jsbsimlib.py</code> 大量 <code>*0.3048</code> 换算）；论文未提。</li></ul>
+<hr>
+<h3>5. 公式 (7)(8)：VLC 观测与归一化（逐分量 + tanh 敏感区数值核算）</h3>
+<p>论文原文（PDF 第 6 页）：</p>
+<p>$$\boldsymbol o=[\psi_g,\ d_h,\ d_v,\ v_a,\ v_z,\ \omega_z] \tag{7}$$</p>
+<p>$$\begin{Bmatrix}\boldsymbol o_n[1]=\psi_g/2\pi\\\boldsymbol o_n[2]=\tanh(\alpha_1 d_h)\\\boldsymbol o_n[3]=\tanh(\alpha_2 d_v)\\\boldsymbol o_n[4]=\tanh(\alpha_3(v_a-\beta_1))\\\boldsymbol o_n[5]=\tanh(\alpha_4 v_z)\\\boldsymbol o_n[6]=\omega_z/4\pi\end{Bmatrix} \tag{8}$$</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(7)(8) —— VLC 观测与归一化（论文式 (7)(8)）</span>
+$$\boldsymbol o=[\psi_g,\ d_h,\ d_v,\ v_a,\ v_z,\ \omega_z],\qquad \boldsymbol o_n=\Big[\tfrac{\psi_g}{2\pi},\ \tanh(\alpha_1d_h),\ \tanh(\alpha_2d_v),\ \tanh(\alpha_3(v_a-\beta_1)),\ \tanh(\alpha_4v_z),\ \tfrac{\omega_z}{4\pi}\Big]$$
+<div class="eq-note"><strong>系数</strong>：$\alpha_1=0.01$，$\alpha_2=0.02$，$\alpha_3=0.05$，$\alpha_4=0.1$，$\beta_1=20$ m/s。<strong>代码对照</strong>（<code>jsbsim_p2p3d_unienv.py</code> L92–98）：<code>obs[0]=angle_minus(goal_yaw, yaw)/(2π)</code>、<code>obs[1]=tanh(goal_horiz·0.01)</code>、<code>obs[2]=tanh(goal_vert·0.02)</code>、<code>obs[3]=r/(4π)</code>、<code>obs[4]=tanh((u−20)·0.05)</code>、<code>obs[5]=tanh(v_down·0.1)</code>。归一化系数<strong>逐项一致</strong> ✅；但代码把 $\omega_z$ 放在第 4 位（顺序差异，功能无影响）。</div>
+</div>
+<h4>5.1 每个分量的精确定义（从代码反推，论文未给）</h4>
+<ul><li><strong>$\psi_g$（航向偏差）</strong>：$\psi_g=\operatorname{wrap}\big(\operatorname{atan2}(\Delta y_E,\Delta x_N)-\psi\big)$，wrap 到 $(-\pi,\pi]$（代码 <code>angle_minus</code> L314–325 先 clip 两角再做差折叠）。归一化 $\psi_g/2\pi\in[-0.5,0.5]$。</li><li><strong>$d_h$（水平距离）</strong>：$\sqrt{(\Delta x_N)^2+(\Delta y_E)^2}$。</li><li><strong>$d_v$（高度差，观测中<strong>带符号</strong>）</strong>：$z_g-z$（NED 向下为正：目标更高 ⇒ $d_v&lt;0$）。⚠️ 注意奖励（§8）用的是 $|d_v|$ 的差分——同一符号两种用法，论文文字未区分。</li><li><strong>$v_a$（空速）</strong>：论文称 airspeed，<strong>代码实际用 $u$（体轴前向速度分量）</strong>（L97 <code>v_body_mps[0]</code>，而非 L86 读取的 <code>airspeed</code> 变量——后者在 VLC 环境里读了但没用）。平飞时两者近似，机动时不同，属实现细节偏离。</li><li><strong>$v_z$（NED 垂向速度）</strong>：<code>v_ned_mps[2]</code> 即 $v_{\text{down}}$（<strong>向下为正</strong>；下降时 $v_z&gt;0$）。</li><li><strong>$\omega_z$（偏航角速率）</strong>：体轴 $r$（<code>v_ang_radps[2]</code>）。归一化 $/4\pi$（$|r|\le2\pi$ ⇒ $\in[-0.5,0.5]$）。</li></ul>
+<h4>5.2 归一化设计的数学意图：tanh 的「近场敏感」特性（数值核算）</h4>
+<p>$\tanh(\alpha_1 d_h)$ 在典型距离下的取值：</p>
+<table><tr><th>$d_h$ (m)</th><th>493（初始）</th><th>300</th><th>200</th><th>100</th><th>50</th><th>30（到达）</th><th>10</th></tr>
+<tr><td>$\tanh(0.01d_h)$</td><td>1.000（饱和）</td><td>0.995</td><td>0.964</td><td>0.762</td><td>0.462</td><td>0.291</td><td>0.100</td></tr>
+</table>
+<p>即前 300 m 该分量<strong>几乎恒定在 1</strong>，只在最后 ~200 m 提供分辨率——代码注释 L93 明说「normalize (especially when $d&lt;200$m)」✅ 与设计意图一致。同理 $\tanh(0.02\,d_v)$ 在 100 m 内敏感（注释「especially when $d&lt;100$m」✅）。<strong>归一化动机的数学表述</strong>：直接输入米级距离会让 NN 输入量纲相差 $10^3$ 倍（493 vs 0.5），权重梯度病态；非线性压缩把「远场恒 1、近场精细」的先验编码进输入——这与「到目标的最后阶段才需要精确导航」的物理直觉一致。</p>
+<h4>5.3 疑点与勘误</h4>
+<ul><li><strong>【勘误 note 第 6 节】</strong>该节 Eq.(4) 写「$\tilde o[1]=\Delta\psi/2$」「$\tilde o[6]=\dot\psi/4$」，正确应为 $\psi_g/(2\pi)$ 与 $\omega_z/(4\pi)$（论文式 (8) + 代码 L92/L96 双重证实）；该节说「ALC 角速度除以 2、姿态除以 4」同样应为「角速度 $/4\pi$、姿态 $/2\pi$」。</li><li><strong>【笔误】</strong>式 (7) 前文写「vertical difference $d_g$」而公式与后文均用 $d_v$，两处不一致（小笔误）。</li><li><strong>【顺序】</strong>式 (7) 的顺序 $[v_a,v_z,\omega_z]$ 与代码 $[\omega_z,v_a,v_z]$ 不同（归一化系数一致）。</li><li><strong>【实现偏离】</strong>「空速」观测实际是 $u$；$d_v$ 观测带符号、奖励取绝对值，论文未说明。</li></ul>
+<hr>
+<h3>6. 公式 (9)(10)：VLC 动作与反归一化（含论文自相矛盾与代码实况）</h3>
+<p>论文原文（PDF 第 6 页）：</p>
+<p>$$\boldsymbol a=[\omega_z,\ v_c,\ v_a] \tag{9}\qquad \begin{Bmatrix}\boldsymbol a_d[1]=\alpha_5\boldsymbol a[1]\\\boldsymbol a_d[2]=\alpha_6\boldsymbol a[2]+\beta_1\\\boldsymbol a_d[3]=\alpha_7\boldsymbol a[3]\end{Bmatrix} \tag{10}$$</p>
+<p>其中 $\alpha_5=0.5$、$\alpha_6=6$、$\alpha_7=3$、$\beta_1=20$ m/s。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(9)(10) —— VLC 动作与反归一化（论文式 (9)(10)）</span>
+$$\boldsymbol a=[\omega_z,\ v_c,\ v_a],\qquad \boldsymbol a_d=\big[0.5\,a_1,\ 6\,a_2+20,\ 3\,a_3\big]$$
+<div class="eq-note"><strong>论文语义</strong>：$a[1]$ 期望偏航角速率（rad/s）、$a[2]$ 期望爬升率（m/s）、$a[3]$ 期望空速（m/s）；网络输出 $\in[-1,1]$，反归一化后送底层 PID。<strong>代码实况</strong>（<code>jsbsim_p2p3d_unienv.py</code> L107–109）：<code>yaw_rate_to_heading(a[0])</code>；<code>airspeed_hold_w_throttle((20+6·a[1])·1.94)</code>（节）；<code>altitude_hold_with_rate(10·a[2]·3.28)</code>（ft/s）。</div>
+</div>
+<h4>6.1 反归一化的量纲核算（先按「代码+式 (10)」的语义算）</h4>
+<ul><li><strong>空速通道</strong>：$v_a=6a+20\in[14,26]$ m/s ✅ 论文「stall 略低于 14、最大 26 m/s」完全吻合；代码乘 1.94 换算节（$1/0.5144=1.944$，即 1 m/s=1.944 kt ✅）。</li><li><strong>爬升率通道</strong>：代码 $10a$ ft/s $=10\times0.3048\,a=3.05a$ m/s，与式 (10) 的 $\alpha_7=3$ 一致（论文把 3.05 圆整为 3）✅，范围 $\pm3$ m/s。</li><li><strong>偏航通道</strong>：论文 $\alpha_5=0.5\Rightarrow\omega_z\in[-0.5,0.5]$ rad/s。但代码<strong>没有乘 0.5</strong>：$a[0]\in[-1,1]$ 直接进入 <code>yaw_rate_to_heading</code>，且被当作 <code>error = a[0]×180</code>（度）送进航向 PI 环（详见 §12 算法 D）。即代码把「偏航角速率指令」实现成了「航向偏差指令（1 单位 = 180°）」，与论文语义和数值都不同。</li></ul>
+<h4>6.2 核心问题：式 (9) 与式 (10) 自相矛盾</h4>
+<p>式 (9) 写 $\boldsymbol a=[\omega_z,\ v_c,\ v_a]$，即 $a[2]=v_c$（爬升率）、$a[3]=v_a$（空速）。但式 (10) 第 2 行 $\boldsymbol a_d[2]=6\boldsymbol a[2]+20$ 产生的区间是 $[14,26]$ m/s——<strong>这是空速的区间</strong>（爬升率不可能以 20 m/s 为基准偏置）。代码证实：$a[1]\to$ 空速 $(20+6a[1])$、$a[2]\to$ 爬升率 $(10a[2]$ ft/s$)$。<strong>结论：式 (9) 的顺序应为 $[\omega_z,\ v_a,\ v_c]$，论文把 $v_c$ 与 $v_a$ 的位置写反了</strong>（或式 (10) 的「$+\beta_1$」应挂在第 3 行——两种改法等效，但与打印文本矛盾）。</p>
+<div class="callout warn"><p><strong>连带勘误 note 第 6 节 Eq.(6)</strong>：该节写「$\dot v_c=6a[2]$、$v_a=3a[3]$」——把 6 倍+偏置给了爬升率、3 倍给了空速，<strong>恰好与论文/代码相反</strong>。正确为 $v_a=6a[2]+20$（或按代码位置 $6a[1]+20$）、$v_c=3a[3]$（±3 m/s，代码 10 ft/s）。该节「$v_a\in[14,26]$」的区间结论正确但配错了缩放式。</p></div>
+<h4>6.3 疑点</h4>
+<ul><li><strong>【输出范围假设不成立】</strong>论文说「神经网络输出范围 -1 到 1」。SB3 的 PPO/A2C/SAC/TD3 连续策略头（Gaussian/deterministic）输出<strong>均值无硬约束</strong>（无 tanh 层；<code>p2p3d_net.py</code> 特征提取器也无）。实际范围靠训练收敛到 ±1 附近，越界动作在 VLC 里被下层 PID 截断（俯仰 ±15°/−10° 等），在 ALC 里被 JSBSim 舵面 ±30° 截断。ALC 油门才是显式 $0.5a+0.5$。</li><li><strong>【代码缺 $\alpha_5$】</strong>如上，0.5 的偏航缩放不存在于发布代码。</li></ul>
+<hr>
+<h3>7. 公式 (11)(12)：ALC 观测与归一化（11 维，逐项代码对照）</h3>
+<p>论文原文（PDF 第 6 页）：</p>
+<p>$$\boldsymbol o=[\psi_g,\ d_h,\ d_v,\ v_a,\ v_z,\ \theta,\ \phi,\ \psi,\ \omega_x,\ \omega_y,\ \omega_z] \tag{11}$$</p>
+<p>$$\begin{Bmatrix}\boldsymbol o_n[1]=\psi_g/2\pi,\ \boldsymbol o_n[2]=\tanh(\alpha_1d_h),\ \boldsymbol o_n[3]=\tanh(\alpha_2d_v),\ \boldsymbol o_n[4]=\tanh(\alpha_3(v_a-\beta_1)),\ \boldsymbol o_n[5]=\tanh(\alpha_4v_z)\\\boldsymbol o_n[i]=\boldsymbol o[i]/2\pi,\ i=6,7,8;\qquad \boldsymbol o_n[j]=\boldsymbol o[j]/4\pi,\ j=9,10,11\end{Bmatrix} \tag{12}$$</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(11)(12) —— ALC 观测与归一化（论文式 (11)(12)）</span>
+$$\boldsymbol o=[\psi_g,d_h,d_v,v_a,v_z,\theta,\phi,\psi,\omega_x,\omega_y,\omega_z],\qquad \boldsymbol o_n[6:9]=\boldsymbol o[6:9]/(2\pi),\quad \boldsymbol o_n[9:12]=\boldsymbol o[9:12]/(4\pi)$$
+<div class="eq-note"><strong>代码对照</strong>（<code>jsbsim_p2p3d_alc_unienv.py</code> L95–114）：前 5 维与 VLC 同式；<code>attitude[i]=orientation[i]/(2π)</code>（i=0,1,2）、<code>ang_vel[j]=v_ang_radps[j]/(4π)</code>（j=0,1,2），obs 顺序 = [goal(3), vel(2), attitude(3), ang_vel(3)]。<strong>归一化系数与式 (12) 逐项一致 ✅</strong>。ALC 动作（L118–121）：<code>aileron=a[0]</code>、<code>elevator=a[1]</code>、<code>throttle=a[2]·0.5+0.5</code>（∈[0,1]，与论文「$c_t$ 范围 0–1」一致 ✅；$\pm1$ 舵面指令经 x8.xml 映射到 ±30° 舵偏）。</div>
+</div>
+<h4>7.1 为什么 ALC 必须加姿态与角速率（数学理由）</h4>
+<p>VLC 的 6 维观测隐含「姿态由底层 PID 负责」；ALC 去掉了 PID，策略必须自己实现 bank-to-turn 的协调，而协调的前提是知道滚转/俯仰。形式化：向心转弯需要的滚转指令由 §3.3 的 $\rho=v^2/(g\tan\phi)$ 反解 $\phi^*=\arctan(v^2/(g\rho))$，没有 $\phi$ 的观测就无法做闭环；同理升降舵配平与 $\alpha$（由 $\theta$ 与航迹角之差决定）相关，俯仰角速率 $q$ 是俯仰阻尼反馈。这正是式 (11) 比式 (7) 多 5 维的全部原因。</p>
+<h4>7.2 疑点</h4>
+<ul><li><strong>【记号反惯例】</strong>论文文字标注「attitude angles $\theta$ (roll), $\phi$ (pitch) and $\psi$ (yaw)」——把 $\theta$ 给滚转、$\phi$ 给俯仰，与航空标准（$\phi$=roll、$\theta$=pitch）<strong>相反</strong>；两份文本抽取一致，疑为论文记号选择而非抽取错误，建议对照 PDF 第 6 页人工确认。</li><li><strong>【顺序错位】</strong>代码 <code>get_local_orientation()</code> 返回 [pitch, roll, yaw]（<code>jsbsimlib.py</code> L222–233），故代码 obs 的 6–8 位是 [pitch, roll, yaw]，与式 (11) 的 [$\theta$(roll), $\phi$(pitch), $\psi$] 顺序不同。归一化同为 $/2\pi$，<strong>功能无影响</strong>（网络不关心标签），但严格对应关系如上。</li><li><strong>【同 §5】</strong>$v_a$ 实为 $u$（L99）。</li><li><strong>【范围】</strong>ALC 的 $|\omega|\le10$ rad/s 终止阈值 $&lt;2\pi$，故 $/4\pi$ 归一化始终不饱和 ✅ 自洽。</li></ul>
+<hr>
+<h3>8. 公式 (13)：奖励函数——势函数差分结构与「最短时间」的涌现（本节核心推导）</h3>
+<p>论文原文（PDF 第 7 页）：</p>
+<p>$$r_t=k_1\Delta d_h+k_2\Delta d_v+k_3\Delta\psi_g,\qquad k_1=0.25,\ k_2=1,\ k_3=20 \tag{13}$$</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(13) —— 每步奖励（论文式 (13)）</span>
+$$r_t=0.25\,\Delta d_h+1\cdot\Delta d_v+20\,\Delta\psi_g$$
+<div class="eq-note"><strong>符号</strong>：$\Delta d_h$、$\Delta d_v$、$\Delta\psi_g$ 为 $d_h$、$d_v$、$\psi_g$ 的「每步减小量」；代码（<code>jsbsim_p2p3d_unienv.py</code> L131–133）实现为 <code>(pre − current)·k</code>，其中 pre 为上一状态值（首步用 <code>_setup_flight</code> 里的初始值）。<strong>关键</strong>：代码中 $d_v$ 项取 <code>abs</code>（L121）、$\psi_g$ 项取 <code>abs</code>（L127）——奖励用的是「绝对值型距离度量」的差分，与 §5 观测中带符号的 $d_v$ 不同。</div>
+</div>
+<h4>8.1 核心发现：$r_t$ 恰是势函数差分（reward shaping 定理的精确特例）</h4>
+<p>定义状态函数（均为状态 $s$ 的函数）：</p>
+<p>$$\Phi(s)=0.25\,d_h(s)+d_v(s)+20\,|\psi_g(s)|$$</p>
+<p>由代码逐行（pre 值 = $s_{t-1}$ 时刻的量，current = $s_t$ 时刻的量）可验证<strong>恒等式</strong>：</p>
+<p>$$r_t=\Phi(s_{t-1})-\Phi(s_t)$$</p>
+<p>按 Ng et al. (1999) 势函数塑形定理，形如 $r'_t=r_t+\gamma\Phi(s_{t+1})-\Phi(s_t)$ 的附加项不改变最优策略；本文奖励是 $\Phi(s_{t-1})-\Phi(s_t)$（$\gamma=1$ 时的负形式，且无基础奖励）。<strong>推论 1（折叠和）</strong>：一整局的未折扣收益严格路径无关：</p>
+<p>$$\sum_{t=1}^{T}r_t=\Phi(s_0)-\Phi(s_T)$$</p>
+<p>只取决于起点与终点！也就是说<strong>未折扣意义下，奖励不奖励「快」，只奖励「最终离目标近、航向对准」</strong>。</p>
+<h4>8.2 「最短时间」从哪来：$\gamma$ 折扣把势函数差分变成时间偏好（完整推导）</h4>
+<p>PPO 优化的是折扣回报。设折扣 $\gamma=0.99$（SB3 默认，代码未改），逐项展开：</p>
+<p>$$\begin{aligned}R_0&=\sum_{t=1}^{T}\gamma^{\,t-1}r_t=\sum_{t=1}^{T}\gamma^{\,t-1}\big(\Phi_{t-1}-\Phi_t\big)\\&=\underbrace{\Phi_0+\gamma\Phi_1+\dots+\gamma^{T-1}\Phi_{T-1}}_{\text{前半}}-\underbrace{\big(\Phi_1+\gamma\Phi_2+\dots+\gamma^{T-1}\Phi_T\big)}_{\text{后半}}\\&=\Phi_0-(1-\gamma)\sum_{t=1}^{T-1}\gamma^{\,t-1}\Phi_t-\gamma^{T-1}\Phi_T\end{aligned}$$</p>
+<p><strong>逐项解读</strong>：① $\Phi_0$ 与策略无关（常数）；② $\gamma^{T-1}\Phi_T\approx0$（$T=750$ 步即 25 s 时 $0.99^{749}\approx5\times10^{-4}$——<strong>最终是否对准目标几乎不影响学习信号</strong>，信号全靠过程）；③ 决定性的是中间项 $-(1-\gamma)\sum\gamma^{t-1}\Phi_t$：权重 $(1-\gamma)\gamma^{t-1}=0.01\times0.99^{t-1}$ 在 $t\lesssim200$ 步（约 6.7 s）内显著（$0.99^{200}=0.134$）。$\Phi_t$ 大 = 当时的距离/航向偏差还很大 = 进展慢。于是<strong>「早把 $\Phi$ 压下去」的策略获得高回报——时间偏好完全由 $\gamma$ 编码</strong>。</p>
+<div class="callout idea"><p><strong>反事实检验</strong>：若 $\gamma=1$，$R_0=\Phi_0-\Phi_T$ 严格路径无关——「磨蹭 39 秒到达」与「20 秒到达」获得完全相同的回报，最短时间<strong>不会涌现</strong>（只有 40 s 时限这种弱约束起作用）。本文方法的 min-time 性质因此本质上依赖 $\gamma$ 与 30 Hz 时间离散（$\gamma^{30}=0.74$，1 秒的延迟就折扣 26%）。论文从未讨论这一机制——这是理解「为什么它不是时间最优控制（PMP 的 $\lambda_0=1$）却产出近似时间最优策略」的关键。</p></div>
+<h4>8.3 数值核算 1：训练曲线收敛值 ≈180 的验算</h4>
+<p>初始 $\Phi_0$ 的期望（目标采样 $d\sim U(450,550)$、$\theta\sim U(1.41,1.73)$、$\phi\sim U(-\pi,\pi)$）：</p>
+<p>$$\mathbb E[\Phi_0]=0.25\,\mathbb E[d\sin\theta]+\mathbb E[d|\cos\theta|]+20\,\mathbb E[|\phi|]=0.25\times500\times0.998+500\times0.080+\frac{20\pi}{2}\approx124.7+40.0+31.4\approx196$$</p>
+<p>（$\mathbb E[\sin\theta]=\frac{1}{0.32}\int_{1.41}^{1.73}\sin\theta\,d\theta=0.998$；$\mathbb E|\cos\theta|=0.080$；$\mathbb E|\phi|=\pi/2$。）到达时（3D 距离 $d_T&lt;30$）$\Phi_T=0.25d_T+d_T+20|\psi_g(T)|\approx15\text{–}35$。于是典型局未折扣收益 $\approx196-25\approx165\text{–}180$——<strong>与 Fig.3 训练曲线收敛值「approximately 180」吻合</strong> ✅（收敛水平还叠加了超时局拖低的效应，量级一致即算通过）。</p>
+<h4>8.4 数值核算 2：权重平衡原则（论文「三项绝对值接近」的定量验证）</h4>
+<table><tr><th>飞行段（30 Hz 每步）</th><th>$\Delta d_h$（步）</th><th>$0.25\Delta d_h$</th><th>$\Delta d_v$</th><th>$1\cdot\Delta d_v$</th><th>$\Delta|\psi_g|$</th><th>$20\Delta|\psi_g|$</th></tr>
+<tr><td>直飞 20 m/s 对准目标</td><td>≈0.66 m</td><td><strong>0.17</strong></td><td>≈0</td><td>0</td><td>≈0</td><td>0</td></tr>
+<tr><td>爬升 3 m/s（正对目标）</td><td>≈0.66 m</td><td>0.17</td><td>≈0.10 m</td><td><strong>0.10</strong></td><td>≈0</td><td>0</td></tr>
+<tr><td>转弯 $r$=1 rad/s</td><td>≈0.3 m</td><td>0.08</td><td>≈0</td><td>0</td><td>≈0.033 rad</td><td><strong>0.66</strong></td></tr>
+</table>
+<p>三项各自在「自己主导的飞行段」上量级为 0.1–0.7，最大（航向项 0.66）与最小（垂向项 0.10）在同一数量级内 ✅——论文「调权重使三项绝对量级接近」的原则经得起数值检验；航向项偏大也与「航向对准比距离更关键」的观察（note.md）一致。</p>
+<h4>8.5 疑点</h4>
+<ul><li><strong>【设计】没有时间惩罚</strong>：$r_t$ 不含 $-1$（每步）项，与多数 min-time RL 工作（如 drone racing）不同；时间最优完全依赖 $\gamma$（§8.2），论文未讨论。</li><li><strong>【非光滑】$|\psi_g|$ 在 $\psi_g=0$ 处不可微</strong>：奖励（而非值函数）不可微无碍训练，但使奖励地形在过零处有折点。</li><li><strong>【无事件奖励】</strong>到达/坠毁奖励均为 0（与 NeuralPlane 的 ±200 事件奖励不同）；「到达即终止」本身就是隐式信号。</li><li><strong>【$\Delta d_v$ 与 $\Delta\psi_g$ 的绝对值口径】</strong>论文式 (13) 与 §5 的 $d_v$（带符号）共用符号，但代码奖励用 $|d_v|$、$|\psi_g|$ 的差分，论文未声明。</li></ul>
+<h3>9. 网络结构与算法 A：PPO 严格推导（含 GAE 与超参数核算）</h3>
+<p>论文 Fig.1 的网络（原文为图，无编号公式；数学化为补充式 (D4)）——代码 <code>network/p2p3d_net.py</code> L13–18 与论文 §3.5 完全一致：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D4) —— 策略/价值网络（Fig.1 数学化，代码逐行核对）</span>
+$$\boldsymbol h_1=\mathrm{ReLU}(\boldsymbol W_1\boldsymbol o_n+\boldsymbol b_1)\in\mathbb R^{64},\qquad \boldsymbol h_2=\mathrm{ReLU}(\boldsymbol W_2\boldsymbol h_1+\boldsymbol b_2)\in\mathbb R^{64},\qquad \boldsymbol\mu=\boldsymbol W_\mu\boldsymbol h_2+\boldsymbol b_\mu\in\mathbb R^3$$
+<div class="eq-note"><strong>说明</strong>：论文的「两层 FC×64 + ReLU」是 SB3 的 <code>features_extractor</code>（<code>P2p3dNetwork</code>）；其上 SB3 的 <code>MlpPolicy</code> 再接 actor 头（输出 3 维均值 $\boldsymbol\mu$ + 可学习 log-std）与 critic 头（输出标量 $V$）。<strong>注意</strong>：<strong>没有 tanh 输出层</strong>——论文 §3.3.2「网络输出范围 -1 到 1」严格说只由训练收敛保证（§6.3 已标注）。<strong>参数核算</strong>：VLC（6 维入）：$6\times64+64=448$、$64\times64+64=4160$、actor $64\times3+3=195$、critic $64+1=65$，共 $\approx4868$ 个权重；ALC（11 维入）多 $5\times64=320$，共 $\approx5188$。这是极小的策略网络（对比 NeuralPlane 的 [128,128]+GRU），印证 note 第 11 节的「Less is more」。</div>
+</div>
+<h4>9.1 PPO 目标函数推导（Schulman 2017，SB3 实现口径）</h4>
+<p><strong>第 1 步：重要性采样比。</strong> 策略从旧参数 $\theta_{\text{old}}$ 采集数据、用新参数 $\theta$ 更新：</p>
+<p>$$r_t(\theta)=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)},\qquad r_t(\theta_{\text{old}})=1$$</p>
+<p><strong>第 2 步：clipped surrogate 目标。</strong> 用优势函数 $\hat A_t$ 加权并截断比值，阻止过大的策略步：</p>
+<p>$$L^{\text{CLIP}}(\theta)=\hat{\mathbb E}_t\Big[\min\big(r_t(\theta)\hat A_t,\ \operatorname{clip}(r_t(\theta),\,1-\varepsilon,\,1+\varepsilon)\,\hat A_t\big)\Big],\qquad \varepsilon=0.2$$</p>
+<p>解读：当 $\hat A_t&gt;0$（好动作）时 clip 上限 $1+\varepsilon$ 防止 $\pi_\theta$ 过度放大该动作；当 $\hat A_t&lt;0$ 时 clip 下限 $1-\varepsilon$ 防止过度抑制。$\min$ 取两者较小者 = 保守估计 ⇒ 形成 trust region。</p>
+<p><strong>第 3 步：GAE 优势估计。</strong> TD 残差 $\delta_t=r_t+\gamma V(s_{t+1})-V(s_t)$，广义优势估计为残差的指数加权和：</p>
+<p>$$\hat A_t^{\text{GAE}}=\sum_{l=0}^{\infty}(\gamma\lambda)^l\delta_{t+l},\qquad \gamma=0.99,\ \lambda=0.95$$</p>
+<p>（$\lambda=0$ 退化为 1 步 TD、$\lambda=1$ 为 Monte Carlo；0.95 取折中。）<strong>第 4 步：总损失</strong>（SB3）：</p>
+<p>$$L(\theta)=L^{\text{CLIP}}(\theta)-c_1\hat{\mathbb E}\big[(V_\theta(s_t)-V_t^{\text{targ}})^2\big]+c_2\,S[\pi_\theta],\qquad c_1=0.5,\ c_2=0$$</p>
+<p><strong>⚠️ 注意 $c_2=0$</strong>：代码未设置 <code>ent_coef</code>，SB3 默认熵系数为 0——即本实验的 PPO<strong>没有任何熵正则</strong>。论文说「same training parameters」时未提这一点。</p>
+<h4>9.2 超参数与更新规模核算（<code>navp2p_v1_train.py</code>/<code>navp2p_v3_train.py</code> L30–48、L68–72）</h4>
+<table><tr><th>超参数</th><th>取值</th><th>来源</th></tr>
+<tr><td>学习率</td><td>$2.5\times10^{-4}$</td><td>代码显式</td></tr>
+<tr><td>minibatch</td><td>32</td><td>代码显式（论文 §3.7.2 提「batch size」）</td></tr>
+<tr><td>rollout 长度 $n_{\text{steps}}$</td><td>2048</td><td>SB3 默认（代码未改）</td></tr>
+<tr><td>并行环境数</td><td>16</td><td>代码显式（论文只说「multiple」）</td></tr>
+<tr><td>总步数</td><td>$2\times10^6$</td><td>代码显式 = 论文 Fig.3 横轴 ✓</td></tr>
+<tr><td>epochs / clip $\varepsilon$ / $\gamma$ / $\lambda$ / 梯度裁剪</td><td>10 / 0.2 / 0.99 / 0.95 / 0.5</td><td>SB3 默认</td></tr>
+<tr><td>熵系数 / 价值损失权重</td><td>0 / 0.5</td><td>SB3 默认</td></tr>
+</table>
+<p><strong>核算</strong>：每次更新样本数 $=16\times2048=32768$；$2\times10^6/32768\approx61$ 次策略更新/训练会话；训练曲线（Fig.3）横轴 0–2×10⁶ 时间步 ✓ 完全对应。30 Hz 控制频率下 $2\times10^6$ 步 ≈ 18.5 小时仿真时长（乘以 16 并行 ≈ 1.2 小时墙钟，若仿真比实时快则更短）。</p>
+<h4>9.3 为什么 PPO 在 ALC 上独赢（理论解释）</h4>
+<p>ALC 的舵面→状态增益高（如 $\delta_a$ 0.12 的 $C_{l\delta_a}$ 在 1 rad 量级偏差下即产生饱和滚转），且每步 $\Delta t=33$ ms 的闭环增益高。off-policy 算法（TD3/SAC）用重放缓冲中的旧数据训练 Q 函数，Q 值外推误差（overestimation bias）在高增益动力学下被放大；A2C 的 vanilla 策略梯度方差大，在敏感动作空间里一步坏更新就进入不可恢复区域（论文观察：A2C 坠机）。PPO 的 clip trust region 恰好把每步更新限制在「不至于毁掉策略」的范围——这就是 on-policy + trust region 在此任务中不可替代的数学理由。</p>
+<hr>
+<h3>10. 算法 B：A2C / TD3 / SAC 的目标函数与失败机理（简短推导）</h3>
+<ul><li><strong>A2C（Mnih 2016）</strong>：同步 actor-critic，$\nabla_\theta J\approx\hat{\mathbb E}\big[\nabla_\theta\log\pi_\theta(a|s)\,\hat A_t\big]$，$\hat A_t$ 为 $n$ 步优势。无信任域、无重要性采样修正 → 高方差；ALC 下策略高频振荡直至坠毁（论文将其排除出 Table 1，Appendix A 图 7(a) 可见 VLC 尚可）。</li><li><strong>TD3（Fujimoto 2018）</strong>：确定性策略 $\mu_\theta$ + 双 Q 网络取 $\min$ 抑制过估计：$$y=r+\gamma\min_{i=1,2}Q'_i\big(s',\ \mu'(s')+\operatorname{clip}(\tilde\varepsilon,-c,c)\big),\qquad \tilde\varepsilon\sim\mathcal N(0,\sigma)$$ 目标网络软更新、策略延迟更新（每 2 步）。ALC 下 $26.08\pm1.39$ s——反而慢于它自己的 VLC（$25.89$ s），且附录 B 显示明显速度振荡。</li><li><strong>SAC（Haarnoja 2018）</strong>：最大熵目标 $$J=\sum_t\mathbb E_{s,a}\big[r_t+\alpha\,\mathcal H(\pi(\cdot|s))\big]$$ 软 Q 迭代 + 重参数化高斯策略。ALC 下全部 64 目标超时（$50.00\pm0.0$ s，与「fail to drive the UAVs to any target point within the time limit」的表述数值上严格一致——50 s 上限的确定性后果）。</li></ul>
+<p><strong>共同点</strong>：三者与 PPO 的差别都不在表示能力，而在<strong>更新机制对高增益闭环的鲁棒性</strong>——这与 note 第 7 节「原理 3」的论述一致，此处补上了量化证据（Table 1 数值）。</p>
+<hr>
+<h3>11. 算法 C：训练与评估协议（从代码重建的伪代码 + 逐项数值核对）</h3>
+<h4>11.1 训练循环（论文 §3.7 文字 ↔ 代码重建）</h4>
+<pre class="code-block"><code># 重建自 navp2p_v1/v3_train.py + jsbsim_p2p3d_*_unienv.py（非论文原伪代码，论文无伪代码）
+num_envs = 16; n_steps = 2048; total = 2e6
+for iteration in range(total // (num_envs * n_steps)):      # ≈ 61 次
+    for each parallel env:                                   # rollout
+        o = env.reset()          # 初始: 高度100 m, u=16 m/s, 姿态/角速率=0
+        for t in range(n_steps):
+            a ~ pi(o)            # VLC: [w_z, v_a, v_c] → 反归一化 → X8Autopilot
+                                 # ALC: [c_a, c_e, c_t] → 直接写 fcs/*-cmd-norm
+            o2, r, done = env.step(a)   # step = do_action + JSBSim fdm.run() (dt=1/30 s)
+            store(o, a, r, done, V(o))  # r = 0.25·Δd_h + Δd_v + 20·Δψ_g
+            if done: reset()
+    compute GAE returns (γ=0.99, λ=0.95)
+    for epoch in range(10):     # minibatch=32 的 PPO 更新, lr=2.5e-4
+        update actor + critic</code></pre>
+<h4>11.2 目标点采样（§3.7.1 的数值推导）</h4>
+<p>球坐标采样 $\theta\sim U(1.41,1.73)$、$\phi\sim U(-\pi,\pi)$、$d\sim U(450,550)$（米），目标（代码 L64–69）：</p>
+<p>$$x_g=d\sin\theta\cos\phi,\qquad y_g=d\sin\theta\sin\phi,\qquad z_g=d\cos\theta+100\quad(\text{高度，向上为正})$$</p>
+<p><strong>核算</strong>：$\cos(1.41)=+0.160$、$\cos(1.73)=-0.159$ ⇒ $z_g\in[100-80,\ 100+80]=[20,180]$ m ✅ 论文「height constrained within a specific range」即此区间；水平距离 $d\sin\theta\in[444,543]$ m（$\sin\theta\in[0.987,1]$）——论文 §4.2.1 说评估目标「500 m 水平距离」是评估专用设置（代码 <code>test_multi</code> L46 精确 500 m），训练采样是 3D 距离 450–550。二者不同，论文未强调。</p>
+<h4>11.3 终止条件总表（训练/评估分列）</h4>
+<table><tr><th>条件</th><th>VLC 训练（unienv L135–142）</th><th>ALC 训练（alc L148–157）</th><th>评估（test L42–53）</th></tr>
+<tr><td>高度</td><td>$z&lt;10$ 或 $z&gt;190$ m</td><td>同左</td><td>同左</td></tr>
+<tr><td>到达</td><td>3D 距离 $&lt;30$ m</td><td>同左</td><td>$\le30$ m</td></tr>
+<tr><td>角速率</td><td>—</td><td>$|\omega_i|&gt;10$ rad/s</td><td>—</td></tr>
+<tr><td>时限</td><td>40 s</td><td>40 s</td><td><strong>50 s</strong>（与 Table 1 注一致 ✅）</td></tr>
+</table>
+<p><strong>疑点</strong>：训练 40 s、评估 50 s——论文 §3.6 只写了 40 s 训练时限，Table 1 用 50 s 口径（SAC-ALC 的 50.00 s 由此而来）；两口径的差异未在正文说明。</p>
+<hr>
+<h3>12. 算法 D：VLC 底层 PID 链（从 <code>jsbsimlib.py</code> 逐行重建的差分方程）</h3>
+<p>VLC 的「速度级指令」由 <code>X8Autopilot</code> 的 5 个 PID 环翻译成舵面/油门。把每个函数写成数学（$e_k$ 为第 $k$ 步误差，积分用欧拉累加）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D5) —— X8Autopilot 五环差分方程（代码重建，增益为代码字面值）</span>
+$$\begin{aligned}\text{(a) 航向环（yaw_rate_to_heading, L527–549）：}\quad& e_k=180\cdot a[0]\ (\text{度}),\quad e_k\leftarrow\operatorname{wrap}_{[-180,180]}(e_k),\\&\phi_c=\operatorname{clip}\Big(-0.0100115\,e_k-0.003191\sum_j e_j,\ \pm 30^\circ\Big)\\[4pt]\text{(b) 滚转环（roll_hold, L443–461）：}\quad& \delta_a=-0.20\,(\phi_c-\phi)+0.089\,p\\[4pt]\text{(c) 爬升率环（altitude_hold_with_rate, L551–568）：}\quad& \theta_c=\operatorname{clip}\Big(-\big(0.03\,e_k+0.6\textstyle\sum_j e_j\big),\ -10^\circ,\ +15^\circ\Big),\ e_k=\dot h_c\ \text{(ft/s)}\\[4pt]\text{(d) 俯仰环（pitch_hold, L423–441）：}\quad& \delta_e=1.0\,(\theta_c-\theta)+0.03\,q\\[4pt]\text{(e) 空速环（airspeed_hold_w_throttle, L487–506）：}\quad& \delta_t=\operatorname{clip}\Big(-\big(1.0\,e_k+0.035\textstyle\sum_j e_j\big),\ 0,\ 1\Big),\ e_k=v_c-v\ \text{(kt)}\end{aligned}$$
+<div class="eq-note"><strong>增益来源</strong>：kp/ki 均为代码字面值（如 <code>kp=-2.0023*0.005=-0.0100115</code>）。<strong>输入换算</strong>：VLC 动作经 §6.1 的反归一化后进入各环——$v_c=(20+6a[1])\times1.94$ kt（<code>1.94</code> 即 m/s→kt 系数 $1/0.5144$）；$\dot h_c=10a[2]$ ft/s（<code>3.28</code> 即 m→ft）；$a[0]$ 直接进航向环。<strong>结构</strong>：(a)→(b) 串级、(c)→(d) 串级、(e) 独立——即「外环航向/爬升率 → 内环滚转/俯仰 → 舵面」+ 油门空速环，正是论文 §1 批评的 multi-layered 结构。</div>
+</div>
+<h4>12.1 两个符号疑点（代码作者自己也留了疑问）</h4>
+<ul><li><strong>滚转环负号</strong>：$\delta_a=-0.20(\phi_c-\phi)+0.089p$ 的负号——作者在 L460 注释里写「GZ.W: why here is a negative symbol?」。按 x8.xml 的定义（正 $\delta_a$ ⇒ $C_{l\delta_a}=+0.1202$ ⇒ 正 $p$，即正副翼右滚），要增加右滚应给正 $\delta_a$，纸面上此负号反号；可能被 simple_pid 的积分项或 effective-aileron 的合并方向补偿（x8.xml L225–230 左右副翼同号相加），实机行为以仿真运行为准，此处如实标注。</li><li><strong>空速环负号</strong>：$\delta_t=\operatorname{clip}(-(1.0e_k+0.035\sum e_j),0,1)$——太慢时 $e_k&gt;0$ ⇒ 油门被推向 0，纸面上是<strong>正反馈</strong>。一个自洽的解释链：若模型推力本就≈0（§4.5 的 8 W 疑点），速度维持实际靠俯仰–高度交换（下俯加速），油门环在滑翔机近似下几乎无作用，「错误的符号」因此从未暴露。此解释与论文 Fig.5 的观察（14 m/s 因升力不足而盘旋、末端高度紧张）一致。二者均需人工验证（本模型无法运行该遗留 JSBSim 模型，见问题清单 7）。</li></ul>
+<h4>12.2 转弯半径的定量核算（解释 Fig.4 的 VLC 大半径）</h4>
+<p>滚转饱和 $\pm30°$ + §3.3 的 $\rho=v^2/(g\tan\phi)$：</p>
+<p>$$\rho_{\min}^{\text{VLC}}=\frac{v^2}{9.81\tan 30^\circ}=\{34.6,\ 70.7,\ 119.5\}\ \text{m}\quad(v=14,\ 20,\ 26\ \text{m/s})$$</p>
+<p>目标在 500 m 外、方位角均匀分布，需要平均转向 $\sim90°$；$v=20$ m/s 时最小半圆掉头弧长 $\pi\times70.7=222$ m。而 ALC 没有滚转上限（副翼直接 ±30°，可达极限滚转角），转弯半径由气动极限决定——Fig.4(f) 的极小半径转弯正是这个差异的体现。论文「VLC 受 PID 安全阈值限制」的定性表述在此得到了定量核算支持 ✅。</p>
+<hr>
+<h3>13. 算法 E/F：MPC 与 3D Dubins 对比协议（重建）与时间下界核算</h3>
+<h4>13.1 MPC 的数学重建（论文 §4.2.1 只给了文字，标注为重建）</h4>
+<p>论文文字：「simplified unicycle kinematic model」「prediction horizon of 0.33 seconds (10 steps at 30 Hz)」「SLSQP」「cost minimizes position error and control effort」「constraints on linear and angular velocity limits」。按此重建：</p>
+<p>$$\dot x=v\cos\psi,\quad \dot y=v\sin\psi,\quad \dot z=v_z,\quad \dot\psi=\omega\qquad(\text{unicycle}+\text{垂直通道})$$</p>
+<p>离散（$\Delta t=1/30$ s，欧拉）预测 $N=10$ 步，决策变量 $\boldsymbol u_0,\dots,\boldsymbol u_{N-1}\in\mathbb R^3$（30 维）：</p>
+<p>$$J=\sum_{k=0}^{N-1}\Big[w_p\|\boldsymbol p_k-\boldsymbol p_g\|^2+w_u\|\boldsymbol u_k-\boldsymbol u_{\text{ref}}\|^2\Big]+w_T\|\boldsymbol p_N-\boldsymbol p_g\|^2$$</p>
+<p>约束（论文只说了有限制，具体数值未给，本文按 X8 包线合理假设）：$v\in[14,26]$ m/s、$|\omega|\le\omega_{\max}$、$|v_z|\le3$ m/s。每 33.3 ms 用 SLSQP 重解一次（滚动时域）。<strong>为什么它干不过 ALC</strong>：① 模型是质点运动学，看不到式 (2)(3) 的惯量与耦合（§3.1 的 $I_{xz}$ 项）；② 0.33 s 的短时域（10 步）意味着「看到」的终点是 6.6 m 外（20 m/s 时）——几乎只能局部贪心；③ 其结果（25.50 s）优于 Dubins（27.94 s）但劣于 PPO-ALC（20.24 s），与论文表述一致 ✅。</p>
+<h4>13.2 3D Dubins 的数学重建与数值核算</h4>
+<p>平面 Dubins：给定最小转弯半径 $\rho$，最短路径由至多三段组成——直飞 S 与最大速率转弯 L/R（候选 6 种：LSL、LSR、RSL、RSR、LRL、RLR），取最短者 $L^*(\rho)$；匀速飞行时间 $t=L^*/v$。3D 扩展（论文未给细节，重建假设）：水平面走 Dubins 路径、垂直面按 PID 爬升率爬/降，转弯半径若受滚转上限约束则 $\rho=v^2/(g\tan\phi_{\max})$ 随速度增大。<strong>数值核算</strong>（64 目标、水平 500 m、$|\Delta z|\le80$ m，直线 3D 距离 ≈500–510 m）：</p>
+<table><tr><th>速度</th><th>实测均值</th><th>等效路径长度</th><th>解读</th></tr>
+<tr><td>14 m/s</td><td>35.36 s</td><td>495 m</td><td>≈ 直线（14 m/s 时 $\rho$ 最小）——$493.6/14=35.3$ s ✅ 吻合</td></tr>
+<tr><td>20 m/s</td><td>27.94 s</td><td>559 m</td><td>+11% 绕行（转向 + 爬升耦合）</td></tr>
+<tr><td>26 m/s</td><td>32.32 s</td><td>840 m</td><td>+66% 绕行（大 $\rho$ + 高速度下爬升率不足，与论文「coupling between climb rate and airspeed」一致 ✅）</td></tr>
+</table>
+<p>这解释了 Table 1 里 26 m/s（32.32 s）反而比 20 m/s（27.94 s）慢的反直觉结果。</p>
+<h4>13.3 时间下界与「距最优多远」的核算（本节最有信息量的数）</h4>
+<p>运动学下界：任何轨迹 3D 位移 $\ge d_{3D}-d_r$（到达球内即终止），速度上限 $v_{\max}=26$ m/s：</p>
+<p>$$t^*\ge\frac{d_{3D}-d_r}{v_{\max}}=\frac{500-30}{26}=18.08\ \text{s},\qquad(\text{不含加速与转弯损失})$$</p>
+<p>PPO-ALC 实测 $20.24$ s：距下界 $\frac{20.24-18.08}{18.08}=11.9\%$。若用 $d_{3D}/v_{\max}=19.23$ s 作界则差 5.2%。考虑到初始速度 16 m/s、需要转向与爬升、30 m 到达球带来的自由度，<strong>PPO-ALC 已相当接近该任务的运动学时间极限</strong>——这比论文的 27.6% 相对提升更能说明 ALC 的绝对水平。百分数核算（验证论文原话）：$(25.94-20.24)/25.94=21.97\%\approx22.0\%$ ✅（vs VLC-PPO）；$(27.94-20.24)/27.94=27.56\%\approx27.6\%$ ✅（vs Dubins-20）。</p>
+<div class="callout warn"><p><strong>重建假设的诚实说明</strong>：MPC 的权重 $w_p,w_u,w_T$、速度/角速率约束值，以及 Dubins 的 3D 扩展方式，论文均未给出，本节的 (E)(F) 为按文字重建的<strong>形式化</strong>，不是论文公式的复现；凡据此做的数值结论均已注明「重建假设」。</p></div>
+<hr>
+<h3>最后. 交叉验证总表与问题清单（「不自圆其说」部分）</h3>
+<h4>14.1 论文公式 ↔ 代码 ↔ 数值 总表</h4>
+<table><tr><th>论文</th><th>代码位置（<code>1.Paper\OpenFlight\OpenFlight\</code>）</th><th>结论</th></tr>
+<tr><td>(1)</td><td><code>airgym/envs/jsbsim_p2p3d_unienv.py</code> L135–142、<code>..._alc_unienv.py</code> L148–157、<code>navp2p_v1_test.py</code> L42–44</td><td>✅ 约束值一致；⚠️ POMDP 名实、记号</td></tr>
+<tr><td>(2)(3)</td><td>JSBSim 求解（<code>lib/jsbsimlib.py</code> L30–45）</td><td>✅ 标准；⚠️ 积分器未指定（默认 AB2/Trapezoid）</td></tr>
+<tr><td>(4)</td><td><code>x8/x8.xml</code> 推进段 L78–106（推力过重心）</td><td>⚠️ $M_t=0$ 未说明</td></tr>
+<tr><td>(5)(6)</td><td>无直接代码（JSBSim 内部约定）</td><td>✅ 代数验证 $R_y(-\alpha)R_z(-\beta)$；⚠️ $\beta_s$ 符号陷阱</td></tr>
+<tr><td>(7)(8)</td><td><code>unienv.py</code> L92–98</td><td>✅ 系数逐项一致；⚠️ 顺序；note 第 6 节「/2、/4」勘误</td></tr>
+<tr><td>(9)(10)</td><td><code>unienv.py</code> L107–109 + <code>jsbsimlib.py</code> L487–568</td><td>❌ 式 (9)/(10) 顺序矛盾；⚠️ $\alpha_5$ 缺失</td></tr>
+<tr><td>(11)(12)</td><td><code>alc_unienv.py</code> L83–116</td><td>✅ 一致；⚠️ $\theta$/$\phi$ 记号、顺序</td></tr>
+<tr><td>(13)</td><td><code>unienv.py</code> L111–146</td><td>✅ 一致；推导得势函数差分结构（§8）</td></tr>
+<tr><td>Fig.1 网络</td><td><code>network/p2p3d_net.py</code> L13–18</td><td>✅ 一致</td></tr>
+<tr><td>训练参数</td><td><code>navp2p_v1/v3_train.py</code> L30–48、L68–72</td><td>✅ 2e6、16 并行、lr 2.5e-4、batch 32；⚠️ 只有 PPO 脚本</td></tr>
+<tr><td>评估协议</td><td><code>navp2p_v1_test_multi.py</code> L42–53</td><td>✅ 64 目标、500 m、20–180 m、50 s</td></tr>
+</table>
+<h4>14.2 论文问题清单（按严重程度）</h4>
+<ol><li><strong>【矛盾】式 (9) 与式 (10) 动作顺序冲突</strong>（§6.2）：式 (9) $\boldsymbol a=[\omega_z,v_c,v_a]$ 但式 (10) 第 2 行是空速映射（$6a[2]+20\in[14,26]$ m/s）；代码证实正确顺序为 $[\omega_z,v_a,v_c]$（$a[1]\to$空速、$a[2]\to$爬升率）。连带 note 第 6 节 Eq.(6) 的 $v_c/v_a$ 标反。</li><li><strong>【不一致】式 (10) 的 $\alpha_5=0.5$ 偏航缩放不在代码中</strong>（§6.1）：代码把 $a[0]$ 作为「航向偏差 ×180°」送入 PI 环（roll 饱和 ±30°），语义与「期望偏航角速率 ±0.5 rad/s」完全不同。</li><li><strong>【符号陷阱】式 (5)(6) 隐含 $\beta_s=-\sin^{-1}(v/V)$</strong>（§4.3）：与标准/JSBSim 约定反号；照抄实现会得到反号的侧力。论文未声明其 $\beta$ 约定。</li><li><strong>【记号】式 (11) 用 $\theta$(roll)、$\phi$(pitch)</strong>（§7.2）：与航空惯例相反，且与代码 [pitch, roll, yaw] 顺序错位（归一化相同、功能无损）。建议对照 PDF 第 6 页人工复核。</li><li><strong>【表述】POMDP 实为 MDP</strong>（§2.3）：观测为状态的确定性函数、无噪声实验；$\gamma$ 从未赋值（本文按 SB3 默认 0.99 推导）。</li><li><strong>【未说明】积分器</strong>（§3.2）：论文与代码均未指定，JSBSim 默认 AB2（速率）/Trapezoidal（位置）——note 第 6 节的「RK4」无依据。</li><li><strong>【模型疑点】<code>electric800W.xml</code> 声明 8.0 W</strong>（§4.5）：$T=P/V$ 估算在 20 m/s 仅 0.4 N，远小于阻力 3.7 N；而论文包线要求 14→26 m/s 加速（需 $T&gt;6$ N）。两种可能：(a) 文件笔误（文件名即 800W，800 W 对应 $T=40$ N 合理）；(b) 仿真实际是无动力滑翔近似，速度靠俯仰–高度交换——后者与 Fig.5 的观察自洽。此外该遗留模型（<code>&lt;thruster file="direct"&gt;</code>）在现代 JSBSim 1.3.3 上无法加载（本次实证已复现，需要旧版 JSBSim），构成复现障碍。</li><li><strong>【质量】模型空重 3.364 kg</strong> 与 note 第 6 节「约 2.5 kg」不符（论文未给质量）。</li><li><strong>【可复现性】仓库只有 PPO 训练脚本</strong>：A2C/TD3/SAC 的训练代码未发布，论文称四算法「same training parameters」仅可核实 batch_size/lr 两个值（且都是 SB3 默认附近的显式值）。</li><li><strong>【实现偏离】「空速」观测实际是体轴 $u$</strong>（§5.1）；$d_v$ 在观测中带符号、在奖励中取绝对值（§8.5）；两者论文均未声明。</li><li><strong>【统计口径】Dubins 14/26 m/s 未达目标的局如何计入均值未说明</strong>（Table 1 脚注只说「some flights unable to reach within 50 s」，若按 50 s 计入则均值应明显更高；35.36/32.32 更像仅统计到达局）。</li><li><strong>【细节】64 目标中有一个几乎在正后方</strong>（方位角 $\pi+\pi/64=182.8°$，需 180° 掉头，见 <code>test_multi</code> L47）；训练 40 s / 评估 50 s 双口径未在正文说明（§11.3）。</li><li><strong>【代码疑点】空速环与滚转环的负号</strong>（§12.1）：空速环纸面为正反馈（慢时收油门）、滚转环负号被作者自留注释质疑；因无法在本机运行该遗留模型，不作最终定性。</li></ol>
+<h4>14.3 验证材料清单（可复跑/可核对）</h4>
+<ul><li><strong>文本</strong>：<code>_derivation_work\openflight\fulltext.txt</code>（PDF 全文抽取，按页标记）；<code>_derivation_work\openflight\pdftext.txt</code>（本次用 pypdf 独立抽取，两份对照）；<code>_derivation_work\openflight\pages\page-001..020.png</code>（页面图像，<strong>本模型无图像能力未读，建议人工复核第 5–7 页公式排版</strong>）。</li><li><strong>代码</strong>（均在 <code>1.Paper\OpenFlight\OpenFlight\</code>）：<code>airgym/envs/jsbsim_p2p3d_unienv.py</code>（VLC 环境，L79–104 观测、L107–109 动作、L111–148 奖励与终止）；<code>airgym/envs/jsbsim_p2p3d_alc_unienv.py</code>（ALC，L83–164）；<code>airgym/envs/jsbsim_p2p3d_attitude_unienv.py</code>（v3 姿态级，论文未含）；<code>lib/jsbsimlib.py</code>（L222–259 姿态/速度/单位换算、L314–325 angle_minus、L423–568 五个 PID 环）；<code>lib/jsbsim_aircraft.py</code>；<code>network/p2p3d_net.py</code>；<code>navp2p_v1/v3_train.py</code>、<code>navp2p_v1_test.py</code>（L42–53）、<code>navp2p_v1_test_multi.py</code>（L42–53 的 64 目标生成）；<code>x8/x8.xml</code>（L31–62 几何/质量/惯量、L237–527 气动系数）、<code>x8/electric800W.xml</code>；<code>README.md</code>（v1/v2/v3 注册表）。</li><li><strong>本次实证脚本</strong>：<code>_derivation_work\openflight\check_thrust.py</code>、<code>check_thrust2.py</code>、<code>patch_x8.py</code>、<code>path_probe.py</code>（JSBSim 1.3.3 + 模型副本 <code>C:\temp_x8</code>；结论：遗留模型无法在新版加载——见问题清单 7）。</li><li><strong>外部依据</strong>：JSBSim 默认积分器见 [FGPropagate.h 源码](https://raw.githubusercontent.com/JSBSim-Team/jsbsim/refs/heads/master/src/models/FGPropagate.h)；论文 DOI [10.1016/j.jai.2025.11.007](https://doi.org/10.1016/j.jai.2025.11.007)；代码仓库 https://github.com/running-mars/OpenFlight 。</li></ul>
 </section>
 
 <footer>📄 Paper Notes · Wang, Wang, Li, Liu, Miao · Journal of Automation and Intelligence 2025 · OpenFlight — Learning Minimum-Time Flight Control for Fixed-Wing UAVs · MathJax + Mermaid Rendering</footer>

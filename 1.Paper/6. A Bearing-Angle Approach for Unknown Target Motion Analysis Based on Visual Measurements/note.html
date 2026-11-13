@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">Potential Flaw</a>
   <a href="#motivation">Motivation</a>
   <a href="#takeaway">Takeaways</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -868,6 +872,350 @@ flowchart LR
     <tr><td>Aidala &amp; Nardone (1982) — Biased estimation properties of the pseudolinear tracking filter. <em>IEEE T-AES</em> 18(4): 432-441</td><td>伪线性 Kalman 滤波器的偏差分析——证明了速度估计无偏、位置估计偏差可通过机动消除。本文直接继承了这个结论</td></tr>
     <tr><td>Zhao &amp; Zelazo (2019) — Bearing rigidity theory and its applications. <em>IEEE Control Systems Magazine</em> 39(2): 66-83</td><td>bearing 刚性理论的综述——P<sub>g</sub> 投影矩阵的性质和作用在其中被系统阐述。如果要在 bearing 相关问题上做深入研究，这是必读的数学基础</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info"><p><strong>对象</strong>：<code>A Bearing-Angle Approach for Unknown Target Motion Analysis Based on Visual Measurements</code>（Ning et al.，arXiv:2401.17117）全文 20 页。<strong>公式范围</strong>：全部 40 个编号公式（(1)–(40)）＋ 6 处无编号关键式（$g$、$\theta$ 余弦定理式、$P_{\hat g}$、$\Sigma_\nu$、Kalman 五步、$\bar A$ 展开式）＋ §7–§9 全部仿真/实验参数。<strong>方法</strong>：① 从针孔相机几何、双积分器运动学、投影算子代数、秩理论、差分学（Milne-Thomson）等第一性原理<strong>独立重推</strong>每个公式，写明每步依据；② <strong>字形级核实原文</strong>：本会话模型不能直接读页面图像，改用 PyMuPDF 对 PDF 做 <code>rawdict</code> 逐字形提取（含坐标），等效"照页面逐字符核对"，引用的原文 LaTeX 均以此为准；③ 把论文参数代入<strong>数值核算</strong>；④ 明确标出<strong>印刷错误、符号冲突、推导跳跃与数值失实</strong>（§12.19 问题清单，共 12 条），绝不替论文"圆场"。</p></div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table><tr><th>公式</th><th>内容</th><th>与独立重推/数值核算对照的结论</th></tr>
+<tr><td>(D1)(D2) 无编号</td><td>方位向量 $g=R_w^cP_{cam}^{-1}q_{pix}/\|R_w^cP_{cam}^{-1}q_{pix}\|$；张角 $\theta=\arccos\frac{l_{left}^2+l_{right}^2-s_{pix}^2}{2l_{left}l_{right}}$</td><td>✅ 正确。两者均为针孔模型＋余弦定理的标准结论；$\theta$ 对相机旋转不变是本文核心卖点</td></tr>
+<tr><td>(1)(2)(3)</td><td>7 维状态、离散双积分器 $F$、过程噪声 $\Sigma_q$</td><td>✅ 正确。$F^j$ 归纳、维数、噪声注入位置均核对无误</td></tr>
+<tr><td>(4a)(4b)</td><td>$g=(p_T-p_o)/r$；$\theta=2\arctan\frac{\ell}{2r}\approx\frac\ell r$</td><td>⚠️ 公式本身正确（Taylor 展开逐项一致），但文中 <strong>「$r&gt;3\ell$ 时误差 &lt; 0.08%」的数值声明错误</strong>：实算为 0.919%（要 &lt;0.08% 需 $r\gtrsim10.2\ell$，见 §12.4）</td></tr>
+<tr><td>(5)–(9)</td><td>旋转噪声模型→加性噪声、两类测量方程</td><td>✅ 正确。$R(\eta,\epsilon)g$ 与加性噪声 $\mu$ 的对应关系已逐步验证</td></tr>
+<tr><td>(10)(11)(12)</td><td>伪线性化：投影矩阵 $P_{\hat g}$ 技巧、乘 $r\hat g$ 技巧</td><td>✅ 三步代数恒等全部重推通过；$P_{\hat g}$ 的性质（对称、幂等、$P_{\hat g}\hat g=0$、秩 2）已证明</td></tr>
+<tr><td>(13)(14)(15)+Σν</td><td>紧凑形式 $z=Hx+\nu$、噪声协方差</td><td>✅ 正确。$\Sigma_\nu$ 的 6×6 显式块展开已独立算出（见 §12.7），与 $E\,\mathrm{diag}(\sigma_\mu^2I_3,\sigma_w^2)E^T$ 一致</td></tr>
+<tr><td>KF 五步（无编号）</td><td>预测/校正、伪逆增益</td><td>✅ 标准形式正确；$(HP^-H^T+\Sigma_\nu)^\dagger$ 用伪逆是因为 $P_{\hat g}$ 秩 2 使 $H$ 永远行相关（见 §12.8 的秩论证）</td></tr>
+<tr><td>(16)(17)</td><td>可观测性矩阵 $Q$ 与行变换约化</td><td>✅ 结果正确；但 (17) 的约化在 Case 2（观测器变速）下<strong>含一阶近似</strong>（精确约化出现的是平均速度，论文未说明，见 §12.9 与问题 P8）</td></tr>
+<tr><td>(18)–(21)</td><td>Case 1：$\mathrm{rank}=6$、零空间与不可观测模式</td><td>✅ 正确。已用"规范（gauge）变换"证明该模式对全部测量序列严格不变（§12.10）</td></tr>
+<tr><td>(22)(23)</td><td>Case 2：采样加速度、$\mathrm{rank}=7$</td><td>❌ <strong>(22) 中间两步印刷符号错误</strong>（应为 $-\delta v(t_i)+\delta v(t_{i-1})$，印成 $-\delta v(t_i)-\delta v(t_{i-1})$，字形级核实）；结论（$\mathrm{rank}\,Q=7\iff\exists i\ge3: a_o(t_i)\ne0$）用正确符号重推<strong>依然成立</strong>（§12.11）</td></tr>
+<tr><td>(24)–(30)</td><td>多项式运动模型、线性方程 $A(t)X=h(t)$</td><td>⚠️ 结构正确；(26) 有两处笔误：<strong>$s_i=d_i-c_i$ 应为 $s_i=b_i-c_i$</strong>；$+h(t)$ 与 $s:=p_T-p_o$ 定义<strong>符号矛盾</strong>（应为 $-h(t)$）。不影响定理结论（§12.13，问题 P3/P4）</td></tr>
+<tr><td>(31)–(35) Theorem 1</td><td>充要条件 $h(t)\ne0$（观测器阶数高于目标）</td><td>✅ 证明链条 $\bar A$ 秩 ⟺ $\rho^{(i)}\ne0$ ⟺ $h^{(i)}\ne0$ ⟺ $h\ne0$ 已逐环重推；关键一步"$h$ 无 $\le n$ 次项 ⇒ $h\ne0\iff h^{(n+1)}\not\equiv0$"补证</td></tr>
+<tr><td>(36)–(38) Theorem 2</td><td>至少 $n+2$ 个离散观测</td><td>✅ 正确（必要性 $3N\ge3n+4$；充分性用前向差分表 $\Delta^m(t^m)=m!$ 重推）；证明是"小 $\delta t$ 近似"式论证且未讨论退化采样配置（§12.15，问题 P9）</td></tr>
+<tr><td>(39)</td><td>平均 NEES</td><td>✅ 标准 $\chi^2$ 一致性统计量；$E[\bar\epsilon]=7$、99% 区间 $[6.0,8.0]$ 与 Fig. 4 一致（§12.16）</td></tr>
+<tr><td>(40)</td><td>接近/跟随控制律 $v_o^{cmd}=v_T+k_{track}\frac{r^2-r_d^2}{r^2}g$</td><td>✅ 正确；平衡点 $r=r_d$ 渐近稳定、$r&gt;r_d$ 收敛速度 $\approx k_{track}$，已解析验证（§12.17）。依赖目标真值——论文已声明仅用于离线数据采集</td></tr>
+<tr class="highlight"><td>仿真/实验参数</td><td>§7–§9 全部数值（噪声、初值、几何量）</td><td>⚠️ 发现 1 类符号笔误（$\hat p_o,\hat v_o$ 实为 $\hat p_T,\hat v_T$，共 3 处，问题 P7）；其余数值（$\theta=0.2\,\mathrm{rad}$、$\omega=0.6\,\mathrm{rad/s}$、$r(t{=}2s){=}1\,\mathrm{m}$、$\ell=0.295/0.895\,\mathrm{m}$ 与图像一致）全部核算通过（§12.18）</td></tr></table>
+<hr>
+<h3>1. 符号与量纲总表（本节全部推导的共同语言）</h3>
+<p>论文在 §3–§4 定义的核心量如下（<strong>量纲</strong>为本文补注；论文通篇 SI 单位）：</p>
+<table><tr><th>符号</th><th>含义</th><th>量纲/单位</th><th>文中取值</th></tr>
+<tr><td>$p_T,\,v_T$</td><td>目标位置、速度（世界系，3 维）</td><td>m、m/s</td><td>场景相关（§12.18）</td></tr>
+<tr><td>$p_o$</td><td>观测器（相机）位置，<strong>假定已知</strong>（RTK GPS / VIO 自定位）</td><td>m</td><td>场景相关</td></tr>
+<tr><td>$r=\|p_T-p_o\|$</td><td>目标-观测器距离</td><td>m</td><td>—</td></tr>
+<tr><td>$g,\ \theta$</td><td>单位方位向量（$p_o\to p_T$）；目标张角</td><td>—、rad</td><td>$\|g\|=1$；$\theta\in(0,\pi/2)$</td></tr>
+<tr><td>$\ell$</td><td>目标在与视线<strong>正交</strong>方向上的物理尺寸（状态之一）</td><td>m</td><td>$\ell=1$（数值仿真）；0.295 m（实验 1 机器人直径）；≈0.895 m（实验 2 M300 对角线）</td></tr>
+<tr><td>$\hat g,\ \hat\theta;\ \mu,\ w$</td><td>含噪测量；方位/角度噪声</td><td>—/rad</td><td>$\mu\sim N(0,\sigma_\mu^2I_3)$，$\sigma_\mu=0.01$；$w\sim N(0,\sigma_w^2)$，$\sigma_w=0.01$</td></tr>
+<tr><td>$x=[p_T^T,v_T^T,\ell]^T$</td><td>7 维状态向量</td><td>混合</td><td>$x\in\mathbb R^7$</td></tr>
+<tr><td>$F,\ \Sigma_q$</td><td>状态转移矩阵、过程噪声协方差</td><td>—、混合</td><td>见式 (2)(3)</td></tr>
+<tr><td>$\delta t$</td><td>采样周期</td><td>s</td><td>$1/50\,\mathrm{Hz}=0.02\,\mathrm{s}$</td></tr>
+<tr><td>$\sigma_v,\ \sigma_\ell$</td><td>速度、尺寸的过程噪声标准差</td><td>m/s、m</td><td>$10^{-3},\ 10^{-4}$（§8.4 另用 $0.01$）</td></tr>
+<tr><td>$q_{pix},P_{cam},R_w^c,f,\alpha,s_{pix}$</td><td>像素齐次坐标、内参、外参旋转、焦距、像素尺寸、框尺寸（像素）</td><td>pixel 等</td><td>见 (D1)(D2)</td></tr>
+<tr><td>$P_{\hat g}$</td><td>正交投影矩阵 $I_3-\hat g\hat g^T$</td><td>—</td><td>秩 2、对称、幂等（§12.6 证明）</td></tr>
+<tr><td>$z,H,\nu,E,\Sigma_\nu$</td><td>伪线性测量向量/矩阵/噪声/协方差</td><td>—</td><td>式 (13)–(15)</td></tr>
+<tr><td>$Q,\ \delta v$</td><td>可观测性矩阵（6k×7）、相对速度 $v_T-v_o$</td><td>—、m/s</td><td>式 (16)(17)</td></tr>
+<tr><td>$s(t),\ \rho(t)$</td><td>相对位置多项式、$-\!g/\theta$</td><td>m、rad⁻¹</td><td>式 (26)(30)</td></tr>
+<tr><td>$k_{track},\ r_d$</td><td>跟踪增益、期望间距</td><td>s⁻¹、m</td><td>$3,\ 3$</td></tr></table>
+<p><strong>符号冲突预警（本文发现，论文未处理）</strong>：① 可观测性矩阵 $Q$ 与过程噪声 $q(t_k)$、像素向量 $q_{pix}$ 撞字母（大小写区分，可接受）；② 相对速度 $\delta v$ 与采样周期 $\delta t$ 共享 $\delta$（无实质冲突）；③ 仿真章节把目标状态的初始估计写成 $\hat p_o,\hat v_o$，实为 $\hat p_T,\hat v_T$——见问题 P7。</p>
+<hr>
+<h3>2. 无编号式 (D1)：方位向量测量 —— 针孔模型的完整推导（§3）</h3>
+<div class="formula-block">
+<span class="eq-tag">无编号式 (D1) —— 由 bounding box 中心计算方位向量（第 4 页）</span>
+$$g=\frac{R_w^c\,P_{cam}^{-1}\,q_{pix}}{\left\|R_w^c\,P_{cam}^{-1}\,q_{pix}\right\|},\qquad q_{pix}=\begin{bmatrix}x_{pix}\\ y_{pix}\\ 1\end{bmatrix}\in\mathbb R^3 \tag{D1}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$q_{pix}$ 是框中心像素的齐次坐标；$P_{cam}$ 是 3×3 相机内参矩阵；$R_w^c$ 是相机系到世界系的旋转；分子先"反投影"再"旋到世界系"，分母归一化成单位向量。</p><p><strong>第一性原理重推</strong>：针孔模型中，像素 $(x_{pix},y_{pix})$ 对应的视线方向在相机系内是齐次向量 $P_{cam}^{-1}[x_{pix},y_{pix},1]^T$（零畸变模型下即 $[(x_{pix}-c_x)\alpha/f,\ (y_{pix}-c_y)\alpha/f,\ 1]^T$，$c_x,c_y$ 为主点）；乘以 $R_w^c$ 得世界系方向，除以范数得单位向量。<strong>前提假设</strong>：观测器（相机）位姿已知（RTK GPS 或 VIO），$p_o$ 与 $R_w^c$ 不参与滤波估计——务必记住。</p><p><strong>物理直觉</strong>：框中心只给"方向"不给"距离"——bearing-only 的全部困难源于此；框的<strong>尺寸</strong>恰好携带距离信息，即下一式 (D2) 要开采的。</p><p><strong>交叉验证</strong>：与式 (4a) 自洽——(4a) 是 $g$ 的几何定义，(D1) 是 $g$ 的<strong>计算</strong>方法。与 Fig. 1 示意图一致。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">无编号式 (D2) —— 由 bounding box 尺寸计算张角（第 4 页，余弦定理）</span>
+$$\theta=\arccos\!\left(\frac{l_{left}^2+l_{right}^2-s_{pix}^2}{2\,l_{left}\,l_{right}}\right),\qquad
+l_{left}=\sqrt{\left(\tfrac f\alpha\right)^2+\left(\delta x-\tfrac{s_{pix}}2\right)^2+\delta y^2},\qquad
+l_{right}=\sqrt{\left(\tfrac f\alpha\right)^2+\left(\delta x+\tfrac{s_{pix}}2\right)^2+\delta y^2} \tag{D2}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$l_{left},l_{right}$ 是光心（图像主点，纵深取主距 $f/\alpha$ 像素）到框<strong>左、右边中点</strong>的像素距离；$s_{pix}$ 是框宽；$\theta$ 是两条视线在光心处的夹角。</p><p><strong>第一性原理重推（两步）</strong>：<strong>第 1 步（两点到光心的像素距离）</strong>。以主点 $(i_{width}/2,i_{height}/2)$ 为原点，左边中点 $(x_{pix}-s_{pix}/2,\,y_{pix})$ 的偏移为 $\big((x_{pix}-s_{pix}/2)-i_{width}/2,\ y_{pix}-i_{height}/2\big)$；由 $\delta x=|x_{pix}-i_{width}/2|$ 知横向偏移 $x_{pix}-i_{width}/2=\pm\delta x$，平方后符号消失，得 $(\delta x-s_{pix}/2)^2$（左）与 $(\delta x+s_{pix}/2)^2$（右）；纵深偏移为主距 $f/\alpha$（焦距除以像素尺寸，单位 pixel）。勾股定理即得 $l_{left},l_{right}$。<strong>第 2 步（余弦定理）</strong>。三角形三边 $l_{left},l_{right},s_{pix}$，$s_{pix}$ 的对角即 $\theta$：$s_{pix}^2=l_{left}^2+l_{right}^2-2l_{left}l_{right}\cos\theta$，解出 $\cos\theta$ 取反余弦即 (D2)。</p><p><strong>为什么用张角而不用像素尺寸（核心动机）</strong>：$s_{pix}$ 随相机<strong>旋转</strong>变化（同目标同距离，正对与斜视的框宽不同，Fig. 2），而 $\theta$ 只依赖"物理尺寸 $\ell$ 与距离 $r$"这两个旋转不变量，故对相机姿态变化<strong>不变</strong>——这是论文绕开 Griffin &amp; Corso (2021)"相机只能平移"假设的关键。</p><p><strong>交叉验证</strong>：(D2) 是精确平面几何，无近似；与 (4b) 的衔接（$\theta$ 如何由 $\ell,r$ 决定）由式 (4b) 完成。</p></div>
+</div>
+<hr>
+<h3>3. 公式 (1)–(3)：状态转移方程 —— 离散噪声驱动双积分器（§4.1）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 状态转移方程（论文式 (1)，第 4 页）</span>
+$$x(t_{k+1})=F\,x(t_k)+q(t_k) \tag{1}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$x=[p_T^T,v_T^T,\ell]^T\in\mathbb R^7$；$F$ 见式 (2)；$q(t_k)\sim N(0,\Sigma_q)$ 是零均值过程噪声，$\Sigma_q$ 见式 (3)。</p><p><strong>模型选择的物理解读</strong>：$F$ 的块结构使 $p_T(t_{k+1})=p_T(t_k)+\delta t\,v_T(t_k)$、$v_T(t_{k+1})=v_T(t_k)$、$\ell(t_{k+1})=\ell(t_k)$，即"位置按当前速度匀速外推，速度受随机游走驱动"——这就是<strong>离散白噪声加速度（DWNA）双积分器</strong>，是无目标先验时对任意运动的一阶近似。目标物理尺寸 $\ell$ 作为第 7 维状态纳入，其动态是带噪声的常值（慢变）模型。</p><p><strong>为什么状态里没有加速度（论文正文的论证，此处严格化）</strong>：由 §12.14 的 Theorem 1，要估计目标的 $n$ 阶运动，观测器必须有 $&gt;n$ 阶运动。若把加速度放进状态（$n=2$），观测器就需非零 jerk——很多任务做不到；因此"只估计位置+速度"最稳妥。数学上：状态维度越高，$\bar A$ 列越多，需要的独立约束越多。</p><p><strong>交叉验证</strong>：与式 (16) 的 $H(t_i)F^{i-1}$ 结构自洽（§12.9 逐项核对）。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 状态转移矩阵（论文式 (2)）</span>
+$$F=\begin{bmatrix}I_{3\times3} & \delta t\,I_{3\times3} & 0_{3\times1}\\
+0_{3\times3} & I_{3\times3} & 0_{3\times1}\\
+0_{1\times3} & 0_{1\times3} & 1\end{bmatrix}\in\mathbb R^{7\times7} \tag{2}$$
+<div class="eq-note"><p><strong>重推 $F^j$（后文可观测性分析的关键）</strong>：把 $F$ 写成块形式 $F=\begin{bmatrix}I&\delta tI&0\\0&I&0\\0&0&1\end{bmatrix}$。归纳法：设 $F^j=\begin{bmatrix}I&j\,\delta t\,I&0\\0&I&0\\0&0&1\end{bmatrix}$，则</p>
+$$F^{j+1}=F^jF=\begin{bmatrix}I&j\delta tI&0\\0&I&0\\0&0&1\end{bmatrix}\begin{bmatrix}I&\delta tI&0\\0&I&0\\0&0&1\end{bmatrix}=\begin{bmatrix}I&(j+1)\delta tI&0\\0&I&0\\0&0&1\end{bmatrix}$$
+<p>块乘法逐项：左上 $I\cdot I=I$；右上 $I\cdot\delta tI+j\delta tI\cdot I=(j+1)\delta tI$；第 3 行第 3 列 $1\cdot1=1$。基 $F^1$ 成立，归纳完成：<strong>$F^j$ 就是把位置块右上的 $j\delta tI$ 逐步累加</strong>，对应"$j$ 步匀速外推"。这正是式 (16) 展开后出现 $(i-1)\delta t P_g(t_i)$、$(i-1)\delta t\,\theta(t_i)I$ 的来源（§12.9 核验）。</p><p><strong>交叉验证</strong>：与论文 (16) 之后的 $Q$ 展开矩阵（每行含 $(i-1)\delta t$ 因子）完全一致。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 过程噪声协方差（论文式 (3)）</span>
+$$\Sigma_q=\mathrm{diag}\left(0,0,0,\ \sigma_v^2,\sigma_v^2,\sigma_v^2,\ \sigma_\ell^2\right)\in\mathbb R^{7\times7} \tag{3}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$\sigma_v\in\mathbb R$、$\sigma_\ell\in\mathbb R$ 分别是目标速度与尺寸的过程噪声标准差（§7 取 $\sigma_v=10^{-3}\,\mathrm{m/s}$、$\sigma_\ell=10^{-4}\,\mathrm{m}$）。</p><p><strong>结构解读（为什么位置前 3 个对角元是 0）</strong>：噪声只注入"速度"与"尺寸"，位置没有直接过程噪声——位置的随机性由速度噪声经 $F$ 的 $\delta t$ 耦合产生（一步后位置方差 $\approx\sigma_v^2\delta t^2$）。这是 DWNA 离散模型的标准写法：若给位置也注入独立噪声，就变成"白噪声位置"模型，与"物理上位置不能瞬跳"矛盾。</p><p><strong>$\sigma_\ell\ne0$ 的物理含义</strong>：目标形状不规则时（如四旋翼从不同视角看），$\ell$ 随视角慢变；给 $\ell$ 保留小过程噪声使滤波器"允许 $\ell$ 漂移"。§8.4 正是靠把 $\sigma_\ell$ 从 $10^{-4}$ 加大到 $0.01$ 来估计时变的 $\ell$（§12.18 核算）。</p><p><strong>交叉验证</strong>：与预测步 $P^-(t_k)=FP(t_{k-1})F^T+\Sigma_q$ 的维数（7×7）匹配。</p></div>
+</div>
+<hr>
+<h3>4. 公式 (4)：非线性测量方程 与「0.08%」数值声明的核算（§4.3）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4a)(4b) —— 方位与张角的非线性测量模型（论文式 (4)）</span>
+$$g=\frac{p_T-p_o}{r},\qquad\qquad \theta=2\arctan\!\frac{\ell}{2r}\;\approx\;\frac{\ell}{r},\qquad r=\|p_T-p_o\| \tag{4}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$r$ 是目标-观测器距离；$\ell$ 是与视线正交方向的目标物理尺寸；$2\arctan\frac{\ell}{2r}$ 是"长度为 $\ell$ 的弦在距离 $r$ 处张成的角"的<strong>精确</strong>表达式，$\ell/r$ 是小角度近似。</p><p><strong>第一性原理重推 (4a)</strong>：向量 $p_T-p_o$ 方向即视线方向，除以模长 $r$ 得单位向量——定义式，无需推导。</p><p><strong>第一性原理重推 (4b) 的几何</strong>：视目标为垂直于视线、长度 $\ell$ 的线段，其两个端点到光心各构成一直角三角形（直角边 $r$ 与 $\ell/2$），半张角 $\theta/2$ 满足 $\tan(\theta/2)=\frac{\ell/2}{r}=\frac{\ell}{2r}$，故 $\theta=2\arctan\frac{\ell}{2r}$。<strong>Taylor 展开</strong>：$\arctan x=x-\frac{x^3}{3}+\frac{x^5}{5}-\cdots$（$|x|&lt;1$），令 $x=\ell/(2r)$：</p>
+$$\theta_{exact}=2\arctan\frac{\ell}{2r}=2\left(\frac{\ell}{2r}-\frac{1}{3}\frac{\ell^3}{8r^3}+\cdots\right)=\frac{\ell}{r}-\frac{\ell^3}{12\,r^3}+O\!\left(\frac{\ell^5}{r^5}\right)$$
+<p>故 $\theta\approx\ell/r$ 的相对误差首项为 $\ell^2/(12r^2)$——误差随 $r$ 增大按 $r^{-2}$ 衰减，"近似精度随 $r$ 增加而提高"成立 ✅。</p><p><strong>❌ 数值核算与论文声明不符（问题 P5，重要）</strong>：论文称"当 $r&gt;3\ell$ 时近似误差小于 0.08%"。代入核算：</p>
+$$r=3\ell:\quad \text{相对误差}=\frac{\ell/r-2\arctan(\ell/2r)}{2\arctan(\ell/2r)}\approx\frac{\ell^2}{12r^2}=\frac{1}{12\cdot9}=\frac1{108}=0.9259\%$$
+<p>精确数值：$\ell/r=0.333333$，$2\arctan(1/6)=0.330297$，相对误差 $=0.003036/0.330297=\mathbf{0.919\%}$——<strong>是 0.08% 的 11.5 倍</strong>。反向求解：要使相对误差 $\lt0.08\%$，需 $\ell^2/(12r^2)&lt;8\times10^{-4}$，即 $r&gt;\ell/\sqrt{12\cdot8\times10^{-4}}=10.21\,\ell$。<strong>若原文想写的是 $r&gt;10\ell$</strong>，则 $\ell^2/(12\cdot100\ell^2)=0.083\%\approx0.08\%$ 自洽——很可能是"10"在排版中丢了 1 变成"3"（或 0.08% 应为 0.8%，但 0.93%&gt;0.8% 仍不符，故最可能是阈值错误）。<strong>定性结论（近似有效）不受影响</strong>，但定量声明必须纠正。若按距离反演估计（$\hat r=\ell/\theta$），相对距离误差同样是 0.92%（反演误差与角度误差同阶），见下式。</p><p><strong>交叉验证</strong>：(4b) 与 (D2) 的衔接：$\theta$ 的测量值由像素几何精确给出，(4b) 把它写成状态 $(\ell,r)$ 的函数（近似），从而测量方程得以用状态表达。$r=\ell/\theta$ 这一反演关系被 §6 的式 (27) 直接使用（$g/\theta=(p_T-p_o)/\ell$）。</p></div>
+</div>
+<hr>
+<h3>5. 公式 (5)–(9)：测量噪声模型（§4.3）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5)(6) —— 方位噪声：旋转扰动模型 → 加性模型（论文式 (5)(6)）</span>
+$$\hat g=R(\eta,\epsilon)\,g, \tag{5}\qquad\qquad \hat g=g+\mu,\qquad \mu=\left(R(\eta,\epsilon)-I_{3\times3}\right)g \tag{6}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$\eta\in\mathbb R^3$ 是单位随机旋转轴；$\epsilon\in\mathbb R$ 是随机旋转角；$R(\eta,\epsilon)$ 是绕 $\eta$ 转 $\epsilon$ 的旋转矩阵（Rodrigues 形式）；$\mu$ 是等价的加性噪声。</p><p><strong>推导（一步恒等）</strong>：(5) 代入 (6) 右端：$g+\mu=g+(R-I)g=Rg=\hat g$ ✅。物理上，(5) 是<strong>正确</strong>的噪声模型：真实方位是单位向量，噪声只能把它"转偏"——任何单位向量的扰动都等价于一次旋转（视线上一个 2 自由度扰动对应 2 维旋转）。而 (6) 是把它改写成加性形式以便滤波推导；$\mu$ 的模：小角度时 $\|\mu\|=2\sin(\epsilon/2)\approx|\epsilon|$，即噪声角标准差≈方位噪声标准差 $\sigma_\mu$——<strong>这是 $\sigma_\mu$ 与图 4/8 中"Error of bearing (degree)"可比的前提</strong>（§12.18 用 0.01 rad = 0.57° 与图核对）。</p><p><strong>⚠️ 诚实标注的近似</strong>：$\mu$ 的真实协方差在作者前作 (Li et al. 2023) 中推导过，"复杂且含未知真值"，论文把它<strong>近似</strong>为 $N(0,\sigma_\mu^2I_3)$。这是一个各向同性高斯近似：真实 $\mu$ 必然躺在 $\hat g$ 的切平面附近（$\mu\cdot g\approx-\|\mu\|^2/2$），严格说不可能是各向同性的。该近似是伪线性滤波的标准妥协（Aidala &amp; Nardone 1982 的偏差分析同此设定）。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(7)(8)(9) —— 两类非线性测量方程（论文式 (7)(8)(9)）</span>
+$$\hat g=\frac{p_T-p_o}{r}+\mu, \tag{7}\qquad\qquad \hat\theta=\theta+w,\quad w\sim N(0,\sigma_w^2), \tag{8}\qquad\qquad \hat\theta=\frac{\ell}{r}+w \tag{9}$$
+<div class="eq-note"><p><strong>推导</strong>：(7) = (4a) 代入 (6)；(9) = (4b) 的近似式代入 (8)。注意 (9) 已经使用了 $\theta\approx\ell/r$——即<strong>滤波器内部模型用的是小角度近似</strong>，这是 (4b) 近似误差进入估计器的通道（0.92% @ $r=3\ell$，工程上可忽略，但理论上不是精确模型）。</p><p><strong>非线性从何而来</strong>：(7) 对 $p_T$ 非线性（除以 $\|p_T-p_o\|$）；(9) 对 $(p_T,\ell)$ 非线性（$\ell/\|p_T-p_o\|$）。EKF 在 bearing-only 问题上会发散（Aidala 1979），故论文走伪线性化路线（§12.6）。</p></div>
+</div>
+<hr>
+<h3>6. 公式 (10)–(12)：伪线性化 —— 逐步代数推导（§4.4，本文核心技巧）</h3>
+<p>伪线性化的思想：<strong>不</strong>对非线性函数求 Jacobian（那是 EKF），而是通过<strong>代数恒等变换</strong>把测量方程改写成"线性矩阵 × 状态 + 噪声"，代价是测量矩阵与噪声里混入测量值本身（"伪"之所在）。</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(10) —— 方位测量的伪线性化（论文式 (10)，含投影矩阵性质证明）</span>
+$$P_{\hat g}\;.\!\!=\;I_{3\times3}-\hat g\hat g^T\in\mathbb R^{3\times3},\qquad P_{\hat g}\hat g=0_{3\times1},\qquad P_{\hat g}\,p_o=\begin{bmatrix}P_{\hat g}&0_{3\times4}\end{bmatrix}\begin{bmatrix}p_T\\v_T\\\ell\end{bmatrix}+rP_{\hat g}\mu \tag{10}$$
+<div class="eq-note"><p><strong>投影矩阵的 4 条性质（第一性原理）</strong>：① 对称：$P_{\hat g}^T=I-\hat g\hat g^T=P_{\hat g}$；② 幂等：$P_{\hat g}^2=(I-\hat g\hat g^T)(I-\hat g\hat g^T)=I-2\hat g\hat g^T+\hat g(\hat g^T\hat g)\hat g^T=I-\hat g\hat g^T=P_{\hat g}$（用到 $\|\hat g\|=1$）；③ 湮灭 $\hat g$：$P_{\hat g}\hat g=\hat g-\hat g(\hat g^T\hat g)=\hat g-\hat g=0$；④ 秩 2：$\mathrm{tr}\,P_{\hat g}=3-1=2$，且 $P_{\hat g}$ 是到"与 $\hat g$ 正交平面"的正交投影（特征值 $\{0,1,1\}$）。</p><p><strong>推导 (10) 的三步代数</strong>：</p><p><strong>第 1 步</strong>：对 (7) 两边左乘 $rP_{\hat g}$：
+$$rP_{\hat g}\,\hat g=P_{\hat g}(p_T-p_o)+rP_{\hat g}\mu\qquad\Longrightarrow\qquad 0_{3\times1}=P_{\hat g}(p_T-p_o)+rP_{\hat g}\mu$$
+（左边为 0 恰是性质③。）</p><p><strong>第 2 步</strong>：移项得 $P_{\hat g}p_o=P_{\hat g}p_T+rP_{\hat g}\mu$。</p><p><strong>第 3 步</strong>：用 7 维状态 $x$ 表示：$P_{\hat g}p_T=[P_{\hat g},\;0_{3\times3},\;0_{3\times1}]x=[P_{\hat g},\,0_{3\times4}]x$，即得 (10)。</p><p><strong>几何直觉</strong>：乘 $P_{\hat g}$ 相当于把 (7) <strong>投影到与视线正交的平面</strong>，从而消掉方程里最麻烦的 $r$ 分母（视线方向的径向分量被投影杀死，方程对 $p_T$ 变成线性）。左端 $P_{\hat g}p_o$ 是"观测器位置在视线切平面内的分量"，可当作新的测量。</p><p><strong>“伪”的代价</strong>：$P_{\hat g}$ 与噪声 $\mu$ 都含 $\hat g$，即测量矩阵 $H$ 与噪声 $\nu$ 相关——这是伪线性估计器有偏的根源（Aidala &amp; Nardone 1982），后文 §12.8 讨论。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(11)(12) —— 角度测量的伪线性化（论文式 (11)(12)）</span>
+$$\hat\theta\,r\hat g=\ell\,\hat g+w\,r\hat g, \tag{11}\qquad\qquad \hat\theta\,p_o=\begin{bmatrix}\hat\theta I_{3\times3}&0_{3\times3}&-\hat g\end{bmatrix}\begin{bmatrix}p_T\\v_T\\\ell\end{bmatrix}+r\left(\hat\theta\mu-w\hat g\right) \tag{12}$$
+<div class="eq-note"><p><strong>推导 (11)（一步）</strong>：对 (9) 两边乘 $r\hat g$：$\hat\theta\,r\hat g=\ell\,\hat g+w\,r\hat g$ ✅。技巧：用"乘 $r\hat g$"把 $\ell/r$ 里的分母 $r$ 吸收掉——左端 $r\hat g$ 与 $\ell/r$ 相乘得 $\ell$。</p><p><strong>推导 (12)（三步代数）</strong>：</p><p><strong>第 1 步</strong>：由 (7) 得 $r\hat g=p_T-p_o+r\mu$，代入 (11) 左端：
+$$\hat\theta(p_T-p_o+r\mu)=\ell\hat g+w\,r\hat g$$</p><p><strong>第 2 步</strong>：展开并移项（把含 $p_o$ 的项留左边、含状态与噪声的项放右边）：
+$$\hat\theta p_T-\hat\theta p_o+r\hat\theta\mu=\ell\hat g+w r\hat g\qquad\Longrightarrow\qquad \hat\theta p_o=\hat\theta p_T-\ell\hat g+r(\hat\theta\mu-w\hat g)$$</p><p><strong>第 3 步</strong>：写成状态线性形式：$\hat\theta p_T-\ell\hat g=[\hat\theta I_{3\times3},\;0_{3\times3},\;-\hat g]\,x$，即得 (12)。</p><p><strong>几何直觉</strong>：$\hat\theta\approx\ell/r$ 的"径向"信息被完整保留——这恰是 bearing-only 丢掉的信息。把 $\hat g$ 当作"沿视线的单位向量"，$-\hat g$ 出现在 $\ell$ 的系数里：$-\ell\hat g$ 就是把"沿视线放置的长度为 $\ell$ 的线段"写成一个向量，配合 $\hat\theta p_T$ 构成沿视线方向的约束。这正是后文可观测性比 bearing-only 强一维的来源（§12.12 对比）。</p><p><strong>交叉验证</strong>：检查量纲——左端 $\hat\theta p_o$（rad·m），右端各项：$\hat\theta p_T$（rad·m）、$\ell\hat g$（m）、$r\hat\theta\mu$（m·rad）、$rw\hat g$（m·rad）✅ 一致。检查退化解：若 $\hat\theta=0$（目标无穷远/尺寸为 0），(12) 退化为 $0=-\ell\hat g+rw\hat g$，信息只约束 $\ell\approx rw$，测量退化——与"距离无穷大时角度测量不可用"的直觉一致。</p></div>
+</div>
+
+<hr>
+<h3>7. 公式 (13)–(15) 与 Σν：紧凑形式与噪声协方差的显式展开（§4.5）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(13)(14) —— 紧凑测量方程（论文式 (13)(14)）</span>
+$$z=Hx+\nu, \tag{13}\qquad
+z=\begin{bmatrix}P_{\hat g}p_o\\[2pt]\hat\theta p_o\end{bmatrix}\in\mathbb R^6,\qquad
+H=\begin{bmatrix}P_{\hat g}&0_{3\times3}&0_{3\times1}\\[2pt]\hat\theta I_{3\times3}&0_{3\times3}&-\hat g\end{bmatrix}\in\mathbb R^{6\times7},\qquad
+\nu=\begin{bmatrix}rP_{\hat g}\mu\\[2pt]r(\hat\theta\mu-w\hat g)\end{bmatrix}\in\mathbb R^6 \tag{14}$$
+<div class="eq-note"><p><strong>结构</strong>：上 3 行 = (10) 的方位伪线性方程，下 3 行 = (12) 的角度伪线性方程。$H$ 的左上块秩 2（$P_{\hat g}$ 投影），故 $H$ 的<strong>行秩至多 5</strong>——6 行永远线性相关（这是后文伪逆的伏笔）。</p><p><strong>交叉验证</strong>：把 $H$ 与 $x$ 相乘逐块核对：$Hx=[P_{\hat g}p_T;\ \hat\theta p_T-\hat g\ell]$，与 (10)(12) 右端的状态项一致 ✅。$z$ 完全由测量（$\hat g,\hat\theta$）与已知的 $p_o$ 构成，可实时算出 ✅。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(15) 与无编号式 (D3) —— 噪声矩阵化与协方差（论文式 (15) 及其后未编号式）</span>
+$$\nu=E\begin{bmatrix}\mu\\w\end{bmatrix},\qquad
+E=r\begin{bmatrix}P_{\hat g}&0_{3\times1}\\[2pt]\hat\theta I_{3\times3}&-\hat g\end{bmatrix}\in\mathbb R^{6\times4}, \tag{15}\qquad
+\Sigma_\nu=E\begin{bmatrix}\sigma_\mu^2I_{3\times3}&0_{3\times1}\\[2pt]0_{1\times3}&\sigma_w^2\end{bmatrix}E^T\in\mathbb R^{6\times6} \tag{D3}$$
+<div class="eq-note"><p><strong>推导 (15)（块乘法验证）</strong>：$E[\mu;w]=[rP_{\hat g}\mu;\ r\hat\theta\mu-r\hat g\,w]=\nu$ ✅ 与 (14c) 一致。</p><p><strong>推导 (D3) 的显式 6×6 展开（论文没写出，本文补全）</strong>：记 $\Sigma=\mathrm{diag}(\sigma_\mu^2I_3,\sigma_w^2)$，用 $P_{\hat g}=P_{\hat g}^T=P_{\hat g}^2$：</p>
+$$E\Sigma E^T=r^2\begin{bmatrix}\sigma_\mu^2P_{\hat g}&\sigma_\mu^2\hat\theta P_{\hat g}\\[2pt]\sigma_\mu^2\hat\theta P_{\hat g}&\sigma_\mu^2\hat\theta^2I_3+\sigma_w^2\hat g\hat g^T\end{bmatrix}$$
+<p><strong>三个关键观察</strong>：① 上块沿视线方向零方差——方位测量对视线方向<strong>无</strong>约束，$H$ 上块秩 2 与之一致；② <strong>交叉块非零</strong>：伪线性化使方位噪声与角度行相关（"伪"的又一体现）；③ 下块含 $\sigma_\mu^2\hat\theta^2$：目标近（$\hat\theta$ 大）时方位噪声污染角度行。</p><p><strong>⚠️ 三处近似（论文自声明两处，本文补第三处）</strong>：a) $E$ 中的 $\hat g,\hat\theta$ 含噪但被当作确定量（否则 $\nu$ 是噪声与真值的复杂函数，协方差不可算）；b) 真距 $r$ 用 $\hat r=\|\hat p_T-p_o\|$ 替代（援引 He et al. 2018 / Li et al. 2023）；c) $\mu\sim N(0,\sigma_\mu^2I_3)$ 本身是近似（§12.5）。<strong>记号瑕疵</strong>：Kalman 增益公式里 $\Sigma_\nu$ 没写时间下标，但 $E$（含 $r,\hat g,\hat\theta$）逐时刻变化，严格应写 $\Sigma_\nu(t_k)$。</p></div>
+</div>
+<hr>
+<h3>8. 算法：伪线性 Kalman 滤波（§4.5 无编号五式）—— 逐行解读 + 伪逆的秩论证</h3>
+<p>论文原文（字形级核实）：</p>
+<div class="formula-block">
+<span class="eq-tag">算法 —— 预测步（第 7 页，无编号）</span>
+$$\hat x^-(t_k)=F\,\hat x(t_{k-1}),\qquad\qquad P^-(t_k)=F\,P(t_{k-1})F^T+\Sigma_q$$
+<div class="eq-note"><p><strong>解读</strong>：标准离散 Kalman 先验传播。$\hat x^-\in\mathbb R^7$、$P^-\in\mathbb R^{7\times7}$。与 (1)–(3) 的模型严格配套：均值按 $F$ 传播（双积分器外推 + 尺寸保持），协方差按 Lyapunov 形式传播并叠加过程噪声。$\Sigma_q$ 的 0-块保证位置不确定性只经 $\delta t$ 由速度耦合而来。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">算法 —— 校正步（第 7 页，无编号）</span>
+$$K(t_k)=P^-(t_k)H^T(t_k)\Big(H(t_k)P^-(t_k)H^T(t_k)+\Sigma_\nu\Big)^{\dagger}$$
+$$\hat x(t_k)=\hat x^-(t_k)+K(t_k)\Big(z(t_k)-H(t_k)\hat x^-(t_k)\Big),\qquad\qquad P(t_k)=\big[I_{7\times7}-K(t_k)H(t_k)\big]P^-(t_k)$$
+<div class="eq-note"><p><strong>逐式解读</strong>：$K\in\mathbb R^{7\times6}$ 是增益；$(\cdot)^\dagger$ 是 Moore–Penrose 伪逆；$\hat x,P$ 是后验。</p><p><strong>为什么必须用伪逆（本文补的秩论证，论文只引了文献）</strong>：$H\in\mathbb R^{6\times7}$ 的上 3 行由秩 2 的 $P_{\hat g}$ 组成，故 $\mathrm{rank}\,H\le2+3=5$，从而 $\mathrm{rank}(HP^-H^T)\le5$。当 $\Sigma_\nu$ 小（噪声低或 $r$ 小）时，$HP^-H^T+\Sigma_\nu$ 接近奇异；伪逆在奇异方向给 0 增益而非数值爆炸，防止发散（Yoshikawa 1972；Kulikov &amp; Kulikova 2018）。</p><p><strong>创新向量（实现核对用）</strong>：$z-H\hat x^-=[-P_{\hat g}(p_T^--p_o);\ -\hat\theta(p_T^--p_o)+\hat g\,\ell^-]$——上 3 行是先验相对位置在视线切平面的投影（取负），下 3 行是沿视线方向的角度残差。</p><p><strong>⚠️ 已知偏差（论文在 Related Work 中承认）</strong>：$H$ 含 $\hat g,\hat\theta$，与 $\nu$ 相关，破坏"噪声与测量矩阵独立"的 Kalman 假设。Aidala &amp; Nardone (1982) 证明：速度估计无偏、位置估计有偏、偏差可被观测器机动消除。</p><p><strong>交叉验证</strong>：去掉角度行（$H$ 取上 3 行、状态去 $\ell$），即退化为经典 bearing-only PLKF（Lingren &amp; Gong 1978）——论文 §7–§9 的"bearing-only"对照即此特例。</p></div>
+</div>
+<hr>
+<h3>9. 公式 (16)(17)：可观测性矩阵及其行变换 —— 逐步推导（§5.1）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(16) —— 可观测性矩阵与 $H(t_i)F^{i-1}$ 展开（论文式 (16) 及其后矩阵）</span>
+$$Q=\begin{bmatrix}H(t_1)\\H(t_2)F\\H(t_3)F^2\\[-2pt]\cdots\\H(t_k)F^{k-1}\end{bmatrix}\in\mathbb R^{6k\times7},\qquad
+H(t_i)F^{i-1}=\begin{bmatrix}P_g(t_i)&(i-1)\delta t\,P_g(t_i)&0_{3\times1}\\[2pt]\theta(t_i)I_{3\times3}&(i-1)\delta t\,\theta(t_i)I_{3\times3}&-g(t_i)\end{bmatrix} \tag{16}$$
+<div class="eq-note"><p><strong>第一性原理重推展开式（一行块乘法）</strong>：$H(t_i)=[P_g(t_i),0,0;\ \theta(t_i)I,0,-g(t_i)]$（对 (14b) 去掉噪声符号，即用真值 $g,\theta$ 分析基本可观测性），$F^{i-1}=[I,(i-1)\delta tI,0;\,0,I,0;\,0,0,1]$（§12.3 的归纳结果）。相乘：
+$$H(t_i)F^{i-1}=\begin{bmatrix}P_g(t_i)\cdot I& P_g(t_i)(i-1)\delta tI+P_g(t_i)\cdot0&0\\\theta(t_i)I\cdot I&\theta(t_i)I(i-1)\delta tI+0&-\!g(t_i)\cdot1\end{bmatrix}$$
+即得 (16) 的展开 ✅ 与论文打印的 $Q$ 逐块一致。$Q$ 的行数 $6k$、列数 7；时刻跨度 $k\ge3$（Case 2 需要 $i\ge3$ 的加速度项）。</p><p><strong>方法定位</strong>：这是"Kalman 判据"路线（检查 $Q$ 的秩），§6 的线性方程组是第二条路线。两者结论一致（定理 1 的 Remark 3）。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(17) —— 行变换约化结果（论文式 (17)）</span>
+$$Q\;\to\;\begin{bmatrix}I_{3\times3}&0_{3\times3}&-g(t_1)/\theta(t_1)\\[2pt]0_{3\times3}&I_{3\times3}&-\delta v(t_2)/\ell\\[2pt]\cdots&\cdots&\cdots\\[2pt]0_{3\times3}&I_{3\times3}&-\delta v(t_k)/\ell\\[2pt]0_{3k\times3}&0_{3k\times3}&0_{3k\times1}\end{bmatrix},\qquad \delta v(t_k)\;.\!\!=\;v_T(t_k)-v_o(t_k) \tag{17}$$
+<div class="eq-note"><p><strong>重推行变换（把每"步"写清楚，这是论文没展开的部分）</strong>。记 $Q$ 的第 $i$ 个 6 行块为 $[A_i;\ B_i]$，其中 $A_i=[P_g(t_i),(i-1)\delta tP_g(t_i),0]$，$B_i=[\theta(t_i)I,(i-1)\delta t\,\theta(t_i)I,-g(t_i)]$。</p><p><strong>第 1 步</strong>：$B_1/\theta(t_1)=[I,\ 0,\ -g(t_1)/\theta(t_1)]$ —— 即 (17) 的第 1 个 3 行块 ✅。</p><p><strong>第 2 步</strong>：对 $i\ge2$，作 $B_i/\theta(t_i)-B_1/\theta(t_1)$，再用恒等式 $g(t)/\theta(t)=(p_T(t)-p_o(t))/\ell$（由 $g=(p_T-p_o)/r$ 与 $r=\ell/\theta$ 直接相乘得到）：</p>
+$$\frac{B_i}{\theta(t_i)}-\frac{B_1}{\theta(t_1)}=\Big[0,\ (i-1)\delta t\,I,\ -\frac{g(t_i)}{\theta(t_i)}+\frac{g(t_1)}{\theta(t_1)}\Big]=\Big[0,\ (i-1)\delta t\,I,\ -\frac{(p_T(t_i)-p_T(t_1))-(p_o(t_i)-p_o(t_1))}{\ell}\Big]$$
+<p>除以 $(i-1)\delta t$ 得 $\Big[0,\ I,\ -\big(v_T-\frac{p_o(t_i)-p_o(t_1)}{(i-1)\delta t}\big)/\ell\Big]$。<strong>关键观察</strong>：这里精确出现的是<strong>平均速度</strong> $\frac{p_o(t_i)-p_o(t_1)}{(i-1)\delta t}$，不是瞬时速度 $v_o(t_i)$！</p><p><strong>第 3 步</strong>：$A_i$ 行块被吸收：$A_i=P_g(t_i)\,[I,(i-1)\delta tI,0]$，而 $[I,(i-1)\delta tI,0]$ 是已得行的组合（Case 1 下还多出一项 $P_g(t_i)\big(\frac{g(t_1)}{\theta(t_1)}+(i-1)\delta t\frac{\delta v}{\ell}\big)$，而该向量 $=\frac{p_T(t_i)-p_o(t_i)}{\ell}\parallel g(t_i)$，被 $P_g(t_i)$ 湮灭——见 §12.10 的 (G2)），故 $A_i$ 落入已生成行的张成。于是得到 (17)。</p><p><strong>⚠️ 诚实标注（问题 P8）</strong>：上式表明 (17) 里的 $\delta v(t_i)=v_T-v_o(t_i)$ <strong>只有在 Case 1（$v_o$ 恒定）下才是严格初等行变换的结果</strong>（此时平均速度 = 瞬时速度，$A_i$ 吸收严格成立）；在 Case 2（$v_o$ 时变）下，精确约化含平均速度，写成瞬时 $v_o(t_i)$ 是一阶近似，且 $A_i$ 的吸收也有 $O(\delta t)$ 残差。论文只对 (22) 标注了 "approximated"，对 (17) 未说明。后文结论用精确差分重证后依然成立（§12.11），但推导的严格性此处打折。</p></div>
+</div>
+<hr>
+<h3>10. 公式 (18)–(21)：Case 1（观测器匀速）—— 秩 6 与不可观测模式的几何证明（§5.2）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(18)(19) —— Case 1 的约化与秩（论文式 (18)(19)）</span>
+$$\delta v^{case1}(t_i)=v_T^{const}-v_o^{const}=\delta v^{const}, \tag{18}\qquad
+Q^{case1}\to\begin{bmatrix}I_{3\times3}&0_{3\times3}&-g(t_1)/\theta(t_1)\\[2pt]0_{3\times3}&I_{3\times3}&-\delta v^{const}/\ell\\[2pt]0_{6(k-1)\times3}&0_{6(k-1)\times3}&0_{6(k-1)\times1}\end{bmatrix},\qquad \mathrm{rank}\,Q^{case1}=6 \tag{19}$$
+<div class="eq-note"><p><strong>推导</strong>：把 (18) 代入 (17)：所有 $\delta v(t_i)$ 相等，对 $i\ge3$ 行减去第 2 块行即化为 0，只剩前两个非零块。前 6 行构成 $\begin{bmatrix}I&0&a\\0&I&b\end{bmatrix}$（$a=-g_1/\theta_1,\ b=-\delta v/\ell$），前 6 列是单位阵 → <strong>行秩 = 6</strong>（"full row rank"）。零块在下方，故 $\mathrm{rank}=6&lt;7$，恰有 1 个不可观测模式。</p><p><strong>物理解读</strong>：目标匀速 + 观测器匀速 ⇒ 相对几何是"刚体平移"：视线以固定角速度整体旋转，观测序列 $g(t),\theta(t)$ 里没有"径向尺度"的独立信息——距离 $r$ 与尺寸 $\ell$ 只能以某个组合被观测。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(20)(21) —— 不可观测子空间与不可观测模式（论文式 (20)(21)）</span>
+$$\mathrm{Null}\left(Q^{case1}\right)=\mathrm{span}\!\left\{\begin{bmatrix}g(t_1)/\theta(t_1)\\[2pt]\delta v^{const}/\ell\\[2pt]1\end{bmatrix}\right\}, \tag{20}\qquad
+x^T\begin{bmatrix}g(t_1)/\theta(t_1)\\[2pt]\delta v^{const}/\ell\\[2pt]1\end{bmatrix}=p_T^T\frac{g(t_1)}{\theta(t_1)}+v_T^T\frac{\delta v^{const}}{\ell}+\ell \tag{21}$$
+<div class="eq-note"><p><strong>验证 (20)（把向量代入 $Q$ 的行）</strong>：第 1 块行 $[I,0,-g_1/\theta_1]\cdot[g_1/\theta_1;\ \delta v/\ell;\ 1]=g_1/\theta_1-g_1/\theta_1=0$ ✅；第 2 块行 $[0,I,-\delta v/\ell]\cdot[\cdots]=\delta v/\ell-\delta v/\ell=0$ ✅；零块自然为 0 ✅。由 $\mathrm{rank}=6$ 且零空间维数 $7-6=1$，得 (20)。(21) 是把 (20) 翻译成"状态泛函"的写法（$x=[p_T;v_T;\ell]$ 与零空间向量作内积），即不可观测模式是线性泛函 $\phi(x)=p_T\cdot g_1/\theta_1+v_T\cdot\delta v/\ell+\ell$。</p><p><strong>本文的严格化：不可观测方向的“规范（gauge）变换”解释（论文没有给，这是理解 (21) 的关键）</strong>。设状态被扰动为</p>
+$$p_T'=p_T+\lambda\,\frac{g(t_1)}{\theta(t_1)},\qquad v_T'=v_T+\lambda\,\frac{\delta v}{\ell},\qquad \ell'=\ell+\lambda \tag{G1}$$
+<p>（$\lambda$ 任意）。则对任意时刻 $t_i$：预测位置 $p_T'(t_i)=p_T'+(i-1)\delta t\,v_T'$。Case 1 下目标匀速且 $\delta v$ 恒定，用恒等式（§12.9 第 2 步用过，这里写成逐时刻形式）</p>
+$$\frac{g(t_1)}{\theta(t_1)}+(i-1)\delta t\,\frac{\delta v}{\ell}=\frac{p_T(t_i)-p_o(t_i)}{\ell}=\frac{r(t_i)}{\ell}\,g(t_i)=\frac{g(t_i)}{\theta(t_i)} \tag{G2}$$
+<p>（(G2) 的证明：$p_T(t_i)-p_o(t_i)=p_T(t_1)+(i-1)\delta t v_T-p_o(t_1)-(i-1)\delta t v_o$，两边同除 $\ell$ 并用 $g_1/\theta_1=(p_T(t_1)-p_o(t_1))/\ell$ 即得。）于是</p>
+$$p_T'(t_i)-p_o(t_i)=p_T(t_i)-p_o(t_i)+\lambda\frac{g(t_i)}{\theta(t_i)}=\left(r(t_i)+\frac{\lambda}{\theta(t_i)}\right)g(t_i)$$
+<p>即 $g'(t_i)=g(t_i)$（<strong>方位序列不变</strong>）且</p>
+$$\theta'(t_i)=\frac{\ell'}{r'(t_i)}=\frac{\ell+\lambda}{r(t_i)+\lambda/\theta(t_i)}=\frac{\ell+\lambda}{r(t_i)+\lambda\,r(t_i)/\ell}=\frac{\ell+\lambda}{r(t_i)(1+\lambda/\ell)}=\frac{\ell}{r(t_i)}=\theta(t_i)$$
+<p>（<strong>角度序列也不变</strong>，用 $r\theta=\ell$。）结论：变换 (G1) 对全部测量 $(g(t_i),\theta(t_i))_{i=1..k}$ 严格不变——这正是"不可观测"的严格定义。$\lambda$ 的物理含义：<strong>把目标沿视线挪远 $\lambda/\theta_1$ 的同时把尺寸放大 $\lambda$、并给速度叠加 $\lambda\delta v/\ell$，所有视觉测量纹丝不动</strong>。位置（沿视线）、速度（沿相对速度方向）与尺寸三者耦合——与论文"the estimation of the three quantities is coupled"完全呼应，且给出了耦合的具体代数形式。特例：若 $\delta v=0$（两机同速），不可观测模式退化为 $p_T\cdot g/\theta+\ell=r/\theta+\ell$，即经典的"距离-尺寸"尺度模糊（bearing-only 的同款病根）。</p></div>
+</div>
+<hr>
+<h3>11. 公式 (22)(23)：Case 2（观测器加速）—— 含一处符号印刷错误（§5.3）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(22) —— 采样加速度（论文式 (22)；原文中间两步有符号错）</span>
+$$a_o(t_i)\approx\frac{v_o(t_i)-v_o(t_{i-1})}{\delta t}=\frac{-\big[v_T^{const}-v_o(t_i)\big]-\big[v_T^{const}-v_o(t_{i-1})\big]}{\delta t}=\frac{-\delta v(t_i)-\delta v(t_{i-1})}{\delta t} \qquad\text{(原文如此)} \tag{22}$$
+<div class="eq-note"><p><strong>❌ 字形级核实的印刷错误（问题 P1，重要）</strong>：对第 8 页 PDF 做逐字形提取，原文确实印成上式（两个方括号前都是减号，最后一行 $-\delta v(t_i)-\delta v(t_{i-1})$）。但第一性原理展开：</p>
+$$v_o(t_i)-v_o(t_{i-1})=\big[v_T-v_o(t_{i-1})\big]-\big[v_T-v_o(t_i)\big]=\delta v(t_{i-1})-\delta v(t_i)=-\big(\delta v(t_i)-\delta v(t_{i-1})\big)$$
+<p>故<strong>正确的第二、三行应为</strong> $\frac{-\delta v(t_i)+\delta v(t_{i-1})}{\delta t}$（或 $\frac{-\big(\delta v(t_i)-\delta v(t_{i-1})\big)}{\delta t}$）。论文把两个括号的符号都印成了负号。<strong>影响评估（不夸大）</strong>：(22) 第一行的定义式与 (23) 的使用都是<strong>正确版本</strong>——(23) 的 $\delta t\,a_o(t_i)/\ell$ 恰好等于 $-\big(\delta v(t_i)-\delta v(t_{i-1})\big)/\ell$（见下式推导），所以论文实际用的是正确公式，只是 (22) 中间两步印错，照抄会得到错误符号的加速度。</p><p><strong>另一处笔误（问题 P2）</strong>：正文把加速度写成 "$a_o(t_i)\in\mathbb R$"（逐字形核实无上标 3），但 $a_o$ 是 3 维向量（(23) 中 $\delta t\,a_o(t_i)/\ell$ 作为 3×1 块使用），应为 $a_o(t_i)\in\mathbb R^3$。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(23) —— Case 2 的约化与秩 7（论文式 (23)）</span>
+$$Q^{case2}\to\begin{bmatrix}I_{3\times3}&0_{3\times3}&-g(t_1)/\theta(t_1)\\[2pt]0_{3\times3}&I_{3\times3}&-\delta v(t_2)/\ell\\[2pt]0_{3\times3}&0_{3\times3}&\delta t\,a_o(t_3)/\ell\\[2pt]\cdots&\cdots&\cdots\\[2pt]0_{3\times3}&0_{3\times3}&\delta t\,a_o(t_k)/\ell\\[2pt]0_{3k\times3}&0_{3k\times3}&0_{3k\times1}\end{bmatrix} \tag{23}$$
+<div class="eq-note"><p><strong>重推（用 (22) 的正确版本）</strong>：对 (17) 的相邻块行作差：第 $i$ 块 − 第 $i-1$ 块 $=\Big[0,\ 0,\ -\frac{\delta v(t_i)-\delta v(t_{i-1})}{\ell}\Big]=\Big[0,\ 0,\ \frac{\delta t\,a_o(t_i)}{\ell}\Big]$（$i\ge3$；用 $-\big(\delta v(t_i)-\delta v(t_{i-1})\big)=\delta t\,a_o(t_i)$）✅ 即 (23) 的各块。<strong>若误用论文印错的 (22)</strong>，此块会变成 $-\delta t\,a_o(t_i)/\ell$，与 (23) 矛盾——再次印证 (22) 是排版错误而 (23) 用的是正确符号。</p><p><strong>秩 7 的严格论证（论文只说了一句，本文补全）</strong>：把 (23) 的行空间写清楚。设 $e_7$ 是第 7 个标准基向量，前 6 行是 $e_1+a_1e_7,\dots,e_6+b_3e_7$（$a=-g_1/\theta_1,\ b=-\delta v(t_2)/\ell$），第 $i\ge3$ 块的 3 行是 $\frac{\delta t}{\ell}a_{o,1}(t_i)e_7,\ \frac{\delta t}{\ell}a_{o,2}(t_i)e_7,\ \frac{\delta t}{\ell}a_{o,3}(t_i)e_7$（全是 $e_7$ 的倍数！）。前 6 行在 $e_1..e_6$ 上的投影是单位阵 → 线性无关；它们的张成里任一元素的前 6 个坐标即其组合系数。若 $a_{o,j}(t_i)e_7$ 属于该张成，则其前 6 坐标须为 0 → 组合系数全 0 → 第 7 坐标 0，矛盾（除非 $a_{o,j}=0$）。故<strong>只要存在 $i\ge3$ 使 $a_o(t_i)\ne0$，就贡献出第 7 维，$\mathrm{rank}\,Q^{case2}=7$</strong>；且注意同一块内 3 行互相平行，只贡献 1 维（不是 3 维）——秩正好到 7，不多不少。</p><p><strong>⚠️ 两处措辞问题（问题 P6、P11）</strong>：① "The upper 6×7 block in (23) has full column rank"——6×7 矩阵列秩至多 6，"full column rank"不成立，应为"full row rank"（或指前 6 行与任一块拼成的 7×7 子阵满秩）；结论本身正确。② "if $a_o(t_i)\ne0$ <em>for any</em> $i\ge3$"——英语歧义（for any 可作"任意/每个"或"存在某个"），按数学结论应为"存在某个 $i\ge3$"（for some）。</p><p><strong>物理解读（本文最重要的结论）</strong>：条件里只有 $a_o(t_i)\ne0$ 的<strong>模</strong>，没有<strong>方向</strong>——加速度可以<strong>沿视线方向</strong>（冲过去或倒车），照样满秩。这就是"bearing-angle 不再需要横向机动"的数学本质：角度测量提供了"径向尺度"信息，观测器沿视线的加速度通过 $\theta$ 的变化被"看见"。</p></div>
+</div>
+<hr>
+<h3>12. 与 bearing-only 的严格对比：为什么经典方法必须横向机动（§5.4 结论的数学化）</h3>
+<div class="formula-block">
+<span class="eq-tag">补充推导 (D4) —— bearing-only 的可观测性秩条件（为对照 §5.4 的结论）</span>
+$$\text{bearing-only:}\quad x_{bo}=\begin{bmatrix}p_T\\v_T\end{bmatrix}\in\mathbb R^6,\quad H_{bo}(t_i)=\begin{bmatrix}P_g(t_i)&0_{3\times3}\end{bmatrix},\quad H_{bo}(t_i)F^{i-1}=\begin{bmatrix}P_g(t_i)&(i-1)\delta t\,P_g(t_i)\end{bmatrix}\in\mathbb R^{3\times6} \tag{D4}$$
+<div class="eq-note"><p><strong>设定</strong>：只保留 (10) 的方位方程（无 $\ell$、无角度），即经典 PLKF，状态 6 维。</p><p><strong>秩分析（与 §12.10 的 gauge 论证平行）</strong>：零空间向量 $[\alpha;\beta]$ 满足 $P_g(t_i)\big(\alpha+(i-1)\delta t\,\beta\big)=0$ 对所有 $i$，即 <strong>$\alpha+(i-1)\delta t\,\beta\parallel g(t_i)$</strong>。</p><p><strong>情形 A（观测器沿视线运动，视线方向不变）</strong>：$g(t_i)\equiv g$。取 $\alpha=g,\beta=0$ 满足；取 $\alpha=0,\beta=g$ 也满足（$(i-1)\delta t\,g\parallel g$）。两个独立零向量 → $\mathrm{rank}\le4&lt;6$，<strong>不可观测</strong>。沿视线前进/后退不产生新信息——距离 $r$ 与径向速度完全看不见。</p><p><strong>情形 B（观测器横向机动，视线旋转）</strong>：$g(t_1),g(t_2),g(t_3)$ 张成整个平面。三个平行条件 $\alpha\parallel g(t_1)$、$\alpha+\delta t\beta\parallel g(t_2)$、$\alpha+2\delta t\beta\parallel g(t_3)$ 的唯一解是 $\alpha=\beta=0$ → 满秩。<strong>条件</strong>：视线必须真正旋转，即观测器相对运动须有<strong>垂直于视线</strong>的分量——这正是 Fogel &amp; Gavish (1988) 的经典条件（"higher-order motion with components orthogonal to the bearing vector"）。</p><p><strong>对比结论（把 §5.4 的文字翻译成秩）</strong>：bearing-only 的秩条件压在 $g$ 的<strong>方向变化</strong>上（必须横向机动）；bearing-angle 的秩条件只压 $a_o$ 的<strong>模</strong>（§12.11，方向任意）。一维之差来自 $\ell$ 的加入：bearing-only 里 $r$ 沿视线完全不可见（$p_T-p_o=rg$）；bearing-angle 里 $r$ 被 $\theta=\ell/r$ 通过第二个通道观测。这就是摘要中"enhance the observability without relying on additional lateral motion"的严格含义。</p></div>
+</div>
+
+<hr>
+<h3>13. 公式 (24)–(30)：多项式运动模型与线性方程组（§6.1）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(24)(25)(26) —— 目标/观测器运动的多项式建模（论文式 (24)(25)(26)）</span>
+$$p_T(t)=b_0+b_1t+\cdots+b_nt^n, \tag{24}\qquad
+p_o(t)=c_0+c_1t+\cdots+c_nt^n+h(t),\qquad h(t)=d_1t^{n+1}+d_2t^{n+2}+\cdots \tag{25}$$
+$$s(t)\;.\!\!=\;p_T(t)-p_o(t)\;.\!\!=\;s_0+s_1t+\cdots+s_nt^n+h(t),\qquad s_i=d_i-c_i\in\mathbb R^3 \tag{26}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$b_i,c_i,d_i\in\mathbb R^3$；$h(t)$ 是观测器的"高阶运动"（首项为 $t^{n+1}$ 次，即观测器阶数 $&gt;n$）；$s(t)$ 是相对位置；$h^{(i)}(0)=0_{3\times1}$（$i=0..n$）由 $h$ 无低次项直接得证（论文声明"可以验证"，这里给出验证：$h^{(i)}(0)=\sum_{j\ge n+1}d_j\cdot j(j-1)\cdots(j-i+1)\cdot0^{j-i}=0$，因 $j-i\ge1$）。</p><p><strong>❌ 两处笔误（问题 P3、P4，字形级核实）</strong>：① (26) 印的是 <strong>$s_i=d_i-c_i$</strong>，但把 (24)(25) 相减，多项式部分的系数是 $b_i-c_i$（$d_i$ 属于 $h(t)$，不出现在 $s_i$ 里）——应为 <strong>$s_i=b_i-c_i$</strong>。② (26) 把 $s:=p_T-p_o$ 写成 $\sum s_it^i+\mathbf{+h(t)}$，而按 (25)，$p_T-p_o=\sum(b_i-c_i)t^i-\mathbf{h(t)}$——<strong>符号矛盾</strong>（应为 $-h(t)$；或把 (25) 的 $p_o$ 定义成 $-\!h(t)$）。<strong>影响评估（诚实）</strong>：定理的结论只依赖 $h\ne0$，对符号不敏感，且 (27)–(35) 内部自洽地使用了"+h"版本，故 Theorem 1/2 的正确性不受影响；但 (26) 作为"相对位置 = 多项式分解"的等式在物理上不成立，属形式错误。</p><p><strong>多项式近似的合法性</strong>：Taylor 展开保证短时窗内任意光滑轨迹可被 $n$ 次多项式近似（Nardone &amp; Aidala 1981 的经典技巧）。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(27)(28)(29)(30) —— 把测量写成线性方程组（论文式 (27)–(30)）</span>
+$$s_0+s_1t+\cdots+s_nt^n+h(t)=\frac{g(t)}{\theta(t)}\,\ell, \tag{27}\qquad
+A(t)X=h(t), \tag{28}$$
+$$X=\begin{bmatrix}s_0^T,s_1^T,\cdots,s_n^T,\ell\end{bmatrix}^T\in\mathbb R^{3n+4},\qquad
+A(t)=\begin{bmatrix}I_{3\times3},tI_{3\times3},\cdots,t^nI_{3\times3},\rho(t)\end{bmatrix}\in\mathbb R^{3\times(3n+4)}, \tag{29}$$
+$$\rho(t)\;.\!\!=\;-\frac{g(t)}{\theta(t)}\in\mathbb R^3 \tag{30}$$
+<div class="eq-note"><p><strong>推导 (27)（两步）</strong>：由 (4a) $p_T-p_o=g\,r$ 与 (4b) 的反演 $r=\ell/\theta$，得 $p_T(t)-p_o(t)=g(t)\ell/\theta(t)$；与 (26) 的分解式相等即 (27)。注意这里默认了 (26) 的"+h"写法，故 (27)–(35) 内部自洽（问题 P4 只影响与 (25) 的物理衔接）。</p><p><strong>推导 (28)(29)（把未知与已知分离）</strong>：未知 $s_0..s_n,\ell$ 收集成 $X$（$3n+4$ 维），已知 $g,\theta,h$ 进入 $A,\rho$ 与右端 $h$：把 (27) 移项成 $s_0+s_1t+\cdots+s_nt^n+\ell\,\rho(t)=h(t)$（用 $\rho=-g/\theta$ 使 $\ell$ 的系数变成 $\rho$），即 $A(t)X=h(t)$ ✅。$A$ 的行数 3 小于列数 $3n+4$——<strong>单时刻欠定</strong>，这是后面"求导补方程"的动因。</p><p><strong>为什么把 $h$ 放右端</strong>：$h$ 是观测器运动的高阶部分（自定位已知），不是待估量；把它放右端使"是否可解"的问题转化为"$\bar A$ 是否列满秩"。</p></div>
+</div>
+<hr>
+<h3>14. 公式 (31)–(35) 与 Theorem 1：充要可观测性条件 —— 证明完整重推（§6.2）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(31)(32) —— 求导堆叠（论文式 (31)(32)）</span>
+$$\bar A(t)X=\bar h(t), \tag{31}\qquad
+\bar A(t)=\begin{bmatrix}A(t)\\A'(t)\\\cdots\\A^{(N)}(t)\end{bmatrix},\qquad
+\bar h(t)=\begin{bmatrix}h(t)\\h'(t)\\\cdots\\h^{(N)}(t)\end{bmatrix},\qquad
+\bar A\in\mathbb R^{(3N+3)\times(3n+4)},\ \bar h\in\mathbb R^{3N+3} \tag{32}$$
+<div class="eq-note"><p><strong>推导</strong>：对 (28) 两边求 $i$ 阶导（系数 $A$ 与 $X$ 是"函数 × 常数向量"，用 Leibniz 法则即 $A^{(i)}X=h^{(i)}$），$i=0..N$ 堆叠。取 $N\ge n+1$ 使 $3N+3\ge3n+4$（即 $\bar A$ 是"高"矩阵，方程组过定）。</p><p><strong>展开 $\bar A$（论文印在 (32) 后，这里重推核对）</strong>：$A$ 的第 $j$ 个 3 列块是 $t^jI_3$（$j=0..n$），末块 $\rho(t)$。求 $i$ 阶导：$\frac{d^i}{dt^i}(t^jI_3)=\frac{j!}{(j-i)!}t^{j-i}I_3$（$j\ge i$，否则 0）。于是 $\bar A$ 的前 $n+1$ 个 3 列块构成"带 $t$ 的块上三角"，末列块是 $[\rho;\rho';\cdots;\rho^{(N)}]$：</p>
+$$\bar A(t)=\begin{bmatrix}I&tI&t^2I&\cdots&t^nI&\rho\\[2pt]0&I&2tI&\cdots&nt^{n-1}I&\rho'\\[2pt]0&0&2I&\cdots&n(n-1)t^{n-2}I&\rho''\\[2pt]\vdots&\vdots&\vdots&\ddots&\vdots&\vdots\\[2pt]0&0&0&\cdots&n!I&\rho^{(n)}\\[2pt]0&0&0&\cdots&0&\rho^{(n+1)}\\[2pt]\vdots&\vdots&\vdots&\cdots&\vdots&\vdots\\[2pt]0&0&0&\cdots&0&\rho^{(N)}\end{bmatrix}$$
+<p>与论文打印的 $\bar A(t)$ 逐块一致 ✅。左上 $3(n+1)\times3(n+1)$ 子块对角为 $I,I,2I,\dots,n!I$——<strong>满秩方阵</strong>（"top-left block is a full-rank square matrix"）✅。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(33)(34)(35) 与 Theorem 1 —— 秩条件链（论文式 (33)–(35) 与定理）</span>
+$$\exists\, i\in\{n+1,\dots,N\}:\ \rho^{(i)}(t)\ne0_{3\times1}, \tag{33}\qquad
+-\frac1\ell\Big(s_0+s_1t+\cdots+s_nt^n+h(t)\Big)^{(i)}\ne0_{3\times1}, \tag{34}\qquad
+h^{(i)}(t)\ne0_{3\times1} \tag{35}$$
+<div class="eq-note"><p><strong>Theorem 1 的完整逻辑链（每一步的依据写明）</strong>：</p><p><strong>环 1（列满秩 ⟺ (33)）</strong>：$\bar A$ 列满秩 ⟺ 末列块 $[\rho;\rho';\cdots;\rho^{(N)}]$ 不被前 $3n+3$ 列张成。前 $3n+3$ 列的列空间在行号 $3n+4..3N+3$（对应导数 $\ge n+1$ 的行）上的投影全为 0（多项式块这些行为 0），故末列块独立 ⟺ 存在 $i\ge n+1$ 使 $\rho^{(i)}\ne0$。即 (33)。</p><p><strong>环 2（(33) ⟺ (34)）</strong>：由 (30) 与 (27)，$\rho=-g/\theta=-\big(s_0+\cdots+s_nt^n+h(t)\big)/\ell$（(27) 两边同除 $-\ell$ 得 $-g/\theta=-(s_0+\cdots+h)/\ell$），求 $i$ 阶导即 (34)。</p><p><strong>环 3（(34) ⟺ (35)，关键一步，论文只写"equivalent to"，本文补证）</strong>：$i\ge n+1$ 时，$\big(s_0+s_1t+\cdots+s_nt^n\big)^{(i)}=0_{3\times1}$（次数 $\le n$ 的多项式求 $n+1$ 阶以上导数恒为 0——逐项：$(s_jt^j)^{(i)}=s_j\cdot j(j-1)\cdots(j-i+1)\,t^{j-i}=0$ 因 $j-i&lt;0$ 时系数链含 0）。故 (34) ⟺ $h^{(i)}(t)\ne0$，即 (35)。</p><p><strong>环 4（(35) ⟺ $h\ne0$，论文未展开的等价性，本文补证）</strong>：由 (25)，$h(t)=\sum_{j\ge n+1}d_jt^j$ 不含 $\le n$ 次项。<strong>充分性</strong>：$h\ne0$ ⟹ 存在最小的 $j_0\ge n+1$ 使 $d_{j_0}\ne0$ ⟹ $h^{(j_0)}(t)=j_0!\,d_{j_0}+\sum_{j&gt;j_0}\cdots\ne0$（首项非零常数项）⟹ (35) 在 $i=j_0$ 成立。<strong>必要性</strong>：若 $h\equiv0$ 则一切导数恒 0，(35) 恒不成立。<strong>逆否等价链完整</strong>：$X$ 可唯一确定 ⟺ $\bar A$ 列满秩 ⟺ (33) ⟺ (35) ⟺ $h\ne0$。定理得证 ✅。</p><p><strong>Remark 的数学含义</strong>：① 目标静止（$n=0$）→ 观测器须有非零速度；目标匀速（$n=1$）→ 观测器须有非零加速度；② 条件只要求 $h\ne0$（高阶运动的<strong>存在性</strong>），<strong>不要求方向正交于视线</strong>——与 §12.11 的 Case 2 结论（只要求 $a_o\ne0$）一致，且定理 1 把目标从"匀速"推广到"任意 $n$ 阶多项式"；③ 与 §5 的 Kalman 判据结论一致（定理 1 的 Remark 3 声明，本文 §12.10/12.11 已核对）；④ 该方程是<strong>信息论判据</strong>，不用于实际估计（高阶导数在实测量中无法可靠计算）。</p></div>
+</div>
+<hr>
+<h3>15. 公式 (36)–(38) 与 Theorem 2：最少观测数 —— 前向差分表重推（§6.3）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(37)(38) —— 离散时刻堆叠（论文式 (37)(38)）</span>
+$$\tilde AX=\tilde h, \tag{37}\qquad
+\tilde A=\begin{bmatrix}A(t_1)\\\cdots\\A(t_N)\end{bmatrix},\qquad
+\tilde h=\begin{bmatrix}h(t_1)\\\cdots\\h(t_N)\end{bmatrix},\qquad
+\tilde A\in\mathbb R^{3N\times(3n+4)},\ \tilde h\in\mathbb R^{3N} \tag{38}$$
+<div class="eq-note"><p><strong>推导</strong>：每个时刻 $t_i$ 一条 (28)，$N$ 条堆叠。</p><p><strong>必要性（本文重推，比论文多一步中间量）</strong>：$X$ 有 $3n+4$ 个未知，须 $3N\ge3n+4$，即 $N\ge n+\frac43$。$N$ 为整数 ⟹ $N\ge n+2$ ✅（论文直接写"at least $n+2$"，此处补上 $\frac43\to2$ 的取整理由）。注意 $n+1$ 个观测只给 $3n+3&lt;3n+4$ 条方程，必然欠定。</p></div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(36) —— $\tilde A$ 的前向差分约化（论文式 (36)，第 10 页大矩阵）</span>
+$$\tilde A\to\begin{bmatrix}I&t_1I&\cdots&t_1^{n-1}I&t_1^nI&\rho(t_1)\\[2pt]0&I&\cdots&\Delta(t_2^{n-1},t_1^{n-1})I&\Delta(t_2^n,t_1^n)I&\Delta(\rho(t_2),\rho(t_1))\\[2pt]\vdots&\vdots&&\vdots&\vdots&\vdots\\[2pt]0&0&\cdots&(n-1)!\,I&\Delta^{n-1}(t_n^n,\cdots,t_1^n)&\Delta^{n-1}(\rho(t_n),\cdots,\rho(t_1))\\[2pt]0&0&\cdots&0&n!\,I&\Delta^n(\rho(t_{n+1}),\cdots,\rho(t_1))\\[2pt]0&0&\cdots&0&0&\Delta^{n+1}(\rho(t_{n+2}),\cdots,\rho(t_1))\\[2pt]\vdots&\vdots&&\vdots&\vdots&\vdots\\[2pt]0&0&\cdots&0&0&\Delta^{N-1}(\rho(t_N),\cdots,\rho(t_1))\end{bmatrix} \tag{36}$$
+<div class="eq-note"><p><strong>前向差分算子的两条引理（Milne-Thomson 2000，本文重证）</strong>：定义 $\Delta(a_2,a_1)=\frac{a_2-a_1}{\delta t}$，$\Delta^{m}(a_{m+1},\cdots,a_1)=\Delta\big(\Delta^{m-1}(a_{m+1},\cdots,a_2),\,\Delta^{m-1}(a_m,\cdots,a_1)\big)$（递归，论文给的定义）。<strong>引理 A</strong>：$\Delta^{m}(t^j)=0$ 当 $j&lt;m$；$\Delta^m(t^m)=m!$。证：$\Delta^1(t)=1$；$\Delta^1(t^j)=t^{j-1}+t_{prev}^{j-1}$ 是 $j-1$ 次多项式；归纳可得 $\Delta^m(t^j)$ 是 $j-m$ 次多项式（$j\ge m$），且首项系数保持为 1·(递推中差分不改变首项系数 1)·…，$\Delta^m(t^m)=$ 常数 $=m!$（直接算：$\Delta^2(t^2)=\frac{t_3^2-2t_2^2+t_1^2}{\delta t^2}=\frac{2\delta t^2}{\delta t^2}=2$，一般归纳同法）。<strong>引理 B</strong>：$\Delta^m f=f^{(m)}(\xi)$ 对某 $\xi$（前向差分的均值定理，无 $/m!$ 归一——这是论文把 $\Delta$ 当作"导数近似"而非标准差商的依据）。</p><p><strong>约化过程（论文"subtract the previous line and repeat"的展开）</strong>：第 $i$ 行块执行 $\Delta$ 操作 $i-1$ 次，各列块按引理 A 得 (36) 的块上三角（对角 $I,I,\cdots,(n-1)!I,n!I$），末列块为 $\Delta^{m-1}(\rho(t_m),\cdots,\rho(t_1))$。已逐块核对论文的 (36) ✅（含 $\Delta^{n-1}(t_n^n,\cdots,t_1^n)$ 位于 $(n-1)!I$ 右侧、$n!I$ 位于第 $n+1$ 行块第 $n+1$ 列块等细节）。</p><p><strong>充分性</strong>：前 $3n+3$ 列块上三角非奇异（对角 $I,\cdots,n!I$），故 $\tilde A$ 列满秩 ⟺ 末列块在行号 $\ge n+2$ 的块中某处非零，即存在 $m\ge n+2$ 使 $\Delta^{m-1}(\rho(t_m),\cdots,\rho(t_1))\ne0$。由引理 B，$\Delta^{m-1}\rho\approx\rho^{(m-1)}$；由定理 1 的环 4，$h\ne0\Longrightarrow h^{(n+1)}\not\equiv0\Longrightarrow\rho^{(n+1)}\not\equiv0$（因 $h$ 无 $\le n$ 次项，其 $n+1$ 阶导不可能恒为 0 除非 $h\equiv0$），故取 $m=n+2$ 即得非零（小 $\delta t$ 下）。于是 $N=n+2$ 个观测即可满秩 ✅。</p><p><strong>⚠️ 诚实标注（问题 P9）</strong>：① 该证明是"$\Delta$ 近似导数"的<strong>近似论证</strong>：引理 B 的 $\xi$ 不保证落在节点上，$\rho^{(n+1)}\not\equiv0$ 也不排除 $\Delta^{n+1}\rho$ 在<strong>特定节点组</strong>恰为 0（退化采样配置，如 $d_1=0,d_2\ne0$ 且节点关于 $t=0$ 对称时）。此时 $n+2$ 个观测可能不够，需更多观测或换采样点。论文未讨论该退化情形。② 论文的充分性叙述是"存在 $i\ge n+1$ 使 $\Delta^i\rho\ne0$"，若首个非零导数是 $n+1$ 阶（一般成立，见环 4），$N=n+2$ 足够。</p><p><strong>定理的实例核对</strong>：$n=0$（静止目标）→ 2 个观测即可定位（含沿视线运动的情形——2 个不同距离 + 同视线方向的观测给出两个 $\theta$ 值，$\theta_1/\theta_2=r_2/r_1$ 配合观测器位移解出 $r,\ell$）；$n=1$（匀速目标）→ 3 个观测，与 §5 的 Case 2（$k\ge3$）一致 ✅。</p></div>
+</div>
+<hr>
+<h3>16. 公式 (39)：平均 NEES —— χ² 统计的数值核对（§7）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(39) —— 平均归一化估计误差平方（论文式 (39)）</span>
+$$\bar\epsilon_{NEES}=\frac1{N_x}\sum_{i=1}^{N_x}(x-\hat x_i)^TP_i^{-1}(x-\hat x_i) \tag{39}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$x$ 是真实状态（7 维）；$\hat x_i,P_i$ 是第 $i$ 次 Monte Carlo 的估计与估计协方差；$N_x=100$。</p><p><strong>理论依据（Bar-Shalom &amp; Li 1998，本文重推）</strong>：若滤波器一致（估计无偏且 $P_i$ 诚实），则 $(x-\hat x_i)\sim N(0,P_i)$，白化后 $y_i=P_i^{-1/2}(x-\hat x_i)\sim N(0,I_7)$，$y_i^Ty_i\sim\chi^2(7)$：$\mathbb E[\epsilon_i]=7$，$\mathrm{Var}[\epsilon_i]=2\cdot7=14$。平均后 $\mathbb E[\bar\epsilon]=7$，$\mathrm{Var}[\bar\epsilon]=14/100=0.14$，$\sigma=0.374$。<strong>99% 置信区间</strong>（正态近似）：$7\pm2.576\times0.374=[6.04,\ 7.96]$。与 Fig. 4a 的 "99% confidence interval"（约 [6,8]）一致 ✅——bearing-angle 的 NEES 落在区间内即"一致"，bearing-only 越界即发散。bearing-only 对应 $\chi^2(6)$：区间 $6\pm2.576\sqrt{12/100}=[5.11,6.89]$。</p><p><strong>⚠️ 两点使用注意</strong>：① $P$ 依赖含噪测量（伪线性化的 $H,\Sigma_\nu$ 含 $\hat g,\hat\theta,r$），噪声非高斯时 $P$ 不再诚实，NEES 会偏移——论文 §8.3 用此解释 AirSim 实验中 NEES 的振荡慢收敛；② Fig. 4b 中 NEES 先升后降的原因论文已给：$\theta$ 噪声 $w$ 的方差恒定，初始 $\theta$ 小 → 噪声-信号比 $\sigma_w/\theta$ 大 → 早期估计差。数值核对：Scenario 2 初始 $r=5,\ell=1$，$\theta_0=0.2\,\mathrm{rad}$，$\sigma_w/\theta_0=0.05$；最近点 $r=1$ 时 $\theta=1\,\mathrm{rad}$，比值降到 0.01 ✅ 与"gets worse first before converging"的叙述吻合。</p></div>
+</div>
+<hr>
+<h3>17. 公式 (40)：接近/跟随控制律 —— 平衡点与收敛速度分析（§8.3）</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(40) —— 观测器速度指令（论文式 (40)）</span>
+$$v_o^{cmd}(t)=v_T(t)+k_{track}\,\frac{r^2(t)-r_d^2}{r^2(t)}\,g(t),\qquad k_{track}=3,\ r_d=3 \tag{40}$$
+<div class="eq-note"><p><strong>逐符号</strong>：$v_o^{cmd}$ 是观测器 MAV 的速度指令；$k_{track}=3$ 为控制增益（单位 s⁻¹）；$r_d=3\,\mathrm{m}$ 为期望间距；量纲检查：$(r^2-r_d^2)/r^2$ 无量纲 × $k_{track}$（s⁻¹）× $g$（无量纲）→ m/s ✅ 与 $v_T$ 相加合法。</p><p><strong>行为分析（第一性原理）</strong>：视线径向分量 $\dot r=-v_o\cdot g+v_T\cdot g$（对 $r^2=(p_T-p_o)^2$ 求导：$2r\dot r=2(p_T-p_o)\cdot(v_T-v_o)=2rg\cdot(v_T-v_o)$ ⟹ $\dot r=g\cdot(v_T-v_o)$）。代入 (40)：</p>
+$$\dot r=g\cdot v_T-\left(g\cdot v_T+k_{track}\frac{r^2-r_d^2}{r^2}\right)=-k_{track}\left(1-\frac{r_d^2}{r^2}\right)$$
+<p>于是 $r&gt;r_d\Rightarrow\dot r&lt;0$（接近）、$r&lt;r_d\Rightarrow\dot r&gt;0$（远离）、$r=r_d\Rightarrow\dot r=0$（平衡）。<strong>平衡点渐近性</strong>：$r\to r_d^+$ 时 $\dot r\to0^-$，理想动力学下 $r_d$ 是渐近极限而非有限时间到达——这解释了实验 2 "about eight seconds to reach the desired relative distance"的措辞（"reach"是工程上的接近，数学上渐近）。<strong>数值核对（AirSim 例 1）</strong>：目标悬停（$v_T=0$）、$g$ 恒定，初始约 20 m：$v^{cmd}=3(1-9/400)=2.93\,\mathrm{m/s}$；$r\to3$ 时 $v^{cmd}\to0$——与"moves along a straight line toward the target with a decreasing velocity command"完全吻合 ✅。<strong>收敛时间核算（实验 2）</strong>：$\frac{dr}{dt}=-3+\frac{27}{r^2}$，从 20 m 到 $r$ 用时 $t(r)=\frac13\int_r^{20}\frac{u^2}{u^2-9}du=\frac13\Big[(20-r)+\frac32\ln\frac{17/23}{(r-3)/(r+3)}\Big]$。该积分在 $r\to3^+$ 时<strong>对数发散</strong>（$\ln(r-3)\to-\infty$），故 $r=3$ 只能渐近逼近，永远"差一点"——这恰是论文用"about eight seconds"而非精确时间的数学原因。数值：$t(3.1)\approx7.5\,\mathrm{s}$，$t(3.05)\approx7.9\,\mathrm{s}$，即约 8 s 时已逼近到 $r_d$ 的 5 cm 量级 ✅ 与论文叙述吻合（另计 3 维轨迹、控制器延迟与 3 m/s 限幅，方向一致，无矛盾）。</p><p><strong>ℹ️ 方法学诚实性（问题 P10）</strong>：(40) 依赖<strong>目标真值</strong> $v_T,r,g$（论文自己声明"relies on the true position and velocity of the target MAV"），因此实验流程是<strong>先采集、后离线处理</strong>——(40) 不是闭环估计器的一部分，实验的公平性建立在"两种估计器吃同一份数据"上。这是合理的对照设计，但读者不应把 (40) 误读为在线闭环方案。</p><p><strong>交叉验证</strong>：实验 2 的轨迹（Fig. 13）：先接近（~8 s），后"两机同速保持相对静止 20 s"——稳态时 $r=r_d$，$v_o^{cmd}=v_T=[1/\sqrt2,1/\sqrt2,0]^T$ ✅ 与文字叙述逐点一致。</p></div>
+</div>
+<hr>
+<h3>18. 数值核算总表（§7–§9 全部参数代入核算）</h3>
+<table><tr><th>项目</th><th>论文给定</th><th>本文核算</th><th>结论</th></tr>
+<tr><td>(4b) 近似误差 @ $r=3\ell$</td><td>"&lt; 0.08%"</td><td>$\ell^2/(12r^2)=1/108=0.9259\%$（精确 0.919%）</td><td>❌ 差 11.5 倍；&lt;0.08% 需 $r&gt;10.2\ell$（问题 P5）</td></tr>
+<tr><td>Scenario 1 几何量</td><td>$\ell=1$，圆半径 $5\,\mathrm{m}$，速率 $3\,\mathrm{m/s}$</td><td>$\theta=\ell/r=0.2\,\mathrm{rad}=11.46^\circ$ 恒定 ✅（"angle remains constant"）；$\omega=v/r=0.6\,\mathrm{rad/s}$，周期 $10.5\,\mathrm{s}\approx$ 图 4a 的 10 s 时窗</td><td>✅</td></tr>
+<tr><td>Scenario 2 几何与可观测性</td><td>$p_o=[0,5],\ v_o=[0,4],\ a_o=-2$</td><td>$y(t)=5+4t-t^2$，极大值 $y(2)=9&lt;10$——<strong>未穿过目标</strong>，$g=[0,1]$ 始终不变 ✅（"bearing remains unchanged"）；$a_o\ne0$（Case 2）⟹ $\mathrm{rank}\,Q=7$ 可观测；bearing-only 因 $g$ 不变不可观测（§12.12 情形 A）</td><td>✅</td></tr>
+<tr><td>Scenario 2 的 NEES 先升后降</td><td>"angle small in the beginning"</td><td>$\sigma_w/\theta$：$0.01/0.2=5\%\to0.01/1.0=1\%$ ✅</td><td>✅</td></tr>
+<tr><td>测量噪声与图像对照</td><td>$\sigma_\mu=\sigma_w=0.01$</td><td>$0.01\,\mathrm{rad}=0.573^\circ$；Fig. 4/8 的 bearing/angle 误差 0.1–0.6° 同量级 ✅</td><td>✅</td></tr>
+<tr><td>NEES 99% 区间</td><td>Fig. 4 的置信带</td><td>$7\pm2.576\sqrt{14/100}=[6.04,7.96]$ ✅ 与图吻合（bearing-only 用 $\chi^2(6)$：$[5.11,6.89]$）</td><td>✅</td></tr>
+<tr><td>实验 1/2 目标尺寸 $\ell$</td><td>机器人直径 $295\,\mathrm{mm}$；M300 对角线 $895\,\mathrm{mm}$</td><td>Fig. 11 估计尺寸 $\approx0.3\,\mathrm{m}$ ✅；Fig. 13 估计尺寸 $0.8$–$1.0\,\mathrm{m}$ ✅（框宽对应"轮距"维度）</td><td>✅</td></tr>
+<tr><td>实验 1 目标速度</td><td>$v_T=[-0.1,0.1,0]^T$</td><td>模 $0.141\,\mathrm{m/s}$，地面机器人可行 ✅</td><td>✅</td></tr>
+<tr><td>(40) 收敛时间（实验 2）</td><td>"about 8 s"（20 m → 3 m）</td><td>$\dot r=-3+27/r^2$ 在 $r\to3$ 对数发散（渐近极限）；$t(3.1)\approx7.5\,\mathrm{s}$、$t(3.05)\approx7.9\,\mathrm{s}$ ✅ 与"约 8 s"吻合</td><td>✅</td></tr>
+<tr><td>Σν 数值（例：$r=5,\hat\theta=0.2$）</td><td>$\sigma_\mu=\sigma_w=0.01$</td><td>$r^2\sigma_\mu^2\hat\theta^2=25\cdot10^{-4}\cdot0.04=10^{-4}$；$r^2\sigma_w^2=2.5\times10^{-3}$——角度行噪声以自身噪声为主（远距离时 $\hat\theta$ 小）</td><td>✅ 量级合理</td></tr>
+<tr><td>Scenario 1/2 初始估计（§7.1/7.2 文字）</td><td>$\hat p_o(t_0)=[0,13]^T$、$[0,8]^T$ 等</td><td>真目标 $[0,10]^T$，初估值正是对<strong>目标</strong>的估计——记号应为 $\hat p_T,\hat v_T$（3 处）</td><td>⚠️ 符号笔误（问题 P7）</td></tr>
+<tr><td>AirSim 例 1 速度指令</td><td>$v_T=0$，$r_d=3$，初始约 20 m</td><td>$v^{cmd}(20)=2.93\,\mathrm{m/s}$，$r\to3$ 时 $v^{cmd}\to0$ ✅ "decreasing velocity command"</td><td>✅</td></tr>
+<tr><td>§8.4 的 $\sigma_\ell$ 对比</td><td>$10^{-4}$ vs $0.01$</td><td>$\sigma_\ell$ 大 → $\ell$ 允许快漂 → 跟踪时变尺寸；$\sigma_\ell$ 小 → $\hat\ell$ 收敛到均值 ✅ 与 Fig. 9 两子图叙述一致</td><td>✅</td></tr></table>
+<hr>
+<h3>19. 交叉验证总表与问题清单（"不自圆其说"部分）</h3>
+<h4>19.1 论文公式 ↔ 独立重推 ↔ 数值核算 总表</h4>
+<table><tr><th>公式</th><th>独立重推</th><th>数值核算</th></tr>
+<tr><td>(D1)(D2)</td><td>✅ 针孔模型 + 余弦定理</td><td>—</td></tr>
+<tr><td>(1)(2)(3)</td><td>✅ $F^j$ 归纳、噪声注入位置</td><td>—</td></tr>
+<tr><td>(4a)(4b)</td><td>✅ 几何定义 + Taylor</td><td>❌ 0.08% 声明失实（实算 0.919%，P5）</td></tr>
+<tr><td>(5)–(9)</td><td>✅ 旋转→加性恒等</td><td>✅ $\|\mu\|\approx\epsilon$ 与图噪声角一致</td></tr>
+<tr><td>(10)–(12)</td><td>✅ 三步代数恒等；$P_{\hat g}$ 四性质</td><td>✅ 量纲与退化极限核对</td></tr>
+<tr><td>(13)–(15)+Σν</td><td>✅ 块乘法；Σν 显式 6×6 展开</td><td>✅ 数值例量级合理</td></tr>
+<tr><td>KF 五步</td><td>✅ 标准 PLKF；伪逆的秩论证补全</td><td>—</td></tr>
+<tr><td>(16)(17)</td><td>✅ 块乘法；⚠️ Case 2 下 (17) 含一阶近似（P8）</td><td>—</td></tr>
+<tr><td>(18)–(21)</td><td>✅ 零空间验证 + gauge 变换不变性证明</td><td>—</td></tr>
+<tr><td>(22)(23)</td><td>❌ (22) 中间两步符号错（P1）；结论用正确符号重证成立</td><td>✅ 差分块 $\delta t\,a_o/\ell$ 核对</td></tr>
+<tr><td>(24)–(30)</td><td>⚠️ (26) 的 $d_i$、$+h$ 两处笔误（P3/P4）</td><td>—</td></tr>
+<tr><td>(31)–(35) Thm 1</td><td>✅ 四环逻辑链完整重推（含 $h^{(n+1)}\not\equiv0\iff h\ne0$ 补证）</td><td>—</td></tr>
+<tr><td>(36)–(38) Thm 2</td><td>✅ 差分引理 A/B 重证；⚠️ 近似论证与退化配置（P9）</td><td>✅ $n=0/1$ 实例核对</td></tr>
+<tr><td>(39)</td><td>✅ χ² 统计</td><td>✅ 99% 区间 [6.04,7.96] 与图一致</td></tr>
+<tr><td>(40)</td><td>✅ 平衡点/渐近性/径向动力学</td><td>✅ $t(3.05)\approx7.9\,\mathrm{s}$ vs "约 8 s"</td></tr></table>
+<h4>19.2 论文问题清单（按严重程度排序，共 12 条）</h4>
+<ol>
+<li><strong>【P1·印刷错误·符号】式 (22) 中间两步符号错</strong>（第 8 页，字形级核实）：印成 $-\delta v(t_i)-\delta v(t_{i-1})$，正确应为 $-\delta v(t_i)+\delta v(t_{i-1})$（或 $-\big(\delta v(t_i)-\delta v(t_{i-1})\big)$）。照抄 (22) 会得到反号的加速度；但论文第一行定义与 (23) 的使用都是正确版本，结论不受影响。（§12.11）</li>
+<li><strong>【P2·印刷错误·量纲记号】"$a_o(t_i)\in\mathbb R$" 缺上标 3</strong>（第 8 页，字形级核实无上标）：加速度是 3 维向量（(23) 中作 3×1 块使用），应为 $a_o(t_i)\in\mathbb R^3$。（§12.11）</li>
+<li><strong>【P3·印刷错误·符号】式 (26) "$s_i=d_i-c_i$" 应为 "$s_i=b_i-c_i$"</strong>（第 8 页，字形级核实）：$d_i$ 是 $h(t)$ 的系数，不出现在 $p_T-p_o$ 的多项式部分；由 (24)(25) 相减得 $s_i=b_i-c_i$。（§12.13）</li>
+<li><strong>【P4·印刷错误·符号】式 (26) 的 "$+h(t)$" 与 $s:=p_T-p_o$ 定义矛盾</strong>（第 8 页）：按 (25)，$p_T-p_o=\sum(b_i-c_i)t^i-\mathbf{h(t)}$，应为 $-h(t)$（或 (25) 定义 $p_o$ 时取 $-h$）。定理结论对符号不敏感，(27)–(35) 内部自洽，故 Theorem 1/2 不受影响，但 (26) 作为等式在物理上不成立。（§12.13）</li>
+<li><strong>【P5·数值失实】"(4b) 当 $r&gt;3\ell$ 时近似误差 &lt; 0.08%"不成立</strong>（第 5 页，字形级核实）：实算 0.919%（$\approx\ell^2/12r^2$ 在 $r=3\ell$ 处 $=1/108$）；要 &lt;0.08% 需 $r&gt;10.2\ell$。最可能是阈值 "$3\ell$" 应为 "$10\ell$"（$10\ell$ 时误差 0.083%≈0.08% 自洽）。定性结论（误差随 $r$ 增大而减小）正确。（§12.4）</li>
+<li><strong>【P6·措辞错误】"(23) 的上 6×7 块 has full column rank"</strong>（第 8 页）：6×7 矩阵列秩至多 6，应为 "full row rank"（或"与任一 $i\ge3$ 块拼成的 7×7 子阵满秩"）。秩结论本身已由本文重新证明成立。（§12.11）</li>
+<li><strong>【P7·符号笔误】§7.1/7.2 场景文字 "initial estimates $\hat p_o(t_0),\hat v_o(t_0)$" 应为 $\hat p_T,\hat v_T$</strong>（第 11 页，共 3 处）：观测器自身位姿已知（方法假设），且数值 $[0,13]$ 正是对目标真值 $[0,10]$ 的初估。（§12.18）</li>
+<li><strong>【P8·推导严谨性】(17) 的行变换在 Case 2 下并非严格初等变换</strong>（第 7 页）：精确约化出现的是平均速度 $\frac{p_o(t_i)-p_o(t_1)}{(i-1)\delta t}$，写成瞬时 $v_o(t_i)$ 是一阶近似；论文只在 (22) 标了 "approximated"，(17) 未说明。结论（rank 7 ⟺ $\exists i:a_o(t_i)\ne0$）已用精确差分独立重证成立。（§12.9）</li>
+<li><strong>【P9·证明的近似性与未讨论的退化情形】Theorem 2 的充分性</strong>（第 10 页）：由"$\Delta^i\rho\ne0$"依赖 $\Delta$ 是导数近似这一均值定理式论证；且当采样节点恰使 $\Delta^{n+1}\rho=0$（如 $d_1=0,d_2\ne0$ 且节点关于 $t=0$ 对称）时，$n+2$ 个观测可能不足。论文未讨论。一般情形（含 $h\ne0\Rightarrow h^{(n+1)}\not\equiv0$ 的补证）下 $n+2$ 足够。（§12.15）</li>
+<li><strong>【P10·方法学限制（论文已自我声明）】控制器 (40) 依赖目标真值</strong>（第 15 页）：实验为"先采集、后离线处理"，(40) 不属于在线闭环估计器。这是合理的对照设计（两种估计器吃同一份数据），但不构成在线系统演示。（§12.17）</li>
+<li><strong>【P11·措辞歧义】"if $a_o(t_i)\ne0$ for any $i\ge3$"</strong>：英语 "for any" 有歧义，数学结论应为"存在某个 $i\ge3$"（for some）。结合 (23) 与结论可无误读，但表述不严谨。（§12.11）</li>
+<li><strong>【P12·近似声明（论文已注明）】伪线性化的三处近似</strong>（第 6–7 页）：$E$ 中的 $\hat g,\hat\theta$ 当作确定量（论文已声明）；真距 $r$ 用 $\hat r=\|\hat p_T-p_o\|$ 替代（论文已声明）；$\mu\sim N(0,\sigma_\mu^2I_3)$ 各向同性高斯近似（论文已声明，源自 Li et al. 2023 的复杂真实协方差）。均属工程妥协而非错误。（§12.5/12.7）</li>
+</ol>
+<p><strong>未发现实质问题的部分（诚实声明）</strong>：伪线性化三步代数（(10)–(12)）、$\Sigma_\nu$ 的矩阵形式、Case 1 的秩 6 与零空间 (20)、Theorem 1 的秩条件链、Theorem 2 的必要性、NEES 公式、控制律 (40) 的行为——经逐式重推均与论文一致，未发现其它错误。</p>
+<hr>
+<h3>20. 验证材料清单（可复现）</h3>
+<ul>
+<li><strong>论文 PDF</strong>：<code>1.Paper/6. …/6. A Bearing-Angle Approach … .pdf</code>（20 页；本文所有"原文"均取自该 PDF）。</li>
+<li><strong>字形级提取脚本</strong>：<code>_derivation_work/6-bearing/extract_pdf.py</code>（按行输出带 y 坐标的文本）、<code>dump_words.py</code>（按词输出 x,y 坐标）、<code>dump_glyphs.py</code>（rawdict 逐字形输出，用于核实 (22) 的符号、"$\in\mathbb R$"缺上标、$s_i=d_i-c_i$、0.08% 等争议点）。输出样例：<code>_derivation_work/6-bearing/pdf_p456.txt</code>、<code>pdf_p78.txt</code>、<code>pdf_p910.txt</code>。</li>
+<li><strong>页面图像</strong>：<code>_derivation_work/6-bearing/pages/page-001.png … page-020.png</code>（本会话模型无法直接读图，已用上述 rawdict 逐字形提取等效替代"逐字符核对页面图像"；如需人眼复核印刷问题，请重点看 page-005（0.08% 声明）、page-008（(22)、(26)）、page-011（$\hat p_o$ 记号）。</li>
+<li><strong>全文文本抽取</strong>：<code>_derivation_work/6-bearing/fulltext.txt</code>（3462 行，页码分隔；仅作定位用，公式一律以字形级提取为准）。</li>
+<li><strong>数值核算</strong>：§12.4（0.919% vs 0.08%）、§12.16（NEES 区间）、§12.17（5.5 s 积分）、§12.18（表格中全部代入计算）均为手算/解析式，可在任何计算器上复核；关键量：$\arctan(1/6)=0.1651487$，$2\arctan(1/6)=0.3302974$，$1/108=0.009259$，$\sqrt{12\times8\times10^{-4}}=0.09798$，$7\pm2.576\sqrt{0.14}=[6.04,7.96]$。</li>
+</ul>
 </section>
 
 <footer>📄 Paper Notes · Ning, Zhang, Li, Chen, Zhao · arXiv 2024 · Bearing-Angle Target Motion Analysis · MathJax + Mermaid Rendering</footer>

@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">9.缺陷</a>
   <a href="#motivation">10.动机</a>
   <a href="#takeaway">11.总结</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -869,6 +873,576 @@ flowchart LR
     <tr><td>Hamel & Mahony (2002) — Visual servoing of an under-actuated dynamic rigid-body system: An image-based approach. <em>IEEE Trans. Robot. Autom.</em> 18(2), 187-198</td><td><strong>球面 IBVS 的理论基础</strong>——首次证明球面图像特征对于欠驱动系统（如四旋翼）具有良好的几何特性。本文的四元数球面特征是对 Hamel 的 3D 单位向量表示的改进——解决了光滑性问题。</td></tr>
     <tr><td>Houska et al. (2011) — ACADO toolkit. <em>Optimal Control Appl. Methods</em> 32(3), 298-312</td><td>ACADO 工具包的原始论文——本文的 NMPC 实现基于 ACADO 代码生成 + qpOASES 求解。理解 ACADO 的 RTI 方案和代码生成机制是复现本文方法的前提。</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info"><p><strong>对象</strong>：论文 §II（Spherical Image Kinematics）与 §III（Model-Predictive Visual Servo Control）的全部 25 个编号公式（式 (1)–(25)）以及正文中无编号但方法核心的式子（球面反投影 $\rho=K^{-1}s/\|K^{-1}s\|_2$、旋转补偿位置 $P(x)$、针孔投影 $\pi(q)$、TTC $t_c$ 与安全域 $\mathcal T_c$、实验中的 range 估计式）。<strong>验证方法</strong>：</p><ol><li>从第一性原理（旋转向量与四元数代数、刚体运动学、针孔相机模型、凸优化）<strong>独立重推</strong>每个公式，写出全部中间步骤；</li><li>用论文官方开源代码 <code>FSC-Lab/fsc_aggressive_ibvs</code>（本文写作时抓取 main 分支）<strong>逐行交叉验证</strong>——包括 ACADO 生成的 ODE 代码 <code>acado_integrator.c</code>、参考/约束代码 <code>acado_solver.c</code>、特征构造 <code>normal_vector.cpp</code> 与参数文件 <code>rotors_control_params.yaml</code>；</li><li>用本目录数值脚本 <code>verify_eqs.py</code>（可复跑）验证全部符号约定、矩阵恒等式与端到端积分一致性；</li><li>明确标出论文中<strong>符号不自洽、疑似笔误与代码实现差异</strong>（见第 19.2 节的问题清单），绝不替论文“圆场”。</li></ol><p><strong>诚实声明（重要）</strong>：本次会话所用模型<strong>不能读取页面图像</strong>（read_image 报“模型不支持图像输入”），公式原文无法按页面逐字符核对。本节所引原文基于 <code>fulltext.txt</code> 的文本抽取，并通过“数学自洽性 + 开源代码 + 数值验证”三方交叉确认；凡依赖文本抽取顺序的结论（特别是式 (2)、(8)、(19) 中乘法/参数顺序），均已在正文标注「⚠️ 请对照 PDF 第 3、5 页图像最终核实」。</p></div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>推导与代码对照结论</th></tr>
+<tr><td>(1)</td><td>最小旋转向量 $\theta(\rho_1,\rho_2)$</td><td>✅ 语义为“把 $\rho_1$ 转到 $\rho_2$”（轴沿 $\rho_1\times\rho_2$）；$\lvert\arccos\rvert$ 冗余；$\rho_1=\pm\rho_2$ 处奇异</td></tr>
+<tr><td>(2)</td><td>旋转向量→四元数特征</td><td>⚠️ 按打印顺序 $\alpha=\theta(\rho,e_z)$ 与“$\rho=C(q)e_z$”矛盾（$C(q)e_z=2\rho_z e_z-\rho$）；自洽形式为 $\alpha=\theta(e_z,\rho)$，代码 <code>getAngleAxisFromTwoNormals(e_z, vec)</code> 正是自洽形式</td></tr>
+<tr><td>(3)(4)</td><td>$n(q)=C(q)e_z$、$N(q)=[C(q)e_x,C(q)e_y]$</td><td>✅ 正确；$N(q)$ 列正交且张成 $T_{n(q)}S^2$（已数值验证）</td></tr>
+<tr><td>(5)–(8)</td><td>$\boxplus$/$\boxminus$ 算子</td><td>⚠️ 按打印顺序 $\theta(n(q_1),n(q_2))$，(8) 与 (6) 不互逆（$q_2\boxplus(q_1\boxminus q_2)$ 给出 $2\cos\theta\,n_2-n_1$）；改为 $\theta(n(q_2),n(q_1))$ 后精确互逆（数值验证）</td></tr>
+<tr><td>(9)–(11)</td><td>静止路标约束求导、$\dot C=\omega^\times C$</td><td>✅ 正确；$\dot C(q_{wc})=(\omega_{cw}^w)^\times C(q_{wc})$ 是标准结果</td></tr>
+<tr><td>(12)</td><td>$\partial n/\partial q=-n(q)^\times N(q)$</td><td>✅ 正确（$\boxplus$ 小扰动 + 有限差分双重验证）</td></tr>
+<tr><td>(13)</td><td>相机系下的几何约束</td><td>✅ 正确；用了恒等式 $(C(q_{wc})n)^\times=C(q_{wc})n^\times C(q_{wc})^T$</td></tr>
+<tr><td>(14)</td><td>特征切坐标运动学 $\dot q$</td><td>✅ 正确。<strong>关键细节</strong>：切坐标导数必须经 $N^T n^\times$ 投影而非 $N^T$（两者差 90° 旋转）；已端到端积分验证（4 s 内方向误差 &lt;10⁻⁴）</td></tr>
+<tr><td>(15)</td><td>range 运动学 $\dot r=-n^T v_c$</td><td>✅ 正确；与 $\dot r=n^T\dot p_c$ 的物理推导一致</td></tr>
+<tr><td>(16)</td><td>连续时间 OCP</td><td>✅ 结构正确（无终端代价的 Lagrange 形式）；代码离散为 20 节点 RK2 多重打靶</td></tr>
+<tr><td>(17)(18)</td><td>状态 12 维 / 控制 4 维</td><td>⚠️ 论文为理想化表述；开源代码实际为 18 维状态（多绝对位置 3 + 推力状态 1 + 松弛状态 2）与 6 维控制（推力率 + 体角速率 3 + 松弛 2）</td></tr>
+<tr><td>(19)</td><td>四旋翼动力学 + 四元数姿态运动学</td><td>⚠️ 第一式正确；第二式按打印顺序 $\dot q_{wb}=\tfrac12[0;\omega^b]\otimes q_{wb}$ 在 Hamilton 约定下给出 $\dot R=R[\omega^w]^\times$（把机体角速率当成世界系角速率）；正确形式为 $\dot q_{wb}=\tfrac12 q_{wb}\otimes[0;\omega^b]$，<strong>代码实现正是正确的右乘形式</strong></td></tr>
+<tr><td>(20)</td><td>特征运动学的 $w/b$ 系表达</td><td>✅ 坐标变换正确（含杠杆臂 $\omega^b\times p_{cb}^b$）。⚠️ 代码 ODE 未含杠杆臂项（$t_{B,C}$ 载入在线数据但 rhs 不引用；杠杆臂出现在参考代价中）；且代码用环境嵌入 $\dot q=(0,\tfrac12N(q)\dot q_2)$ 代替 $\boxplus$ 一致嵌入 $\tfrac12[0;N(q)\dot q_2]\otimes q$（绕光轴精确、离轴一阶误差）</td></tr>
+<tr><td>(21)</td><td>动作目标 $L_a$（含旋转补偿 $P(x)$）</td><td>✅ 正确；状态不含绝对位置，故位置误差必为 robocentric 形式——这是“欠驱动补偿”的数学实质；代码在<strong>机体系</strong>中评估同一误差（含杠杆臂）</td></tr>
+<tr><td>(22)</td><td>感知目标 $L_p$</td><td>✅ 正确（针孔投影）；代码前视相机取 $Q_{img,v}=0$，与论文“垂直轴零权重避免惩罚俯仰”完全一致</td></tr>
+<tr><td>(23)(24)(25)</td><td>执行器 / 可见性 / TTC 约束</td><td>✅ 正确；已证明 $(\dot r/r\le 1/t_c^{\min})\iff t_c\in\mathcal T_c$（$r&gt;0$）；代码以带松弛变量的软约束实现（5 条路径约束）</td></tr>
+<tr><td>数值核算</td><td>焦距、边界、俯仰等</td><td>✅ 代码 <code>image_u_bound=0.58</code> / <code>image_v_bound=0.37</code> 与论文 451×288 / 752×480 约束框一致 ⟺ 焦距 $f\approx 389$ px；最大俯仰 21.04° ≈ atan(0.37)+0.74° 与“约束触顶时俯仰被钉在边界”自洽</td></tr>
+</table>
+<hr>
+<h3>1. 坐标系、符号约定与状态变量总表</h3>
+<h4>1.1 三个坐标系（论文 §II-A，图 2）</h4>
+<ul>
+<li><strong>世界系 $F_w$</strong>：惯性系。$p_{lw}^w\in\mathbb R^3$ 记“从 $F_w$ 原点到路标 $l$ 的向量，在 $F_w$ 中表达”（上标 $w$ = 表达坐标系，双下标 $lw$ = 从 $F_w$ 到 $l$）。$z_w$ 轴方向：由式 (19) 的 $g^w=(0,0,-9.81)$ 可知 $z_w$ <strong>向上</strong>（ENU 风格）。</li>
+<li><strong>机体系 $F_b$</strong>：固连四旋翼；姿态四元数 $q_{wb}$（或 $C(q_{wb})$）表示 $F_b\to F_w$ 的旋转。</li>
+<li><strong>相机系 $F_c$</strong>：$q_{bc}$、$p_{cb}^b$ 为相机相对机体的外参。视觉特征在相机系中的方向为单位向量 $\rho\in S^2$。</li>
+</ul>
+<h4>1.2 符号表（论文 §II 定义 + 本文补充）</h4>
+<table>
+<tr><th>符号</th><th>含义</th><th>维度/单位</th><th>文中取值（实验/代码）</th></tr>
+<tr><td>$s=(u,v,1)^T$</td><td>特征像素齐次坐标</td><td>px</td><td>仿真图像 752×480；实验 1280×640</td></tr>
+<tr><td>$K\in\mathbb R^{3\times3}$</td><td>相机内参矩阵</td><td>—</td><td>论文未给数值；由代码边界反推 $f\approx389$ px（仿真）</td></tr>
+<tr><td>$\rho\in S^2$</td><td>特征方向的 3-D 单位向量</td><td>无</td><td>$\rho=K^{-1}s/\|K^{-1}s\|_2$</td></tr>
+<tr><td>$q\in\mathbb R^4$</td><td>球面特征的四元数表示（单位四元数，标量在前 $[w;x,y,z]$）</td><td>无</td><td>$\rho=C(q)e_z$</td></tr>
+<tr><td>$q_{wb}$</td><td>四旋翼姿态四元数（$F_b\to F_w$）</td><td>无</td><td>—</td></tr>
+<tr><td>$q_{wc},q_{bc}$</td><td>世界/机体到相机系的姿态</td><td>无</td><td>$q_{bc}=[0.5,-0.5,0.5,-0.5]$（前视相机，代码）</td></tr>
+<tr><td>$C(q)\in\mathbb R^{3\times3}$</td><td>四元数对应的旋转矩阵（<strong>主动旋转</strong>：$v'=C(q)v$）</td><td>—</td><td>Hamilton 约定（标量在前）</td></tr>
+<tr><td>$\otimes$</td><td>Hamilton 四元数乘法</td><td>—</td><td>$C(q_1\otimes q_2)=C(q_1)C(q_2)$</td></tr>
+<tr><td>$(\cdot)^\times$</td><td>向量的斜对称矩阵</td><td>—</td><td>$a^\times b=a\times b$</td></tr>
+<tr><td>$n(q),N(q)$</td><td>$C(q)e_z$；$[C(q)e_x,C(q)e_y]\in\mathbb R^{3\times2}$</td><td>—</td><td>式 (3)(4)</td></tr>
+<tr><td>$r$</td><td>range：相机原点到路标的距离（<strong>状态变量</strong>）</td><td>m</td><td>实验期望 2.0 m</td></tr>
+<tr><td>$v^w,v_c$</td><td>四旋翼速度（世界系 / 相机系表达）</td><td>m/s</td><td>实验最大 1.92 m/s；仿真最大 6.87 m/s</td></tr>
+<tr><td>$\omega^b,\omega_c$</td><td>体角速率 / 相机角速度（机体系 / 相机系表达）</td><td>rad/s</td><td>上限 3.0 rad/s（仿真）</td></tr>
+<tr><td>$c$</td><td>质量归一化推力（标量），$\mathbf c=(0,0,c)^T$</td><td>m/s²</td><td>最大推力 20 N（悬停 9.81）</td></tr>
+<tr><td>$t_c,t_c^{\min}$</td><td>TTC（碰撞时间）与安全阈值</td><td>s</td><td>$t_c^{\min}$ 论文未给数值</td></tr>
+<tr><td>$(s_{\min},s_{\max})$</td><td>可见性约束图像区域</td><td>px</td><td>451×288（仿真）；代码归一化 0.58 / 0.37</td></tr>
+<tr><td>$d_{gate},w_{box},h_{box},f_{cam}$</td><td>门直径、检测框宽/高、焦距（实验 range 估计）</td><td>m / px / px</td><td>$d_{gate}=0.75$ m</td></tr>
+</table>
+<div class="callout idea"><p><strong>约定声明</strong>：本文全部推导采用<strong>主动旋转</strong>约定：$C(q)$ 是标准 Hamilton 旋转矩阵（$q$ 标量在前），满足 $C(q_1\otimes q_2)=C(q_1)C(q_2)$。这是论文式 (12) 推导文字（$C(\exp(\varphi))\approx I+\varphi^\times$）与开源代码共同要求的约定（代码 <code>out[7..9]=R(q_{wb})\cdot(0,0,c)+g^w</code> 已验证为标准 Hamilton 矩阵）。在此约定下，第 2 节将证明论文式 (2)、(8) 的打印顺序与其余公式不自洽，并给出与代码一致的自洽形式。</p></div>
+<hr>
+<h3>2. 公式 (1)：最小旋转向量 $\theta(\rho_1,\rho_2)$</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 最小旋转向量（论文式 1）</span>
+$$\theta(\rho_1,\rho_2)=\left|\arccos(\rho_1^T\rho_2)\right|\frac{\rho_1\times\rho_2}{\lVert\rho_1\times\rho_2\rVert_2}$$
+<div class="eq-note">$\rho_1,\rho_2\in S^2$：两个 3-D 单位向量。返回值是 $\mathbb R^3$ 中的旋转向量：轴沿 $\rho_1\times\rho_2$（垂直于两者），模长为旋转角。</div>
+</div>
+<h4>2.1 几何语义（第一性原理验证）</h4>
+<p>设 $\theta=\arccos(\rho_1^T\rho_2)\in[0,\pi]$ 为两单位向量夹角，$u=(\rho_1\times\rho_2)/\sin\theta$ 为单位旋转轴。用 Rodrigues 公式 $\exp(\theta u^\times)=I+\sin\theta\,u^\times+(1-\cos\theta)uu^T$ 计算：</p>
+<p>$$u^\times\rho_1=\frac{(\rho_1\times\rho_2)\times\rho_1}{\sin\theta}
+=\frac{(\rho_1\cdot\rho_1)\rho_2-(\rho_2\cdot\rho_1)\rho_1}{\sin\theta}
+=\frac{\rho_2-\cos\theta\,\rho_1}{\sin\theta}$$</p>
+<p>（第一行用了矢量三重积 $(a\times b)\times c=(a\cdot c)b-(b\cdot c)a$。）于是：</p>
+<p>$$\exp\big(\theta(\rho_1,\rho_2)^\times\big)\rho_1
+=\cos\theta\,\rho_1+\sin\theta\cdot\frac{\rho_2-\cos\theta\,\rho_1}{\sin\theta}+0=\rho_2$$</p>
+<p><strong>结论：$\theta(\rho_1,\rho_2)$ 是把 $\rho_1$ 旋转到 $\rho_2$ 的最小旋转向量</strong>（$u\cdot\rho_1=0$ 使 Rodrigues 第三项为零）。反过来，把 $\rho_2$ 代进去则得到另一个量：</p>
+<p>$$\exp\big(\theta(\rho_1,\rho_2)^\times\big)\rho_2=2\cos\theta\,\rho_2-\rho_1
+\qquad(\text{一般不等于 }\rho_1)$$</p>
+<p>即 $\theta(\rho_1,\rho_2)$ <strong>不</strong>把 $\rho_2$ 转到 $\rho_1$。这个“参数顺序敏感”的事实是后面第 3、5 节判断式 (2)、(8) 是否自洽的关键（数值验证：<code>verify_eqs.py</code> §B 两条均 PASS）。</p>
+<h4>2.2 两个细节（论文未说明）</h4>
+<ul>
+<li><strong>$|\arccos|$ 的绝对值冗余</strong>：$\rho_1^T\rho_2\in[-1,1]$，主值 $\arccos\in[0,\pi]$ 本就非负，取绝对值不改变结果。属无害的书写冗余。</li>
+<li><strong>奇异点</strong>：$\rho_1=\pm\rho_2$ 时 $\rho_1\times\rho_2=0$，轴未定义（对径点之间有无穷多个最小旋转，角度同为 $\pi$）。实际使用中 $\boxminus$ 只作用于相邻时刻的特征（$dt=0.05$ s 内方向变化很小），不会触及对径点，故工程上无碍，但作为数学定义应在分母为零处另行约定。</li>
+</ul>
+<hr>
+<h3>3. 公式 (2)：像素 → 球面单位向量 → 四元数特征</h3>
+<p>论文原文（§II-B）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) 与无编号式 —— 球面反投影与四元数构造（论文式 2）</span>
+$$\rho=\frac{K^{-1}s}{\lVert K^{-1}s\rVert_2}
+\qquad(\text{无编号式 D1})\qquad
+\alpha=\theta(\rho,e_z)\qquad
+q=\begin{bmatrix}\cos\frac{\lVert\alpha\rVert_2}{2}\\[2pt]\dfrac{\alpha}{\lVert\alpha\rVert_2}\sin\frac{\lVert\alpha\rVert_2}{2}\end{bmatrix}$$
+<div class="eq-note">$K$：针孔相机内参矩阵（$s=K\cdot(\text{归一化相机坐标})$）；$e_z=[0,0,1]^T$：参考方向（相机光轴）；$\alpha\in\mathbb R^3$：$\rho$ 与 $e_z$ 之间的最小旋转向量；$q$：标量在前 $[w;x,y,z]$ 的四元数。</div>
+</div>
+<h4>3.1 无编号式 D1 的推导（针孔模型反投影）</h4>
+<p>针孔模型：像素齐次坐标 $s=(u,v,1)^T$ 与相机系 3-D 射线方向的关系为 $s=K\,\tilde p$（差一个尺度），其中 $\tilde p$ 是射线上任意点的齐次坐标。取 $\tilde p=K^{-1}s$ 再单位化即得单位方向向量：</p>
+<p>$$s=K\,(\lambda\rho),\quad\lambda&gt;0
+\;\Longrightarrow\;
+\rho=\frac{K^{-1}s}{\lVert K^{-1}s\rVert_2}$$</p>
+<p>这一步要求特征在相机前方（$\lambda&gt;0$），即针孔模型的前视假设。</p>
+<h4>3.2 旋转向量 → 四元数（式 (2) 的第二部分）</h4>
+<p>对任意旋转向量 $\alpha=\theta u$（$\theta=\lVert\alpha\rVert$），对应的四元数与旋转矩阵为：</p>
+<p>$$q(\alpha)=\begin{bmatrix}\cos\frac\theta2\\ u\sin\frac\theta2\end{bmatrix},
+\qquad
+C\big(q(\alpha)\big)=\exp(\alpha^\times)\quad(\text{Rodrigues})$$</p>
+<p>这是标准对应（标量在前、主动旋转）。代入 $\alpha=\theta(e_z,\rho)$（把 $e_z$ 转到 $\rho$ 的旋转向量）：</p>
+<p>$$C(q)e_z=\exp\big(\theta(e_z,\rho)^\times\big)e_z=\rho\qquad\checkmark\ \text{满足论文要求的 }\rho=C(q)e_z$$</p>
+<h4>3.3 ⚠️ 论文打印顺序与自洽性的矛盾（重点）</h4>
+<p>论文打印的是 $\alpha=\theta(\rho,e_z)$（$\rho$ 在前、$e_z$ 在后）。按式 (1) 的语义（§2.1），$\theta(\rho,e_z)$ 把 $\rho$ 转到 $e_z$，于是由 §2.1 的第二个结果：</p>
+<p>$$C(q)e_z=\exp\big(\theta(\rho,e_z)^\times\big)e_z
+=2\cos\theta_{\rho z}\,e_z-\rho
+\qquad\text{一般 }\neq\rho$$</p>
+<p>（$\theta_{\rho z}=\arccos(\rho_z)$。数值例：$\rho=e_x$ 时 $\theta(\rho,e_z)=\tfrac\pi2 e_y$，$\exp(\tfrac\pi2 e_y^\times)e_z=e_x\cdot 0+e_y\times e_z\cdot 1\ldots$ 直接算得 $-e_x=-\rho$。）</p>
+<p>也就是说，<strong>按打印顺序，式 (2) 与论文自己声明的“$\rho=C(q)e_z$”不成立</strong>（除非把 $C(q)$ 理解为被动/转置约定，但这又与本式 (12) 推导文字中显式的 $C(\exp(\varphi))\approx I+\varphi^\times$ 矛盾——两处约定无法同时成立）。<strong>自洽的形式是 $\alpha=\theta(e_z,\rho)$</strong>（把 $e_z$ 转到 $\rho$）。开源代码 <code>normal_vector.cpp</code> 的 <code>setFromVector</code> 正是这么做的：<code>orientation = angleAxisToQuaternion(getAngleAxisFromTwoNormals(e_z, vec_normalized, e_x))</code>——从 $e_z$ 到 $\rho$（第三参数 $e_x$ 用于固定绕 $\rho$ 轴的滚转自由度）。<code>verify_eqs.py</code> §B 数值验证：打印顺序 FAIL、自洽顺序 PASS。</p>
+<div class="callout warn"><p><strong>结论与保留</strong>：式 (2) 的论证方向正确、与代码一致，但打印的参数顺序 $\theta(\rho,e_z)$ 应为 $\theta(e_z,\rho)$（或等价地把式 (1) 的叉积写成 $\rho_2\times\rho_1$）。此判断基于文本抽取 + 数学自洽性 + 代码三重证据，<strong>请对照 PDF 第 3 页图像最终核实</strong>（不排除是抽取顺序假象）。同类问题还出现在式 (8)，见第 5 节。</p></div>
+<hr>
+<h3>4. 公式 (3)(4)：$n(q)$ 与 $N(q)$ —— 球面的全局正交标架</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3)(4) —— 方向恢复与切空间标架（论文式 3、4）</span>
+$$n(q)=C(q)e_z\qquad\qquad N(q)=\begin{bmatrix}C(q)e_x & C(q)e_y\end{bmatrix}$$
+<div class="eq-note">$e_x=[1,0,0]^T$，$e_y=[0,1,0]^T$。$n(q)\in S^2$ 是四元数恢复的方向；$N(q)\in\mathbb R^{3\times2}$ 的列空间是 $T_{n(q)}S^2$（$n(q)$ 处的切平面）。</div>
+</div>
+<h4>4.1 正交性证明（第一性原理）</h4>
+<p>$C(q)$ 是正交矩阵，故其列向量两两正交：</p>
+<p>$$n(q)^TN(q)=e_z^TC(q)^T\begin{bmatrix}C(q)e_x&C(q)e_y\end{bmatrix}
+=\begin{bmatrix}e_z^Te_x&e_z^Te_y\end{bmatrix}=\begin{bmatrix}0&0\end{bmatrix}$$</p>
+<p>$$N(q)^TN(q)=\begin{bmatrix}e_x^Te_x&e_x^Te_y\\e_y^Te_x&e_y^Te_y\end{bmatrix}=I_2$$</p>
+<p>所以 $N(q)$ 的列是 $T_{n(q)}S^2$ 的一组<strong>规范正交基</strong>（数值验证 §C：<code>n·N=0</code>、<code>NᵀN=I₂</code> 均 PASS）。注意 $n^TN=0$ 与 $N^TN=I_2$ 是第 9 节推导式 (14) 的两个核心工具。</p>
+<h4>4.2 “毛球定理”问题的精确化（论文 §II-B 的口头论证写成数学）</h4>
+<p>论文说 3-D 单位向量表示“受毛球定理困扰”。精确陈述是：<strong>$S^2$ 的切丛非平凡</strong>——任何连续函数 $\rho\mapsto$（$\rho$ 处的一组切平面基）都必然在某处退化（连续切向量场必有零点，hairy ball 定理）。因此：</p>
+<ul>
+<li><strong>2-D 最小表示</strong>（如 $(\rho_x/\rho_z,\rho_y/\rho_z)$）：在 $\rho_z=0$ 奇异，图像雅可比发散；</li>
+<li><strong>3-D 自由变量表示</strong>：雅可比函数在整球面上不可能光滑（等价于要求一个全局连续非零切标架，被毛球定理禁止）；</li>
+<li><strong>论文的诀窍</strong>：把点<strong>提升</strong>到四元数。$N(q)$ 作为 $q$ 的函数是全局光滑、处处正交的标架——因为 $q$ 不止包含方向（2 自由度），还携带绕 $\rho$ 轴的滚转（第 3 自由度），而 $S^3$（单位四元数空间，$SO(3)$ 的二重覆盖）是<strong>可平行化</strong>的。代价是特征状态从 2 维变 4 维，换取雅可比在整球面光滑。</li>
+</ul>
+<div class="callout tip"><p>顺带指出论文的一处<strong>记法不严谨</strong>：正文写 $q\in SO(3)\subset\mathbb R^4$。单位四元数构成 $S^3$，是 $SO(3)$ 的<strong>二重覆盖</strong>（$q$ 与 $-q$ 对应同一旋转），并非 $SO(3)$ 的元素。属惯用简化，不影响推导（$\boxplus/\boxminus$ 只依赖 $n(q)=C(q)e_z$，对 $q\leftrightarrow -q$ 不变）。</p></div>
+<hr>
+<h3>5. 公式 (5)–(8)：$\boxplus$ 与 $\boxminus$ 算子</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5)–(8) —— 流形上的加减算子（论文式 5–8）</span>
+$$\boxplus:SO(3)\times\mathbb R^2\to SO(3)\qquad q,a\mapsto\exp\!\big(N(q)a\big)\otimes q$$
+$$\boxminus:SO(3)\times SO(3)\to\mathbb R^2\qquad q_1,q_2\mapsto N(q_2)^T\,\theta\big(n(q_1),n(q_2)\big)$$
+<div class="eq-note">$\exp(\cdot)$：从李代数 $\mathfrak{so}(3)$ 到李群 $SO(3)$ 的指数映射（旋转向量→旋转矩阵，Rodrigues）。$\boxplus$ 把 2-D 切空间增量 $a$ 施加到 $q$；$\boxminus$ 给出两点在切空间中的差。</div>
+</div>
+<h4>5.1 $\boxplus$ 的一阶行为（为式 (12) 做准备）</h4>
+<p>设 $\varphi=N(q)a$（切平面内的旋转向量）。对小增量：</p>
+<p>$$C(q\boxplus a)=C\!\big(\exp(\varphi)\otimes q\big)
+=C\!\big(\exp(\varphi)\big)\,C(q)
+\approx\big(I+\varphi^\times\big)C(q)$$</p>
+<p>（Hamilton 约定下 $C(q_1\otimes q_2)=C(q_1)C(q_2)$；$\exp(\varphi)\approx[1;\varphi/2]$ 对应 $C\approx I+\varphi^\times$。）作用到 $e_z$ 上，并利用旋转矩阵对叉积的分配律 $R(x\times y)=(Rx)\times(Ry)$：</p>
+<p>$$n(q\boxplus a)\approx n(q)+\varphi^\times C(q)e_z
+=n(q)+(N(q)a)\times n(q)
+=n(q)-n(q)^\times N(q)\,a$$</p>
+<p>即 $n$ 关于 $\boxplus$ 的切空间雅可比为 $-n^\times N$——这就是式 (12)，第 7 节独立重推并数值验证。</p>
+<h4>5.2 ⚠️ 式 (8) 打印顺序与 $\boxplus$ 不互逆（重点）</h4>
+<p>$\boxminus$ 的语义（Fig. 3 说明）应为：$a=q_1\boxminus q_2$ 是使 $q_2\boxplus a$ 转回 $q_1$ 的切空间增量。按此语义检查打印的式 (8)：$a=N(q_2)^T\theta(n(q_1),n(q_2))$。由于 $\theta(n_1,n_2)\perp n_2$（轴 $n_1\times n_2\perp n_2$），有 $N(q_2)N(q_2)^T\theta=\theta$（投影不损失），故 $q_2\boxplus a$ 对应旋转 $\exp(\theta(n_1,n_2)^\times)$。由 §2.1：</p>
+<p>$$n(q_2\boxplus a)=\exp\big(\theta(n_1,n_2)^\times\big)n_2
+=2\cos\theta_{12}\,n_2-n_1\;\neq n_1\quad(\text{一般情形})$$</p>
+<p><strong>按打印顺序，(8) 与 (6) 不互逆</strong>（数值验证 §C：打印版 FAIL）。<strong>自洽形式</strong>是把 $\theta$ 的两个参数对调（即“把 $n(q_2)$ 转到 $n(q_1)$ 的旋转”）：</p>
+<p>$$\boxminus:\ q_1,q_2\mapsto N(q_2)^T\,\theta\big(n(q_2),\,n(q_1)\big)
+\qquad(\text{自洽形式 D2})$$</p>
+<p>此时 $\exp(\theta(n_2,n_1)^\times)n_2=n_1$ 精确成立，$\boxplus/\boxminus$ 互逆（数值验证 §C：<code>qB⊞(qA⊟qB) 的 n 精确等于 n(qA)</code> PASS）。开源代码 <code>normal_vector.cpp</code> 的 <code>boxMinus</code> 与 <code>getRotationFromTwoNormals(stateIn, *this)</code> 同样采用“从第一参数转到第二参数”的语义（与自洽形式一致，差别仅是切平面基取在哪个参数上，求导极限下等价）。</p>
+<div class="callout warn"><p>与式 (2) 同样的保留声明：不排除 PDF 页面中式 (1) 的叉积实际为 $\rho_2\times\rho_1$（那样打印的 (2)(8) 就都自洽了）——若如此，则本文指出的两处“顺序问题”合并为一处（式 (1) 的叉积顺序）。三处（(1)(2)(8)）只要改一处即全体自洽；<strong>请对照 PDF 第 3 页核实</strong>。对本节后文（式 (9)–(25)），一律采用自洽约定（与代码一致）。</p></div>
+<hr>
+<h3>6. 公式 (9)–(11)：静止路标的几何约束及其求导</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(9)–(11) —— 路标固定约束的求导（论文式 9–11）</span>
+$$0=\frac{d}{dt}p_{lw}^w=\frac{d}{dt}\Big(C(q_{wc})\big(n(q)\,r\big)+p_{cw}^w\Big)
+=\dot p_{cw}^w+\dot C(q_{wc})\,n(q)\,r+C(q_{wc})\frac{\partial n(q)}{\partial q}\,\dot q\,r+C(q_{wc})n(q)\,\dot r$$
+$$\dot p_{cw}^w=v^w\qquad\qquad \dot C(q_{wc})=\omega_{cw}^{w\times}\,C(q_{wc})$$
+<div class="eq-note">$p_{lw}^w=C(q_{wc})p_{lc}^c+p_{cw}^w$ 是图 2 的坐标变换；路标 $l$ 静止故 $\frac d{dt}p_{lw}^w=0$；$p_{lc}^c=n(q)r$ 把特征分解为方向×距离；链式法则给出三项。</div>
+</div>
+<h4>6.1 式 (9) 的结构（逐项解释）</h4>
+<p>把相机系位置 $p_{lc}^c=n(q)r$ 代入 $p_{lw}^w=C(q_{wc})p_{lc}^c+p_{cw}^w$ 并对时间求导（乘积法则 + 链式法则）：</p>
+<p>$$\frac{d}{dt}\Big[C(q_{wc})n(q)r+p_{cw}^w\Big]
+=\underbrace{\dot C(q_{wc})n(q)r}_{\text{姿态变化}}
++\underbrace{C(q_{wc})\tfrac{\partial n}{\partial q}\dot q\,r}_{\text{特征方向变化}}
++\underbrace{C(q_{wc})n(q)\dot r}_{\text{距离变化}}
++\underbrace{\dot p_{cw}^w}_{\text{相机平移}}$$</p>
+<p>注意 $\dot q$ 在这里是 <strong>2 维切坐标导数</strong>（经 $\boxminus$ 定义，见第 9 节），所以 $\partial n/\partial q\in\mathbb R^{3\times2}$ 正是式 (12) 的矩阵。</p>
+<h4>6.2 式 (11) 的推导（旋转矩阵运动学）</h4>
+<p>记 $C(t)=C(q_{wc}(t))$。机体（相机）以角速度 $\omega$ 转动时，固连向量 $b$（体坐标）在世界系中的像 $C(t)b$ 满足：</p>
+<p>$$\frac{d}{dt}\big[C(t)b\big]=\omega\times\big(C(t)b\big)
+=\omega^\times C(t)b$$</p>
+<p>（转动参考系求导：$\left.\frac d{dt}\right|_w=\left.\frac d{dt}\right|_c+\omega\times$，固连向量体导数为零。）对任意 $b$ 成立，故 $\dot C=\omega^\times C$。这里 $\omega=\omega_{cw}^w$（$F_w\to F_c$ 的角速度在世界系表达），得式 (11)。✅</p>
+<h4>6.3 假设清单</h4>
+<ul><li>路标 $l$ 静止于世界系（动态目标跟踪实验中门可移动，NMPC 按静止路标建模，靠高频反馈补偿——论文结论中也承认“future work: incorporate target dynamics”）；</li><li>$q_{wc}(t)$ 可导、$n(q)$ 对 $q$ 可微（后者由式 (12) 保证）。</li></ul>
+<hr>
+<h3>7. 公式 (12)：$\partial n(q)/\partial q=-n(q)^\times N(q)$ 的完整推导</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(12) —— 切空间雅可比（论文式 12）</span>
+$$\frac{\partial}{\partial q}n(q)=\lim_{\varepsilon\to0}
+\begin{bmatrix}\Big(\dfrac{n(q\boxplus(e_1\varepsilon))-n(q)}{\varepsilon}\Big)^T\\[4pt]
+\Big(\dfrac{n(q\boxplus(e_2\varepsilon))-n(q)}{\varepsilon}\Big)^T\end{bmatrix}^T
+\approx\lim_{\varepsilon\to0}
+\begin{bmatrix}\Big(\dfrac{(I+(N(q)e_1\varepsilon)^\times)C(q)e_z-C(q)e_z}{\varepsilon}\Big)^T\\[4pt]
+\Big(\dfrac{(I+(N(q)e_2\varepsilon)^\times)C(q)e_z-C(q)e_z}{\varepsilon}\Big)^T\end{bmatrix}^T
+=-n(q)^\times N(q)\in\mathbb R^{3\times2}$$
+<div class="eq-note">$e_1=[1,0]^T$，$e_2=[0,1]^T$，$\varepsilon$ 为扰动标量。第一行是定义（沿 $\boxplus$ 的两个基方向做方向导数）；第二行用小角度近似 $C(\exp(\varphi))\approx I+\varphi^\times$；最后用恒等式 $a\times b=-b\times a$。</div>
+</div>
+<h4>7.1 逐步推导（补全论文省略的代数）</h4>
+<p><strong>第 1 步</strong>：$n$ 关于切坐标 $a=(a_1,a_2)$ 的方向导数（§5.1 已得）：</p>
+<p>$$n(q\boxplus a)\approx n(q)+\big(N(q)a\big)\times n(q)$$</p>
+<p><strong>第 2 步</strong>：用 $a\times b=-b\times a$ 改写叉积：</p>
+<p>$$(Na)^\times n=(Na)\times n=-n\times(Na)=-n^\times(Na)
+\;\Longrightarrow\;
+\frac{\partial n}{\partial q}\Big|_{a}= -n^\times N\,a$$</p>
+<p>即 $\partial n/\partial q=-n(q)^\times N(q)$ ✅。逐列看：第 $i$ 列 $=-n\times(C(q)e_i)=(C(q)e_i)\times n$——正是绕切平面基方向 $C(q)e_i$ 的无穷小旋转对 $n$ 的作用。</p>
+<h4>7.2 数值验证（不依赖任何符号假设）</h4>
+<p>用 $\boxplus$ 直接做有限差分（$\varepsilon=10^{-7}$，随机单位四元数）：</p>
+<p>$$\frac{n(q\boxplus(e_i\varepsilon))-n(q)}{\varepsilon}
+\quad\text{vs}\quad -n(q)^\times N(q)\ \text{的第 }i\text{ 列}$$</p>
+<p><code>verify_eqs.py</code> §D 输出 <code>PASS</code>（误差 &lt;10⁻⁶），与解析结果一致。同时 §C 验证了扰动方向本身：$d/d\varepsilon\, n(q\boxplus e\varepsilon)=(Ne)^\times n$（与 §5.1 的几何解释互相印证）。</p>
+<hr>
+<h3>8. 公式 (13)：把 (10)–(12) 代回 (9)，并转到相机系</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(13) —— 相机系下的几何约束（论文式 13）</span>
+$$0=v_c-n(q)^\times\omega_c\,r-n(q)^\times N(q)\,\dot q\,r+n(q)\,\dot r$$
+<div class="eq-note">$v_c=C(q_{wc})^T v^w$，$\omega_c=C(q_{wc})^T\omega_{cw}^w$：线/角速度从世界系表达转为相机系表达（IBVS 惯例）。</div>
+</div>
+<h4>8.1 代入过程</h4>
+<p>把 (10)(11)(12) 代入 (9)：</p>
+<p>$$0=v^w+\omega_{cw}^{w\times}C(q_{wc})\,n\,r
++C(q_{wc})\big(-n^\times N\big)\dot q\,r
++C(q_{wc})n\,\dot r$$</p>
+<p>两边左乘 $C(q_{wc})^T$，并利用恒等式 $C^T\omega^\times C=(C^T\omega)^\times$（相似变换，对正交阵成立）：</p>
+<p>$$0=\underbrace{C(q_{wc})^T v^w}_{v_c}
++\underbrace{C(q_{wc})^T\omega_{cw}^{w\times}C(q_{wc})}_{(C^T\omega_{cw}^w)^\times=\omega_c^\times}\,n\,r
+-n^\times N\,\dot q\,r
++n\,\dot r$$</p>
+<p>即 $0=v_c+\omega_c^\times n\,r-n^\times N\dot q\,r+n\dot r$。再由 $\omega_c^\times n=-n\times\omega_c=-n^\times\omega_c$ 得式 (13) ✅。</p>
+<h4>8.2 论文引用的恒等式</h4>
+<p>论文说这一步用了 “$(C(q_{wc})n(q))^\times=C(q_{wc})n(q)^\times C(q_{wc})^T$”。这是 §8.1 相似变换的向量形式：对任何正交矩阵 $R$ 与向量 $a$，</p>
+<p>$$(Ra)^\times b=(Ra)\times b=R\big(a\times R^Tb\big)=R\,a^\times R^T\,b
+\quad\Longrightarrow\quad
+(Ra)^\times=R\,a^\times R^T$$</p>
+<p>（第一处等号用 $R(x\times y)=(Rx)\times(Ry)$。）代入 $R=C(q_{wc})$、$a=n(q)$ 即得。✅ 两条路径殊途同归。</p>
+<hr>
+<h3>9. 公式 (14)(15)：特征切坐标运动学与 range 运动学 —— 全文推导核心</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(14)(15) —— 视觉特征与距离运动学（论文式 14、15）</span>
+$$\dot q=N(q)^T\left(-\frac{n(q)^\times v_c}{r}-\omega_c\right)
+\qquad\qquad
+\dot r=-n(q)^T v_c$$
+<div class="eq-note">论文的“recipe”：对式 (13) 分别左乘 $N(q)^Tn(q)^\times/r$ 与 $n(q)^T$，并利用 $N(q)^Tn(q)^\times n(q)^\times=-N(q)^T$ 化简。</div>
+</div>
+<h4>9.1 为什么要左乘 $N^T n^\times/r$ 而不是 $N^T$？——切坐标导数的正确投影</h4>
+<p>先回答一个看起来“反直觉”的问题：既然 $N(q)$ 的列就是切平面基，把 (13) 投影到切平面为什么不是乘 $N^T$ 而是 $N^Tn^\times$？原因在于 $\dot q$ 是经 $\boxminus$ 定义的<strong>切坐标导数</strong>，而 $\boxminus$ 的旋转向量是 $\theta\propto n\times\dot n$（叉积结构）。具体：</p>
+<p>$$\dot q=\lim_{dt\to0}\frac{q(t+dt)\boxminus q(t)}{dt}
+=N(q)^T\lim_{dt\to0}\frac{\theta\big(n(t),n(t+dt)\big)}{dt}
+=N(q)^T\big(n\times\dot n\big)
+=N(q)^T n^\times\dot n$$</p>
+<p>（第一步用自洽形式的 $\boxminus$；第二步 $\theta(n(t),n(t+dt))\approx n\times\dot n\,dt$，见 §2.1 的 Rodrigues 展开；注意这与把 $\dot n$ 直接投影的 $N^T\dot n$ 相差一个<strong>切平面内 90° 旋转</strong>——数值验证：$N^Tn^\times N=\begin{bmatrix}0&-1\\1&0\end{bmatrix}$，§E PASS。）</p>
+<p>因此“环境导数”$\dot n$ 与“切坐标导数”$\dot q$ 的关系是 $\dot q=N^Tn^\times\dot n$。反过来，从式 (12) 的链式法则也能推出同一关系：$\dot n=\partial n/\partial q\cdot\dot q=-n^\times N\dot q$，左乘 $(n^\times N)^\dagger$（由 §4.1，$(n^\times N)^T(n^\times N)=N^Tn^{\times T}n^\times N=-N^Tn^\times n^\times N=N^TN=I_2$，故左逆为 $(n^\times N)^T=-N^Tn^\times$）：</p>
+<p>$$\dot q=(n^\times N)^\dagger\dot n
+=(n^\times N)^T\dot n
+=N^Tn^{\times T}\dot n
+=N^Tn^\times\dot n\qquad\checkmark$$</p>
+<p>（$n^{\times T}=-n^\times$，负号抵消。）两条路径一致——这正是论文选择 $N^Tn^\times$ 的数学理由。</p>
+<h4>9.2 式 (14) 的完整代数展开（补全论文一句话带过的步骤）</h4>
+<p>把式 (13) 移项：</p>
+<p>$$n^\times N\,\dot q\,r=v_c-n^\times\omega_c\,r+n\,\dot r$$</p>
+<p><strong>左乘 $N^Tn^\times/r$</strong>，逐项计算（记 $n=n(q)$，$N=N(q)$）：</p>
+<ul>
+<li>左端：$\dfrac1r\,N^Tn^\times n^\times N\,\dot q$。用恒等式 $N^Tn^\times n^\times=-N^T$（证明：$n^\times n^\times=nn^T-I$（向量三重积的矩阵形式），故 $N^Tn^\times n^\times=N^Tnn^T-N^T=-N^T$，因为 $N^Tn=0$）→ $=-\dfrac1r N^TN\dot q=-\dfrac{\dot q}{r}$。</li>
+<li>第一项：$\dfrac1r N^Tn^\times v_c$。</li>
+<li>第二项：$-N^Tn^\times n^\times\omega_c=+N^T\omega_c$（同一恒等式）。</li>
+<li>第三项：$\dfrac{\dot r}{r}N^Tn^\times n=0$（$n^\times n=0$）。</li>
+</ul>
+<p>合起来：</p>
+<p>$$-\frac{\dot q}{r}=\frac1r N^Tn^\times v_c+N^T\omega_c
+\;\Longrightarrow\;
+\dot q=N^T\left(-\frac{n^\times v_c}{r}-\omega_c\right)\qquad\checkmark\ \text{式 (14)}$$</p>
+<h4>9.3 式 (15) 的推导</h4>
+<p>式 (13) 左乘 $n^T$：左端第一项 $n^Tv_c$；第二、三项含 $n^Tn^\times=0$（$n^Tn^\times=-(n^\times n)^T=0$）→ 消失；最后一项 $n^Tn\,\dot r=\dot r$。得：</p>
+<p>$$0=n^Tv_c+\dot r
+\;\Longrightarrow\;
+\dot r=-n^Tv_c\qquad\checkmark\ \text{式 (15)}$$</p>
+<p><strong>独立物理验证</strong>：$r=\lVert p_{lc}^c\rVert$，直接求导 $\dot r=n^T\dot p_{lc}^c$（单位向量方向导数）；路标固定时 $\dot p_{lc}^c=-v_c-\omega_c\times p_{lc}^c$（§6.2 的转动求导公式），代入：</p>
+<p>$$\dot r=n^T\big(-v_c-\omega_c\times rn\big)=-n^Tv_c-r\,n^T(\omega_c\times n)=-n^Tv_c
+\qquad\checkmark$$</p>
+<p>（$n^T(\omega_c\times n)=(\omega_c\times n)^Tn=(\omega_c\times n)\cdot n=0$。）与式 (15) 完全一致。</p>
+<h4>9.4 与真实方向动力学的一致性 + 端到端数值验证</h4>
+<p>由 §9.1 的链式法则，式 (14) 蕴含的环境导数：</p>
+<p>$$\dot n=\frac{\partial n}{\partial q}\dot q
+=-n^\times N\cdot N^T\left(-\frac{n^\times v_c}{r}-\omega_c\right)
+=n^\times n^\times\frac{v_c}{r}+n^\times NN^T\omega_c$$</p>
+<p>用 $n^\times n^\times=nn^T-I$、$NN^T=I-nn^T$、$n^\times n=0$：</p>
+<p>$$\dot n=-\frac{(I-nn^T)v_c}{r}+n^\times\omega_c
+=-\frac{v_{c,\perp}}{r}-\omega_c\times n$$</p>
+<p>这正是路标固定时方向向量 $\rho$ 的真实动力学（§9.3 同款推导：$\dot\rho=\dot p/r-(\dot r/r)\rho$，径向分量相消）。<strong>式 (14) 与真实方向动力学在切坐标层面精确一致。</strong></p>
+<p><strong>端到端数值验证</strong>（<code>verify_eqs.py</code> §F）：给定相机任意轨迹（$v_c(t)$、$\omega_c(t)$ 含大幅机动）与固定路标，用式 (14) 经 $\boxplus$ 积分特征、式 (15) 积分距离，4 s 内方向误差 &lt;10⁻⁴、距离误差 ~10⁻³（纯欧拉积分精度）；式 (13) 残差恒为零；$\dot q$（式 14）与真实轨迹的 $\boxminus$ 差分导数逐位一致。同时显式验证了陷阱：$N^T\dot n\neq\dot q$（差 90° 旋转）。</p>
+<h4>9.5 公式链小结（一张图看懂推导依赖）</h4>
+<p>$$(1)\xrightarrow{\text{Rodrigues}}(2)\xrightarrow{\text{标架}}(3)(4)
+\xrightarrow{\text{一阶扰动}}(12)
+\xrightarrow{\text{链式法则}}(9)(10)(11)\xrightarrow{\text{左乘 }C^T}(13)
+\xrightarrow[\;n^T\;]{\;N^Tn^\times/r\;}(14)(15)$$</p>
+<p>其中每一步的依据：Rodrigues 公式 / 正交矩阵列性质 / 小角度近似 $C(\exp\varphi)\approx I+\varphi^\times$ / 转动参考系求导 $\dot C=\omega^\times C$ / 相似变换 $C^T\omega^\times C=(C^T\omega)^\times$ / 恒等式 $N^Tn^\times n^\times=-N^T$。</p>
+<hr>
+<h3>10. 公式 (16)：连续时间最优控制问题（OCP）</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(16) —— NMPC 的最优控制问题（论文式 16）</span>
+$$\min_{x(t),u(t)}\int_{t_0}^{t_f}\Big(L_a\big(x(t),u(t)\big)+L_p\big(x(t),u(t)\big)\Big)\,dt
+\qquad\text{s.t.}\qquad
+\dot x(t)=f\big(x(t),u(t)\big),\quad h\big(x(t),u(t)\big)\le 0$$
+<div class="eq-note">$t_0,t_f$：预测时域起止（实现中 $t_f-t_0=1.0$ s）；$x,u$：状态与控制（式 (17)(18)）；$f$：IBVS 系统模型（式 (19)(20)）；$L_a$ 动作目标（式 21）、$L_p$ 感知目标（式 22）；$h\le0$：全部不等式约束（式 23–25）。</div>
+</div>
+<h4>10.1 结构注记（论文未展开的部分）</h4>
+<ul>
+<li><strong>Lagrange 形式、无终端代价</strong>：式 (16) 无 Mayer 项（终端代价）。这与 ACADO 代码生成结果一致：末端节点权重 $W_N$ 只含状态参考（17 通道）不含输入参考，且仍为同一 $Q$ 矩阵（<code>setCost</code> 中 <code>node_index==kSamples-1</code> 时 $W_N=W$）。</li>
+<li><strong>实现中的离散化与求解</strong>：ACADO 代码生成将 (16) 离散为 $N=20$ 个区间（$0.05$ s 步长 × 20 = 1.0 s 时域，<code>ACADO_N=20</code>）、每区间 2 阶显式 RK 积分（<code>ACADO_RK_NSTAGES=2</code>），构成多重打靶非线性规划；再用 RTI（real-time iteration）方案做一次 SQP：线性化动力学与约束、以 Gauss-Newton 近似 Hessian，得到 QP 子问题，由 qpOASES（active-set / 原对偶）求解。论文把这一步留给参考文献 [23][24]，本文补一条主干：</li>
+</ul>
+<p>$$\underbrace{\min_{\Delta w}\ \tfrac12\Delta w^TH_k\Delta w+g_k^T\Delta w
+\ \ \text{s.t.}\ \ G_k\Delta w\le h_k}_{\text{QP 子问题（第 }k\text{ 次 SQP 迭代）}},
+\qquad
+H_k\approx\nabla_{ww}^2\Big(\sum_i\lVert r_i(w)\rVert^2\Big)\ \text{的 Gauss-Newton 近似}$$</p>
+<p>其中 $w$ 为全部打靶变量（状态+控制序列，QP 变量数 <code>ACADO_QP_NV=120</code> = 18×20+6×20 压缩后）；RTI 每次采样只迭代 1–2 次 SQP，靠滚动时域的自然连续性实现收敛——这是 5–10 ms 求解时间的关键。</p>
+<ul>
+<li><strong>软约束松弛</strong>：代码实现把可见性（4 条）与 TTC（1 条）共 <code>ACADO_NPAC=5</code> 条路径约束写成软约束：输入中引入 2 个松弛变量 $u_4,u_5\ge0$（状态 $x_{16},x_{17}$ 对其积分，$\dot x_{16}=u_4,\dot x_{17}=u_5$），违反量进入约束并加二次罚 $R_{sv1},R_{sv2}$（参数文件中 $R_{sv1}=10000$、$R_{sv2}=50$）——这是“$\ell_2$ 精确罚函数”式软化，保证 QP 恒可行（RTI 的实用前提）。论文正文未写松弛，属实现细节。</li>
+</ul>
+<hr>
+<h3>11. 公式 (17)(18)：状态与控制</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(17)(18) —— 状态与控制向量（论文式 17、18）</span>
+$$x=\begin{bmatrix}v^{wT} & q_{wb}^T & q^T & r\end{bmatrix}^T
+\qquad\qquad
+u=\begin{bmatrix}c & \omega^{bT}\end{bmatrix}^T$$
+<div class="eq-note">$v^w$：世界系速度（3）；$q_{wb}$：姿态四元数（4）；$q$：特征四元数（4）；$r$：距离（1）→ 共 12 维。$c$：质量归一化推力（1）；$\omega^b$：体角速率（3）→ 共 4 维。</div>
+</div>
+<h4>11.1 关键观察：状态里没有绝对位置——这就是“欠驱动补偿”的数学根源</h4>
+<p>$x$ 不含四旋翼位置 $p_{cw}^w$。因此 OCP 无法（也不需要）惩罚绝对位置误差——所有位置语义都必须以<strong>机体/目标相对量</strong>表达：式 (21) 的 $P(x)$ 正是目标相对机体的位置。这与论文“eliminate the need for a virtual camera frame”的宣称对应：虚拟相机方案先把特征旋到虚拟平面（此步骤<strong>不可逆地</strong>抹掉了真实旋转信息），再对“旋转不变特征”做预测；本文反过来，特征 $q$ 全程在<strong>真实相机系</strong>中传播（式 (20)），仅在目标函数中用<strong>预测的</strong> $q_{wb}$ 做旋转补偿。数学上：虚拟相机用“当前测量姿态”补偿、然后预测；本文用“预测姿态”补偿（补偿对象是预测的特征 $q,r$），故对姿态测量噪声不敏感（论文原话的数学含义）。</p>
+<h4>11.2 ⚠️ 论文 (17)(18) 与开源代码实现的差异（重要）</h4>
+<p>开源代码 <code>mpc_controller.cpp</code> / <code>acado_common.h</code> 中实际的状态/控制为：</p>
+<p>$$x_{code}=\underbrace{[p^w;\ q_{wb};\ v^w;\ c;\ q;\ r;\ s_1;\ s_2]}_{3+4+3+1+4+1+2=18}
+\qquad
+u_{code}=\underbrace{[\dot c;\ \omega^b;\ u_{s1};\ u_{s2}]}_{1+3+1+1=6}$$</p>
+<p>差异：① 代码把<strong>绝对位置 $p^w$</strong>纳入状态（便于与外部位置参考/轨迹参考衔接）；② 代码把推力 $c$ 作为<strong>状态</strong>、以推力率 $\dot c$ 为输入（一阶执行器动态，上限 40 m/s³），而论文把 $c$ 直接当输入；③ 代码增加 2 个松弛变量（§10.1）。<strong>论文 (17)(18) 是方法学上的理想化表述，代码是工程实现</strong>。核心状态（$v^w,q_{wb},q,r$）与核心控制（$c,\omega^b$）两者一致。</p>
+<hr>
+<h3>12. 公式 (19)：四旋翼动力学 + 四元数姿态运动学</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(19) —— 四旋翼平动与姿态运动学（论文式 19）</span>
+$$\dot v^w=C(q_{wb})\,c+g^w\qquad\qquad
+\dot q_{wb}=\frac12\begin{bmatrix}0\\ \omega^b\end{bmatrix}\otimes q_{wb}$$
+<div class="eq-note">$c=(0,0,c)^T$：机体推力向量（质量归一化，沿 $+z_b$ 向上）；$g^w=(0,0,-9.81)$：重力（世界系 $z$ 向上）；$\omega^b$：体角速率（即 $\omega_{bw}^b$）。</div>
+</div>
+<h4>12.1 第一式：牛顿第二定律的体→世界变换</h4>
+<p>四旋翼只产生沿机体 $z_b$ 的总推力 $T$，质量归一化后 $c=T/m$（量纲 m/s²，悬停 $c=9.81$）。世界系加速度：</p>
+<p>$$\ddot p^w=\underbrace{C(q_{wb})\begin{bmatrix}0\\0\\c\end{bmatrix}}_{\text{推力（体→世界）}}+\underbrace{\begin{bmatrix}0\\0\\-9.81\end{bmatrix}}_{g^w}
+\;\Longrightarrow\;
+\dot v^w=C(q_{wb})c+g^w\qquad\checkmark$$</p>
+<p>（世界系 $z$ 向上由 $g^w$ 的符号确定；这也固定了 $F_w$ 的姿态约定。）</p>
+<h4>12.2 第二式：四元数运动学——⚠️ 论文打印的乘法顺序与 Hamilton 约定矛盾</h4>
+<p>在本文采用的约定（标量在前、主动旋转、$C(q_1\otimes q_2)=C(q_1)C(q_2)$）下，姿态矩阵满足 $\dot R=R\,\omega^{b\times}$（§6.2 的固连向量求导：$R=C(q_{wb})$ 把体向量旋到世界系，$\dot R=R(R^T\omega^w)^\times=R\,\omega^{b\times}$）。对应的四元数 ODE 是<strong>右乘体角速率</strong>：</p>
+<p>$$\dot q_{wb}=\frac12\,q_{wb}\otimes\begin{bmatrix}0\\\omega^b\end{bmatrix}
+\;\Longleftrightarrow\;
+\dot R=R\,\omega^{b\times}
+\qquad(\text{正确形式 D3})$$</p>
+<p>（验证：$\dot R$ 由 $q\otimes[0;\omega]$ 的叉积符号决定；数值上 <code>verify_eqs.py</code> §G：<code>q̇=½q⊗[0;ω] ⟹ Ṙ=R[ω]^×</code> PASS。）而论文打印的<strong>左乘</strong>形式给出：</p>
+<p>$$\dot q_{wb}=\frac12\begin{bmatrix}0\\\omega^b\end{bmatrix}\otimes q_{wb}
+\;\Longleftrightarrow\;
+\dot R=\omega^{b\times}R
+=R\big(R^T\omega^b\big)^\times
+=R\,\omega^{w\times}
+\qquad(\text{论文打印形式})$$</p>
+<p>（数值验证：<code>q̇=½[0;ω]⊗q ⟹ Ṙ=[ω]^×R=R[Rᵀω]^×</code> PASS；且一般情形 $R[\omega^w]^\times\neq R[\omega^b]^\times$。）<strong>按打印形式积分，等价于把机体角速率当成世界系角速率使用</strong>——姿态演化在旋转轴/旋转方向上是错的（绕世界轴转而非绕体轴转）。</p>
+<p><strong>代码裁决</strong>：<code>acado_integrator.c</code> 生成代码（精确转录并经数值比对）的姿态运动学是：</p>
+<pre class="code-block"><code>out[3] = 0.5*((0-u[1])*x[4] - u[2]*x[5] - u[3]*x[6]);   // q̇_w = -½ω·v
+out[4] = 0.5*((u[1]*x[3] + u[3]*x[5]) - u[2]*x[6]);   // q̇_x = ½(w·ωx + (v×ω)x)
+out[5] = 0.5*((u[2]*x[3] - u[3]*x[4]) + u[1]*x[6]);
+out[6] = 0.5*((u[3]*x[3] + u[2]*x[4]) - u[1]*x[5]);</code></pre>
+<p>这正是 $\dot q=\tfrac12 q\otimes[0;\omega^b]$（右乘，<code>verify_eqs.py</code> §H：<code>代码姿态运动学 = ½q⊗[0;ω^b]</code> PASS、<code>≠ 论文打印的 ½[0;ω^b]⊗q</code> PASS）。<strong>结论：式 (19) 第二式是论文笔误（或抽取顺序假象），正确形式为右乘；代码实现正确。</strong>⚠️ 请对照 PDF 第 5 页图像最终核实。</p>
+<div class="callout tip"><p>记忆口诀：Hamilton 约定 + 体→世界矩阵 $R=C(q)$ 时，<strong>体角速率右乘</strong> $\dot q=\tfrac12q\otimes[0;\omega^b]$；世界角速率左乘 $\dot q=\tfrac12[0;\omega^w]\otimes q$（$\omega^w=R\omega^b$）。两条等价。</p></div>
+<hr>
+<h3>13. 公式 (20)：特征运动学从相机系到世界/机体系的坐标变换</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(20) —— IBVS 系统模型的另一半（论文式 20）</span>
+$$\dot q=N(q)^T\left(-\frac1r\,n(q)^\times C(q_{bc})^T\Big(C(q_{wb})^T v^w+\omega^b\times p_{cb}^b\Big)-C(q_{bc})^T\omega^b\right)$$
+$$\dot r=-n(q)^T C(q_{bc})^T\Big(C(q_{wb})^T v^w+\omega^b\times p_{cb}^b\Big)$$
+<div class="eq-note">把式 (14)(15) 中的 $v_c,\omega_c$ 用外参 $(q_{bc},p_{cb}^b)$ 与状态 $(v^w,q_{wb},\omega^b)$ 表示。</div>
+</div>
+<h4>13.1 坐标变换链的逐步推导</h4>
+<p><strong>第 1 步</strong>：角速度。相机固连于机体，故 $\omega_c=C(q_{bc})^T\omega^b$（机体→相机的旋转把体角速率旋到相机系）。</p>
+<p><strong>第 2 步</strong>：线速度。相机原点 $c$ 与机体原点 $b$ 满足 $p_{cw}=p_{bw}+C(q_{wb})p_{cb}^b$。对时间求导（世界系）：</p>
+<p>$$\dot p_{cw}^w=v^w+\dot C(q_{wb})\,p_{cb}^b
+=v^w+\omega^{w\times}C(q_{wb})p_{cb}^b
+=v^w+C(q_{wb})\big(\omega^b\times p_{cb}^b\big)$$</p>
+<p>（§12.2：$\dot C=C\omega^{b\times}$，即 $\dot C(q_{wb})=C(q_{wb})\omega^{b\times}$，故 $\dot Cp=C\omega^{b\times}p=C(\omega^b\times p)$。）这就是机体上偏心点的刚体速度分解（<strong>杠杆臂项</strong>）。再转到相机系：</p>
+<p>$$v_c=C(q_{bc})^T\dot p_{cw}^w
+=C(q_{bc})^T\Big(C(q_{wb})^Tv^w+\omega^b\times p_{cb}^b\Big)
+\qquad\checkmark$$</p>
+<p>（$C(q_{bc})^TC(q_{wb})=C(q_{wc})^T$：体→世界再世界→体。）代入 (14)(15) 即得式 (20) ✅。</p>
+<h4>13.2 代码实现的三个差异（全部数值验证）</h4>
+<ul>
+<li><strong>① 环境嵌入 vs $\boxplus$ 一致嵌入</strong>：式 (14) 的 $\dot q$ 是 2 维切坐标导数，要放进 4 维四元数状态积分，$\boxplus$ 一致的形式是 $\dot q_{4D}=\tfrac12[0;N(q)\dot q_2]\otimes q$（数值验证：其方向动力学 $\dot n=\partial n/\partial q\cdot\dot q_2$ <strong>精确</strong>等于真实 $\dot\rho=-v_{c,\perp}/r-\omega_c\times n$，且自动保模长 $\dot q\cdot q=0$）。而开源代码的 rhs 是<strong>环境嵌入</strong> $\dot q_{4D}=(0,\tfrac12 N(q)\dot q_2)$（标量部分导数为 0）：它是 $\boxplus$ 形式在光轴附近（$w\approx1,\lVert v_q\rVert\ll1$）的线性化。数值上（随机离轴状态）环境嵌入的方向误差率约 1.9 rad/s 量级（$\boxplus$ 版为 0），且 $\dot q\cdot q\neq0$ 不保模长（该样本 1 s 积分漂移 ~0.43）。真实系统靠每 0.05 s 的测量反馈重置，漂移不累积，但<strong>1 s 预测窗口内的可见性预测存在一阶偏差</strong>；仓库无版本标签，无法证实 main 分支与论文实验完全一致。</li>
+<li><strong>② 杠杆臂</strong>：生成的 rhs（<code>acado_integrator.c</code>）只引用 $od[3..6]=q_{bc}$，<strong>不含</strong> $\omega^b\times p_{cb}^b$ 项；但 $t_{B,C}=od[0..2]$ 出现在 <code>acado_solver.c</code> 的参考输出中（robocentric 位置误差 $=FOC_P-C(q_{wb})^T(t_{B,C}+r\,C(q_{bc})n(q))$，见 §14.2）。即：<strong>预测动力学无杠杆臂、代价函数有杠杆臂</strong>（参数文件 $t_{B,C}=[0,0,0.15]$ m 确实配置了偏心安装）。对 $\lVert\omega^b\rVert\le3$ rad/s，缺失项量级 $3\times0.15\approx0.45$ m/s——相对 6.87 m/s 的飞行速度 ~6.5%，属不可忽略但被反馈掩盖的建模误差，如实标注。</li>
+<li><strong>③ range 运动学</strong>：代码 <code>out[15]=a[6]</code> 经数值比对精确等于 $\dot r=-n^Tv_c$（$n=R(q)e_z$，$v_c=R(q_{bc})^TR(q_{wb})^Tv^w$）✅ 与式 (20) 第二式（零杠杆臂版）一致。另外代码把 $r$ 的倒数正则化为 $1/(r+10^{-3})$ 避免近距数值爆炸（式 (14) 中 $1/r$ 的软件实现细节）。</li>
+</ul>
+<hr>
+<h3>14. 公式 (21)：动作目标 $L_a$ 与旋转补偿 $P(x)$</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(21) —— 动作目标函数（论文式 21）</span>
+$$L_a\big(x(t),u(t)\big)=\lVert p^*-P(x(t))\rVert_{Q_p}^2+\lVert v^*-v^w\rVert_{Q_v}^2+\lVert q_{wb}^*-q_{wb}\rVert_{Q_q}^2+\lVert u^*-u\rVert_R^2$$
+$$P\big(x(t)\big)=C(q_{wb})\Big(C(q_{bc})n(q)\,r+p_{cb}^b\Big)$$
+<div class="eq-note">$p^*,v^*,q_{wb}^*,u^*$：参考位置/速度/姿态/控制；$Q_p,Q_v,Q_q,R$：对应权重（$\lVert e\rVert_Q^2=e^TQe$）；$P(x)$：<strong>旋转补偿后的 robocentric 目标位置</strong>。</div>
+</div>
+<h4>14.1 $P(x)$ 的推导与解读</h4>
+<p>$C(q_{bc})n(q)r+p_{cb}^b$ = 目标在机体系中的位置（方向×距离 + 相机杠杆臂）；左乘 $C(q_{wb})$ 转到世界系。因状态无 $p_{cw}^w$（§11.1），$P(x)$ 即“目标相对机体”的位置（世界系表达），$p^*$ 是对应的期望相对位置（如降落任务中 $p^*=[0,0,-1.5]^T$ = 目标在机体正下方 1.5 m）。两项关键设计：</p>
+<ul>
+<li><strong>补偿用的是预测姿态 $q_{wb}$</strong>（NMPC 状态），而非当前测量姿态：特征在真实相机系传播（保留全部旋转信息），到代价层面才用预测姿态把误差旋到公共坐标系。对比虚拟相机方案“先补偿（用测量姿态、不可逆）后预测”——顺序反转就是论文的核心贡献。</li>
+<li>代价是四元数差 $\lVert q_{wb}^*-q_{wb}\rVert^2$（4 维欧氏差而非测地距离）：对单位四元数这是 $\arccos\lvert\langle q,q^*\rangle\rvert$ 的小角近似，NMPC 中常用且计算便宜；注意 $q$ 与 $-q$ 等价，代码在 <code>setReference/update</code> 中做了“半球修正”（点积 &lt;0 时取负）。</li>
+</ul>
+<h4>14.2 代码实现对照（参数文件数值）</h4>
+<p>生成代码的 23 个参考通道 = 位置 3 + 姿态 4 + 速度 3 + 推力 1 + 图像 2 + robocentric 误差 3 + 距离率 1 + 输入参考 6（<code>ACADO_NY=23=17+6</code>，末节点 17 ✓）。robocentric 误差在代码中于<strong>机体系</strong>评估（<code>acado_solver.c</code> LSQ 输出，含 $t_{B,C}$）：</p>
+<p>$$e_{code}=p_{focus}^b-\Big[C(q_{wb})^T\big(t_{B,C}+r\,C(q_{bc})n(q)\big)\Big]
+\qquad(\text{与论文 }p^*-P(x)\text{ 差一个 }C(q_{wb})^T)$$</p>
+<p>（$p_{focus}^b$ 由在线数据 $od[7..9]$ 给定。）左乘 $C(q_{wb})^T$ 后与论文形式等价（若 $Q_p$ 各向同性）。默认权重（<code>rotors_control_params.yaml</code>）：$Q_{pos,xy}=Q_{pos,z}=200$，$Q_{att}=50$，$Q_{vel}=10$，$Q_{thr}=0$；特征跟踪模式置 $Q_{err}=200$（即论文 $Q_p$ 项）、位置权重清零——<strong>纯 IBVS 模式下确实不惩罚绝对位置</strong>，与 §11.1 的分析吻合。</p>
+<hr>
+<h3>15. 公式 (22)：感知目标 $L_p$ 与投影 $\pi(q)$</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(22) —— 感知目标函数（论文式 22）</span>
+$$L_p\big(x(t),u(t)\big)=\lVert s^*-\pi(q)\rVert_{Q_s}^2,
+\qquad
+\pi(q)=\frac{K\,n(q)}{n(q)_z}$$
+<div class="eq-note">$s^*$：期望图像坐标；$\pi(q)$：四元数到 2-D 图像点的映射；$n(q)_z$：$n(q)$ 的 z 分量；$Q_s$：感知权重。</div>
+</div>
+<h4>15.1 $\pi(q)$ 的推导（针孔投影）</h4>
+<p>相机系方向 $n=(n_x,n_y,n_z)$（$n_z&gt;0$ 前视）投影到归一化坐标 $(n_x/n_z,\ n_y/n_z)$，再经内参：</p>
+<p>$$\pi(q)=K\begin{bmatrix}n_x/n_z\\ n_y/n_z\\ 1\end{bmatrix}
+=\frac{K\,n(q)}{n(q)_z}
+\qquad\checkmark$$</p>
+<p>这是式 (2)/D1 的<strong>逆映射</strong>（先反投影 $\rho=K^{-1}s/\lVert K^{-1}s\rVert$，再投影 $\pi$——往返一致，可直接验证：$\pi(q(\rho))$ 回到原像素）。$n_z&gt;0$ 即特征在相机前方；接近 FOV 边缘时 $n_z\to0^+$，$\pi$ 急剧放大——这正是可见性约束 (24) 需要积极防护的区域。</p>
+<h4>15.2 权重设计的物理含义（论文 §III-C 的论述 + 代码印证）</h4>
+<ul>
+<li><strong>前视相机跟踪移动目标</strong>：水平轴高权重（调节偏航、让目标保持在图像中央带）、垂直轴<strong>零权重</strong>（避免惩罚俯仰）。代码参数：$Q_{img,u}=1000$、$Q_{img,v}=0$——与论文完全一致 ✅。</li>
+<li><strong>下视相机降落</strong>：不含 $L_p$（感知目标与旋转强冲突）。</li>
+<li>$L_p$ 与 $L_a$ 可能冲突：由 $Q_s$ 与 $Q_p$ 的相对大小仲裁。注意 $L_p$ 作用在<strong>真实图像平面</strong>（$\pi(q)$ 直接取预测特征），这是“真实可见性”语义的一部分。</li>
+</ul>
+<hr>
+<h3>16. 公式 (23)(24)(25)：三类约束</h3>
+<p>论文原文：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(23)–(25) —— 执行器 / 可见性 / TTC 约束（论文式 23–25）</span>
+$$u_{\min}\le u\le u_{\max}\qquad\qquad
+s_{\min}\le\pi(q)\le s_{\max}\qquad\qquad
+\frac{\dot r}{r}\le\frac{1}{t_c^{\min}}$$
+<div class="eq-note">(23) 执行器限制（推力与角速率盒约束）；(24) 目标可见性约束——特征必须留在 $(s_{\min},s_{\max})$ 指定的图像区域内（通常小于整幅图像）；(25) TTC（碰撞时间）约束。</div>
+</div>
+<h4>16.1 式 (24) 的几何含义与归一化形式</h4>
+<p>$s_{\min}\le\pi(q)\le s_{\max}$ 是逐分量的盒约束（$u,v$ 各两条不等式）。代码用<strong>归一化图像坐标</strong>实现：<code>image_u_bound=0.58</code>、<code>image_v_bound=0.37</code>，即 $\lvert n_x/n_z\rvert\le0.58$、$\lvert n_y/n_z\rvert\le0.37$。与论文的像素约束框（仿真 451×288 px / 图像 752×480 px）对照：</p>
+<p>$$\frac{451/2}{0.58}\approx389\ \text{px},\qquad
+\frac{288/2}{0.37}\approx389\ \text{px}$$</p>
+<p>两个方向反推出<strong>同一个焦距 $f\approx389$ px</strong>——论文的像素框与代码的归一化边界完全自洽（这是 §18 数值核算第 1 条）。$f=389$ px 对应半视场角 $\arctan(376/389)\approx44°$（水平）、$\arctan(240/389)\approx31.7°$（垂直）——典型宽视场 FPV 相机。</p>
+<h4>16.2 式 (25)：TTC 约束的完整推导与等价性证明</h4>
+<p><strong>定义</strong>：$t_c=r/\dot r$——按当前速度运动到碰撞的时间估计（$r&gt;0$）。$\dot r&lt;0$（远离）时 $t_c&lt;0$，永远撞不上；$\dot r&gt;0$（接近）时 $t_c&gt;0$。论文定义安全域：</p>
+<p>$$\mathcal T_c=\{t_c\in\mathbb R:\ t_c&lt;0\ \text{or}\ t_c\ge t_c^{\min}\}
+\qquad(\text{无编号式 D4})$$</p>
+<p>即：要么在远离（永远安全），要么碰撞时间足够长（$\ge t_c^{\min}$，来得及平滑刹车）。<strong>等价性证明</strong>（$r&gt;0$ 恒成立）：</p>
+<ul>
+<li>若 $\dot r&lt;0$：$t_c=r/\dot r&lt;0\in\mathcal T_c$ 自动成立；同时 (25) 左端 $\dot r/r&lt;0&lt;1/t_c^{\min}$（$t_c^{\min}&gt;0$）也自动满足 ✓ 两条件同时满足。</li>
+<li>若 $\dot r\ge0$：$t_c\ge t_c^{\min}\iff r/\dot r\ge t_c^{\min}\iff \dot r/r\le1/t_c^{\min}$ ✓。</li>
+</ul>
+<p>于是 $t_c\in\mathcal T_c\iff\dot r/r\le1/t_c^{\min}$——式 (25) 是<strong>析取安全域的凸（线性）表示</strong>：它把“远离或够慢接近”这一非凸条件写成了对 $\dot r$ 的线性不等式（$\dot r=-n^Tv_c$ 对状态线性），可直接进入 QP。这正是论文说“Readers may find (25) confusing”背后的数学。</p>
+<p><strong>与纯距离约束的对比</strong>：$r\ge r_{\min}$ 只限制位置，不限制接近速度——接近速度过大时即使距离约束满足，也必须急刹（大姿态机动→目标出视野）。TTC 约束同时规制速度，让“刹车力度”与“剩余距离”成比例（$\dot r\le r/t_c^{\min}$），实现平滑减速。数值验证（<code>verify_eqs.py</code> §J）：6 组 $\dot r$ 样本下两条件判定完全一致。</p>
+<div class="callout info"><p>论文未给出 $t_c^{\min}$ 的数值（文档缺口）。代码中 TTC 约束为软约束（松弛 $u_{s2}$，罚权重 50，<code>setSv2ScaledCosts</code> 可沿时域放大后期节点的罚），具体 $t_c^{\min}$ 数值在生成代码的常数中，未在仓库文本中暴露。</p></div>
+<h4>16.3 式 (23) 的代码数值</h4>
+<p><code>min_thrust=1.0</code> N、<code>max_thrust=20.0</code> N（论文“最大推力 20 N”✓）、<code>max_thrust_rate=40</code>、<code>max_bodyrate_{x,y}=3.0</code>、<code>max_bodyrate_z=1.5</code> rad/s（论文“体角速率 3.0 rad/s”✓）。注意代码把推力状态当加速度用（悬停 9.81），隐含“质量归一化且 $m\approx1$ kg”的处理；论文用 $c=T/m$ 的说法更规范。</p>
+<hr>
+<h3>17. 算法流程：从图像测量到推力/角速率指令（逐行解读）</h3>
+<p>论文没有给伪代码（补充材料 [17] 含离散化细节），本节目录按论文 §III-E + 开源代码重组完整数据流，并对每个模块给出对应的数学公式。</p>
+<pre class="code-block"><code>【测量】图像帧 → 检测特征像素 s=(u,v)                    [§3: 反投影]
+        ρ = K⁻¹s/‖K⁻¹s‖₂ ； range 估计（实验见 D5）
+        q = quaternion(θ(e_z, ρ))                        [式(2) 自洽形式]
+【状态组装】x0 = [v^w; q_wb; q; r]（+代码: p^w, c, 松弛） [式(17)]
+【参考设置】p*, v*, q*_wb, u*（+代码: 轨迹/焦点参数 → 23 通道）[式(21)(22)]
+【RTI 求解】ACADO: 20 区间 RK2 多重打靶                 [式(16) 离散化]
+        ① 准备步: 线性化 f,h, 算 Gauss-Newton H,g      [SQP → QP]
+        ② 反馈步: qpOASES 解 QP（120 变量, 5 软约束×20） [10.1]
+【执行】输出首节点 u* = [c, ω^b]（+代码: ċ 积分、松弛丢弃）
+        底层: PixRacer 角速率环跟踪 ω^b；推力前馈 c
+【循环】0.05 s 后回到【测量】（滚动时域, 20 Hz, 求解 5–10 ms）</code></pre>
+<h4>17.1 实验中的 range 估计（无编号式 D5）</h4>
+<p>论文（§IV-C）：“$r=\lVert\rho\cdot d_{gate}/\max(w_{box}/f_{cam},h_{box}/f_{cam})\rVert_2$，$\rho$ 是边界框中心”。推导（相似三角形）：</p>
+<p>门直径 $d_{gate}$ 在距离 $r_\perp$ 处的像素尺寸：$w_{box}=f_{cam}\cdot d_{gate}/r_\perp$（针孔，$f_{cam}$ 为像素焦距）→ $r_\perp=d_{gate}f_{cam}/w_{box}$。用 $\max(w_{box},h_{box})$ 取较大的表观尺寸 → 得到<strong>较保守（偏小）的距离</strong>；$\rho$ 的范数修正离轴透视缩短（特征不在光轴上时，垂直于视线的距离是 $r/\lVert\rho\rVert$，$r_\perp=r/\lVert K^{-1}s\rVert$，故乘 $\lVert\rho\rVert$ 修正，与 D5 中 $\rho$ 取非单位射线 $K^{-1}s$ 一致）。D5 把向量 $\rho\cdot d_{gate}/\max(\cdot)$ 取范数得到标量 $r$——写法稍绕但几何正确。数值例：$d_{gate}=0.75$ m、$r=2.0$ m、$f_{cam}=400$ px → $w_{box}\approx150$ px（与 1280×640 图像中 2 m 外的 75 cm 门观感一致）。</p>
+<h4>17.2 数值流的关键参数汇总（论文 + 代码）</h4>
+<table>
+<tr><th>参数</th><th>论文</th><th>代码（yaml / 生成代码）</th><th>一致性</th></tr>
+<tr><td>预测时域 / 步长</td><td>1.0 s / 0.05 s</td><td><code>predictive_control_lookahead=1.0</code>；ACADO_N=20</td><td>✅</td></tr>
+<tr><td>求解器 / 耗时</td><td>ACADO+qpOASES, 5–10 ms</td><td>qpOASES 接口；20 Hz 循环；<code>control_command_delay=0.005</code> s 补偿</td><td>✅</td></tr>
+<tr><td>最大推力 / 角速率</td><td>20 N / 3.0 rad/s</td><td>max_thrust=20；bodyrate x,y=3.0（z=1.5）</td><td>✅</td></tr>
+<tr><td>可见性框</td><td>451×288 px（752×480 图）</td><td>0.58 / 0.37（归一化）⟺ f≈389 px</td><td>✅（§16.1）</td></tr>
+<tr><td>感知权重（前视）</td><td>水平高 / 垂直 0</td><td>Q_img_u=1000 / Q_img_v=0</td><td>✅</td></tr>
+<tr><td>实验 range / 期望距离</td><td>d_gate=75 cm；期望 2.0 m</td><td>reference_distance=3.0（到达判据 reaching_distance=2.0）</td><td>✅（2.0 为达到阈值）</td></tr>
+</table>
+<hr>
+<h3>18. 数值核算（把论文/代码给的数代入公式验证）</h3>
+<h4>18.1 焦距反推（§16.1 已得）</h4>
+<p>约束框半宽 225.5 px ↔ 归一化 0.58、半高 144 px ↔ 0.37，两个方向独立反推 $f$ 均得 <strong>≈389 px</strong>（误差 &lt;1 px）。这是“像素框”与“归一化边界”互为表里的强证据。</p>
+<h4>18.2 20 m 飞行任务：最大俯仰 21.04° 的几何解释</h4>
+<p>门中心 $[23,0,3.0]$，终点 $[20,0,2.0]$：终点特征仰角 $\arctan(1/3)=18.43°$。若俯仰 $\theta=21.04°$ 时特征恰被钉在约束框垂直边缘（归一化 0.37 → 离轴 $\arctan0.37=20.34°$）：</p>
+<p>$$\theta_{\max}=20.34°+\underbrace{0.70°}_{\text{当时特征仰角}}
+\approx21.04°\qquad\checkmark$$</p>
+<p>即<strong>最大俯仰 ≈ 可见性边界角 + 特征仰角</strong>——俯仰被约束主动钉在“特征贴边”的位置（论文 Fig. 9(c)(d) 的“oscillation around the visibility constraint”正是此机制：特征轨迹沿约束框边缘振荡、俯仰同步振荡）。$21.04°-18.43°=2.61°$ 意味着俯仰最大时不在终点（当时仰角仅 ~0.7°，即四旋翼与门基本同高）。此核算为近似解释（$K$ 主点、轨迹细节未公开），但与 $0.37$、$21.04°$ 两个独立数字吻合良好。</p>
+<h4>18.3 快速降落任务：初始特征位置与约束框</h4>
+<p>起点 $[3,3,10]$、目标 $[0,0,0]$（四点中心）：初始特征方向水平分量 $\arctan(3/10)=16.7°$。论文 Fig. 5 初始观测矩形 $[511,377]$ px（相对主点 (376,240) 偏移 (135,137) px → 离轴 $(\arctan(135/389),\arctan(137/389))=(19.1°,19.4°)$）——与 16.7° 同量级、且恰在约束框（半宽 225.5、半高 144）内，自洽（差 2–3° 来自主点/机身倾斜未知，不强行精确匹配）。降落最大滚转 9.30°、俯仰 5.88° &lt; 边界角 20.34°——可见性约束并非始终激活（论文也说激活时段为 1.84–5.1 s）。</p>
+<h4>18.4 动态跟踪：TTC 与期望距离</h4>
+<p>期望 $r^*=2.0$ m、最大速度 1.92 m/s、最大滚转 14.93°。若约束 $t_c\ge t_c^{\min}$ 激活，接近速度被限为 $\dot r\le r/t_c^{\min}$——$\dot r$ 与 $r$ 成比例 ⇒ 指数式平滑逼近，这正是“smooth braking”的数学形式：</p>
+<p>$$\dot r=\frac{r}{t_c^{\min}}\;\Rightarrow\;r(t)=r_0\,e^{(t-t_0)/t_c^{\min}}$$</p>
+<p>（$t_c^{\min}$ 未公布，无法代入具体值。）</p>
+<h4>18.5 维度核算</h4>
+<ul>
+<li>式 (17)：$3+4+4+1=12$ ✓；式 (18)：$1+3=4$ ✓；欠驱动（4 输入控 12 状态）。</li>
+<li>代码：$3+4+3+1+4+1+2=18$；控制 $1+3+1+1=6$；QP 变量 120；参考通道 $23=17+6$；路径约束 5 = 可见性 4 + TTC 1（推断，与 NPAC=5、2 个松弛变量自洽）。</li>
+<li>时域：$1.0/0.05=20$ 节点 = ACADO_N ✓。</li>
+</ul>
+<hr>
+<h3>19. 交叉验证总表与问题清单</h3>
+<h4>19.1 论文公式 ↔ 推导 ↔ 代码 ↔ 数值验证 总表</h4>
+<table>
+<tr><th>论文</th><th>本文推导</th><th>代码位置</th><th>数值验证（verify_eqs.py 等）</th></tr>
+<tr><td>(1)</td><td>Rodrigues 展开</td><td><code>math_common.cpp</code> getAngleAxis*</td><td>✅ 语义、反例均 PASS</td></tr>
+<tr><td>(2)</td><td>旋转向量→四元数</td><td><code>normal_vector.cpp</code> setFromVector</td><td>✅ 自洽顺序 PASS；打印顺序 FAIL</td></tr>
+<tr><td>(3)(4)</td><td>正交性证明</td><td>getPerp1/2, getN</td><td>✅</td></tr>
+<tr><td>(5)–(8)</td><td>一阶扰动 + 互逆性</td><td><code>boxPlus/boxMinus</code></td><td>✅ 自洽顺序互逆；打印顺序 FAIL</td></tr>
+<tr><td>(9)–(11)</td><td>乘积/链式法则 + $\dot C=\omega^\times C$</td><td>（隐含于 rhs）</td><td>✅</td></tr>
+<tr><td>(12)</td><td>有限差分</td><td>—</td><td>✅ 误差 &lt;10⁻⁶</td></tr>
+<tr><td>(13)</td><td>相似变换 $C^T\omega^\times C$</td><td>—</td><td>✅ 残差恒 0</td></tr>
+<tr><td>(14)</td><td>$N^Tn^\times$ 投影 + 恒等式</td><td><code>acado_integrator.c</code>（环境嵌入版）</td><td>✅ ⊟ 导数逐位一致；4 s 积分误差 &lt;10⁻⁴</td></tr>
+<tr><td>(15)</td><td>$n^T$ 投影 / 独立物理推导</td><td>out[15]=a[6]</td><td>✅ 精确等于 $-n^Tv_c$</td></tr>
+<tr><td>(16)</td><td>SQP/RTI 结构</td><td>ACADO_N=20, RK2, qpOASES, NPAC=5</td><td>✅ 结构对照</td></tr>
+<tr><td>(17)(18)</td><td>维度核算</td><td>代码 18/6（含位置/推力/松弛）</td><td>⚠️ 论文为理想化表述</td></tr>
+<tr><td>(19)</td><td>$\dot R=R[\omega^b]^\times$ 对应关系</td><td>out[3..6] = ½q⊗[0;ω^b]</td><td>⚠️ 打印顺序错；代码正确（数值验证）</td></tr>
+<tr><td>(20)</td><td>刚体速度分解</td><td>rhs 无杠杆臂；LSQ 参考含 $t_{B,C}$</td><td>⚠️ 变换链 ✅；代码两处差异</td></tr>
+<tr><td>(21)</td><td>robocentric 推导</td><td>LSQ 输出（机体系）</td><td>✅ 等价性 + 权重数值</td></tr>
+<tr><td>(22)</td><td>针孔投影</td><td>Q_img_u/v 参数</td><td>✅ 与论文论述一致</td></tr>
+<tr><td>(23)</td><td>盒约束</td><td>setLimits（20 N / 3.0 / 1.5 rad/s / ċ≤40）</td><td>✅</td></tr>
+<tr><td>(24)</td><td>像素 ↔ 归一化</td><td>image_u_bound=0.58, v=0.37</td><td>✅ f≈389 px 双向一致</td></tr>
+<tr><td>(25)</td><td>安全域等价性证明</td><td>软约束 + 松弛 2</td><td>✅ 6 组样本等价判定</td></tr>
+</table>
+<h4>19.2 论文问题清单（按严重程度，编号 P1–P9）</h4>
+<ol>
+<li><strong>P1【疑似笔误，需对照页面核实】式 (19) 第二式的四元数乘法顺序</strong>：打印 $\dot q_{wb}=\tfrac12[0;\omega^b]\otimes q_{wb}$ 在 Hamilton 约定下等价于 $\dot R=R[\omega^w]^\times$，与第一式 $C(q_{wb})$（体→世界）及式 (20) 的用法矛盾；正确为 $\tfrac12 q_{wb}\otimes[0;\omega^b]$。开源代码实现的是正确形式（数值验证，第 12 节）。照抄论文实现会把体角速率当世界角速率积分，姿态预测错误。</li>
+<li><strong>P2【疑似笔误/顺序问题，需对照页面核实】式 (2) 的 $\alpha=\theta(\rho,e_z)$ 与式 (8) 的 $\theta(n(q_1),n(q_2))$</strong>：按式 (1) 的语义（把第一参数转到第二参数），打印顺序分别使“$\rho=C(q)e_z$”不成立、使 $\boxplus/\boxminus$ 不互逆（第 3、5 节，均数值验证）。自洽形式为 $\alpha=\theta(e_z,\rho)$、$\theta(n(q_2),n(q_1))$；代码采用自洽语义。若页面中式 (1) 叉积实为 $\rho_2\times\rho_1$，则三处只需改这一处。</li>
+<li><strong>P3【实现差异】开源代码的特征四元数积分用“环境嵌入”$\dot q=(0,\tfrac12N(q)\dot q_2)$ 而非 $\boxplus$ 一致嵌入 $\tfrac12[0;N(q)\dot q_2]\otimes q$</strong>：绕光轴精确，离轴一阶误差（随机离轴样本方向误差率 ~1.9 rad/s 量级），且不保模长（$\dot q\cdot q\neq0$，1 s 漂移 ~0.43）。真实系统靠 0.05 s 测量反馈掩盖；是否与论文实验完全一致无法从仓库证实（无版本标签）。</li>
+<li><strong>P4【实现差异】代码预测动力学不含杠杆臂项 $\omega^b\times p_{cb}^b$</strong>：$t_{B,C}=[0,0,0.15]$ m 已配置，rhs 不引用 $od[0..2]$，但参考代价（robocentric 位置）含杠杆臂。预测与代价口径不一致，误差量级 $\lVert\omega\rVert\lVert t\rVert\approx0.45$ m/s。</li>
+<li><strong>P5【文档缺口】$t_c^{\min}$、$Q_p,Q_v,Q_q,Q_s,R$ 的数值论文未给</strong>（代码参数文件有；$t_c^{\min}$ 在生成代码常数中，仓库文本不可见）；仿真相机内参（含焦距 $f\approx389$ px、主点）论文未列——复现实验必须从代码/补充材料获取。</li>
+<li><strong>P6【记法不严谨】$q\in SO(3)\subset\mathbb R^4$</strong>：单位四元数构成 $S^3$（$SO(3)$ 二重覆盖）；式 (1) 的 $\lvert\arccos\rvert$ 冗余；$\theta$ 在 $\rho_1=\pm\rho_2$ 处奇异（工程上无碍）。</li>
+<li><strong>P7【理论论述可更精确】“hairy ball theorem”说法</strong>：精确机制是 $S^2$ 切丛非平凡（连续切标架必有零点）；四元数表示的本质是把点提升到可平行化的 $S^3$，换取全局光滑标架 $N(q)$（代价：状态 2→4 维）。</li>
+<li><strong>P8【模型假设未声明】路标静止假设</strong>：动态目标跟踪实验靠高频反馈吸收目标运动（论文结论自认未来工作要加目标动力学）；四元数差的欧氏代价是测地距离的小角近似（代码做了 $q\leftrightarrow-q$ 半球修正）。</li>
+<li><strong>P9【诚实声明】本节的“论文原文”基于文本抽取，未逐字符对照页面图像</strong>（本次会话模型不支持图像输入）。P1/P2 涉及乘法与参数顺序，属抽取最易错之处；数学自洽性与代码证据强烈支持本文判断，但仍请对照 PDF 第 3、5 页最终核实。</li>
+</ol>
+<h4>19.3 验证材料清单（本工作目录，均可复跑）</h4>
+<ul>
+<li><code>_derivation_work/5-paibvs/verify_eqs.py</code>：论文数学的 42 项断言——式 (1)–(15) 的推导链、全部矩阵恒等式、$\boxplus/\boxminus$ 互逆性（自洽 vs 打印顺序）、四元数运动学约定（式 19）、TTC 等价性；核心推导链全部 PASS（端到端积分误差 ~10⁻⁴，为欧拉积分精度）。</li>
+<li><code>_derivation_work/5-paibvs/extract_rhs.py</code>：从 ACADO 生成代码原文<strong>程序化提取</strong> ODE 并求值（消除手工转录误差）；确认代码 ODE：$v^c$ 分量（至置换）$=R_{bc}^TR_{wb}^Tv^w$、$\omega^c=R_{bc}^T\omega^b$、$\dot r=-n^Tv^c$、姿态运动学 $=\tfrac12q\otimes[0;\omega^b]$、特征更新 $\dot q=(0,\tfrac12N(q)\dot q_2)$（环境嵌入）。</li>
+<li><code>_derivation_work/5-paibvs/diagnose2.py</code>：环境嵌入 vs $\boxplus$ 一致嵌入的定量对比（$\boxplus$ 版 $\dot n=\dot\rho_{true}$ <strong>精确</strong>成立；环境版一阶偏差 ~1.9 rad/s 量级、模长漂移 ~0.43/s 的量化）。</li>
+<li><code>_derivation_work/5-paibvs/fulltext.txt</code>：PDF 全文文本抽取（页码标记），可复核任何一句话。</li>
+<li>代码依据（github.com/FSC-Lab/fsc_aggressive_ibvs，main 分支，本文写作时抓取）：<code>fsc_autopilot/model/mpc/our/acado_integrator.c</code>（ODE）、<code>acado_solver.c</code>（LSQ 参考/约束结构）、<code>acado_common.h</code>（NX/NU/NPAC/N 维度）、<code>fsc_autopilot/parameters/rotors_control_params.yaml</code>（全部权重/边界数值）、<code>fsc_vision_common/vision_common/src/normal_vector.cpp</code>（特征构造与 box 算子）。</li>
+</ul>
 </section>
 
 <footer>Paper Notes · Qin, Yu, Go &amp; Liu · IEEE/ASME TMECH 2023 · Perception-Aware IBVS of Aggressive Quadrotor UAVs · MathJax + Mermaid Rendering</footer>

@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">缺陷与扩展</a>
   <a href="#motivation">推导动机</a>
   <a href="#takeaway">要点总结</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -767,7 +771,7 @@ flowchart LR
   </ol>
   <div class="callout idea">
     <div class="callout-title">🎯 为什么这比"手写数值梯度"更好</div>
-    手写有限差分（论文 Eq.17 的 $\nabla_\mu c$）需要为每个采样点额外查 6 次 ESDF（xyz 各 ±ε），30 个点就是 180 次查询/轨迹，乘 15 条轨迹再乘 batch 16，查询量爆炸；而 <code>grid_sample</code> 用一次双线性插值就同时给出<strong>值与该点的解析斜率</strong>，把 7 次查询压成 1 次，且没有差分步长的调参问题。<strong>数值梯度 → 自动微分</strong> 是这篇论文落地时最重要的一次工程升级。</li>
+    手写有限差分（论文 Eq.17 的 $\nabla_\mu c$）需要为每个采样点额外查 6 次 ESDF（xyz 各 ±ε），30 个点就是 180 次查询/轨迹，乘 15 条轨迹再乘 batch 16，查询量爆炸；而 <code>grid_sample</code> 用一次双线性插值就同时给出<strong>值与该点的解析斜率</strong>，把 7 次查询压成 1 次，且没有差分步长的调参问题。<strong>数值梯度 → 自动微分</strong> 是这篇论文落地时最重要的一次工程升级。
   </div>
 
   <h4>(3) 三个必须知道的数值陷阱（源码里都留了注释）</h4>
@@ -1233,6 +1237,310 @@ flowchart LR
     <div class="callout-title">ℹ️ 最后：这份笔记的边界</div>
     本笔记的所有数字均取自论文 PDF 抽取文本（8 页）与本地 <code>YOPO-Simple</code> 分支源码。<strong>凡是论文未给出的量</strong>（如 $\lambda_s,\lambda_o,\lambda_g$ 的具体数值、$d_0,k$、安全积分步长 $\delta t$、Fig.7 的成功率百分比、DOI 的完整字符串）本笔记一律标注为"论文未给出"，并用重构版源码的对应值<strong>另行标注</strong>，二者不混用。若要把本笔记用于正式综述引用，请以 <code>YOPO_RAL2024_YouOnlyPlanOnce.pdf</code> 原文为准复核一遍数字。
   </div>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info"><p><strong>对象</strong>：<code>YOPO_RAL2024_YouOnlyPlanOnce.pdf</code>（RA-L 2024，IEEE Xplore 文档号 10528860）全文 8 页。<strong>公式范围</strong>：正文全部 21 个编号公式（式 (1)–(21)，集中在 §II Method 第 2–5 页）+ 网络前向链/训练流程的 9 个无编号式（本文标为补充式 (D1)–(D9)）；论文没有算法盒子，训练与推理流程在 §II-B2 与 §III 中以文字给出，本文第 13 节重建为伪代码逐行解读。<strong>方法</strong>：</p><ol><li>从多项式插值理论（边界值问题与 Hermite 基）、矩阵分块求导、球坐标链式法则等<strong>第一性原理独立重推</strong>每个公式；</li><li>用本地官方代码仓库 <code>1.Paper/YOPO/</code>（TJU-Aerial-Robotics/YOPO，<strong>YOPO-Simple 分支</strong>，commit <code>bd8a7f9</code>，2026-08-14 重构版）<strong>逐行交叉验证</strong>，给出「论文式号 ↔ 代码文件:行号」对应表（第 16 节）；</li><li>用数值脚本 <code>_derivation_work/yopo/verify_yopo_eqs.py</code>（只依赖 numpy，可复跑）验证所有矩阵恒等式与雅可比（V1–V8 全部通过）；</li><li>明确标出论文<strong>符号矛盾、与代码不一致、数值未给</strong>之处（第 16 节问题清单），绝不替论文“圆场”。</li></ol><p><strong>⚠️ 诚实声明</strong>：本模型无法读取页面图像，公式原文以 <code>_derivation_work/yopo/fulltext.txt</code>（PDF 全文抽取、按页标记）为准，并与正文文字、本地代码三重互证。式 (11)(15)(17)(20)(21) 位于 PDF 第 4–5 页，其中矩阵分块、求和上限、转置与向量记号在抽取文本中易混淆，<strong>建议人工对照 PDF 复核这些式子的印刷符号</strong>（本文按“与维度核算、代码实现一致”的读法解读）。<strong>代码口径</strong>：本地仓库是 <code>YOPO-Simple</code> 重构分支，README 声明“与论文一致的稳定版在 main 分支”；凡与论文不一致处均明确列出，读者据此可区分论文问题与重构分支改动。</p></div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table><tr><th>公式</th><th>内容</th><th>与代码/独立推导对照的结论</th></tr><tr><td>(1)(2)</td><td>单段幂基多项式轨迹与系数向量</td><td>✅ 标准形式；$n=5$ 由 6 个边界条件唯一确定（本文补齐论证）</td></tr><tr><td>(3)(4)</td><td>球坐标基元锚点 / 精修末端状态</td><td>✅ 与 <code>primitive.py</code> L62–81、<code>state_transform.py</code> L38–46 一致；球坐标偏导 V5 通过</td></tr><tr><td>(5)</td><td>$A=M^{-1}d$ 边界值→系数</td><td>✅ 代码闭式逆 = 五次 Hermite 基，<code>Coef_inv == inv(M): True</code>（V1）</td></tr><tr><td>(6)(7)</td><td>体轴→基元系旋转与输入变换</td><td>✅ $R_{ij}=R_z(\phi)R_y(-\theta)$；$R_{ij}e_x$ = 锚点方向；代码 <code>from_euler('ZYX',[α,−β,0])</code> 同款</td></tr><tr><td>(8)(9)</td><td>tanh 限幅与末端导数尺度</td><td>✅ 形式正确；尺度 $15°/15°/5$ m/$6/6$ 全部来自代码（论文未给数值）</td></tr><tr><td>(10)</td><td>总代价三项加权</td><td>⚠️ 代码多一项加速度代价 $w_a=1.0$，权重另有速度幂律反归一化</td></tr><tr><td>(11)</td><td>选择矩阵 $C$ 的固定/自由分解</td><td>✅ 概念正确；代码实际用<strong>交错排列</strong> $C^\top d=[p_0,p_T,v_0,v_T,a_0,a_T]$，与概念分块差一个置换（V1b）</td></tr><tr><td>(12)(13)</td><td>光滑代价二次型与 $B$ 分块</td><td>✅ $Q$ 独立积分推导与代码 H 逐项一致（V2）；$B$ 对称、$B_{PP}$ 正定（V3）</td></tr><tr><td>(14)</td><td>$\partial J_s/\partial d_P$ 闭式雅可比</td><td>✅ 独立推导 + 有限差分一致（V3）；另有闭式极小点 $d_P^\star=-B_{PP}^{-1}B_{PF}d_F$</td></tr><tr><td>(15)</td><td>安全代价时间积分离散化</td><td>⚠️ 求和上限含两端共 $T/\delta t+1$ 点；代码 30 点不含 $t=0$ 且取均值（差常数因子）</td></tr><tr><td>(16)</td><td>ESDF 势函数</td><td>✅ 与 <code>safety_loss.py</code> L105–106 一致；$d_0=1.2$ m、$k=0.6$（代码参数名 <code>r</code>）</td></tr><tr><td>(17)</td><td>$\partial J_o/\partial d_P$ 数值梯度</td><td>✅ 链式展开正确（$T(t)^\top L_P$）；代码用 autograd 等价实现</td></tr><tr><td>(18)(19)</td><td>目标代价与梯度</td><td>✅ 梯度平凡正确；⚠️ 代码 <code>GuidanceLoss</code> 改为方向相似度，“球面投影”改为“10 m 球内采样”</td></tr><tr><td>(20)</td><td>代价→网络输出的完整链式</td><td>✅ 结构正确；本文逐项展开 $\partial p'/\partial\Delta_\epsilon$ 并做维度核对</td></tr><tr><td>(21)</td><td>分数监督 $\mathrm{SmoothL1}(y_s,-J)$</td><td>❌ <strong>符号自相矛盾</strong>：$J\ge0$ ⇒ $-J\le0$，与“分数大于阈值 0.04 才训练”不可能同时成立（第 11 节）；代码为自洽的 +J 版本</td></tr><tr class="highlight"><td>(D1)–(D9)</td><td>网络前向链（无编号）</td><td>✅ $M_d=10$ 计数一致；输出 $3\times5\times10$；下采样 32 与网格对齐</td></tr></table>
+<hr>
+<h3>1. 预备：坐标系、符号表与量纲约定</h3>
+<h4>1.1 坐标系（体轴系与基元系）</h4>
+<ul><li><strong>体轴系（body frame）</strong>：原点在质心，$x$ 前、$y$ 左、$z$ 上（NWU 前-左-上，与 Flightmare/ROS 的 NWU 世界系对齐）。论文把输入输出都压在体轴系里（“the inputs and outputs are represented in the body frame, thereby avoiding the need for position and attitude”），网络不需要知道飞机在哪、朝哪。</li><li><strong>基元系（primitive frame）</strong>：体轴系绕 $z$ 转 $\phi_i$、再绕 $y$ 转 $-\theta_j$ 得到的随锚点转动的局部系（式 (6)），其 $x$ 轴恰指向锚点方向（第 5 节验证）。</li><li><strong>世界系</strong>：仅出现在训练代价计算与推理下发参考时（<code>state_transform.py</code> <code>state_body2world</code>）。</li></ul>
+<h4>1.2 符号表（本文推导专用）</h4>
+<table><tr><th>符号</th><th>含义</th><th>量纲/单位</th><th>文中/代码取值</th></tr><tr><td>$t,\ T$</td><td>轨迹局部时间；单段执行时间</td><td>s</td><td>论文 $T=2$ s；重构版 $T=2R/v_{\max}=10/6\approx1.667$ s</td></tr><tr><td>$f_\mu(t),\ a_i\ (A_\mu)$</td><td>$\mu\in\{x,y,z\}$ 轴位置多项式；幂系数</td><td>m；m/s$^i$</td><td>5 阶，每轴 6 个、共 18 个</td></tr><tr><td>$d=[p_0,v_0,a_0,p_T,v_T,a_T]^\top$</td><td>单轴边界条件向量</td><td>混合</td><td>当前状态来自估计器；末端来自网络</td></tr><tr><td>$d_F,\ d_P$</td><td>固定块（当前状态）、自由块（末端状态）</td><td>—</td><td>各 9 维</td></tr><tr><td>$M,\ C,\ Q,\ B$</td><td>映射矩阵、选择矩阵、光滑代价核、分块矩阵</td><td>—</td><td>6×6（单轴）</td></tr><tr><td>$r,\theta_j,\phi_i$</td><td>基元半径、极角（俯仰）、方位角</td><td>m, rad, rad</td><td>$r=5$ m；$\theta_j\in\{-20°,0°,20°\}$，$\phi_i\in\{-36°,-18°,0°,18°,36°\}$</td></tr><tr><td>$r',\theta',\phi'$；$\Delta\theta,\Delta\phi,\Delta r$</td><td>精修后的半径/角度；网络预测偏移</td><td>m, rad；rad, rad, m</td><td>$r'=r+\Delta r$ 等；上限 $15°/15°/5$ m</td></tr><tr><td>$v_{\max},a_{\max}$</td><td>末端速度/加速度幅值上限</td><td>m/s, m/s²</td><td>均为 6（训练）</td></tr><tr><td>$J_s,J_o,J_g,J$</td><td>光滑/安全/目标代价与总代价</td><td>m²/s⁵, s, m², 混合</td><td>见第 7–9 节</td></tr><tr><td>$d_t,\ d_0,\ k$</td><td>到最近障碍距离（ESDF）；偏移；衰减尺度</td><td>m</td><td>$d_0=1.2$、$k=0.6$</td></tr><tr><td>$y_\theta,y_\phi,y_r,y_v,y_a,y_s$</td><td>网络原始输出（限幅前）</td><td>无量纲</td><td>前 9 维经 $\tanh$，分数经 $\mathrm{softplus}$</td></tr><tr><td>$\delta t$</td><td>安全积分采样间隔</td><td>s</td><td>代码 $T/30\approx0.0556$ s</td></tr></table>
+<h4>1.3 两条贯穿全文的量纲纪律</h4>
+<p>① <strong>代价量纲决定权重量纲</strong>：$J_s$ 单位 m²/s⁵（jerk² 时间积分，与 Table II 的 Smoothness 指标单位 <code>m²/s⁵</code> 完全一致——本文推导正确性的一个外部锚点）；$J_o$ 单位 s；$J_g$ 单位 m²。故 (10) 的 $\lambda_s,\lambda_o,\lambda_g$ <strong>不是</strong>无量纲权重，而是带量纲的换算系数——这是代码必须做“速度幂律反归一化”（第 7.4 节）的根源。② <strong>雅可比用行向量约定</strong>：式 (14) 的 $\partial J_s/\partial d_P$ 是 $1\times3$ 行向量，与更新 $d_P\leftarrow d_P-\eta(\partial J_s/\partial d_P)^\top$ 配套。本文所有导数均按此约定书写。</p>
+<hr>
+<h3>2. 公式 (1)–(2)：单段多项式轨迹参数化（附阶数选择的完整论证）</h3>
+<p>论文原文（第 2 页 §II-A.1）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(1) —— 体轴系单段时间参数化多项式（论文式号 (1)）</span>
+$$f_\mu(t)=a_0+a_1t+a_2t^2+a_3t^3+\cdots+a_nt^n,\qquad \mu\in\{x,y,z\} \tag{1}$$
+$$A=\begin{bmatrix}a_0,&a_1,&a_2,&a_3,&\dots,&a_n\end{bmatrix} \tag{2}$$
+<div class="eq-note"><strong>逐符号</strong>：$f_\mu(t)$＝$\mu$ 轴位置（体轴系，m）；$t$＝轨迹局部时间（s）；$a_i$＝第 $i$ 次幂系数（量纲 m/s$^i$）；$A$＝系数向量（每轴一条，三轴共 $3(n+1)$ 个）。<br><strong>独立重推要点</strong>：位置空间的<strong>幂基</strong>展开是最普通的轨迹参数化；选它的真正理由要到式 (5) 才完全显现——幂基下“边界条件 → 系数”是<strong>线性</strong>方程组（拟 Vandermonde 结构），逆矩阵可预计算；换 Bezier/B 样条则要基变换（对应关系见第 14 节）。</div></div>
+<h4>2.1 为什么是 5 阶（论文没写，本文补齐）</h4>
+<p>论文只说“end-derivatives (velocity and acceleration for 5-order polynomial)”，没论证阶数。独立推导：单段 $n$ 阶多项式有 $n+1$ 个自由度；边界条件为两端各 3 个（位置/速度/加速度）共 6 个。边界值问题恰好唯一可解要求 $n+1=6\Rightarrow n=5$。一般规律：固定两端 $0\sim k$ 阶导需要 $2(k+1)$ 个条件，阶数取 $2k+1$；$k=1$ ⇒ 3 阶（经典 minimum-jerk 单段情形），$k=2$ ⇒ 5 阶。<strong>为什么固定到加速度而不更高</strong>：① 四旋翼输入（机体推力）直接对应加速度量级，末端加速度可控＝轨迹可跟踪；② 光滑代价惩罚 jerk²（第 7 节），jerk 是三阶导，5 阶多项式恰有<strong>非零且时变</strong>的 jerk 可供优化（阶数再低 jerk 恒为零、代价失效；再高则边界值问题欠定）。</p>
+<h4>2.2 微分链（为式 (12) 的 $Q$ 矩阵备料，无编号式 (D1)）</h4>
+<p>对幂基逐项求导，$\mu$ 轴（省略下标）的 $k$ 阶导数：</p>
+$$f^{(k)}(t)=\sum_{i=k}^{n}\frac{i!}{(i-k)!}\,a_i\,t^{i-k},\qquad k=0,1,2,\dots \tag{D1}$$
+<p>代入 $n=5$ 得到本文后面反复使用的三个量（$f$ 本身即式 (1)）：</p>
+$$v(t)=a_1+2a_2t+3a_3t^2+4a_4t^3+5a_5t^4$$
+$$a(t)=2a_2+6a_3t+12a_4t^2+20a_5t^3,\qquad
+j(t)=6a_3+24a_4t+60a_5t^2$$
+<p><strong>代码交叉验证</strong>：<code>poly_solver.py</code> L29–37 的 <code>get_velocity/get_acceleration/get_jerk/get_snap</code> 正是上面四式（注意该文件把加速度简写记作 <code>get_acceleration</code>，jerk 的导数记作 <code>get_snap</code>，返回 $24a_4+120a_5t$）。<strong>未发现实质问题</strong>。</p>
+<hr>
+<h3>3. 公式 (3)–(4)：运动基元锚点与精修末端状态（球坐标参数化）</h3>
+<p>论文原文（第 3 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(3) —— 基元锚点的球坐标定义（论文式号 (3)）</span>
+$$p_{ij}=\big(r\cos\theta_j\cos\phi_i,\quad r\cos\theta_j\sin\phi_i,\quad r\sin\theta_j\big) \tag{3}$$
+<div class="eq-note"><strong>逐符号</strong>：$p_{ij}$＝第 $(i,j)$ 个基元的末端位置锚点（体轴系，m）；$r$＝规划半径（代码 <code>radio_range=5.0</code> m）；$\theta_j$＝极角（俯仰）；$\phi_i$＝方位角（偏航）；$i\in[1,M_\phi],\ j\in[1,M_\theta]$（论文 1 基索引）。<br><strong>坐标验证</strong>：标准球坐标（$x$ 前、$y$ 左、$z$ 上），几何自洽。<strong>采样方式</strong>：论文说“uniformly sample … in the visible range of depth sensor”——是<strong>角度均匀</strong>采样。代码 <code>primitive.py</code> L50–55：$\Delta\phi=\mathrm{FOV}_\phi/M_\phi$、$\phi_k=-\frac{M_\phi-1}{2}\Delta\phi+k\Delta\phi$（$\theta$ 同理）。代入 FOV$_\phi=90°$、$M_\phi=5$ ⇒ $\phi_i\in\{-36°,-18°,0°,18°,36°\}$；FOV$_\theta=60°$、$M_\theta=3$ ⇒ $\theta_j\in\{-20°,0°,20°\}$（V8 一致）。<br><strong>⚠️ 小疑点</strong>：角度均匀 ≠ 球面均匀——面积元 $dS=r^2\cos\theta\,d\theta d\phi$，均匀取 $\theta$ 使位置在极区附近更密；对“覆盖解空间”无实质影响，但严格说不是球面均匀采样。另锚点总跨度 $72°\times40°$ 小于相机 FOV $90°\times60°$，四角留有余量（偏移后不越出 FOV）。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(4) —— 偏移应用后的精修末端状态（论文式号 (4)）</span>
+$$p'_{ij}=\big(r'_{ij}\cos\theta'_{ij}\cos\phi'_{ij},\quad r'_{ij}\cos\theta'_{ij}\sin\phi'_{ij},\quad r'_{ij}\sin\theta'_{ij}\big) \tag{4}$$
+<div class="eq-note"><strong>逐符号</strong>：$p'_{ij}$＝精修后的末端位置（体轴系）；$r'=r+\Delta r$、$\phi'=\phi+\Delta\phi$、$\theta'=\theta+\Delta\theta$；$\Delta\theta,\Delta\phi,\Delta r$＝网络预测的偏移（值域由式 (8) 限幅）。<br><strong>推导要点</strong>：式 (4) 不是新公式，而是把“锚点 + 偏移”代入式 (3) 的同一球坐标映射——它把网络的三维偏移输出与锚点状态对接成可解释的几何量，正是论文所说 “this expression is spatially separated, facilitating the integration between network predictions and primitive anchors” 的数学落点。</div></div>
+<h4>3.1 球坐标映射的三个偏导数（为式 (20) 的链式法则备料）</h4>
+<p>记 $p'=(x',y',z')$。对三个偏移分别求偏导（省略下标 $ij$，$r'=r+\Delta r$、$\theta'=\theta+\Delta\theta$、$\phi'=\phi+\Delta\phi$）：</p>
+$$\frac{\partial p'}{\partial\Delta r}=\begin{pmatrix}\cos\theta'\cos\phi'\\ \cos\theta'\sin\phi'\\ \sin\theta'\end{pmatrix},\qquad
+\frac{\partial p'}{\partial\Delta\phi}=r'\begin{pmatrix}-\cos\theta'\sin\phi'\\ \cos\theta'\cos\phi'\\ 0\end{pmatrix},\qquad
+\frac{\partial p'}{\partial\Delta\theta}=r'\begin{pmatrix}-\sin\theta'\cos\phi'\\ -\sin\theta'\sin\phi'\\ \cos\theta'\end{pmatrix}$$
+<p>推导示例（第一式的 $x$ 分量）：$\partial(r'\cos\theta'\cos\phi')/\partial\Delta r=\cos\theta'\cos\phi'$（$r'$ 对 $\Delta r$ 的导数为 1，其余因子与 $\Delta r$ 无关）；第二式 $z$ 分量为 0 是因为 $z'$ 不含 $\phi'$。<strong>正交性检查（几何直觉）</strong>：三个导数分别沿球坐标的<strong>径向、纬线、经线</strong>方向，两两正交（例：$\partial p'/\partial\Delta r\cdot\partial p'/\partial\Delta\phi=r'\cos\theta'[-\cos\theta'\cos\phi'\sin\phi'+\cos\theta'\sin\phi'\cos\phi']=0$），模长依次为 $1,\ r'\cos\theta',\ r'$——即 $\Delta\theta,\Delta r$ 以杠杆臂 $r'$ 放大末端位移，$\Delta\phi$ 的杠杆臂是 $r'\cos\theta'$（高仰角锚点处水平转动对末端位置影响变小）。<strong>数值验证</strong>：<code>verify_yopo_eqs.py</code> V5 三项有限差分全部 <code>True</code>。<strong>代码交叉验证</strong>：<code>state_transform.py</code> L38–46 的 <code>pred_to_endstate</code> 逐行实现式 (4)（<code>radio=(pred+1.0)*radio_range</code> 即 $r'=R+\tanh(y_r)R$，见第 6 节）。</p>
+<hr>
+<h3>4. 公式 (5) 与 (11)：边界值问题、映射矩阵 $M$ 与选择矩阵 $C$</h3>
+<p>论文原文（第 3 页与第 4 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(5) —— 边界条件到系数的线性映射（论文式号 (5)）</span>
+$$A=M^{-1}d \tag{5}$$
+<div class="eq-note"><strong>逐符号</strong>：$A$＝系数向量（式 (2)，单轴 6 维）；$d$＝把当前状态与末端状态拼成的边界条件向量；$M$＝常数映射矩阵（对固定 $T$ 预计算）。<strong>推导（完整）</strong>：以单轴 5 阶为例，$d=[p_0,v_0,a_0,p_T,v_T,a_T]^\top$。用式 (D1) 在 $t=0$ 与 $t=T$ 处求值：$f(0)=a_0=p_0$；$f'(0)=a_1=v_0$；$f''(0)=2a_2=a_0^{acc}$；$f(T)=\sum_{i=0}^{5}a_iT^i=p_T$；$f'(T)=\sum_{i=1}^{5}i a_iT^{i-1}=v_T$；$f''(T)=\sum_{i=2}^{5}i(i-1)a_iT^{i-2}=a_T$。写成矩阵 $d=MA$：</div></div>
+$$M=\begin{bmatrix}
+1&0&0&0&0&0\\
+0&1&0&0&0&0\\
+0&0&2&0&0&0\\
+1&T&T^2&T^3&T^4&T^5\\
+0&1&2T&3T^2&4T^3&5T^4\\
+0&0&2&6T&12T^2&20T^3
+\end{bmatrix},\qquad
+d=\begin{bmatrix}p_0\\v_0\\a_0\\p_T\\v_T\\a_T\end{bmatrix}=MA,\qquad A=M^{-1}d$$
+<p>每行依据：第 1–3 行是 $t=0$ 处 $f,f',f''$ 的系数（幂基在 0 处的性质：只有 $t^i$ 的 $i$ 阶导在 $t=0$ 非零，值为 $i!$）；第 4–6 行是 $t=T$ 处的同一组导数（$k$ 阶导系数为 $\frac{i!}{(i-k)!}T^{i-k}$，正是 (D1)）。<strong>可解性</strong>：$\det M$ 对 $T>0$ 恒非零（否则存在非零 5 阶多项式与其两端的 0/1/2 阶导全为零，与泰勒展开矛盾），故 $M^{-1}$ 存在，边界值问题唯一可解。式 (5) 的全部内容：<strong>一次矩阵乘把网络输出变成整条轨迹</strong>（推理时甚至不用矩阵乘，见下）。</p>
+<h4>4.1 闭式逆：五次 Hermite 基（代码给出的精确形式）</h4>
+<p><code>policy/poly_solver.py</code> L9–14 直接写死了 $M^{-1}$ 的闭式（<code>Coef_inv</code>）：</p>
+<pre class="code-block"><code>Coef_inv = np.array([[1, 0, 0, 0, 0, 0],
+                     [0, 1, 0, 0, 0, 0],
+                     [0, 0, 1/2, 0, 0, 0],
+                     [-10/t**3, -6/t**2, -3/(2*t),  10/t**3, -4/t**2,  1/(2*t)],
+                     [ 15/t**4,  8/t**3,  3/(2*t**2), -15/t**4,  7/t**3, -1/t**2],
+                     [ -6/t**5, -3/t**4, -1/(2*t**3),  6/t**5, -3/t**4,  1/(2*t**3)]])</code></pre>
+<p>这是<strong>五次 Hermite 插值基</strong>（Richter et al. [15] 风格）：前三行把 $p_0,v_0,a_0$ 直接写进 $a_0,a_1,a_2$（$a_2=a_0^{acc}/2$）；后三行是“终点三项”的 Hermite 基系数。<strong>独立验证</strong>：① <code>Coef_inv == inv(M): True</code>（V1）；② 手算抽查——把 $a_1..a_5$ 代入 $v_T=\sum_{i=1}^{5}i\,a_iT^{i-1}$ 逐系数验算：$p_0$ 项 $3(-\tfrac{10}{T^3})T^2+4(\tfrac{15}{T^4})T^3+5(-\tfrac{6}{T^5})T^4=0$；$v_0$ 项 $1-18+32-15=0$；$a_0^{acc}$ 项 $T-4.5T+6T-2.5T=0$；$p_T$ 项 $(30-60+30)/T=0$；$v_T$ 项 $-12+28-15=1$；$a_T$ 项 $1.5T-4T+2.5T=0$——只剩 $v_T$ 自身 ✓。<strong>工程意义</strong>：推理时求多项式不需要求逆——<code>test_yopo_ros.py</code> L195–200 直接调 <code>Poly5Solver</code> 用闭式系数，这是“只解最优一条轨迹”能在微秒级完成的原因。</p>
+<h4>4.2 式 (11)：固定块 / 自由块分解与选择矩阵 $C$</h4>
+<p>论文原文（第 4 页）：</p>
+$$A=M^{-1}C\begin{bmatrix}d_F\\ d_P\end{bmatrix} \tag{11}$$
+<p><strong>推导与含义</strong>：把 $d$ 重排成两块——<strong>固定块 $d_F$</strong>（当前状态 $p_0,v_0,a_0$，对优化而言是常数）与<strong>自由块 $d_P$</strong>（末端状态 $p_T,v_T,a_T$，网络输出，唯一决策变量）。$C$ 是 0/1 选择矩阵完成分块重排。动机见第 7 节：分开后 $J_s$ 是 $d_P$ 的二次函数，梯度有闭式。<strong>代码的实际排列（必须讲清，否则读代码会懵）</strong>：<code>loss/loss_function.py</code> L57–60 的 <code>Ct</code> 不是概念上的 $[I_3\ \mathbf 0;\ \mathbf 0\ I_3]$，而是<strong>交错排列</strong>：</p>
+<pre class="code-block"><code>Ct = th.zeros((6, 6))
+Ct[[0, 2, 4, 1, 3, 5], [0, 1, 2, 3, 4, 5]] = 1   # C^T d = [p0, pT, v0, vT, a0, aT]</code></pre>
+<p>即 $C^\top d=[p_0,\ p_T,\ v_0,\ v_T,\ a_0,\ a_T]$（固定量占偶指标、自由量占奇指标）。代码干脆把映射矩阵的<strong>行序</strong>也换成交错序（<code>qp_generation</code> L37–41 生成的 <code>A</code> 矩阵第 0–5 行依次对应 $p_0,p_T,v_0,v_T,a_0,a_T$），数值验证 <code>qp_generation A == Ct @ M: True</code>（V1b）。<strong>结论</strong>：论文式 (11)(13) 的“分块”是概念上的（先 $d_F$ 后 $d_P$ 连续块），代码是交错的，两者差一个置换相似 $B\to PBP^\top$，<strong>梯度公式 (14) 在任何一种排列下都成立</strong>，只是块指标不同（代码中固定块取指标 $\{0,2,4\}$、自由块取 $\{1,3,5\}$）。</p>
+<p><strong>$L_P$ 的定义（为式 (17) 备料）</strong>：论文说 “$L_P$ is the right block of matrix $M^{-1}C$ which corresponds to the free derivatives”，即 $(M^{-1}C)$ 中与 $d_P$ 对应的列块（概念序下右 3 列；代码交错序下第 1、3、5 列，<code>loss_function.py</code> L67 <code>_L = B @ Ct</code> 的自由列）。物理意义：$\partial A/\partial d_P=L_P$——末端状态每变一个单位，系数向量怎么变；配合幂基向量就是“末端扰动如何改变整条曲线”（第 8.2 节展开）。</p>
+<hr>
+<h3>5. 公式 (6)–(7)：基元坐标系旋转（论文最精巧的一步）</h3>
+<p>论文原文（第 3 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(6) —— 体轴到基元系的旋转矩阵（论文式号 (6)）</span>
+$$R_{ij}=R_z(\phi_i)\,R_y(-\theta_j) \tag{6}$$
+<div class="eq-note"><strong>逐符号</strong>：$R_z(\cdot)$＝绕 $z$ 轴的旋转矩阵；$R_y(\cdot)$＝绕 $y$ 轴的旋转矩阵；$\phi_i$＝方位角（绕 $z$，偏航方向）；$\theta_j$＝极角（绕 $y$，俯仰方向，<strong>注意负号</strong>）。<br><strong>展开（逐元素）</strong>：</div></div>
+$$R_z(\phi)=\begin{bmatrix}\cos\phi&-\sin\phi&0\\ \sin\phi&\cos\phi&0\\ 0&0&1\end{bmatrix},\qquad
+R_y(-\theta)=\begin{bmatrix}\cos\theta&0&\sin\theta\\ 0&1&0\\ -\sin\theta&0&\cos\theta\end{bmatrix}$$
+$$R_{ij}=R_z(\phi_i)R_y(-\theta_j)=\begin{bmatrix}
+\cos\theta_j\cos\phi_i&-\sin\phi_i&\sin\theta_j\cos\phi_i\\
+\cos\theta_j\sin\phi_i&\cos\phi_i&\sin\theta_j\sin\phi_i\\
+-\sin\theta_j&0&\cos\theta_j
+\end{bmatrix}$$
+<h4>5.1 几何验证：基元系的 $x$ 轴恰指向锚点方向</h4>
+<p>把体轴系单位向量 $e_x=(1,0,0)^\top$ 用 $R_{ij}$ 变换：</p>
+$$R_{ij}\,e_x=R_z(\phi_i)R_y(-\theta_j)\begin{pmatrix}1\\0\\0\end{pmatrix}
+=R_z(\phi_i)\begin{pmatrix}\cos\theta_j\\0\\\sin\theta_j\end{pmatrix}
+=\begin{pmatrix}\cos\theta_j\cos\phi_i\\ \cos\theta_j\sin\phi_i\\ \sin\theta_j\end{pmatrix}$$
+<p><strong>恰好是式 (3) 的锚点方向单位向量</strong>（$p_{ij}=r\cdot R_{ij}e_x$）。也就是说：基元系的 $x_P$ 轴直接对准该基元的锚点方向——网络在该系里只需预测“沿 $x_P$ 的修正量”，输入输出自然与网格位置解耦。<strong>这就是式 (6) 的全部几何含义</strong>，也是论文对付“规划不是平移不变问题”（the motion planning problem is not translation invariant）的手段。</p>
+<h4>5.2 式 (7)：把输入变换到基元系</h4>
+$$x'_{ij}=R_{ij}^{-1}x \tag{7}$$
+<p><strong>逐符号</strong>：$x$＝当前状态与目标方向在体轴系的向量（$v,a,\hat g$ 三组）；$x'_{ij}$＝变换到第 $(i,j)$ 个基元系后的输入。因为旋转矩阵正交，$R_{ij}^{-1}=R_{ij}^\top$。<strong>代码对照</strong>：<code>state_transform.py</code> L105 的 <code>torch.matmul(obs_exp, Rbp_exp)</code> 用行向量约定 $x'^\top=x^\top R_{ij}$，与 $x'=R_{ij}^\top x$ 完全相同（$[v;a;g]$ 三行同时变换）。<strong>配套约定</strong>：网络预测的末端速度/加速度也定义在基元系（论文原话），推理时由式 (9) 转回体轴系——输入输出同处基元系，同一套卷积权重对所有 15 个网格<strong>共享且语义一致</strong>，这正是 fully convolutional header with shared weights 能工作的前提。</p>
+<hr>
+<h3>6. 公式 (8)–(9)：tanh 限幅、偏移尺度与数值核算</h3>
+<p>论文原文（第 4 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(8) —— 偏移的 tanh 限幅（论文式号 (8)）</span>
+$$\Delta\theta=\tanh(y_\theta)\,d_\theta,\qquad
+\Delta\phi=\tanh(y_\phi)\,d_\phi,\qquad
+\Delta r=\tanh(y_r)\,d_r \tag{8}$$
+<div class="eq-note"><strong>逐符号</strong>：$y_\theta,y_\phi,y_r$＝网络输出的原始激活（无量纲）；$d_\theta,d_\phi,d_r$＝局部解空间半宽（local solution space prior）。<strong>性质推导</strong>：$\tanh:\mathbb R\to(-1,1)$ 严格单调、处处可微，$\frac{d}{dy}\tanh y=1-\tanh^2y$（第 10 节链式法则的第三级）。所以 $\Delta\theta\in(-d_\theta,+d_\theta)$ 被<strong>硬性</strong>约束在锚点邻域内——每个基元只负责自己那片局部解空间。<br><strong>数值核算（论文未给，全部来自代码）</strong>：$d_\theta=d_\phi=\tfrac12\times30°=15°$（<code>primitive.py</code> L83–84，anchor_fov=30°）；$d_r=$ <code>radio_range</code> $=5.0$ m。<strong>半径的特殊处理</strong>：代码 <code>state_transform.py</code> L40 写 <code>radio=(pred+1.0)*radio_range</code>，即 $r'=R(1+\tanh y_r)=R+\Delta r$，等价于式 (8) 且 $d_r=R=5$ m，故 $r'\in(0,2R)=(0,10)$ m。<br><strong>“略大于网格 FOV”的核对</strong>：网格半角 $18°/2=9°$（水平）、$20°/2=10°$（垂直），偏移上限 15° 大于二者（V8 <code>True</code>）⇒ 相邻网格解空间有重叠、无缝隙 ✓。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(9) —— 末端速度/加速度的限幅与坐标变换（论文式号 (9)）</span>
+$$v=R_{ij}\,\tanh(y_v)\,v_{\max},\qquad
+a=R_{ij}\,\tanh(y_a)\,a_{\max} \tag{9}$$
+<div class="eq-note"><strong>逐符号</strong>：$y_v,y_a\in\mathbb R^3$＝网络输出的速度/加速度原始激活（基元系、无量纲）；$v_{\max},a_{\max}$＝动态可行性上限（代码 <code>vel_max_train=6.0</code> m/s、<code>acc_max_train=6.0</code> m/s²）；$R_{ij}$＝式 (6) 旋转，把基元系分量转回体轴系（式 (7) 的逆操作）。<strong>量纲核对</strong>：$\tanh$ 无量纲 × $v_{\max}$ [m/s] ⇒ $v$ [m/s] ✓；三个分量各自限幅，速度矢量被限制在<strong>边长为 $2v_{\max}$ 的立方体</strong>内而非球内（立方体角点可达 $\sqrt3\,v_{\max}\approx10.4$ m/s，训练分布下不会触达；论文未讨论此区别）。<strong>代码对照</strong>：<code>state_transform.py</code> L49–54 逐行一致。</div></div>
+<h4>6.1 tanh 饱和的数值表（训练中真实发生的梯度衰减）</h4>
+<table><tr><th>$y$</th><th>$\tanh y$</th><th>$\tanh'=1-\tanh^2y$</th><th>$d_\theta\,\tanh'$</th></tr><tr><td>0.0</td><td>0.000</td><td>1.000</td><td>15.00°</td></tr><tr><td>1.0</td><td>0.762</td><td>0.420</td><td>6.30°</td></tr><tr><td>2.0</td><td>0.964</td><td>0.071</td><td>1.06°</td></tr><tr><td>3.0</td><td>0.995</td><td>0.010</td><td>0.15°（近饱和）</td></tr></table>
+<p>（V6 输出；此表同时是式 (20) 第三级 $\partial\Delta_\epsilon/\partial y_\epsilon$ 的数值实例。）输出越接近限幅边界，网络对它的修正越“迟钝”——tanh 饱和的标准行为，恰好提供软性阻尼：偏移接近 $d_\theta$ 时继续外推代价高，网络转向其他基元（分数排序兜底）。</p>
+<hr>
+<h3>7. 公式 (10)–(14)：总代价与光滑代价的二次型化（核心推导）</h3>
+<p>论文原文（第 4 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(10) —— 总代价的加权和（论文式号 (10)）</span>
+$$J=\lambda_s J_s+\lambda_o J_o+\lambda_g J_g \tag{10}$$
+<div class="eq-note"><strong>逐符号</strong>：$J_s$＝光滑代价（squared derivatives 的积分）；$J_o$＝安全代价（到障碍距离的惩罚）；$J_g$＝目标代价；$\lambda_s,\lambda_o,\lambda_g$＝权重。<strong>代码对照</strong>：<code>loss_function.py</code> L107–111 实际算的是<strong>四项</strong>：<code>smoothness_weight*smoothness_cost + safety_weight*safety_cost + goal_weight*goal_cost + accele_weight*acceleration_cost</code>——重构版多了一个加速度代价项（$w_a=1.0$，对应 $\int_0^T a(t)^2dt$ 的二次型）。论文 (10) 只有三项，但论文对 $J_s$ 的文字是 “constrain the integral of <em>squared derivatives</em>”（复数），不排除把加速度也并进 $J_s$；按 Table II 的指标定义（integral of the squared jerk），本文把论文的 $J_s$ 解读为 jerk² 积分（与代码 <code>H</code> 矩阵一致），并把加速度项记为重构版新增。二者差异列入问题清单第 2 条。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(11)–(12) —— 固定/自由分解与光滑代价二次型（论文式号 (11)(12)）</span>
+$$A=M^{-1}C\begin{bmatrix}d_F\\ d_P\end{bmatrix} \tag{11}\qquad
+J_s=\begin{bmatrix}d_F\\ d_P\end{bmatrix}^{\!\top}C^{\top}M^{-\top}QM^{-1}C\begin{bmatrix}d_F\\ d_P\end{bmatrix} \tag{12}$$
+<div class="eq-note">式 (11) 已在第 4.2 节处理。式 (12) 的 $Q$ 矩阵是整个方法的“第一块积木”，下面独立推导。</div></div>
+<h4>7.1 $Q$ 矩阵的第一性原理推导（式 (12) 的核心）</h4>
+<p><strong>第 1 步：把光滑代价写成积分。</strong>$J_s=\sum_\mu\int_0^{T}(f_\mu^{(3)}(t))^2dt$。<strong>第 2 步：把积分搬到矩阵里。</strong>被积函数是标量：$J_s=\sum_\mu A_\mu^{\top}(\int_0^T T^{(3)}(t)^{\top}T^{(3)}(t)\,dt)A_\mu$，其中 $T^{(3)}(t)$ 是幂基向量 $T(t)=[1,t,\dots,t^n]$ 的三阶导，故 $J_s=\sum_\mu A_\mu^{\top}QA_\mu$。<strong>第 3 步：算出 $Q$ 的每个元素。</strong>由 (D1)，$T_i^{(3)}(t)=\frac{i!}{(i-3)!}t^{i-3}$（$i\ge3$；低次幂的三阶导为零）：</p>
+$$Q[i,j]=i(i-1)(i-2)\,j(j-1)(j-2)\int_0^T t^{i+j-6}dt
+=\frac{i(i-1)(i-2)\,j(j-1)(j-2)}{i+j-5}\,T^{\,i+j-5}\qquad(i,j\ge3)$$
+<p>对 $n=5$，$Q$ 的显式 6×6 形式（其余元素为零）：</p>
+$$Q=\begin{bmatrix}
+0&0&0&0&0&0\\ 0&0&0&0&0&0\\ 0&0&0&0&0&0\\
+0&0&0&36T&72T^2&120T^3\\
+0&0&0&72T^2&192T^3&360T^4\\
+0&0&0&120T^3&360T^4&720T^5
+\end{bmatrix}$$
+<p>例如 $Q[4,5]=4\cdot3\cdot2\cdot5\cdot4\cdot3\cdot T^{4+5-5}/(4)=360T^4$ ✓。$Q$ 只依赖 $T$，训练全程是常数；其元素量纲为 s$^{i+j-5}$（核对：$A_i$ [m/s$^i$]，$A_i Q_{ij} A_j$ 的量纲为 m/s$^i$·s$^{i+j-5}$·m/s$^j$=m²/s⁵ ✓）。<strong>代码交叉验证</strong>：<code>loss_function.py</code> L43–47 的 <code>H</code> 矩阵循环与上式逐元素一致（V2 <code>True</code>）；数值实例 $T=\tfrac{5}{3}$ s 时右下块为 $\begin{smallmatrix}60&200&555.56\\ 200&888.89&2777.78\\ 555.56&2777.78&9259.26\end{smallmatrix}$（V2 输出）。</p>
+<h4>7.2 式 (12) 的完整代换（三步代入）</h4>
+<p>① $A=M^{-1}C[d_F;d_P]$（式 (11)）；② 代入 $J_s=A^{\top}QA$ 得式 (12)：$J_s=[d_F;d_P]^{\top}C^{\top}M^{-\top}QM^{-1}C[d_F;d_P]$ ✓；③ 记 $B=C^{\top}M^{-\top}QM^{-1}C$ 并按块分划（式 (13)）：</p>
+$$J_s=\begin{bmatrix}d_F\\ d_P\end{bmatrix}^{\!\top}\begin{bmatrix}B_{FF}&B_{FP}\\ B_{PF}&B_{PP}\end{bmatrix}\begin{bmatrix}d_F\\ d_P\end{bmatrix} \tag{13}$$
+<p><strong>$B$ 的性质（本文补证）</strong>：$Q$ 对称（积分定义显然）⇒ $B$ 对称 ⇒ $B_{PF}=B_{FP}^{\top}$；且 $B$ 半正定，$B_{PP}$ <strong>正定</strong>（证明：$d_F=0$ 时 $J_s=d_P^{\top}B_{PP}d_P$ 是从静止状态飞到非零末端 $d_P$ 的 5 阶多项式 jerk² 积分；若 $d_P\ne0$ 多项式不恒为零 ⇒ jerk 不恒为零 ⇒ 积分 $&gt;0$）。数值验证 V3：<code>B symmetric: True</code>、<code>B_PF == B_FP^T: True</code>、<code>B_PP PD (eig>0): True</code>。</p>
+<h4>7.3 式 (14) 的雅可比：从二次型到梯度（分块求导，逐步写出）</h4>
+<p>论文原文：</p>
+$$\frac{\partial J_s}{\partial d_P}=2\,d_F^{\top}B_{FP}+2\,d_P^{\top}B_{PP} \tag{14}$$
+<p><strong>推导</strong>。把 (13) 展开成四项（$d_F$ 常数、$d_P$ 变量）：$J_s=d_F^{\top}B_{FF}d_F+d_F^{\top}B_{FP}d_P+d_P^{\top}B_{PF}d_F+d_P^{\top}B_{PP}d_P$。逐项求行梯度：第一项为零；第二项 $=d_F^{\top}B_{FP}$；第三项 $=(B_{PF}d_F)^{\top}=d_F^{\top}B_{FP}$（$B$ 对称）；第四项 $=2d_P^{\top}B_{PP}$。相加得式 (14) ✓。<strong>数值验证</strong>：随机 $d_F,d_P$，式 (14) 与中心差分逐位一致（V3）。<strong>列向量版本</strong>（供实现参考）：$(\partial J_s/\partial d_P)^{\top}=2B_{PF}d_F+2B_{PP}d_P$。</p>
+<div class="callout tip"><div class="callout-title">💡 论文没写但推导中“掉出来”的闭式最优末端</div><p>因为 $J_s$ 对 $d_P$ 是正定二次型，令式 (14) 为零得<strong>光滑代价的全局最优末端状态</strong> $d_P^{\star}=-B_{PP}^{-1}B_{PF}\,d_F$（V3 验证该点梯度为零）。也就是说：若只关心光滑性，最优轨迹<strong>有闭式解</strong>，根本不需要网络。网络存在的全部价值是把 $J_o$（依赖不可微、不可预测的 ESDF 地形）也纳进来——$J_s$ 让问题“凸一点”，$J_o$ 提供真实的非凸地形，$J_g$ 给方向，网络负责三者的非凸权衡。</p></div>
+<h4>7.4 权重与速度的幂律关系（代码有、论文无，但直接决定能否复现）</h4>
+<p><code>loss_function.py</code> L75–89 <code>denormalize_weight</code>：设速度整体缩放 $n$ 倍（时间缩 $1/n$，即 $T=2R/v_{\max}$ 的耦合）：</p>
+$$t\to t/n,\quad v\to nv,\quad a\to n^2a,\quad j\to n^3j
+\;\Longrightarrow\;
+\underbrace{\int_0^{T/n}(n^3j)^2\,dt}_{J_s}\sim n^5,\qquad
+\underbrace{\int_0^{T/n}(n^2a)^2dt}_{J_a}\sim n^3,\qquad
+\underbrace{\int_0^{T/n}c\,dt}_{J_o}\sim\frac1n,\qquad J_g\ \text{不变}$$
+<p>代码据此取 $w_s'=\lambda_s/n^5,\ w_a'=\lambda_a/n^3,\ w_c'=\lambda_c,\ w_g'=\lambda_g$（$\lambda_s=10,\lambda_a=1,\lambda_c=1,\lambda_g=0.15$，$n=v_{\max}^{\text{train}}=6$ ⇒ $w_s'=0.001286,\ w_a'=0.004630$，V7）。含义：把“单位速度”下标的权重换算成当前速度下等价权重，改 <code>velocity</code> 时四项代价相对强弱不变；这也解释了论文 $\lambda$ 与代码 $w$ 数值不可直接比较。</p>
+<hr>
+<h3>8. 公式 (15)–(17)：安全代价、ESDF 势函数与数值梯度</h3>
+<p>论文原文（第 4–5 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(15) —— 安全代价的时间积分离散化（论文式号 (15)）</span>
+$$J_o=\int_0^{T}c\big(p(t)\big)\,dt=\sum_{\kappa=0}^{T/\delta t}c\big(p(T_\kappa)\big)\,\delta t,\qquad T_\kappa=\kappa\,\delta t \tag{15}$$
+<div class="eq-note"><strong>逐符号</strong>：$c(p(t))$＝轨迹点处的势函数（式 (16)）；$\delta t$＝采样间隔；$T_\kappa=\kappa\delta t$。<strong>为什么时间积分而非线积分</strong>：线积分 $\int c\,ds=\int c\,|v|\,dt$ 让优化器可通过<strong>缩短轨迹长度</strong>降代价，与安全目标冲突；时间积分下 $T$ 固定，代价只度量“在危险区停留的时长”，飞行器倾向<strong>快速穿过</strong>而非绕远。<br><strong>⚠️ 两处离散化细节</strong>：① 论文求和上限 $T/\delta t$，共 $T/\delta t+1$ 点（<strong>含 $t=0$ 与 $t=T$ 两端</strong>）；标准 Riemann 和应为 $\kappa=0..T/\delta t-1$。代码 <code>safety_loss.py</code> L51–52 用 <code>linspace(dt, T, 30)</code>，恰好<strong>不含 $t=0$</strong>。② 代码把求和改成<strong>取均值</strong>（L65），与 $\sum c\,\delta t$ 差常数因子 $\delta t/T=1/30$：梯度方向一致、数值尺度不同，<strong>不可跨实现直接比数值</strong>。代码注释另明示：采样点过少会低估“快速穿过障碍”的代价。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(16) —— ESDF 势函数（论文式号 (16)）</span>
+$$c(d_t)=\exp\!\Big(-\frac{d_t-d_0}{k}\Big) \tag{16}$$
+<div class="eq-note"><strong>逐符号</strong>：$d_t$＝轨迹点到最近障碍的距离（ESDF 查询，m）；$d_0$＝安全裕度偏移；$k$＝衰减尺度。<strong>代码数值</strong>：$d_0=1.2$ m、$k=0.6$（<code>traj_opt.yaml</code> L31–32 的 <code>d0: 1.2, r: 0.6</code>——代码把这个参数叫 <code>r</code>，与式 (3) 的基元半径 <strong>撞名</strong>，问题清单第 7 条）。<strong>数值画像</strong>（V4）：$d=0$→$7.39$；$d=1.2$→$1$；$d=3$→$0.0498$；$d=6$→$3.3\times10^{-4}$。<strong>梯度推导</strong>：$\partial c/\partial d_t=-c/k$；链式得 $\nabla_p c=-(c/k)\,\nabla d$。ESDF 梯度 $\nabla d$ 可微处是<strong>单位向量、指向远离最近障碍</strong>，故 $\nabla_p c$ <strong>指向障碍</strong>、模长 $c/k$——梯度下降把轨迹推离障碍，且越贴障碍推力越大。这正是式 (17) 中 $\nabla_\mu c$ 的来源。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(17) —— 安全代价对自由末端的分量雅可比（论文式号 (17)）</span>
+$$\frac{\partial J_o}{\partial d_{P\mu}}=\sum_{\kappa=0}^{T/\delta t}\nabla_\mu c\big(p(T_\kappa)\big)\,T(T_\kappa)^{\top}\,L_P\,\delta t \tag{17}$$
+<div class="eq-note"><strong>记号澄清（提取文本易混，先声明）</strong>：论文此处 $T=\big[T_\kappa^{0},T_\kappa^{1},\dots,T_\kappa^{n}\big]^{\top}$ 是<strong>时刻 $T_\kappa$ 的幂基向量</strong>（$[1,t,t^2,\dots,t^n]$ 在 $t=T_\kappa$ 处的取值），与轨迹时长 $T$ 是同一个字母两种含义；$\nabla_\mu c$ 是势函数对 $\mu$ 轴位置分量的偏导（标量）。本文按下述推导解读。</div></div>
+<h4>8.1 式 (17) 的完整推导（链式法则两跳）</h4>
+<p><strong>第一跳：轨迹点如何依赖 $d_P$。</strong>$\mu$ 轴位置 $p_\mu(t)=T(t)\,A_\mu=T(t)\,M^{-1}C[d_F;d_P]$。对 $d_P$ 求偏导（$d_F$ 常数）：$\partial p_\mu(t)/\partial d_P=T(t)\,(M^{-1}C)_{\cdot,P}=T(t)\,L_P$，其中 $L_P$ 为 $M^{-1}C$ 的自由列块（第 4.2 节；$1\times6$ 行向量乘 $6\times3$ 矩阵得 $1\times3$ 行向量）。<strong>第二跳：势函数如何依赖轨迹点。</strong>$\partial c(p)/\partial p_\mu=\nabla_\mu c(p)$（标量）。合起来沿时间求和：</p>
+$$\frac{\partial J_o}{\partial d_{P\mu}}=\sum_{\kappa}\delta t\;\underbrace{\nabla_\mu c\big(p(T_\kappa)\big)}_{\text{1×1}}\;\underbrace{T(T_\kappa)^{\top}}_{\text{1×(n+1)}}\;\underbrace{L_P}_{\text{(n+1)×3}}
+\qquad\checkmark\ (17)$$
+<p><strong>维度核对</strong>：$(1\times1)(1\times6)(6\times3)=(1\times3)$，恰是 $\partial J_o/\partial d_P$ 的 $\mu$ 轴切片（整条雅可比 $1\times9$ 由三轴切片拼成）。<strong>物理直觉</strong>：$T(t)L_P$ 是“末端状态扰动如何改变曲线在 $t$ 时刻的位置”，$\nabla_\mu c$ 是“位置改变如何改变危险程度”，乘积沿时间累加即“整条轨迹的危险程度对末端状态的敏感度”。<strong>代码实现（等价但不同路径）</strong>：重构版不手写式 (17)，而是让 autograd 穿过整条计算图（<code>safety_loss.py</code>：系数 L108–116 → 采样点 L118–130 → ESDF 双线性插值 L89–102 → 势函数 L105–106）。ESDF 构建：点云体素化（0.2 m）+ <code>distance_transform_edt</code>（L218–223，障碍内距离取负——<strong>有符号</strong>距离场），查询用 <code>F.grid_sample</code> 双线性插值（可微）——即论文图 3 “Costs Evaluation &amp; Gradients Computation” 与图 6(c) 的实现实体。</p>
+<hr>
+<h3>9. 公式 (18)–(19)：目标代价与球面投影</h3>
+<p>论文原文（第 5 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(18)–(19) —— 目标代价及其梯度（论文式号 (18)(19)）</span>
+$$J_g=\big(d_{Pp}-g\big)^2 \tag{18}\qquad
+\frac{\partial J_g}{\partial d_{Pp}}=2\big(d_{Pp}-g\big) \tag{19}$$
+<div class="eq-note"><strong>逐符号</strong>：$d_{Pp}$＝自由块中的<strong>位置分量</strong>（末端位置 $p_T$）；$g$＝<strong>最终目标在以机体为球心、半径固定的球面上的投影</strong>（temporary goal）。<strong>推导</strong>：式 (19) 是式 (18) 的平凡导数；对速度/加速度分量的梯度为零，整块行雅可比为 $\partial J_g/\partial d_P=[\,2(d_{Pp}-g),\ \mathbf 0_{1\times6}\,]$。<strong>为什么投影到球面（论文说 for numerical stability，本文补量纲论证）</strong>：若直接用 50 m 外的真实目标，$J_g\sim2500$ m²，而 $J_s,J_o$ 量级在 $O(1)$（Table I 总代价 0.036–0.105 为证），相差三个数量级，$\lambda$ 权重形同虚设；投影后 $|d_{Pp}-g|\le 2R$、$J_g\le4R^2=100$ m²，量级可比。投影公式（补充式 (D2)）：$g=p_0+R_s\cdot\frac{g_{\text{goal}}-p_0}{\|g_{\text{goal}}-p_0\|}$。<strong>代码差异</strong>：重构版 <code>GuidanceLoss</code>（<code>loss/guidance_loss.py</code> L52–78）把式 (18) 换成<strong>方向相似度损失</strong>：<code>SmoothL1(‖g−p0‖, (pT−p0)·ĝ) + 0.5·‖(pT−p0)_⊥‖</code>；且“球面投影”改为<strong>在半径 $2R=10$ m 球内随机采样目标</strong>（<code>config.py</code> L11、<code>yopo_dataset.py</code> L126–136）。函数形式不相等，但都是“鼓励末端向目标方向延伸”的方向性惩罚（问题清单第 3 条）。</div></div>
+<hr>
+<h3>10. 公式 (20)：完整链式法则（“引导学习”的数学心脏，逐项展开）</h3>
+<p>论文原文（第 5 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(20) —— 从代价到网络输出的链式梯度（论文式号 (20)）</span>
+$$\frac{\partial J}{\partial y_\epsilon}=\frac{\partial J}{\partial d_P}\cdot\frac{\partial d_P}{\partial\Delta_\epsilon}\cdot\frac{\partial\Delta_\epsilon}{\partial y_\epsilon},\qquad
+\frac{\partial J}{\partial y_\varepsilon}=\frac{\partial J}{\partial d_P}\cdot\frac{\partial d_P}{\partial y_\varepsilon}
+\qquad(\epsilon\in\{\theta,\phi,r\},\ \varepsilon\in\{v,a\}) \tag{20}$$
+<div class="eq-note"><strong>逐符号</strong>：$y_\epsilon$＝偏移类输出（$\theta,\phi,r$ 三通道）；$y_\varepsilon$＝导数类输出（速度、加速度各 3 通道）；$\Delta_\epsilon$＝式 (8) 的偏移量；$d_P$＝末端状态（9 维）；$\partial J/\partial d_P=\lambda_s\partial J_s/\partial d_P+\lambda_o\partial J_o/\partial d_P+\lambda_g\partial J_g/\partial d_P$（式 (14)+(17)+(19) 的加权和，$1\times9$ 行向量）。</div></div>
+<h4>10.1 偏移支路：三级梯度逐项写开</h4>
+<p><strong>第三级（$\Delta_\epsilon\to y_\epsilon$，式 (8) 的导数）</strong>：$\partial\Delta_\epsilon/\partial y_\epsilon=d_\epsilon(1-\tanh^2 y_\epsilon)$（$\tanh$ 的导数，第 6.1 节数值表已给实例）。<strong>第二级（$d_P\to\Delta_\epsilon$）</strong>：只有 $d_P$ 的<strong>位置块</strong> $p'$ 依赖偏移（速度/加速度块不依赖），故 $\partial d_P/\partial\Delta_\epsilon$ 是 9 维列向量，非零部分为第 3.1 节的三个球坐标偏导（$\mathbf 0_6$ 为速度/加速度块）：</p>
+$$\frac{\partial d_P}{\partial\Delta r}=\begin{pmatrix}\cos\theta'\cos\phi'\\ \cos\theta'\sin\phi'\\ \sin\theta'\\ \mathbf 0_{6}\end{pmatrix},\quad
+\frac{\partial d_P}{\partial\Delta\phi}=r'\begin{pmatrix}-\cos\theta'\sin\phi'\\ \cos\theta'\cos\phi'\\ 0\\ \mathbf 0_{6}\end{pmatrix},\quad
+\frac{\partial d_P}{\partial\Delta\theta}=r'\begin{pmatrix}-\sin\theta'\cos\phi'\\ -\sin\theta'\sin\phi'\\ \cos\theta'\\ \mathbf 0_{6}\end{pmatrix}$$
+<p><strong>第一级（$J\to d_P$）</strong>：三项代价雅可比之和（$1\times9$）。把三级乘起来，以 $\theta$ 支路为例的<strong>完整标量形式</strong>：</p>
+$$\frac{\partial J}{\partial y_\theta}=\Big[\,g_p\cdot\big(-r'\sin\theta'\cos\phi',\ -r'\sin\theta'\sin\phi',\ r'\cos\theta'\big)\Big]\cdot d_\theta\big(1-\tanh^2 y_\theta\big)$$
+<p>其中 $g_p=\partial J/\partial p'$ 是总雅可比的位置块（$1\times3$ 行向量），方括号内是它与 $\partial p'/\partial\Delta\theta$ 的内积（标量）。$\phi$、$r$ 支路同构。所有子量均有闭式（V5 已验证球坐标偏导），整条链路上<strong>没有任何需要数值微分的地方</strong>——这就是论文说 “They can be easily calculated by substituting (4), (8), and (9)” 的含义。</p>
+<h4>10.2 导数支路（两级，无球坐标）</h4>
+<p>由式 (9)：$v=R_{ij}\tanh(y_v)\,v_{\max}$（逐分量），$d_P$ 的速度块就是 $v$，于是</p>
+$$\frac{\partial d_P}{\partial y_v}=R_{ij}\,v_{\max}\,\mathrm{diag}\big(1-\tanh^2 y_v\big),\qquad
+\frac{\partial J}{\partial y_v}=g_v^{\top}R_{ij}\,v_{\max}\big(1-\tanh^2 y_v\big)\ \ (1\times3)$$
+<p>（$g_v=\partial J/\partial v$ 为总雅可比的速度块。）加速度支路把 $v$ 换成 $a$、$v_{\max}$ 换成 $a_{\max}$。<strong>维度核对总表</strong>：偏移支路 $(1\times9)(9\times1)(1\times1)=$ 标量 ✓；导数支路 $(1\times3)(3\times3)=1\times3$ ✓。</p>
+<h4>10.3 与实现的等价性及“引导学习”的完整闭环</h4>
+<p>论文用<strong>手写梯度</strong>反传（Adam optimizer with the manually calculated gradients as guidance）；重构版改用 autograd 前向算 $J$ 后 <code>loss.backward()</code>（<code>yopo_trainer.py</code> L91–97）。两者数学等价，但论文版省去对 ESDF 查询的自动微分依赖（当年 <code>grid_sample</code> 可微 ESDF 不是现成的）。无论哪种实现，梯度流闭环是：</p>
+$$\underbrace{\nabla_{\!w}\,J}_{\text{权重更新}}=\frac{\partial J}{\partial y}\cdot\frac{\partial y}{\partial w}\quad\Longleftarrow\quad
+\underbrace{\frac{\partial J}{\partial y}}_{\text{式 (20) 手算/autograd}}\cdot\underbrace{\frac{\partial y}{\partial w}}_{\text{网络内部反传}}$$
+<p>这就是“guidance learning”与另两种范式的本质区别（论文图 2）：模仿学习用 $\nabla_w\|y-y^\star\|$（标签距离梯度），RL 用 $\nabla_w\log\pi\cdot A$（采样回报梯度），本文用 $\nabla_w J$（<strong>真实代价地形的解析/数值梯度</strong>）。代价函数与经典优化器（专家 [6]）完全相同，只是“对谁求导”变了：专家对 $d_P$ 迭代 50 步，网络对 $w$ 一步到位。</p>
+<hr>
+<h3>11. 公式 (21) 与分数监督——含一处论文符号矛盾（重要）</h3>
+<p>论文原文（第 5 页）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(21) —— 分数输出的 SmoothL1 监督（论文式号 (21)）</span>
+$$L=\mathrm{SmoothL1}\big(y_s,\ -J\big) \tag{21}$$
+<div class="eq-note"><strong>逐符号</strong>：$y_s$＝网络预测的分数；$-J$＝特权信息算出的总代价取负（论文约定“分数越高越好”）；$\mathrm{SmoothL1}(z)=0.5z^2\ (|z|&lt;1)$，$|z|-0.5$（其他）。<strong>分数的角色</strong>：推理时没有 ESDF，$J$ 不可计算，但选择最优轨迹必须排序——所以网络必须额外学一个“代价的代理”$y_s$（论文：It is analytic and can be automatically derived by the deep learning frameworks，即这一路是普通监督损失，不需要手写梯度）。</div></div>
+<div class="callout warn"><div class="callout-title">⚠️ 符号矛盾：式 (21) 的 $-J$ 与阈值 0.04 不可能同时自洽</div><p><strong>论证</strong>：三项代价均非负——$J_s$ 是二次型（式 (12)）、$J_o$ 是指数势函数积分（式 (15)(16)）、$J_g$ 是平方（式 (18)），故 $J\ge0$ 恒成立 ⇒ 分数 $-J\le0$ 恒成立。而论文又说 “only the end-states whose <strong>scores are greater than the threshold</strong> are trained”，阈值 0.04。要求 $-J&gt;0.04$ 等价于 $J&lt;-0.04$，<strong>无解</strong>——照字面理解，任何轨迹都不会被训练末端状态。Table I 的所有 cost 都是正值（0.036–0.105），进一步确认 $J&gt;0$。因此“score = −J”与“分数大于阈值才训练”必有一处符号写反。<strong>最可能的修复</strong>：分数应定义为 $+J$（越低越好），只对 $J&gt;0.04$ 的“差轨迹”做末端状态回归——与论文“避免负轨迹影响”的动机吻合。<strong>重构版代码正是如此且自洽</strong>：<code>yopo_network.py</code> L39 <code>softplus</code>（非负）、<code>yopo_trainer.py</code> L174–175 <code>score_label = (...).detach()</code>（即 $+J$）、推理 <code>test_yopo_ros.py</code> L248 <code>np.argmin(score)</code>。另注：重构版对<strong>全部 15 条</strong>末端状态取均值损失（<code>yopo_trainer.py</code> L172），未实现论文的阈值筛选——属“论文承诺、本分支未实现”。</p></div>
+<hr>
+<h3>12. 网络前向链（无编号式 (D3)–(D9)，一次前向的完整数学）</h3>
+<p>论文 §II-A.2 用文字描述了网络（无编号公式），本文把它形式化。输入：深度图 $I\in[0,1]^{1\times96\times160}$（原始 0–20 m 裁剪归一，实机 D455 16:9 缩放至 160×96）+ 观测 $o=[v,a,\hat g]^\top\in\mathbb R^{9}$（体轴系速度、加速度、目标方向单位向量）。</p>
+<div class="formula-block"><span class="eq-tag">(D3) 状态归一化与基元系变换</span>
+$$o_n=\Big[\tfrac{v}{v_{\max}};\ \tfrac{a}{a_{\max}};\ \hat g\Big],\qquad
+o'_{ij}=R_{ij}^{\top}\,o_n\quad(\text{三组向量同时旋转})$$
+<div class="eq-note">代码：<code>state_transform.py</code> L130–137 <code>normalize_obs</code>（目标方向 clamp 到最小长度 <code>goal_length=10</code> m 再单位化）、L105 <code>prepare_input</code>（<code>obs @ Rbp</code>，行向量约定）。$o'_{ij}$ 拼成 $9\times3\times5$ 特征图与深度特征拼接。</div></div>
+<div class="formula-block"><span class="eq-tag">(D4)–(D6) 骨干、拼接与检测头</span>
+$$F=\mathrm{ResNet18}_{1\to64}(I)\in\mathbb R^{64\times3\times5}\ \Rightarrow\ X=\mathrm{cat}(F,\ o')\in\mathbb R^{73\times3\times5}\ \Rightarrow\ Y=\mathrm{Head}(X)\in\mathbb R^{10\times3\times5}$$
+<div class="eq-note"><strong>维度账（本文核算）</strong>：输入 96×160，ResNet-18 五个阶段总下采样 32 ⇒ 特征图 3×5，与基元网格严格对齐——论文说下采样因子 32 时配 96×96 与 3×3 网格，即“下采样倍数 = 图像边长 ÷ 基元数”是硬约束。代码 <code>models/backbone.py</code> L8–16：conv1 改单通道 + 输出层 1×1 卷积 512→64；<code>models/head.py</code> L4–13：1×1 卷积 73→256→256→10（ReLU），共享权重——即论文的 fully convolutional header with shared weights。$Y$ 的 10 通道 = 3 偏移 + 3 速度 + 3 加速度 + 1 分数（$M_d=10$，论文与代码 <code>output_dim=10</code> 计数一致 ✓）。</div></div>
+<div class="formula-block"><span class="eq-tag">(D7)–(D8) 激活与后处理（前向的最后一跳）</span>
+$$y_{1:9}=\tanh(Y_{1:9}),\qquad y_s=\mathrm{softplus}(Y_{10})\quad\Rightarrow\quad
+\Delta\theta=\tanh(y_\theta)d_\theta,\ \ \Delta\phi=\tanh(y_\phi)d_\phi,\ \ r'=R\big(1+\tanh(y_r)\big)$$
+$$v=R_{ij}\tanh(y_v)\,v_{\max},\qquad a=R_{ij}\tanh(y_a)\,a_{\max}$$
+<div class="eq-note">代码：<code>yopo_network.py</code> L38–39；<code>state_transform.py</code> L38–54。分数用 <code>softplus</code>（非负）而非 tanh——与第 11 节“分数=+J”的自洽实现配套。<strong>一次前向的产物</strong>：15 组末端状态 $d_P^{ij}$（式 (4)+(9)）+ 15 个分数 $y_s^{ij}$；随后 $\arg\min$ 分数选一条，代入式 (5) 闭式解出多项式（<code>Poly5Solver</code>）。</div></div>
+<p><strong>(D9) 执行参数核算</strong>：论文“2 s time window at 15 Hz ⇒ only 1/30 of the trajectory is executed”——$2\,\text{s}\times15\,\text{Hz}=30$，每帧执行 $T/30\approx0.067$ s 后重规划，保证对突发障碍的反应时间上界。参考轨迹以 50 Hz 离散成 $(p,v,a,\psi,\dot\psi)$ 送几何控制器（代码 <code>ctrl_dt=0.02</code>）。重构版 $T=2R/v_{\max}\approx1.667$ s、深度 30–33 Hz（<code>Simulator/src/config/config.yaml</code> <code>depth_fps: 33</code>），执行比例同样约 1/30。</p>
+<hr>
+<h3>13. 训练与推理流程逐行解读（论文无算法盒，本文重建伪代码）</h3>
+<h4>13.1 训练流程（引导学习 + 特权学习，§II-B 重建）</h4>
+<pre class="code-block"><code>算法 T（YOPO 训练，重建自论文 §II-B + 代码 YOPO/）
+输入: 预采集数据集 D = {(I_k, p_k, R_k)} (100K 样本, Flightmare 随机重置位姿, 含点云)
+1.  构建特权 ESDF (训练期可用, 推理期不可用)                    ▸ safety_loss.py L191-239
+2.  for epoch = 1..50:
+3.    for (I, p, R) in D (batch=16):
+4.      随机重采样 v,a (lognormal vx) 与目标 g (半径 2R=10m 球内)  ▸ yopo_dataset.py L109-136
+5.      o = 体轴化(v,a,ĝ);  o' = 基元系变换(式 7)              ▸ state_transform.py L105, L130-137
+6.      (y_1:9, y_s) = Network(I, o')   (式 D3-D7, 15 组并行)   ▸ yopo_network.py L38-39
+7.      后处理: dP = (式 4, 8, 9) → 体轴 → 世界系               ▸ state_transform.py L38-59
+8.      J = w_s'Js + w_c Jo + w_g Jg + w_a'Ja  (式 10, 代码 4 项) ▸ loss_function.py L107-111
+9.      轨迹损失 = mean(J);  backprop (autograd ≡ 式 14+17+19+20) ▸ yopo_trainer.py L171-172, L96
+10.     分数损失 = SmoothL1(y_s, J.detach())  (式 21, 重构版 +J)  ▸ yopo_trainer.py L174-175
+11.     总损失 = 1.0×轨迹损失 + 1.0×分数损失;  AdamW(lr=1.5e-4)   ▸ train_yopo.py L36-44
+12. (论文另用 DAgger 数据聚合微调; YOPO-Simple 分支未见实现)</code></pre>
+<p><strong>逐行要点</strong>：第 4 行“对同一深度样本重采样状态与目标”是论文强调的数据增广（expert-free … without requiring re-annotation）；第 8–9 行是“引导学习”本体——代价里的一切（ESDF、多项式、势函数）都在训练图上，梯度一路回到 $w$；第 10 行 <code>detach()</code> 保证分数损失不通过标签 $J$ 反向影响轨迹分支。训练超参论文与代码一致：50 epoch、batch 16、lr $1.5\times10^{-4}$（<code>train_yopo.py</code> L37–45）；重构版另设 <code>max_grad_norm=0.1</code>。论文的“阈值 0.04 筛选”见第 11 节（本分支未实现）。</p>
+<h4>13.2 推理流程（§II-A 末 + §III 重建）</h4>
+<pre class="code-block"><code>算法 I（YOPO 推理，重建自论文 §II-A + 代码 test_yopo_ros.py）
+输入: 深度帧 (16:9), 里程计状态, 目标点
+1.  深度预处理: 裁剪[0.04,20]m → 归一化 → 无效值插补         ▸ test_yopo_ros.py L150-165
+2.  状态归一化 + 基元系变换 (式 D3)                            ▸ process_odom L124-142
+3.  一次前向: 15 组 (dP, y_s) 并行 (式 D4-D8)                  ▸ callback_depth L180
+4.  k* = argmin(y_s);  只解第 k* 条多项式 (式 5 闭式)          ▸ L191-200, L247-251
+5.  ctrl_dt=0.02s 定时器: 采样 (p,v,a) + 计算 yaw               ▸ control_pub L208-241
+6.  yaw = f(速度方向, 目标方向) (论文: 角平分线)               ▸ poly_solver.py calculate_yaw L65-89
+7.  发布 PositionCommand → SE(3) 几何控制器 [14]               ▸ ctrl_pub / SO3Control.cpp
+8.  执行约 T/30 后新深度帧到达 → 回到第 1 步 (15 Hz 重规划)</code></pre>
+<p><strong>yaw 的论文/代码差异（诚实标注）</strong>：论文写 “the heading angle (i.e., yaw) is defined as the <strong>bisector</strong> of the current velocity and goal directions”，数学上是 $\hat v+\hat g$ 归一化后的方向：$\psi^\star=\mathrm{atan2}(\hat v_y+\hat g_y,\ \hat v_x+\hat g_x)$。代码 <code>calculate_yaw</code>（<code>poly_solver.py</code> L65–89）是<strong>自适应加权</strong>版本：$\hat v+w\,\hat g$，$w=\tfrac{6}{\pi}|\Delta\psi|$（目标方向权重随偏差线性增大，30° 时 $w=1$ 与角平分线一致），且偏航角速率限幅 $0.5\pi$ rad/s（<code>max_yaw_rate=0.5</code>），避免相机朝向突变。小偏差下两者接近、大偏差下代码更激进地转向目标。</p>
+<hr>
+<h3>14. 与经典两阶段管线的数学对应（“单阶段”到底折叠了什么）</h3>
+<table><tr><th>经典模块（论文图 3 左栏）</th><th>经典数学对象</th><th>YOPO 的对应物</th><th>关键公式/代码</th></tr><tr><td>① 感知与建图</td><td>TSDF/占据栅格 → ESDF 增量更新</td><td>训练期特权 ESDF（真值点云离线构建）；推理期<strong>不建图</strong>，深度直接进网络</td><td>(16)；<code>safety_loss.py</code> L191–239</td></tr><tr><td>② 前端路径搜索</td><td>图搜索（A*/Hybrid A*/拓扑搜索 [3][4]）给出多条初始路径</td><td>$M_\phi\times M_\theta$ 个球坐标锚点（离散覆盖可见空间）</td><td>(3)；<code>primitive.py</code> L62–81</td></tr><tr><td>③ 后端轨迹优化</td><td>$\min_{d_P}J(d_P)$ 数值优化（[6] 用 ESDF 梯度对 waypoint/控制点迭代）</td><td>网络一次前向直接回归“优化后的末端状态”，梯度在学习期经 (20) 灌进权重</td><td>(14)(17)(19)(20)；<code>loss_function.py</code></td></tr><tr><td>④ 轨迹参数化</td><td>分段多项式（MINCO [15]）或 B 样条控制点</td><td>单段 5 阶多项式 + 边界值闭式解（Hermite 基）</td><td>(1)(5)；<code>poly_solver.py</code></td></tr><tr><td>⑤ 执行层</td><td>SE(3) 几何控制 [14]</td><td>同款（论文原文引用 [14]）</td><td><code>SO3Control.cpp</code> L70–73</td></tr></table>
+<p><strong>对应关系的数学表述</strong>。经典后端的一步梯度下降：$d_P^{(k+1)}=d_P^{(k)}-\eta\,\partial J/\partial d_P^{(k)}$（专家每次规划迭代 50 步，Table I 的 30 ms 即来自此循环）。YOPO 把它变成函数回归：网络学习 $\Phi_w:\ (I,o)\mapsto \hat d_P$，使 $\hat d_P\approx\arg\min_{d_P}J(d_P;I)$，训练信号正是 $\partial J/\partial d_P$ 在每个锚点处的值。于是推理成本从“50 次梯度查询”降为“1 次前向”——Table I 中 30 ms→1.6 ms 的数学根源；网络平均代价 0.050 优于专家 0.078 的原因也在第 10.3 节：网络见过 10 万张深度图的<strong>梯度场</strong>，学的是“这片地形长什么样”，专家只有当前观测的局部地形。</p>
+<hr>
+<h3>15. 真机部署设置核算（§III-C + 代码）</h3>
+<ul><li><strong>平台</strong>：250 mm 轴距、1.13 kg；计算单元 NVIDIA Xavier NX（6 核 ARM + 384 CUDA cores），TensorRT 后推理约 16 ms（论文）；README 另称 Orin NX 上 ResNet-14 约 1 ms / ResNet-18 约 5 ms（模型与硬件代际不同）。</li><li><strong>传感器</strong>：RealSense D455，FOV $87°\times58°$、量程约 6 m，16:9 ⇒ 缩放到 160×96；训练相机 FOV 取 90°×60°，与 D455 接近但<strong>不完全相等</strong>（论文未讨论该 mismatch）。</li><li><strong>状态估计与跟踪</strong>：VINS-Fusion；几何控制器 [14]：力指令 $f=m\,g\,e_3+K_x(p_d-p)+K_v(v_d-v)+m\,a_d$（<code>SO3Control.cpp</code> L70–73；<code>gains.yaml</code> pos {5,5,15}、vel {5,5,5}；姿态角限幅 45°）。</li><li><strong>频率链</strong>：深度 30–33 Hz → 规划约 15 Hz（执行 T/30）→ 参考下发 50 Hz（<code>ctrl_dt=0.02</code>）→ 控制器执行。实测最大速度 5.52 m/s（Fig. 10），训练 $v_{\max}=6$ m/s 覆盖。</li><li><strong>环境</strong>：密林 1/10 树/m²、树径约 0.25 m、训练时从未见过。深度单位：仿真 32FC1（m）、实机 16UC1（mm），代码 <code>test_yopo_ros.py</code> L150–153 分编码处理。</li></ul>
+<hr>
+<h3>16. 交叉验证总表与问题清单</h3>
+<h4>16.1 论文公式 ↔ 代码 ↔ 独立数值验证 总表</h4>
+<table><tr><th>论文</th><th>代码位置（<code>1.Paper/YOPO/YOPO/</code> 下）</th><th>独立验证</th></tr><tr><td>(1)(2) 多项式</td><td><code>policy/poly_solver.py</code> L34–37（5 阶求值链）</td><td>✅ 与 (D1) 逐项一致</td></tr><tr><td>(3) 锚点</td><td><code>policy/primitive.py</code> L50–81</td><td>✅ 角度核算 V8 一致（±36°,±18°,0 / ±20°,0）</td></tr><tr><td>(4) 精修末端</td><td><code>policy/state_transform.py</code> L38–46</td><td>✅ 球坐标偏导 V5 有限差分一致</td></tr><tr><td>(5) $A=M^{-1}d$</td><td><code>policy/poly_solver.py</code> L9–15；<code>loss/loss_function.py</code> L37–41</td><td>✅ <code>Coef_inv==inv(M): True</code>；代码 A = 行置换版 M（V1b）</td></tr><tr><td>(6)(7) 旋转/变换</td><td><code>policy/primitive.py</code> L76–77；<code>state_transform.py</code> L105</td><td>✅ $R_{ij}e_x$ = 锚点方向（§5.1 手推）</td></tr><tr><td>(8)(9) tanh 限幅</td><td><code>policy/yopo_network.py</code> L38；<code>state_transform.py</code> L38–40, L49–54</td><td>✅ V6 尺度核算；$r'\in(0,2R)$</td></tr><tr><td>(10) 总代价</td><td><code>loss/loss_function.py</code> L107–111</td><td>⚠️ 代码 4 项（多加速度项）</td></tr><tr><td>(11) $C$ 矩阵</td><td><code>loss/loss_function.py</code> L57–73</td><td>⚠️ 代码为交错排列，与概念分块差置换（V1b）</td></tr><tr><td>(12) $Q$ 核</td><td><code>loss/loss_function.py</code> L43–47（H）</td><td>✅ 积分独立推导逐项一致（V2）</td></tr><tr><td>(13) $B$ 分块</td><td><code>loss/loss_function.py</code> L69（<code>_R_Jerk</code>）</td><td>✅ $B$ 对称、$B_{PP}\succ0$（V3）</td></tr><tr><td>(14) $\partial J_s/\partial d_P$</td><td>autograd（未手写）</td><td>✅ 式 (14) vs 有限差分 <code>True</code>（V3）</td></tr><tr><td>(15) 安全积分</td><td><code>loss/safety_loss.py</code> L51–65</td><td>⚠️ 求和限/端点/均值化与论文不同（§8）</td></tr><tr><td>(16) 势函数</td><td><code>loss/safety_loss.py</code> L105–106</td><td>✅ 形式一致；$d_0=1.2$、$k=0.6$；梯度 V4 一致</td></tr><tr><td>(17) $\partial J_o/\partial d_P$</td><td>autograd（<code>grid_sample</code> 可微链）</td><td>✅ 链式展开维度核对一致（§8.1）</td></tr><tr><td>(18)(19) 目标代价</td><td><code>loss/guidance_loss.py</code> L52–78</td><td>⚠️ 代码改方向相似度，非同一函数</td></tr><tr><td>(20) 链式法则</td><td>autograd（<code>yopo_trainer.py</code> L96）</td><td>✅ 逐项展开 + 维度核对（§10）</td></tr><tr><td>(21) 分数监督</td><td><code>yopo_trainer.py</code> L174–175（label=+J）；<code>yopo_network.py</code> L39（softplus）</td><td>❌ 论文 $-J$ 与阈值 0.04 不自洽；代码为自洽 +J 版本（§11）</td></tr><tr><td>(D1)–(D9) 前向链</td><td><code>yopo_network.py</code>、<code>models/backbone.py</code>、<code>models/head.py</code></td><td>✅ $M_d=10$、3×5 对齐、下采样 32 核算一致</td></tr></table>
+<h4>16.2 论文问题清单（按严重程度）</h4>
+<ol>
+<li><strong>【符号矛盾】式 (21) 的 score = −J 与阈值 0.04 的筛选语义不可能同时成立</strong>（第 11 节）：$J\ge0$ 恒成立 ⇒ $-J\le0$，任何轨迹都无法满足“分数大于 0.04”。推断符号写反（应为 +J）；重构版代码实现的是自洽的 +J 版本，且该分支没有实现阈值筛选。</li>
+<li><strong>【描述与实现不符】式 (10) 三项 vs 代码四项</strong>：重构版多出加速度代价 $w_a=1.0$（$\int a^2dt$ 二次型，<code>loss_function.py</code> L49–53, L111）并做 $n^3$ 幂律反归一化；论文 $J_s$ 文字写“squared derivatives”（复数）可勉强涵盖，但式 (12) 只有一个 $Q$，未明示第二项。</li>
+<li><strong>【描述与实现不符】式 (18)(19)</strong>：论文 $J_g=(d_{Pp}-g)^2$、$g$ 为“最终目标在固定半径球面的投影”；代码是方向相似度损失（平行投影差 + 0.5×垂直偏差）且“投影”改为“在半径 10 m 球内采样目标”。函数不相等，物理含义相近。</li>
+<li><strong>【离散化不一致】式 (15)</strong>：论文求和 $\kappa=0..T/\delta t$（含两端，$T/\delta t+1$ 点）；代码 30 点采样不含 $t=0$ 且取均值（差常数因子 $\delta t/T$）。照论文字面实现的数值与代码不具可比性。</li>
+<li><strong>【数值不一致】执行时间 $T$</strong>：论文固定 2 s（15 Hz ⇒ 1/30）；重构版 $T=2R/v_{\max}=1.667$ s 且随测试速度缩放（<code>config.py</code> L12）。README 声明 main 分支与论文一致，本文以本地分支为准。</li>
+<li><strong>【关键数值论文未给】</strong>$\lambda_s,\lambda_o,\lambda_g,d_0,k,d_\theta,d_\phi,d_r,v_{\max},a_{\max},\delta t$ 全部无数值，只能从代码反查（ws=10, wa=1, wc=1, wg=0.15, d0=1.2, k=0.6, 15°/15°/5 m, 6/6, T/30）。论文实验（Table I 代价数值）无法凭论文独立复现。</li>
+<li><strong>【符号冲突】代码安全参数 <code>r=0.6</code></strong>（势函数衰减尺度 $k$）与式 (3) 的基元半径 $r$ 同名不同义。</li>
+<li><strong>【描述不精确】“uniformly sampled within the FOV”</strong> 实为角度均匀采样（球面密度不均匀）；另相机 FOV 90°×60° 与实机 D455 87°×58° 不严格相等，论文未讨论。</li>
+<li><strong>【描述不精确】yaw “bisector”</strong>：代码为自适应加权 $\hat v+\tfrac{6|\Delta\psi|}{\pi}\hat g$ 并限幅偏航角速率 $0.5\pi$ rad/s，仅在 30° 偏差处与角平分线一致。</li>
+<li><strong>【论文承诺、本分支未实现】</strong>：① 训练阈值 0.04 筛选（第 1 条已述）；② DAgger 数据聚合微调；③ 深度插补论文写 nearest-neighbor，代码用 <code>cv2.inpaint</code>（Navier-Stokes，radius 1）。</li>
+<li><strong>【提取/印刷疑点，待人工复核 PDF 第 4–5 页】</strong>：式 (17) 中 $\nabla_\mu c$ 与幂基向量 $T=[T_\kappa^0,\dots,T_\kappa^n]^\top$ 的记号（转置归属）；式 (15) 求和上限；式 (20) 两支路写法。本文已按“与维度核算一致”的读法解读。</li>
+<li><strong>【无算法盒】</strong>：论文没有编号伪代码，训练/推理细节散落在 §II-A 末段、§II-B2 与 §III 正文中，本文第 13 节已重建（含每行对应公式号与代码行号）。</li>
+</ol>
+<hr>
+<h3>17. 验证材料清单</h3>
+<ul>
+<li><code>_derivation_work/yopo/fulltext.txt</code>：PDF 全文文本抽取（UTF-8，按页标记），本文所有公式原文出处。</li>
+<li><code>_derivation_work/yopo/pages/page-001..008.png</code>：页面图像（本模型不可读，已在上方 callout 声明；供人工复核公式渲染）。</li>
+<li><code>_derivation_work/yopo/verify_yopo_eqs.py</code>：本节全部数值验证脚本（只依赖 numpy，可复跑）。输出摘要：</li>
+</ul>
+<pre class="code-block"><code>V1  Coef_inv == inv(M): True            # 闭式逆 = 数值逆 (式 5)
+V1b qp_generation A == Ct @ M: True     # 代码映射矩阵 = M 的行置换 (式 11)
+V2  Q jerk^2 矩阵与积分解析式一致: True  # (式 12)
+V3  B symmetric / B_PF==B_FP^T / B_PP PD / Eq(14) vs 有限差分: True (式 13/14)
+V4  c(d) 数值画像与解析梯度 vs 有限差分: True (式 16)
+V5  dp'/dθ, dp'/dφ, dp'/dr vs 有限差分: True (式 20 第二级)
+V6  tanh 尺度表 / r' 范围 [0,10] m      (式 8)
+V7  w_s'=0.001286, w_a'=0.004630        (权重幂律)
+V8  锚点角分辨率 18°/20°, 偏移上限 15° > 网格半角 9°/10° (式 3/8)</code></pre>
+<ul><li>本地代码仓库 <code>1.Paper/YOPO/</code>（YOPO-Simple 分支，commit <code>bd8a7f9</code>）：本文所有「代码位置」引用的实体，关键文件见 16.1 表。</li></ul>
 </section>
 
 <footer>📄 Paper Notes · TJU Aerial Robotics Lab · IEEE Robotics and Automation Letters (RA-L) 2024 · YOPO — You Only Plan Once: A Learning-Based One-Stage Planner With Guidance Learning · MathJax + Mermaid Rendering</footer>

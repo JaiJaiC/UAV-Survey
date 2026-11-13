@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">Potential Flaw</a>
   <a href="#motivation">Motivation</a>
   <a href="#takeaway">Takeaways</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -1024,6 +1028,571 @@ flowchart LR
     <tr><td>Vrba et al. (2025) — On onboard LiDAR-based flying object detection. <em>IEEE T-RO</em> 41:593–611；Pliska et al. (2024) — Towards safe mid-air drone interception. <em>IEEE RA-L</em> 9(10):8810–8817</td><td>主动传感路线的代表作。理解「为什么本文坚持被动视觉」需要知道 LiDAR 路线的成本、重量与<strong>可被探测</strong>这三个约束。也是「反无人机」系统级设计的参考。</td></tr>
     <tr><td>本项目代码：<a href="https://github.com/rislab/catchrl" target="_blank">github.com/rislab/catchrl</a></td><td>论文声称的开源实现（PyTorch 并行仿真 + APG 训练 + 轨迹生成）。想复现「图 7 的 30% 差距」或改观测（加张角/角速率），从这里入手最快。建议先读轨迹生成（Algorithm 1）与动力学模块，再读训练循环。</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+
+<div class="callout info">
+<p><strong>对象</strong>：arXiv:2607.02472v1（2026-07-02）正文 §3「Methodology」与附录 A.1–A.4。 <strong>公式范围</strong>：论文全部 16 个编号公式——式 (1)–(4)（正文第 4 页，可微四旋翼动力学）、式 (5)–(9)（第 4–5 页，目标函数）、式 (10)–(15)（附录 A.1，第 12–13 页，入侵者轨迹族与可行性判据）、式 (16)（附录 A.2，超参搜索目标）——以及 <strong>Algorithm 1</strong>（第 13 页，可行轨迹池生成）。论文有名字但<strong>没有印出公式</strong>的核心组件（二次推力模型、混控矩阵、PD 姿态控制器、点质量 PMD 模型、BPTT/伴随梯度流、RK4 雅可比）在 §6、§7、§14、§15 以「补充式 (D1)–(D8)」严格化。<strong>方法</strong>：本文不复述论文文字，而是：</p>
+<ol>
+<li>从牛顿第二定律、角动量定理、四元数代数、链式法则、曲线微分几何等第一性原理<strong>独立重推</strong>每个公式，写出中间步骤；</li>
+<li>用论文自身给出的参数（Table 2–6：质量、惯量、推力上限、时间常数、增益、权重）<strong>代入数值核算</strong>，检验公式之间、公式与正文论断之间是否自洽；</li>
+<li>明确标出<strong>印刷错误、单位问题、缺失参数、量纲不闭合、推导跳跃</strong>之处（见 §16.2 问题清单），不替论文圆场。</li>
+</ol>
+<div class="callout warn"><div class="callout-title">⚠️ 诚实声明：图像无法读取，公式源自文本提取的多重互证</div>本模型的当前后端<strong>不支持图像输入</strong>，page-001…017.png 无法直接核对公式渲染。本文所有「论文原文」均来自 <code>_derivation_work\intruder\fulltext.txt</code> 的文本抽取，并经（a）同一公式在正文不同位置的重复出现、（b）上下文语义、（c）数值核算三路互证。文本抽取质量良好（公式结构完整、下标清晰），但<strong>建议人工复核以下页面</strong>：第 4 页（式 (1)–(4) 的矩阵/上下标）、第 5 页（式 (6)–(9) 的 $\hat v_{rel}$ 是否戴帽）、第 12–13 页（式 (10)–(15) 的 $\lVert c(s)\rVert$ 指数、式 (13) 的 $N_m$）、第 16–17 页（Table 2–6 数值，尤其 Table 6 的 RPM 单位与 Table 3 的 $g_{max}$）。</div>
+</div>
+<hr>
+
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>逐式核对结论</th></tr>
+<tr><td>(1)</td><td>位置/速度动力学（刚体 + 阻力 + 重力）</td><td>✅ 牛顿第二定律直推成立；⚠️ 阻力 $d(v)$ 放在 $R_{wb}(\cdot)$ 内的帧约定有歧义（§2.3）</td></tr>
+<tr><td>(2)</td><td>四元数运动学 + 欧拉方程</td><td>✅ 推导成立；⚠️ 四元数乘法约定（Hamilton/JPL）未声明（§3.1）</td></tr>
+<tr><td>(3)</td><td>二次 + 线性复合阻力</td><td>✅ 形式标准；⚠️ $k_{d,1}=0.1$ 比典型值偏大 2–3 倍（§4.3）</td></tr>
+<tr><td>(4)</td><td>转子一阶延迟</td><td>✅ 解析解与离散化核算一致（每控制步响应 66%）；⚠️ Table 6 RPM「rev/s」疑为 rev/min（§5.3）</td></tr>
+<tr><td>(5)</td><td>六项加权损失</td><td>✅ 尺度不变性论证成立；⚠️ $\lambda_{close}$ vs $\lambda_{closing}$ 命名不一、$v_{des}$ 全文未给值（§8）</td></tr>
+<tr><td>(6)</td><td>$L_{align}=\lVert \hat d\times\hat v_{rel}\rVert=\sin\angle$</td><td>✅ 叉积-正弦恒等式成立；与 $\dot\lambda$ 的关系推导成立；⚠️ $v_{rel}\to 0$ 奇异（§9.2）</td></tr>
+<tr><td>(7)</td><td>$L_{close}=-\hat d^\top v_{rel}$</td><td>✅ $L_{close}=-\dot\rho$ 恒等成立，符号约定正确（§9.3）</td></tr>
+<tr><td>(8)</td><td>加速度/jerk/限速正则</td><td>✅ 形式标准；⚠️ $j_t$ 的离散定义、$v_{des}$ 未印明（§10.1）</td></tr>
+<tr><td>(9)</td><td>偏航对准 $L_{yaw}$</td><td>✅ 推导出 $L_{yaw}=-\lVert\hat d_{xy}\rVert\cos(\psi-\psi_{los})$，物理正确（§10.2）</td></tr>
+<tr><td>(10)</td><td>入侵者参数曲线族</td><td>✅ 与 Table 1 三族一致；⚠️ Table 1 只写 $(\phi,\theta)$ 而 Table 4 写 rpy，是否含偏航含糊（§11.1）</td></tr>
+<tr><td>(11)</td><td>$a_{net}=\frac{T_c}{m}b-g\hat z$</td><td>✅ 由式 (1) 置 $d=0$ 直接推出，两处自洽（§11.5）</td></tr>
+<tr><td>(12)</td><td>可行性双判据</td><td>✅ 从推力可达集 $\{Ab-g\hat z: 0\le A\le A_{max}, b_z\ge0\}$ 推出（§11.5）</td></tr>
+<tr><td>(13)</td><td>$A_{max}=\eta N_m F_m/m$</td><td>✅ 核算：2.65 kg→15.9 m/s²、1.0 kg→42.1 m/s²；⚠️ 与「推重比 2.7」的关系有歧义（§11.5）</td></tr>
+<tr><td>(14)</td><td>逐点可行性 + 下降余量</td><td>✅ 推导成立；$\beta=0.6$ ⟺ 推力 z 分量 $\ge 0.4g$（§11.6）</td></tr>
+<tr><td>(15)</td><td>恒速曲线的加速度 $a(s)$</td><td>✅ 两次链式求导逐步重推逐项一致；$a\perp v$ 校验通过（§11.3）</td></tr>
+<tr><td>(16)</td><td>$J=300(1-\text{SR})+L_{p99}$</td><td>✅ 「先成功率后时间」的优先级逻辑核算成立（§13）</td></tr>
+<tr><td>算法 1</td><td>可行轨迹池生成（三段式）</td><td>✅ 逻辑自洽；逐行解读见 §12</td></tr>
+<tr><td>补充式 (D1)–(D8)</td><td>推力/混控/PD/PMD/BPTT/RK4</td><td>⚠️ 论文未印明，本文按标准做法重建并逐项标注假设（§6、§7、§14、§15）</td></tr>
+<tr><td>螺旋约束 $v_{tgt}^2\kappa_{max}\le mg$</td><td>附录 A.1 无编号式</td><td>❌ <strong>量纲不闭合</strong>（左 m/s²、右 N），应为 $\le g$ 或 $\le A_{max}$（§11.7）</td></tr>
+</table>
+<hr>
+
+<h3>1. 坐标系、符号约定与状态变量总表（推导前置）</h3>
+
+<h4>1.1 三个坐标系</h4>
+<ul>
+<li><strong>世界惯性系 $W$</strong>：z 轴<strong>向上</strong>（重力写作 $-g\hat z$，$g=9.807$ m/s²）。损失项「All terms are calculated in the world frame」。</li>
+<li><strong>机体系 $B$</strong>：$x_B$ 前、$y_B$ 右、$z_B$ <strong>沿推力方向（上）</strong>——由 $f=[0,0,u_1]^\top$ 与四旋翼惯例确定；角速度 $\omega$ 在机体系分解。</li>
+<li><strong>起始帧 $S$</strong>：由拦截者<strong>初始化时刻的姿态</strong>定义（$R_{SW}$ 整个回合内为常值正交阵）。策略的观测与动作都在 $S$ 帧表达——这是「对初始朝向等变」的实现手段：$\hat d_t^S = R_{SW}^\top \hat d_t^W$，$a_{cmd}^W = R_{SW}\, a_{cmd}^S$。</li>
+</ul>
+
+<h4>1.2 符号总表（符号 | 含义 | 单位/文中取值）</h4>
+<table>
+<tr><th>符号</th><th>含义</th><th>单位 / 文中取值</th></tr>
+<tr><td>$p,v,q,\omega$</td><td>世界系位置、速度；姿态四元数；机体系角速度</td><td>m、m/s、无（单位范数）、rad/s</td></tr>
+<tr><td>$R_{wb}$</td><td>机体系→世界系旋转矩阵（由 $q$ 生成，$R_{wb}\in SO(3)$）</td><td>无</td></tr>
+<tr><td>$R_t$（观测）</td><td>机体系→<strong>起始帧</strong>旋转矩阵（正文：body-to-start）</td><td>无</td></tr>
+<tr><td>$f=[0,0,u_1]^\top$</td><td>机体系集体推力；$u_1=\sum_i F_i$</td><td>N</td></tr>
+<tr><td>$\tau$</td><td>机体系总力矩（滚转/俯仰/偏航）</td><td>N·m</td></tr>
+<tr><td>$J$</td><td>惯量矩阵（Table 6：$I_{xx},I_{yy},I_{zz}=0.0143,0.0175,0.021$；$I_{xy},I_{yz},I_{xz}=2.91\times10^{-7},-4.25\times10^{-5},-1.91\times10^{-5}$）</td><td>kg·m²</td></tr>
+<tr><td>$g$</td><td>重力加速度 9.807（Table 5/6）</td><td>m/s²</td></tr>
+<tr><td>$d(v)$</td><td>气动阻力 $=-k_{d,1}\lVert v\rVert v-k_{d,2}v$；$k_{d,1}=0.1$ (1/m)、$k_{d,2}=0.1$ (1/s)</td><td>N</td></tr>
+<tr><td>$\Omega_i,\Omega_{cmd,i}$</td><td>第 $i$ 转子实际/指令转速（$i=1..4$）</td><td>rev/min（文中印 rev/s，疑误，见 §5.3）</td></tr>
+<tr><td>$\tau_r$</td><td>转子时间常数 0.0186 s</td><td>s</td></tr>
+<tr><td>$F_i,\ f_2,f_1,f_0$</td><td>单转子推力 $F_i=f_2\Omega_i^2+f_1\Omega_i+f_0$；系数<strong>未给出</strong>（§6.1）</td><td>N</td></tr>
+<tr><td>$\ell_{arm},\theta_m,k_{moment}$</td><td>臂长 0.15 m；电机展开角 0.7854 rad(45°)；力矩系数 0.0108（§6.2）</td><td>m、rad、m（疑）</td></tr>
+<tr><td>$a_{cmd},\psi$</td><td>策略输出：质量归一化推力指令（=期望加速度）与偏航角（起始帧）</td><td>m/s²、rad</td></tr>
+<tr><td>$d_t,v_{rel,t},\hat d_t$</td><td>相对位置 $p^{tgt}-p^{agt}$、相对速度 $v^{tgt}-v^{agt}$、单位视线 $d/\lVert d\rVert$</td><td>m、m/s、无</td></tr>
+<tr><td>$m_t\equiv L_{align},\ v_{c,t}\equiv-L_{close}$</td><td>视线漂移量、接近速度（式 (6)(7)）</td><td>无、m/s</td></tr>
+<tr><td>$\lambda_{align..yaw}$</td><td>损失权重 $5.0,1.07,1.5\times10^{-3},1.96\times10^{-4},0.4,0.064$（Table 2）</td><td>无</td></tr>
+<tr><td>$c_r,e_r,s_{box}$</td><td>捕获半径 0.3 m、逃逸半径 100 m、初始框 10 m</td><td>m</td></tr>
+<tr><td>$\Delta t_{sim},\Delta t_{ctrl},T_{ep}$</td><td>2.5 ms 物理子步、0.02 s 控制步（8 子步/步）、600 步（12 s）回合上限</td><td>s、步</td></tr>
+<tr><td>$v_{tgt},r_{axis},\rho_{ar},z_{rate}$</td><td>入侵者恒速、半轴、轴比、螺旋爬升率（Table 1/4）</td><td>m/s、m、无、m/rad</td></tr>
+<tr><td>$A_{max},\eta,N_m,F_m,\beta$</td><td>可用加速度上限、折减系数 0.6、转子数 4、单转子最大推力、下降余量 0.6</td><td>m/s²、无、无、N、无</td></tr>
+<tr><td>$\hat b_{1,t}$</td><td>机体 x 轴在世界系水平面投影的单位向量（式 (9)）</td><td>无</td></tr>
+</table>
+<p><strong>状态计数</strong>：论文说状态为 $[p,v,q,\omega]$（3+3+4+3=13 维）。但转子转速 $\Omega_{1..4}$ 有自己的微分方程 (4)，BPTT 时它必须参与计算图——<strong>实际可微状态是 17 维</strong> $[p,v,q,\omega,\Omega_1,\Omega_2,\Omega_3,\Omega_4]$（§14.4 的线性化按 17 维展开）。论文把转子当作「动力学内部的辅助变量」叙述，不算错，但读者实现时不要漏掉它对梯度流的贡献。</p>
+<hr>
+
+<h3>2. 公式 (1)：平动方程——刚体 + 阻力 + 重力的直接推论</h3>
+
+<h4>2.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 位置/速度动力学（论文式 (1)）</span>
+$$ \dot{p}=v,\qquad \dot{v}=\frac{1}{m}R_{wb}\big(f+d(v)\big)-g\hat{z} \tag{1} $$
+<div class="eq-note">
+<strong>$p$</strong>=世界系位置 (m)｜<strong>$v$</strong>=世界系线速度 (m/s)｜<strong>$m$</strong>=质量 2.65/1.0 kg（Table 6 脚注）｜<strong>$R_{wb}$</strong>=体→世界旋转｜<strong>$f=[0,0,u_1]^\top$</strong>=机体系集体推力 (N)｜<strong>$d(v)$</strong>=机体系气动阻力 (N)｜<strong>$g=9.807$</strong> m/s²｜<strong>$\hat z=[0,0,1]^\top$</strong> 世界上轴。
+</div>
+</div>
+
+<h4>2.2 第一性原理推导（牛顿第二定律在惯性系）</h4>
+<p>对质心写牛顿第二定律（只在惯性系 $W$ 成立）：</p>
+<p>$$ m\left.\frac{dv}{dt}\right|_W = F^{W}_{\text{总}} = \underbrace{R_{wb}\big(f+d(v)\big)}_{\text{机体系力旋转到世界系}} + \underbrace{(-mg\,\hat z)}_{\text{重力}} $$</p>
+<p>两边除以 $m$ 并配 $\dot p=v$（位置的定义）即得式 (1)。<strong>关键约定检查</strong>：$f=[0,0,u_1]^\top$ 是<strong>机体系</strong>向量，$R_{wb}$ 是<strong>体→世界</strong>映射——所以 $R_{wb}f$ 把「沿机体 z 的推力」转成世界系向量。悬停时 $R_{wb}=I$，需要 $u_1=mg$：$f=(0,0,mg)$，$R_{wb}f-g\hat z=0$ ✅ 物理自洽（推力沿 $+z_B$ 向上）。</p>
+
+<h4>2.3 一处必须指出的帧约定歧义（阻力 $d(v)$ 到底在哪个帧）</h4>
+<p>式 (1) 把 $d(v)$ <strong>放在 $R_{wb}(\cdot)$ 里面</strong>，即阻力被当作机体系向量。但 $v$（状态里的速度）是世界系的。于是有两种读法：</p>
+<ul>
+<li><strong>读法 A（自洽）</strong>：$d(\cdot)$ 内部用的是<strong>机体系速度</strong> $v_B=R_{wb}^\top v$，即 $d(v_B)=-k_{d,1}\lVert v_B\rVert v_B-k_{d,2}v_B$。因为旋转保范数 $\lVert v_B\rVert=\lVert v\rVert$，整体效果是 $$R_{wb}\,d(v_B)=-k_{d,1}\lVert v\rVert\,v-k_{d,2}\,v$$ 即「阻力沿世界系速度反方向」，物理正确。</li>
+<li><strong>读法 B（帧混用）</strong>：直接用世界系 $v$ 算 $d$，再被 $R_{wb}$ 旋转——阻力方向会跟着机体姿态转，<strong>物理错误</strong>。</li>
+</ul>
+<p>从「quadrotor 阻力通常沿速度反方向」的常识看，作者意图几乎肯定是读法 A，但<strong>记号 $d(v)$ 没有区分 $v$ 与 $v_B$，且未说明</strong>。官方代码（github.com/rislab/catchrl）能否澄清这一点是复现时第一个要查的地方。<strong>本文后续核算均按读法 A</strong>。</p>
+
+<h4>2.4 数值核算与交叉验证</h4>
+<ul>
+<li><strong>与附录式 (11) 的互证</strong>：置 $d=0$，式 (1) 变成 $\dot v=\frac{u_1}{m}R_{wb}\hat z_B-g\hat z=\frac{T_c}{m}b-g\hat z$，其中 $b=R_{wb}[0,0,1]^\top$ 是推力轴的世界系方向、$T_c=u_1$——<strong>正是附录式 (11)</strong>。正文与附录两处写法逐符号互证 ✅。</li>
+<li><strong>阻力在 10 m/s 的量级</strong>：$\lVert d\rVert/m = k_{d,1}v^2+k_{d,2}v = 0.1\times100+0.1\times10 = 11$ m/s²（1 kg 平台）——<strong>超过重力</strong>。即最高速巡航时阻力吃掉的推力预算与悬停对抗重力相当；$A_{max}\approx 42$ m/s² 的 1 kg 平台约 26% 的推力预算被阻力占据（§11.5）。这解释了为什么论文把 $L_{vmax}$（式 (8)）作为正则项：<strong>速度越高，阻力惩罚越重，等效推力余量越少</strong>。</li>
+<li><strong>量纲自检</strong>：$d(v)/m$ 的量纲 $[k_{d,1}]\cdot\text{m/s}\cdot\text{m/s}=m/s^2$ ⟹ $[k_{d,1}]=1/\text{m}$；$[k_{d,2}]\cdot\text{m/s}=m/s^2$ ⟹ $[k_{d,2}]=1/\text{s}$ ✅ 与 Table 5/6 的单位一致。</li>
+</ul>
+<hr>
+
+<h3>3. 公式 (2)：姿态方程——四元数运动学与欧拉方程</h3>
+
+<h4>3.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 姿态/角速度动力学（论文式 (2)）</span>
+$$ \dot{q}=\frac{1}{2}\,q\otimes\omega,\qquad \dot{\omega}=J^{-1}\big(\tau-\omega\times J\omega\big) \tag{2} $$
+<div class="eq-note">
+<strong>$q$</strong>=姿态四元数（标部+矢部，$\lVert q\rVert=1$）｜<strong>$\otimes$</strong>=四元数乘法（$\omega$ 视为标部为 0 的四元数 $(0,\omega)$）｜<strong>$\omega$</strong>=机体系角速度 (rad/s)｜<strong>$J$</strong>=3×3 惯量矩阵｜<strong>$\tau$</strong>=机体系外力矩 (N·m)｜<strong>$\omega\times J\omega$</strong>=陀螺/牵连项。
+</div>
+</div>
+
+<h4>3.2 四元数运动学 $\dot q=\tfrac12 q\otimes\omega$ 的推导与约定</h4>
+<p><strong>第 1 步：四元数乘法定义</strong>（Hamilton 约定，也是多数机器人库的约定）：</p>
+<p>$$ (s_1,\mathbf v_1)\otimes(s_2,\mathbf v_2)=\Big(s_1s_2-\mathbf v_1\cdot\mathbf v_2,\ s_1\mathbf v_2+s_2\mathbf v_1+\mathbf v_1\times\mathbf v_2\Big) $$</p>
+<p><strong>第 2 步</strong>：把 $\omega$ 写成纯虚四元数 $(0,\omega)$，代入：</p>
+<p>$$ q\otimes(0,\omega)=\Big(-\mathbf q\cdot\omega,\ q_0\,\omega+\mathbf q\times\omega\Big) $$</p>
+<p><strong>第 3 步：矩阵形式</strong>（写成 $\dot q=\tfrac12\Omega(\omega)\,q$，$\Omega$ 是 4×4 反对称矩阵）：</p>
+<p>$$ \dot q=\frac12\begin{bmatrix}0&-\omega_x&-\omega_y&-\omega_z\\ \omega_x&0&\omega_z&-\omega_y\\ \omega_y&-\omega_z&0&\omega_x\\ \omega_z&\omega_y&-\omega_x&0\end{bmatrix}q \qquad\Big(\Omega(\omega)\text{ 反对称 ⟹ 保范数}\Big) $$</p>
+<p><strong>第 4 步：范数保持的严格证明</strong>（四元数必须是单位四元数，验证微分方程不破坏这一点）：</p>
+<p>$$ \frac{d}{dt}\lVert q\rVert^2 = 2q^\top\dot q = q^\top\big(q\otimes(0,\omega)\big) = q_0(-\mathbf q\cdot\omega)+\mathbf q\cdot(q_0\omega+\mathbf q\times\omega) = -q_0\,\mathbf q\cdot\omega + q_0\,\mathbf q\cdot\omega + \underbrace{\mathbf q\cdot(\mathbf q\times\omega)}_{=0}=0 $$</p>
+<p>✅ 连续时间下范数严格守恒。但<strong>RK4 离散积分会有数值漂移</strong>（RK4 保能量不保范数），实现时每子步归一化 $q\leftarrow q/\lVert q\rVert$ 是标准做法——<strong>论文未提及</strong>，复现者务必加。</p>
+<p><strong>第 5 步：约定检查（容易踩坑处）</strong>。式 $\dot q=\tfrac12 q\otimes\omega$ 与旋转公式 $v_W=R_{wb}(q)\,v_B$、矩阵导数 $\dot R_{wb}=R_{wb}[\omega]_\times$（$[\omega]_\times$ 为机体系角速度叉乘矩阵）<strong>严格配套</strong>（Hamilton 右乘约定；若用 JPL/左乘约定则为 $\dot q=\tfrac12\omega\otimes q$ 且 $R$ 含义互换）。论文<strong>没有声明采用哪种约定</strong>。一致性判据：悬停时 $q=(1,0,0,0)$，$R_{wb}=I$，推力轴 $R_{wb}\hat z_B=\hat z$ 向上 ✅——两种约定在四元数↔矩阵映射正确实现时都能满足，<strong>但混用会得到姿态取逆的错误模型</strong>。这是复现式 (1)+(2) 时第二处要对着代码核实的地方。</p>
+
+<h4>3.3 欧拉方程 $\dot\omega=J^{-1}(\tau-\omega\times J\omega)$ 的完整推导</h4>
+<p><strong>第 1 步：角动量定理。</strong> 机体系角动量 $H=J\omega$。角动量定理只在惯性系成立：</p>
+<p>$$ \left.\frac{dH}{dt}\right|_W=\tau \quad\Longrightarrow\quad \left.\frac{dH}{dt}\right|_B+\omega\times H=\tau \quad\Longrightarrow\quad J\dot\omega+\omega\times J\omega=\tau $$</p>
+<p>（第二项是转动参考系的牵连项；$\dot\omega$ 是分量直接求导。）移项即得式 (2)。</p>
+<p><strong>第 2 步：$\omega\times J\omega$ 的逐分量展开（$J$ 含非对角项，按 Table 6 数值）。</strong> 记 $J=[J_{ij}]$，$H=J\omega$：</p>
+<p>$$ H=\begin{pmatrix}J_{xx}p+J_{xy}q+J_{xz}r\\ J_{xy}p+J_{yy}q+J_{yz}r\\ J_{xz}p+J_{yz}q+J_{zz}r\end{pmatrix},\qquad \omega\times H=\begin{pmatrix}qH_z-rH_y\\ rH_x-pH_z\\ pH_y-qH_x\end{pmatrix} $$</p>
+<p>（注：惯量积 $I_{xy},I_{yz},I_{xz}$ 的<strong>符号约定</strong>——$J=[I_{xx},-I_{xy},-I_{xz};\ldots]$ 还是对称正形式——论文未说明；Table 6 给的交叉项量级 $10^{-7}\sim10^{-5}$，两种约定在数值上差异可忽略，但符号错会引入小的常值力矩偏差。）</p>
+<p><strong>第 3 步：数值量级核算（证明「非线性项」不可忽略）。</strong> 取极端机动角速率 $\omega=(10,0,10)$ rad/s（急滚+急偏航，敏捷拦截中常见），用 Table 6 的 $J$（交叉项取零近似）：$J\omega=(0.143,\ 0,\ 0.208)$，</p>
+<p>$$ \omega\times J\omega=(0\cdot 0.208-10\cdot 0,\ 10\cdot 0.143-10\cdot 0.208,\ 10\cdot 0-0\cdot 0.143)=(0,\ -0.651,\ 0)\ \text{N·m} $$</p>
+<p>而单轴最大差分力矩（§6.2 推导）约 $\ell_{arm}\frac{\sqrt2}{2}\cdot 2F_m\approx 0.106\times 35\approx 3.7$ N·m。即 <strong>10 rad/s 时陀螺项吃掉俯仰力矩预算的 ~18%；20 rad/s 时按 $\omega^2$ 增长到 ~70%</strong>。这就是「拦截需要非线性四旋翼动力学」的定量理由：点质量模型完全丢掉这项，策略学不到「高速滚转/偏航会互相拖拽」的耦合。✅ 与正文论断（§3.2、图 7 的 30% 差距）互为印证。</p>
+
+<h4>3.4 惯量数值的物理合理性核算（Table 6 自查）</h4>
+<p>把质量想象成「中心机体 + 4 个转子质量 $m_r$ 在 $\ell_{arm}=0.15$ m 处（45° 布局）」：转子贡献 $I_{zz}^{rot}=4m_r\ell^2$、$I_{xx}^{rot}=I_{yy}^{rot}=2m_r\ell^2$（X 构型）。由 $I_{zz}=0.021$ 反推 $m_r=0.021/(4\times0.0225)=0.233$ kg/转子（电机+桨+电调，合理量级）。转子对 $I_{xx}$ 的贡献 $2\times0.233\times0.0225=0.0105$，与给定 $I_{xx}=0.0143$ 差 0.0038——由中心机体（电池等）的竖向质量分布补足。用恒等式 $I_{xx}+I_{yy}-I_{zz}=2\sum_i m_i z_i^2$（平行轴定理，$z_i$ 为质点相对质心的竖向坐标）核算：$0.0143+0.0175-0.021=0.0108$ ⟹ $\sum m_i z_i^2=0.0054$，例如 0.5 kg 的电池在 $z\approx0.1$ m 处恰为 $0.5\times0.01=0.005$ ✅。<strong>Table 6 的惯量张量与「2.65 kg 平台 + 0.15 m 臂」的物理图像完全吻合，未发现数值异常。</strong>（$I_{yy}>I_{xx}$ 的 22% 差反映电池/载荷的左右不对称，也合理。）</p>
+<hr>
+
+<h3>4. 公式 (3)：二次 + 线性复合阻力模型</h3>
+
+<h4>4.1 论文原文与第一性原理</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 气动阻力（论文式 (3)）</span>
+$$ d(v)=-k_{d,1}\lVert v\rVert v-k_{d,2}v,\qquad k_{d,1}=0.1\ \text{m}^{-1},\quad k_{d,2}=0.1\ \text{s}^{-1} \tag{3} $$
+<div class="eq-note">
+<strong>来源</strong>：流体力学中压差阻力 $F=\tfrac12\rho C_D A\,v^2$（$\propto$ 动压×迎风面积）与粘性线性阻力 $F\propto v$ 的两项叠加，按单位质量归一后就是式 (3) 的形式：$k_{d,1}=\rho C_D A/(2m)$，$k_{d,2}$ 为粘性/线性化系数。
+</div>
+</div>
+<ul>
+<li><strong>系数反演</strong>：$m=1$ kg、海平面 $\rho=1.225$ kg/m³：$k_{d,1}=0.1$ ⟹ $C_DA=2mk_{d,1}/\rho=0.163$ m²。四旋翼机体迎风面积典型 0.05–0.10 m²、$C_D\sim1$，即典型 $k_{d,1}\in[0.03,0.06]$。<strong>论文取值偏大 2–3 倍</strong>——可以理解为把旋翼诱导阻力/动量阻力一并折算进机体阻力（高速大倾角飞行时旋翼诱导阻力显著），论文未说明来源，标注为疑点。</li>
+<li><strong>两项的交叉点</strong>：$k_{d,1}v^2=k_{d,2}v\Rightarrow v^{*}=k_{d,2}/k_{d,1}=1$ m/s——1 m/s 以下线性项主导，以上二次项主导。拦截全程 0–10 m/s，两项都要，保留复合模型的理由成立 ✅。</li>
+<li><strong>逐点核算表</strong>（1 kg 平台的阻力加速度 $\lVert d\rVert/m$）：$v=1$ m/s → 0.2 m/s²；$v=4$ m/s → 2.0 m/s²；$v=10$ m/s → 11 m/s²。对比 $g=9.807$：<strong>顶速阻力与重力同量级</strong>，这是「$A_{max}=42$ m/s² 的平台在 10 m/s 时实际可用机动只有约 31 m/s²」的直接原因，也解释了图 5/7 中成功率随入侵者速度单调下降的斜率。</li>
+<li><strong>帧约定</strong>：见 §2.3 的读法 A/B 歧义，此处同样适用。</li>
+</ul>
+<hr>
+
+<h3>5. 公式 (4)：转子一阶延迟——「滞后最小模型」的解析解</h3>
+
+<h4>5.1 论文原文与推导</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4) —— 转子转速一阶延迟（论文式 (4)）</span>
+$$ \dot\Omega_i=\frac{1}{\tau_r}\big(\Omega_{cmd,i}-\Omega_i\big),\qquad i=1,\dots,4,\qquad \tau_r=0.0186\ \text{s} \tag{4} $$
+<div class="eq-note">
+<strong>物理</strong>：电机+桨的转速不能突变——电压阶跃后转速按一阶系统趋近指令值。$\tau_r$ 是「从阶跃开始到达 63.2% 变化量」的时间常数。
+</div>
+</div>
+<p><strong>解析解</strong>（$\Omega_{cmd}$ 在 $[0,t]$ 内恒定）：分离变量</p>
+<p>$$ \frac{d(\Omega_i-\Omega_{cmd})}{\Omega_i-\Omega_{cmd}}=-\frac{dt}{\tau_r}\ \Longrightarrow\ \Omega_i(t)=\Omega_{cmd,i}+\big(\Omega_i(0)-\Omega_{cmd,i}\big)e^{-t/\tau_r} $$</p>
+<p><strong>控制步内的精确离散化</strong>（$\Delta t_{ctrl}=0.02$ s 内指令恒定，这正是仿真器的结构）：</p>
+<p>$$ \Omega_{k+1}=\Omega_{cmd}+\big(\Omega_k-\Omega_{cmd}\big)e^{-\Delta t_{ctrl}/\tau_r} $$</p>
+
+<h4>5.2 数值核算</h4>
+<ul>
+<li><strong>每控制步响应比例</strong>：$e^{-0.02/0.0186}=e^{-1.0753}=0.3412$ ⟹ 每 20 ms 只闭合剩余差距的 $1-0.341=65.9\%\approx2/3$。第 3 个控制步后残余 $0.341^3=3.97\%$，即<strong>阶跃推力需要约 3 个控制步（60 ms）才基本到位</strong>——与「拦截成败取决于末段几十毫秒」的说法同量级，忽略该滞后会系统性低估加速时间。</li>
+<li><strong>每物理子步</strong>（$\Delta t_{sim}=2.5$ ms，RK4 内部）：$e^{-0.0025/0.0186}=0.8743$ ⟹ 12.6%/子步；每控制步 8 子步。</li>
+<li><strong>带宽</strong>：$f_c=1/(2\pi\tau_r)=8.56$ Hz。控制环 50 Hz，转子带宽只有控制环的 1/5.8——<strong>执行器是系统最慢环节</strong>，姿态环（增益 110 等）比它快得多，所以动力学瓶颈确实在转子。</li>
+</ul>
+
+<h4>5.3 一个疑为印刷/单位错误之处（Table 6）</h4>
+<p>Table 6 的「RPM range $[\Omega_{min},\Omega_{max}]=[2970,20965]$」标注单位为 <strong>rev/s</strong>。核算：20965 rev/s = 1,257,900 rev/min，2970 rev/s = 178,200 rev/min——任何商用无刷电机都不可能达到（桨尖会超声速解体）。<strong>合理读法是 rev/min</strong>：20965 RPM ≈ 2195 rad/s、2970 RPM ≈ 311 rad/s。用 §6.1 的推力模型反推（$F_m=17.54$ N、$f_1=f_0=0$ 假设）可得悬停转速 $\Omega_h=\sqrt{mg/4f_2}\approx 1336$ rad/s ≈ 12,760 RPM，落在 [2970, 20965] 区间中部 ✅——rev/min 解读自洽，rev/s 解读物理荒谬。<strong>判定：单位笔误，应为 rev/min（或数值为 rad/s 系下的笔误），建议对照官方代码/第 17 页原文复核。</strong></p>
+<h3>6. 推力模型与混控矩阵（论文只给名字，本文数学化——补充式 D1–D3）</h3>
+<p>正文 §3.2 只说「The forces and torques are then generated via a quadratic thrust model and mixer matrix」，<strong>没有给出公式</strong>。以下按标准四旋翼建模重建，并用 Table 6 参数逐项核算。<strong>以下 D1–D3 是本文的补充式，非论文原式。</strong></p>
+
+<h4>6.1 二次推力模型（补充式 D1）</h4>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D1) —— 单转子推力</span>
+$$ F_i=f_2\,\Omega_i^2+f_1\,\Omega_i+f_0,\qquad i=1,\dots,4 $$
+<div class="eq-note">
+<strong>出处依据</strong>：式 (13) 的正文「$F_m=f_2\Omega_{max}^2+f_1\Omega_{max}+f_0$ is the maximum available per-rotor force」——即每个转子的推力是转速的二次函数。<strong>论文未给 $f_2,f_1,f_0$ 的数值</strong>。桨叶动量理论下 $F\approx c_T\rho A_p R^2\Omega^2$（$c_T$ 推力系数、$A_p$ 桨盘面积、$R$ 桨半径），$f_1,f_0$ 是拟合修正项（通常很小）。
+</div>
+</div>
+<p><strong>数值识别</strong>（假设 $f_1=f_0=0$，用「推重比 2.7 + 质量 2.65 kg」与 $\Omega_{max}=20965$ RPM=2195.4 rad/s）：总推力上限 $T_{max}=2.7\times2.65\times9.807=70.16$ N ⟹ 单转子 $F_m=17.54$ N ⟹</p>
+<p>$$ f_2=\frac{F_m}{\Omega_{max}^2}=\frac{17.54}{2195.4^2}=3.64\times10^{-6}\ \text{N·s}^2/\text{rad}^2 $$</p>
+<p>悬停转速：$mg/4=f_2\Omega_h^2$ ⟹ $\Omega_h=\sqrt{6.497/3.64\times10^{-6}}=1336$ rad/s = 12,760 RPM（在 [2970, 20965] 区间内 ✅）。1 kg 平台悬停 7,834 RPM。这些数字与真实 5 英寸级四旋翼（悬停 8k–13k RPM）一致，<strong>佐证 §5.3 的 rev/min 判断</strong>。</p>
+
+<h4>6.2 混控矩阵（补充式 D2）——从 $\ell_{arm}$ 与 $\theta_m$ 逐项推出</h4>
+<p>设第 $i$ 个转子在 $x_B$–$y_B$ 平面内的方位角为 $\theta_i=\theta_m+(i-1)\tfrac{\pi}{2}$（$\theta_m=0.7854$ rad = 45°，即 X 构型：$45^\circ,135^\circ,225^\circ,315^\circ$），力臂 $\mathbf r_i=\ell_{arm}[\cos\theta_i,\ \sin\theta_i,\ 0]^\top$，推力沿 $+z_B$：$\mathbf F_i=F_i\,\hat z_B$。单个转子产生的力矩：</p>
+<p>$$ \boldsymbol\tau_i=\mathbf r_i\times\mathbf F_i=\ell_{arm}F_i\begin{pmatrix}\sin\theta_i\\ -\cos\theta_i\\ 0\end{pmatrix} $$</p>
+<p>（逐步：$(x,y,0)\times(0,0,F)=(yF-0,\ 0-xF,\ 0-0)=(yF,-xF,0)$，代入 $x=\ell\cos\theta,\ y=\ell\sin\theta$。）叠加四个转子并加入反扭矩项：</p>
+<p>$$ u_1=\sum_{i=1}^{4}F_i,\qquad \tau_x=\ell_{arm}\sum_i F_i\sin\theta_i,\qquad \tau_y=-\ell_{arm}\sum_i F_i\cos\theta_i,\qquad \tau_z=k_{moment}\sum_i \sigma_i F_i \tag{D2} $$</p>
+<p>其中 $\sigma_i=\pm1$ 为桨旋转方向的交错符号（$\tau_z$ 来自电机反扭矩 $k_\tau\Omega_i^2$ 与推力的比值 $k_{moment}\approx k_\tau/f_2$）。代入 $\theta_m=\pi/4$ 的四个方位角（$\sin\theta_i=\frac{\sqrt2}{2}(1,1,-1,-1)$，$\cos\theta_i=\frac{\sqrt2}{2}(1,-1,-1,1)$）：</p>
+<p>$$ \tau_x=\ell_{arm}\frac{\sqrt2}{2}\big(F_1+F_2-F_3-F_4\big),\qquad \tau_y=\ell_{arm}\frac{\sqrt2}{2}\big(-F_1+F_2+F_3-F_4\big),\qquad \tau_z=k_{moment}\big(F_1-F_2+F_3-F_4\big) $$</p>
+<p>（$\tau_z$ 的符号按 $1,3$ 正转、$2,4$ 反转的常见编号。）</p>
+<p><strong>数值核算</strong>：$\ell_{arm}\sqrt2/2=0.106$ m。悬停（$F_i=mg/4$）时 $\tau_x=\tau_y=0$ ✅（X 构型天然平衡）。最大滚转力矩：$F_1=F_2=F_m,\ F_3=F_4=0$ ⟹ $\tau_{x,max}=0.106\times2F_m=3.72$ N·m（2.65 kg 平台）——与 §3.3 陀螺项的量级比较正是那里用到的数字。<strong>$k_{moment}=0.0108$ 的量纲</strong>：若 $\tau_z=k_{moment}\sum\sigma_iF_i$ 则 $[k_{moment}]=$ m，0.0108 m=1.08 cm，与 5 英寸桨的 $k_\tau/k_f$ 典型比值 0.01–0.02 m <strong>一致 ✅</strong>；若作用在 $\Omega_i^2$ 上则单位为 N·m·s²/rad²。<strong>论文未说明，两者数值上需对照代码核实</strong>——标注为重建不确定项。</p>
+
+<h4>6.3 可达性小结（D3，为 §11 铺路）</h4>
+<p>以上 D1+D2 给出「指令 → 力/力矩」的完整映射：$\Omega_{cmd}\xrightarrow{(4)}\Omega\xrightarrow{D1}F_i\xrightarrow{D2}(u_1,\tau)\xrightarrow{(1)(2)}(\dot v,\dot\omega)$。反向看，四旋翼的<strong>世界系净加速度只能取</strong> $\frac{T_c}{m}b-g\hat z$ 的形式（$b$ 单位推力轴、$0\le T_c\le N_mF_m$），这就是附录式 (11)–(13) 的实质（§11.5 严格化）。</p>
+<hr>
+
+<h3>7. PD 姿态控制器（论文只引文献 [24]，本文重建——补充式 D4）</h3>
+<p>正文说「These outputs are tracked using a PD attitude controller [24]」（[24]=Mellinger, Michael &amp; Kumar, IJRR 2012）。论文没有给出控制器公式；Table 6 给了四组增益：<code>PD pos. gain (x,y,z) 6.25, 6.25, 16.0</code>、<code>PD vel. gain 5.0, 5.0, 8.0</code>、<code>PD rot. gain 110, 89, 70</code>、<code>PD ang. vel gain 20, 15, 15</code>。以下按 Mellinger 结构重建（<strong>补充式，重建而非原文</strong>）：</p>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D4) —— 期望姿态 → 力矩的 PD 链</span>
+$$ \hat b_{des}=\frac{a_{cmd}+g\hat z}{\lVert a_{cmd}+g\hat z\rVert},\qquad \hat x_c=[\cos\psi,\ \sin\psi,\ 0]^\top,\qquad \hat y_{des}=\frac{\hat b_{des}\times\hat x_c}{\lVert\hat b_{des}\times\hat x_c\rVert},\qquad \hat x_{des}=\hat y_{des}\times\hat b_{des} $$
+$$ R_{des}=\big[\hat x_{des},\ \hat y_{des},\ \hat b_{des}\big],\qquad e_R=\frac12\Big(R_{des}^\top R_{wb}-R_{wb}^\top R_{des}\Big)^{\vee},\qquad e_\omega=\omega $$
+$$ \tau=-K_R\,e_R-K_\omega\,e_\omega,\qquad K_R=\operatorname{diag}(110,89,70),\quad K_\omega=\operatorname{diag}(20,15,15),\qquad u_1=m\,\lVert a_{cmd}+g\hat z\rVert $$
+<div class="eq-note">
+<strong>第 1 行</strong>：把「期望加速度 $a_{cmd}$」翻译成期望姿态——要产生世界系加速度 $a_{cmd}$，推力轴必须指向 $a_{cmd}+g\hat z$（先抵消重力再提供机动），其单位向量即 $\hat b_{des}$；偏航自由度由 $\psi$ 决定（$\hat x_c$ 在水平面）。<strong>第 2 行</strong>：姿态误差 $e_R$（旋转矩阵误差的轴角表示，$(\cdot)^\vee$ 为反对称阵→向量）；$e_\omega$ 为角速度误差（期望角速度取 0：$a_{cmd}$ 是「加速度指令」而非轨迹，姿态指令视为准静态）。<strong>第 3 行</strong>：PD 力矩 + 沿 $\hat b_{des}$ 的推力（$u_1=m\lVert a_{cmd}+g\hat z\rVert$ 使推力投影到期望方向时恰好产生 $a_{cmd}$）。增益来自 Table 6 的 rot/ang-vel 行。
+</div>
+</div>
+<p><strong>重建自检</strong>：① 悬停（$a_{cmd}=0$）：$\hat b_{des}=\hat z$、$R_{des}=R_z(\psi)$，$u_1=mg$ ✅。② 水平加速 $a_{cmd}=(a,0,0)$：$\hat b_{des}=(a,\ 0,\ g)/\sqrt{a^2+g^2}$，机体需前倾 $\theta=\arctan(a/g)$——「先倾斜再加速」的四旋翼基本事实 ✅。③ $e_R$ 的李代数 $\tfrac12(R_{des}^\top R-R^\top R_{des})^\vee$ 在 $R\to R_{des}$ 时一阶等于轴角误差向量——Mellinger 原文的标准选择 ✅。</p>
+<p><strong>增益量纲核算</strong>：$K_R$ 的单位 N·m/rad：110 N·m/rad 的滚转刚度，配合 $I_{xx}=0.0143$，姿态环固有频率 $\omega_n=\sqrt{K_R/I_{xx}}=\sqrt{110/0.0143}=87.7$ rad/s ≈ 14 Hz；$K_\omega=20$ N·m/(rad/s)，阻尼比 $\zeta=K_\omega/(2\sqrt{K_RI})=20/(2\sqrt{110\times0.0143})=20/2.508=7.97$——<strong>严重过阻尼</strong>。这并非设计缺陷：$a_{cmd}$ 由策略给出且每 20 ms 更新一次，过阻尼姿态环保证「无超调跟踪 + 不激发高频振荡」，正好配合 $L_{jerk}$ 正则的意图 ✅。<strong>疑点</strong>：Table 6 的 pos/vel 增益（6.25/5.0/16/8）在正文的主回路里<strong>没有出现</strong>——策略直接输出 $a_{cmd}$ 而非位置指令。它们可能用于回合初始的悬停稳定或评估环境的复位。论文未说明，标注为「角色不明」。</p>
+<hr>
+
+<h3>8. 公式 (5)：六项加权损失与权重配平</h3>
+
+<h4>8.1 论文原文与符号</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5) —— 逐步总损失（论文式 (5)）</span>
+$$ L_t=\lambda_{align}L_{align}+\lambda_{close}L_{close}+\lambda_{acc}L_{acc}+\lambda_{jerk}L_{jerk}+\lambda_{vmax}L_{vmax}+\lambda_{yaw}L_{yaw} \tag{5} $$
+<div class="eq-note">
+<strong>权重（Table 2）</strong>：$\lambda_{align}=5.0$、$\lambda_{close}=1.07$、$\lambda_{acc}=1.5\times10^{-3}$、$\lambda_{jerk}=1.96\times10^{-4}$、$\lambda_{vmax}=0.4$、$\lambda_{yaw}=0.064$。损失用<strong>特权信息</strong>（入侵者位置/速度）计算，特权量不进入策略输入。所有项在世界系计算。
+</div>
+</div>
+
+<h4>8.2 尺度不变性的严格证明（附录 A.2「Scale」段落的数学化）</h4>
+<p>论文说「The objective is nearly invariant to a global rescaling $\lambda\to\alpha\lambda$ absorbed into the policy step size: only the ratios of the weights matter」。证明：设 $\tilde L=\alpha L$，则 $\nabla_\theta\tilde L=\alpha\nabla_\theta L$；梯度下降 $\theta\leftarrow\theta-\eta\nabla_\theta\tilde L=\theta-\eta\alpha\nabla_\theta L$ 与「学习率改为 $\eta'=\eta\alpha$ 优化原 $L$」<strong>完全相同</strong>。因此 $(\lambda,\eta)$ 与 $(\alpha\lambda,\eta/\alpha)$ 是同一训练，$\lambda$ 的绝对尺度是冗余自由度 ⟹ 有效自由度为「6 个权重的比值 + 学习率」。论文把 $\lambda_{align}$ 锚定为 5 消除该退化方向——正确且必要，否则超参搜索会在无效方向上浪费预算。</p>
+
+<h4>8.3 权重配平的数值核算（为什么 $\lambda_{acc},\lambda_{jerk}$ 小三个数量级）</h4>
+<p>各损失项的<strong>典型量级</strong>（按 1 kg 平台、$a_{cmd}\sim$ 数 m/s² 的巡航与机动段估计）× 权重：</p>
+<table>
+<tr><th>项</th><th>典型量级（估计）</th><th>权重 $\lambda$</th><th>加权贡献 $\lambda L$</th><th>角色</th></tr>
+<tr><td>$L_{align}=\sin\angle$</td><td>$\sim0.2$（$12^\circ$ 视线漂移）</td><td>5.0</td><td>$\sim1.0$</td><td>制导主项</td></tr>
+<tr><td>$L_{close}=-\dot\rho$</td><td>$\sim-5$（接近速度 5 m/s）</td><td>1.07</td><td>$\sim-5.4$</td><td>制导主项（负）</td></tr>
+<tr><td>$L_{acc}=\lVert a\rVert^2$</td><td>$\sim10^2$</td><td>$1.5\times10^{-3}$</td><td>$\sim0.15$</td><td>抑制饱和</td></tr>
+<tr><td>$L_{jerk}=\lVert j\rVert^2$</td><td>$\sim10^3$–$10^4$（$\Delta a/\Delta t$ 的平方）</td><td>$1.96\times10^{-4}$</td><td>$\sim0.2$–$2$</td><td>平滑/BPTT 稳定</td></tr>
+<tr><td>$L_{vmax}$（单边）</td><td>$0\sim10^2$</td><td>0.4</td><td>$0\sim40$（仅在超速时）</td><td>飞行包线</td></tr>
+<tr><td>$L_{yaw}$</td><td>$[-1,1]$</td><td>0.064</td><td>$\sim\pm0.03$</td><td>视场保持</td></tr>
+</table>
+<p>结论：制导两项的加权贡献在 $\mathcal O(1–5)$ 量级主导；$L_{acc}/L_{jerk}$ 原始值大 2–4 个数量级，必须用小权重压回 $\mathcal O(0.1–1)$，否则「省力」会压死「拦截」。<strong>这套权重在量级上自洽</strong> ✅。（注：$L_{close}$ 贡献为负——它是对「快接近」的奖励项，训练在最小化 $L_t$ 的意义下是「负值更优」，梯度下降照常处理，无需特殊符号翻转。）</p>
+<p><strong>两处不一致/缺失，如实指出</strong>：① 式 (5) 用 $\lambda_{close}$，Table 2 印成 $\lambda_{closing}$——命名不一致（无实质影响）；② $L_{vmax}=\max(0,\lVert v\rVert-v_{des})^2$ 的阈值 $v_{des}$ <strong>在 Table 2–6 与全文任何位置都没有给值</strong>——复现者无法确定速度上限，这是一个实质性缺失参数。</p>
+<hr>
+
+<h3>9. 公式 (6)(7)：平行导引的两个标量——从相对运动学到梯度分析</h3>
+
+<h4>9.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(6) —— 视线对齐（论文式 (6)）</span>
+$$ m_t=L_{align}=\Big\lVert \hat d_t\times\hat v_{rel,t}\Big\rVert=\sin\angle\big(d_t,\ v_{rel,t}\big) \tag{6} $$
+<span class="eq-tag" style="margin-top:12px;">Eq.(7) —— 接近速度（论文式 (7)）</span>
+$$ v_{c,t}=-L_{close}=-\hat d_t^{\top}v_{rel,t} \tag{7} $$
+<div class="eq-note">
+<strong>$d_t=p_t^{tgt}-p_t^{agt}$</strong> 相对位置｜<strong>$v_{rel,t}=v_t^{tgt}-v_t^{agt}$</strong> 相对速度｜<strong>$\hat d_t=d_t/\lVert d_t\rVert$</strong> 单位视线（LOS）｜<strong>$\hat v_{rel}=v_{rel}/\lVert v_{rel}\rVert$</strong> 归一化相对速度。
+</div>
+</div>
+
+<h4>9.2 相对运动学的两个恒等式（后续推导全靠它）</h4>
+<p><strong>恒等式 1（距离变化率）</strong>：$\rho=\lVert d\rVert$，$\rho^2=d\cdot d$，两边求导 $2\rho\dot\rho=2d\cdot v_{rel}$，故</p>
+<p>$$ \dot\rho=\hat d^{\top}v_{rel} \tag{9.1} $$</p>
+<p><strong>恒等式 2（视线角速率）</strong>：$\hat d=d/\rho$，</p>
+<p>$$ \dot{\hat d}=\frac{d}{dt}\frac{d}{\rho}=\frac{v_{rel}}{\rho}-\frac{d}{\rho^2}\dot\rho=\frac{1}{\rho}\Big(I-\hat d\hat d^{\top}\Big)v_{rel}\ \Longrightarrow\ \Big\lVert\dot{\hat d}\Big\rVert=\frac{\lVert\hat d\times v_{rel}\rVert}{\rho}=\frac{\lVert v_{rel}\rVert\sin\angle}{\rho} $$</p>
+<p>（最后一步用 $\lVert(I-\hat d\hat d^\top)v_{rel}\rVert=\lVert\hat d\times v_{rel}\rVert$——投影与叉积的模长恒等。）</p>
+
+<h4>9.3 式 (6) 的推导与「尺度无关」的精确含义</h4>
+<p><strong>第 1 步：叉积-正弦恒等式</strong>。对任意向量 $a,b$：$\lVert a\times b\rVert^2=\lVert a\rVert^2\lVert b\rVert^2-(a\cdot b)^2=\lVert a\rVert^2\lVert b\rVert^2\sin^2\angle(a,b)$。取 $a=\hat d$、$b=\hat v_{rel}$（均为单位向量）：</p>
+<p>$$ \Big\lVert\hat d\times\hat v_{rel}\Big\rVert=\sin\angle\big(\hat d,\hat v_{rel}\big)=\sin\angle\big(d,v_{rel}\big)\qquad\checkmark \tag{6 成立} $$</p>
+<p>（角度相同是因为 $\hat d,\hat v_{rel}$ 分别是 $d,v_{rel}$ 的归一化，方向不变。）</p>
+<p><strong>第 2 步：与平行导引（PN）判据的关系</strong>。平行导引要求<strong>视线方向不漂移</strong>（constant bearing）⟺ $\dot{\hat d}=0$ ⟺ $d\times v_{rel}=0$ ⟺ $v_{rel}\parallel d$。由恒等式 2：</p>
+<p>$$ L_{align}=\sin\angle=\frac{\rho\,\lVert\dot{\hat d}\rVert}{\lVert v_{rel}\rVert}\quad\Longleftrightarrow\quad \lVert\dot{\hat d}\rVert=\frac{\lVert v_{rel}\rVert}{\rho}L_{align} $$</p>
+<p>经典 PN 用 $\dot\lambda\equiv\lVert\dot{\hat d}\rVert$ 乘接近速度做指令，但 $\dot\lambda$ 里<strong>含 $1/\rho$</strong>——纯方位观测下 $\rho$ 不可测，PN 无法直接实现。式 (6) 改用 $\hat v_{rel}$ 归一化，把 $1/\rho$ 换成了 $1/\lVert v_{rel}\rVert$ 的「自归一化」，<strong>损失信号与距离无关、只依赖两个方向</strong>。这正是论文说「vanishes when the relative velocity is aligned with the LOS」的严格含义，也是纯方位设置下最接近 PN 的可微替代 ✅。</p>
+
+<h4>9.4 式 (7) 的推导与符号约定</h4>
+<p>由恒等式 1，$L_{close}=\hat d^\top v_{rel}=\dot\rho$ <strong>就是距离变化率本身</strong>：接近时 $\rho$ 减小、$\dot\rho<0$。定义 $v_c=-L_{close}=-\dot\rho\ge0$ 为「接近速度」（论文符号）。所以「minimize $L_{close}$ ⟺ maximize $v_c$」——<strong>最小化一个为负的量 = 最大化其绝对值</strong>，论文特意提醒「note the sign」，这是复现时最容易搞反的地方。✅ 推导无问题。</p>
+<p><strong>捕获几何核算</strong>：若 $L_{align}=0$ 严格成立（碰撞航向）且 $v_c$ 恒定，则 $\rho(t)=\rho_0-v_ct$，相遇时间 $t_{go}=\rho_0/v_c$。以 $\rho_0=10$ m、$v_c=5$ m/s 计，$t_{go}=2$ s=100 控制步 &lt; $T_{ep}=600$ ✅ 在回合长度内可达。捕获半径 $c_r=0.3$ m 意味「物理碰撞」而非「接近」。</p>
+
+<h4>9.5 两项损失的梯度分析（BPTT 的信号结构，第一性原理）</h4>
+<p>损失通过 $d,v_{rel}$ 依赖状态 $x_t$（训练时入侵者轨迹已知，只有 $p^{agt},v^{agt}$ 可导）。逐项求导（$\hat u\equiv\hat v_{rel}$，$\theta=\angle(d,v_{rel})$，$\rho=\lVert d\rVert$）：</p>
+<p>$$ \frac{\partial L_{close}}{\partial v^{agt}}=\hat d^{\top},\qquad \frac{\partial L_{close}}{\partial p^{agt}}=\frac{1}{\rho}\,v_{rel}^{\top}\Big(I-\hat d\hat d^{\top}\Big) $$</p>
+<p>$$ \frac{\partial L_{align}}{\partial v^{agt}}=\frac{\hat d\cdot\hat u}{L_{align}\,\lVert v_{rel}\rVert}\Big(I-\hat u\hat u^{\top}\Big)\hat d,\qquad \frac{\partial L_{align}}{\partial p^{agt}}=\frac{\hat d\cdot\hat u}{L_{align}\,\rho}\Big(\hat u-(\hat d\cdot\hat u)\hat d\Big) $$</p>
+<p>推导要点（$L_{align}=\sqrt{1-(\hat d\cdot\hat u)^2}$，链式法则）：$\partial L/\partial\hat u=-\frac{\hat d\cdot\hat u}{L}\hat d$；$\partial\hat u/\partial v_{rel}=(I-\hat u\hat u^\top)/\lVert v_{rel}\rVert$；$\partial\hat d/\partial d=(I-\hat d\hat d^\top)/\rho$；$\partial d/\partial p^{agt}=-I$；再合成。逐项验算：当 $\theta$ 很小时 $\lVert\partial L_{align}/\partial v^{agt}\rVert=\lvert\cos\theta\rvert/\lVert v_{rel}\rVert$ 有界，$\lVert\partial L_{align}/\partial p^{agt}\rVert=\lvert\cos\theta\rvert/\rho$ 有界——<strong>梯度不会爆炸，但两个制导项的位置梯度都 $\propto 1/\rho$</strong>。结论（论文未讨论的分析发现）：</p>
+<ul>
+<li><strong>远距离时</strong>：位置空间的梯度信号按 $1/\rho$ 衰减，速度空间的梯度不衰减——APG 在长距离主要靠「速度对准」学习；</li>
+<li><strong>近距离时</strong>：位置梯度变强，负责末段修正。距离信息实际上通过 $1/\rho$ 的<strong>梯度强度</strong>隐式注入——这正是「GRU 必须隐式估计距离」的另一面：网络若估不准 $\rho$，就无法正确权衡两个信号；</li>
+<li>$L_{align}$ 在 $\theta=0$（完美对齐）处不可导（锥点），但两侧极限梯度有界——数值上无碍，理论上是个不可微点，论文未提（小疑点）。</li>
+</ul>
+<hr>
+
+<h3>10. 公式 (8)(9)：正则项与偏航对准</h3>
+
+<h4>10.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(8) —— 平滑与限速（论文式 (8)）</span>
+$$ L_{acc}=\lVert a_t\rVert^{2},\qquad L_{jerk}=\lVert j_t\rVert^{2},\qquad L_{vmax}=\max\big(0,\ \lVert v_t\rVert-v_{des}\big)^{2} \tag{8} $$
+<span class="eq-tag" style="margin-top:12px;">Eq.(9) —— 偏航对准（论文式 (9)）</span>
+$$ L_{yaw}=-\hat d_t^{\top}\hat b_{1,t} \tag{9} $$
+<div class="eq-note">
+<strong>$a_t$</strong>=指令加速度（正文「penalize commanded acceleration」⟹ $a_t=a_{cmd,t}$，质量归一化推力指令）｜<strong>$j_t$</strong>=指令加速度的 jerk。论文未给离散定义，按标准取 $j_t=(a_t-a_{t-1})/\Delta t_{ctrl}$（<strong>重建，标注不确定</strong>）｜<strong>$v_{des}$</strong>=期望速度上限（<strong>值缺失</strong>，见 §8.3）｜<strong>$\hat b_{1,t}$</strong>=机体 x 轴在世界系水平面的单位投影。
+</div>
+</div>
+
+<h4>10.2 式 (9) 的完整推导（把它写成显式的偏航角函数）</h4>
+<p>机体 x 轴的世界系方向：$b_1=R_{wb}\,e_1$，水平投影 $b_{1,xy}=(b_{1x},b_{1y},0)$，归一化 $\hat b_1=b_{1,xy}/\lVert b_{1,xy}\rVert$。悬停/小滚转俯仰时 $R_{wb}\approx R_z(\psi)$，于是</p>
+<p>$$ \hat b_1=\big(\cos\psi,\ \sin\psi,\ 0\big)\ \Longrightarrow\ L_{yaw}=-\hat d^{\top}\hat b_1=-\Big(\hat d_x\cos\psi+\hat d_y\sin\psi\Big)=-\Big\lVert\hat d_{xy}\Big\rVert\cos\big(\psi-\psi_{los}\big) $$</p>
+<p>其中 $\psi_{los}=\operatorname{atan2}(\hat d_y,\hat d_x)$ 是视线的方位角（最后一处用了 $\cos$ 的和角公式：$\hat d_x\cos\psi+\hat d_y\sin\psi=\lVert\hat d_{xy}\rVert\cos(\psi-\psi_{los})$）。因此：</p>
+<ul>
+<li>$L_{yaw}$ 的最小值是 $-\lVert\hat d_{xy}\rVert$，在 $\psi=\psi_{los}$（机头正对目标方位）处取得 ✅；</li>
+<li>梯度 $\partial L_{yaw}/\partial\psi=\lVert\hat d_{xy}\rVert\sin(\psi-\psi_{los})$，把偏航角平滑拉向视线方位；</li>
+<li><strong>物理作用</strong>：相机装在机头，$L_{yaw}$ 是「目标保持在水平视场中心」的软约束。注意它只约束<strong>水平</strong>分量——垂直视场没有任何约束，俯冲获取视差时目标可能滑出垂直视场（论文未讨论，§16.2 列入风险项）；</li>
+<li>滚转/俯仰非零时 $\hat b_1$ 的精确式仍是投影归一化，上式是悬停邻域的一阶近似——小角度下精确成立，大机动下定性成立。</li>
+</ul>
+
+<h4>10.3 式 (8) 三项的数学性质</h4>
+<ul>
+<li>$L_{acc}=\lVert a\rVert^2$：二次型，梯度 $2a$——<strong>处处可微</strong>，直接惩罚满油门，避免「bang-bang 抖动解」。</li>
+<li>$L_{jerk}$：$j_t=(a_t-a_{t-1})/\Delta t_{ctrl}$（离散差分）⟹ $L_{jerk}$ 惩罚<strong>相邻控制步指令跳变</strong>。它把「平滑」强加在指令层面，比惩罚状态 jerk 更直接地抑制高频振荡——正文说「mitigating high-frequency oscillations that destabilize BPTT」：BPTT 的梯度沿 64 步回传，指令的高频抖动经动力学传播后放大梯度范数，$L_{jerk}$ 从源头压制 ✅。</li>
+<li>$L_{vmax}$：hinge 的平方，$\partial L_{vmax}/\partial v=2\max(0,\lVert v\rVert-v_{des})\,\hat v$——<strong>梯度连续</strong>（$C^1$），超速时才激活，低于 $v_{des}$ 时零梯度零损失：给「为转弯而减速」留出自由 ✅。与 §2.4 的阻力核算呼应：限速同时也是<strong>限阻力</strong>——速度越高阻力吃掉的推力预算越多，$L_{vmax}$ 间接保护机动余量。</li>
+</ul>
+<h3>11. 公式 (10)–(15)：入侵者轨迹族与动力学可行性判据（附录 A.1）</h3>
+
+<h4>11.1 式 (10) 与三个轨迹族</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(10) —— 参数曲线（论文式 (10)）</span>
+$$ p(s)=c_0+R_{tilt}\,h(s)+z(s)\,\hat z \tag{10} $$
+<div class="eq-note">
+<strong>$s$</strong>=标量相位｜<strong>$c_0$</strong>=曲线中心｜<strong>$h(s)$</strong>=xy 平面内的平面曲线（Table 1）｜<strong>$z(s)$</strong>=竖直分量｜<strong>$R_{tilt}=R_z(\psi)R_y(\theta)R_x(\phi)$</strong>=每回合采样的 ZYX 欧拉旋转，把平面曲线「掀」进 3D。$\dot{(\cdot)}$ 对时间求导、$(\cdot)'$ 对相位求导。
+</div>
+</div>
+<p>Table 1 的三个家族（代入式 (10)）：</p>
+<p>$$ \text{椭圆: }h(s)=\big(r_{axis}\cos s,\ r_{axis}\rho_{ar}\sin s,\ 0\big),\quad z(s)=0;\qquad \text{螺旋: }h(s)=\big(r_{axis}\cos s,\ r_{axis}\rho_{ar}\sin s,\ 0\big),\quad z(s)=z_{rate}\,s $$</p>
+<p>$$ \text{双纽线: }h(s)=\Big(r_{axis}\cos s,\ \tfrac{r_{axis}\rho_{ar}}{2}\sin 2s,\ 0\Big),\quad z(s)=0 $$</p>
+<p>训练只用椭圆（Table 4：曲线类型=ellipse），螺旋/双纽线仅评估——后两者是「分布外」泛化测试。Table 4 的采样：$v_{tgt}\sim U(-10,10)$（图 7 基准）或 $U(-4,4)$（图 5）、倾斜角 $U(-0.5,0.5)$ rad、$r_{axis}\sim U(4,8)$ m、$\rho_{ar}\sim U(0.5,1.5)$。<strong>含糊处</strong>：Table 1 写倾斜为 per-env $(\phi,\theta)$（只两个角），Table 4 写「Tilt rpy」——偏航 $\psi$ 是否也随机化未说明（两表口径不完全一致，标注）。</p>
+
+<h4>11.2 恒速条件：$\dot s=v_{tgt}/\lVert c(s)\rVert$（附录 A.1.1 的推导）</h4>
+<p>定义切向量 $c(s)=p'(s)=R_{tilt}h'(s)+z'(s)\hat z$（逐项：$p'=R_{tilt}h'+z'\hat z$，$c_0$ 是常数）。链式法则 $\dot p=c(s)\,\dot s$。要求实际速度恒为 $v_{tgt}$（论文：intruder 恒速执行轨迹）：</p>
+<p>$$ \lVert\dot p\rVert=\lVert c(s)\rVert\,\lvert\dot s\rvert=\lvert v_{tgt}\rvert\ \Longrightarrow\ \dot s=\frac{v_{tgt}}{\lVert c(s)\rVert}\qquad\checkmark $$</p>
+<p>（$\dot s$ 的符号 = $v_{tgt}$ 的符号 ⟹ 正负速度决定顺/逆时针遍历方向——这正是算法 1 末尾「signed-split」的出处。）注意：$\dot s$ <strong>一般不是常数</strong>（$\lVert c\rVert$ 随 $s$ 变），除非曲线有旋转对称性（圆的 $\lVert c\rVert$ 恒定）。</p>
+
+<h4>11.3 式 (15) 的完整推导（本附录最值得逐行重推的一式）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(15) —— 恒速参数曲线的加速度（论文式 (15)）</span>
+$$ a(s)=v_{tgt}^{2}\left[\frac{c'(s)}{\lVert c(s)\rVert^{2}}-\frac{c(s)\,\big(c(s)\cdot c'(s)\big)}{\lVert c(s)\rVert^{4}}\right] \tag{15} $$
+</div>
+<p><strong>第 1 步（速度）</strong>：$\dot p(t)=c(s)\,\dot s$（§11.2）。</p>
+<p><strong>第 2 步（加速度 = 对时间再求导，链式法则）</strong>：</p>
+<p>$$ a=\frac{d}{dt}\Big(c(s)\,\dot s\Big)=c'(s)\,\dot s\cdot\dot s+c(s)\,\ddot s=c'(s)\,\dot s^2+c(s)\,\ddot s $$</p>
+<p><strong>第 3 步（求 $\ddot s$：对 $\dot s=v_{tgt}/\lVert c\rVert$ 再求导）</strong>。先算 $\lVert c\rVert$ 的导数：$\lVert c\rVert^2=c\cdot c$，$2\lVert c\rVert\,d\lVert c\rVert/dt=2c\cdot c'\dot s$，故</p>
+<p>$$ \ddot s=\frac{d}{dt}\frac{v_{tgt}}{\lVert c\rVert}=-v_{tgt}\frac{d\lVert c\rVert/dt}{\lVert c\rVert^2}=-v_{tgt}\frac{c\cdot c'}{\lVert c\rVert^3}\,\dot s $$</p>
+<p><strong>第 4 步（代入整理）</strong>：</p>
+<p>$$ a=c'\dot s^2-v_{tgt}\frac{c\,(c\cdot c')}{\lVert c\rVert^3}\dot s=v_{tgt}^2\left[\frac{c'}{\lVert c\rVert^2}-\frac{c\,(c\cdot c')}{\lVert c\rVert^4}\right]\qquad\checkmark \tag{15 逐项一致} $$</p>
+<p>（最后一步代 $\dot s=v_{tgt}/\lVert c\rVert$：$\dot s^2=v^2/\lVert c\rVert^2$，$v\dot s/\lVert c\rVert^3=v^2/\lVert c\rVert^4$。）</p>
+<p><strong>第 5 步：独立校验（恒速 ⟹ 加速度垂直于速度）</strong>。对任何恒速曲线必须 $a\cdot\dot p=0$。用式 (15) 验证：</p>
+<p>$$ a\cdot c=v_{tgt}^2\left[\frac{c'\cdot c}{\lVert c\rVert^2}-\frac{(c\cdot c')\,\lVert c\rVert^2}{\lVert c\rVert^4}\right]=v_{tgt}^2\left[\frac{c\cdot c'}{\lVert c\rVert^2}-\frac{c\cdot c'}{\lVert c\rVert^2}\right]=0\qquad\checkmark $$</p>
+<p>恒等式成立——<strong>式 (15) 通过独立一致性检验，未发现错误</strong>。</p>
+
+<h4>11.4 曲率公式 $\kappa=\lVert c\times c'\rVert/\lVert c\rVert^3$（附录 A.1.2 的推导）</h4>
+<p>空间曲线曲率的定义 $\kappa=\lVert\dot p\times\ddot p\rVert/\lVert\dot p\rVert^3$（Frenet 框架）。代入 $\dot p=c\dot s$、$\ddot p=a=c'\dot s^2+c\ddot s$：</p>
+<p>$$ \dot p\times\ddot p=(c\dot s)\times\big(c'\dot s^2+c\ddot s\big)=\dot s^3\,\big(c\times c'\big)+\dot s\,\ddot s\,\underbrace{(c\times c)}_{=0} $$</p>
+<p>取模并除 $\lVert\dot p\rVert^3=\dot s^3\lVert c\rVert^3$：</p>
+<p>$$ \kappa(s)=\frac{\dot s^3\,\lVert c\times c'\rVert}{\dot s^3\,\lVert c\rVert^3}=\frac{\lVert c(s)\times c'(s)\rVert}{\lVert c(s)\rVert^3}\qquad\checkmark $$</p>
+
+<h4>11.5 式 (11)(12)(13)：可达集与可行性判据的严格化</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(11)(12)(13) —— 净加速度、可行条件、加速度上限（论文式 (11)(12)(13)）</span>
+$$ a_{net}=\frac{T_c}{m}b-g\hat z \tag{11} $$
+$$ \Big\lVert a_{cmd,t}\Big\rVert\le A_{max}\quad\text{且}\quad a_{cmd,t,z}\ge 0,\qquad a_{cmd,t}=a_d+g\hat z \tag{12} $$
+$$ A_{max}=\eta\,\frac{N_mF_m}{m},\qquad F_m=f_2\Omega_{max}^2+f_1\Omega_{max}+f_0,\qquad \eta=0.6,\quad N_m=4 \tag{13} $$
+</div>
+<p><strong>式 (11) 的推导</strong>：就是式 (1) 置阻力为零（可行性分析忽略阻力，保守估计）：$\dot v=\frac{u_1}{m}R_{wb}\hat z_B-g\hat z$，令 $T_c=u_1$、$b=R_{wb}[0,0,1]^\top$ 即得。<strong>与正文式 (1) 逐符号互证 ✅</strong>。</p>
+<p><strong>可达集推导（式 (12) 的依据）</strong>：四旋翼唯一能施加的力是沿机体推力轴、大小 $0\le T_c\le N_mF_m$ 的推力。因此世界系加速度的可达集为</p>
+<p>$$ \mathcal A=\Big\{a: a=A\,b-g\hat z,\quad 0\le A\le A_{max},\quad b\in S^2,\ b_z\ge0\Big\} $$</p>
+<p>（$b_z\ge0$：推力轴必须指向上半球——桨只能往「机背上方」吹，不能产生向下的推力分量超过重力抵消所需……更准确地说，$b_z\ge0$ 是「推力轴不过水平面」的约束，等价于拒绝倒飞姿态。）给定需求 $a_d$，需要 $a_d+g\hat z=A b$，即 $b=(a_d+g\hat z)/\lVert a_d+g\hat z\rVert$。这可行当且仅当：</p>
+<p>$$ \lVert a_d+g\hat z\rVert\le A_{max}\ \ (\text{大小够})\quad\text{且}\quad \big(a_d+g\hat z\big)_z\ge 0\ \ (\text{方向在上半球})\quad\Longleftrightarrow\ \text{式 (12)}\ \checkmark $$</p>
+<p><strong>式 (13) 的数值核算</strong>（$F_m$ 用「推重比 2.7 × 质量 2.65 kg」：$F_m=2.7\times2.65\times9.807/4=17.54$ N）：</p>
+<p>$$ m=2.65\ \text{kg}:\ A_{max}=\frac{0.6\times4\times17.54}{2.65}=15.9\ \text{m/s}^2\approx1.62\,g;\qquad m=1.0\ \text{kg}:\ A_{max}=42.1\ \text{m/s}^2\approx4.29\,g $$</p>
+<p><strong>与正文论断的互证</strong>：最紧的椭圆（$r_{axis}=4$ m、$\rho_{ar}=1.5$，$\kappa_{max}=1.5/4=0.375$ m⁻¹）在 $v=5$ m/s 时向心加速度 $v^2\kappa=9.4$ m/s²，$\lVert a+g\hat z\rVert=\sqrt{9.4^2+9.8^2}=13.6<15.9$ 可行；$v=6$ m/s 时 $16.7>15.9$ 不可行——<strong>正好落在正文「2.65 kg 平台在入侵者速度超过 4 m/s 后电机饱和」的论断区间 ✅</strong>。1 kg 平台 $v=10$ m/s：$\sqrt{37.5^2+96.2}=38.8<42.1$ 勉强可行——图 7 在 10 m/s 处成功率 15–65%（非零）与该「最紧曲线勉强可行、多数曲线可行」的核算一致 ✅。<strong>歧义标注</strong>：「推重比 2.7」若指<strong>原始</strong>推力则 $A_{max}=0.6\times2.7g=15.9$ m/s²；若 2.7 已是 $\eta$ 折减后的有效推重比，则 $A_{max}=26.5$ m/s²。两种读法相差 67%，论文未说明——建议用代码的 $f_2,\Omega_{max}$ 直接验算。</p>
+
+<h4>11.6 式 (14)：逐点检验与「下降余量」的推导</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(14) —— 椭圆/双纽线的可行性（论文式 (14)）</span>
+$$ \max_s\Big\lVert a(s)+g\hat z\Big\rVert\le A_{max}\quad\text{且}\quad \min_s a_z(s)\ge-\beta g,\qquad \beta=0.6 \tag{14} $$
+</div>
+<p>第一个判据是式 (12) 第一式沿相位 $s$ 的稠密网格化（$a(s)$ 由式 (15) 给出）✅。第二个判据的推导：下降弧上 $a_z<0$，所需推力加速度的 z 分量为 $a_z+g$；要求 $a_z\ge-\beta g$ ⟺ $a_z+g\ge(1-\beta)g=0.4g$——即<strong>任何时刻推力矢量的 z 分量至少保留 $0.4g$</strong>，等价于推力轴与水平面的夹角不小于 $\arcsin(0.4g/\lVert a+g\hat z\rVert)$ 给出的下限。$\beta=0.6$ 是工程余量（正文：「leaves margin so the attitude controller does not saturate on the descending arc」）✅ 推导自洽。</p>
+<p><strong>数值例</strong>：倾角 $\phi=0.5$ rad（$29^\circ$）的圆轨道，$r=4$ m、$v=10$ m/s：向心加速度 $25$ m/s²，下降弧的竖直分量 $a_z\approx-25\sin 0.5=-12.0$ m/s²。判据二要求 $a_z\ge-0.6g=-5.88$ → <strong>拒绝</strong>；同曲线 $v=4$ m/s：$a_z=-25\times(16/100)\times0.479=-1.9\ge-5.88$ → 通过。即<strong>可行性过滤器主要杀掉「高速 + 大倾角」的组合</strong>——这正是评估集要「每个速度档都有足够可行样本」的原因（算法 1 的拒绝采样 + abort 机制，§12）。</p>
+
+<h4>11.7 螺旋的曲率约束：一处量纲不闭合的印刷式 + 完整的正确推导</h4>
+<p>论文原文（无编号）：「for the spiral trajectory, we impose $v_{tgt}^2\kappa_{max}\le mg$，where $\kappa_{max}=\max_s\kappa(s)$… derived from Eq. (10) as $\kappa(s)=\lVert c(s)\times c'(s)\rVert/\lVert c(s)\rVert^3$」。</p>
+<p><strong>先推导螺旋为什么只需曲率判据</strong>（把论文没说清的地方补全）。螺旋的 $c(s)=R_{tilt}h'(s)+z_{rate}\hat z$，其中 $h'$ 是圆 $(r\cos s, r\rho_{ar}\sin s,0)$ 的切向（本文为简写取圆 $\rho_{ar}=1$：$h'=(-r\sin s,\ r\cos s,\ 0)$）。关键事实：$c\cdot c'=0$（圆与竖直平移的复合：$c'=-h$，$c\cdot c'=(h')\cdot(-h)+z_{rate}\hat z\cdot 0=0$，因 $h'\perp h$）。代入式 (15)：</p>
+<p>$$ a=v^2\frac{c'}{\lVert c\rVert^2}\ \Longrightarrow\ \lVert a\rVert=v^2\frac{\lVert c'\rVert}{\lVert c\rVert^2}=v^2\frac{r}{r^2+z_{rate}^2}=v^2\kappa \qquad\Big(\kappa=\frac{\lVert c\times c'\rVert}{\lVert c\rVert^3}=\frac{r}{r^2+z_{rate}^2}\Big) $$</p>
+<p>（$\lVert c\times c'\rVert=r\sqrt{r^2+z_{rate}^2}$、$\lVert c\rVert^3=(r^2+z_{rate}^2)^{3/2}$，相除即 $r/(r^2+z_{rate}^2)$。）同时竖直分量 $a_z=0$（圆的竖直加速度为零，见推导）——所以对圆螺旋，<strong>总加速度大小就是 $v^2\kappa$，式 (12) 的两个判据退化为一个</strong>：$\lVert a+g\hat z\rVert=\sqrt{(v^2\kappa)^2+g^2}\le A_{max}$（且 $a_z=0\ge-\beta g$ 自动满足）。</p>
+<p><strong>论文印的 $v_{tgt}^2\kappa_{max}\le mg$ 有量纲错误</strong>：左边 $v^2\kappa$ 的量纲是 m/s²（加速度），右边 $mg$ 是 N（力）——<strong>不闭合</strong>。按本节的推导，正确形式应为 $v^2\kappa_{max}\le A_{max}$（严格）或保守的 $v^2\kappa_{max}\le g$（把向心加速度上限压到重力，右侧量纲 m/s²）。论文的写法多半是「$v^2\kappa\le g$ 的笔误（多乘了 $m$）」，<strong>判定：印刷错误，不影响生成逻辑但复现时阈值差 $m$ 倍</strong>。另外注意：论文对椭圆/双纽线用式 (14) 双判据、对螺旋只用曲率判据，两套标准不统一——对螺旋确实够用（$a_z=0$），但 $\rho_{ar}\ne1$ 的椭圆螺旋时 $c\cdot c'\ne0$，$a_z\ne0$，曲率判据不再完备（次要问题，标注）。</p>
+<hr>
+
+<h3>12. 算法 1 逐行解读：可行轨迹池生成（附录 A.1.2）</h3>
+<pre class="code-block"><code>Algorithm 1  Generating a pool of feasible trajectories for a range of speed magnitudes
+Require: speed magnitudes, desired number of trajectories, shape-parameter ranges,
+         feasibility test, pool size, draw budget
+ 1: for each speed magnitude do
+ 2:     feasible pool ← empty
+ 3:     draws ← 0
+ 4:     while |feasible pool| &lt; pool size and draws &lt; draw budget do
+ 5:         draw shape parameters uniformly from the ranges     ▷ semi-axis, axis ratio, tilt, zrate
+ 6:         draws ← draws + 1
+ 7:         if the shape is dynamically feasible at this speed then   ▷ feasibility test
+ 8:             add the shape to the feasible pool
+ 9:         end if
+10:     end while
+11:     if |feasible pool| &lt; desired number of trajectories then
+12:         abort: feasible region too thin    ▷ widen the ranges or lower the top speed
+13:     end if
+14:     kept ← farthest-point selection from the feasible pool   ▷ max-min in normalized parameter space
+15:     signed-split: assign traversal direction
+16:     output each kept shape and its signed speed
+17: end for</code></pre>
+<p><strong>逐行解读</strong>（三段式结构）：</p>
+<ol>
+<li><strong>第 1–10 行：拒绝采样（rejection sampling）</strong>。对每个速度档独立进行：均匀采样形状参数（半轴、轴比、倾斜、爬升率），用 §11 的可行性判据（式 (14) 或螺旋曲率判据）检验，可行才入池；`pool size` 与 `draw budget` 双上限防止无限循环。期望采样次数 = pool size / 接受率——<strong>速度越高、参数范围越宽，接受率越低，draw budget 就是为此设的安全阀</strong>。</li>
+<li><strong>第 11–13 行：显式失败而非静默降级</strong>。若池子填不满，直接 abort 并提示「放宽范围或降低最高速度」——保证「每个 (族, 速度) 桶都有足量样本」，成功率指标不被空桶污染。这是评估严谨性的关键设计（若静默产出稀薄可行集，§11.6 的核算显示高速+大倾角组合本来就稀缺）。</li>
+<li><strong>第 14 行：最远点选择（farthest-point selection）</strong>。在<strong>归一化参数空间</strong>（各参数缩放到 [0,1]）里贪心挑出使「两两最小距离最大化」的子集——把「按可行域密度聚集」的样本摊开，保证几何多样性，而不是让评估集在参数空间里抱团。</li>
+<li><strong>第 15–16 行：signed-split</strong>。一半样本正速度、一半负速度（逆遍历）——训练时 $v_{tgt}\sim U(-10,10)$ 已含双向，评估集显式对半分保证两种遍历方向都有覆盖。</li>
+</ol>
+<p><strong>自检</strong>：算法对每个速度档独立运行 ⟹ 输出「速度档 × 曲线族 × 双向」的完整格子；论文随后说「Each generation run reports acceptance rate and diversity diagnostics (closest-pair spread, per-axis coverage, etc.)」与「aborts if any (family, speed) bucket cannot be filled」——与第 11–13 行一致 ✅。未发现算法层面的逻辑问题。唯一可挑剔处：farthest-point 的贪心实现复杂度 $O(NK)$（$N$ 池大小、$K$ 需保留数），对「每档几千样本」完全够用，无需优化。</p>
+<hr>
+
+<h3>13. 公式 (16)：超参搜索目标 $J=300(1-\text{SR})+L_{p99}$</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(16) —— 超参搜索目标（论文式 (16)）</span>
+$$ J=300\,(1-\text{SR})+L_{p99} \tag{16} $$
+<div class="eq-note">
+<strong>SR</strong>$\in[0,1]$=评估回合拦截成功率｜<strong>$L_{p99}$</strong>=回合长度（time-to-intercept）的第 99 百分位；超过 12 s 的拦截记失败。
+</div>
+</div>
+<p><strong>优先级逻辑的核算</strong>：$\Delta J=300\,\Delta(1-\text{SR})+\Delta L_{p99}=-300\,\Delta\text{SR}+\Delta L_{p99}$。成功率提升 1%（$\Delta\text{SR}=+0.01$）带来的收益 $\Delta J=-3$，等价于把 $L_{p99}$ 压缩 3 s——在 $L_{p99}$ 典型值 ~5–12 s 的量级下，<strong>「成功率每 1% 优先于时间 3 s」</strong>。当 SR 逼近 1 时 $\Delta\text{SR}$ 空间耗尽，$L_{p99}$ 项自然接管平局判定 ✅ 与论文「prioritizes improving the success rate until it is close to 100%」一致。用 $p99$ 而非均值/中位数：关注<strong>最差 1%</strong>（部署中最要命的尾风险），方向正确。权重 300 的选取没有理论依据（是量级设计），但逻辑自洽。搜索过程（Optuna TPE + Hydra，16 随机启动 + 共 64 试验，log-uniform 先验，逐轮 FANOVA/MDI/Spearman/1D 切片收缩区间）无公式，不再展开。</p>
+<hr>
+
+<h3>14. APG 的梯度流：BPTT、离散伴随与 RK4 雅可比（论文无式，本文补全——补充式 D5–D7）</h3>
+
+<h4>14.1 优化问题与展开的链式法则（补充式 D5）</h4>
+<p>论文目标（§3 开头，无编号）：$\theta^{*}=\arg\min_\theta\sum_{t=0}^{T}L(x_t,\pi_\theta(o_t))$。确定性动力学 $x_{t+1}=F(x_t,u_t)$、$u_t=\pi_\theta(o_t)$、$o_t$ 是 $x_t$ 的函数（含入侵者轨迹，训练时已知）。直接展开复合求导：</p>
+<p>$$ \frac{\partial L}{\partial\theta}=\sum_{t=0}^{T}\sum_{s=0}^{t}\frac{\partial L_t}{\partial x_t}\cdot\frac{\partial x_t}{\partial x_s}\cdot\frac{\partial x_s}{\partial u_s}\cdot\frac{\partial u_s}{\partial\theta}\qquad\Big(\frac{\partial x_t}{\partial x_s}=\prod_{k=s}^{t-1}\frac{\partial x_{k+1}}{\partial x_k}\Big) \tag{D5} $$</p>
+<p>这是 BPTT 的前向展开形式：第 $s$ 步动作的影响沿状态链传播到所有 $t\ge s$ 的损失。时间代价 $O(T^2)$ 矩阵乘法。</p>
+
+<h4>14.2 离散伴随（反向递归，$O(T)$ 代价的标准实现）</h4>
+<p>定义共态（伴随变量）$\lambda_t=\partial L^{total}/\partial x_t$。反向递归与参数梯度：</p>
+<p>$$ \lambda_T=\frac{\partial L_T}{\partial x_T},\qquad \lambda_t=\frac{\partial L_t}{\partial x_t}+\lambda_{t+1}\frac{\partial x_{t+1}}{\partial x_t}\quad(t=T-1,\dots,0),\qquad \frac{\partial L}{\partial\theta}=\sum_{t=0}^{T}\lambda_{t+1}\,\frac{\partial x_{t+1}}{\partial u_t}\frac{\partial u_t}{\partial\theta} \tag{D6} $$</p>
+<p><strong>推导（对一步递归式归纳）</strong>：把 $L^{total}=\sum_t L_t(x_t,u_t)$ 与约束 $x_{t+1}=F(x_t,u_t)$ 写成拉格朗日量 $\mathcal L=\sum_t L_t+\sum_t\lambda_{t+1}^\top\big(F(x_t,u_t)-x_{t+1}\big)$；对 $x_t$ 求偏导置零得 $\lambda_t=\partial L_t/\partial x_t+\lambda_{t+1}\partial F/\partial x_t$，对 $\theta$ 求导得上式。这就是自动微分在 64 步计算图上的反向传播所实现的东西——<strong>论文用 PyTorch 的 autograd 隐式完成，无需手写伴随</strong>，但理解它才能看懂「冻结环境」「梯度裁剪 5.0」等实现细节的用意。</p>
+
+<h4>14.3 状态雅可比 $\partial x_{t+1}/\partial x_t$ 与 $\partial x_{t+1}/\partial u_t$ 的显式结构（17 维状态）</h4>
+<p>连续动力学 $\dot x=F_c(x,u)$（$x=[p,v,q,\omega,\Omega_{1..4}]$，17 维），单步（含 RK4）雅可比由 $\partial F_c/\partial x$ 组成。对 Euler 子步 $x+\Delta t F_c$，$\partial x_{t+1}/\partial x_t=I+\Delta t\,\partial F_c/\partial x+O(\Delta t^2)$。核心分块（<strong>逐块推导</strong>）：</p>
+<ul>
+<li><strong>阻力块的雅可比</strong>（$\nabla_v(\lVert v\rVert v)$ 的推导）：$\partial(\lVert v\rVert v_i)/\partial v_j=\delta_{ij}\lVert v\rVert+v_i v_j/\lVert v\rVert$，故
+$$ \frac{\partial d}{\partial v}=-k_{d,1}\Big(\lVert v\rVert I+\frac{vv^\top}{\lVert v\rVert}\Big)-k_{d,2}I $$</li>
+<li><strong>四元数块的雅可比</strong>：由 §3.2 的矩阵形式 $\dot q=\tfrac12\Omega(\omega)q$：$\partial\dot q/\partial\omega=\tfrac12\begin{bmatrix}-q_x&-q_y&-q_z\\ q_0&-q_z&q_y\\ q_z&q_0&-q_x\\ -q_y&q_x&q_0\end{bmatrix}$（4×3，逐列即 $\Omega(e_k)q$）。</li>
+<li><strong>欧拉方程的雅可比</strong>（陀螺项的线性化，推导见下）：
+$$ \frac{\partial}{\partial\omega}\big(\omega\times J\omega\big)=[\omega]_\times J-[J\omega]_\times\qquad\Big(\text{用 }a\times b=[a]_\times b,\ \partial([\omega]_\times J\omega)=[\omega]_\times J\,d\omega-[J\omega]_\times d\omega\Big) $$
+故 $\partial\dot\omega/\partial\omega=-J^{-1}\big([\omega]_\times J-[J\omega]_\times\big)$。</li>
+<li><strong>转子块</strong>：$\partial\dot\Omega/\partial\Omega=-(1/\tau_r)I_4$，$\partial\dot\Omega/\partial\Omega_{cmd}=(1/\tau_r)I_4$（式 (4) 直接求导）。</li>
+<li><strong>对动作的依赖</strong>：$u_t=[a_{cmd},\psi]\to$ PD 控制器（D4）$\to\Omega_{cmd}\to\dot\Omega$。链：$\partial x_{t+1}/\partial u_t$ 经 $\partial\Omega_{cmd}/\partial u_t$（PD 控制器雅可比，姿态误差 $e_R$ 对 $\hat b_{des}$、$\hat x_c$ 的导数——全部解析可微）再进转子块。</li>
+<li><strong>观测块</strong>：$o_t=(v_t^S,\ R_t^{BS},\ \hat d_t^S)$，其中 $\hat d$ 含 $1/\lVert d\rVert$ 的归一化——autograd 自动处理，但注意 $d\to0$ 时梯度奇异（捕获前），实现需 $\varepsilon$ 保护。</li>
+</ul>
+
+<h4>14.4 RK4 的雅可比链（补充式 D7）</h4>
+<p>定步长 RK4：$y_{n+1}=y_n+\frac{\Delta t}{6}(k_1+2k_2+2k_3+k_4)$，$k_1=F(y_n)$，$k_2=F(y_n+\frac{\Delta t}{2}k_1)$，$k_3=F(y_n+\frac{\Delta t}{2}k_2)$，$k_4=F(y_n+\Delta t\,k_3)$。记 $J_j=\partial F/\partial y|_{y=y_j}$（$y_j$ 为各阶段起点），链式求导：</p>
+<p>$$ \frac{\partial y_{n+1}}{\partial y_n}=I+\frac{\Delta t}{6}\Big[J_1+2J_2\Big(I+\tfrac{\Delta t}{2}J_1\Big)+2J_3\Big(I+\tfrac{\Delta t}{2}J_2\Big)\Big(I+\tfrac{\Delta t}{2}J_1\Big)+J_4\Big(I+\Delta t\,J_3\Big)\Big(I+\tfrac{\Delta t}{2}J_2\Big)\Big(I+\tfrac{\Delta t}{2}J_1\Big)\Big] $$</p>
+<p>（每个括号对应「内层阶段对 $y_n$ 的依赖」。）PyTorch autograd 自动按此展开；<strong>数值要点</strong>：RK4 全由加减乘与 $F$ 的逐元素运算构成，处处可微（$\max,\lVert\cdot\rVert$ 仅在损失侧，不在动力学侧）——这就是「differentiable dynamics」的完整实现路径 ✅。8 子步 × 4 阶段 × 64 步 = 2048 个阶段计算存图，显存与梯度裁剪（$g_{max}=5.0$）的取舍即源于此。</p>
+
+<h4>14.5 训练与网络数值核算（全部与论文数字互证）</h4>
+<ul>
+<li><strong>训练步数</strong>：$1500\times64\times512=49{,}152{,}000\approx49.15$M ✅（正文「approximately 49.15 million steps」）。</li>
+<li><strong>回合时长</strong>：$600\times0.02=12$ s ✅（Table 3 段「total episode duration is 12 s」）。</li>
+<li><strong>RK4 子步</strong>：$\Delta t_{ctrl}/\Delta t_{sim}=0.02/0.0025=8$ ✅。</li>
+<li><strong>网络参数量核算</strong>（图 2：state extractor Linear(12→192) + target extractor Linear(3→192) + 两个 LayerNorm + GRUCell(192) + Linear(192→192) + head Linear(192→4)）：$2496+768+768+222{,}336+37{,}056+772\approx264{,}196$——<strong>约 26.4 万参数</strong>（GRU 占 84%）。注意：note 第 11 节说「网络只有几万参数」是<strong>不准确的</strong>，实为 26 万（几万参数的应该是「几万～几十万」量级的口误）；26 万参数在 Jetson 级设备上依然是轻量网络。</li>
+<li><strong>训练时间比</strong>：Quad 137 / PMD 10 = 13.7 倍 ✅（刚体+RK4 的图规模代价）；PPO 7 分钟最快但图 4a 显示其样本效率低一个数量级。</li>
+<li><strong>评估量</strong>：110,000 个环境，成功率统计误差 $\sim\sqrt{p(1-p)/N}\le0.15\%$——30% 的差距远在噪声之上 ✅。</li>
+</ul>
+<hr>
+
+<h3>15. PMD 点质量模型（Table 5 参数的数学化——补充式 D8）</h3>
+<p>论文只说 PMD 是「simplified point mass dynamics model」并引 [20,21]，<strong>没有给出方程</strong>。Table 5 的参数（accel/vel/yaw 三组 smooth factor + window + delay）暗示以下结构（<strong>重建，形式未确认</strong>）：</p>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D8) —— 点质量模型（重建）</span>
+$$ \dot p=v,\qquad \dot v=a,\qquad \dot a=\frac{\beta_a}{\tau_a}\Big(a_{cmd}(t-\delta_a)-a\Big),\qquad \dot\psi=\frac{\beta_\psi}{\tau_\psi}\Big(\psi_{cmd}(t-\delta_\psi)-\psi\Big) $$
+<div class="eq-note">
+<strong>解读</strong>：PMD 把「加速度指令→实际加速度」建模为一阶平滑 + 纯延迟（$\beta_a=12$、$\tau_a=1$ s 给出时间常数 $\tau_a/\beta_a=83$ ms；$\delta_a=0.02$ s = 一个控制步），速度平滑（$\beta_v=0.5,\tau_v=2$ s）用于观测。域随机化（训练时）：$\beta_a\sim U(5,12)$、$\delta_a\sim U(0.01,0.04)$、$\beta_\psi\sim U(5,12)$、$\delta_\psi\sim U(0.01,0.05)$——在「加速度带宽 + 延迟」上随机化，让 PMD 策略学会容忍执行器不理想性，从而在迁移到 Quad 评估时不完全失配（正文：domain randomization to help PMD policies generalize）。
+</div>
+</div>
+<p><strong>与 Quad 模型的本质差别（把 §7.4 的定性说法量化）</strong>：PMD 的加速度<strong>任意方向瞬时可达</strong>（只有平滑/延迟约束），可达集是「半径为 $\lVert a_{cmd}\rVert_{max}$ 的球」，<strong>不含推力-姿态耦合</strong>：它不知道「要先花 ~60 ms 把机体倾斜 30° 才能获得水平加速度 $g\tan30^\circ=5.7$ m/s²」。因此 PMD 学到的策略在 Quad 评估上表现为「大加速度 + 高频修正 + 过冲」（图 9/10 的 jerk 高约 2 倍），而 Quad APG 学到的策略「更早建立碰撞航向、控制努力更低」。<strong>本节重建不保证与代码逐字一致（论文未印公式），复现时以 github.com/rislab/catchrl 为准</strong>。</p>
+<hr>
+
+<h3>16. 交叉验证总表与问题清单</h3>
+
+<h4>16.1 公式 ↔ 推导 ↔ 数值核算 总表</h4>
+<table>
+<tr><th>论文</th><th>本文独立推导/核算</th><th>结论</th></tr>
+<tr><td>(1) 平动</td><td>牛顿第二定律直推；悬停 $u_1=mg$ 自检通过；与式 (11) 置 $d=0$ 互证</td><td>✅ 成立；阻力帧约定歧义（§2.3）</td></tr>
+<tr><td>(2) 姿态</td><td>四元数范数守恒证明；$\omega\times J\omega$ 展开；10 rad/s 时陀螺项 0.65 N·m≈俯仰预算 18%</td><td>✅ 成立；四元数约定未声明（§3.2）</td></tr>
+<tr><td>(3) 阻力</td><td>$k_{d,1}$ 反演 $C_DA=0.163$ m²；交叉点 1 m/s；10 m/s 时 11 m/s²&gt;g</td><td>⚠️ 形式正确、系数偏大 2–3×（§4.1）</td></tr>
+<tr><td>(4) 转子延迟</td><td>解析解 + 精确离散化；每步 65.9%；带宽 8.56 Hz；3 步 96%</td><td>✅ 数值全部自洽</td></tr>
+<tr><td>Table 6 RPM</td><td>rev/s 解读→178k–1.26M RPM 物理荒谬；rev/min 解读→悬停 12.8k RPM 居中</td><td>❌ <strong>单位疑为 rev/min</strong>（§5.3）</td></tr>
+<tr><td>Table 6 惯量</td><td>转子质量反演 0.233 kg；$I_{xx}+I_{yy}-I_{zz}=2\Sigma m_iz_i^2$ 用 0.5 kg 电池在 z=0.1 m 闭合</td><td>✅ 物理图像完全吻合（§3.4）</td></tr>
+<tr><td>Table 6 $k_{moment}=0.0108$</td><td>若作用在推力上→1.08 cm，与 5 英寸桨 $k_\tau/k_f\in[0.01,0.02]$ m 一致</td><td>✅ 量级自洽；单位未声明（§6.2）</td></tr>
+<tr><td>(5) 总损失</td><td>尺度不变性证明；加权贡献表（制导 $\mathcal O(1-5)$ 主导）</td><td>✅ 成立；$\lambda_{closing}$ 命名不一、$v_{des}$ 缺失（§8.3）</td></tr>
+<tr><td>(6) $L_{align}$</td><td>叉积-正弦恒等式；$\dot{\hat d}$ 与 $L_{align}$ 的关系；梯度 $\propto1/\rho$ 有界</td><td>✅ 成立；$v_{rel}=0$ 奇异（§9.2/9.5）</td></tr>
+<tr><td>(7) $L_{close}$</td><td>$L_{close}=\dot\rho$ 恒等式；$t_{go}=\rho_0/v_c$ 核算 2 s=100 步</td><td>✅ 成立（§9.4）</td></tr>
+<tr><td>(8)(9) 正则</td><td>$L_{yaw}=-\lVert\hat d_{xy}\rVert\cos(\psi-\psi_{los})$ 显式推导；hinge² 梯度连续</td><td>✅ 成立；$j_t,v_{des}$ 未定义/未给（§10）</td></tr>
+<tr><td>(10) 曲线族</td><td>Table 1 三族代入；Table 1(φ,θ) vs Table 4 rpy 口径不一</td><td>⚠️ 含糊（§11.1）</td></tr>
+<tr><td>(15) $a(s)$</td><td>两次链式求导逐项重推一致；$a\perp c$ 独立校验 =0</td><td>✅ 未发现错误（§11.3）</td></tr>
+<tr><td>$\kappa$ 公式</td><td>Frenet 定义代入 $c,c'$ 推导一致；螺旋特例 $\kappa=r/(r^2+z^2)$</td><td>✅ 成立（§11.4/11.7）</td></tr>
+<tr><td>(11)(12)(13)</td><td>可达集 $\{Ab-g\hat z\}$ 推导；$A_{max}$=15.9/42.1 m/s²；最紧椭圆 5→6 m/s 处正好越过 15.9 阈值</td><td>✅ 成立；TWR 与 $\eta$ 关系歧义（§11.5）</td></tr>
+<tr><td>(14)</td><td>$\beta=0.6$⟺推力 z 分量 $\ge0.4g$；数值例 $v=10$,$\phi=0.5$ rad 被拒、$v=4$ 通过</td><td>✅ 成立（§11.6）</td></tr>
+<tr><td>螺旋约束 $v^2\kappa\le mg$</td><td>量纲核算：左 m/s²、右 N 不闭合；正确为 $\le g$ 或 $\le A_{max}$</td><td>❌ <strong>量纲错误</strong>（§11.7）</td></tr>
+<tr><td>(16) $J$</td><td>$\Delta SR=1\%$⟺$\Delta L_{p99}=3$ s 的优先级核算</td><td>✅ 逻辑自洽（§13）</td></tr>
+<tr><td>算法 1</td><td>三段式逐行解读；abort 机制与「桶不空」保证一致</td><td>✅ 逻辑自洽（§12）</td></tr>
+<tr><td>训练数字</td><td>49.15M 步、12 s 回合、8 子步、13.7× 时间比、110k 评估、26.4 万参数</td><td>✅ 全部互证（§14.5）</td></tr>
+<tr><td>Table 3 学习率</td><td>$\eta_a=1.64\times10^{-3}\to\eta_{final}=5\times10^{-4}$ 需比值 0.305，与 $\rho_{lr}=0.186$ 不符</td><td>⚠️ 衰减比定义不明（§16.2）</td></tr>
+</table>
+
+<h4>16.2 论文问题清单（按严重程度排序）</h4>
+<ol>
+<li><strong>【量纲错误】螺旋可行性约束 $v_{tgt}^2\kappa_{max}\le mg$</strong>（第 13 页，无编号式）：左边加速度 (m/s²)、右边力 (N)。正确应为 $v^2\kappa_{max}\le g$ 或 $\le A_{max}$（§11.7）。照抄实现会差一个 $m$ 倍（对 1 kg 平台恰好无差、2.65 kg 平台差 2.65 倍）。</li>
+<li><strong>【缺失参数】$v_{des}$ 全文未给值</strong>：式 (8) 的 $L_{vmax}$ 阈值在 Table 2–6 与正文中都不存在，复现者无法设置速度上限（§8.3）。</li>
+<li><strong>【疑单位错误】Table 6 RPM 范围标「rev/s」</strong>：[2970, 20965] rev/s 对应 178k–1.26M RPM，物理荒谬；rev/min 解读与悬停转速核算自洽（§5.3）。建议对照官方代码与第 17 页原文。</li>
+<li><strong>【帧约定歧义】式 (1) 的 $d(v)$</strong>：阻力在 $R_{wb}(\cdot)$ 内，但 $v$ 是世界系状态——若直接用世界系 $v$ 计算再旋转则阻力方向错；自洽读法是内部用机体系速度 $v_B=R_{wb}^\top v$（§2.3）。</li>
+<li><strong>【未声明约定】四元数乘法与混控符号</strong>：Hamilton/JPL 约定、$\tau_z$ 的 $\sigma_i$ 符号、$k_{moment}$ 的作用对象（推力还是 $\Omega^2$）均未印明，只能反推（§3.2、§6.2）。混用约定会得到姿态取逆的模型。</li>
+<li><strong>【符号不一致】$\lambda_{close}$ vs $\lambda_{closing}$</strong>：式 (5) 与 Table 2 命名不一（§8.3，无实质影响）。</li>
+<li><strong>【表间口径不一】倾斜角随机化</strong>：Table 1 写 per-env $(\phi,\theta)$（两个角），Table 4 写「Tilt rpy $U(-0.5,0.5)$」——偏航是否随机化、每角是否独立采样，两表无法互证（§11.1）。</li>
+<li><strong>【式 (6) 奇异】$v_{rel}\to0$ 时 $\hat v_{rel}$ 未定义</strong>：训练初段（双方低速、方向漂移）很常见，实现必须加 $\varepsilon$ 保护；论文未提（§9.2）。</li>
+<li><strong>【表 3 疑排版错误】PPO 的 Max gradient norm 印成「1/1」</strong>：大概率是 1.0（或 0.5/1）的排版事故（第 16 页 Table 3）。</li>
+<li><strong>【表 3 数值不自洽】学习率衰减比 $\rho_{lr}=0.186$</strong>：$\eta_{final}/\eta_a=5\times10^{-4}/1.64\times10^{-3}=0.305\ne0.186$——除非衰减比有别的定义（如按 epoch 的几何因子），表格数字无法直接复现（§14.5）。</li>
+<li><strong>【TWR 与 $A_{max}$ 关系歧义】</strong>：正文「thrust-to-weight ratio 2.7」若指原始推力，$A_{max}=\eta\times2.7g=15.9$ m/s²；若已含 $\eta$ 折减，则 $A_{max}=26.5$ m/s²。两种读法差 67%，影响可行性过滤器的阈值（§11.5）。</li>
+<li><strong>【分析发现，非错误】$L_{align}$ 位置梯度 $\propto1/\rho$</strong>：远距离时「视线修正」的梯度信号按 $1/\rho$ 衰减，网络必须借 GRU 隐状态与速度空间梯度补足——论文未讨论这一信号结构（§9.5）。</li>
+<li><strong>【次要】螺旋可行性只用曲率判据、椭圆/双纽线用式 (14) 双判据</strong>：对圆螺旋因 $a_z=0$ 恰好完备，但对 $\rho_{ar}\ne1$ 的椭圆螺旋（$c\cdot c'\ne0$）$a_z\ne0$，曲率判据不再完备（§11.7）。</li>
+<li><strong>【次要】Table 6 pos/vel 增益角色不明</strong>：主回路策略直接输出 $a_{cmd}$，位置/速度 PD 增益（6.25/5.0/16/8）在正文无对应使用点，疑似仅用于回合初始悬停或评估复位（§7）。</li>
+<li><strong>【RK4 + 四元数】归一化未提及</strong>：RK4 积分不保四元数范数，需每子步归一化；论文未说明（§3.2，实现细节）。</li>
+</ol>
+<p><strong>未发现实质问题的部分</strong>：式 (6)(7) 的几何恒等式、式 (15) 的链式推导、式 (11)–(14) 的可达集逻辑、算法 1 的结构、Table 6 惯量数值、训练规模数字——以上均通过本文独立推导/核算，<strong>未发现错误</strong>（不硬凑问题）。</p>
+<hr>
+
+<h3>17. 可复现性附录与人工复核清单</h3>
+<ul>
+<li><strong>验证材料</strong>：<code>_derivation_work\intruder\fulltext.txt</code>（17 页全文文本抽取，本文所有引文出处）；<code>_derivation_work\intruder\pages\page-001..017.png</code>（页面图像，本模型无法读取，供人工复核）。</li>
+<li><strong>本文完成的关键数值核算（可手工复算）</strong>：$e^{-0.02/0.0186}=0.341$（§5.2）；$1500\times64\times512=49.15$M（§14.5）；$600\times0.02=12$ s；$0.02/0.0025=8$；$f_2=3.64\times10^{-6}$、$\Omega_h=12{,}760$ RPM（§6.1）；$A_{max}=15.9/42.1$ m/s²（§11.5）；$\kappa_{max}=0.375$ m⁻¹ 与 5→6 m/s 阈值（§11.5）；$\omega\times J\omega=(0,-0.651,0)$（§3.3）；网络参数 264,196（§14.5）。</li>
+<li><strong>建议人工复核的页面</strong>：第 4 页（式 (1)–(4)）、第 5 页（式 (6)–(9)，重点：$\hat v_{rel}$ 的帽子）、第 12–13 页（式 (10)–(15)、螺旋约束的量纲）、第 16 页（Table 2–3：$\lambda_{closing}$、$g_{max}$、$\rho_{lr}$）、第 17 页（Table 5–6：RPM 单位、PD 增益角色）。</li>
+<li><strong>建议对照的官方代码</strong>：github.com/rislab/catchrl——优先核查：阻力帧约定（§2.3）、四元数约定（§3.2）、混控矩阵与 $k_{moment}$（§6.2）、PD 控制器结构（§7）、PMD 平滑形式（§15）、$v_{des}$ 与 $f_2,f_1,f_0$ 的真实值。</li>
+</ul>
 </section>
 
 <footer>Paper Notes · Anoruo, Tian, Rathod et al. · arXiv:2607.02472 (2026) · Bearing-Only Interception with Differentiable Quadrotor Dynamics · MathJax + Mermaid Rendering</footer>

@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">缺陷与扩展</a>
   <a href="#motivation">推导动机</a>
   <a href="#takeaway">要点总结</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -1395,6 +1399,459 @@ flowchart TB
     <strong>② 它最值得警惕的是"安全"二字的成色：护盾降低的是网络犯错的概率，不是物理碰撞的概率。</strong><br>
     <strong>③ 它最值得用的是那套开源代码：<code>safeAction.cpp</code> + <code>env.py</code> 可以直接搬进任何"速度接口"的机器人项目。</strong>
   </div>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+
+<div class="callout info"><p><strong>对象</strong>：<code>NavRL: Learning Safe Flight in Dynamic Environments</code>（Z. Xu et al., IEEE RA-L, vol. 10, no. 4, pp. 3668–3675, 2025；DOI 10.1109/LRA.2025.3546069）正文 <strong>III. Methodology</strong> 第 3–6 页的全部 13 个编号公式（式 (1)–(13a–d)）与 §IV 的训练/评估描述。<strong>公式范围</strong>：论文共 13 组编号公式 + 1 处最优化问题（13a–d）；另有若干无编号的核心方法数学（PPO/GAE、Beta 分布、速度障碍几何、Kalman 常加速度模型、占据栅格 log-odds 更新、训练障碍运动模型），本文统一编号为<strong>补充式 (D1)–(D15)</strong>。<strong>方法</strong>：本文不是复述论文文字，而是：</p><ol><li>对每个公式做<strong>符号定义 → 第一性原理重推 → 物理/几何直觉 → 交叉验证</strong>四步处理；</li><li>用本地代码仓库 <code>1.Paper\NavRL\</code>（上游 <code>github.com/Zhefan-Xu/NavRL</code>，commit <code>3725bcc</code>，见 <code>SOURCE.txt</code>）<strong>逐行交叉验证</strong>（isaac-training/ 训练端、ros1/ros2 部署端、quick-demos/ 演示端）；</li><li>用本目录数值脚本 <code>verify_navrl.py</code>（可复跑，仅依赖标准库）独立验证全部关键代数断言（26/26 通过）；</li><li>明确标出论文中<strong>印刷错误、公式与文字矛盾、公式与作者自己代码不一致、以及代码中的 bug</strong>（见「最后」节问题清单），绝不替论文"圆场"。</li></ol><p><strong>诚实声明（页面图像核对）</strong>：本次写作使用的模型不支持图像输入，无法直接目视核对 PDF 页面渲染；公式原文以 <code>_derivation_work\navrl\fulltext.txt</code> 的逐字符抽取文本为准，并用<strong>正文文字描述 + 本地代码实现 + 数值验证三重互证</strong>（公式本身若抽取有误，代码与文字会立刻对不上）。建议人工目视复核以下页码的公式渲染：式 (1) 在第 3 页；式 (2)–(6) 在第 4 页；式 (7)–(12) 在第 5 页；式 (13a–d) 与图 5 在第 5–6 页。</p></div>
+<hr>
+
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>与代码/独立推导对照的结论</th></tr>
+<tr><td>(1)</td><td>MDP 最优策略目标（累积折扣回报）</td><td>✅ 标准 MDP 表述，无问题；训练实现是有限时域截断 + GAE 自助（见 §2）</td></tr>
+<tr><td>(2)</td><td>机器人内部状态 $S_{int}$（7 维）</td><td>⚠️ 结构正确；<strong>代码实为 8 维</strong>（距离拆成 $d_{2d},d_z$，env.py L459–477）</td></tr>
+<tr><td>(3)(4)</td><td>动态障碍状态矩阵 $S_{dyn}$ 与向量 $D_i$（9 维）</td><td>⚠️ 结构正确；<strong>代码每槽 10 维</strong>（宽度离散类别 + 高度二值化，env.py L508–518）；$N_d=5$</td></tr>
+<tr><td>(5)</td><td>静态障碍射线长度矩阵 $S_{stat}$</td><td>✅ 正确；代码 $N_h=36, N_v=4$，量程 4 m，vfov [−10°,20°]；"超量程 + 小偏移"与代码 clamp 有细微差别</td></tr>
+<tr><td>(6)</td><td>动作映射 $V= v_{lim}(2\hat{V}-1)$</td><td>✅ 与 ppo.py L89 完全一致；$v_{lim}=2.0$（训练）；ros2 部署默认 1.0</td></tr>
+<tr><td>(7)</td><td>总奖励加权和</td><td>⚠️ 论文不给 $\lambda$ 数值；代码 $\lambda=[1,1,1,0.1,8]$ <strong>外加 +1 生存奖励</strong>（论文未提及，env.py L574–577）</td></tr>
+<tr><td>(8)</td><td>速度奖励（投影点积）</td><td>✅ 与 env.py L556–558 一致（点积旋转不变，世界系/目标系等价）；<code>clip(max=2)</code> 被注释</td></tr>
+<tr><td>(9)</td><td>静态安全奖励（对数均值）</td><td>✅ 与 env.py L549 一致（scan=range−distance，log(range−scan)=log(distance)，已数值验证）；对数梯度"近处放大"</td></tr>
+<tr><td>(10)</td><td>动态安全奖励</td><td>⚠️ 论文用 $\lVert P_r-P_{oi}\rVert$；<strong>代码减去障碍半宽</strong> $\lVert\Delta P\rVert-w/2$ 并 clamp/量程填充（env.py L531–532, L554）</td></tr>
+<tr><td>(11)</td><td>平滑惩罚</td><td>✅ 与 env.py L560–561 一致（等价于平均加速度惩罚）</td></tr>
+<tr><td>(12)</td><td>高度惩罚</td><td>❌ <strong>公式与其自身文字矛盾</strong>：按公式在 $[z_s,z_g]$ 区间<strong>内部</strong>也罚（仅端点为零）；代码按文字实现 + ±0.2 m 死区、权重 8（env.py L563–566）</td></tr>
+<tr><td>(13a)</td><td>护盾目标：最小干预投影</td><td>✅ 与 solver.h linearProgram3（方向不优化、最近点）一致</td></tr>
+<tr><td>(13b)</td><td>ORCA 半平面约束</td><td>❌ <strong>与 ORCA 及作者自己代码不等价</strong>：正确形式应为 $((V_{safe}-V_{oi})-(V_{rl}-V_{oi}+\Delta V_i))\cdot\Delta V_i\ge0\iff(V_{safe}-V_{rl}-\Delta V_i)\cdot\Delta V_i\ge0$；论文印出的约束多出 $V_{oi}\cdot\Delta V_i$ 位移，仅静态障碍（$V_{oi}=0$）成立。已构造数值反例（§8.4、verify_navrl.py）</td></tr>
+<tr><td>(13c)</td><td>控制限幅 $V_{min}\le V_{safe}\le V_{max}$</td><td>⚠️ 论文写盒约束；代码用<strong>速度球</strong> $\lVert V\rVert\le V_{max}$，且 ros1 $V_{max}=\sqrt3\,v_{lim}\approx3.46$、ros2 $=\sqrt2\,v_{lim}$（球外接盒，角落可达超限值）</td></tr>
+<tr><td>(13d)</td><td>约束对全部 $N$ 个障碍成立</td><td>✅ 与代码一致（所有障碍/球都 push 半平面）</td></tr>
+<tr class="highlight"><td>无编号</td><td>PPO/GAE/Beta/ORCA 锥投影/KF-CA/log-odds/课程学习</td><td>✅ 全部逐行核实（§2、§6、§8、§9、§10，D 系列）；<strong>课程学习：论文有、发布代码无</strong></td></tr>
+</table>
+<hr>
+
+<h3>1. 坐标系、符号约定与状态变量总表</h3>
+<h4>1.1 三个坐标系</h4>
+<ul>
+<li><strong>世界系 $W$</strong>：Isaac Sim 中为 z 轴竖直向上的右手系（重力 <code>[0,0,−9.81]</code>，sim.yaml）；ROS 部署中为地图系 <code>map</code>（z 向上）。所有位置/速度默认在此系表达。</li>
+<li><strong>目标坐标系 $G$</strong>（论文 §III-B 定义）：原点在<strong>起点</strong> $P_s$；$x$ 轴沿"起点→目标"向量；$y$ 轴与地面平行。论文说"$x$-axis aligns with the vector pointing from $P_s$ to $P_g$"（3D 向量），<strong>代码实际用该向量在水平面的投影</strong>（<code>target_dir_2d</code>，z 置 0，env.py L466–467），当起点/目标高度不同时两者略有差别（训练中起点/目标高度独立随机取 0.5–2.5 m，env.py L361、L389，故代码帧 ≠ 论文字面帧）。</li>
+<li><strong>机体/传感器系 $B$</strong>：LiDAR 射线以机器人基座为原点，<code>attach_yaw_only=True</code>（env.py L50）——射线图只随偏航旋转、不随俯仰/滚转倾斜。</li>
+</ul>
+<h4>1.2 目标坐标变换的完整推导（代码 <code>utils.py: vec_to_new_frame</code> L217–246）</h4>
+<div class="formula-block">
+<span class="eq-tag">(D1) —— 目标坐标系 G 的标准正交基构造（无编号式/补充式）</span>
+$$\hat{g}_x=\frac{d_{xy}}{\lVert d_{xy}\rVert},\qquad \hat{g}_y=\frac{\hat{z}_W\times \hat{g}_x}{\lVert\hat{z}_W\times\hat{g}_x\rVert},\qquad \hat{g}_z=\hat{g}_x\times\hat{g}_y$$
+$$\mathbf{v}^G=\Big(\mathbf{v}\cdot\hat{g}_x,\ \mathbf{v}\cdot\hat{g}_y,\ \mathbf{v}\cdot\hat{g}_z\Big)^T,\qquad d_{xy}=(P_g-P_s)-\Big((P_g-P_s)\cdot\hat{z}_W\Big)\hat{z}_W$$
+<div class="eq-note">
+<strong>符号</strong>：$d_{xy}$ = 起点→目标向量的水平投影（m）| $\hat{z}_W=(0,0,1)$ | $\hat{g}_x,\hat{g}_y,\hat{g}_z$ = G 系三轴在世界系的分量（无单位）| $\mathbf{v}^G$ = 任意向量在 G 系的分量。<br>
+<strong>推导要点</strong>：① 先取目标方向水平投影并归一化得 $\hat{g}_x$（保证 $\hat{g}_x$ 在地面平面内——这正是"$y$ 轴与地面平行"的配套条件）；② $\hat{g}_y=\hat{z}_W\times\hat{g}_x$ 右手定则给出地面平面内垂直于 $\hat{g}_x$ 的轴；③ $\hat{g}_z=\hat{g}_x\times\hat{g}_y$ 使三轴构成标准正交右手系（对一般水平向量恒有 $\hat{g}_z=\hat{z}_W$）。<strong>已数值验证</strong>：三轴两两正交且归一（verify_navrl.py）。<br>
+<strong>物理直觉</strong>：G 系把"去目标"编码为固定的 $\hat{g}_x$ 方向，同一网络参数在环境任意平移旋转下看到相同的输入——这是比"绝对世界坐标"更利于泛化的平移/旋转等变表示，论文称其"reduces dependency on the global coordinate system, improving overall RL training convergence speed"。<br>
+<strong>代码对照</strong>：utils.py L223–233 的 <code>bmm</code> 逐维点积正是上式的批量实现；训练（env.py L470）与部署（ros2 navigation.py L300）都用同一函数，<strong>训练-部署一致性 ✅</strong>。注意训练/部署都把 $d_{xy}$ 的 z 分量置 0（论文字面是 3D 向量），这是论文与代码的一个小偏差（影响极小：$\hat{g}_x$ 只差一个高度分量）。</div>
+</div>
+<h4>1.3 符号总表（后文推导共用）</h4>
+<table>
+<tr><th>符号</th><th>含义</th><th>单位</th><th>文中/代码取值</th></tr>
+<tr><td>$P_r, P_g, P_s$</td><td>机器人、目标、起点位置</td><td>m</td><td>世界系；训练区 40×40×4.5 m（env.py <code>map_range</code>）</td></tr>
+<tr><td>$V_r$</td><td>机器人速度（世界系）</td><td>m/s</td><td>限幅 $v_{lim}=2.0$（训练）；ros2 部署默认 1.0</td></tr>
+<tr><td>$P_{oi}, V_{oi}$</td><td>第 $i$ 个动态障碍中心位置/速度</td><td>m, m/s</td><td>训练速度幅值 $[0.5,1.5]$（train.yaml <code>vel_range</code>）</td></tr>
+<tr><td>$N_d, M$</td><td>动态障碍槽位数、每槽维度</td><td>—</td><td>代码 $N_d=5$（ppo.yaml <code>dyn_obs_num</code>）；论文 $M=9$，代码 $M=10$</td></tr>
+<tr><td>$N_h, N_v$</td><td>水平/垂直射线数</td><td>—</td><td>代码 36（10° 间隔）/ 4（vfov [−10°,20°]）</td></tr>
+<tr><td>$S_{stat}(i,j)$</td><td>第 $(i,j)$ 条射线的长度</td><td>m</td><td>量程 4 m（sensor.lidar_range）</td></tr>
+<tr><td>$\hat{V}\in[0,1]^3$</td><td>网络输出的归一化速度</td><td>—</td><td>Beta 分布采样（训练）/ 均值（部署）</td></tr>
+<tr><td>$\alpha_k,\beta_k$</td><td>第 $k$ 维动作的 Beta 形状参数</td><td>—</td><td>$\alpha,\beta=1+\mathrm{softplus}(\cdot)+10^{-6}$（utils.py L116–117）</td></tr>
+<tr><td>$\gamma,\ \lambda_{GAE},\ \epsilon$</td><td>折扣、GAE 参数、PPO 截断</td><td>—</td><td>0.99 / 0.95 / 0.1（ppo.py L60；论文 §IV）</td></tr>
+<tr><td>$r_r, r_o, d_{safe}$</td><td>机器人半径、障碍半径、安全距离</td><td>m</td><td>0.3（部署 <code>robot_size</code>）/ 障碍相关 / 0.3（safe_action_param.yaml）</td></tr>
+<tr><td>$\tau,\ \Delta t$</td><td>护盾预测时域、退步长</td><td>s</td><td>2.0 / 0.05（safe_action_param.yaml）</td></tr>
+<tr><td>$\lambda_1..\lambda_5$</td><td>五项奖励权重</td><td>—</td><td>论文未给；代码 $[1,1,1,0.1,8]$ + 常数 +1（env.py L575）</td></tr>
+</table>
+
+<h3>2. 公式 (1)：MDP 目标与 PPO 的训练数学（含补充式 D2–D5）</h3>
+<p>论文原文（第 3 页，III-B 开头）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 最优策略的累积折扣回报最大化（论文式号 (1)）</span>
+$$\pi^{*}=\arg\max_{\pi}\ \mathbb{E}\left[\sum_{t=0}^{T}\gamma^{t}R(s_t,a_t)\right],\qquad \gamma\in[0,1] \tag{1}$$
+<div class="eq-note">
+<strong>符号</strong>：$\pi(a_t|s_t)$ = 随机策略 | $s_t\in\mathcal{S}$ 状态 | $a_t\in\mathcal{A}$ 动作（此处为速度指令 $\mathbb{R}^3$）| $R(s_t,a_t)$ 即时奖励 | $\gamma=0.99$ 折扣因子 | $T$ 时域（论文写 $T$，实现为 2200 步的截断回合，train.yaml <code>max_episode_length</code>）。<br>
+<strong>推导/解读</strong>：标准 MDP $(\mathcal{S},\mathcal{A},P,R,\gamma)$，$P(s_{t+1}|s_t,a_t)$ 由 Isaac Sim 四旋翼动力学 + 障碍运动给定（论文没有写出四旋翼动力学方程——方法层是"速度指令"抽象，低层由 Lee 几何控制器/ PX4 跟踪，见 §6.3）。期望是对"策略与环境的联合随机性"取的：$\mathbb{E}\left[\cdot\right]=\mathbb{E}_{\tau\sim\pi,P}\left[\cdot\right]$。因为 NavRL 用的是 PPO（策略梯度族），式 (1) 只定义了<strong>优化目标</strong>，实际训练用的是下面的代理目标。<br>
+<strong>数值核对</strong>：$\gamma=0.99$ 时 1 m 外的奖励衰减到 0.99，50 步后 ≈ 0.605——折扣只"看见"约 $1/(1-\gamma)=100$ 步量级的时间尺度，与 2200 步回合相比是很短视的（约 1.6 s @62.5 Hz）；安全行为几乎完全靠即时/近期奖励塑造，远期的"活着"价值由 +1 生存奖励逐步累积（见 §7.1）。</div>
+</div>
+<p>论文只说"基于 PPO [17]"而没有写 PPO 的任何公式。仓库 <code>isaac-training/training/scripts/ppo.py</code> 与 <code>utils.py</code> 是标准实现（截断代理 + GAE + Huber 值损失 + 熵正则）。下面把训练数学补全，并逐条标注与代码的对应关系——这是"论文没说、但复现必须知道"的部分。</p>
+<div class="formula-block">
+<span class="eq-tag">(D2) —— PPO 截断代理目标（补充式；ppo.py L142–145）</span>
+$$L^{CLIP}(\theta)=\mathbb{E}_{t}\left[\min\Big(\rho_t(\theta)\hat{A}_t,\ \mathrm{clip}\big(\rho_t(\theta),\,1-\epsilon,\,1+\epsilon\big)\hat{A}_t\Big)\right],\qquad \rho_t(\theta)=\frac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{old}}(a_t\mid s_t)}$$
+<div class="eq-note">
+<strong>符号</strong>：$\rho_t$ = 新旧策略似然比 | $\hat{A}_t$ = GAE 优势估计（D3）| $\epsilon=0.1$（ppo.yaml <code>clip_ratio</code>，论文 §IV 明说 0.1 ✅）。<br>
+<strong>推导</strong>：① 策略梯度定理 $\nabla_\theta J=\mathbb{E}\big[\nabla_\theta\log\pi_\theta(a|s)\,\hat{A}\big]$；② TRPO 用 KL 约束，PPO 用截断代替约束：$\rho$ 超出 $[1-\epsilon,1+\epsilon]$ 后梯度被 <code>clip</code> 切断（对 $\rho$ 的梯度为 0），使单次更新不会把策略推出"信任域"——对安全类任务至关重要（一次大更新可能抹掉刚学会的避障行为）。③ <code>min</code> 取两个代理中较悲观者：防止"变好太多"（$\rho>1+\epsilon$ 且 $\hat{A}>0$）被过度奖励。④ 代码乘了 $action\_dim=3$（L145 <code>* self.action_dim</code>），使损失尺度与动作维数无关。<br>
+<strong>交叉验证</strong>：ppo.py L142–145 逐行即上式（<code>ratio.clamp(0.9, 1.1)</code>、<code>min(surr1, surr2)</code>）✅。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">(D3) —— GAE 优势估计与回报（补充式；utils.py L122–149）</span>
+$$\delta_t=r_t+\gamma V(s_{t+1})(1-d_t)-V(s_t),\qquad \hat{A}_t=\delta_t+\gamma\lambda_{GAE}(1-d_t)\,\hat{A}_{t+1},\qquad \hat{G}_t=\hat{A}_t+V(s_t)$$
+<div class="eq-note">
+<strong>符号</strong>：$\delta_t$ = 单步 TD 误差 | $d_t$ = 终止标志（碰撞/越界，<code>terminated</code>；注意代码用 <code>terminated</code> 而非 <code>done</code>，截断 <code>truncated</code> 不截断 bootstrap，ppo.py L101）| $\lambda_{GAE}=0.95$ | $V(s)$ = critic 输出。<br>
+<strong>推导</strong>：TD(0) 误差按 $\gamma\lambda$ 指数加权回传：展开 $\hat{A}_t=\sum_{l=0}^{\infty}(\gamma\lambda)^l\delta_{t+l}$（终止处截断）；$\lambda=1$ 退化为 MC 估计（无偏、高方差），$\lambda=0$ 退化为单步 TD（有偏、低方差），0.95 是"偏保守的折中"（与第 6 节笔记一致）。<strong>$\hat{G}_t=\hat{A}_t+V(s_t)$</strong> 是 GAE 恒等式（优势 = 回报 − 基线，推导：递归展开 $\hat{A}_t=\delta_t+\gamma\lambda\hat{A}_{t+1}$ 并取 $\lambda=1$ 特例即 $\hat{G}_t-V(s_t)$）。<strong>已数值验证</strong>：递推一步展开与 $\delta+\gamma\lambda\hat{A}_{t+1}$ 恒等（verify_navrl.py）。<br>
+<strong>工程细节（代码独有，论文未提）</strong>：① 优势标准化 <code>adv=(adv−mean)/std.clip(1e-7)</code>（ppo.py L111）；② return 用 <code>ValueNorm</code> 运行均值/方差归一化（$\beta=0.995$ 指数滑动 + 去偏，utils.py L10–72），再喂给 critic；③ critic 用 <strong>Huber 损失（delta=10）+ 值截断</strong>（ppo.py L151–154）：$L_V=\max\big(\mathrm{Huber}(ret, V_{clip}), \mathrm{Huber}(ret, V)\big)$，$V_{clip}=V_{old}+\mathrm{clip}(V-V_{old},\pm0.1)$——与 actor 截断对称。④ 梯度范数上限 5（L165–166）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">(D4) —— 总损失与优化器（补充式；ppo.py L138, L157, L64–66）</span>
+$$L=L^{CLIP}\cdot 3-\underbrace{10^{-3}\cdot\mathbb{E}\big[H(\pi_\theta)\big]}_{\text{熵正则}}+L_V,\qquad \theta\leftarrow \mathrm{Adam}\big(\theta,\ \nabla_\theta L,\ lr=5\times10^{-4}\big)$$
+<div class="eq-note">
+<strong>符号</strong>：$H(\pi_\theta)$ = Beta 策略熵（D9）| 熵系数 $10^{-3}$（ppo.yaml）| Adam 学习率 $5\times10^{-4}$（论文 §IV 明说 ✅，ppo.yaml 三个优化器同值）。<br>
+<strong>推导/解读</strong>：熵正则 $-c\,H$ 鼓励探索；$c=10^{-3}$ 很小，避免把已学的确定性避障策略"洗掉"。critic/actor/特征提取器<strong>三个独立优化器</strong>（L64–66），共享 256-256 主干（L40）。线性层<strong>正交初始化 gain=0.01</strong>（L76–81）：初始策略输出接近零 → $\alpha=\beta\approx1+10^{-6}$ → 初始 Beta≈均匀分布、初始速度≈0——避免训练一开始就全速撞墙，这是安全 RL 的"冷启动"技巧（第 6 节笔记已指出）。<br>
+<strong>与式 (1) 的联系</strong>：$\hat{G}_t$（return）是 $\sum_t\gamma^t r_t$ 的估计；PPO 通过最大化截断代理（而非直接最大化式 (1)）规避高方差与策略崩溃。</div>
+</div>
+<hr>
+<h3>3. 公式 (2)：机器人内部状态 $S_{int}$（7 维 vs 代码 8 维）</h3>
+<p>论文原文（第 4 页，III-B State）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 内部状态：去目标单位向量 + 距离 + 目标系速度（论文式号 (2)）</span>
+$$S_{int}=\left[\frac{P_g^{G}-P_r^{G}}{\lVert P_g^{G}-P_r^{G}\rVert},\ \lVert P_g^{G}-P_r^{G}\rVert,\ V_r^{G}\right]^{T}\in\mathbb{R}^{7} \tag{2}$$
+<div class="eq-note">
+<strong>符号</strong>：上标 $(\cdot)^G$ = 在目标坐标系 G 中表达（§1.2）| 第一块 = 机器人→目标的<strong>单位方向向量</strong>（3 维，无单位）| 第二块 = 距离<strong>标量</strong>（1 维，m）| 第三块 $V_r^G$ = 机器人速度在 G 系的分量（3 维，m/s）。合计 $3+1+3=7$ 维。<br>
+<strong>为什么拆成"单位向量 + 范数"</strong>：论文称该拆法"showed slightly faster convergence speed"。可解释的角度：① 单位向量有界（分量 ∈[−1,1]），范数单独一个正标量——两块数值尺度解耦，比"原始 3 维位移"（各分量可到 ±40 m）对网络权重初始化友好得多（位移向量在近目标处趋于 0、远处很大，尺度剧烈变化）；② 方向信息（往哪飞）与距离信息（还要飞多远）对策略是两种不同"通道"的任务信号。论文未给消融数据，此条属于合理推断，非论文证明。<br>
+<strong>与代码的差异（如实指出）</strong>：代码 <code>drone_state</code> 是 <strong>8 维</strong>（env.py L459–477）：$$\underbrace{\left[\frac{P_g-P_r}{\lVert P_g-P_r\rVert}\right]^{G}}_{3}\ \underbrace{d_{2d},\ d_z}_{2}\ \underbrace{V_r^{G}}_{3}\qquad d_{2d}=\lVert(P_g-P_r)_{xy}\rVert,\ d_z=(P_g-P_r)_z$$ 即把论文的"距离范数"1 维拆成<strong>水平距离 + 竖直距离</strong> 2 维（距离信息由 1 变 2，总维 8）。此外方向单位向量用 <code>distance.clamp(1e-6)</code> 防除零（L469）。第 6 节笔记已列出该差异，本节给出精确式子与行号。</div>
+</div>
+<div class="callout tip">
+<div class="callout-title">💡 一个容易算错的账：$S_{int}$ 的 7 维怎么数</div>
+"单位向量"是 3 维（不是 1 维），"范数"是 1 维——常被误数成 4+3 或 3+3。论文式 (2) 的书写 $\left[\frac{\cdot}{\lVert\cdot\rVert},\ \lVert\cdot\rVert,\ V_r^G\right]$ 中，第一项是向量除法（3 维），第二项是标量，第三项是 3 维向量。代码 8 维 = 3（单位向量）+ 1（$d_{2d}$）+ 1（$d_z$）+ 3（速度）。
+</div>
+
+<h3>4. 公式 (3)(4)：动态障碍状态 $S_{dyn}$ 与 $D_i$（含 Kalman 常加速度模型 D6）</h3>
+<p>论文原文（第 4 页）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 动态障碍状态矩阵（论文式号 (3)）</span>
+$$S_{dyn}=\left[D_1,\dots,D_{N_d}\right]^{T},\qquad S_{dyn}\in\mathbb{R}^{N_d\times M},\qquad D_i\in\mathbb{R}^{M} \tag{3}$$
+<div class="eq-note">
+<strong>符号</strong>：$D_i$ = 第 $i$ <strong>近</strong>的动态障碍状态行 | $N_d$ = 预定义槽位数（代码 5，ppo.yaml <code>dyn_obs_num</code>；论文只说"predeﬁned"未给数值）| $M$ = 每槽维度（论文式 (4) 展开为 9，代码为 10）。<br>
+<strong>选取规则</strong>：代码按<strong>水平 2D 距离</strong>取 top-k 最近（env.py L487–488 <code>torch.topk(..., largest=False)</code>），论文说"ith closest dynamic obstacle"（未指明 2D/3D 距离——2D 障碍的 z 距离恒为 0，用 2D 距离对两者统一）。<strong>补零规则</strong>：论文说"实际障碍数 &lt; $N_d$ 时置零"；代码<strong>额外</strong>把 2D 距离超量程（&gt;4 m）的障碍也置零（env.py L489、L494），即"不在量程内的障碍 = 不存在"——比论文多一条规则。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4) —— 单个动态障碍的状态向量（论文式号 (4)）</span>
+$$D_i=\left[\frac{P_{oi}^{G}-P_r^{G}}{\lVert P_{oi}^{G}-P_r^{G}\rVert},\ \lVert P_{oi}^{G}-P_r^{G}\rVert,\ V_{oi}^{G},\ \mathrm{dim}(o_i)\right]^{T}\in\mathbb{R}^{9} \tag{4}$$
+<div class="eq-note">
+<strong>符号</strong>：第一块 = 机器人→障碍的单位方向（3 维）| 第二块 = 距离（1 维）| $V_{oi}^G$ = 障碍速度在 G 系的分量（3 维，m/s）| $\mathrm{dim}(o_i)$ = 障碍的<strong>高度与宽度</strong>（2 维，m）。合计 $3+1+3+2=9$ 维 → 论文 $M=9$。<br>
+<strong>代码的 10 维实现</strong>（env.py L508–518）：$$D_i^{code}=\left[\underbrace{\hat{r}_{oi}^{G}}_{3},\ \underbrace{d_{2d},\ d_z}_{2},\ \underbrace{V_{oi}^{G}}_{3},\ \underbrace{w_{cat},\ h_{cat}}_{2}\right]\in\mathbb{R}^{10}$$ 两处不同：① 距离像 $S_{int}$ 一样拆 $d_{2d}/d_z$（9→10 的 +1）；② <strong>尺寸被"类别化"</strong>而非原始米值：宽度 $w_{cat}=w/0.25-1\in\{0,1,2,3\}$（训练障碍宽度按 0.25 m 步进：0.25/0.5/0.75/1.0 m，env.py L150–153、L213、L509）；高度 $h_{cat}$：$h\le1$ m → 保留原值，$h&gt;1$ → 0（二值"可越/不可越"，L513）。部署端（ros2 navigation.py L329–336）等价处理：$w=\max(w,h)+2r_{robot}$，$\mathrm{clamp}(\lceil w/0.25\rceil-1,\ 0,\ 3)$，高度 $\le1\to1$、$&gt;1\to0$。$N_d=5$ 槽 × 10 维。<br>
+<strong>物理解读</strong>：障碍状态只含<strong>位置、速度、尺寸</strong>，不含加速度、意图、类别——速度信息正是动态避障区别于静态避障的关键输入（论文的核心卖点之一）；但注意 2D 障碍（"长圆柱"，人）的 z 速度在训练中被视为 0（env.py L486 把后一半障碍的相对位置 z 置 0）。</div>
+</div>
+<p><strong>$V_{oi}$ 从哪来？</strong>训练中障碍速度由环境直接给（上帝视角）；真实部署中由<strong>跟踪模块估计</strong>——论文说"a Kalman filter is used to estimate obstacle velocities, with a constant acceleration model"。这就是一个没有编号但可完全公式化的核心方法：</p>
+<div class="formula-block">
+<span class="eq-tag">(D5) —— 训练环境的动态障碍运动模型（补充式；env.py: move_dynamic_obstacle L251–291）</span>
+$$P_{oi}(t+\Delta t)=P_{oi}(t)+V_{oi}\cdot\Delta t,\qquad V_{oi}=\lVert V_{oi}\rVert\cdot\frac{P_{oi}^{goal}-P_{oi}}{\lVert P_{oi}^{goal}-P_{oi}\rVert},\qquad \lVert V_{oi}\rVert\sim\mathcal{U}[0.5,\,1.5]\ \text{(每 2 s 重采样一次)}$$
+<div class="eq-note">
+<strong>符号</strong>：$P_{oi}^{goal}$ = 该障碍的当前"游走目标"（在其出生点 <code>dyn_obs_origin</code> 附近 $\pm5$ m 内随机采样，env.py L260–266；距目标 &lt;0.5 m 时重采样新目标）| $\Delta t=0.016$ s 物理步长 | 速度幅值在 $[0.5,1.5]$ m/s 均匀采样。<br>
+<strong>推导/解读</strong>：训练障碍做<strong>分段匀速直线运动</strong>（每 2 s 变一次速——"constant velocity over 2-second windows"）。这与护盾的 VO 假设（障碍在未来 $\tau=2$ s 内匀速）<strong>精确配套</strong>：训练分布就是护盾假设的分布。真实行人速度约 1.2 m/s 落在 $[0.5,1.5]$ 区间内。2D 障碍（圆柱）的 z 固定为 2.5 m（<code>max_obs_2d_height/2</code>，L194、L271）。<br>
+<strong>诚实说明</strong>：论文正文没有写训练障碍怎么动；上述模型是从代码提取的。论文 §IV-A 只给了数量课程（60→120）与森林环境。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">(D6) —— 部署端 Kalman 常加速度（CA）跟踪模型（补充式；dynamicDetector.cpp L1969–1996, kalmanFilter.cpp L33–47）</span>
+$$\mathbf{x}=\left[x,\ y,\ v_x,\ v_y,\ a_x,\ a_y\right]^{T},\qquad
+A=\begin{bmatrix}
+1&0&\Delta t&0&\tfrac12\Delta t^{2}&0\\
+0&1&0&\Delta t&0&\tfrac12\Delta t^{2}\\
+0&0&1&0&\Delta t&0\\
+0&0&0&1&0&\Delta t\\
+0&0&0&0&1&0\\
+0&0&0&0&0&1
+\end{bmatrix}$$
+$$\hat{\mathbf{x}}^{-}=A\hat{\mathbf{x}}+Bu,\quad P^{-}=APA^{T}+Q,\quad S=R+HP^{-}H^{T},\quad K=P^{-}H^{T}S^{-1},\quad \hat{\mathbf{x}}=\hat{\mathbf{x}}^{-}+K(\mathbf{z}-H\hat{\mathbf{x}}^{-}),\quad P=(I-KH)P^{-}$$
+<div class="eq-note">
+<strong>符号</strong>：状态 = 障碍 2D 位置/速度/加速度（世界系 x-y 平面）| $A$ = CA 状态转移矩阵（$\Delta t=0.033$ s 默认，dynamicDetector.cpp L291–292，30 Hz）| $H=I_{6\times6}$（伪观测：位置用检测值，速度/加速度用<strong>有限差分</strong>构造）| $B=0$ | $P,Q,R$ = 对角协方差（$Q$ 对角元按 <code>eQPos/eQVel/eQAcc</code> 缩放，$R$ 按 <code>eRPos/eRVel/eRAcc</code>，L1991–1995）。<br>
+<strong>观测构造</strong>（L2015–2032）：取 $k$ 帧前历史框，$\mathbf{z}=[x,\ y,\ \Delta x/(\Delta t\,k),\ \Delta y/(\Delta t\,k),\ \Delta v_x/(\Delta t\,k),\ \Delta v_y/(\Delta t\,k)]^T$——即"位置 + 位置差分速度 + 速度差分加速度"的伪观测，把非线性有限差分塞进线性观测模型。<br>
+<strong>推导</strong>：常加速度假设 $x_{t+1}=x_t+v_t\Delta t+\tfrac12a_t\Delta t^2$、$v_{t+1}=v_t+a_t\Delta t$、$a_{t+1}=a_t$ 展开即 $A$（已数值验证，verify_navrl.py）。预测-更新两步是标准线性 KF；$S$ 为新息协方差，$K$ 使后验方差最小（BLUE 推导从略，见任何最优估计教材）。<br>
+<strong>诚实说明 ①</strong>：该 KF 只跟踪<strong> x-y 平面</strong>（6 态无 z）；障碍 z 速度用位置差分单算（L820–822：$V_{box}(2)=\Delta z/(\Delta t\cdot\text{frameGap})$）。论文"constant acceleration model"指的就是这个 6 态模型，另有 4 态 CV 版本（L1944–1967，$A=I+\Delta t\begin{bmatrix}0&0&1&0\\0&0&0&1\\0&0&0&0\\0&0&0&0\end{bmatrix}$）供切换。<strong>诚实说明 ②</strong>：障碍 z 轴运动在护盾 VO 里被当作 0 处理（VO 是 3D 几何但障碍速度传的是完整 3 维，见 §8.6）。</div>
+</div>
+<p>此外数据关联的"特征向量 + 相似度"（论文 §III-A）在代码中是（dynamicDetector.cpp L1648–1705）：</p>
+<div class="formula-block">
+<span class="eq-tag">(D7) —— 障碍关联特征与相似度门限（补充式；dynamicDetector.cpp L1649–1699）</span>
+$$f=\Big(2\Delta P_{ro},\ 2\Delta P_{ro,z},\ s_{xyz},\ 0.5\,N_{pc},\ 0.5\,\sigma_{pc,x},\ 0.5\,\sigma_{pc,y},\ 0.5\,\sigma_{pc,z}\Big),\qquad \mathrm{sim}(f_a,f_b)=\frac{f_a\cdot f_b}{\lVert f_a\rVert\lVert f_b\rVert}$$
+$$\text{匹配条件：}\ \mathrm{sim}&gt;\mathrm{simThresh}\ \text{且}\ \mathrm{IoU}(\text{预测框},\text{检测框})&gt;0$$
+<div class="eq-note">
+<strong>符号</strong>：$\Delta P_{ro}$ = 障碍相对机器人的位置（3 维，权重 2）| $s_{xyz}$ = 包围盒尺寸（权重 1）| $N_{pc}$ = 簇内点云数（权重 0.5）| $\sigma_{pc}$ = 簇内点云标准差（权重 0.5）| 权重向量 <code>[2,2,2,1,1,1,0.5,0.5,0.5,0.5]</code>（L1650）。<br>
+<strong>解读</strong>：余弦相似度（归一化点积，度量方向一致性而非尺度）+ 预测框 IoU 门限——双门限抑制误匹配；预测框由 $x\leftarrow x+V_x\Delta t$ 线性外推（<code>linearProp</code> L1667–1676）。论文文字（"position, bounding box dimensions, point cloud size, and point cloud standard deviation... similarity scores"）与代码完全对应 ✅。</div>
+</div>
+
+<h3>5. 公式 (5)：静态障碍射线表示 $S_{stat}$（含占据栅格 log-odds D8）</h3>
+<p>论文原文（第 4 页）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5) —— 射线长度矩阵（论文式号 (5)）</span>
+$$S_{stat}=\left[R_{\theta_0},\dots,R_{\theta_{N_v}}\right],\qquad S_{stat}\in\mathbb{R}^{N_h\times N_v},\qquad R_{\theta_i}\in\mathbb{R}^{N_h} \tag{5}$$
+<div class="eq-note">
+<strong>符号</strong>：$\theta_i$ = 第 $i$ 个竖直平面（射线面）的仰角 | $R_{\theta_i}$ = 该仰角平面内 $N_h$ 条水平射线的<strong>长度</strong>向量 | $N_h,N_v$ = 水平/竖直射线数（由"射线角间隔"与"竖直视场"决定；代码：10° 间隔 → $N_h=360/10=36$，$N_v=4$，vfov [−10°,20°] → 仰角 $[-10°,0°,10°,20°]$，sim/sensor 配置）。<br>
+<strong>射线几何</strong>：第 $(h,v)$ 条射线在机体水平系的方向为 $\mathbf{d}=(\cos\theta_v\cos\theta_h,\ \cos\theta_v\sin\theta_h,\ \sin\theta_v)$，长度 = 该方向到第一个被占据体素的距离（DDA 体素遍历，map_manager <code>raycast.cpp</code>，slab 法求交："the problem is now s+t·ds=1" L28 注释即 AABB slab 求交）。LiDAR 只绕偏航旋转（<code>attach_yaw_only</code>），俯仰/滚转不倾斜射线图。<br>
+<strong>"超量程"约定（论文 vs 代码）</strong>：论文说超量程射线赋"最大量程 + 一个小偏移"；代码存储的是 <strong>scan = range − distance</strong>（反深度约定！env.py L437–442），奖励项用 <code>log(range − scan)</code>，等效于把超量程射线 clamp 到量程本身（无小偏移）。两者目的相同（区分"4 m 内无障碍"与"4 m 外未知"），数值上差 $\log(4+\delta)-\log 4\approx\delta/4$，量级可忽略。<br>
+<strong>为什么要射线图而非图像/点云</strong>：射线长度是<strong>几何量</strong>，仿真与真实深度图的中间表示一致（都归结为"某方向距离"），像素级外观（纹理、光照）不进状态 → sim-to-real 差距最小化（论文的核心论证，第 7 节笔记有详述；§7 的 Eq.(F) 已推导像素→射线的反投影，本节不重复）。</div>
+</div>
+<p>射线所查询的占据体素图按贝叶斯对数几率（log-odds）递归更新（论文："recursively update the log probability of occupancy for each voxel based on the latest depth image"）。代码是标准实现（map_manager <code>occupancyMap.cpp</code> L1016–1033、<code>occupancyMap.h</code> L489）：</p>
+<div class="formula-block">
+<span class="eq-tag">(D8) —— 占据概率的 log-odds 递归更新（补充式；occupancyMap.cpp L213–246, L1016–1033）</span>
+$$\ell_{t+1}=\mathrm{clip}\Big(\ell_t+\ell_{hit/miss},\ \ell_{min},\ \ell_{max}\Big),\qquad \ell=\log\frac{p}{1-p},\qquad \ell_{hit}=\log\frac{0.70}{0.30},\ \ell_{miss}=\log\frac{0.35}{0.65}$$
+$$\text{occupied}\iff \ell\ge \ell_{occ}=\log\frac{0.80}{0.20},\qquad \ell_{min}=\log\frac{0.12}{0.88},\ \ell_{max}=\log\frac{0.97}{0.03}$$
+<div class="eq-note">
+<strong>推导</strong>：贝叶斯更新 $p(m|z)=\frac{p(z|m)p(m)}{p(z|m)p(m)+p(z|\neg m)(1-p(m))}$ 两边取 logit 得<strong>加法形式</strong> $\ell(m|z)=\ell(m)+\log\frac{p(z|m)}{p(z|\neg m)}$——概率空间的乘法变成 log-odds 空间的加法，故可"递归"且 O(1) 更新。命中射线端点体素加 $\ell_{hit}=\log(0.7/0.3)\approx+0.847$，穿过体素加 $\ell_{miss}=\log(0.35/0.65)\approx-0.619$，钳位到 $[\ell_{min},\ell_{max}]$ 防饱和；占据判定阈值 $\ell_{occ}=\log(0.8/0.2)\approx+1.386$。<br>
+<strong>参数</strong>：$p_{hit}=0.70,\ p_{miss}=0.35,\ p_{min}=0.12,\ p_{max}=0.97,\ p_{occ}=0.80$（occupancy_map_param.yaml L29–33；体素分辨率 0.1 m，机器人尺寸 [0.3,0.3,0.1] m 用于膨胀）。<strong>O(1) 访问</strong>：预分配数组 + 哈希地址 <code>indexToAddress</code>（occupancyMap.h L527–542），对应论文 "constant time complexity (O(1))"。动态障碍的占据体素按检测框迭代清除（论文原话；代码在 <code>cleanLocalMap</code>/freeRegions 机制中实现）。<br>
+<strong>诚实说明</strong>：论文没写具体概率参数（正文只说"log probability of occupancy"）；上述数值全部来自仓库 yaml，属"论文省略、代码给定"。</div>
+</div>
+<hr>
+<h3>6. 公式 (6)：动作空间——归一化速度与 Beta 策略（含 D9）</h3>
+<p>论文原文（第 4 页，III-B Action）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(6) —— 归一化动作到速度指令的仿射映射（论文式号 (6)）</span>
+$$V_{ctrl}^{G}=v_{lim}\cdot\left(2\,\hat{V}_{ctrl}^{G}-1\right),\qquad \hat{V}_{ctrl}^{G}\in[0,1] \tag{6}$$
+<div class="eq-note">
+<strong>符号</strong>：$\hat{V}_{ctrl}^G$ = 网络输出的归一化速度（$\in[0,1]^3$，无单位）| $V_{ctrl}^G$ = 最终速度指令（G 系，m/s）| $v_{lim}=2.0$ m/s（论文 §IV；ppo.yaml <code>action_limit</code>）。<br>
+<strong>推导</strong>：$[0,1]$ 到 $[-v_{lim},+v_{lim}]$ 的仿射映射：先 $2\hat V$ 展到 $[0,2]$，再减 1 平移到 $[-1,1]$，最后乘 $v_{lim}$。两端点核对：$\hat V=0\to -v_{lim}$，$\hat V=1\to +v_{lim}$，$\hat V=0.5\to 0$（已数值验证）。<br>
+<strong>代码对照</strong>：ppo.py L89–91 逐字一致：<code>actions = (2 * action_normalized * action_limit) − action_limit</code>，随后 <code>vec_to_world</code> 把 G 系速度转到世界系。部署端 ros2 navigation.py L355–360 用 <code>ExplorationType.MEAN</code>（即 $\hat V=\mathbb{E}[\mathrm{Beta}]$）+ 同样的仿射映射 ✅。<br>
+<strong>数值差异</strong>：ros2 部署默认 <code>vel_limit=1.0</code>（navigation_param.yaml L3），训练 2.0——论文 §IV 的"2.0 m/s"是训练值；部署可另配。设计动机（论文原话）：策略无需学习动作限幅，换平台只需改 $v_{lim}$，是 sim-to-real 的又一抓手。</div>
+</div>
+<p>为什么用 Beta 分布而不是高斯？论文引 [45]（Chou et al. 2017）称 Beta 策略"bias-free 且收敛更快"。代码实现（ppo.py L45–51、utils.py L107–120）：</p>
+<div class="formula-block">
+<span class="eq-tag">(D9) —— Beta 策略密度、参数化与部署取值（补充式；utils.py L89–120）</span>
+$$\pi_\theta(\hat V\mid s)=\prod_{k=1}^{3}\frac{\hat V_k^{\alpha_k-1}(1-\hat V_k)^{\beta_k-1}}{B(\alpha_k,\beta_k)},\qquad
+\alpha_k=1+\mathrm{softplus}\big(\phi_\alpha(s)_k\big)+10^{-6},\qquad \beta_k=1+\mathrm{softplus}\big(\phi_\beta(s)_k\big)+10^{-6}$$
+$$\mathbb{E}\big[\hat V_k\big]=\frac{\alpha_k}{\alpha_k+\beta_k},\qquad \mathrm{Var}\big[\hat V_k\big]=\frac{\alpha_k\beta_k}{(\alpha_k+\beta_k)^{2}(\alpha_k+\beta_k+1)},\qquad H_k=\ln B(\alpha,\beta)-(\alpha-1)\psi(\alpha)-(\beta-1)\psi(\beta)+(\alpha+\beta-2)\psi(\alpha+\beta)$$
+<div class="eq-note">
+<strong>符号</strong>：$B(\alpha,\beta)=\Gamma(\alpha)\Gamma(\beta)/\Gamma(\alpha+\beta)$ 为 Beta 函数 | $\psi$ = digamma 函数 | $\phi_\alpha,\phi_\beta$ = 两个独立线性头（<code>alpha_layer/beta_layer</code>，L110–111）| softplus 保证输出为正。<br>
+<strong>推导要点 ①（单峰性）</strong>：$\alpha_k,\beta_k\ge 1+10^{-6}&gt;1$，密度在 $(0,1)$ 两端为 0、严格单峰——<strong>不会出现"概率质量堆在边界"的饱和现象</strong>（对比 tanh+高斯：$x$ 大时 $\tanh(x)$ 饱和，密度被压缩到边界、log-prob 失真）。均值 $\alpha/(\alpha+\beta)$ 是标准 Beta 一阶矩；方差式是二阶矩直接积分。<br>
+<strong>推导要点 ②（熵）</strong>：$H$ 式由 $\mathbb{E}[\ln X]=\psi(\alpha)-\psi(\alpha+\beta)$ 代入密度对数展开得到（ppo.py L138 用它做熵正则，系数 $10^{-3}$）。<br>
+<strong>训练/部署不一致性的自觉处理</strong>：训练时从 Beta <strong>采样</strong>（探索，torchrl <code>ProbabilisticActor</code>），部署时取<strong>均值</strong>（确定性、平滑，ros2 navigation.py L355）——论文明说"we use the mean of the Beta distribution as the normalized velocity output" ✅。注意：均值 $\alpha/(\alpha+\beta)$ 经式 (6) 映射后不一定是"中位速度 0"，而是策略置信的期望速度。</div>
+</div>
+<div class="callout info">
+<div class="callout-title">ℹ️ 动作链的完整闭环（论文未展开的部分）</div>
+G 系归一化速度 → 仿射映射（式 (6)）→ 世界系速度指令 $V_{ctrl}$（vec_to_world，utils.py L249–257：把"世界 x 轴在 G 系的分量"构造出来再变换）→ 训练时 <code>VelController</code> 包裹 <strong>Lee 位置控制器</strong>（train.py L54–56，OmniDrones 外部依赖）把速度指令转成四旋翼姿态+推力 → 实机时 PX4 速度环。论文没有给出四旋翼动力学方程（这是"速度指令"抽象层的代价）：**式 (1) 的转移函数 $P(s_{t+1}|s_t,a_t)$ 隐含了低层控制器的全部动力学**，而 VO 护盾也建立在"速度指令可被低层可靠跟踪"的假设上——这是整套方法的隐式前提（低层带宽 20 Hz 部署 vs 2 m/s 限速，边际充足）。
+</div>
+
+<h3>7. 公式 (7)–(12)：奖励函数的逐项推导与数值核算</h3>
+<p>论文原文（第 5 页，III-B Reward）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(7) —— 总奖励（论文式号 (7)）</span>
+$$r=\lambda_1 r_{vel}+\lambda_2 r_{ss}+\lambda_3 r_{ds}+\lambda_4 r_{smooth}+\lambda_5 r_{height} \tag{7}$$
+<div class="eq-note">
+<strong>论文只给了符号 $\lambda_i$，没有数值。</strong>代码实现（env.py L574–577）：$$r=\underbrace{1.0\,r_{vel}}_{\lambda_1}+\underbrace{1.0}_{\text{生存奖励}}+\underbrace{1.0\,r_{ss}}_{\lambda_2}+\underbrace{1.0\,r_{ds}}_{\lambda_3}-\underbrace{0.1\,\lVert\Delta V\rVert}_{\lambda_4}-\underbrace{8.0\,\Delta h^{2}}_{\lambda_5}$$ 即 $\lambda=[1,1,1,0.1,8]$，外加论文未提及的 <strong>+1 常数生存奖励</strong>。<br>
+<strong>生存奖励的数学意义（值得推导）</strong>：每步 +1、$\gamma=0.99$，若回合跑满 2200 步，折扣总生存收益 $\sum_{t=0}^{2199}0.99^t=\frac{1-0.99^{2200}}{1-0.99}\approx 100.0$。碰撞提前终止 → 损失"剩余约 100 的折扣收益"，等价于一个<strong>隐式的 −100 终局碰撞惩罚</strong>（实际略小于 100，取决于撞在何时）。对比：代码里显式的碰撞惩罚 <code>self.reward[collision] -= 50</code> 被注释掉了（env.py L580）——作者最终选择了"纯隐式惩罚"。这个 +1 是五项权重之外第六个"隐藏权重"，复现时漏掉会显著改变最优策略的避障动机。</div>
+</div>
+<h4>7.1 速度奖励 $r_{vel}$（式 (8)）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(8) —— 速度在去目标方向上的投影（论文式号 (8)）</span>
+$$r_{vel}=\frac{P_g-P_r}{\lVert P_g-P_r\rVert}\cdot V_r,\qquad P_g,P_r,V_r\in\mathbb{R}^{3} \tag{8}$$
+<div class="eq-note">
+<strong>推导</strong>：单位向量 $\hat{d}=(P_g-P_r)/\lVert P_g-P_r\rVert$ 与速度的点积 = $V_r$ 在去目标方向上的<strong>标量投影</strong> = $\lVert V_r\rVert\cos\theta$（$\theta$ 为速度与去目标方向的夹角）。同向全速：$+\lVert V_r\rVert\le v_{lim}=2$；垂直/反向：$\le0$。<br>
+<strong>几何直觉</strong>：这是"进度奖励"——沿目标方向每前进 1 m 得 1 分，无上界截断（代码 L558 <code>#.clip(max=2.0)</code> 被注释，实际速度被 $v_{lim}$ 物理限住，故 $r_{vel}\in[-2,2]$）。注意它<strong>只奖励方向上的速度</strong>，不惩罚慢——"快"由每步 +1 的生存奖励间接驱动（早点到、早拿新回合的 +1？不，训练中到达目标不终止，见 §9；实际驱动是单位时间内赚更多 $r_{vel}$）。<br>
+<strong>代码对照</strong>：env.py L556–558 在世界系算点积——与论文的"世界系写法"一致；若在 G 系算也相同（旋转不改变点积）✅。部署无此项（部署只做推理，奖励不参与）。<br>
+<strong>疑点（诚实）</strong>：$r_{vel}$ 与 $r_{ds}$/护盾在"冲向迎面行人"的场景下是<strong>对抗</strong>的：迎面障碍时朝目标飞 = 朝障碍飞，$r_{vel}$ 推高、$r_{ds}$ 压低——安全-任务权衡的机制完全靠 $\lambda$ 和网络隐式实现，论文没有显式的"安全优先"结构（这是与 CBF/约束式 RL 路线的本质区别，见 §8 与问题清单第 10 条）。</div>
+</div>
+<h4>7.2 静态安全奖励 $r_{ss}$（式 (9)）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(9) —— 射线距离的对数平均（论文式号 (9)）</span>
+$$r_{ss}=\frac{1}{N_h N_v}\sum_{i=1}^{N_h}\sum_{j=1}^{N_v}\log S_{stat}(i,j) \tag{9}$$
+<div class="eq-note">
+<strong>代码自洽性推导</strong>：代码存储 <code>lidar_scan = range − distance</code>（env.py L437–442），奖励写 <code>torch.log((lidar_range − lidar_scan).clamp(1e-6, lidar_range)).mean((2,3))</code>（L549）→ $\log(range-scan)=\log(distance)$，再对 $36\times4$ 射线取平均——与式 (9)（$S_{stat}$=射线长度=距离）<strong>逐位一致</strong>（已数值验证）。<br>
+<strong>为什么要 $\log$（核心直觉，值得定量）</strong>：$d(\log x)/dx=1/x$——<strong>近距离处梯度最陡</strong>。0.3 m 处梯度 3.33，3.0 m 处 0.33，<strong>正好 10 倍</strong>（已数值验证）："越近越危险"的非线性风险感知被 $\log$ 自动编码；线性尺度下 0.3→0.6 与 3.0→3.3 的奖励增量相同，不符合风险直觉。$\log$ 还惩罚极端贴近：$d\to0^+$ 时 $\log d\to-\infty$（代码 clamp 到 $10^{-6}$ → 下限 $\log 10^{-6}\approx-13.8$，防数值爆炸）。<br>
+<strong>补充几何意义</strong>：$\frac1{N}\sum\log d_i=\log\left(\prod d_i^{1/N}\right)$ = 射线距离的<strong>几何均值</strong>的对数——离群射线（一条极近）会把整体拉低（几何均值对极小值敏感），恰好是我们想要的"最危险射线主导"。<br>
+<strong>疑点（与 §6 笔记呼应的深入版）</strong>：$r_{ss}$ 不含<strong>接近速度</strong>——静态障碍无所谓（障碍不动），但射线图对动态障碍也是盲的（动态障碍被从占据图里清除）。所以"迎面冲来的行人"在 $r_{ss}$ 里完全不可见，只能靠 $r_{ds}$（也只含距离）与状态里的 $V_{oi}$（网络可学但无直接奖励梯度）。<strong>奖励函数整体没有相对速度项</strong>——这是本文奖励设计最值得注意的留白（护盾在部署端补上了这一环，但训练策略没学到）。</div>
+</div>
+<h4>7.3 动态安全奖励 $r_{ds}$（式 (10)）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(10) —— 到动态障碍距离的对数平均（论文式号 (10)）</span>
+$$r_{ds}=\frac{1}{N_d}\sum_{i=1}^{N_d}\log\lVert P_r-P_{oi}\rVert \tag{10}$$
+<div class="eq-note">
+<strong>符号</strong>：$\lVert P_r-P_{oi}\rVert$ = 机器人到第 $i$ 近障碍<strong>中心</strong>的 3D 欧氏距离（m）。<br>
+<strong>代码实现（与论文有两处不同）</strong>（env.py L530–532, L554）：$$r_{ds}^{code}=\frac{1}{N_d}\sum_{i=1}^{N_d}\log\Big(\mathrm{clamp}\big(\lVert\Delta P\rVert-\tfrac{w}{2},\ 10^{-6},\ 4\big)\Big)$$ ① 距离<strong>减去障碍半宽</strong> $w/2$（代码注释自认"not 100% correct in math but should be good enough for approximation"——用中心距离减半宽近似<strong>表面距离</strong>）；② clamp 到 $[10^{-6},4]$，且<strong>超量程槽位用 4 m 填充</strong>（L532）→"无障碍"槽贡献 $\log 4\approx1.386$。数值例子：障碍宽 0.5 m、中心距 1 m：论文式得 $\log1=0$，代码得 $\log0.75=-0.288$——代码更保守（把尺寸也算进风险）✅ 方向合理。<br>
+<strong>与式 (9) 的结构同构性</strong>：都是"对数距离平均"——但 $r_{ss}$ 用射线（到表面），$r_{ds}$ 用中心距（减半宽近似表面）。</div>
+</div>
+<h4>7.4 平滑惩罚 $r_{smooth}$（式 (11)）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(11) —— 相邻时刻速度差的 $L_2$ 范数（论文式号 (11)）</span>
+$$r_{smooth}=-\lVert V_r(t_i)-V_r(t_{i-1})\rVert \tag{11}$$
+<div class="eq-note">
+<strong>推导</strong>：$\lVert\Delta V\rVert/\Delta t$ 就是<strong>平均加速度</strong>的模（$\Delta t=0.016$ s）——惩罚速度突变 = 惩罚大加速度 = 保护姿态环（PX4 对突变的水平速度指令会大幅倾转机身，轻则抖动重则失稳）。权重 0.1（$\lambda_4$）是"轻推"。<br>
+<strong>代码对照</strong>：env.py L560–561（世界系差分）+ L575 乘 0.1 ✅；前一帧速度在 L590 更新。部署端无此项（推理阶段不产生奖励）。</div>
+</div>
+<h4>7.5 高度惩罚 $r_{height}$（式 (12)）——<strong>论文公式与文字自相矛盾</strong></h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(12) —— 高度越界惩罚（论文式号 (12)）</span>
+$$r_{height}=-\left(\min\left(\lvert P_{r,z}-P_{s,z}\rvert,\ \lvert P_{r,z}-P_{g,z}\rvert\right)\right)^{2} \tag{12}$$
+<div class="eq-note">
+<strong>论文文字</strong>（紧接公式）："which applies when the current height $P_{r,z}$ falls <strong>outside</strong> the range defined by the start height $P_{s,z}$ and goal height $P_{g,z}$."<br>
+<strong>矛盾（代数展开）</strong>：设 $z_s\le z_g$，若 $z_r\in(z_s,z_g)$（<strong>区间内部</strong>），则 $\min(|z_r-z_s|,|z_r-z_g|)=\min(z_r-z_s,\ z_g-z_r)&gt;0$ → 惩罚<strong>非零</strong>。只有当 $z_r=z_s$ 或 $z_r=z_g$ 时公式才为 0。数值例子：$z_s=1.0,\ z_g=1.5,\ z_r=1.2$ → 论文公式给 $-0.04$，而按文字应为 0（已数值验证）。<strong>按公式实现会把整个 $[z_s,z_g]$ 区间内的飞行都罚</strong>，与"只在越界时生效"的文字直接冲突。<br>
+<strong>代码实现的是文字</strong>（env.py L416–417 定义 <code>height_range=[min(z_s,z_g), max(z_s,z_g)]</code>；L563–566）：$$r_{height}^{code}=-8.0\cdot\Big(\big[\max(0,\ z_r-z_{max}-0.2)\big]^{2}+\big[\max(0,\ z_{min}-0.2-z_r)\big]^{2}\Big)$$ 即：区间内部（含 ±0.2 m 死区）为 0，越界按<strong>平方超出量</strong>罚，权重 8（五项中最大）。死区避免在边界反复抖动。<br>
+<strong>正确的"文字版"公式应为铰链形式</strong>：$r_{height}=-\left(\min\big(0,\ z_r-z_{max},\ z_{min}-z_r\big)\right)^{2}$（越界才非零）。论文印的 $\min$ 套绝对值是错的。<br>
+<strong>结论</strong>：<strong>❌ 式 (12) 为论文公式错误</strong>（或至少是"公式与其定义文字不一致"）。按论文公式复现会显著惩罚合法高度区间内的飞行（最大可达 $-\left(\frac{z_g-z_s}{2}\right)^2$，在区间中点）。实验跑的是代码，故论文结果不受影响——但复现者必须知道。</div>
+</div>
+<div class="callout warn">
+<div class="callout-title">⚠️ 奖励数值小抄（全部来自代码，论文未给）</div>
+<table>
+<tr><th>项</th><th>公式</th><th>权重</th><th>典型数值</th></tr>
+<tr><td>$r_{vel}$</td><td>投影点积</td><td>1.0</td><td>全速朝目标 ≈ +2；侧飞 ≈ 0</td></tr>
+<tr><td>生存</td><td>常数</td><td>+1/步</td><td>满回合 ≈ 100（折扣累计）</td></tr>
+<tr><td>$r_{ss}$</td><td>$\log$ 距离均值</td><td>1.0</td><td>0.3 m 贴墙 ≈ −1.20；3 m ≈ +1.10（单射线）</td></tr>
+<tr><td>$r_{ds}$</td><td>$\log$(中心距−半宽) 均值</td><td>1.0</td><td>中心距 1 m、宽 0.5 m ≈ −0.29</td></tr>
+<tr><td>$r_{smooth}$</td><td>$-\lVert\Delta V\rVert$</td><td>0.1</td><td>0→2 m/s 突变 ≈ −0.2</td></tr>
+<tr><td>$r_{height}$</td><td>死区外平方</td><td>8.0</td><td>越界 0.3 m ≈ −0.72</td></tr>
+</table>
+量级比较：五项中 $r_{vel}$（±2）与生存（+1/步）主导，安全项在贴墙/贴人时以 $-\log$ 形式急剧变负（clamp 下限 −13.8×权重），高度项靠 8.0 的权重在越界 0.5 m 时达到 −2——设计上安全项在"危险时刻"必须压过速度项，这正是权重配比的含义。
+</div>
+<hr>
+<h3>8. 公式 (13a–d)：安全护盾——从速度障碍到线性规划（含 D10–D14）</h3>
+<p>论文原文（第 5–6 页，III-D）：若策略动作不在任何 VO 内，$V_{safe}=V_{rl}$；否则解：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(13a–d) —— 动作投影优化（论文式号 (13a–d)）</span>
+$$\min_{V_{safe}\in\mathbb{R}^{3}}\ \lVert V_{safe}-V_{rl}\rVert \tag{13a}$$
+$$\mathrm{s.t.}\quad \Big(V_{safe}-\big(V_{rl}-V_{oi}+\Delta V_i\big)\Big)\cdot\Delta V_i\ge 0 \tag{13b}$$
+$$V_{min}\le V_{safe}\le V_{max} \tag{13c}$$
+$$\forall i\in\{1,\dots,N\} \tag{13d}$$
+<div class="eq-note">
+<strong>符号</strong>：$V_{rl}$ = 策略网络输出的动作（被当作"期望速度" preferred velocity）| $V_{safe}$ = 护盾修正后的安全动作 | $\Delta V_i$ = 退出第 $i$ 个 VO 所需的<strong>最小速度改变量</strong>（图 5(b) 蓝色箭头）| $V_{min},V_{max}$ = 控制限幅 | $N$ = 障碍球总数。<br>
+<strong>目标 (13a)</strong>：<strong>最小干预</strong>原则——离策略动作最近的安全速度（保留策略意图）。<strong>(13d)</strong>：每个障碍各贡献一个半平面。下面按"VO 几何 → ORCA 半平面 → LP 求解"的顺序把 (13b) 完整推一遍，并指出其与作者代码的差异。</div>
+</div>
+<h4>8.1 VO 的几何定义与分解（D10）</h4>
+<div class="formula-block">
+<span class="eq-tag">(D10) —— 速度障碍集合（补充式；对应论文图 5）</span>
+$$VO^{\tau}_{r|o}=\Big\{\,V_r\ \Big|\ \exists\,t\in[0,\tau]:\ \big\lVert (P_r+V_r t)-(P_o+V_o t)\big\rVert\le R\,\Big\},\qquad R=r_r+r_o+d_{safe}$$
+$$\xrightarrow{\text{相对量}}\quad VO^{\tau}=\Big\{\,v\ \Big|\ \exists\,t\in[0,\tau]:\ \lVert t\,v-p\rVert\le R\,\Big\},\qquad v=V_r-V_o,\quad p=P_o-P_r$$
+<div class="eq-note">
+<strong>符号</strong>：$R$ = 合成半径（机器人 + 障碍 + 安全距离 $d_{safe}=0.3$ m）| $\tau=2.0$ s（safe_action_param.yaml <code>time_horizon</code>）| 原点在机器人处。<br>
+<strong>推导</strong>：把机器人缩为点、障碍膨胀 $R$（C-space 变换）；相对位置 $p$、相对速度 $v$ 下，未来 $t$ 时刻相对位置为 $p-vt$（注意符号：论文/代码用 $\mathrm{relPos}=P_o-P_r$、$\mathrm{relVel}=V_r-V_o$，则 $t$ 时刻相对距离为 $\lVert p-vt\rVert=\lVert tv-p\rVert$）。<br>
+<strong>几何分解（两个部分）</strong>：① <strong>锥</strong>（无穷时域）：$t$ 不限时，射线 $tv$ 到 $p$ 的最近距离 $d_{min}=\lVert p\rVert\sin\theta_{v}$（$\theta_v$ 为 $v$ 与 $p$ 的夹角），$d_{min}\le R$ 且最近点在前方 → 条件 $v\cdot p&gt;0$ 且 $\lVert p\times v\rVert^{2}\le R^{2}\lVert v\rVert^{2}$（推导：$d_{min}^2=\lVert p\rVert^2-(p\cdot v)^2/\lVert v\rVert^2\le R^2$），即<strong>顶点在原点、轴向 $p$、半角 $\theta=\arcsin(R/\lVert p\rVert)$ 的圆锥</strong>；② <strong>截断圆盘</strong>（有限时域）：最近点发生在 $t\ge\tau$ 的速度若在 $t=\tau$ 时刻落在圆内也算碰撞 → 条件 $\lVert\tau v-p\rVert\le R$，即速度空间中以 $p/\tau$ 为心、$R/\tau$ 为半径的<strong>圆盘</strong>。两者并集即 VO（图 5(b) 的"圆 + 锥"正是这个分解：圆 $\{p/\tau,\ R/\tau\}$，锥从原点张出）。<br>
+<strong>数值核对</strong>：$\tau=2$ s、$R=0.6$ m、$p=(3,0)$：锥半角 $\arcsin(0.2)=11.5°$；截断圆盘心 $(1.5,0)$、半径 0.3。迎面行人 $V_o=(-1.2,0)$、机器人 $V_r=(2,0)$：$v=(3.2,0)$，$d_{min}=0$ → 必在 VO 内 ✅。</div>
+</div>
+<h4>8.2 ORCA 半平面的三分支构造（D11）——逐行对应 safeAction.cpp L74–158</h4>
+<p>VO 是锥+圆的非凸并集，直接"最小修正"是非凸问题。ORCA [46] 的解法：把 VO 在"最接近当前相对速度的边界"处<strong>线性化成一个半平面</strong>，修正量有闭式解。代码（<code>getORCAPlane</code>）分三种情况，令 $w$ 为中间量、$\hat{w}=w/\lVert w\rVert$，半平面为 $\{V:\ (V-(V_{rl}+u))\cdot\hat{w}\ge0\}$：</p>
+<div class="formula-block">
+<span class="eq-tag">(D11) —— ORCA 修正向量 u 的三分支（补充式；safeAction.cpp L86–154）</span>
+$$\textbf{情况 1（截断圆投影）}:\ w=v-\frac{p}{\tau},\qquad u=\left(\frac{R}{\tau}-\lVert w\rVert\right)\hat{w}$$
+$$\textbf{情况 2（锥投影）}:\ a=\lVert p\rVert^{2},\ b=p\cdot v,\ c=\lVert v\rVert^{2}-\frac{\lVert p\times v\rVert^{2}}{\lVert p\rVert^{2}-R^{2}},\ t=\frac{b+\sqrt{b^{2}-ac}}{a},\ w=v-t\,p,\ u=\big(R\,t-\lVert w\rVert\big)\hat{w}$$
+$$\textbf{情况 3（已碰撞退化）}:\ w=v-\frac{p}{\Delta t},\qquad u=\left(\frac{R}{\Delta t}-\lVert w\rVert\right)\hat{w},\qquad \Delta t=0.05\ \text{s}$$
+<div class="eq-note">
+<strong>分支判定</strong>（代码 L86–144）：$\lVert p\rVert^{2}&gt;R^{2}$ 未碰撞；其中若 $w\cdot p&lt;0$ 且 $(w\cdot p)^2&gt;R^2\lVert w\rVert^2$（当前相对速度在截断圆的"背面"）走情况 1，否则走情况 2；$\lVert p\rVert^{2}\le R^{2}$ 走情况 3。每步还判定 <code>inVO</code>：情况 1 判 $\lVert v\tau-p\rVert&lt;R$；情况 2 判 $\angle(v,p)&lt;\arcsin(R/\lVert p\rVert)$。<br>
+<strong>推导验证（这是关键——不做空头承诺）</strong>：三种情况下修正后相对速度 $z=v+u$ 的落点已<strong>数值验证</strong>（verify_navrl.py，2000 组随机）：情况 1 $\lVert z-p/\tau\rVert=R/\tau$（落在截断圆上）；情况 2 $(z\cdot p)^2=(\lVert p\rVert^2-R^2)\lVert z\rVert^2$（落在锥面上）；情况 3 $\lVert z-p/\Delta t\rVert=R/\Delta t$。即 $u$ 恰好把相对速度推到 VO 边界，是最小修正（$u$ 与边界在该点的外法向平行）。<br>
+<strong>情况 2 的 $t$ 二次方程的由来（诚实说明）</strong>：锥面方程 $C(w)=(w\cdot p)^2-(\lVert p\rVert^2-R^2)\lVert w\rVert^2=0$；RVO2 的构造是沿 $p$ 方向的"轴向切片" $w=v-tp$（锥的平移对称性保证最近点位于过 $v$ 的轴平行线上），代入 $C$ 并配合 $z=v+u$ 在锥面上、$u\perp$ 锥面切平面的条件，得到 $at^2-2bt+c=0$，取大根（$b+\sqrt{b^2-ac}$，因为 $t$ 对应"前方的交点"）。该公式与 RVO2 官方实现（Berg et al. 2011 [46]，论文明确引用）<strong>逐字符相同</strong>，本仓库 safeAction.cpp 是其三维移植。第一性原理的完整拉格朗日推导篇幅较长且与 [46] 附录重复，本文以"构造 + 落点数值验证"保证正确性。<br>
+<strong>物理直觉</strong>：情况 1/2 分别对应"危险在时域末端（截断圆）/ 危险在方向（锥）"两种撞法；情况 3 是"已经在撞"的应急退避（用 $\Delta t=0.05$ s 代替 $\tau$，退得更急）。$u$ 的符号与大小自动适应：远离障碍时 $\lVert w\rVert$ 大 → $u$ 小甚至为负（把约束"让开"），这正是 ORCA 比"直接投影到 VO 外"更平滑的原因。</div>
+</div>
+<h4>8.3 (13b) 的严格推导：正确形式与论文印出形式的差异（❌ 核心疑点）</h4>
+<p>ORCA 半平面是对<strong>相对速度</strong>定义的：把相对速度 $v=V_{rl}-V_{oi}$ 修正到 $v+u$ 后，安全的<strong>绝对</strong>速度 $V_{safe}$ 需满足其相对速度 $(V_{safe}-V_{oi})$ 落在 $v+u$ 的"外侧"半空间：</p>
+<div class="formula-block">
+<span class="eq-tag">(D12) —— (13b) 的正确推导（相对速度空间 → 绝对速度空间）</span>
+$$\Big(\underbrace{(V_{safe}-V_{oi})}_{\text{新相对速度}}-\underbrace{\big((V_{rl}-V_{oi})+\Delta V_i\big)}_{\text{修正后相对速度}}\Big)\cdot\Delta\hat{V}_i\ge0\ \Longrightarrow\ \Big(V_{safe}-V_{rl}-\Delta V_i\Big)\cdot\Delta\hat{V}_i\ge0$$
+<div class="eq-note">
+<strong>推导</strong>：把 $V_{safe}-V_{oi}$ 当作新的相对速度，约束它处于以 $v+u$ 为边界点、外法向 $\Delta\hat{V}_i$（$=\hat{w}$）的半空间。展开括号：$(V_{safe}-V_{oi})-(V_{rl}-V_{oi}+\Delta V_i)=V_{safe}-V_{rl}-\Delta V_i$——<strong>$V_{oi}$ 精确消去</strong>（代数恒等式，与障碍是否匀速无关）。这就是标准 ORCA 约束，也是作者代码实现的形式：<code>plane.point = V_rl + u</code>、<code>plane.normal = û</code>（safeAction.cpp L156），约束 $(V-(V_{rl}+u))\cdot\hat{w}\ge0$。<br>
+<strong>论文印出的是</strong>（式 13b）：$$\big(V_{safe}-\left(V_{rl}-V_{oi}+\Delta V_i\right)\big)\cdot\Delta V_i\ge0$$ 展开得 $(V_{safe}-V_{rl}+V_{oi}-\Delta V_i)\cdot\Delta V_i\ge0$。与正确形式相比：① 约束点用了"修正后的<strong>相对</strong>速度" $V_{rl}-V_{oi}+\Delta V_i$ 却去约束<strong>绝对</strong>速度 $V_{safe}$；② 展开后多出一项 $V_{oi}\cdot\Delta V_i$ 位移。<br>
+<strong>等价性判定（代数）</strong>：论文式 $\iff (V_{safe}-V_{rl}-\Delta V_i)\cdot\Delta V_i\ge -V_{oi}\cdot\Delta V_i$（法向取 $\Delta V_i$ 与 $\hat w$ 只差正标量）。当 $V_{oi}=0$（静态障碍）或 $V_{oi}\perp\Delta V_i$ 时与正确式等价；<strong>对一般移动障碍不等价</strong>：$V_{oi}\cdot\Delta V_i&gt;0$ 时论文式更松（把不安全速度放进来），$&lt;0$ 时更紧（把安全速度挡出去）。<br>
+<strong>数值反例（已构造，verify_navrl.py）</strong>：$p=(3,0,0)$、$R=1$、相对速度 $v=(1.6,0.4,0)$（锥内）、障碍速度 $V_{oi}=(0.9,0,0)$、$V_{rl}=v+V_{oi}=(2.5,0.4,0)$，取 $V_{test}=V_{rl}+u+0.05\,\hat{w}$：<strong>代码约束左侧 = +0.050（可行），论文 (13b) 左侧 = −0.039（不可行）</strong>——同一个速度，按代码安全、按论文公式不安全。随机搜索也稳定找到同类反例（脚本输出反例 1 组）。<br>
+<strong>影响评估（不夸大）</strong>：① 作者实验跑的是代码（标准 ORCA），<strong>论文结果不受影响</strong>；② 但"按论文公式复现"的人会得到与作者不同的护盾行为（对移动障碍约束移位 $V_{oi}\cdot\Delta V_i$）；③ 本节同时<strong>更正第 6 节笔记 Eq.(13) 的注记</strong>：那里称"两者在障碍匀速假设下等价"——严格代数展开表明不等价，差异与"匀速假设"无关（正确式在任何 $V_{oi}$ 下都消去 $V_{oi}$），只在 $V_{oi}=0$ 或 $V_{oi}\perp\Delta V_i$ 时成立。</div>
+</div>
+<div class="callout danger">
+<div class="callout-title">🚨 论文式 (13b) 的"最小修复"</div>
+若把 (13b) 第一因子里的 $V_{safe}$ 换成 $(V_{safe}-V_{oi})$（即约束新<strong>相对速度</strong>）：$\big((V_{safe}-V_{oi})-(V_{rl}-V_{oi}+\Delta V_i)\big)\cdot\Delta V_i\ge0\iff(V_{safe}-V_{rl}-\Delta V_i)\cdot\Delta V_i\ge0$，即得正确 ORCA 约束。判断：论文大概率是漏印了 $V_{safe}$ 旁的 "$-V_{oi}$"（或误把相对空间约束写在了绝对速度上）——与式 (12) 一样属于"公式层错误、实现层正确"。
+</div>
+<h4>8.4 约束 (13c) 与 LP 求解级联（D13–D14）</h4>
+<div class="formula-block">
+<span class="eq-tag">(D13) —— 代码实际的速度可行域与线性规划级联（补充式；navigation.py L304/L332/L231, solver.h L173–255）</span>
+$$\min_{V\in\mathbb{R}^3}\ \lVert V-V_{rl}\rVert\quad\mathrm{s.t.}\quad \hat{w}_i\cdot\big(V-(V_{rl}+u_i)\big)\ge0\ \ (\forall i),\qquad \lVert V\rVert\le V_{max},\qquad V_{max}=\begin{cases}\sqrt3\,v_{lim},&\text{ros1}\\\sqrt2\,v_{lim},&\text{ros2}\end{cases}$$
+<div class="eq-note">
+<strong>与论文 (13c) 的差异</strong>：论文写盒约束 $V_{min}\le V_{safe}\le V_{max}$；代码用<strong>速度球</strong> $\lVert V\rVert\le V_{max}$（solver.h 的 <code>radius</code> 参数），且 $V_{max}=\sqrt3\,v_{lim}$（ros1，$v_{lim}=2.0$ → 3.46 m/s）或 $\sqrt2\,v_{lim}$（ros2，默认 $v_{lim}=1.0$ → 1.41 m/s）。$\sqrt3\,v_{lim}$ 恰好是盒 $[-v_{lim},v_{lim}]^3$ 的外接球半径——球比盒<strong>松</strong>：对角方向允许单分量达到 $\sqrt3\,v_{lim}&gt;v_{lim}$（已数值验证）。动机可理解为给 LP 留求解余地（内切球半径 $v_{lim}$ 会过度限制任何斜向运动），但论文的盒约束文字与代码不符，需如实记录。<br>
+<strong>LP 求解级联（无迭代、无初值，最坏 $O(N^3)$，实测 2 ms）</strong>：① <code>linearProgram3</code>（solver.h L173–201）：初始解 = $V_{rl}$ 在球内的投影（球外则缩到 $\lVert V\rVert=V_{max}$），逐平面检查 $\hat w_i\cdot(p_i-V)&gt;0$，违者调 <code>linearProgram2</code> 在该平面上解 2 维问题；② <code>linearProgram2</code>（L100–162）：先把 $V_{rl}$ 投影到平面（球截面圆内），违者再与平面 $j&lt;i$ 求交线，调 <code>linearProgram1</code>；③ <code>linearProgram1</code>（L17–88）：直线上解 1 维问题，球约束给出 $t\in[-d\cdot p\pm\sqrt{(d\cdot p)^2+r^2-\lVert p\rVert^2}]$（$p$=线上基点，$d$=方向），平面约束给出 $t=(p_i-p)\cdot n_i/(d\cdot n_i)$，逐步夹逼 $[t_{left},t_{right}]$，空集则失败；④ LP3 失败（不可行，多为对向障碍的半平面对撞）时调 <code>linearProgram4</code>（L210–255）：把"对撞"平面两两合成投影平面后重解 LP3（方向优化模式）。<br>
+<strong>目标函数等价性</strong>：LP3 的非方向优化模式找"球内可行域中离 $V_{rl}$ 最近的点"，与 (13a) 的 $\min\lVert V_{safe}-V_{rl}\rVert$ 一致（球约束并入可行域）✅。<br>
+<strong>仅当需要时才解</strong>：<code>needSolve</code>（任一障碍 inVO）为假时 $V_{safe}=V_{rl}$ 直接返回（safeAction.cpp L267–274、L431–437），对应论文"If this action is not within any of the VO regions, we set $V_{safe}$ equal to the policy action" ✅。</div>
+</div>
+<h4>8.5 障碍的球分解与高度平面（D14）——静态/动态不对称 + ros1 参数 bug</h4>
+<div class="formula-block">
+<span class="eq-tag">(D14) —— 障碍 → 球簇的覆盖规则（补充式；safeAction.cpp L190–247, L314–410）</span>
+$$r_{dyn}=\frac12\sqrt{w^{2}+h^{2}},\qquad n_{stack}=\left\lceil\frac{s_z}{s_{xy}}\right\rceil\qquad\text{（动态：底面对角半长，沿 z 堆叠）}$$
+$$r_{static}=0.1\ \text{m},\qquad n_{xyz}=\left\lceil\frac{s_{x}/2-0.1}{0.1}\right\rceil\times\left\lceil\frac{s_{y}/2-0.1}{0.1}\right\rceil\times\left\lceil\frac{s_{z}/2-0.1}{0.1}\right\rceil\qquad\text{（静态：0.1 m 网格球）}$$
+<div class="eq-note">
+<strong>符号</strong>：$w,h,s_z$ = 障碍占地宽/高与高 | $s_{xy}=\max(w,h)$ | $n_{stack},n_{xyz}$ = 堆叠球数。<br>
+<strong>解读与不对称（如实指出）</strong>：动态障碍 → 沿 z 堆叠的大球（半径 = 底面对角半长，激光版间距 $s_{xy}$、地图版间距 $r/2$），机器人半径取 <code>agentRadius + safetyDist</code>；静态障碍 → 0.1 m 小球网格（地图版）或 DBSCAN 聚类后"半径×1.5 + 中心向机器人偏移 maxDist"的单球（激光版，L396–397），且<strong>不加机器人半径</strong>（地图版只加 safetyDist、激光版加 0）——与动态障碍的"agentRadius+safetyDist"不对称。可能的解释：地图版静态框来自<strong>已按机器人尺寸膨胀</strong>的占据图（occupancy_map_param.yaml <code>robot_size:[0.3,0.3,0.1]</code> 参与 inflate），故不必再加；激光版用"半径放大 1.5 倍 + 中心朝机器人平移"补偿聚类误差。此为从代码结构的推断，论文未说明。<br>
+<strong>高度平面（L254–265, L418–429）</strong>：若 $z+v_z\tau&lt;h_{min}$ 加平面 $\hat z\cdot V\ge0$（法向 $(0,0,1)$，点 = 原点）；若 $z+v_z\tau&gt;h_{max}$ 加平面 $\hat z\cdot V\le0$。注意这是<strong>启发式</strong>（强迫 $v_z\ge0$ / $v_z\le0$），不是精确边界半平面（精确形式应为 $\hat z\cdot V\ge(h_{min}-z)/\tau$）；且平面点取原点而非边界点。$h_{min}=0.7,\ h_{max}=1.3$（safe_action_param.yaml）。<br>
+<strong>🚨 ros1 参数覆盖 bug（代码层，非论文层）</strong>：safeAction.cpp L56 写 <code>getParam(ns_+"/safety_distance", this-&gt;maxHeight_)</code>——把 <strong>safety_distance 的值读进了 maxHeight_ 变量</strong>（应为 <code>safetyDist_</code>）。后果：$maxHeight\_$ 从 1.3 被覆盖为 0.3，而 <code>safetyDist_</code> 恒为默认 0.3（恰好等于 yaml 值，纯属巧合）。已数值推演：悬停 $z=1.0$ m、$v_z=0$ 时"禁止上升"平面（$v_z\le0$）<strong>总被加入</strong>（正确参数下不触发）；下降 $v_z=-0.3$ m/s 时两个高度平面<strong>同时加入</strong> → $v_z$ 被钉在 0。即 ros1 部署中护盾一旦激活，机器人在 0.3 m 以上<strong>无法爬升</strong>。ros2 版本参数读取正确（L48–49 读入 <code>safetyDist_</code>，默认 0.05）。由于论文实机实验走 ros1 + PX4 路径（README III），该 bug 大概率在实机中生效（也可能实机用的是未发布的修复版——以仓库快照为准的诚实表述）。</div>
+</div>
+
+<h3>9. 训练流程的算法化解读（论文无伪代码；按代码重建）</h3>
+<p>论文没有给出任何 Algorithm 环境块（与 NeuralPlane 附录 A.5 不同），只有 §IV-A 的散点描述。按 train.py/ppo.py/env.py 重建的流程：</p>
+<pre class="code-block"><code>算法 NavRL-Train（依据 train.py L84–134 + ppo.py L94–126 重建）：
+输入：cfg（num_envs=1024, max_frame_num=1.2e9, dt=0.016 s）
+1  并行启动 num_envs 个 Hummingbird + 森林地形（350 静态 + N_dyn 动态障碍）
+2  for i, data in enumerate(collector):                 # 每批 = 1024×32 = 32768 帧
+3      policy.train(data):                                # ppo.py L94–126
+4          next_values ← critic(特征(next_obs))
+5          adv, ret ← GAE(γ=0.99, λ=0.95; 用 terminated 掩码)   # utils.py L130–148
+6          adv ← (adv − mean)/std.clip(1e-7); ret ← ValueNorm(ret)
+7          for epoch in 1..4:                             # ppo.yaml training_epoch_num
+8              for minibatch in 16 份:                    # ppo.yaml num_minibatches
+9                  loss = 熵(−1e-3·H) + 截断代理(min, ε=0.1)·3 + 截断Huber(delta=10)
+10                 Adam(5e-4) 更新 actor/critic/extractor；梯度范数 clip 5
+11     if i % 1000 == 0: 评估（动作取 Beta 均值）并保存 checkpoint   # train.py L105–129
+12 直至 total_frames = 1.2e9（≈10 h @ RTX 4090）</code></pre>
+<ul>
+<li><strong>回合终止</strong>（env.py L583–587）：碰撞（静态：任一条射线距离 ≤0.3 m → <code>max(scan)&gt;range−0.3</code> L570；动态：盒判定 $d_{2d}\le w/2+0.3$ 且 $|d_z|\le h/2+0.3$ L525–528）、高度出 $[0.2,4]$ m、或 2200 步截断。<strong>到达目标（$d&lt;0.5$ m）在训练中不终止回合</strong>（L583 只记入 stats）——与论文"reset either upon colliding or at the end of the episode"一致（论文没说到达就重置，此处是<strong>补充确认</strong>而非矛盾）。</li>
+<li><strong>课程学习：论文有、发布代码无</strong>（⚠️）：论文 §IV-A 描述"60→120 个动态障碍，成功率 &gt;80% 就 +20"并给出 Table I 对比；但发布版 train.py <strong>没有任何课程逻辑</strong>（grep 全库 <code>curriculum|success_rate</code> 零命中，train.py 只用 cfg 固定的 <code>env_dyn.num_obstacles</code>，README 示例也是固定 80 个）。Table I 的实验应为作者未发布的训练脚本所跑。复现"课程学习"需要自己写外层循环改 cfg。<strong>同时更正第 6 节笔记 6.5 的流程图</strong>：其中"成功率 &gt; 80% → 动态障碍 +20"是论文描述的流程，不是发布代码的行为。</li>
+<li><strong>训练-部署一致性账</strong>：训练 62.5 Hz（dt=0.016）推理由网络在 20 Hz 部署（ros2 定时器 0.05 s，navigation.py L502–510）；训练动作经 Lee 控制器、实机经 PX4——速度指令层掩盖了两者差异（论文 sim-to-real 论点的机制）。</li>
+<li><strong>论文数值核对</strong>：成功率 80.96%（100 障碍模型）→ 代码无法直接重算（依赖训练日志）；训练总量 1.2e9 帧 = train.yaml <code>max_frame_num: 12e8</code> ✅；运行时间表 III：策略 1 ms（4090）/7 ms（Orin NX）、护盾 2/16 ms——与 ORCA 无迭代 LP 的设计一致。</li>
+</ul>
+
+<h3>10. 感知链路的公式化（U-depth / DBSCAN / 集成检测）</h3>
+<p>论文 §III-A 的检测流水线没有编号公式，这里把三个关键部件写成数学（标注 D15 系列，供复现参考）：</p>
+<div class="formula-block">
+<span class="eq-tag">(D15) —— U-depth 直方图行检测与 DBSCAN 聚类（补充式；uvDetector.cpp, dbscan.cpp）</span>
+$$U(u,d)=\#\big\{\text{深度像素}(u',v'):\ \lfloor u'\cdot k\rfloor=u,\ \mathrm{bin}(z_{v'})=d\big\},\qquad \text{检测}=U\text{ 图中沿 }d\text{ 方向的连续行分组}$$
+$$\mathrm{DBSCAN}:\ \mathcal{C}=\big\{\mathbf{x}_i:\ \mathbf{x}_i\ \text{与}\ \mathbf{x}_j\ \text{密度可达},\ \lVert\mathbf{x}_i-\mathbf{x}_j\rVert\le\varepsilon,\ |N_\varepsilon(\mathbf{x}_j)|\ge\text{minPts}\big\}$$
+<div class="eq-note">
+<strong>解读</strong>：① U-depth [44] 把深度图沿列压缩成"顶视直方图" $U(u,d)$（$u$=水平角，$d$=深度 bin），障碍物表现为 $U$ 图中连续的行段 → 行分组算法给出 3D 包围盒（uvDetector.cpp L205–235 的直方图 + L377–460 的行分组）；② DBSCAN 对点云聚类（$\varepsilon$、minPts 参数见 dynamic_detector_param.yaml），簇边界点定尺寸；③ <strong>集成</strong>：两个检测器相互验证取"共识"（论文："mutual agreements from both detectors to identify consistent results"，dynamicDetector.cpp 的匹配+IoU 合并 L1012–1023）；④ <strong>动静分类</strong>：YOLO 2D 框与 3D 检测的 2D 重投影匹配来标"动态"。随后是 §4 的关联（D7）+ Kalman（D6）。运行时间：静态感知 8/15 ms、动态感知 11/27 ms（论文表 III）。<br>
+<strong>诚实说明</strong>：两个检测器都是"工程算法"而非可推导的解析公式，本节只做形式化与代码定位；论文把细节指向其前作 [43]。</div>
+</div>
+<hr>
+<h3>最后. 交叉验证总表（论文 ↔ 代码 ↔ 独立验证）与问题清单</h3>
+<h4>F.1 论文公式 ↔ 代码位置 ↔ 独立数值验证 总表</h4>
+<table>
+<tr><th>论文</th><th>代码位置（仓库根 <code>1.Paper\NavRL\</code>）</th><th>独立验证</th></tr>
+<tr><td>(1)</td><td>ppo.py L100–113（GAE/return）、train.yaml max_episode_length</td><td>✅ 标准 MDP；实现为截断回合 + bootstrap</td></tr>
+<tr><td>(2)</td><td>env.py L459–477（8 维 drone_state）</td><td>⚠️ 论文 7 维 vs 代码 8 维（$d_{2d}/d_z$ 拆分）</td></tr>
+<tr><td>(3)(4)</td><td>env.py L484–518（top-k=5、10 维槽）、ppo.yaml dyn_obs_num</td><td>⚠️ 论文 M=9 vs 代码 M=10；补零规则代码更严</td></tr>
+<tr><td>(5)</td><td>env.py L437–442（scan=range−distance）、sensor 配置（36×4, 4 m）</td><td>✅；"量程+偏移"与 clamp 有微差</td></tr>
+<tr><td>(6)</td><td>ppo.py L89–91、navigation.py（ros2）L359–360</td><td>✅ 逐字一致（验证 $\hat V=0/1$ 端点）</td></tr>
+<tr><td>(7)</td><td>env.py L574–577</td><td>⚠️ $\lambda=[1,1,1,0.1,8]$ + 生存奖励 +1（论文未提）</td></tr>
+<tr><td>(8)</td><td>env.py L556–558</td><td>✅；clip(max=2) 被注释（L558）</td></tr>
+<tr><td>(9)</td><td>env.py L549 + L437–442</td><td>✅ log(range−scan)=log(distance) 数值验证；$\log$ 梯度 0.3/3 m = 10×</td></tr>
+<tr><td>(10)</td><td>env.py L530–532, L554</td><td>⚠️ 代码减半宽 + clamp + 量程填充，论文没有</td></tr>
+<tr><td>(11)</td><td>env.py L560–561, L575</td><td>✅（等价平均加速度惩罚）</td></tr>
+<tr><td>(12)</td><td>env.py L416–417, L563–566</td><td>❌ 论文公式与文字矛盾；代码按文字 + ±0.2 死区（数值验证）</td></tr>
+<tr><td>(13a)</td><td>solver.h L173–201（linearProgram3 非方向优化）</td><td>✅</td></tr>
+<tr><td>(13b)</td><td>safeAction.cpp L74–158（<code>plane.point=V_rl+u</code>, <code>normal=û</code>）</td><td>❌ 论文式 ≠ ORCA/代码；仅 $V_{oi}=0$ 等价；已构造数值反例</td></tr>
+<tr><td>(13c)</td><td>ros1 navigation.py L304/L332（$\sqrt3 v_{lim}$）、ros2 L231（$\sqrt2 v_{lim}$）</td><td>⚠️ 盒约束 vs 球约束；球外接盒、角落可超 $v_{lim}$</td></tr>
+<tr><td>(13d)</td><td>safeAction.cpp L190–247（全部障碍球 push 平面）</td><td>✅</td></tr>
+<tr><td>无编号 PPO</td><td>ppo.py L137–167、utils.py L122–149</td><td>✅ 截断代理/GAE/Huber/熵逐行对应（GAE 递推数值验证）</td></tr>
+<tr><td>无编号 Beta</td><td>utils.py L107–120（1+softplus+1e-6）</td><td>✅ 严格单峰、均值部署（数值验证）</td></tr>
+<tr><td>无编号 ORCA 锥投影</td><td>safeAction.cpp L116–143</td><td>✅ 修正点落锥面（2000 组随机数值验证）</td></tr>
+<tr><td>无编号 KF-CA</td><td>dynamicDetector.cpp L1969–1996、kalmanFilter.cpp L33–47</td><td>✅ 6 态 CA 矩阵数值验证；2D-only + z 差分单算</td></tr>
+<tr><td>无编号 log-odds</td><td>occupancyMap.cpp L1016–1033（yaml: 0.70/0.35/0.12/0.97/0.80）</td><td>✅ 标准贝叶斯 logit 加法更新</td></tr>
+<tr><td>课程学习</td><td>train.py（全文件）</td><td>⚠️ <strong>论文有、发布代码无</strong>（grep 全库无 curriculum 逻辑）</td></tr>
+</table>
+<h4>F.2 论文问题清单（按严重程度排序）</h4>
+<ol>
+<li><strong>【公式错误】式 (12) 与其定义文字矛盾</strong>：按公式，机器人处于 $[z_s,z_g]$ 区间<strong>内部</strong>也受罚（只有恰在端点才为 0）；文字说"仅在越界时生效"。代码按文字实现（+±0.2 m 死区）。正确形式应为铰链式 $\min(0,z_r-z_{max},z_{min}-z_r)$ 的平方。照抄式 (12) 复现会持续惩罚合法高度区间。</li>
+<li><strong>【公式错误】式 (13b) 与 ORCA/作者代码不等价</strong>：论文约束 $(V_{safe}-(V_{rl}-V_{oi}+\Delta V_i))\cdot\Delta V_i\ge0$ 展开后含 $V_{oi}\cdot\Delta V_i$ 位移；正确形式为 $(V_{safe}-V_{rl}-\Delta V_i)\cdot\Delta\hat V_i\ge0$（$V_{oi}$ 应消去）。仅静态障碍（$V_{oi}=0$）或 $V_{oi}\perp\Delta V_i$ 时成立；已构造"代码判安全、论文公式判不安全"的数值反例。作者代码是标准 ORCA（正确），故实验结果不受影响。</li>
+<li><strong>【代码 bug，ros1 分支】safeAction.cpp L56 把 <code>safety_distance</code> 读进 <code>maxHeight_</code></strong>：$h_{max}$ 从 1.3 被覆盖为 0.3 → 护盾激活时几乎总加"禁止上升"平面，下降时与下限平面叠加把 $v_z$ 钉在 0。$safetyDist_$ 恰好取默认 0.3 与 yaml 一致，掩盖了参数错位。ros2 分支无此 bug（正确读入 <code>safetyDist_</code>）。实机若用 ros1 分支，此 bug 大概率生效（诚实表述：无法排除作者用了未发布修复版）。</li>
+<li><strong>【描述与代码不符】课程学习</strong>：论文 §IV-A 的 60→120（+20 @ 成功率 80%）与 Table I 无对应代码（train.py 固定障碍数）。发布仓库无法直接复现 Table I。</li>
+<li><strong>【描述与代码不符】动态特征提取器</strong>：论文 §IV 说"static and dynamic feature extractors use 3-layer convolutional neural networks"；代码静态是 3 层 CNN（4→16→16 通道），<strong>动态是 MLP[128,64]</strong>（ppo.py L30–33）。</li>
+<li><strong>【状态维度不一致】式 (2) 7 维/代码 8 维；式 (4) 9 维/代码 10 维</strong>：距离拆 $d_{2d}+d_z$、宽度离散化 + 高度二值化。论文未给出 $N_d,N_h,N_v$ 数值（代码 5/36/4）。</li>
+<li><strong>【公式与实现差异】式 (10)</strong>：论文用中心距 $\lVert P_r-P_{oi}\rVert$，代码用 $\lVert\Delta P\rVert-w/2$（表面距近似）+ clamp + 超量程填充 $\log 4$。方向合理但属实现差异，论文未注明。</li>
+<li><strong>【信息缺失】式 (7) 的 $\lambda$ 与生存奖励</strong>：论文不给权重；代码 $\lambda=[1,1,1,0.1,8]$ 且另有 +1/步生存奖励（≈ 满回合 100 的隐式碰撞惩罚），显式碰撞惩罚（−50）被注释。</li>
+<li><strong>【约束形式差异】式 (13c)</strong>：论文盒约束 vs 代码速度球（$\sqrt3\,v_{lim}$/$\sqrt2\,v_{lim}$），球外接盒允许单分量超 $v_{lim}$；高度平面是启发式（$v_z\gtrless0$）而非精确边界半平面。</li>
+<li><strong>【留白（非错误，值得注意）】奖励函数不含相对速度/接近速率项</strong>：$r_{ss},r_{ds}$ 只含距离；"迎面高速逼近"的风险信息只在状态（$V_{oi}$）里，没有直接奖励梯度。安全-任务权衡完全靠网络隐式学习，护盾（VO）在部署端才显式补上相对速度推理——这是"学习策略 + 显式护盾"双保险设计的结构性留白，也是与 CBF/约束式 RL 路线的本质区别。</li>
+</ol>
+<h4>F.3 验证材料清单</h4>
+<ul>
+<li><code>verify_navrl.py</code>（_derivation_work\navrl\ 目录，可复跑，仅依赖标准库）：26/26 通过。输出摘要（前几条）：<pre class="code-block"><code>cone branch: corrected relative velocity z=v+u lies ON the VO cone              : PASS
+circle branch: corrected relative velocity lies ON cutoff circle (R/tau)        : PASS
+collision branch: corrected relative velocity lies ON circle (R/dt)             : PASS
+Eq(13b) algebra: paper_lhs = eps*|u| + V_oi·u (V_oi does NOT cancel)            : PASS
+Eq(13b): genuine in-VO case — test point satisfies code plane but violates paper (13b) : PASS
+Eq(12): paper formula nonzero INSIDE [z_s,z_g] (contradicts its own text)       : PASS
+ros1 param bug: hovering at z=1.0 triggers 'v_z&lt;=0' plane                        : PASS
+Eq(9): log-gradient at 0.3 m is 10x that at 3.0 m                                : PASS</code></pre></li>
+<li><code>fulltext.txt</code>（_derivation_work\navrl\）：PDF 全文抽取文本（分页），用于核对任何一句话。</li>
+<li>页面图像 <code>pages/page-001..008.png</code>：本模型不能读图，建议人工目视复核：式 (1) 第 3 页、式 (2)–(6) 第 4 页、式 (7)–(12) 第 5 页、式 (13a–d) 与图 5 第 5–6 页（尤其式 (12) 的 min/绝对值嵌套与式 (13b) 括号内的符号）。</li>
+<li>仓库快照：<code>github.com/Zhefan-Xu/NavRL</code> @ commit <code>3725bcc</code>（2025-07-03，见 SOURCE.txt）；本文所有"代码行号"以该快照为准。</li>
+</ul>
 </section>
 
 <footer>📄 Paper Notes · Zhefan Xu, Xinming Han, Haoyu Shen, Hanyu Jin, Kenji Shimada · IEEE Robotics and Automation Letters (RA-L) 2025 · NavRL — NavRL: Learning Safe Flight in Dynamic Environments · MathJax + Mermaid Rendering</footer>

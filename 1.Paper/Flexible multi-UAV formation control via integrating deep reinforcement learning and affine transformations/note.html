@@ -160,6 +160,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -180,6 +183,7 @@ MathJax = {
   <a href="#flaw">Flaw</a>
   <a href="#motivation">Motivation</a>
   <a href="#takeaway">Takeaways</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -791,6 +795,574 @@ flowchart LR
     <tr><td>Bai et al. (2022) — Learning-Based Multi-Robot Formation Control with Obstacle Avoidance. <em>IEEE Trans. Intell. Transp. Syst.</em> 23, 11811-11822</td><td>本文的关键 baseline——纯学习方法的编队控制。理解纯学习方法的局限（刚性相对位置约束导致编队灵活性不足），才能理解混合驱动的优势。</td></tr>
     <tr><td>Quan et al. (2023) — Robust and Efficient Trajectory Planning for Formation Flight in Dense Environments. <em>IEEE Trans. Robot.</em> 39, 4785-4804</td><td>编队相似性误差（Laplacian-based）的提出者——本文直接采用了该指标作为评估标准。理解该指标的尺度不变性证明（对旋转/平移/缩放不变），以及为什么它是评估"编队拓扑结构"的最纯粹指标。</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info"><p><strong>对象</strong>：<code>Liu et al. - 2025 - Flexible multi-UAV formation control...</code>（Aerospace Science and Technology 157 (2025) 109812）正文第 4–9 页的全部 <strong>23 个编号公式（式 (1)–(23)）</strong>、第 4 页 <strong>算法 1</strong>、第 7 页 <strong>算法 2</strong>，以及方法核心但无编号的公式（GAE、PPO 损失、策略网络前向、POMDP 元组等，本文记为 <strong>补充式 (D1)–(D10)</strong>）。<strong>方法</strong>：本文不是复述论文文字，而是：</p><ol><li>从仿射几何、图论（应力矩阵）、策略梯度定理等第一性原理<strong>独立重推</strong>每个公式，并写出中间代数步骤；</li><li>用 PyMuPDF 读取 PDF <strong>原始字形层</strong>（字符 + Unicode 码点 + 渲染坐标）逐式核实论文打印内容——本模型无法直接目视页面图像，故以码点级证据等价替代"图像核实"，所有「印刷错误」判定均附码点（如 U+2016/U+007C 之分）；</li><li>用本地代码 <code>affine_demo.py</code>（同目录）做「论文式号 ↔ 代码行号」交叉验证（见第 14 节对应表）；</li><li>用数值脚本 <code>_derivation_work/flexible/verify_numbers.py</code>（本工作区，可复跑）核算全部数值算例；</li><li>明确标出论文中<strong>符号混用、印刷缺陷、记号矛盾与既有笔记不一致</strong>之处（见最后的问题清单），绝不替论文"圆场"。</li></ol></div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>核实结论</th></tr>
+<tr><td>(1)(2)</td><td>UAV 运动学模型 + 输入约束</td><td>⚠️ 数学正确；打印缺陷：第三分量 $\phi$ 缺导数点、输入向量印成 $[v,0,w]^T$（码点级证实）；$\omega$/$w$ 混用；单位未声明（$v_{max}=1$ m/s 由 §5.3 反推）</td></tr>
+<tr><td>(3)(4)</td><td>平衡应力条件与应力矩阵</td><td>✅ 正确；但应力对称定义印成 $\omega_{ij}=\omega_{ii}$（应为 $\omega_{ji}$，码点级证实）</td></tr>
+<tr><td>(5)</td><td>仿射变换下时变目标编队</td><td>✅ 正确；<strong>note 第 6 节把 Kronecker 顺序抄反</strong>（写成 $(A\otimes I_d)x$，在按节点堆叠约定下是错的），本文以论文为准</td></tr>
+<tr><td>(6)(7)(8)</td><td>应力分块与 follower 目标位置</td><td>✅ 正确；由 $\bar\Omega P=0$ 分块解出，且本文证明式 (8) 恰为标称构型的仿射像（含 numpy 数值例）</td></tr>
+<tr><td>(9)(10)</td><td>随机策略与最小期望到达时间</td><td>✅ 标准 POMDP 记号；但 (10) 从不直接解，靠奖励 (16)–(20) 松弛（本文给出对应表）</td></tr>
+<tr><td>(11)–(13)</td><td>碰撞/到达约束</td><td>✅ 与式 (17)(18) 的 0.1 m 半径、$R_d$ 惩罚互补一致</td></tr>
+<tr><td>(14)(15)</td><td>离散运动学</td><td>⚠️ 数学正确（式 (1) 的显式 Euler）；$\Delta t$ 未给值；位置更新用更新后 $\phi_t^i$（半隐式顺序未声明）</td></tr>
+<tr><td>(16)–(19)</td><td>奖励：目标/碰撞/角速度</td><td>⚠️ 设计正确；式 (17)(18) 范数分隔符不匹配（$|\cdot\|$、$\|\cdot|$，码点级证实）；式 (19) 在 $|\omega|=0.7$ 处有 $-0.07$ 小跳跃</td></tr>
+<tr><td>(20)</td><td>航向角惩罚</td><td>⚠️ 设计正确；$H$ 及阈值 0.3 的单位未声明；$D$ 定义印成 $\|\|\cdot\|$；$r_a\propto1/d$ 在目标附近发散（被 0.1 m 切换截断）</td></tr>
+<tr><td>(21)</td><td>Procrustes 位置误差</td><td>⚠️ 有闭式解；<strong>无 $1/n$</strong>（与 [35] 及 note 第 6 节不同，§5.5 文字证明论文用和形式）；只消除相似变换，<strong>不消除剪切</strong></td></tr>
+<tr><td>(22)</td><td>Laplacian 相似性误差</td><td>⚠️ 数学正确；权重函数未指定；「缩放不变」对固定带宽高斯核仅近似成立（数值反证 0.0214≠0）</td></tr>
+<tr><td>(23)</td><td>jerk</td><td>✅ 定义式；离散化格式未给</td></tr>
+<tr><td>算法 1</td><td>两层编队控制</td><td>⚠️ 逻辑正确；$g_i^*(t)$ 缺块下标；$D_f$ 与 $r$ 双符号混用</td></tr>
+<tr><td>算法 2</td><td>PPO（KL-penalty 变体）</td><td>❌ 行 22 $L_V$ 负号疑似错误；行 18 $L_{PPO}(\phi)$ 笔误；GAE 的 $\delta$ 不随 $l$ 平移；行 14 缺对 $i$ 求和；$s_t^i$ 从未定义</td></tr>
+<tr><td>网络结构</td><td>2×Conv1D+2×FC+sigmoid/tanh</td><td>✅ 维度链 512→254→126→4032→260→128→2 自洽；激活函数与动作域匹配</td></tr>
+<tr class="highlight"><td>总体</td><td>决策层（式 (3)–(8)）</td><td>✅ 代数框架完全自洽（本文补两条一致性定理）；执行层（式 (9)–(20)、算法 2）多处印刷/记号缺陷，但设计逻辑可复原</td></tr>
+</table>
+<div class="callout warn"><p><strong>核实手段声明</strong>：本模型无法目视 PNG 图像，改用更严格替代——从 PDF 原始字形层读字符、Unicode 码点与坐标（脚本 <code>_derivation_work/flexible/extract_*.py</code>）。下文「码点级证实」即指有字符级证据（如 $\phi$ 无 U+0307 点、U+2016 双竖线 vs U+007C 单竖线）。</p></div>
+<hr>
+<h3>1. 公式 (1)–(2)：UAV 运动学模型与输入约束</h3>
+<p>论文原文（第 4 页 §3.1.2，按字形层逐字符核实，含打印原貌）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— UAV 运动学模型（论文式 (1)，注意打印原貌）</span>
+$$\dot f=\begin{bmatrix}\dot x\\ \dot y\\ \phi\end{bmatrix}=\begin{bmatrix}\cos\phi&-\sin\phi&0\\ \sin\phi&\cos\phi&0\\ 0&0&1\end{bmatrix}\begin{bmatrix}v\\ 0\\ w\end{bmatrix} \tag{1}$$
+<div class="eq-note">
+<strong>打印原貌说明</strong>：论文实际打印为 $f=[\dot x,\ \dot y,\ \phi]^T$ 与输入向量 $[v,0,w]^T$——第三分量 $\phi$ 上没有导数点（码点级证实：$\dot x,\dot y$ 带 U+0307，$\phi$ 无），输入用的是意大利体 $w$（U+1D464）而非 $\omega$。正确读法显然是 $\dot f=[\dot x,\dot y,\dot\phi]^T$ 与 $[v,0,\omega]^T$，本文按正确读法推导。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 输入约束（论文式 (2)）</span>
+$$\begin{cases}0\le v\le v_{max}\\ |\omega|\le \omega_{max}\end{cases} \tag{2}$$
+<div class="eq-note">正文紧接着写的是「where $v_{max}$ and $w_{max}$ are the maximum absolute values of $v$ and $w$」——式 (2) 用 $\omega_{max}$、文字用 $w_{max}$，且下文 §4.3.2 又回到 $\omega_t^i$。这是全文第一次出现 $\omega$/$w$ 混用（详见问题清单 #1）。</div>
+</div>
+<h4>1.1 符号定义</h4>
+<table>
+<tr><th>符号</th><th>含义</th><th>单位（推断）</th><th>文中取值</th></tr>
+<tr><td>$x,y$</td><td>UAV 在世界系 $X_w$–$Y_w$ 的水平/垂直坐标（§3.1.1）</td><td>m</td><td>—</td></tr>
+<tr><td>$\phi$</td><td>航向角（heading angle）</td><td>rad</td><td>—</td></tr>
+<tr><td>$v$</td><td>机体系 $x_b$ 轴线速度指令</td><td>m/s</td><td>$(0.0,1.0)$（§4.3.2；§5.3 明确最大速度 1 m/s）</td></tr>
+<tr><td>$\omega$</td><td>机体系 $z$ 轴角速度指令（原文多处印成 $w$）</td><td>rad/s</td><td>$(-1.0,1.0)$（§4.3.2，隐含 $\omega_{max}=1$）</td></tr>
+<tr><td>$v_{max},\omega_{max}$</td><td>输入幅值上限</td><td>m/s, rad/s</td><td>1, 1（由 §5.3/§4.3.2 反推）</td></tr>
+</table>
+<h4>1.2 完整推导（第一性原理）</h4>
+<p><strong>第 1 步：模型假设。</strong>这是 2D 平面内的独轮车（unicycle）模型：假设 UAV 质心速度为 $v$，方向始终沿机头方向（无侧滑约束——2D 下机体系 $y_b$ 方向速度恒为 0，这正是式 (1) 中输入向量第二个分量为 0 的原因）；航向角变化率即角速度：$\dot\phi=\omega$。</p>
+<p><strong>第 2 步：机体速度到世界速度。</strong>世界系 $X_w$–$Y_w$（水平-垂直坐标）与机体系 $x_b$–$y_b$ 相差航向角 $\phi$。机体速度向量 $[v,0]^T$ 旋转到世界系：</p>
+$$\begin{bmatrix}\dot x\\ \dot y\end{bmatrix}=\begin{bmatrix}\cos\phi&-\sin\phi\\ \sin\phi&\cos\phi\end{bmatrix}\begin{bmatrix}v\\ 0\end{bmatrix}=\begin{bmatrix}v\cos\phi\\ v\sin\phi\end{bmatrix},\qquad \dot\phi=\omega$$
+<p><strong>第 3 步：扩成 3×3 齐次形式。</strong>把第三个方程并入矩阵，即得式 (1)（按正确读法）：</p>
+$$\dot f=\begin{bmatrix}\dot x\\ \dot y\\ \dot\phi\end{bmatrix}=\begin{bmatrix}\cos\phi&-\sin\phi&0\\ \sin\phi&\cos\phi&0\\ 0&0&1\end{bmatrix}\begin{bmatrix}v\\ 0\\ \omega\end{bmatrix}$$
+<p>逐分量核对：$\dot x=v\cos\phi-0\cdot\sin\phi+0\cdot\omega=v\cos\phi$ ✓；$\dot y=v\sin\phi$ ✓；$\dot\phi=0+0+1\cdot\omega=\omega$ ✓。<strong>注意中间一列 $(-\sin\phi,\cos\phi,0)^T$ 在本题中永远乘 0</strong>——它是为形式完整保留的（若未来引入侧向速度 $v_y$ 才起作用）。</p>
+<h4>1.3 物理直觉</h4>
+<ul>
+<li>标准的<strong>独轮车/差分驱动模型</strong>：控制 2 个自由度（前进 + 转角），位形 3 个自由度（$x,y,\phi$），<strong>欠驱动 1 维</strong>——UAV 不能横向平移，只能"先转向、再前进"。</li>
+<li>输出是<strong>速度指令</strong>而非加速度/推力——隐含"理想下层速度环"假设（论文未建模），与固定翼气动模型类论文有本质区别。</li>
+</ul>
+<h4>1.4 与离散形式式 (14)(15) 的交叉核对</h4>
+<p>式 (14)(15)（见第 6 节）是把式 (1) 用显式 Euler 离散：$p_t^i=p_t^{t-1}+\Delta t\,v_t^i[\cos\phi_t^i,\sin\phi_t^i]^T$，$\phi_t^i=\phi_t^{t-1}+\Delta t\,\omega_t^i$。除以 $\Delta t$ 取 $\Delta t\to0$ 极限即回到 $\dot p=v[\cos\phi,\sin\phi]^T$、$\dot\phi=\omega$ ✓ 与式 (1) 一致。<strong>一个细节</strong>：位置更新用的是更新后的 $\phi_t^i$（半隐式/辛 Euler 顺序：先转航向、再位移）。标准显式 Euler 应为 $\phi_{t-1}$。两者只差 $O(\Delta t^2)$，但实现顺序不同会带来轻微差别——论文未声明采用哪种顺序，实现者需注意（问题清单 #11）。</p>
+<hr>
+<h3>2. 公式 (3)–(4)：平衡应力与应力矩阵</h3>
+<p>论文原文（第 4 页 §4.2.2）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 平衡应力条件（论文式 (3)）</span>
+$$(\Omega\otimes I_d)\,P=\mathbf 0 \tag{3}$$
+<div class="eq-note">$P=[p_1^T,p_2^T,\dots,p_n^T]^T\in\mathbb R^{dn}$ 为编队构型（<strong>按节点堆叠</strong>：先 $p_1$ 的 $d$ 个分量，再 $p_2$ 的……）；$\Omega\in\mathbb R^{n\times n}$ 为应力矩阵；$I_d\in\mathbb R^{d\times d}$ 单位阵；$\otimes$ 为 Kronecker 积。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4) —— 应力矩阵定义（论文式 (4)）</span>
+$$[\Omega]_{ij}=\begin{cases}-\omega_{ij},& i\ne j\ \text{且}\ j\in\mathcal N_i\\ 0,& i\ne j\ \text{且}\ j\notin\mathcal N_i\\ \sum_{k\in\mathcal N_i}\omega_{ik},& i=j\end{cases} \tag{4}$$
+<div class="eq-note">论文前一句的应力定义打印为「$\omega_{ij}=\omega_{ii}\in\mathbb R$」（码点级证实：两个下标都是 $i$），按无向图的对称应力应为 $\omega_{ij}=\omega_{ji}$（见 §2.2 推导与问题清单 #3）。</div>
+</div>
+<h4>2.1 符号定义</h4>
+<table>
+<tr><th>符号</th><th>含义</th><th>备注</th></tr>
+<tr><td>$\mathcal G=(\mathcal V,\mathcal E)$</td><td>无向通信图；$\mathcal V=\{1,\dots,n\}$，$\mathcal E\subseteq\mathcal V\times\mathcal V$；$(i,j)\in\mathcal E\Leftrightarrow(j,i)\in\mathcal E$</td><td>§4.2.1</td></tr>
+<tr><td>$\mathcal N_i$</td><td>节点 $i$ 的邻居集 $\mathcal N_i=\{j\in\mathcal V:(i,j)\in\mathcal E\}$</td><td>§4.2.1</td></tr>
+<tr><td>$\omega_{ij}$</td><td>边 $(i,j)$ 上的应力标量，$\omega_{ij}=\omega_{ji}\in\mathbb R$，可正可负可为零</td><td>无单位（图论量）</td></tr>
+<tr><td>$\Omega$</td><td>应力矩阵：类拉普拉斯结构，行和为零</td><td>式 (4)</td></tr>
+<tr><td>$P$</td><td>当前编队构型（$dn$ 维列向量）</td><td>式 (3)</td></tr>
+</table>
+<h4>2.2 完整推导：从标量定义到式 (3)</h4>
+<p><strong>第 1 步：平衡应力的标量定义。</strong>论文原话：应力 $\{\omega_{ij}\}_{(i,j)\in\mathcal E}$ 称为平衡应力（equilibrium stress），当且仅当对每个 $i$：</p>
+$$\sum_{j\in\mathcal N_i}\omega_{ij}\,(p_j-p_i)=0 \qquad (\text{未编号，物理意义：节点 }i\text{ 受到的“虚拟合力”为零})$$
+<p>这正是弹簧网络平衡条件：把 $\omega_{ij}(p_j-p_i)$ 看成边 $(i,j)$ 对节点 $i$ 的"拉力"（$\omega_{ij}&gt;0$ 时该边试图把 $i$ 拉向 $j$——吸引力；$\omega_{ij}&lt;0$ 时推离——排斥力；下文 §4.2.2 原话正是这个解释）。<strong>注意 $\omega_{ij}=\omega_{ji}$（对称）是必须的</strong>：作用-反作用要求边对两端点的力大小相等方向相反，$\omega_{ij}(p_j-p_i)$ 与 $\omega_{ji}(p_i-p_j)$ 要互消，只有 $\omega_{ij}=\omega_{ji}$ 才能让"边内力"自洽；且只有对称时才存在由势能 $\frac12\sum_{(i,j)}\omega_{ij}\|p_i-p_j\|^2$ 导出的守恒解释。</p>
+<p><strong>第 2 步：写成矩阵。</strong>取式 (4) 的 $\Omega$（对角元为 $\mathcal N_i$ 上应力之和、非对角元为 $-\omega_{ij}$）。对每个节点 $i$：</p>
+$$\begin{aligned}
+\big[(\Omega\otimes I_d)P\big]_{i\text{块}}&=\sum_{j=1}^{n}[\Omega]_{ij}\,p_j=[\Omega]_{ii}p_i+\sum_{j\in\mathcal N_i}[\Omega]_{ij}p_j\\
+&=\Big(\sum_{k\in\mathcal N_i}\omega_{ik}\Big)p_i-\sum_{j\in\mathcal N_i}\omega_{ij}\,p_j=\sum_{j\in\mathcal N_i}\omega_{ij}(p_i-p_j)=-\sum_{j\in\mathcal N_i}\omega_{ij}(p_j-p_i)
+\end{aligned}$$
+<p>于是「对所有 $i$，$\sum_j\omega_{ij}(p_j-p_i)=0$」⟺「$(\Omega\otimes I_d)P=\mathbf 0$」 ✓ 与式 (3) 完全一致。<strong>关键代数细节</strong>：$(\Omega\otimes I_d)$ 是 $dn\times dn$ 的分块矩阵，其 $(i,j)$ 块是标量 $[\Omega]_{ij}$ 乘 $I_d$；因为 $P$ 按节点堆叠，乘积的第 $i$ 块恰好是 $\sum_j[\Omega]_{ij}p_j$。若 $P$ 按坐标堆叠（所有 $x$ 在前、所有 $y$ 在后），则必须写成 $(I_d\otimes\Omega)P=0$——<strong>Kronecker 顺序完全由堆叠约定决定</strong>，这是读懂本节（以及后文第 5 节的矛盾点）的钥匙。</p>
+<h4>2.3 $\Omega$ 的两个结构性性质（后文反复用到，先证好）</h4>
+<p><strong>性质 A：行和为零。</strong>对任意 $i$：$\sum_{j=1}^n[\Omega]_{ij}=\sum_{k\in\mathcal N_i}\omega_{ik}-\sum_{j\in\mathcal N_i}\omega_{ij}=0$，即 $\Omega\,\mathbf 1_n=\mathbf 0$。</p>
+<p><strong>性质 B：平移不变性。</strong>若 $P$ 满足式 (3)，则对任意 $b\in\mathbb R^d$：</p>
+$$(\Omega\otimes I_d)(P+\mathbf 1_n\otimes b)=(\Omega\otimes I_d)P+\underbrace{(\Omega\mathbf 1_n)\otimes(I_d\, b)}_{=0}=0$$
+<p>即<strong>把整个编队整体平移 $b$ 仍是平衡构型</strong>——平衡应力约束不钉死绝对位置，只约束相对位置。这正是仿射编队能"整体飞行"的根源，也是下一节式 (5) 中平移项 $\mathbf 1_n\otimes b(t)$ 的合法性所在。</p>
+<div class="callout idea"><p><strong>为什么叫"应力"矩阵？</strong>$\Omega$ 与图拉普拉斯 $L=D-A$ 结构相同，只是边权允许为负（负权 = 排斥力，让编队"撑开"）。Zhao 2018 [14] 的核心结论：存在由标称构型 $r$ 设计的 $\Omega$ 使 $r$ 全局刚性/仿射可定位，本文直接引用该框架。</p></div>
+<hr>
+<h3>3. 公式 (5)：仿射变换下的时变目标编队（本节核心）</h3>
+<p>论文原文（第 5 页 §4.2.3）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5) —— 仿射变换作用下的时变目标编队（论文式 (5)）</span>
+$$P^*(t)=\big(I_n\otimes A(t)\big)\,r+\mathbf 1_n\otimes b(t) \tag{5}$$
+<div class="eq-note">$r=[r_1^T,r_2^T,\dots,r_n^T]^T=[r_l^T,\ r_f^T]^T\in\mathbb R^{dn}$ 为<strong>标称构型</strong>（nominal configuration，按节点堆叠）；$A(t)\in\mathbb R^{d\times d}$ 为线性变换部分；$b(t)\in\mathbb R^d$ 为平移；$I_n$ 为 $n\times n$ 单位阵；$\mathbf 1_n=[1,\dots,1]^T$。$(A(t),b(t))$ 合称当前时刻的仿射变换。</div>
+</div>
+<h4>3.1 逐节点展开（为什么 Kronecker 顺序是 $I_n\otimes A$）</h4>
+<p>Kronecker 积的分块结构 $(I_n\otimes A)$ 是块对角矩阵 $\mathrm{diag}(A,A,\dots,A)$，作用在按节点堆叠的 $r$ 上：</p>
+$$P^*(t)=\begin{bmatrix}A&0&\cdots&0\\ 0&A&\cdots&0\\ \vdots&\vdots&\ddots&\vdots\\ 0&0&\cdots&A\end{bmatrix}\begin{bmatrix}r_1\\ r_2\\ \vdots\\ r_n\end{bmatrix}+\begin{bmatrix}b\\ b\\ \vdots\\ b\end{bmatrix}\quad\Longrightarrow\quad p_i^*(t)=A(t)\,r_i+b(t),\quad i=1,\dots,n$$
+<p>即<strong>每一架 UAV 的目标位置都由同一个仿射映射生成</strong>：$p_i^*=\mathcal A(r_i)$，$\mathcal A(x)=Ax+b$。这就是"仿射编队"的全部含义——全体成员共享同一个 $(A,b)$。</p>
+<div class="callout danger"><p><strong>与既有笔记的核对（必须纠正）</strong>：note.html 第 6 节 Group A 与 note.md L21 把式 (5) 写成 $x'(t)=(A(t)\otimes I_d)\cdot x+[\mathbf 1_N\otimes I_d]\cdot b(t)$。<strong>这个 Kronecker 顺序在论文的堆叠约定下是错的</strong>：$(A\otimes I_d)$ 是 $d\times d$ 分块、每块 $n\times n$ 的矩阵，它作用在<strong>按坐标堆叠</strong>的向量上才是对的；而论文的 $P$ 明确按节点堆叠（§4.2.1 定义 $P=[p_1^T,\dots,p_n^T]^T$），所以必须用 $(I_n\otimes A)$。平移项 $[\mathbf 1_N\otimes I_d]b=\mathbf 1_N\otimes b$ 恰好等价，这一半没错。本文以 PDF 字形层核实的论文原式为唯一标准。</p></div>
+<h4>3.2 仿射群 Aff(2) 与六种基本变换的矩阵表示（对应 Fig. 5 与 affine_demo.py）</h4>
+<p>二维仿射变换全体构成群 $\mathrm{Aff}(2)$：复合律 $(A_2,b_2)\circ(A_1,b_1)=(A_2A_1,\ A_2b_1+b_2)$，逆 $(A^{-1},-A^{-1}b)$，单位元 $(I_2,0)$。图 5 展示的六种变换一一对应（矩阵形式即 affine_demo.py 的 <code>rotation_matrix/scaling_matrix/shear_matrix</code>，见第 14 节）：</p>
+<table>
+<tr><th>Fig. 5</th><th>变换</th><th>$A$</th><th>$b$</th><th>demo 代码</th></tr>
+<tr><td>(a)</td><td>标称</td><td>$I_2$</td><td>$0$</td><td>L147-151</td></tr>
+<tr><td>(b)</td><td>旋转 $\theta$</td><td>$R(\theta)=\begin{bmatrix}\cos\theta&-\sin\theta\\ \sin\theta&\cos\theta\end{bmatrix}$</td><td>$0$</td><td>L152-156</td></tr>
+<tr><td>(c)</td><td>缩放（可非均匀）</td><td>$\mathrm{diag}(s_x,s_y)$</td><td>$0$</td><td>L157-161</td></tr>
+<tr><td>(d)(e)</td><td>剪切</td><td>$\begin{bmatrix}1&h_x\\ 0&1\end{bmatrix}$、$\begin{bmatrix}1&0\\ h_y&1\end{bmatrix}$（demo 用 $\begin{bmatrix}1&h_x\\ h_y&1\end{bmatrix}$ 双剪）</td><td>$0$</td><td>L162-171</td></tr>
+<tr><td>(f)</td><td>综合</td><td>$R(\pi/6)\,\mathrm{diag}(0.6,0.8)\,\mathrm{Shear}(0.3,0)$</td><td>$(3,2)$</td><td>L172-176</td></tr>
+</table>
+<p><strong>分解定理</strong>：任意 $A$ 由极分解 $A=RU$（$R\in O(2)$，$U\succeq 0$ 对称）唯一写成「旋转×拉伸」；$U$ 再谱分解为沿主轴的各向异性缩放。所以旋转/缩放/剪切不是三种并列操作，而是任意线性映射的三种"基元"。$A$ 有 4 个自由度、$b$ 有 2 个，共 6 个——2D 仿射群是 6 维的。</p>
+<h4>3.3 关键结构定理：仿射像仍是平衡构型（为什么"结构不散"）</h4>
+<p>设标称构型 $r$ 满足 $(\Omega\otimes I_d)r=0$（$\Omega$ 由 $r$ 设计，这是 Zhao 2018 的起点）。对式 (5) 的 $P^*(t)$：</p>
+$$\begin{aligned}
+(\Omega\otimes I_d)P^*(t)&=(\Omega\otimes I_d)(I_n\otimes A)\,r+(\Omega\otimes I_d)(\mathbf 1_n\otimes b)\\
+&=(\Omega\otimes A)\,r+\underbrace{(\Omega\mathbf 1_n)\otimes b}_{=0\ (\text{性质 A})}\\
+&=(\Omega\otimes I_d)\,(I_n\otimes A)\,r
+\end{aligned}$$
+<p>（第二步用到混合积性质 $(\Omega\otimes I_d)(I_n\otimes A)=\Omega\otimes A$。）要让它为 0，注意 $(I_n\otimes A)r$ 是"逐节点左乘 $A$"后的构型，一般<strong>不是</strong> $\Omega$ 的平衡构型，所以 $(\Omega\otimes I_d)P^*\ne 0$ 一般成立——除非我们把"平衡"换成"仿射等价"：</p>
+$$(\Omega\otimes A)\,r\overset{?}{=}0$$
+<p>由于 $(\Omega\otimes A)=(\Omega\otimes I_d)(I_n\otimes A)=(I_n\otimes A)(\Omega\otimes I_d)$（两边都等于 $\Omega\otimes A$，交换律在此成立），故</p>
+$$(\Omega\otimes A)\,r=(I_n\otimes A)\,\underbrace{(\Omega\otimes I_d)\,r}_{=0}=0$$
+<p>✓ <strong>结论</strong>：$(\Omega\otimes A)r=0$ 恒成立，即 $P^*(t)$ 在"被 $A^{-1}$ 拉回"后仍是 $\Omega$ 的平衡构型；或者说<strong>仿射变换把平衡构型映到平衡构型（在应力矩阵同步左乘 $A$ 的意义下）</strong>。这正是"编队可以任意旋转/缩放/剪切/平移而结构关系不变"的代数本质：边向量 $p_j^*-p_i^*=A(r_j-r_i)$ 与标称边向量 $r_j-r_i$ 只差同一个线性映射，所有<strong>共线关系、平行关系、线段比例都保持</strong>（仿射保持重心坐标），队形"形状的骨架"不散。</p>
+<h4>3.4 数值算例（与 affine_demo.py 的 diamond 编队核对）</h4>
+<p>取 demo <code>create_formation('diamond')</code>（L55-65）的 5 机菱形（scale=2）：</p>
+$$r=\big[[0,0],\ [2,0],\ [-2,0],\ [0,2],\ [0,-2]\big]^T\quad(\text{按节点堆叠})$$
+<p>取 Fig. 5(c) 型非均匀缩放 $A=\mathrm{diag}(0.5,0.7)$、$b=0$：</p>
+$$P^*=\begin{cases}p_1^*=(0,0)\\ p_2^*=(1.0,0)\\ p_3^*=(-1.0,0)\\ p_4^*=(0,1.4)\\ p_5^*=(0,-1.4)\end{cases}$$
+<p>横轴方向从 $\pm2$ 缩到 $\pm1$、纵轴从 $\pm2$ 缩到 $\pm1.4$——正好对应 demo 的 <code>scaling_matrix(0.5,0.7)</code>（L157-161）与 Fig. 5(c)。再验证共线性保持：标称中 $r_1,r_2,r_4$ 不成一线，但 $r_2,r_1,r_3$ 共线且 $r_1$ 是中点；变换后 $p_2^*,p_1^*,p_3^*$ 仍共线且 $p_1^*$ 仍是中点（$0=(1+(-1))/2$）✓。中点在仿射下仍为中点，这是重心坐标不变性最简单的实例。</p>
+<div class="callout tip"><p><strong>直觉一句话</strong>：式 (5) 回答的是"编队<strong>应该</strong>在哪里"——它是决策层输出的<strong>目标</strong>，不是约束。仿射变换的"刚性"体现在目标形状上；而实际飞行路径由执行层 DRL 自由决定（可以绕开障碍物、暂时偏离目标）。affine_demo.py 的 <code>demo_avoidance_principle()</code>（L718-891）正是把这一点画成了图："Affine transformation is the TARGET, not the CONSTRAINT"。</p></div>
+<hr>
+<h3>4. 公式 (6)–(7)：应力矩阵的分块形式</h3>
+<p>论文原文（第 6 页）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(6) —— 全维应力矩阵（论文式 (6)）</span>
+$$\bar\Omega=\Omega\otimes I_d \tag{6}$$
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(7) —— leader/follower 分块（论文式 (7)）</span>
+$$\bar\Omega=\begin{bmatrix}\bar\Omega_{ll}&\bar\Omega_{lf}\\ \bar\Omega_{fl}&\bar\Omega_{ff}\end{bmatrix} \tag{7}$$
+<div class="eq-note">论文明确：$\bar\Omega_{ll}\in\mathbb R^{dn_l\times dn_l}$、$\bar\Omega_{lf}\in\mathbb R^{dn_l\times dn_f}$、$\bar\Omega_{fl}\in\mathbb R^{dn_f\times dn_l}$、$\bar\Omega_{ff}\in\mathbb R^{dn_f\times dn_f}$，其中 $n_l$ 为 leader 数、$n_f=n-n_l$ 为 follower 数。</div>
+</div>
+<h4>4.1 推导与维数核对</h4>
+<p>把 $\Omega$ 按前 $n_l$ 行/列分块 $\Omega=\begin{bmatrix}\Omega_{ll}&\Omega_{lf}\\ \Omega_{fl}&\Omega_{ff}\end{bmatrix}$（leader 在前、follower 在后，与 $P_l=[p_1^T,\dots,p_{n_l}^T]^T$、$P_f=[p_{n_l+1}^T,\dots,p_n^T]^T$ 的排序一致），则</p>
+$$\bar\Omega_{ll}=\Omega_{ll}\otimes I_d\in\mathbb R^{n_l d\times n_l d},\qquad \bar\Omega_{fl}=\Omega_{fl}\otimes I_d\in\mathbb R^{n_f d\times n_l d},\quad \text{等}$$
+<p>维数全部与论文一致 ✓。由式 (3) 立得论文原话「Obviously, $\bar\Omega P=0$ is obtained from Eq. (3)」——即</p>
+$$\bar\Omega P=\begin{bmatrix}\bar\Omega_{ll}&\bar\Omega_{lf}\\ \bar\Omega_{fl}&\bar\Omega_{ff}\end{bmatrix}\begin{bmatrix}P_l\\ P_f\end{bmatrix}=\begin{bmatrix}\bar\Omega_{ll}P_l+\bar\Omega_{lf}P_f\\ \bar\Omega_{fl}P_l+\bar\Omega_{ff}P_f\end{bmatrix}=\mathbf 0 \tag{D1}$$
+<p>这是下一节式 (8) 的全部准备。</p>
+<div class="callout info"><p><strong>记号提示</strong>：$\bar\Omega$（bar 版）是 $dn\times dn$ 的"全维"应力矩阵；分块记号 $\bar\Omega_{fl}$ 是 $\bar\Omega$ 的第 (f,l) 块，不是 $\Omega_{fl}$ 本身加 bar 之后再做 Kronecker——虽然数值上 $\bar\Omega_{fl}=\Omega_{fl}\otimes I_d$ 恰好成立，两者一致，不必纠结。</p></div>
+<hr>
+<h3>5. 公式 (8)：follower 时变目标位置（分布式框架的基石）</h3>
+<p>论文原文（第 6 页）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(8) —— follower 时变目标位置（论文式 (8)）</span>
+$$P_f^*(t)=-\bar\Omega_{ff}^{-1}\,\bar\Omega_{fl}\,P_l(t) \tag{8}$$
+<div class="eq-note">$P_l(t)$ 为 leader 当前位置（$dn_l$ 维）；$P_f^*(t)$ 为 follower 的目标位置（$dn_f$ 维）；$\bar\Omega_{ff}$ 须非奇异。</div>
+</div>
+<h4>5.1 完整推导（两步）</h4>
+<p><strong>第 1 步：从式 (D1) 的 follower 块行解出 $P_f$。</strong>第二行：$\bar\Omega_{fl}P_l+\bar\Omega_{ff}P_f=0$。两边左乘 $\bar\Omega_{ff}^{-1}$ 并移项：</p>
+$$P_f=-\bar\Omega_{ff}^{-1}\bar\Omega_{fl}\,P_l$$
+<p>✓ 与式 (8) 一致（$P_f$ 换成目标记号 $P_f^*(t)$）。这就是全部推导——式 (8) 不是新原理，而是平衡条件式 (3) 对 follower 分块后的代数解。</p>
+<p><strong>第 2 步：可逆性条件（论文只引 [14] 未展开，这里补全）。</strong>$\bar\Omega_{ff}=\Omega_{ff}\otimes I_d$ 非奇异 ⟺ $\Omega_{ff}$ 非奇异。Zhao 2018 [14] 的条件：编队 $(G,r)$ 需是<strong>仿射可定位</strong>的，其充分条件包括（$d=2$ 时）<strong>leader 数 $n_l\ge d+1=3$ 且 leaders 仿射张成 $\mathbb R^2$</strong>（不共线），并要求 $r$ 关于 $\Omega$ 是平衡构型且 $\Omega_{ff}$ 非奇异（还有全局刚性条件，细节见 [14] Theorem 3）。<strong>为什么至少 3 个 leader</strong>：2D 仿射有 6 个自由度，2 个 leader 只给 4 个位置数，不足以确定 $(A,b)$——下一节 §5.3 用行列式给出精确论证。</p>
+<h4>5.2 一致性验证：式 (8) 恰是标称构型的仿射像（独立于论文的验证）</h4>
+<p>设 leaders 由仿射变换驱动：$P_l(t)=(I_{n_l}\otimes A)r_l+\mathbf 1_{n_l}\otimes b$。代入式 (8)：</p>
+$$-\bar\Omega_{ff}^{-1}\bar\Omega_{fl}P_l=-\bar\Omega_{ff}^{-1}\bar\Omega_{fl}\big[(I_{n_l}\otimes A)r_l+\mathbf 1_{n_l}\otimes b\big]$$
+<p><strong>平移部分</strong>：利用行和为零的块形式 $\Omega_{fl}\mathbf 1_{n_l}=-\Omega_{ff}\mathbf 1_{n_f}$（由 $\Omega\mathbf 1_n=0$ 的下半块）：</p>
+$$-\bar\Omega_{ff}^{-1}\bar\Omega_{fl}(\mathbf 1_{n_l}\otimes b)=-\bar\Omega_{ff}^{-1}\big[(\Omega_{fl}\mathbf 1_{n_l})\otimes b\big]=-\bar\Omega_{ff}^{-1}\big[(-\Omega_{ff}\mathbf 1_{n_f})\otimes b\big]=\bar\Omega_{ff}^{-1}\bar\Omega_{ff}(\mathbf 1_{n_f}\otimes b)=\mathbf 1_{n_f}\otimes b$$
+<p><strong>线性部分</strong>：利用 $\bar\Omega r=0$ 的 follower 块 $\bar\Omega_{fl}r_l=-\bar\Omega_{ff}r_f$，以及 $(I_{n_f}\otimes A)$ 与 $\bar\Omega_{ff}$ 可交换（$(\Omega_{ff}\otimes I_d)(I_{n_f}\otimes A)=\Omega_{ff}\otimes A=(I_{n_f}\otimes A)(\Omega_{ff}\otimes I_d)$）：</p>
+$$\begin{aligned}
+-\bar\Omega_{ff}^{-1}\bar\Omega_{fl}(I_{n_l}\otimes A)r_l
+&=-\bar\Omega_{ff}^{-1}(\Omega_{fl}\otimes A)r_l
+=-\bar\Omega_{ff}^{-1}(I_{n_f}\otimes A)(\Omega_{fl}\otimes I_d)r_l\\
+&=-(I_{n_f}\otimes A)\bar\Omega_{ff}^{-1}\bar\Omega_{fl}r_l
+=(I_{n_f}\otimes A)\,r_f
+\end{aligned}$$
+<p>两段相加：</p>
+$$-\bar\Omega_{ff}^{-1}\bar\Omega_{fl}P_l(t)=(I_{n_f}\otimes A)r_f+\mathbf 1_{n_f}\otimes b \equiv P_f^*(t)\quad(\text{式 (5) 的 follower 块})$$
+<p>✓✓ <strong>结论</strong>：只要 leaders 按仿射变换飞行、标称构型是 $\Omega$ 的平衡构型，则式 (8) 计算出的 follower 目标<strong>精确等于</strong>标称构型的仿射像——决策层的两部分（式 (5) 的全局仿射、式 (8) 的分布式计算）在数学上完全等价。这是本文分布式架构自洽性的核心证据，论文只用文字说"one-to-one correspondence"，本文把代数补全。</p>
+<h4>5.3 从 leaders 反解 $(A,b)$（解释"one-to-one"）</h4>
+<p>当 leaders 按 $p_{li}=Ar_{li}+b$ 运动时，用差消去 $b$：</p>
+$$p_{li}-p_{l1}=A(r_{li}-r_{l1}),\quad i=2,\dots,n_l$$
+<p>拼成 $d\times(n_l-1)$ 矩阵 $\Delta P=[p_{l2}-p_{l1},\dots]$、$\Delta R=[r_{l2}-r_{l1},\dots]$，则 $A\,\Delta R=\Delta P$。当 $n_l-1\ge d$ 且 $\Delta R$ 行满秩（leaders 仿射张成 $\mathbb R^d$）时：</p>
+$$A=\Delta P\,\Delta R^T(\Delta R\,\Delta R^T)^{-1}\ \ (\text{最小二乘}),\qquad b=p_{l1}-Ar_{l1}$$
+<p>$d=2$、$n_l=3$ 时 $\Delta R$ 是 $2\times2$，$A=\Delta P\,\Delta R^{-1}$ 唯一。<strong>若只有 2 个 leader</strong>（affine_demo.py 的情形，见第 14 节），$\Delta R$ 是 $2\times1$，只能确定 $A$ 在 span 方向上的作用——这正是 demo 必须"假设无剪切、A=sR"的原因，与论文理论条件 $n_l\ge d+1$ 的差距详见问题清单 #15。</p>
+<h4>5.4 完整数值算例（numpy 逐位验证过，脚本 verify_numbers.py）</h4>
+<p>构造 $n=4$、$d=2$：标称 $r_1=(0,0)$、$r_2=(2,0)$、$r_3=(1,2)$、$r_4=(1,\tfrac23)$（follower 4 恰为三 leader 的质心）。取应力 $\omega_{4j}=1\ (j=1,2,3)$、$\omega_{12}=\omega_{13}=\omega_{23}=-\tfrac13$（读者可代回 §2.2 标量式验证 $(\Omega\otimes I_2)r=0$，numpy 输出 8 个零 ✓）。此时</p>
+$$\Omega=\begin{bmatrix}1/3&1/3&1/3&-1\\ 1/3&1/3&1/3&-1\\ 1/3&1/3&1/3&-1\\ -1&-1&-1&3\end{bmatrix},\qquad \Omega_{ff}=[3],\quad \Omega_{fl}=[-1,-1,-1]$$
+<p>式 (8)：$P_f^*=-\tfrac13(-p_1-p_2-p_3)\otimes I_2=\tfrac13(p_1+p_2+p_3)$——<strong>follower 目标 = 三 leader 位置的质心</strong>。几何直觉：应力结构把 follower"锁"在质心，无论 leaders 怎么飞（旋转/缩放/剪切/平移），式 (8) 自动输出新质心。</p>
+<p>取 $A=R(30^\circ)\,\mathrm{diag}(0.5,1)=\begin{bmatrix}0.4330&-0.5\\ 0.25&0.8660\end{bmatrix}$、$b=(3,2)$：leaders 飞到</p>
+$$p_1^*=(3,2),\quad p_2^*=(3.8660,2.5),\quad p_3^*=(2.4330,3.9821)$$
+<p>式 (8) 输出 $P_f^*=\tfrac13(p_1^*+p_2^*+p_3^*)=(3.0997,2.8273)$，而直接算仿射像 $Ar_4+b=(3.0997,2.8273)$——<strong>两者逐位相同</strong> ✓（numpy：<code>Eq(8) follower target under affine == A r4 + b</code>）。再用 §5.3 反解：$\Delta P\,\Delta R^{-1}$ 精确恢复 $A$、$b=(3,2)$ ✓。这组数字同时验证了式 (5)、(8)、§5.3 三处公式与 §5.2 的一致性定理。</p>
+<hr>
+<h3>6. POMDP 形式化与公式 (9)–(15)：执行层优化问题</h3>
+<p>论文原文（第 6 页 §4.3）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(9) —— 随机策略采样（论文式 (9)）</span>
+$$a_t^i\sim\pi_\theta\big(a_t^i\mid o_t^i\big) \tag{9}$$
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(10) —— 优化目标：最小化期望到达时间（论文式 (10)）</span>
+$$\arg\min_{\pi_\theta}\ \mathbb E\big(t_g\mid\pi_\theta\big) \tag{10}$$
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(11)(12)(13) —— 三类约束（论文式 (11)–(13)）</span>
+$$\text{s.t.}\quad \|p_t^i-p_t^j\|\ge R_d \tag{11}\qquad \|p_t^i-B_k\|\ge R_d \tag{12}\qquad p_t^i=g_t^i \tag{13}$$
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(14)(15) —— 离散运动学约束（论文式 (14)(15)）</span>
+$$p_t^i=p_t^{t-1}+\Delta t\cdot v_t^i\begin{bmatrix}\cos\phi_t^i\\ \sin\phi_t^i\end{bmatrix} \tag{14}\qquad \phi_t^i=\phi_t^{t-1}+\Delta t\cdot\omega_t^i \tag{15}$$
+<div class="eq-note">$B_k$（$0\le k\le M$）为障碍物位置；$R_d$ 为安全半径（后文取 0.5 m）；$g_t^i$ 为目标位置（来自决策层）；$\Delta t$ 为仿真步长（全文未给值）。</div>
+</div>
+<h4>6.1 POMDP 六元组与本文的实例化（论文只有文字，此处数学化）</h4>
+<p>论文原话：POMDP 是六元组 $(\mathcal S,\mathcal A,\mathcal T,\mathcal R,\Omega,\mathcal O)$：状态空间、动作空间、状态转移模型、奖励函数、观测集合（$o\in\Omega$）与状态-观测映射（$o\sim\mathcal O(s)$）。本文的实例化：</p>
+<table>
+<tr><th>分量</th><th>本文实例化</th><th>出处</th></tr>
+<tr><td>$\mathcal S$</td><td>含 $(p_t^i,\phi_t^i)$、$g_t^i$、$B_k$、邻居 $p_t^j$ 等（论文<strong>从未明确定义</strong> $s_t^i$，但算法 2 又用 $V_\phi(s_t^i)$——问题清单 #8）</td><td>§4.3</td></tr>
+<tr><td>$\mathcal A$</td><td>$a_t^i=[v_t^i,\omega_t^i]$，$v_t^i\in(0,1)$、$\omega_t^i\in(-1,1)$（机体系，单位推断 m/s、rad/s）</td><td>§4.3.2</td></tr>
+<tr><td>$\mathcal T$</td><td>不显式建模——<strong>model-free</strong>：由 STAGE 仿真器按式 (14)(15) 演进</td><td>§4.3</td></tr>
+<tr><td>$\mathcal R$</td><td>式 (16)–(20)，见第 7 节</td><td>§4.3.3</td></tr>
+<tr><td>$\Omega$</td><td>$o_t^i=(o_{t,z}^i,o_{t,g}^i,o_{t,v}^i)$：LiDAR 三帧 $3\times512$ + 目标极坐标 + 当前动作</td><td>§4.3.1</td></tr>
+<tr><td>$\mathcal O$</td><td>LiDAR 只给 270° 视场内距离值——<strong>部分可观测</strong>的根源（身后 90° 盲区 + 探测距离 5 m 上限）</td><td>§3.1.1/§4.3.1</td></tr>
+</table>
+<h4>6.2 推导：为什么式 (10)–(15) 是"同一个问题"的两面</h4>
+<p><strong>第 1 步：式 (14)(15) 是式 (1) 的显式 Euler 离散。</strong>式 (14) 除以 $\Delta t$ 取极限即 $\dot p=v[\cos\phi,\sin\phi]^T$，与式 (1) 一致 ✓；式 (15) 给出 $\dot\phi=\omega$ ✓。注意式 (14) 用更新后的 $\phi_t^i$（半隐式顺序，问题清单 #11）。</p>
+<p><strong>第 2 步：式 (10) 是声明式目标，论文从不直接解它。</strong>$\mathbb E(t_g\mid\pi_\theta)$ 是随机停止时间，直接优化需转移模型或稀疏梯度，论文两者皆无。实际做法是换成 PPO 最大化奖励（算法 2），奖励 (16)–(20) 是 (10)–(12) 的<strong>拉格朗日式松弛</strong>：</p>
+<table>
+<tr><th>式 (10)–(13) 的目标/约束</th><th>奖励对应项</th><th>对应关系</th></tr>
+<tr><td>$\min t_g$（尽快到达）</td><td>式 (17) 过程奖励 $\omega_g(\|p_{t-1}^i-g_t^i\|-\|p_t^i-g_t^i\|)$</td><td>距离缩减量 ≈ 到达时间导数（势函数成形，见 §7.3）</td></tr>
+<tr><td>式 (11)(12) 碰撞约束</td><td>式 (18) 碰撞惩罚 $r_c=-15$</td><td>硬约束罚函数化</td></tr>
+<tr><td>式 (13) 到达条件</td><td>式 (17) 到达奖励 $r_a=+15$（$\|p_t^i-g_t^i\|&lt;0.1$ 时）</td><td>终止条件 + 稀疏奖</td></tr>
+<tr><td>式 (14)(15) 运动学</td><td>仿真器强制执行（动作经 sigmoid/tanh 压缩进 $(0,1)\times(-1,1)$）</td><td>可行域约束</td></tr>
+</table>
+<h4>6.3 疑点标注（诚实）</h4>
+<ul>
+<li><strong>$\Delta t$ 全文未给值</strong>（STAGE 默认 0.1 s 是社区常识但论文没写）；§7.3 的量纲换算按 $\Delta t=0.1$ s 作示范并注明假设。</li>
+<li><strong>$v_t^i\in(0.0,1.0)$ 是开区间</strong>：$v=0$（悬停）不可达，与式 (2) 闭区间不一致——UAV 永远前进，正前方障碍只能靠转向绕开（对比 Long et al. [30] 允许停车）。</li>
+<li><strong>$B_k(0\le k\le M)$ 与部分可观测的矛盾</strong>：约束 (12) 实际只对<strong>可见</strong>障碍生效，未知障碍的安全性完全交给策略泛化——论文的核心卖点，也是无法给出硬保证之处。</li>
+</ul>
+<hr>
+<h3>7. 公式 (16)–(20)：奖励函数逐项推导与数值核算</h3>
+<p>论文原文（第 6–7 页 §4.3.3，按字形层核实，含打印原貌）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(16) —— 总奖励四分量（论文式 (16)）</span>
+$$r_t^i=r_{t,g}^i+r_{t,c}^i+r_{t,w}^i+r_{t,a}^i \tag{16}$$
+<div class="eq-note">$r_{t,g}^i$：导航至目标；$r_{t,c}^i$：碰撞惩罚；$r_{t,w}^i$：角速度平滑；$r_{t,a}^i$：航向角惩罚。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(17) —— 目标奖励（论文式 (17)，分隔符打印原貌）</span>
+$$r_{t,g}^i=\begin{cases}r_a,&\text{if }\ \|p_t^i-g_t^i\|\lt 0.1\\[2pt] \omega_g\big(\|p_{t-1}^i-g_t^i\|-|p_t^i-g_t^i\|\big),&\text{otherwise}\end{cases} \tag{17}$$
+<div class="eq-note"><strong>打印原貌</strong>：第二行第二个范数是 $|p_t^i-g_t^i\|$——左单竖线 U+007C、右双竖线 U+2016（码点级证实），语义显然为 $\|p_t^i-g_t^i\|$（问题清单 #4）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(18) —— 碰撞惩罚（论文式 (18)，分隔符打印原貌）</span>
+$$r_{t,c}^i=\begin{cases}r_c,&\text{if }\ \|p_t^i-p_t^j| \lt R_d\ \ \text{or}\ \ \|p_t^i-B_k\|\lt R_d\\[2pt] 0,&\text{otherwise}\end{cases} \tag{18}$$
+<div class="eq-note"><strong>打印原貌</strong>：第一个条件右分隔符是单竖线 U+007C（左为 U+2016）——与式 (17) 同款缺陷，语义为 $\|p_t^i-p_t^j\|&lt;R_d$。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(19) —— 角速度惩罚（论文式 (19)）</span>
+$$r_{t,w}^i=\omega_w\,|\omega_t^i|\qquad\text{if }\ |\omega_t^i|>0.7 \tag{19}$$
+<div class="eq-note">条件赋值写法：$|\omega_t^i|\le0.7$ 时 $r_{t,w}^i=0$（论文未写 else 分支，从文字「suppression for larger angular velocity」确认）。$\omega_w=-0.1$。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(20) —— 航向角惩罚（论文式 (20)，含 $D$ 定义）</span>
+$$r_{t,a}^i=\begin{cases}(0.3-H)/D,&\text{if }\ H\lt 0.3\\[2pt] (-0.1*H)/D,&\text{otherwise}\end{cases},\qquad D=\omega_d*||p_t^i-g_t^i\| \tag{20}$$
+<div class="eq-note"><strong>打印原貌</strong>：$D$ 定义左分隔符为两个单竖线 U+007C U+007C（右为 U+2016）——第三处分隔符缺陷。$H$ 为「当前航向与指向目标向量夹角」的绝对值；$\omega_d=0.1$。</div>
+</div>
+<h4>7.1 符号定义与参数值</h4>
+<table>
+<tr><th>参数</th><th>值</th><th>含义</th><th>单位</th></tr>
+<tr><td>$r_a$</td><td>$+15$</td><td>到达目标奖励</td><td>无量纲</td></tr>
+<tr><td>$r_c$</td><td>$-15$</td><td>碰撞惩罚（与 $r_a$ 对称）</td><td>无量纲</td></tr>
+<tr><td>$R_d$</td><td>$0.5$ m</td><td>安全半径（UAV 间与 UAV-障碍共用）</td><td>m</td></tr>
+<tr><td>$\omega_g$</td><td>$2.5$</td><td>距离缩减奖励权重</td><td>奖励/m</td></tr>
+<tr><td>$\omega_w$</td><td>$-0.1$</td><td>角速度惩罚权重</td><td>奖励/(rad/s)</td></tr>
+<tr><td>$\omega_d$</td><td>$0.1$</td><td>$D$ 的系数（距离权重）</td><td>1/m</td></tr>
+<tr><td>阈值 0.1 m / 0.7 / 0.3</td><td>—</td><td>到达半径 / 角速度阈值 / 航向角阈值</td><td>m / rad/s（推断）/ rad（推断）</td></tr>
+</table>
+<h4>7.2 逐项推导</h4>
+<p><strong>$r_{t,g}^i$（式 17）——势函数成形。</strong>过程奖励是势函数 $\Phi(p)=\omega_g\|p-g_t^i\|$ 的一步下降量 $\omega_g[\Phi(p_{t-1})-\Phi(p_t)]$。势成形的已知性质：势部分沿轨迹求和只差端点值（$\sum_t[\Phi(p_{t-1})-\Phi(p_t)]=\Phi(p_0)-\Phi(p_T)$），<strong>不会扭曲最优策略</strong>，只提供稠密的"前进方向"梯度。到达奖 $+15$ 是 0.1 m 判定圆内的稀疏终止奖励。</p>
+<p><strong>$r_{t,c}^i$（式 18）——罚函数化。</strong>触发条件 $&lt;R_d$ 与式 (11)(12) 的 $\ge R_d$ 恰好互补；$r_c=-15$ 与 $r_a=+15$ 形成对称二分信号。论文未说明碰撞后是否终止 episode（STAGE 场景下通常即任务失败）。</p>
+<p><strong>$r_{t,w}^i$（式 19）——抑制急转。</strong>$|\omega|&gt;0.7$ 时线性罚 $-0.1|\omega|$：$\omega=1$ 时 $-0.1$、$\omega=0.71$ 时 $-0.071$、$\omega=0.69$ 时 $0$——分段点有 $0.07$ 跳变（不连续但只进期望估计，实际无碍）。</p>
+<p><strong>$r_{t,a}^i$（式 20）——航向对齐 + 距离反比缩放。</strong>$H&lt;0.3$（约 17.2°）给正奖 $(0.3-H)/D$，否则罚 $-0.1H/D$。除以 $D=\omega_d\|p-g\|$ 的动机（论文原话）：消除轨迹长度对惩罚累计的影响——远时罚轻（允许绕路）、近时罚重（强制对准）。</p>
+<h4>7.3 数值核算（全部由 verify_numbers.py 复核）</h4>
+<p><strong>示例 1（单步，假设 $\Delta t=0.1$ s）</strong>：UAV 距目标 2.0 m、一步走 0.1 m（$v=1$）、$H=0.2$、$\omega=0.5$：</p>
+$$r_{g}=2.5\times(2.0-1.9)=0.25,\qquad r_{w}=0\ (|\omega|<0.7),\qquad r_{a}=\frac{0.3-0.2}{0.1\times1.9}=0.5263\quad\Rightarrow\quad r=0.7763$$
+<p><strong>示例 2（尺度对比，暴露设计权衡）</strong>：过程奖励每步上限 $\omega_g v_{max}\Delta t=2.5\times0.1=0.25$；而 $r_a$ 在 $H=0$、$d=1$ m 时达 $0.3/0.1=3.0$——<strong>航向奖励可达过程奖励的 12 倍</strong>：近距离处"对准目标"压倒"往前走"，策略被强烈拉向对准方向（有意为之，抑制 zigzag）。代价：$r_a\propto1/d$ 在 $d\to0$ 发散（被 0.1 m 处切换 $+15$ 截断）；$d=0.1$ m 时 $r_a$ 上限 $0.3/0.01=30$——到达奖的两倍，此处奖励梯度极陡，训练稳定性风险论文未讨论。</p>
+<p><strong>示例 3（episode 尺度自洽）</strong>：§5.1.2 报告收敛后平均奖励约 90（阶段一）/115（阶段二）。量级核对：$N=5$ 全部到达 $5\times15=75$，加全程势成形（初始距目标 3 m 时约 $2.5\times3=7.5$/架）与航向奖励，每架 15+几，合计 90–115 完全合理 ✓。<strong>论文报告的收敛奖励与式 (16)–(20) 的参数尺度自洽。</strong></p>
+<hr>
+<h3>8. 观测/动作空间与策略网络（无编号式 D2–D5，Fig. 6）</h3>
+<h4>8.1 观测与动作的精确规格（数学化）</h4>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D2) —— 观测三分量（§4.3.1 文字，无编号）</span>
+$$o_t^i=\big(\,o_{t,z}^i,\ o_{t,g}^i,\ o_{t,v}^i\,\big),\qquad o_{t,z}^i\in\mathbb R^{3\times512},\quad o_{t,v}^i=[v_t^i,\ \omega_t^i]\in\mathbb R^2$$
+<div class="eq-note">$o_{t,z}^i$：2D 激光<strong>连续三帧</strong>、每帧 512 个距离值（视场 270°、最大探测 5 m）；$o_{t,g}^i$：相对目标的<strong>极坐标</strong>（距离+角度）；$o_{t,v}^i$：上一时刻动作。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D3) —— 动作空间（§4.3.2 文字，无编号）</span>
+$$a_t^i=[v_t^i,\ \omega_t^i],\qquad v_t^i\in(0.0,1.0)\ \text{m/s(推断)},\quad \omega_t^i\in(-1.0,1.0)\ \text{rad/s(推断)}$$
+</div>
+<h4>8.2 网络前向的逐层维度推导（Fig. 6 + §4.3.4 → 数学）</h4>
+<p>卷积输出长度 $L_{out}=\lfloor(L-k)/s\rfloor+1$：</p>
+<table>
+<tr><th>层</th><th>规格</th><th>维度核算</th></tr>
+<tr><td>输入</td><td>三帧 LiDAR</td><td>$3\times512$</td></tr>
+<tr><td>隐藏层 1</td><td>1D 卷积 32 滤波器、k=5、s=2 + ReLU</td><td>$32\times\lfloor(512-5)/2\rfloor+1=32\times254$</td></tr>
+<tr><td>隐藏层 2</td><td>1D 卷积 32 滤波器、k=3、s=2 + ReLU</td><td>$32\times\lfloor(254-3)/2\rfloor+1=32\times126$</td></tr>
+<tr><td>展平 + 全连接 3</td><td>FC 256 + ReLU</td><td>$32\times126=4032\to256$</td></tr>
+<tr><td>拼接</td><td>第三层输出 $\oplus\ o_{t,g}^i\oplus o_{t,v}^i$</td><td>$256+2+2=260$</td></tr>
+<tr><td>全连接 4</td><td>FC 128 + ReLU</td><td>$260\to128$</td></tr>
+<tr><td>输出层</td><td>2 单元：sigmoid（$v$）+ tanh（$\omega$）</td><td>$128\to2$</td></tr>
+</table>
+<div class="callout info"><p><strong>一处必须澄清的歧义</strong>：论文原话「The output of the third layer is connected to the other two inputs ($o_{t,g}^i$ and $o_{t,v}^i$) and fed into the last hidden layer」——拼接发生在<strong>FC256 之后、FC128 之前</strong>（$260\to128$），上表按此实现。第 6 节笔记表「k5s2/k3s1」的第二卷积步长应为 s2（论文 span=2），顺带修正。</p></div>
+<h4>8.3 输出层激活 ↔ 动作范围（为什么 sigmoid/tanh 不是随便选的）</h4>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D4) —— 输出层与动作范围匹配（无编号）</span>
+$$v_{mean}=\sigma(h_4\cdot w_v+b_v)\in(0,1)\Longleftrightarrow v_t^i\in(0,1);\qquad \omega_{mean}=\tanh(h_4\cdot w_\omega+b_\omega)\in(-1,1)\Longleftrightarrow\omega_t^i\in(-1,1)$$
+<div class="eq-note">$\sigma$ 值域 $(0,1)$、$\tanh$ 值域 $(-1,1)$——与动作空间 (D3) <strong>逐点匹配</strong>，网络输出天然满足式 (2) 约束、无需裁剪（Long et al. [30] 同款）。</div>
+</div>
+<h4>8.4 随机策略的高斯参数化（无编号式 D5）</h4>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D5) —— 动作采样分布（§4.3.4 末段，无编号）</span>
+$$a_t^i\sim\mathcal N\big(v_{t,mean}^i,\ v_{t,logstd}^i\big)\quad\Longleftrightarrow\quad a_t^i=v_{t,mean}^i+\exp(v_{t,logstd}^i)\cdot\varepsilon,\quad \varepsilon\sim\mathcal N(0,I_2)$$
+<div class="eq-note">均值由网络输出；<strong>对数标准差是状态无关的可学习参数</strong>（「updated solely during training」），测试用确定性均值。论文把 $\mathcal N(v_{mean},v_{logstd})$ 当分布参数是简写（第二参数应为方差或标准差），本文按重参数化展开。</div>
+</div>
+<h4>8.5 疑点</h4>
+<ul>
+<li>$o_{t,g}^i$ 极坐标的<strong>角度参考</strong>（世界系 $X_w$ 还是机头体轴）未声明；若相对体轴则与 $H$ 同源，论文未说（问题清单 #10）。</li>
+<li>§3.1.1 定义 $d_{scan}$ 但<strong>从未赋值、从未使用</strong>；§4.3.1 直接写 5 m——疑为符号断层（问题清单 #10）。</li>
+<li>两卷积层均 32 通道、stride=2（$3\to32\to32$，第二层不翻倍）——与 VGG 式设计不同，但无对错。</li>
+</ul>
+<hr>
+<h3>9. 算法 2：PPO 训练算法逐行解读与损失函数推导</h3>
+<p>论文原文（第 7 页 Algorithm 2；行 18 的 $L_{PPO}(\phi)$ 与行 22 的负号均为<strong>打印原貌</strong>，码点级证实）：</p>
+<pre class="code-block"><code>Algorithm 2  Proposed training algorithm based on PPO.
+ 1: Initialization: Initialize policy network π_θ and value function V_φ(s_t).
+ 2: for i = 1,2,… do
+ 3:   // Collect data in parallel
+ 4:   for UAV = 1,2,…,N do
+ 5:     Run policy π_θ for T_i timesteps, collecting {o_t^i, r_t^i, a_t^i}, where t ∈ [0, T_i]
+ 6:     Estimate advantages using GAE [31]  Â_t^i = Σ_{l=0}^{T_i} (γλ)^l δ_t^i,  where δ_t^i = r_t^i + γ V_φ(s_{t+1}^i) − V_φ(s_t^i)
+ 7:     if Σ_{i=1}^{N} T_i &gt; T_max then
+ 8:       break
+ 9:     end if
+10:   end for
+11:   π_old ← π_θ
+12:   // Update policy
+13:   for j = 1,…,E_π do
+14:     L_PPO(θ) = Σ_{t=1}^{T_max} [π_θ(a_t^i|o_t^i) / π_old(a_t^i|o_t^i)] Â_t^i − β KL[π_old|π_θ] + ξ max(0, KL[π_old|π_θ] − 2 KL_target)²
+15:     if KL[π_old|π_θ] &gt; 4 KL_target then
+16:       break and continue with next iteration i + 1
+17:     end if
+18:     Update θ with lr_θ by Adam w.r.t L_PPO(φ)
+19:   end for
+20:   // Update value function
+21:   for k = 1,2,…,E_V do
+22:     L_V(φ) = −Σ_{i=1}^{N} Σ_{t=1}^{T_i} ( Σ_{t′&gt;t} γ^{t′−t} r_{t′}^i − V_φ(s_t^i) )²
+23:     Update φ with lr_φ by Adam [32] w.r.t L_V(φ)
+24:   end for
+25:   // Adapt KL Penalty Coefficient
+26:   if KL[π_old|π_θ] &gt; β_high KL_target then
+27:     β ← αβ
+28:   else if KL[π_old|π_θ] &lt; β_low KL_target then
+29:     β ← β/α
+30:   end if
+31: end for</code></pre>
+<h4>9.1 逐行解读（行号 ↔ 数学）</h4>
+<table>
+<tr><th>行</th><th>解读</th></tr>
+<tr><td>1</td><td>初始化 $\pi_\theta$ 与 $V_\phi$。$V_\phi$ 的自变量写 $s_t$——POMDP 语境应为观测，且 $s_t^i$ 从未定义（问题清单 #8）</td></tr>
+<tr><td>4–5</td><td><strong>并行采样</strong>：$N$ 架 UAV 用<strong>共享策略</strong>各跑 $T_i$ 步，收集 $\{o_t^i,r_t^i,a_t^i\}$——CTDE：训练共享、执行分布式</td></tr>
+<tr><td>6</td><td>GAE 优势估计（§9.2 详析）</td></tr>
+<tr><td>7–8</td><td>总步数达 $T_{max}=8000$ 即停采</td></tr>
+<tr><td>11</td><td>$\pi_{old}\leftarrow\pi_\theta$：重要性采样基准快照</td></tr>
+<tr><td>13–19</td><td>策略更新：$E_\pi=20$ epoch；KL 超 $4KL_{target}$ 中断；$lr_\theta=5\times10^{-5}/2\times10^{-5}$（两阶段）</td></tr>
+<tr><td>21–24</td><td>价值更新：$E_V=10$ epoch、$lr_\phi=10^{-3}$（公式问题见 §9.4）</td></tr>
+<tr><td>26–30</td><td>自适应 $\beta$：$KL&gt;1.5KL_{target}\Rightarrow\beta\gets2\beta$；$KL&lt;0.5KL_{target}\Rightarrow\beta\gets\beta/2$（$\alpha=2$）</td></tr>
+</table>
+<h4>9.2 GAE 的推导与论文写法的勘误（无编号式 D6–D7）</h4>
+<p><strong>第 1 步：TD 残差</strong>（行 6 的 $\delta$）：</p>
+$$\delta_t^i=r_t^i+\gamma V_\phi(s_{t+1}^i)-V_\phi(s_t^i) \tag{D6}$$
+<p><strong>第 2 步：GAE 标准形式</strong>（Schulman et al. [31]，论文所引）：</p>
+$$\hat A_t^{GAE(\gamma,\lambda)}=\sum_{l=0}^{\infty}(\gamma\lambda)^l\,\delta_{t+l},\qquad \lambda\in[0,1] \tag{D7}$$
+<p>等价递推 $\hat A_t=\delta_t+\gamma\lambda\hat A_{t+1}$；它是一族 $n$-步优势估计的指数加权平均（$\lambda\to0$ 退化为 1 步 TD、$\lambda\to1$ 退化为 MC）。<strong>论文行 6 与标准形式有三处出入</strong>：① $\delta_t^i$ 不随 $l$ 平移（应为 $\delta_{t+l}^i$），按字面是同一残差重复加权；② 上界 $T_i$ 应为 $T_i-t$；③ $s_t^i$ 未定义（收集的是 $o_t^i$）。本文按 (D7) 理解，$\lambda=0.95$、$\gamma=0.99$（Table 1）。</p>
+<h4>9.3 $L_{PPO}$ 三项的推导与数值解读（无编号式 D8）</h4>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D8) —— PPO（KL-penalty 变体 + 附加二次软约束）损失（算法 2 行 14）</span>
+$$L_{PPO}(\theta)=\sum_{t=1}^{T_{max}}\underbrace{\frac{\pi_\theta(a_t^i|o_t^i)}{\pi_{old}(a_t^i|o_t^i)}\,\hat A_t^i}_{\text{① 重要性加权优势}}-\underbrace{\beta\,\mathrm{KL}[\pi_{old}\|\pi_\theta]}_{\text{② KL 惩罚}}+\underbrace{\xi\max\big(0,\ \mathrm{KL}[\pi_{old}\|\pi_\theta]-2KL_{target}\big)^2}_{\text{③ 二次软约束}}$$
+<div class="eq-note">$\beta=1.0$（自适应）、$KL_{target}=15\times10^{-4}$、$\xi=50.0$。论文把①求和写成 $\sum_{t=1}^{T_{max}}$ 但数据为 $\sum_iT_i\le T_{max}$ 步且被积式带 $i$ 上标——<strong>缺对 $i$ 求和</strong>（问题清单 #8），本文按「全体 UAV 全部采样步」理解。</div>
+</div>
+<p><strong>① 从策略梯度定理推导。</strong>对累计奖励目标 $J(\theta)$：$\nabla_\theta J=\mathbb E[\frac{\pi_\theta}{\pi_{old}}\hat A_t\nabla_\theta\log\pi_\theta]$，积回得代理目标 $\mathbb E[\frac{\pi_\theta}{\pi_{old}}\hat A_t]$——好动作提概率、坏动作降概率，比率是重要性采样修正。</p>
+<p><strong>② KL 惩罚</strong>：限制新旧策略距离（Schulman 2017 的 PPO-Penalty 变体；本文不用 clip 变体）。KL 方向 $\mathrm{KL}[\pi_{old}\|\pi_\theta]$（前向 KL）。</p>
+<p><strong>③ 二次软约束（本文相对原版 PPO 的加项）</strong>：$KL&gt;2KL_{target}=3\times10^{-3}$ 时按 $\xi=50$ 罚平方（$KL=0.004\to5\times10^{-5}$、$KL=0.005\to2\times10^{-4}$）。配合行 15 硬停止（$KL&gt;4KL_{target}=6\times10^{-3}$ 丢弃本次更新）与行 26–30 的 $\beta$ 自适应，形成<strong>软罚→硬停→调 $\beta$ 三层防发散</strong>。数值直觉：$KL_{target}=1.5\times10^{-3}$ 意味着每次更新允许的分布位移极小（约 0.15% 平均 KL），训练极其保守——多 UAV 共享策略下"一架撞车带崩全局"的合理保险。</p>
+<p><strong>符号约定缺口</strong>：PPO 是<strong>最大化</strong> $L_{PPO}$，Adam 是<strong>最小化</strong>——行 18「Adam w.r.t. $L_{PPO}(\phi)$」既把参数写成 $\phi$（应为 $\theta$），也没声明优化 $-L_{PPO}$（问题清单 #6）。</p>
+<h4>9.4 $L_V$ 的推导与三处问题（无编号式 D9，danger 级）</h4>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D9) —— 价值损失（算法 2 行 22，打印原貌含负号）</span>
+$$L_V(\phi)=-\sum_{i=1}^{N}\sum_{t=1}^{T_i}\Big(\underbrace{\sum_{t'&gt;t}\gamma^{t'-t}\,r_{t'}^i}_{\text{MC 回报}}-\ V_\phi(s_t^i)\Big)^2$$
+</div>
+<ul>
+<li><strong>问题 1：负号。</strong>标准价值损失是 $\sum(G_t-V_\phi(s_t))^2$（正号，最小化 MSE）。带负号后 Adam 最小化 $L_V$ 等价于<strong>最大化 MSE</strong>——价值网络会主动偏离回报。除非约定"优化 $-L_V$"，否则是实质性错误（问题清单 #5）。</li>
+<li><strong>问题 2：回报起点 $t'&gt;t$。</strong>$\sum_{t'&gt;t}\gamma^{t'-t}r_{t'}^i=\gamma r_{t+1}+\gamma^2r_{t+2}+\dots$ <strong>漏掉即时奖励 $r_t^i$</strong>（标准 $G_t=\sum_{t'\ge t}$）。</li>
+<li><strong>问题 3：无自举截断。</strong>纯 MC 回报在 episode 边界直接截断（不补 $\gamma V(s_{T_i+1})$），而 GAE 的 $\delta_t$ 处处用 $V$ 自举——优势用 TD、目标用 MC，两者不一致。</li>
+</ul>
+<div class="callout danger"><p><strong>对复现者的影响</strong>：照抄行 22（负号 + $t'&gt;t$）价值网络会学到错误目标，GAE 优势随之失真。作者公开的收敛曲线（图 8）能训出来，说明<strong>实际实现几乎肯定与伪代码不同</strong>（多半是 $+\sum(\sum_{t'\ge t}\gamma^{t'-t}r_{t'}-V)^2$ 或 GAE 目标）。这是必须向读者说清的「伪代码与预期实现不一致」。</p></div>
+<h4>9.5 超参数表核对（Table 1 ↔ 算法 2 ↔ §5.1.2）</h4>
+<p>Table 1 全部 12 项（$\lambda=0.95$、$\gamma=0.99$、$T_{max}=8000$、$E_\pi=20$、$\beta=1.0$、$KL_{target}=15e{-4}$、$\xi=50.0$、$lr_\theta=5e{-5}/2e{-5}$、$E_V=10$、$lr_\phi=1e{-3}$、$\alpha=2.0$、$\beta_{high}=1.5$、$\beta_{low}=0.5$）与算法 2 的行 6/7/13/14/18/21/23/26/27/28/29 逐一对应 ✓。两点值得注意：价值学习率 $10^{-3}$ 比策略 $5\times10^{-5}$ 高一个量级（价值拟合更"廉价"）；$\beta_{low}=0.5$ 比标准 PPO-Penalty 的 $2/3$ 更激进地松绑。课程学习两阶段（§5.1.2：平均奖励 90→115）与 §7.3 的奖励尺度核算自洽。</p>
+<hr>
+<h3>10. 公式 (21)：Procrustes 编队位置误差（含闭式解推导）</h3>
+<p>论文原文（第 9 页 §5.3，按字形层核实：<strong>求和号上没有 $1/n$</strong>）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(21) —— 编队位置误差（论文式 (21)，注意无 $1/n$）</span>
+$$e_{dist}=\min_{R,\,t,\,s}\ \sum_{i=1}^{n}\big\|p_d^i-(sR\,p_c^i+t)\big\|^2 \tag{21}$$
+<div class="eq-note">$p_d^i$、$p_c^i$：理想编队 $F_d$ 与当前编队 $F_c$ 中第 $i$ 架 UAV 位置；$R\in SO(2)$、$t\in\mathbb R^2$、$s\in\mathbb R_+$。带缩放的 Orthogonal Procrustes 问题（相似变换对齐）。</div>
+</div>
+<h4>10.1 推导：闭式解（Umeyama 1991 的 2D 特例）</h4>
+<p><strong>第 1 步：去质心。</strong>记质心 $\bar p_d,\bar p_c$，中心化 $\hat p_d^i=p_d^i-\bar p_d$、$\hat p_c^i=p_c^i-\bar p_c$。展开式 (21)（交叉项为零）：</p>
+$$\sum_i\|p_d^i-(sRp_c^i+t)\|^2=\sum_i\|\hat p_d^i-sR\hat p_c^i\|^2+n\|\bar p_d-(sR\bar p_c+t)\|^2$$
+<p>第二项只含 $t$，令其为零：</p>
+$$t^*=\bar p_d-sR\,\bar p_c \tag{21a}$$
+<p><strong>第 2 步：最优旋转与缩放。</strong>记 $X=[\hat p_c^1;\dots;\hat p_c^n]$（$n\times2$）、$Y=[\hat p_d^1;\dots]$，$M=X^TY$。固定 $s$ 时 Orthogonal Procrustes 解：对 $M$ 做 SVD $M=U\Sigma V^T$：</p>
+$$R^*=V\,D\,U^T,\qquad D=\mathrm{diag}\big(1,\ \det(VU^T)\big) \tag{21b}$$
+<p>（$D$ 保证 $\det R^*=+1$，限制在 $SO(2)$ 防镜像。）固定 $R$ 时对 $s$ 求导置零：</p>
+$$s^*=\frac{\mathrm{tr}(Y^T X R^*)}{\mathrm{tr}(X^T X)}=\frac{\mathrm{tr}(\Sigma D)}{\mathrm{tr}(X^TX)} \tag{21c}$$
+<p>把 (21a)(21b)(21c) 代回即得 $e_{dist}$——<strong>式 (21) 有完全解析解</strong>；论文说"transformed into a nonlinear optimization problem"（数值优化）不冲突，但闭式解更快更稳。</p>
+<h4>10.2 数值验证（verify_numbers.py，含噪声）</h4>
+<p>取 $F_d=\{(0,0),(2,0),(1,2),(1,2/3)\}$，真值 $\theta=0.7$、$s_{true}=1.3$、$t=(1,-2)$，加 0.02 高斯噪声构造 $F_c$。闭式解输出 $s^*=0.7648\approx1/1.3=0.7692$ ✓（对齐方向是 $F_c\to F_d$，故收敛到 $1/s_{true}$）、$R^*$ 为 $\theta\approx-0.7$ 的旋转 ✓、残差 $e_{dist}=7.77$（≈ 4 点×2 维×0.02² 噪声量级）——闭式解与真值自洽。</p>
+<h4>10.3 三个必须指出的点</h4>
+<ul>
+<li><strong>无 $1/n$</strong>：式 (21) 是<strong>和</strong>而非均值（字形层确认）。这解释了 §5.5 原话「position error increases in direct proportion to the size of the formation」及另行定义「average = 总误差 ÷ 规模数」。note 第 6 节/note.md 的 $\frac1N\sum$ 是 [35] 的写法，与论文不符。</li>
+<li><strong>只消除相似变换</strong>：$(sR,t)$ 仅 4 自由度，消旋转/平移/均匀缩放；<strong>剪切与非均匀缩放会计入误差</strong>。而决策层式 (5) 的 $A$ 是 6 自由度一般仿射——若编队执行剪切变形（Fig. 5(d-f)），式 (21) 无法"原谅"它。<strong>指标与模型之间存在能力失配</strong>（A-F 的 0.078 小误差说明其场景未用剪切自由度）。</li>
+<li><strong>公平性</strong>：度量"形状（相似形）保持能力"而非"轨迹跟踪"——论文原话「reflects the formation's ability to maintain its configuration, rather than its trajectory tracking capability」✓。</li>
+</ul>
+<hr>
+<h3>11. 公式 (22)：Laplacian 编队相似性误差</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(22) —— 编队相似性误差（论文式 (22)）</span>
+$$e_{sim}=\|\hat L-\hat L_{des}\|_F^2=\mathrm{tr}\big\{(\hat L-\hat L_{des})^T(\hat L-\hat L_{des})\big\} \tag{22}$$
+<div class="eq-note">$\hat L$、$\hat L_{des}$：当前/期望编队的<strong>对称归一化拉普拉斯矩阵</strong>；$\|\cdot\|_F$ 为 Frobenius 范数。</div>
+</div>
+<h4>11.1 定义补全（论文没给，此处补标准定义）</h4>
+<p>由位置构造带权邻接 $W$（$W_{ij}=\kappa(p_i,p_j)$，权重函数论文<strong>未指定</strong>）、度 $D=\mathrm{diag}(W\mathbf 1)$、拉普拉斯 $L=D-W$：</p>
+$$\hat L=D^{-1/2}LD^{-1/2}=I-D^{-1/2}WD^{-1/2} \tag{D10}$$
+<p>Frobenius 展开 $\|X\|_F^2=\mathrm{tr}(X^TX)=\sum_{i,j}X_{ij}^2$ 与式 (22) 一致 ✓。</p>
+<h4>11.2 不变性论证（论文只说"see [27] for a detailed proof"，此处写清并给出边界）</h4>
+<p><strong>旋转、平移：严格不变。</strong>$\hat L$ 只依赖成对距离，刚性变换保距离 ✓。</p>
+<p><strong>均匀缩放：依赖权重函数的齐次性。</strong>$p_i\mapsto sp_i$ 时：(i) 拓扑型权重（0/1、$k$-NN）→ 图不变，严格不变 ✓；(ii) 齐次核 $f(cx)=c^{\kappa}f(x)$（如 $1/x^{\kappa}$）→ $W\to s^{\kappa}W$、$D\to s^{\kappa}D$、$\hat L\to\hat L$，严格不变 ✓；(iii) 固定带宽高斯核 $W_{ij}=\exp(-\|p_i-p_j\|^2/\sigma^2)$ → 不齐次，$\hat L$ 会变。<strong>数值反证</strong>（verify_numbers.py）：$F_d$ 经 $\theta=0.7$、$s=1.3$、$t=(1,-2)$ 相似变换后，$\sigma=1$ 高斯核下 $\|\hat L_c-\hat L_d\|_F^2=0.0214\ne0$。</p>
+<p><strong>结论（诚实）</strong>：论文「scale-invariant to rotations, translations, and scaling」的严格成立取决于 [27] 的权重构造，论文未说明——标注为待核实（问题清单 #10）。</p>
+<h4>11.3 谱解释与量纲</h4>
+<p>$\hat L$ 对称半正定、谱 $\lambda(\hat L)\subset[0,2]$。若两矩阵可交换则 $\|\hat L-\hat L_{des}\|_F^2=\sum_k(\lambda_k-\lambda_k^{des})^2$——两图"振动模式"逐点差平方和。$n$ 节点图 $\|\hat L\|_F^2\le4(n-1)$（$O(n)$），表 2 的 $e_{sim}\approx0.015$–$0.089$ 相对此尺度确实很小，与"结构保持良好"一致 ✓。</p>
+<hr>
+<h3>12. 公式 (23)：jerk 指标</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(23) —— jerk 定义（论文式 (23)）</span>
+$$jerk\big(\hat p(t)\big)=\frac{d^3\hat p(t)}{dt^3} \tag{23}$$
+<div class="eq-note">位置的三阶导数（加加速度），单位 m/s³。表 2 的 "Avg Jerk" 是全程时间平均（离散化格式未给，如中心差分 $\frac{p_{t+2}-3p_{t+1}+3p_t-p_{t-1}}{\Delta t^3}$ 需实现者自选）。</div>
+</div>
+<h4>12.1 为什么用 jerk 度量平滑性</h4>
+<p>工程依据（引 [36]）：jerk = 加速度变化率，对应力/力矩变化率，直接关联能耗与执行机构磨损。表 2 中 Ours 的 Avg Jerk（6.2–6.5）显著低于 ORCA-varying（10.95–13.99）✓，与"DRL 输出连续速度指令、无求解器跳变"的方法论预期一致。<strong>注意</strong>：式 (23) 是定义不是算法；表 2 数值不可独立复算（问题清单 #10）。</p>
+<hr>
+<h3>13. 算法 1：两层编队控制算法逐行解读（行号 ↔ 公式）</h3>
+<pre class="code-block"><code>Algorithm 1  Two Layers Formation Control Algorithm.
+ 1: Initialization:
+ 2:   Initialize the environment settings (UAVs position P, obstacles positions B_k, and target formation positions D_f);
+ 3:   Configure the desired formation shape D_f;
+ 4:   Calculate reference trajectories R for leader UAVs based on known obstacle areas and desired formation shape D_f;
+ 5: for t = 1,2,…,T do
+ 6:   for i = 1,2,…,N do
+ 7:     // Decision layer
+ 8:     if i is a leader then
+ 9:       Update goal point g*_i(t) from reference trajectories R
+10:     end if
+11:     if i is a follower then
+12:       Calculate goal point g*_i(t) = −Ω̄_ff^{−1} Ω̄_fl P_l(t) (See Eq. (8))
+13:     end if
+14:     // Execution layer
+15:     Track target points g*_i(t) using neural network output to determine actions a_t^i (See Section 4.3.2, Action space)
+16:   end for
+17:   Update UAV status information (position, LiDAR, etc.)
+18: end for</code></pre>
+<table>
+<tr><th>行</th><th>对应公式/原理</th><th>解读</th></tr>
+<tr><td>2–3</td><td>§4.2.3 标称构型 $r$</td><td>$D_f$ 即标称构型——<strong>符号断层</strong>：§4.2.3 用 $r$、算法 1 用 $D_f$，从未划等号（问题清单 #14）</td></tr>
+<tr><td>4</td><td>§3.2 已知障碍</td><td>leaders 参考轨迹 $R$ 由<strong>已知障碍区</strong>离线规划——决策层唯一"知道障碍物"处；未知障碍全交执行层</td></tr>
+<tr><td>8–10</td><td>—</td><td>leader 目标直接取自参考轨迹（只带队，不追踪仿射关系）</td></tr>
+<tr><td>12</td><td><strong>式 (8)</strong></td><td>follower 目标点。记号问题：$P_f^*(t)$ 是全体 follower 的 $dn_f$ 维向量，对单机 $i$ 应取对应 $2\times2$ 分块（问题清单 #14）</td></tr>
+<tr><td>15</td><td><strong>式 (9)–(20)、算法 2 产物</strong></td><td>执行层：$o_t^i\to$ 网络 $\to a_t^i=[v,\omega]$（CTDE）</td></tr>
+<tr><td>17</td><td>式 (14)(15)</td><td>仿真器按运动学更新位置与 LiDAR</td></tr>
+</table>
+<p><strong>复杂度核对</strong>：$-\bar\Omega_{ff}^{-1}\bar\Omega_{fl}$ 可<strong>离线预计算</strong>（应力矩阵不变时），每步每机只需 $2\times 2n_l$ 行乘——$O(n_l)$/步。论文 §5.4 报告 Ours 9.1 ms vs ORCA 76–81 ms，方向与该复杂度吻合（代数运算 vs 线性规划）✓。</p>
+<hr>
+<h3>14. affine_demo.py ↔ 论文式号对应表（本地代码交叉验证）</h3>
+<table>
+<tr><th>demo 位置</th><th>实现</th><th>对应论文</th><th>一致性</th></tr>
+<tr><td>L29–32 <code>rotation_matrix</code></td><td>$R(\theta)$</td><td>式 (5) 的 $A$；Fig. 5(b)</td><td>✅</td></tr>
+<tr><td>L34–37 <code>scaling_matrix</code></td><td>$\mathrm{diag}(s_x,s_y)$</td><td>式 (5) 的 $A$；Fig. 5(c)</td><td>✅</td></tr>
+<tr><td>L39–42 <code>shear_matrix</code></td><td>$\begin{bmatrix}1&h_x\\ h_y&1\end{bmatrix}$</td><td>式 (5) 的 $A$；Fig. 5(d-f)（demo 双参数剪切，论文单边——同族）</td><td>✅</td></tr>
+<tr><td>L44–52 <code>affine_transform</code></td><td><code>points @ A.T + b</code></td><td>式 (5)：$p_i^*=Ar_i+b$ 逐行实现（$pA^T\equiv(Ap^T)^T$）</td><td>✅</td></tr>
+<tr><td>L55–104 <code>create_formation</code></td><td>5 机标称形状（scale=2）</td><td>标称构型 $r$（§4.2.3）</td><td>✅（数值例见 §3.4）</td></tr>
+<tr><td>L107–134 <code>compute_affine_from_leaders</code></td><td>2 个 leader 反解 $\theta,s$：$A=R(\theta)\mathrm{diag}(s,s)$</td><td>§4.2.3 一一对应；§5.3 的 $\Delta P\Delta R^{-1}$</td><td>⚠️ <strong>简化</strong>：demo 自注「2D 至少 3 点，这里 2 leader + 假设无剪切」——论文理论要求 $n_l\ge d+1=3$（问题清单 #15）</td></tr>
+<tr><td>L229–528 <code>FormationSimulator</code></td><td>拖 leader → 实时算 $(A,b)$ → 全体目标</td><td>算法 1 决策层 + 式 (8)</td><td>✅（显式 $(A,b)$ 等价实现式 (8)）</td></tr>
+<tr><td>L547–578 斥力偏移</td><td>指数势场 <code>vec/dist·exp(−dist/safe)·0.3</code></td><td>执行层（式 (9)–(20) 的 PPO）</td><td>⚠️ demo 自注「实际是 PPO 策略，这里简化」</td></tr>
+<tr><td>L561/573 <code>safe_dist=0.8</code></td><td>安全距离 0.8 m</td><td>$R_d=0.5$ m（§4.3.3）</td><td>❌ <strong>数值不一致</strong>（demo 可视化放大；问题清单 #15）</td></tr>
+<tr><td>L898–1000 <code>demo_narrow_passage</code></td><td>缩放 0.5/0.3/0.3+旋转 过 1.5 m 窄道</td><td>式 (5) 缩放自由度；§1/§3.2 窄道动机</td><td>✅ 直观复现卖点</td></tr>
+</table>
+<hr>
+<h3>最后. 交叉验证总表（论文 ↔ 代码 ↔ 独立数值验证）与问题清单</h3>
+<h4>总表</h4>
+<table>
+<tr><th>论文</th><th>字形层核实</th><th>独立数值验证</th><th>affine_demo.py</th></tr>
+<tr><td>(1)(2)</td><td>⚠️ 问题 #1、#2</td><td>✅ 3×3 展开与独轮车模型逐分量一致</td><td>—</td></tr>
+<tr><td>(3)(4)</td><td>⚠️ $\omega_{ii}$ 打印（#3）</td><td>✅ 标量定义 ⟺ 矩阵形式逐块证明；$\Omega\mathbf 1_n=0$</td><td>—</td></tr>
+<tr><td>(5)</td><td>✅</td><td>✅ 逐节点展开 + 仿射像平衡定理（§3.3）+ diamond 数值例</td><td>✅ L44–52</td></tr>
+<tr><td>(6)(7)(8)</td><td>✅</td><td>✅ 分块推导 + 一致性定理（§5.2）+ K4 数值例逐位一致（§5.4）</td><td>✅ 决策层（L539–545）</td></tr>
+<tr><td>(9)–(13)</td><td>✅</td><td>✅ 目标→奖励松弛对应表（§6.2）</td><td>—</td></tr>
+<tr><td>(14)(15)</td><td>✅</td><td>✅ 与式 (1) 的 Euler 离散一致；半隐式顺序注明</td><td>—</td></tr>
+<tr><td>(16)–(20)</td><td>⚠️ 三处分隔符缺陷（#4）</td><td>✅ 数值核算 §7.3（0.7763/步；90–115 收敛奖自洽）</td><td>⚠️ safe_dist 0.8≠0.5</td></tr>
+<tr><td>网络结构</td><td>✅</td><td>✅ 维度链 512→254→126→4032→260→128→2</td><td>—</td></tr>
+<tr><td>算法 2</td><td>❌ 问题 #5–#8</td><td>✅ GAE/PPO 与 [31][32] 对照勘误</td><td>—</td></tr>
+<tr><td>(21)</td><td>✅（无 $1/n$ 确认）</td><td>✅ Umeyama 闭式解数值验证（$s^*\approx1/s_{true}$）</td><td>—</td></tr>
+<tr><td>(22)</td><td>✅</td><td>⚠️ 高斯核缩放不变性数值反证（0.0214≠0）</td><td>—</td></tr>
+<tr><td>(23)</td><td>✅</td><td>✅ 定义级；离散实现未给</td><td>—</td></tr>
+<tr><td>算法 1</td><td>✅</td><td>⚠️ 记号问题 #14；复杂度 $O(n_l)$/步</td><td>✅ L229+ 交互仿真同构</td></tr>
+</table>
+<h4>论文问题清单（按严重程度，全部有码点/代数证据）</h4>
+<ol>
+<li><strong>【符号混用·中】$\omega$ 与 $w$ 全文混用</strong>（码点级证实）：§3.1.1 写 $a=[v,\omega]$（U+1D714）却解释为「$v$ and $w$ represent…」（U+1D464）；§3.1.2「$v$ and $w$ are the command inputs」；式 (1) 输入向量印成 $[v,0,w]^T$；式 (2) 用 $|\omega|\le\omega_{max}$ 而随文写「$w_{max}$」；§4.3.4 又写「limit the output of $w_t^i$」。数学上始终指同一量（z 轴角速度），但实现者极易把 $w$ 当成另一变量。</li>
+<li><strong>【印刷缺陷·低】式 (1) 第三分量 $\phi$ 缺导数点</strong>（码点级证实：$\dot x,\dot y$ 带 U+0307、$\phi$ 无）：应为 $[\dot x,\dot y,\dot\phi]^T$。</li>
+<li><strong>【印刷缺陷·低】应力对称定义印成 $\omega_{ij}=\omega_{ii}$</strong>（码点级证实：两下标均 U+1D456）：按无向图应为 $\omega_{ij}=\omega_{ji}$。照抄 $\omega_{ii}$ 会丢掉"边权对称"这一使 $\Omega$ 有物理意义（作用-反作用）的关键性质。</li>
+<li><strong>【印刷缺陷·低】式 (17)(18)(20) 三处范数分隔符不匹配</strong>（码点级证实）：式 (17) 第二项 $|\cdot\|$（左 U+007C、右 U+2016）；式 (18) 第一条件 $\|\cdot|$；$D$ 定义 $\|\|\cdot\|$（左两个 U+007C）。语义均为 $\|\cdot\|$。</li>
+<li><strong>【疑似错误·高】算法 2 行 22：$L_V(\phi)=-\sum(G_t-V_\phi(s_t))^2$ 的负号</strong>：Adam 最小化 = 最大化 MSE。标准形式为正号。除非约定优化 $-L_V$（伪代码未声明）。</li>
+<li><strong>【笔误·中】算法 2 行 18：$L_{PPO}(\phi)$ 应为 $L_{PPO}(\theta)$</strong>（码点级证实：括号内是 U+1D719 φ）；且「Adam w.r.t. $L_{PPO}$」未声明最大化/最小化的符号约定（实现应优化 $-L_{PPO}$）。</li>
+<li><strong>【记号错误·中】算法 2 行 6 的 GAE 写法</strong>：$\hat A_t^i=\sum_{l=0}^{T_i}(\gamma\lambda)^l\delta_t^i$ 中 $\delta_t^i$ 应为 $\delta_{t+l}^i$、上界应为 $T_i-t$。按字面实现会把同一残差重复加权求和。</li>
+<li><strong>【记号不一致·中】$s_t^i$ 从未定义</strong>：算法 2 收集 $\{o_t^i,r_t^i,a_t^i\}$，但行 6/22 用 $V_\phi(s_t^i)$；POMDP 语境下应为观测或观测历史。行 14 的 $\sum_{t=1}^{T_{max}}$ 也缺对 $i$ 的求和。</li>
+<li><strong>【不一致·中】式 (21) 无 $1/n$ 归一化</strong>：论文式 (21) 是误差和；note 第 6 节/note.md 抄成了 $\frac1N\sum$（[35] 写法）。§5.5 文字（"position error increases in direct proportion to the size…average = 总误差÷规模数"）证明论文用和形式。</li>
+<li><strong>【未定义/未赋值·低】多处参数与约定缺失</strong>：$d_{scan}$ 定义后从未赋值使用；$\Delta t$（式 (14)(15)）无值；$H$ 与阈值 0.3/0.7 的单位未声明；$o_{t,g}^i$ 极坐标的角度参考系未声明；式 (22) 的权重函数 $w_{ij}$ 未指定（缩放不变性的严格成立依赖它，§11.2 已给数值反例）；式 (23) 离散化格式未给。</li>
+<li><strong>【顺序约定·低】式 (14) 用 $\phi_t^i$（半隐式 Euler）</strong>：位置更新在航向更新之后，与标准显式 Euler 差 $O(\Delta t^2)$。论文未声明顺序，复现结果可能因此有微小出入。</li>
+<li><strong>【细节·低】动作空间 $v_t^i\in(0.0,1.0)$ 开区间</strong>：与式 (2) 闭区间不一致，$v=0$（悬停）不可达（sigmoid 输出也到不了端点）。有意的简化，但论文没说明。</li>
+<li><strong>【设计权衡·中】$r_{t,a}^i\propto 1/D$ 在目标附近发散</strong>（§7.3 核算：$d=0.1$ m 时单步可达 30，超过到达奖两倍）：0.1 m 切换点附近奖励梯度极陡，训练稳定性风险未讨论；且「除以 $D$ 消除轨迹长度影响」只是近似（惩罚按时间而非弧长累积）。</li>
+<li><strong>【记号·低】算法 1 的 $g_i^*(t)$ 块下标与 $D_f$/$r$ 双符号</strong>：行 12 把全体 follower 的向量式 (8) 直接赋给单机目标点，应取第 $i$ 个 $2\times2$ 分块；$D_f$ 与标称构型 $r$ 是同一对象但从未划等号。</li>
+<li><strong>【与本地 demo 不一致·中】affine_demo.py 三处偏离论文</strong>：(i) 2 个 leader 反解 $(A,b)$ 并假设无剪切（$A=sR$，4 自由度），论文理论条件 $n_l\ge d+1=3$（6 自由度）——demo L112-113 注释自认；(ii) 安全距离 0.8 m（L561/L573）≠ 论文 $R_d=0.5$ m；(iii) 执行层用指数势场代替 PPO（L548-549 注释自认）。demo 是教学演示，数值不可当复现依据。</li>
+<li><strong>【诚实声明·中】无稳定性/收敛性分析</strong>：决策层是纯代数（本文 §3.3/§5.2 补了两条一致性定理，论文本身只引 [14]）；执行层是黑箱 DRL，无 Lyapunov/收敛证明，未知障碍无硬安全保证——数据驱动避障路线的固有边界，结论节也未提及。</li>
+<li><strong>【与既有笔记不一致·低】note 第 6 节三处抄写误差</strong>：(i) Eq.(5) 写成 $(A(t)\otimes I_d)x$，Kronecker 顺序与论文 $(I_n\otimes A(t))r$ 相反（按节点堆叠约定下前者错误，§3.1 已证）；(ii) Eq.(21) 写成 $\frac1N\sum$，论文无 $1/N$；(iii) 网络表第二卷积步长写成 k3s1，论文为 span=2。以本文字形层核实结果为准。</li>
+</ol>
+<h4>验证材料清单（全部可复跑）</h4>
+<ul>
+<li><code>_derivation_work/flexible/fulltext.txt</code>：PDF 全文抽取（页码分隔），用于定位公式。</li>
+<li><code>_derivation_work/flexible/pages/page-001..014.png</code>：页面图像（本模型无法目视，未直接引用；字形层核实已等价覆盖）。</li>
+<li><code>_derivation_work/flexible/extract_verify.py</code> → <code>pages_pos.txt</code>：按行坐标重建 5 个公式页版面文本。</li>
+<li><code>_derivation_work/flexible/extract_raw*.py</code> → <code>raw_chars*.txt</code>：关键区域字符+Unicode 码点级转储——所有「码点级证实」判定的证据。</li>
+<li><code>_derivation_work/flexible/verify_numbers.py</code>：全部数值算例（§3.4、§5.4、§7.3、§10.2、§11.2、维度链）的可复跑脚本。</li>
+<li><code>affine_demo.py</code>（论文目录内）：第 14 节对应表所引的本地演示代码。</li>
+</ul>
 </section>
 
 <footer>Paper Notes · Liu, Yan et al. · Aerospace Science and Technology 2025 · Flexible Multi-UAV Formation Control via DRL and Affine Transformations · MathJax + Mermaid Rendering</footer>

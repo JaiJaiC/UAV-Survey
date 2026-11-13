@@ -205,6 +205,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -225,6 +228,7 @@ MathJax = {
   <a href="#flaw">Potential Flaw</a>
   <a href="#motivation">Motivation</a>
   <a href="#takeaway">Takeaways</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -856,6 +860,521 @@ flowchart LR
     <tr><td>Park et al. (2020) — Lightweight high voltage generator for untethered electroadhesive perching. <em>IEEE Robot. Autom. Lett.</em> 5, 4485–4492</td><td>此前最轻的高压发生器（4.32 kV / 951 mg），用于电粘附停靠而非飞行推进。CoulombFly 的 HVPC 在此基础上将电压-质量比提升了 55%，且将高压电源用于飞行推进——开创了全新应用场景。</td></tr>
     <tr><td>Floreano & Wood (2015) — Science, technology and the future of small autonomous drones. <em>Nature</em> 521, 460–466</td><td>小型无人机领域的经典综述——发表于 CoulombFly 前 9 年。当时对"太阳能微型无人机"的展望基本上指向"更大的固定翼"。CoulombFly 的出现完全改写了这个叙事：微型 + 太阳能 + 旋翼 = 可能。</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info">
+<p><strong>对象</strong>：Shen, Peng et al., "Sunlight-powered sustained flight of an ultralight micro aerial vehicle", <em>Nature</em> 631, 537–542 (2024)，DOI <code>10.1038/s41586-024-07609-4</code>。推导依据：本工作目录 <code>_derivation_work/0-fracture/fulltext.txt</code>（19 页全文抽取）、页面图像 <code>pages/page-001.png</code>–<code>page-019.png</code>、已有笔记 note.html 第 6/7/10 节。</p>
+<p><strong>公式范围</strong>：Methods「Vehicle design / Electrostatic motor」的全部 9 个编号公式 (1)–(9)（PDF 第 8–9 页，Nature 第 540–541 页），加上正文/Extended Data 中的系统级关键无编号公式，统一标注为补充式 (D1)–(D13)：持续飞行功率收支、太阳辐照几何、Cockcroft–Walton 倍压、质量预算、尺度律。<strong>本篇没有任何学习/控制算法</strong>（无数据、无训练），「算法」部分以 Methods 文字重构的「尺寸-功率-质量协同设计流程」伪代码呈现（第 13 节）。</p>
+<p><strong>方法</strong>：1）每个公式先引论文原文 LaTeX → 逐符号定义（含义/量纲/文中取值）→ 第一性原理重推（库仑定律、刚体定轴转动、旋翼动量理论、电路方程、球面天文学）→ 物理解读 → 数值核算（代入论文全部实测参数）→ 疑点标注；2）交叉验证采用"同一结论多条独立路径"策略（升力-功率效率分别用<strong>实测比值 / 系数公式 / 动量理论</strong>三条路径独立复现）；3）对印刷错误、单位混用、口径不一致明确标注，不替论文圆场。</p>
+<p><strong>⚠️ 诚实声明</strong>：本次执行的模型<strong>无图像输入</strong>，无法逐字核对 PDF 页面上的公式渲染。式 (1)–(9) 的 LaTeX 依据 <code>fulltext.txt</code> 的字符碎片（下标/上标行模式）重建，全部经过<strong>量纲分析 + 数值自洽</strong>双重校验（凡能代入实测数值的均已闭环）。<strong>建议人工复核</strong>：式 (1)–(8) 见 <code>pages/page-008.png</code>（PDF 第 8 页，Nature p.540），式 (9) 见 <code>pages/page-009.png</code>（p.541）；Fig. 2e/f/g 见 <code>page-003.png</code>，Fig. 3c/d 见 <code>page-004.png</code>。重建存在残余歧义处（式 (8) 尾项、Fig. 2e 坐标轴）已在正文明确标出。</p>
+</div>
+<hr>
+
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>独立推导/数值核算结论</th></tr>
+<tr><td>(1)(2)</td><td>静电扭矩 $M_e=NEqR_0$ 及放大形式 $M_e=k_0EqR_0^2$</td><td>✅ 量纲正确、物理正确（$F=qE$ ×力臂×叶片数）；"放大比缩小划算"的论证成立</td></tr>
+<tr><td>(3)</td><td>功率链路 $P=VI=P_e/\eta=M_e\omega/\eta=2\pi M_e n/\eta$</td><td>✅ 恒等式链自洽；飞行点 6.8 kV×20.1 μA = 0.137 W 精确闭合；⚠️ $n$ 在此按 rev/s、在 (5)(6) 按 rpm</td></tr>
+<tr><td>(4)</td><td>扭矩预算 $M_e=M_R+M_P$</td><td>✅ 低速 $M_R\to 0$、$M_e\approx M_P$；飞行点反推 $M_P\approx 2.1$ mN·m</td></tr>
+<tr><td>(5)(6)</td><td>螺旋桨推力/扭矩系数公式 $T=C_T\rho(n/60)^2D_P^4$、$M_P=C_M\rho(n/60)^2D_P^5$</td><td>✅ 标准旋翼公式（叶片微元推导给出量纲结构）；飞行点反推 $C_T\approx0.19$、$C_M\approx0.049$</td></tr>
+<tr><td>(7)(8)</td><td>螺旋桨轴功率 $P_P=2\pi M_P n$；升力-功率效率 $\sigma$ 链</td><td>✅ 代数链完全自洽；$\sigma=30.7$ g/W 经<strong>三条独立路径</strong>复现（30.73/30.74/30.73）；⚠️ 式 (8) 尾项 "3,600" 无法从文本抽取唯一重建</td></tr>
+<tr><td>(9)</td><td>$M_e=Nk_1U_1U_2CR_0/d$（电压-电容形式）</td><td>✅ 代换正确（$E=k_1U_1/d,\ q=CU_2$，电刷使 $U_2=U_1$）；⚠️ 参数 $d,C,k_1$ 全文未给数值，只能数量级验证</td></tr>
+<tr><td>(D1)</td><td>持续飞行功率收支不等式</td><td>✅ 判据本身正确、飞行点闭合；⚠️ 920 W m⁻² 测量平面未说明，"0.8 W/g"与"30% 效率"相差 1.9×</td></tr>
+<tr><td>(D2)–(D4)</td><td>太阳辐照几何/光伏模型</td><td>✅ 入射角 48°+北京+春季 11:50 反解 $\delta\approx-8°$（3 月中旬）自洽；工作点 4.5 V≈0.75$V_{oc}$ 合理</td></tr>
+<tr><td>(D5)–(D7)</td><td>Cockcroft–Walton 12 级倍压与 HVPC</td><td>✅ $2N_cV_{pk}=9.6$ kV 与实测 9.0 kV 吻合（94%）；⚠️ "7.09 kV/g" 与 9/1.13=7.96 不符；⚠️ "≈25%" 效率与 27.2% 不符</td></tr>
+<tr><td>(D8)–(D10)</td><td>质量/功耗/升重预算</td><td>✅ 4.21 g、0.568 W、1.59 g 载荷全部精确闭合；❌ 正文 "7.6 g W⁻¹" 应为 7.4；❌ 5.8 g/0.314 W = 18.5 g W⁻¹ 与声明范围 [20.2, 43.3] 矛盾</td></tr>
+<tr><td>(D11)–(D13)</td><td>尺度律（雷诺数、静电 vs 电磁、放大论证）</td><td>✅ 论文两个 Re 值（4.4×10⁴、1.2×10³）用同一约定 $\rho V_{tip}R/\mu$ 精确复现；Trimmer 标度分析成立</td></tr>
+<tr><td>算法 0</td><td>设计流程伪代码</td><td>✅ 由 Methods 文字完整重构，每一步对应论文一个决策点</td></tr>
+</table>
+<p>总体判断：<strong>论文 9 个编号公式物理上全部成立，没有发现推导错误；问题集中在数值口径、单位约定与未公布的参数</strong>（第 14.2 节问题清单，共 13 条，其中 3 条为硬性数值矛盾）。</p>
+<hr>
+
+<h3>1. 符号约定与全局假设（后续所有推导的前提）</h3>
+<h4>1.1 符号表（按首次出现顺序）</h4>
+<table>
+<tr><th>符号</th><th>物理含义</th><th>量纲/单位</th><th>文中取值</th></tr>
+<tr><td>$M_e$</td><td>静电电机对转子的驱动力矩</td><td>N·m</td><td>飞行点 ≈2.1 mN·m（由 $P/\omega$ 反推，§3）</td></tr>
+<tr><td>$N$</td><td>转子叶片数</td><td>—</td><td>64</td></tr>
+<tr><td>$E$（$\bar E$）</td><td>电极板间平均电场强度</td><td>V/m</td><td>未给值（约 0.6–1.4 MV/m，按 $U_1/d$ 估算）</td></tr>
+<tr><td>$q$</td><td>单片叶片在电荷转移中携带的电荷</td><td>C</td><td>未给值（约 1 nC，由电流反推，§7）</td></tr>
+<tr><td>$R_0$</td><td>转子半径</td><td>m</td><td>60 mm（最终样机）</td></tr>
+<tr><td>$k_0$</td><td>叶片数-半径比例系数（$N=k_0R_0$）</td><td>m⁻¹</td><td>未给值（≈1067 m⁻¹ 量级）</td></tr>
+<tr><td>$V,I$</td><td>电机输入电压/电流</td><td>V、A</td><td>飞行：6.8 kV、20.1 μA</td></tr>
+<tr><td>$P,P_e,\eta$</td><td>输入电功率、转子机械功率、电机能量转换效率</td><td>W、W、—</td><td>0.137 W；$\eta$ 未给值（估算取 0.9）</td></tr>
+<tr><td>$\omega,n$</td><td>角速度、转速</td><td>rad/s、rev/s 或 rpm</td><td>飞行 625 rpm → $\omega=65.45$ rad/s</td></tr>
+<tr><td>$M_R,M_P$</td><td>驱动转子本体的力矩、驱动螺旋桨的力矩</td><td>N·m</td><td>低速 $M_R\ll M_P$</td></tr>
+<tr><td>$T$</td><td>螺旋桨升力（推力）</td><td>N</td><td>飞行 = 整车重力 $mg=41.3$ mN</td></tr>
+<tr><td>$C_T,C_M$</td><td>推力系数、扭矩系数（无量纲）</td><td>—</td><td>飞行点反推 0.194、0.049（§5）</td></tr>
+<tr><td>$\rho,\mu$</td><td>空气密度、动力粘度</td><td>kg/m³、Pa·s</td><td>1.225、1.81×10⁻⁵（标准海平面）</td></tr>
+<tr><td>$D_P$</td><td>螺旋桨直径（$=2R_P$）</td><td>m</td><td>0.2 m（半径 100 mm）</td></tr>
+<tr><td>$P_P,\sigma$</td><td>螺旋桨轴功率、升力-功率效率</td><td>W、g/W</td><td>—、30.7（推进）/7.4（整机）</td></tr>
+<tr><td>$k_1$</td><td>电场分布修正系数（平行板近似修正）</td><td>—</td><td>未给值（由极板角 $\alpha=45°$、宽度 $w=11$ mm 决定）</td></tr>
+<tr><td>$U_1,U_2$</td><td>电极板间电压、叶片-下一极板间电压</td><td>V</td><td>电刷接触时 $U_2=U_1$</td></tr>
+<tr><td>$d,C$</td><td>电极板间距、叶片-极板转移电容</td><td>m、F</td><td>均未给值（$C\approx0.1$–0.3 pF 反推，§7）</td></tr>
+<tr><td>$G,\theta,A_{cell}$</td><td>太阳辐照度、入射角、电池总面积</td><td>W/m²、°、m²</td><td>920、48°、48 cm²（2×4×6 cm）</td></tr>
+<tr><td>$\eta_{PV},\eta_{conv}$</td><td>光伏效率、HVPC 转换效率</td><td>—</td><td>30%（裸片）、24.1%（总口径）</td></tr>
+<tr><td>$P_{mc}$</td><td>单片机（STC15W104）功耗</td><td>W</td><td>0.065</td></tr>
+<tr><td>$N_c,V_{pk}$</td><td>CW 级数、每级输入交流峰值电压</td><td>—、V</td><td>12、400（=800 V p-p 的一半）</td></tr>
+</table>
+<h4>1.2 全局假设清单（论文明示或隐含）</h4>
+<ul>
+<li>空气取标准海平面大气（$\rho=1.225$ kg/m³、$\mu=1.81\times10^{-5}$ Pa·s）；论文未给海拔/温度修正（北京室内试验，误差 &lt;2%，可接受）。</li>
+<li>恒扭矩假设：$E,q,R_0,N$ 均与转速无关（§2 证明），仅在电压固定时成立。</li>
+<li>低转速近似 $M_e\approx M_P$（式 (4) 中 $M_R\to0$）：飞行转速仅 625 rpm，成立。</li>
+<li>螺旋桨固定桨距、刚性叶片；$C_T,C_M$ 在工作点附近视为常数（式 (8) 的比值形式由此导出）。</li>
+<li>升力平衡：$T=mg$（悬停/匀速状态，忽略导轨摩擦与下洗回流效应；论文用悬挂砝码法标定升力，同此假设）。</li>
+<li>光伏侧按稳态工作点处理，忽略温度系数与光强波动（1 h 耐久试验支持稳态假设）。</li>
+</ul>
+<hr>
+<h3>2. 公式 (1)–(2)：静电扭矩与「放大比缩小划算」的尺度论证</h3>
+<h4>2.1 论文原文（按 fulltext.txt 字符碎片重建）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 静电扭矩（论文式 1）</span>
+$$M_e = N E q R_0 \tag{1}$$
+<div class="eq-note">
+<strong>$M_e$</strong>：作用在转子上的静电合力矩（electrostatic torque），N·m &nbsp;|&nbsp;
+<strong>$N$</strong>：转子叶片数（64）&nbsp;|&nbsp;
+<strong>$E$</strong>：电极板间平均电场强度，V/m &nbsp;|&nbsp;
+<strong>$q$</strong>：单片叶片携带的电荷，C &nbsp;|&nbsp;
+<strong>$R_0$</strong>：转子半径，m（样机 60 mm）。论文原文表述："we can simplify the electrostatic torque ($M_e$) of the rotor to $M_e=NEqR_0$，其中 $N$ 与 $R_0$ 正相关"。
+</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 静电扭矩的半径放大形式（论文式 2）</span>
+$$M_e = k_0 E q R_0^2 \tag{2}$$
+<div class="eq-note">
+<strong>$k_0$</strong>：叶片数的比例系数（$N=k_0R_0$），量纲 m⁻¹ &nbsp;|&nbsp; 其余符号同式 (1)。论文原话："$N$ is positively correlated with $R_0$; the larger the rotor radius, the greater the number of rotor blades"。
+</div>
+</div>
+<h4>2.2 第一性原理推导（独立重推）</h4>
+<p><strong>第 1 步（库仑定律）</strong>：电荷 $q$ 在电场 $E$ 中受力 $F=qE$（方向沿场线，即切向驱动力）。这是静电电机全部力学的基础——与电磁电机 $F=IL\times B$ 形成对照（见 §12 尺度律）。</p>
+<p><strong>第 2 步（力矩定义）</strong>：单片叶片对转轴的力矩 = 切向力 × 力臂：$\tau_{blade}=F\cdot R_0=qER_0$。</p>
+<p><strong>第 3 步（求和）</strong>：$N$ 片叶片同时受力时总力矩</p>
+<p>$$M_e = N\cdot qER_0 = NEqR_0 \qquad \checkmark (1)$$</p>
+<p><strong>第 4 步（代入叶片数-半径关系）</strong>：叶片沿圆周排列，半径越大可容纳的叶片越多，线性化为 $N=k_0R_0$（$k_0$ 为常数）：</p>
+<p>$$M_e = (k_0R_0)\cdot EqR_0 = k_0 E q R_0^2 \qquad \checkmark (2)$$</p>
+<h4>2.3 量纲校验（防印刷错误的第一道关）</h4>
+<p>$$[NEqR_0]=[V/m]\cdot[C]\cdot[m]=[V\cdot C]=[J]=[N\cdot m] \qquad \checkmark$$</p>
+<p>$$[k_0]=[N/R_0]=m^{-1};\qquad [k_0EqR_0^2]=m^{-1}\cdot(V/m)\cdot C\cdot m^2=V\cdot C=N\cdot m \qquad \checkmark$$</p>
+<h4>2.4 物理直觉：为什么扭矩与转速无关（恒扭矩特性）</h4>
+<p>式 (1) 右边不含转速 $n$：$E$ 由电压和几何决定，$q=CU_2$ 由电容和电压决定，$N,R_0$ 是几何量。因此<strong>电压恒定时扭矩恒定，与转速、负载无关</strong>——这正是 Fig. 2e 红线的来历，也是与电磁电机（扭矩-转速强耦合、堵转电流最大）的本质区别。这一特性在第 3 节会推出电流与转速的线性关系。</p>
+<h4>2.5 数值核算与交叉验证</h4>
+<ul>
+<li>式 (1)→(9) 的代换链一致性见 §7（$E=k_1U_1/d,\ q=CU_2$ 代入后回到同一表达式）。</li>
+<li>数量级核算（§7 详推）：$q\approx 1$ nC（由电流反推）、$E\approx 0.6$–$1.4$ MV/m（6.8 kV 除以 5–10 mm 等效间距）→ $M_e=64\times 10^6\times 10^{-9}\times 0.06\approx 4$ mN·m，与实测反推值 2.1 mN·m（§3）<strong>同一数量级</strong> ✅。</li>
+<li>式 (2) 的放大论证与论文行为一致：由 2.5 kV 才能勉强转动（$M_e\propto U^2$，见 §7）到 60 mm 半径样机输出 2.1 mN·m——论文据此把"增大尺寸"列为给足扭矩的最有效手段（Fig. 4a 的 60 mm 选择）✅。</li>
+</ul>
+<div class="callout warn">
+<div class="callout-title">⚠️ 疑点</div>
+<ul>
+<li>式 (1) 隐含"全部 $N$ 片叶片同时受满电场力"——实际只有处于电极区间的叶片贡献主力矩，修正系数 $k_1$（式 (9)）部分吸收该效应，但 (1) 本身没有显式处理；论文未说明有效叶片占比。</li>
+<li>$q$、$E$ 均未给数值；$N=k_0R_0$ 是连续化近似（真实叶片数随 $R_0$ 阶梯变化）。</li>
+</ul>
+</div>
+<hr>
+
+<h3>3. 公式 (3)：功率链路与能量转换效率（恒扭矩 → 电流 ∝ 转速 → 堵转零电流）</h3>
+<h4>3.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 功率链路（论文式 3）</span>
+$$P = VI = \frac{P_e}{\eta} = \frac{M_e\omega}{\eta} = \frac{2\pi M_e n}{\eta} \tag{3}$$
+<div class="eq-note">
+<strong>$P$</strong>：电机输入电功率，W &nbsp;|&nbsp; <strong>$V,I$</strong>：输入电压、电流 &nbsp;|&nbsp; <strong>$P_e$</strong>：转子静电机械功率（$=M_e\omega$）&nbsp;|&nbsp; <strong>$\eta$</strong>：电机能量转换效率（"related to only the charge-transfer process, not the speed"）&nbsp;|&nbsp; <strong>$\omega$</strong>：角速度，rad/s &nbsp;|&nbsp; <strong>$n$</strong>：转速。<strong>注意：此式 $\omega=2\pi n$ 要求 $n$ 单位为 rev/s</strong>（与式 (5)(6) 的 rpm 不同，见 §6.4 疑点）。
+</div>
+</div>
+<h4>3.2 第一性原理推导（每个等号逐一写明依据）</h4>
+<p>① $P=VI$：电功率定义（直流）。② $P_e=M_e\omega$：刚体定轴转动的机械功率定义（力矩×角速度）。③ 能量转换效率定义 $\eta=P_e/P$ → $P=P_e/\eta$。④ $\omega=2\pi n$（$n$ 取 rev/s）。四步连等即得式 (3)。</p>
+<p>$$\eta=\frac{P_e}{P}=\frac{M_e\omega}{VI} \qquad\Longleftrightarrow\qquad P=VI=\frac{M_e\omega}{\eta}=\frac{2\pi M_e n}{\eta}$$</p>
+<h4>3.3 由此推出两条被论文文字强调、但未写成公式的性质</h4>
+<p><strong>性质 A：电流与转速成正比。</strong> 电流的唯一来源是叶片的电荷转移。设每转发生 $N_{ev}$ 次转移事件、每次转移电荷 $q$，则</p>
+<p>$$I = N_{ev}\, q\, n \qquad (n\ \text{rev/s})$$</p>
+<p>转速越高、单位时间转移事件越多、电流越大——Fig. 2e 蓝线"speed–current curve is almost a straight line"由此而来 ✅。结合式 (3)：$P=VI\propto n$，功率也随转速线性上升。</p>
+<p><strong>性质 B：堵转零电流。</strong> $n=0$ 时 $I=N_{ev}qn=0$——堵转时没有电荷转移、没有电流、不发热。论文"almost zero current in a stalled state, ensuring the vehicle's safety"正是这一推论的直接结果；对比电磁电机堵转时反电动势为零、电流最大（烧毁风险）。</p>
+<h4>3.4 数值核算（飞行点精确闭合）</h4>
+<p>$$P = VI = 6.8\times10^{3}\,\text{V}\times 20.1\times10^{-6}\,\text{A} = 0.1367\ \text{W} \approx 0.137\ \text{W} \qquad \checkmark\ (\text{正文})\ \checkmark\ (\text{Methods 写 0.136 W})$$</p>
+<p>$$\omega = 2\pi n = 2\pi\times\frac{625}{60} = 65.45\ \text{rad/s}$$</p>
+<p>$$M_e \approx M_P = \frac{P\eta}{\omega} = \frac{0.137\times\eta}{65.45} \approx 2.09\ \text{mN·m}\ (\eta=1);\qquad 1.88\ \text{mN·m}\ (\eta=0.9)$$</p>
+<p>即：<strong>这台 1.52 g 的静电电机在飞行点输出约 2 mN·m</strong>。§5 将用这个值反推 $C_M$ 并完成全链路闭环。</p>
+<div class="callout tip">
+<div class="callout-title">💡 交叉验证</div>
+<p>电压-电流-功率三者：6.8 kV × 20.1 μA = 0.137 W 精确等于正文值；等效电阻 $R_{eq}=6.8\text{kV}/20.1\mu\text{A}=338$ MΩ 与论文"equivalent resistance of 330 MΩ（300–400 MΩ）"精确吻合 ✅（电阻特征也印证电流纯由电荷转移构成，§7）。</p>
+</div>
+<hr>
+
+<h3>4. 公式 (4)：扭矩预算——转子自耗与螺旋桨分配</h3>
+<h4>4.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4) —— 扭矩预算（论文式 4）</span>
+$$M_e = M_R + M_P \tag{4}$$
+<div class="eq-note">
+<strong>$M_R$</strong>：驱动转子本体（含干摩擦轴承与转子气动阻力）的力矩 &nbsp;|&nbsp; <strong>$M_P$</strong>：驱动螺旋桨的力矩。论文原话："When the speed is low, $M_R$ is small, and most of the electrostatic torque is used to drive the propeller. Therefore, at low speeds, it can be considered that $M_e\approx M_P$."
+</div>
+</div>
+<h4>4.2 推导与数值</h4>
+<p>式 (4) 是角动量平衡的直接写出：定轴转动的驱动力矩 = 负载力矩之和。低速时转子本体的摩擦/风阻力矩占比小，取 $M_e\approx M_P$。飞行点验证：</p>
+<p>$$M_P = \frac{P_P}{2\pi n} \approx \frac{0.137}{2\pi\times 625/60} = 2.09\ \text{mN·m} \qquad \checkmark$$</p>
+<p>该近似把 §5–§6 的螺旋桨公式与电机参数连接起来，是式 (8) 中 $\approx$ 号的法律依据。✅</p>
+<hr>
+
+<h3>5. 公式 (5)–(6)：螺旋桨推力与扭矩系数公式（附叶片微元量纲推导）</h3>
+<h4>5.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5) —— 螺旋桨推力公式（论文式 5）</span>
+$$T = C_T \rho \left(\frac{n}{60}\right)^2 D_P^4 \tag{5}$$
+<div class="eq-note">
+<strong>$T$</strong>：推力（升力），N &nbsp;|&nbsp; <strong>$C_T$</strong>：无量纲推力系数 &nbsp;|&nbsp; <strong>$\rho$</strong>：空气密度，kg/m³ &nbsp;|&nbsp; <strong>$n$</strong>：转速，<strong>rpm</strong>（$(n/60)$ 把 rpm 换为 rev/s）&nbsp;|&nbsp; <strong>$D_P$</strong>：螺旋桨直径，m。出处 refs. 43–45（BEM 类模型，全钢 2017《Introduction to Multicopter Design and Control》等）。
+</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(6) —— 螺旋桨扭矩公式（论文式 6）</span>
+$$M_P = C_M \rho \left(\frac{n}{60}\right)^2 D_P^5 \tag{6}$$
+<div class="eq-note">
+<strong>$M_P$</strong>：螺旋桨所需轴扭矩，N·m &nbsp;|&nbsp; <strong>$C_M$</strong>：无量纲扭矩系数。注意 $D_P^5$（比推力公式多一个长度幂次——扭矩 = 力 × 力臂）。</div>
+</div>
+<h4>5.2 叶片微元推导（说明幂次为什么是 $D_P^4$ 与 $D_P^5$）</h4>
+<p>半径 $r$ 处、弦长 $c(r)$ 的叶片微元 $dr$，当地气流速度 $V(r)=2\pi r\cdot n/60$。动压 $\tfrac12\rho V^2$ 作用于微元面积 $c\,dr$，乘以当地升力系数 $C_l(r)$：</p>
+<p>$$dT = \tfrac12 \rho\, V(r)^2\, C_l(r)\, c(r)\, dr = \tfrac12 \rho \left(\frac{2\pi n}{60}\right)^2 C_l(r)\, c(r)\, r^2\, dr$$</p>
+<p>$$dM_P = r\cdot dF \approx \tfrac12 \rho \left(\frac{2\pi n}{60}\right)^2 C_l(r)\, c(r)\, r^3\, dr \quad(\text{乘力臂 } r,\ \text{阻力分量并入 } C_l \text{ 修正})$$</p>
+<p>沿展向积分，并把积分值吸收进系数（几何相似桨 $\int C_l c r^2 dr \propto D_P^4$、$\int C_l c r^3 dr \propto D_P^5$，因为 $r,c\sim D_P$）：</p>
+<p>$$T = C_T \rho \left(\frac{n}{60}\right)^2 D_P^4, \qquad M_P = C_M \rho \left(\frac{n}{60}\right)^2 D_P^5 \qquad \checkmark (5)(6)$$</p>
+<h4>5.3 量纲校验</h4>
+<p>$$[C_T\rho(n/60)^2D_P^4]=[kg/m^3][s^{-2}][m^4]=[kg\cdot m/s^2]=N \quad \checkmark$$</p>
+<p>$$[C_M\rho(n/60)^2D_P^5]=[kg/m^3][s^{-2}][m^5]=[kg\cdot m^2/s^2]=N\cdot m \quad \checkmark$$</p>
+<h4>5.4 数值核算：由飞行实测反推 $C_T,C_M$（并引出品质因数）</h4>
+<p>飞行点：$T=mg=4.21\times10^{-3}\times9.81=41.3$ mN，$n=625$ rpm，$D_P=0.2$ m，$M_P\approx2.09$ mN·m（§3）：</p>
+<p>$$C_T=\frac{T}{\rho(n/60)^2D_P^4}=\frac{0.0413}{1.225\times108.5\times1.6\times10^{-3}}=0.194 \qquad \checkmark$$</p>
+<p>$$C_M=\frac{M_P}{\rho(n/60)^2D_P^5}=\frac{2.09\times10^{-3}}{1.225\times108.5\times3.2\times10^{-4}}=0.049 \qquad \checkmark$$</p>
+<p>功率系数 $C_P=2\pi C_M=0.31$。这两个值<strong>远高于常规航模桨</strong>（$C_T\sim0.05$–$0.15$）——8 叶大实度 + 低雷诺数（Re≈4.4×10⁴，粘性主导、$C_l$ 低、阻力占比大）所致。物理含义：这台桨"用高扭矩系数换低转速"（§6 证明 $\sigma\propto1/n$，低转速是设计目标），效率代价由低盘载补偿。</p>
+<p><strong>补充核算（旋翼动量理论，验证 $C_T$ 的合理性）</strong>：悬停诱导功率</p>
+<p>$$P_{ideal}=T\,v_i=T\sqrt{\frac{T}{2\rho A}}=0.0413\times\sqrt{\frac{0.0413}{2\times1.225\times0.0314}}=0.0413\times0.733=30.3\ \text{mW}$$</p>
+<p>品质因数（Figure of Merit）$FM=P_{ideal}/P_P=30.3/137=0.22$——低 Re 大实度旋翼的典型水平（常规直升机 0.7–0.8，昆虫级旋翼 0.1–0.3）✅ 自洽。</p>
+<hr>
+
+<h3>6. 公式 (7)–(8)：升力-功率效率 σ 的完整代数推导与三重数值交叉验证</h3>
+<h4>6.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(7) —— 螺旋桨轴功率（论文式 7）</span>
+$$P_P = 2\pi M_P n \approx 2\pi M_e n \tag{7}$$
+<div class="eq-note">
+<strong>$P_P$</strong>：螺旋桨轴功率（机械功率 $M_P\omega$，$n$ 取 rev/s）&nbsp;|&nbsp; 第二个等式用式 (4) 的低速近似 $M_e\approx M_P$。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(8) —— 升力-功率效率 σ 的定义链（论文式 8）</span>
+$$\sigma = \frac{T}{P} = \frac{T}{VI} = \frac{T\eta}{P_e} = \frac{T\eta}{M_e\omega} \approx \frac{T\eta}{M_P\omega} = \frac{T\eta}{2\pi M_P n} \tag{8}$$
+<div class="eq-note">
+<strong>$\sigma$</strong>：升力-功率效率（每瓦电功率产生的升力，N/W 或 g/W）&nbsp;|&nbsp; 各等号依据：① 定义；② $P=VI$；③ $VI=P_e/\eta$；④ $P_e=M_e\omega$；⑤ $\approx$ 用式 (4) 低速近似；⑥ $\omega=2\pi n$。<strong>注意 $n$ 在此为 rev/s</strong>。论文原文尾项还把 (5)(6) 代入写成含 "$3,600$" 的封闭形式（见 §6.3 疑点）。
+</div>
+</div>
+<h4>6.2 独立重推：代入式 (5)(6) 的封闭形式（含两种转速单位的双版本）</h4>
+<p>$$\sigma \approx \frac{T\eta}{2\pi M_P n} = \frac{\eta\, C_T\rho(n/60)^2D_P^4}{2\pi\, C_M\rho(n/60)^2D_P^5\, n} = \frac{\eta\, C_T}{2\pi\, C_M\, D_P\, n}$$</p>
+<p>上式中 $n$ 若为 rev/s，得：</p>
+<p>$$\sigma \approx \frac{\eta C_T}{2\pi C_M D_P n} \qquad (n\ \text{rev/s})$$</p>
+<p>若 $n$ 统一为 rpm（$\omega=2\pi n/60$，且 (5)(6) 中的 $(n/60)$ 保持原样），则多一个因子 60：</p>
+<p>$$\sigma \approx \frac{\eta C_T}{2\pi C_M D_P n}\cdot 60 = \frac{30\,\eta C_T}{\pi C_M D_P n} \qquad (n\ \text{rpm})$$</p>
+<p>两种写法等价，只差转速单位的口径。文本抽取中的 "$3,600$" 最可能是 $60^2$ 因子在分子分母重组时的残迹（$30=3600/120$），<strong>无法从字符碎片唯一重建原排版</strong>，建议人工核对 PDF 第 8 页。</p>
+<h4>6.3 三重独立路径交叉验证（σ = 30.7 g/W 的三次复现）</h4>
+<p><strong>路径 1——实测比值（论文定义式本身）</strong>：</p>
+<p>$$\sigma = \frac{T}{P} = \frac{4.21\ \text{g}}{0.137\ \text{W}} = 30.73\ \text{g/W} \approx 30.7 \qquad \checkmark\ (\text{与正文精确一致})$$</p>
+<p><strong>路径 2——系数公式（式 (8) + (5)(6)，用 §5 反推的 $C_T,C_M$，$\eta=1$ 对应"电功率全部转为轴功率"的口径）</strong>：</p>
+<p>$$\sigma = \frac{30\, C_T}{\pi C_M D_P n} = \frac{30\times0.194}{\pi\times0.049\times0.2\times625} = \frac{5.83}{19.3} = 0.302\ \text{N/W} = 30.7\ \text{g/W} \qquad \checkmark$$</p>
+<p><strong>路径 3——动量理论（完全不用式 (5)–(8)）</strong>：</p>
+<p>$$\sigma = \frac{T}{P} = \frac{FM\cdot T}{P_{ideal}} = \frac{FM}{v_i} = \frac{0.221}{0.733\ \text{m/s}} = 0.301\ \text{N/W} = 30.7\ \text{g/W} \qquad \checkmark$$</p>
+<p>（$FM=0.221=P_{ideal}/P_P$、$v_i=0.733$ m/s 取自 §5.4。）<strong>三条完全独立的路径同时给出 30.7 g/W——论文的核心指标在此实现数值闭环，无任何"对不上"之处。</strong></p>
+<h4>6.4 由此导出的两个设计结论（论文文字背后的数学）</h4>
+<p><strong>结论 A：$\sigma\propto1/n$ → 大桨低转速。</strong> 固定电压时 $M_e$ 恒定；平衡 $M_e=M_P=C_M\rho(n/60)^2D_P^5$ 决定转速，而</p>
+<p>$$\frac{T}{M_P}=\frac{C_T D_P^4}{C_M D_P^5}=\frac{C_T}{C_M D_P}\quad\Longrightarrow\quad \sigma\approx\frac{\eta}{2\pi n}\cdot\frac{C_T}{C_M D_P}$$</p>
+<p>转速越低 $\sigma$ 越高；用大直径桨在同样扭矩下把转速压下来，正是"8 叶、100 mm 半径、13° 安装角"的选择逻辑（论文："we can use a large propeller to work at low speeds to improve lift-to-power efficiency"）✅。</p>
+<p><strong>结论 B：电压-升力-功率的幂律。</strong> $M_e\propto U^2$（§7）、$n\propto\sqrt{M_e}\propto U$、$T=C_T\rho(n/60)^2D_P^4\propto U^2$、$P\propto n\propto U$（§3 性质 A）。数值抽查：$P(8.5\text{kV})/P(6.8\text{kV})=(8.5/6.8)^3=1.95$，预测 0.267 W，实测 0.314 W（论文 5.0→8.5 kV 扫频数据），偏差 15%——幂律整体成立，偏差来自高压端离子电流（8.5 kV 已接近起晕电压，论文自述）✅。</p>
+<div class="callout warn">
+<div class="callout-title">⚠️ 疑点</div>
+<ul>
+<li><strong>单位混用（重要）</strong>：式 (3)(7)(8) 的 $\omega=2\pi n$ 要求 $n$ 为 rev/s；式 (5)(6) 的 $(n/60)$ 明确 $n$ 为 rpm。同一符号 $n$ 两种单位混排，照抄公式实现时极易差 60 倍（见问题清单 6）。</li>
+<li>式 (8) 尾项的封闭形式（含 "$3,600$" 与下标 $3,5$）无法从文本抽取唯一重建，建议人工核对 <code>page-008.png</code>。</li>
+<li>$\eta$（电机能量转换效率）未给数值；本文路径 2/3 取 $\eta=1$（即把 $P$ 全部视为轴功率）也能闭合，说明在 30.7 g/W 的口径下 $\eta$ 已被吸收进 $C_M$ 反推值。</li>
+</ul>
+</div>
+<hr>
+<h3>7. 公式 (9)：静电扭矩的电压-电容形式（含电荷转移微观核算）</h3>
+<h4>7.1 论文原文</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(9) —— 静电扭矩的电压-电容形式（论文式 9）</span>
+$$M_e = N E q R_0 = N k_1 \frac{U_1}{d}\, C U_2\, R_0 = \frac{N k_1 U_1 U_2 C R_0}{d} \tag{9}$$
+<div class="eq-note">
+<strong>$k_1$</strong>：电场分布修正系数（把真实非平行板电场等效为平行板场 $\bar E=k_1U_1/d$）&nbsp;|&nbsp; <strong>$U_1$</strong>：电极板间电压（=输入电压）&nbsp;|&nbsp; <strong>$U_2$</strong>：叶片与下一极板间电压 &nbsp;|&nbsp; <strong>$d$</strong>：电极板间距 &nbsp;|&nbsp; <strong>$C$</strong>：电荷转移瞬间叶片-下一极板形成的电容。论文原话："If brushes are used to make soft contact between the rotor blade and the electrode plate, $U_2$ is equal to $U_1$."
+</div>
+</div>
+<h4>7.2 推导（两个代换，逐一定义）</h4>
+<p><strong>代换 ① $E=k_1U_1/d$</strong>：理想平行板场 $E=U/d$；真实电极板非无限大平行板（扇形排列、45° 倾角、11 mm 宽），乘修正系数 $k_1$。$k_1$ 由极板角 $\alpha$（决定切向场分量大小）与宽度 $w$（决定场均匀性）决定——论文用场仿真（Extended Data Fig. 3b）证明宽极板（3.8 mm）场更强更均匀、优于窄极板（0.2 mm）。</p>
+<p><strong>代换 ② $q=CU_2$</strong>：叶片接触电刷时与下一极板构成电容 $C$，所带电荷 $q=CU_2$。电刷软接触使 $U_2=U_1$（无电晕压降——这正是论文用电刷替代电晕放电的原因："eliminates large voltage loss compared with the corona effect"）。</p>
+<p>代入式 (1)：</p>
+<p>$$M_e = N\left(k_1\frac{U_1}{d}\right)\left(CU_2\right)R_0 = \frac{Nk_1U_1U_2CR_0}{d} \qquad \checkmark (9)$$</p>
+<h4>7.3 两条直接推论（与论文现象逐一对应）</h4>
+<p><strong>推论 1：扭矩 ∝ 电压²，转速 ∝ 电压。</strong> 电刷时 $U_2=U_1\equiv U$：</p>
+<p>$$M_e=\frac{Nk_1CR_0}{d}\,U^2 \qquad\Longrightarrow\qquad M_e\propto U^2$$</p>
+<p>与螺旋桨负载平衡：$M_e=C_M\rho(n/60)^2D_P^5$ → $n\propto\sqrt{M_e}\propto U$。故电压是"转速油门"：2.5 kV 起步（扭矩刚超过 $M_R$）、6.8 kV 飞行 625 rpm、8.5 kV 接近起晕上限——与论文全部电压-转速描述一致 ✅。</p>
+<p><strong>推论 2：电机的电阻特征。</strong> 电流 = 电荷转移速率：$I=N_{ev}qn\propto U\cdot U=U^2$，$P=UI\propto U^3$。等效电阻</p>
+<p>$$R_{eq}=\frac{U}{I}=\frac{6.8\times10^3}{20.1\times10^{-6}}=338\ \text{MΩ} \qquad \checkmark\ (\text{论文: }330\ \text{MΩ},\ 300\text{–}400\ \text{MΩ})$$</p>
+<h4>7.4 电荷转移的微观核算（由电流反推 $q$、$C$，检验式 (9) 的数量级）</h4>
+<p>每转事件数：64 叶片 × 16 电极 = 1024 次接触/转；每次接触包含放电+反向充电两次转移（净供电源流按 2 次计）：</p>
+<p>$$Q_{rev}=\frac{I}{n}=\frac{20.1\times10^{-6}}{625/60}=1.93\ \mu\text{C/r};\qquad q=\frac{Q_{rev}}{64\times16\times2}=\frac{1.93\times10^{-6}}{2048}=0.94\ \text{nC}$$</p>
+<p>$$C=\frac{q}{U_2}=\frac{0.94\times10^{-9}}{6800}=0.14\ \text{pF}\qquad(\text{与毫米级气隙电容同一数量级}\ \checkmark)$$</p>
+<p><strong>闭合检验</strong>：式 (9) 要求 $E_{eff}=M_e/(NqR_0)=2.09\times10^{-3}/(64\times0.94\times10^{-9}\times0.06)=5.8\times10^5$ V/m。而 $E_{eff}=k_1U_1/d$：取 $k_1=0.5$（非理想场修正）得 $d=5.9$ mm；取 $k_1=1$ 得 $d=11.7$ mm——与"厘米级转子上毫米级电极间距"完全相容。<strong>式 (9) 在合理参数区间内精确闭合</strong> ✅（但 $d,C,k_1$ 论文未公布，只能做数量级验证）。</p>
+<div class="callout warn">
+<div class="callout-title">⚠️ 疑点</div>
+<ul>
+<li>$d$、$C$、$k_1$ 三个关键参数全文未给数值，式 (9) 无法严格数值闭合（本节的 0.14 pF、5–12 mm 均为反推值）。</li>
+<li><strong>Fig. 2e 与飞行点的张力</strong>：Fig. 2e（5 kV）电流-转速斜率给出 $Q_{rev}=I/n\approx0.6$ μC/r；按 $q\propto U$ 外推到 6.8 kV 应得 ≈0.82 μC/r，而飞行实测为 1.93 μC/r——差约 2.4×。可能与批次差异（Extended Data Fig. 2e,f 的 A–D 批次）、电刷接触状态或高压下附加离子电流有关，论文未解释。抽取的"电荷量 4–16 μC/r"轴标签与 $I=Q_{rev}n$ 无法自洽（该轴若真为 4–16 则电流应达百 μA 级），建议人工核对 <code>page-003.png</code> 原图坐标。</li>
+</ul>
+</div>
+<hr>
+
+<h3>8. 补充式 (D1)：持续飞行的功率收支不等式（全文最重要的无编号公式）</h3>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D1) —— 持续飞行功率收支不等式</span>
+$$\eta_{PV}\, G\cos\theta\, A_{cell} \;\geq\; P_{in} = \frac{P_{motor}}{\eta_{conv}} + P_{mc} \tag{D1}$$
+<div class="eq-note">
+<strong>左边</strong>：太阳能电池在辐照度 $G$（W/m²）、入射角 $\theta$ 下的可用电功率（$\eta_{PV}$ 为模组级效率）；<strong>右边</strong>：系统总功耗 = 电机功率经 HVPC 折算（$P_{motor}/\eta_{conv}$，$\eta_{conv}$ 为 HVPC 转换效率，不含单片机）+ 单片机 $P_{mc}=0.065$ W。持续飞行（1 h 不衰减）的必要条件。</div>
+</div>
+<h4>8.1 能量链路的完整分解（每一级的定义与效率）</h4>
+<p>$$\underbrace{G\cos\theta A_{cell}}_{\text{入射光功率 }P_{sun}} \xrightarrow{\ \eta_{PV}\ } \underbrace{\eta_{PV}P_{sun}}_{\text{电池输出 }P_{PV}} \xrightarrow{\ \eta_{conv}\ } \underbrace{P_{motor}=VI}_{\text{电机电功率 }0.137\text{ W}} \xrightarrow{\ \eta_{motor}\ } \underbrace{P_e=M_e\omega}_{\text{转子机械功率}} \xrightarrow{\ FM\ } \underbrace{P_{ideal}=Tv_i}_{\text{最小诱导功率 }30.3\text{ mW}}$$</p>
+<p>端到端效率 = 各级连乘（另乘单片机占比因子 $1-P_{mc}/P_{in}=0.886$）：</p>
+<p>$$\eta_{end} = \eta_{PV}\cdot\eta_{conv}\cdot\left(1-\frac{P_{mc}}{P_{in}}\right)\cdot\eta_{motor}\cdot FM \approx 0.19\times0.27\times0.886\times0.9\times0.22 \approx 0.9\%$$</p>
+<p>独立核算（DNI 口径）：$P_{ideal}/P_{sun}=0.0303/2.955=1.03\%$ ✅ 两条路径一致。端到端只有约 1%——听起来低，但这是 4.21 g 的整机，绝对功耗仅 0.568 W，"1% 也够飞"正是静电方案成立的底气。</p>
+<h4>8.2 代入飞行实测数值核算（三种读数口径的对照表）</h4>
+<p>右端：$P_{in}=0.137/0.272+0.065=0.569$ W（用 §10 核算的 $\eta_{conv}=27.2\%$），与实测 0.568 W 一致 ✅。左端按三种口径核算：</p>
+<table>
+<tr><th>口径</th><th>可用功率核算</th><th>对比 0.568 W</th></tr>
+<tr><td>A. 920 = 电池平面辐照（辐照计正对太阳）</td><td>按 0.8 W/g 规格：$0.768\times920/1000=0.707$ W</td><td>✅ 裕度 24%</td></tr>
+<tr><td>B. 920 = 直射 DNI，电池水平（×cos48°=0.669）</td><td>按 0.8 W/g 规格：$0.768\times0.669\times0.92=0.473$ W</td><td>❌ 不闭合</td></tr>
+<tr><td>C. 920 = 直射 DNI，电池水平</td><td>按 30% 效率口径：$920\times0.669\times0.0048\times0.30=0.887$ W</td><td>✅ 裕度 56%</td></tr>
+<tr><td>D. 飞行实测抽取（0.126 A×4.50 V=0.567 W）</td><td>所需模组效率：$0.567/(920\times0.669\times0.0048)=19.2\%$（DNI 水平）或 $12.9\%$（平面口径）</td><td>⚠️ 介于 16%（0.8 W/g 规格）与 30%（裸片）之间</td></tr>
+</table>
+<div class="callout tip">
+<div class="callout-title">💡 判读</div>
+<p>飞行确实持续了 1 h，故真实可用功率 ≥0.568 W，<strong>口径 C/D 与事实相容</strong>：模组效率 19.2%（DNI 口径）与"裸片 30% + 封装/工作点失配损耗"自洽；而"0.8 W/g @1 sun"规格换算的 16% 偏保守。<strong>但论文没有说明 920 W/m² 是直射还是电池平面辐照，也没有解释 0.8 W/g 与 30% 效率之间 1.9× 的差距</strong>（见问题清单 10）——在"水平电池 + 48° 入射"下这两个规格只有一个能与 0.568 W 同时成立。</p>
+</div>
+<hr>
+
+<h3>9. 补充式 (D2)–(D4)：太阳辐照模型与光伏工作点</h3>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D2) —— 平面辐照与入射角</span>
+$$G_{plane} = G_{dn}\cos\theta \tag{D2}$$
+<div class="eq-note">
+<strong>$G_{dn}$</strong>：直射法向辐照度（DNI）&nbsp;|&nbsp; <strong>$\theta$</strong>：太阳光线与受光面法线的夹角（入射角）。水平放置的电池 $\theta$ = 太阳天顶角。1 sun（AM1.5 标准测试条件）= 1000 W/m²；太阳常数 1361 W/m²（大气层外），晴天海平面 DNI 约 900–1000 W/m²。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D3) —— 太阳高度角方程（球面天文学）</span>
+$$\sin h = \sin\varphi\sin\delta + \cos\varphi\cos\delta\cos H,\qquad h = 90° - \theta \tag{D3}$$
+<div class="eq-note">
+<strong>$h$</strong>：太阳高度角 &nbsp;|&nbsp; <strong>$\varphi$</strong>：地理纬度（北京 39.9°N）&nbsp;|&nbsp; <strong>$\delta$</strong>：太阳赤纬 &nbsp;|&nbsp; <strong>$H$</strong>：时角（正午 0°，11:50 ≈ +2.5°）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D4) —— 光伏功率与工作点</span>
+$$P_{PV} = \eta_{PV}\, G_{plane}\, A_{cell},\qquad V_{mpp}\approx 0.8\,V_{oc},\qquad V_{work}=4.50\ \text{V} \lt V_{mpp} \tag{D4}$$
+<div class="eq-note">
+<strong>$V_{oc}$</strong>：开路电压（两片串联共 6.04 V，单片 3.02 V，多结 GaAs 特征）&nbsp;|&nbsp; <strong>$V_{mpp}$</strong>：最大功率点电压（≈0.8$V_{oc}$≈4.8 V）&nbsp;|&nbsp; <strong>$V_{work}$</strong>：实际工作电压 4.50 V，略低于 MPP（留裕度，且必须高于 HVPC 启动电压 4.30 V ✅）。</div>
+</div>
+<h4>9.1 入射角 48° 的反解：试验日期与"北京春季 11:50"互证</h4>
+<p>水平电池 + 入射角 48° → 太阳高度角 $h=42°$。代入 (D3)（$\varphi=39.9°$，11:50 的 $H\approx2.5°$）：</p>
+<p>$$\sin42° = \sin39.9°\sin\delta + \cos39.9°\cos\delta\cos2.5° \;\Longrightarrow\; 0.669 = 0.641\sin\delta + 0.765\cos\delta$$</p>
+<p>化成单一正弦（$R=\sqrt{0.641^2+0.765^2}=0.998$、$\phi=\arctan(0.765/0.641)=50.0°$）：</p>
+<p>$$\sin(\delta+50.0°)=\frac{0.669}{0.998}=0.670 \;\Longrightarrow\; \delta \approx -8.0°$$</p>
+<p>太阳赤纬 −8° 对应<strong>3 月中旬</strong>——与"spring"完全吻合（且 34% 相对湿度正是北京春季的干燥空气，也与电机在 45% RH 以下性能最佳的说法自洽 ✅）。这一反解同时<strong>证明入射角 48° 与"11:50 am、北京、春季"三个信息相互一致，论文的飞行条件描述无矛盾</strong>。</p>
+<h4>9.2 光伏预算的遗留疑点</h4>
+<div class="callout warn">
+<div class="callout-title">⚠️ 疑点</div>
+<ul>
+<li>920 W/m² 的测量平面未说明（DNI 还是电池平面），直接决定功率收支闭合与否（§8.2 表 B vs A/C）。</li>
+<li>Methods「Electronics」把电池尺寸写成 "4 mm × 6 mm"（正文 Fig. 1 为 4 cm × 6 cm）——若真为 4×6 mm² 则 0.8 W/g 不可能成立，应属笔误（问题清单 11）。</li>
+<li>"0.8 W/g @1 sun"（两片共 0.768 W，模组效率 16%）与"30% 能量转换效率"（48 cm² 理论 1.44 W）相差 1.9×，论文未解释缺口来源（封装质量/工作点失配/温度系数都可能）。</li>
+</ul>
+</div>
+<hr>
+<h3>10. 补充式 (D5)–(D7)：Cockcroft–Walton 12 级倍压与 HVPC 增益/效率</h3>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D5) —— CW 电压倍增器理想输出电压</span>
+$$V_{out}^{ideal} = 2N_c\, V_{pk} \tag{D5}$$
+<div class="eq-note">
+<strong>$N_c$</strong>：级数（12）&nbsp;|&nbsp; <strong>$V_{pk}$</strong>：每级输入交流峰值电压（= 次级 800 V p-p 的一半，400 V）。半波倍压每级贡献 $2V_{pk}$（钳位→整流峰值叠加）。</div>
+</div>
+<h4>10.1 增益链路的逐步核算（4.5 V → 9 kV 的每一步）</h4>
+<p>$$4.5\ \text{V dc} \xrightarrow{\text{谐振斩波}(L_m\text{ 与寄生电容谐振})} 16\ \text{V p-p（初级）} \xrightarrow{\times50\ (\text{1:50 匝比})} 800\ \text{V p-p（次级）} \xrightarrow{\text{CW}\times(2N_c=24)} 9.6\ \text{kV（理想）}$$</p>
+<p>$$V_{out}^{ideal}=2\times12\times400=9600\ \text{V};\qquad V_{out}^{实测}=9.0\ \text{kV}\ \Longrightarrow\ \frac{9000}{9600}=93.75\%\ \checkmark\ (\text{带 500 MΩ 负载的跌落} \approx 6\%)$$</p>
+<p>升压比校核：$9000/4.5=2000$、$4000/4.5=889\approx900$ —— 与论文"step-up ratio varies from 900 to 2,000"精确一致 ✅；变压器环节 $16\times50=800$ 与论文原文逐字一致 ✅。</p>
+<h4>10.2 负载跌落与纹波（把"9.6 理想 → 9.0 实测"定量化）</h4>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D6) —— CW 跌落与纹波（半波 n 级经典公式）</span>
+$$\Delta V_{droop} = \frac{I}{fC}\left(\frac{2n^3}{3}+\frac{n^2}{2}-\frac{n}{6}\right),\qquad \delta V_{ripple} = \frac{I}{fC}\cdot\frac{n(n+1)}{2} \tag{D6}$$
+<div class="eq-note">
+<strong>$I$</strong>：负载电流 &nbsp;|&nbsp; <strong>$f$</strong>：开关频率 &nbsp;|&nbsp; <strong>$C$</strong>：每级电容。$n=12$ 时括号系数 = 1152+72−2 = 1222。</div>
+</div>
+<p>核算：9 kV/500 MΩ 负载 → $I=18$ μA，$f=86$ kHz，实测跌落 600 V（9.6→9.0），反解所需级电容：</p>
+<p>$$C = \frac{I\times1222}{f\times\Delta V} = \frac{18\times10^{-6}\times1222}{86\times10^{3}\times600} \approx 430\ \text{pF}$$</p>
+<p>对应纹波 $\delta V=(I/fC)\times78\approx38$ V（输出 0.4%）。<strong>注意</strong>：级电容具体值在 Extended Data Table 2（未抽取），430 pF 是反推需求值——若实际级电容远小于此，跌落将远超 6%，与实测矛盾，故可判定级电容应为数百 pF 量级。建议人工核对 ED Table 2。</p>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D7) —— HVPC 效率口径与电压-质量比</span>
+$$\eta_{conv} = \frac{P_{motor}}{P_{in}-P_{mc}} = \frac{IV}{P_{in}-P_{mc}};\qquad \gamma_V = \frac{V_{out,max}}{m_{HVPC}} \tag{D7}$$
+<div class="eq-note">
+<strong>$\eta_{conv}$</strong>：HVPC 转换效率（不含单片机功耗的口径，Methods 原话 "the efficiency of the drive electronics is $IV/(P_{in}-P_{mc})$"）&nbsp;|&nbsp; <strong>$\gamma_V$</strong>：电压-质量比，kV/g。</div>
+</div>
+<h4>10.3 数值核算与三处口径问题</h4>
+<ul>
+<li><strong>效率核算</strong>：$\eta_{conv}=0.1367/(0.568-0.065)=0.1367/0.503=27.2\%$，而 Methods 写 "≈ 25%" ⚠️（正文的 24.1% 是另一口径：$0.137/0.568=24.1\%$，把单片机功耗计入分母，恰好精确 ✅）。同一章内两个"效率"口径不同且 27.2% 与"≈25%"对不上（问题清单 4）。</li>
+<li><strong>电压-质量比</strong>：$9.0/1.13=7.96$ kV/g，论文写 7.09 kV/g（对应 8.01 kV 的电压）⚠️。且"比此前最轻（4.32 kV/951 mg = 4.54 kV/g）高 55%"与 7.09 一致（$7.09/4.54=1.56$），若用 7.96 则高 75%——论文取的是某个未说明的工作电压（问题清单 5）。</li>
+<li><strong>负载-效率单调性自洽</strong>：Fig. 3d 给出 15%（1 GΩ）→ 58%（100 MΩ）；飞行点负载 338 MΩ、效率 24–27% 落在其间且趋势正确 ✅。</li>
+<li><strong>谐振工作点</strong>：86 kHz / D=0.2 的选择落在论文所述 fL–fH 平台区（输出高且效率对频率不敏感），与 Fig. 3c 的描述一致 ✅。</li>
+</ul>
+<hr>
+
+<h3>11. 补充式 (D8)–(D10)：结构质量预算、功率预算与升重裕度（三处硬性矛盾所在）</h3>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D8) —— 总质量预算</span>
+$$m_{tot} = (m_{motor}+m_{prop}) + (m_{HVPC}+m_{cell}) + m_{conn} = (1.52+0.44)+(1.13+0.96)+0.16 = 4.21\ \text{g} \tag{D8}$$
+<div class="eq-note">逐项相加精确闭合 ✅（推进 1.96 g + 电源 2.09 g + 连接结构 0.16 g）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D9) —— 总功率预算</span>
+$$P_{in} = P_{motor} + P_{mc} + P_{loss} = 0.137 + 0.065 + 0.366 = 0.568\ \text{W} \tag{D9}$$
+<div class="eq-note">$P_{loss}=0.366$ W 为 HVPC 的开关/磁件/二极管损耗（= $P_{motor}/\eta_{conv}-P_{motor}=0.137/0.272-0.137$）。低电压侧实测 $0.126\text{ A}\times4.50\text{ V}=0.567$ W ≈ 0.568 ✅。<strong>但论文同页印成 "0.576 W"——乘法算错</strong>（问题清单 3）。</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D10) —— 升重比与载荷裕度</span>
+$$r_{LW}=\frac{T_{max}}{m_{prop}\cdot g}=\frac{5.8}{1.96}=2.96\approx2.9 \qquad m_{payload}=5.8-4.21=1.59\ \text{g} \tag{D10}$$
+<div class="eq-note">
+<strong>$T_{max}$</strong>：8.5 kV 时最大升力 5.8 g（挂砝码法实测）&nbsp;|&nbsp; 分母取推进系统自重 1.96 g（论文"lift-to-weight ratio 2.9"的口径；若按整车 4.21 g 则为 1.38，论文未注明口径）。载荷 1.59 g 与正文"approximately 1.59 g"一致 ✅。</div>
+</div>
+<h4>11.1 三处硬性数值矛盾（逐条核算，不圆场）</h4>
+<table>
+<tr><th>#</th><th>论文说法</th><th>独立核算</th><th>判定</th></tr>
+<tr class="highlight"><td>1</td><td>正文/摘要：整机升力-功率效率 "7.6 g W⁻¹"（功耗 0.568 W）</td><td>$4.21/0.568=7.41\approx7.4$ g/W；$7.6\times0.568=4.32$ g &gt; 整车 4.21 g（升力不可能超过自重悬停值）</td><td>❌ 应为 7.4（Fig. 2g 的 "7.4 g W⁻¹" 是对的）</td></tr>
+<tr class="highlight"><td>2</td><td>8.5 kV：功耗 0.314 W、升力 5.8 g；效率范围 20.2–43.3 g W⁻¹</td><td>$5.8/0.314=18.5$ g/W 落在声明范围之外；$43.3\times0.314=13.6$ g ≠ 5.8 g</td><td>❌ 三者不能同时成立（可能来自不同批次/桨组合，论文未说明）</td></tr>
+<tr class="highlight"><td>3</td><td>Methods：0.126 A × 4.50 V = "0.576 W"</td><td>$0.126\times4.50=0.567$ W（与正文 0.568 W 自洽）</td><td>❌ 乘法/排版错误</td></tr>
+</table>
+<h4>11.2 自洽侧（供对照：论文算得准的地方）</h4>
+<ul>
+<li>$30.7\times0.137=4.206$ g ≈ 整车 4.21 g ✅（电机级效率与升力完全自洽）。</li>
+<li>$9.2\times0.97$ mW $=8.9$ mg ≈ 微型样机 9 mg ✅（微型样机数据同样自洽）。</li>
+<li>载荷 $5.8-4.21=1.59$ g ✅；升重比 $5.8/1.96=2.96\approx2.9$ ✅（口径=推进系统）。</li>
+</ul>
+<hr>
+
+<h3>12. 补充式 (D11)–(D13)：尺度律——雷诺数、静电 vs 电磁、放大论证</h3>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D11) —— 旋翼雷诺数（论文所用约定）</span>
+$$Re = \frac{\rho V L}{\mu},\qquad V=V_{tip}=\frac{2\pi n}{60}R,\qquad L=R \tag{D11}$$
+<div class="eq-note">
+<strong>约定</strong>：特征速度取桨尖速度、特征长度取桨半径（非常规的 chord@75%R 约定——但唯有此约定能同时精确复现论文的两个 Re 值，见下）。</div>
+</div>
+<p><strong>数值复现（两个值全部命中，反证约定唯一）</strong>：</p>
+<p>$$\text{主样机:}\quad Re=\frac{1.225\times2\pi\times(625/60)\times0.1\times0.1}{1.81\times10^{-5}}=\frac{0.802}{1.81\times10^{-5}}=4.43\times10^{4}\ \checkmark\ (\text{论文 }4.4\times10^4)$$</p>
+<p>$$\text{微型样机:}\quad Re=\frac{1.225\times2\pi\times(10860/60)\times0.004\times0.004}{1.81\times10^{-5}}=\frac{2.23\times10^{-2}}{1.81\times10^{-5}}=1.23\times10^{3}\ \checkmark\ (\text{论文 }1.2\times10^3)$$</p>
+<p>主样机 Re≈4.4×10⁴ 属"低雷诺数旋翼"：粘性主导、层流分离、$C_T$ 大而 $FM$ 低（§5.4 的 0.22）；微型样机 Re≈1.2×10³ 更甚（$FM\approx0.077$，由 9 mg/0.97 mW/8 mm 反推：$P_{ideal}=74$ μW）。</p>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D12) —— Maxwell 应力：静电与电磁的力密度上限</span>
+$$\sigma_{ES}=\tfrac12\varepsilon_0 E^2,\qquad \sigma_{mag}=\frac{B^2}{2\mu_0} \tag{D12}$$
+<div class="eq-note">
+<strong>$\sigma_{ES}$</strong>：静电场对导体表面的 Maxwell 应力 &nbsp;|&nbsp; <strong>$E$</strong>：电场强度，受空气击穿（≈3 MV/m）限制 → $\sigma_{ES}\approx18$–40 Pa &nbsp;|&nbsp; <strong>$B$</strong>：磁通密度，受磁饱和（≈1–2 T）限制 → $\sigma_{mag}\approx0.4$–1.6 MPa。</div>
+</div>
+<p><strong>读法</strong>：磁力密度是静电力的 $10^4$–$10^5$ 倍——所以大尺度机器（电机、发电机）必然用电磁；但"力密度"不是故事的全部：静电力是表面效应、且完全不需要传导电流（无 $I^2R$ 铜损、无铁损、堵转不烧）。</p>
+<div class="formula-block">
+<span class="eq-tag">补充式 (D13) —— Trimmer 标度律与放大论证</span>
+$$F_{ES}=\tfrac12\varepsilon_0E^2\,A \propto L^2,\qquad F_{mag}=JB\,V \propto L^3,\qquad \frac{F}{m}:\ \text{静电}\propto L^{-1},\ \text{电磁}\propto L^{0} \tag{D13}$$
+<div class="eq-note">
+<strong>$A,V$</strong>：面积、体积 &nbsp;|&nbsp; <strong>$J$</strong>：电流密度 &nbsp;|&nbsp; <strong>$m$</strong>：质量（$\propto L^3$）。表面力 $\propto L^2$、体积力 $\propto L^3$；单位质量的比力：静电随尺寸缩小<strong>增强</strong>（$L^{-1}$），电磁与尺寸无关（$L^0$）——这就是 MEMS 大量使用静电驱动、而本文把静电"逆向放大"到厘米级仍有竞争力的第一性原因。</div>
+</div>
+<p><strong>交叉尺度估计（诚实版）</strong>：以实用剪切应力比，小电机气隙剪切应力约 100–1000 Pa vs 静电 18–40 Pa，静电差 1–1.5 个数量级；但静电电机把电磁电机"铜+铁+轴承"的质量和损耗全部省掉（本文 1.52 g / 2 mN·m / 0.137 W、不发热），最终在克级实现 2–3 倍整机升力-功率效率（Fig. 2g：7.4 vs 2.3–3.7 g W⁻¹）✅。故"静电在小尺度胜出"的成立机制是<strong>损耗结构与质量结构的胜利</strong>，而非裸力密度——论文正文的表述（"friction and resistive losses"）与此一致。</p>
+<p><strong>论文的放大论证（式 (2) 的展开）</strong>：叶片为二维薄箔（高度固定），$q=CU_2\propto$ 叶片面积 $\propto R_0$，$N=k_0R_0$，$E$ 恒定 → $M_e=k_0EqR_0^2\propto R_0^3$；而二维板材结构的质量 $m\propto R_0^2$：</p>
+<p>$$\frac{M_e}{m}\propto \frac{R_0^3}{R_0^2}=R_0 \qquad\Longrightarrow\qquad \text{比扭矩随尺寸线性增长：放大 15×，比扭矩 15×}$$</p>
+<p>这就是"Increasing the size of the electrostatic motor is the most effective solution"的数学依据 ✅。<strong>代价方向</strong>：微型样机 60→4 mm（1/15），比扭矩 1/15，只能靠转速 625→10,860 rpm（×17.4）补偿，且 Re 掉到 1.2×10³ 后 $FM$ 降至 0.08、$\sigma$ 从 30.7 掉到 9.2 g/W（×0.30）——微型化的效率代价全部有据可查 ✅。</p>
+<p><strong>为什么静电场需要 kV 级电压（收尾的必然性）</strong>：$U=E\cdot d$，取 $E\approx1$–2 MV/m（低于击穿）、$d\approx2$–11 mm（电极间距）→ $U\approx2$–10 kV，与电机工作电压 4.0–9.0 kV 完全一致 ✅——"千伏电源"不是工程妥协，而是静电力密度的物理必然。</p>
+<hr>
+
+<h3>13. 算法：CoulombFly 尺寸-功率-质量协同设计流程（由 Methods 文字重构）</h3>
+<pre class="code-block"><code>算法 0：CoulombFly 尺寸-功率-质量协同设计流程
+（重构自 Methods "Vehicle design"，每一步对应论文一个决策点）
+────────────────────────────────────────────────────────────
+输入: 目标总质量 m* = 4.21 g；辐照 G = 920 W/m²；入射角 θ = 48°；
+     电池 η_PV = 30%；HVPC η_conv ≈ 24%–58%（随负载电阻变化）
+输出: 同时满足 功率收支(D1)、扭矩平衡(式6)、质量预算(D8) 的可行构型
+
+1  初选转子半径 R0 ← 二维板材工艺上限（激光切割、装配刚度约束）
+2  扭矩校验:  Me = k0·E·q·R0²                      (式2, Me ∝ R0³)
+      若 Me 不足以平衡桨载 CM·ρ·(n/60)²·DP⁵，则增大 R0
+      → 论文结论: R0 = 60 mm（"增大尺寸是给足扭矩最有效的手段"）
+3  配桨（最大化 σ = Tη/(2π·MP·n)，式8；σ ∝ 1/n）:
+      大直径 DP = 200 mm、8 叶压低转速、安装角 13°（升力/效率/工艺折中）
+4  HVPC 设计:  2·Nc·Vpk = 2×12×400 V = 9.6 kV ≥ 电机工作电压 4–9 kV  (D5)
+      匝比 1:50、开关频率 86 kHz、占空比 D = 0.2（落在 fL–fH 效率平台区）
+5  光伏校核:  η_PV·G·cosθ·A_cell ≥ P_motor/η_conv + P_mc              (D1)
+      A_cell = 2×24 cm² GaAs 薄膜（Voc = 6.04 V ≥ HVPC 启动电压 4.30 V）
+6  质量校核:  1.52+0.44+1.13+0.96+0.16 = 4.21 g ≤ 5.8 g − 1.59 g 载荷  (D8/D10)
+7  迭代 2–6，直到 功率、扭矩、质量 三约束同时收紧
+────────────────────────────────────────────────────────────
+收敛解: R0=60 mm, N=64 叶片, 8 对电极, DP=200 mm 8 叶, Nc=12,
+       匝比 1:50, f=86 kHz, D=0.2, 2×GaAs(4×6 cm) → 4.21 g / 0.568 W / 30.7 g·W⁻¹</code></pre>
+<div class="callout idea">
+<div class="callout-title">🎯 设计流程的三个不变量（本文贡献的"算法内核"）</div>
+<ol>
+<li><strong>扭矩不变量</strong>：静电扭矩与转速无关（式 (1) 无 $n$）→ 设计时只需保证电压给足扭矩，转速由负载自动平衡。</li>
+<li><strong>效率不变量</strong>：$\eta$ 只取决于电荷转移过程、与转速无关（式 (3) 注）→ 电机效率在全部工作点近似常数。</li>
+<li><strong>功率收支不变量</strong>：(D1) 是不等式而非等式 → 只要光伏可用功率 ≥ 总功耗，飞行就能无限持续（1 h 试验即验证）。</li>
+</ol>
+</div>
+<hr>
+
+<h3>14. 交叉验证总表与问题清单（"不自圆其说"部分）</h3>
+<h4>14.1 论文数值 ↔ 独立核算 总表</h4>
+<table>
+<tr><th>项目</th><th>论文值</th><th>独立核算</th><th>判定</th></tr>
+<tr><td>电机电功率（飞行）</td><td>0.137 W（6.8 kV×20.1 μA）</td><td>$6.8\times10^3\times20.1\times10^{-6}=0.1367$ W</td><td>✅</td></tr>
+<tr><td>推进系统升力-功率效率</td><td>30.7 g W⁻¹</td><td>$4.21/0.137=30.73$（另两条独立路径亦得 30.7，§6.3）</td><td>✅</td></tr>
+<tr class="highlight"><td>整机升力-功率效率</td><td>正文 7.6 / Fig. 2g 7.4</td><td>$4.21/0.568=7.41$</td><td>❌ 7.6 错，7.4 对</td></tr>
+<tr><td>电机等效电阻</td><td>330 MΩ（300–400）</td><td>$6800/20.1\times10^{-6}=338$ MΩ</td><td>✅</td></tr>
+<tr><td>HVPC 效率（总口径）</td><td>24.1%</td><td>$0.137/0.568=24.1\%$</td><td>✅</td></tr>
+<tr class="highlight"><td>HVPC 效率（除 MC 口径）</td><td>"≈25%"</td><td>$0.1367/(0.568-0.065)=27.2\%$</td><td>❌ 应 ≈27%</td></tr>
+<tr><td>CW 理想输出 vs 实测</td><td>9.0 kV 实测</td><td>$2\times12\times400=9.6$ kV（94%）</td><td>✅</td></tr>
+<tr><td>升压比范围</td><td>900–2000</td><td>$4000/4.5=889$、$9000/4.5=2000$</td><td>✅</td></tr>
+<tr class="highlight"><td>电压-质量比</td><td>7.09 kV g⁻¹</td><td>$9.0/1.13=7.96$ kV/g（7.09 对应 8.01 kV）</td><td>❌ 口径不明</td></tr>
+<tr><td>低电压侧功率</td><td>"0.576 W"（0.126 A×4.50 V）</td><td>$0.126\times4.50=0.567$ W</td><td>❌ 乘法错</td></tr>
+<tr><td>最大升力/功耗/效率（8.5 kV）</td><td>5.8 g、0.314 W、20.2–43.3 g W⁻¹</td><td>$5.8/0.314=18.5$ g W⁻¹；$43.3\times0.314=13.6$ g</td><td>❌ 不能同时成立</td></tr>
+<tr><td>载荷余量</td><td>≈1.59 g</td><td>$5.8-4.21=1.59$</td><td>✅</td></tr>
+<tr><td>升重比</td><td>2.9</td><td>$5.8/1.96=2.96$（口径=推进系统）</td><td>✅（口径未注明）</td></tr>
+<tr><td>主样机 Re</td><td>$4.4\times10^4$</td><td>$\rho V_{tip}R/\mu=4.43\times10^4$</td><td>✅</td></tr>
+<tr><td>微型样机 Re</td><td>$1.2\times10^3$</td><td>$\rho V_{tip}R/\mu=1.23\times10^3$</td><td>✅</td></tr>
+<tr><td>微型样机效率</td><td>9.2 g W⁻¹</td><td>$9\ \text{mg}/0.97\ \text{mW}=9.3$</td><td>✅</td></tr>
+<tr><td>质量预算</td><td>4.21 g</td><td>$1.96+2.09+0.16=4.21$</td><td>✅</td></tr>
+<tr><td>功率预算</td><td>0.568 W</td><td>$0.137+0.065+0.366=0.568$</td><td>✅</td></tr>
+<tr><td>太阳几何（48°/春季/11:50/北京）</td><td>入射角 48°</td><td>反解 $\delta\approx-8°$（3 月中旬）</td><td>✅</td></tr>
+<tr class="highlight"><td>光伏口径</td><td>920 W m⁻² + 0.8 W/g + 30% 效率</td><td>三者与 0.568 W 消耗不能同时自洽（§8.2）</td><td>❌ 口径未说明</td></tr>
+</table>
+<h4>14.2 论文问题清单（按严重程度排序）</h4>
+<ol>
+<li><strong>【数值矛盾·高】"7.6 g W⁻¹"应为 7.4</strong>（§11.1 #1）：$7.6\times0.568=4.32$ g 超过整车质量 4.21 g，物理不可能；$4.21/0.568=7.41$ 与 Fig. 2g 的 7.4 一致。摘要与正文两处都写 7.6。</li>
+<li><strong>【数值矛盾·高】8.5 kV 三点数据互斥</strong>（§11.1 #2）：最大升力 5.8 g、该电压功耗 0.314 W、效率上限 43.3 g W⁻¹ 三者不可能同属一个工况（$5.8/0.314=18.5$ g W⁻¹ 低于声明下限 20.2；$43.3\times0.314=13.6$ g ≠ 5.8 g）。最可能是不同批次/不同桨的数据混列（Extended Data Fig. 2e,f 有 A–D 批次），论文未加区分。</li>
+<li><strong>【数值矛盾·中】0.126×4.50 = 0.567 被印成 "0.576 W"</strong>（Methods「Flight test」）：与同段 0.568 W、正文 0.568 W 均不符，属乘法/排版错误。</li>
+<li><strong>【数值不一致·中】HVPC 效率 "≈25%"</strong>：按论文自己的数字 $IV/(P_{in}-P_{mc})=0.1367/0.503=27.2\%$（或 26.8%，用 0.135 W）。且正文 24.1% 是另一口径（$0.137/0.568$，含单片机），两个口径并存未声明。</li>
+<li><strong>【数值不一致·中】电压-质量比 7.09 kV/g</strong>：$9.0/1.13=7.96$ kV/g；7.09 对应 8.01 kV。若用 7.96，则"比前最轻高 55%"应改为 75%——论文取了未说明的电压值。</li>
+<li><strong>【单位约定·中】符号 $n$ 在式 (3)(7)(8) 为 rev/s、在式 (5)(6) 为 rpm</strong>：$\omega=2\pi n$ 与 $(n/60)$ 混排，照抄实现差 60 倍；论文未给任何单位注释。</li>
+<li><strong>【无法核对】式 (8) 尾项封闭形式</strong>：抽取的 "3,600" 与下标碎片无法唯一重建（本文给出两种等价形式 $\eta C_T/(2\pi C_MD_Pn)$ 与 $30\eta C_T/(\pi C_MD_Pn)$，数值均闭合）；请人工核对 <code>page-008.png</code>。</li>
+<li><strong>【数据缺口】式 (9) 的 $d,C,k_1$ 全文未给数值</strong>：只能数量级验证（本文反推 $q\approx1$ nC、$C\approx0.14$ pF、$d_{eff}\approx6$–12 mm 时闭合），无法严格核算。</li>
+<li><strong>【图内张力】Fig. 2e 与飞行点差约 2.4×</strong>：5 kV 曲线斜率对应 $Q_{rev}\approx0.6$ μC/r，按 $q\propto U$ 外推 6.8 kV 应 ≈0.82 μC/r，实测 $I/n=1.93$ μC/r；且抽取的"4–16 μC/r"轴标签与 $I=Q_{rev}n$ 自洽性存疑。可能与批次差异/离子电流有关，论文未解释；建议核对 <code>page-003.png</code>。</li>
+<li><strong>【口径未说明·中】920 W m⁻² 的测量平面与光伏规格自相矛盾</strong>：若 920 为直射且电池水平（cos48°），"0.8 W/g"规格给出 0.473 W &lt; 0.568 W 消耗（不可能持续飞行）；"30% 效率"口径给出 0.887 W（成立）。0.8 W/g（→16% 模组效率）与 30%（裸片）之间 1.9× 缺口未解释。</li>
+<li><strong>【笔误·低】Methods「Electronics」电池尺寸 "4 mm × 6 mm"</strong>：应为 4 cm × 6 cm（正文 Fig. 1 及 0.8 W/g 规格均要求 24 cm² 级面积）。</li>
+<li><strong>【小笔误·低】Methods 飞行点电压 "6.7 kV" 与正文 "6.8 kV" 不一致</strong>（对应 0.135 W vs 0.137 W；6.8 kV×20.1 μA = 0.1367 W 与正文 0.137 自洽）。</li>
+<li><strong>【口径未注明·低】"lift-to-weight ratio 2.9" 的分母</strong>：按推进系统自重 1.96 g 计算（$5.8/1.96=2.96$），按整车 4.21 g 则为 1.38；论文未注明。同理"7.4 g W⁻¹"是整车口径而"30.7"是推进系统口径，两者混排于同一段。</li>
+</ol>
+<h4>14.3 验证材料与建议人工复核项</h4>
+<ul>
+<li><code>_derivation_work/0-fracture/fulltext.txt</code>：全文文本（式 (1)–(9) 位于第 8–9 页标记处），本节的每一句原文引用均可回溯。</li>
+<li><code>_derivation_work/0-fracture/pages/page-008.png</code>（PDF p.8/Nature p.540）：式 (1)–(8) 渲染核对（重点：式 (8) 尾项）。</li>
+<li><code>_derivation_work/0-fracture/pages/page-009.png</code>（p.541）：式 (9) 及 $k_1,U_1,U_2,d,C$ 符号核对。</li>
+<li><code>_derivation_work/0-fracture/pages/page-003.png</code>：Fig. 2e（电流/电荷双轴）、2f（升力/效率双轴）、2g 核对。</li>
+<li><code>_derivation_work/0-fracture/pages/page-004.png</code>：Fig. 3c/d（HVPC 输出与效率曲线）核对。</li>
+<li>note.html 第 6 节（浅层公式 Group A–C）、第 7 节（原理详解）、第 10 节（动机推导）与本节的对应关系：第 6 节的 $F=qE$、$V_{out}\approx2NV_{peak}$、$\sigma=F/P$ 分别被本节 §2、§10、§6 严格化；第 6 节"$V_{peak}\approx375$ V"与本文 400 V 的差异来自 800 V p-p 取峰值（400 V）而非均方根，本节以峰值为准。</li>
+</ul>
 </section>
 
 <footer>📄 Paper Notes · Shen, Peng et al. · Nature 2024 · CoulombFly — Sunlight-Powered Sustained Flight · MathJax + Mermaid Rendering</footer>

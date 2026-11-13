@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">Potential Flaw</a>
   <a href="#motivation">Motivation</a>
   <a href="#takeaway">Takeaways</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -775,6 +779,446 @@ flowchart LR
     <tr><td>Metz et al. (2021) — Gradients are not all you need. <em>arXiv:2111.05803</em></td><td>首次系统性地指出可微分仿真中 BPTT 导致的梯度爆炸问题——本文的"时间梯度衰减"直接针对此问题。理解这篇是理解本文方法动机的关键前置知识。</td></tr>
     <tr><td>Song et al. (2024) — Learning quadruped locomotion using differentiable simulation. <em>CoRL 2024</em></td><td>将可微分物理用于四足 locomotion 的代表性工作。与本文的关联：方法论同源（都是用可微分物理训练神经网络策略），但迁移到了完全不同的领域（四足行走 vs 无人机视觉飞行）。对比阅读可以理解可微分物理的跨领域适用性。</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info"><p><strong>对象</strong>：Zhang, Hu, Song, Zou, Lin，<em>Learning vision-based agile flight via differentiable physics</em>，Nature Machine Intelligence 7, 954–966 (2025)（DOI 10.1038/s42256-025-01048-0）——正文 <strong>Method</strong> 节（第 9–10 页，p.962–963）与 Extended Data Fig. 1/2（第 14–15 页）。<strong>公式范围</strong>：论文只有 <strong>2 个编号式</strong>——式 (1)（轨迹优化目标）与式 (2)（梯度下降）；其余全部为无编号式：解析策略梯度、点质量积分、飞控冲激响应、四个损失项、总损失、时间梯度衰减梯度，本文编号为<strong>补充式 (D1)–(D11)</strong>，并把网络结构与训练流程逐行数学化。<strong>方法</strong>：本文不是复述论文文字，而是：</p><ol><li>从链式法则、运动学积分、一阶系统响应、四旋翼力平衡等第一性原理<strong>独立重推</strong>每个公式；</li><li>用官方代码库 <strong>HenryHuYu/DiffPhysDrone v1.0</strong>（Zenodo DOI 10.5281/zenodo.15250256，已下载到 <code>_derivation_work/3-diffphys/code/</code>）<strong>逐行交叉验证</strong>（<code>env_cuda.py</code>、<code>main_cuda.py</code>、<code>model.py</code>、<code>src/dynamics_kernel.cu</code>、<code>src/test.py</code>）；</li><li>用论文参数值做<strong>数值核算</strong>（如 64×150 步×50,000 迭代 = 4.8×10⁸ 步，恰好落在图 6c–e 的 x 轴 0–5（×10⁸）范围内）；</li><li>诚实标注：本模型<strong>不支持读取页面图像</strong>（read_image 不可用），因此"照页面图像逐字符核实"未能直接执行；公式引文依据 = <code>fulltext.txt</code> 文本抽取 + 官方代码 + 正文文字三重互证，需要人工对照 page-009/010.png 复核的细节已在 §14 问题清单中逐一列出，绝不替论文"圆场"。</li></ol></div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>与代码/第一性原理对照的结论</th></tr>
+<tr><td>(1)(2)</td><td>轨迹优化目标与梯度下降</td><td>✅ 正确。但式 (1) 的 $\mathcal{L}_\theta$ 是 N 步求和，而策略梯度式带 $1/N$（均值梯度），相差常数因子（不影响最优解，记号不严谨）</td></tr>
+<tr><td>(D1)</td><td>解析策略梯度 $\sum_{i=0}^{k}\prod_{j=i+1}^{k}\frac{\partial x_j}{\partial x_{j-1}}$</td><td>✅ 正确，已用链式法则完整重推；隐含假设"观测→状态梯度不回传"，与代码（render 无反向核、目标速度 detach）一致。⚠️ 本笔记第 6 节把内层 $\sum_{i=0}^{k}$ 错写成 $\sum_{i=0}^{k-1}$</td></tr>
+<tr class="highlight"><td>(D2)(D3)</td><td>点质量积分 + 加速度合成</td><td>✅ 积分格式与代码 L132–137 逐字一致（梯形速度 + 旧加速度位置，全局二阶精度）。⚠️ 论文正文说"quadratic air drag"，v1.0 代码训练时二次项系数置 0，实际随机化的是线性阻力系数</td></tr>
+<tr><td>(D4)</td><td>飞控冲激响应 $\eta(t)=\lambda e^{-\lambda(t-\tau)}$</td><td>✅ 正确；离散精确解 = 指数滑动平均（EMA），与代码 <code>act_next = act_pred·(1−α) + act·α</code> 一致；$\lambda$≈12 s⁻¹、$\tau$=1 步。⚠️ 本笔记第 6 节用 $e^{-\tau\Delta t}$ 记衰减率，符号用错（$\tau$ 是延迟）</td></tr>
+<tr><td>(D5)</td><td>加速度 → 姿态/集体推力映射</td><td>✅ 正确，等于 Faessler 微分平坦姿态重构；代码 <code>update_state_vec</code> 逐行一致；数值核算：TWR 3.6 → 最大水平加速度 33.9 m/s²、倾斜角 73.9°</td></tr>
+<tr><td>(D6)</td><td>速度匹配损失 SmoothL1</td><td>✅ 正确；2 s 窗口 = 30 步与代码一致。⚠️ 代码把 $\bar v_t$ 与 $v^{\rm set}_{t-29}$（窗口起点目标）对齐，论文公式写同刻 $k$</td></tr>
+<tr class="highlight"><td>(D7)</td><td>避碰损失（截断二次 + softplus 屏障）</td><td>⚠️ 公式本身合理且可微；但 $v^c_k$ 的作用域三方不一致：印刷公式（按文本抽取）只乘第一项、正文文字说"乘两项之和"、代码两项都乘且 <code>clamp_min(1)</code> 使静止时惩罚不归零。本笔记第 6 节的 $1/\beta_2$、$2\beta_2$ 写法与论文不符</td></tr>
+<tr><td>(D8)(D9)</td><td>加速度/jerk 平滑损失与总损失</td><td>⚠️ 印刷为 $\|a_k\|_2$ 范数、代码为 $\|\mathrm{act}_k\|^2$ 平方和（范数/平方在文本抽取中无法区分，需对页 10 图复核）；jerk 差分方向 $(a_k-a_{k+1})$ 为负向（平方后无影响，排版瑕疵）</td></tr>
+<tr><td>(D10)</td><td>时间梯度衰减 $e^{-\alpha\Delta t}$</td><td>✅ 正确；衰减 = 时间折扣的梯度版，有效记忆窗 ≈ $\alpha^{-1}$ 秒；代码只衰减 p→p、v→v 对角路径（近似等价）。$\alpha\in[0.25,4]$ 时 $e^{-\alpha\Delta t}\in[0.766,0.983]$</td></tr>
+<tr><td>(D11)</td><td>网络结构（CNN+GRU）与输入变换</td><td>✅ 与代码逐层一致；参数总量 ≈ 51.4 万。⚠️ 论文说"所有卷积 stride=1"，代码第一层 stride=2（否则 1024→192 投影不成立）</td></tr>
+<tr><td>训练流程</td><td>64 环境×150 步×1/15 s 前向 + 损失组装 + 衰减 BPTT + AdamW</td><td>✅ 与代码一致；50,000 迭代×9,600 步/迭代 = 4.8×10⁸ 步 ✓ 与图 6c–e 横轴吻合。⚠️ 多智能体配置 batch=256，与正文"64 environments"不符</td></tr>
+</table>
+<hr>
+<h3>1. 符号、单位与文中取值总表</h3>
+<table>
+<tr><th>符号</th><th>含义</th><th>单位</th><th>文中取值 / 代码取值</th></tr>
+<tr><td>$k$, $N$, $T$</td><td>离散时刻、总步数、损失求和步数</td><td>—</td><td>$k=0..N$；训练轨迹 $T=150$ 步</td></tr>
+<tr><td>$\Delta t$, $t_k$</td><td>仿真步长、$t_k=\Delta t\cdot k$</td><td>s</td><td>$\Delta t=1/15$ s（训练时 $t\sim\mathcal N(1/15,\ 0.1/15)$ 随机化）</td></tr>
+<tr><td>$x_k,\ u_k,\ o_k$</td><td>状态（位置+速度）、控制输入、观测</td><td>—</td><td>$x_k=(p_k,v_k)\in\mathbb{R}^6$；$u_k\in\mathbb{R}^3$（期望加速度）；$o_k=h(x_k)$（深度图+状态）</td></tr>
+<tr><td>$f,\ h$</td><td>动力学函数（残差形式）、传感器模型</td><td>—</td><td>$x_{k+1}=x_k+f(x_k,u_k)$</td></tr>
+<tr><td>$l_k$</td><td>逐步损失（cost）</td><td>随项而定</td><td>$l_k=l(x_k,u_k)$；负损失 = PPO 基线的 reward</td></tr>
+<tr><td>$\pi_\theta$</td><td>策略网络（CNN+GRU+FC，≈51.4 万参数）</td><td>—</td><td>$u_k=\pi_\theta(o_k)$；输出 6 维 = [期望加速度 3，速度估计 3]</td></tr>
+<tr><td>$\gamma$</td><td>学习率</td><td>—</td><td>AdamW 初值 $10^{-3}$，余弦退火至 $10^{-5}$</td></tr>
+<tr><td>$p_k,\ v_k,\ a_k$</td><td>位置、速度、加速度（世界系）</td><td>m, m/s, m/s²</td><td>训练场地约 11 m×6 m；速度上限随机化 $(0.75+2.5r)\times m_{tp}$</td></tr>
+<tr><td>$g$</td><td>重力加速度</td><td>m/s²</td><td>$g=9.80665$（代码 <code>g_std</code>）</td></tr>
+<tr><td>$\hat u_k$, $u_k$</td><td>滤波后实际推力加速度、策略输出期望推力</td><td>m/s²</td><td>$\hat u_k=(1-e^{-\lambda\Delta t})u_k+e^{-\lambda\Delta t}\hat u_{k-1}$</td></tr>
+<tr><td>$\tau,\ \lambda$</td><td>飞控固定延迟、指数平滑系数</td><td>s, s⁻¹</td><td>代码：$\tau=1$ 步 ≈ 67 ms（act_lag）；$\lambda\sim\mathcal N(12,1.2)$ s⁻¹（pitch），yaw 通道 $\lambda_y\sim\mathcal N(6,0.6)$ s⁻¹</td></tr>
+<tr><td>$D(v)$</td><td>空气阻力（加速度当量）</td><td>m/s²</td><td>线性系数随机化 $\in[0.3,0.45]$ s⁻¹；二次项系数训练时=0；风速 $v_{\rm wind}\sim\mathcal N(0,\mathrm{diag}(1,1,0.2)^2)$</td></tr>
+<tr><td>$d_k,\ r_q,\ v^c_k$</td><td>到最近障碍点的距离、无人机半径、接近速度</td><td>m, m, m/s</td><td>代码：$r_q$ 由 drone_radius∈[0.1,0.15] 与 margin∈[0.1,0.3] 合成；$v^c_k=9\times$距离下降速率（下限 1）</td></tr>
+<tr><td>$\beta_1,\ \beta_2$</td><td>softplus 权重与陡度</td><td>—, m⁻¹</td><td>$\beta_1=2.5$，$\beta_2=32$（代码 softplus 权重=coef_collide 2.0/5.0/7.5，见 §8.4）</td></tr>
+<tr><td>$\lambda_v,\lambda_c,\lambda_a,\lambda_j$</td><td>四项损失权重</td><td>—</td><td>$(1,\ 2,\ 0.01,\ 0.001)$</td></tr>
+<tr><td>$\alpha$</td><td>时间梯度衰减率</td><td>s⁻¹</td><td>消融 $\alpha\in\{0.25,0.5,1,2,4\}$；代码默认 grad_decay=0.4（等效 $\alpha\approx0.92$）</td></tr>
+<tr><td>$v^{\rm set}_k,\ \bar v_k$</td><td>设定速度、2 s 滑动平均速度</td><td>m/s</td><td>$\bar v_k=\frac{1}{30}\sum_{t=k-29}^{k}v_t$（15 Hz×2 s=30 步）</td></tr>
+</table>
+<div class="callout tip"><div class="callout-title">阅读提示</div>本文动力学是<strong>加速度输入的点质量模型</strong>：策略输出的"动作" $u_k$ 就是期望加速度（比推力），经飞控滤波后成为 $\hat u_k$，叠加扰动与阻力得到实际加速度 $a_k$，再积分出 $v_k,p_k$。姿态 $R$ 只用于<strong>渲染深度图</strong>和构造观测（上向量），不参与平动积分——这是"点质量优先于刚体"的关键简化（消融图 6e 证实其优化景观更优）。</div>
+<hr>
+<h3>2. 公式 (1)(2)：问题形式化与梯度下降</h3>
+<p>论文原文（第 9 页 Problem formulation）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 轨迹优化目标（论文式 (1)）</span>
+$$\min_{\theta}\ \mathcal{L}_\theta=\sum_{k=0}^{N-1} l(x_k,u_k)=\sum_{k=0}^{N-1} l\big(x_k,\ \pi_\theta(o_k)\big) \tag{1}$$
+<span class="eq-tag">Eq.(2) —— 参数更新（论文式 (2)）</span>
+$$\theta\leftarrow\theta-\gamma\,\nabla_\theta\mathcal{L}_\theta \tag{2}$$
+<div class="eq-note">
+<strong>符号</strong>：$\theta$ = 策略网络全部参数；$\mathcal{L}_\theta$ = N 步总损失；$l(x_k,u_k)$ = 逐步损失（可微）；$\pi_\theta(o_k)$ = 策略；$\gamma$ = 学习率。<strong>系统定义</strong>（同页文字）：状态 $x_k\in\mathcal{X}$、控制 $u_k\in\mathcal{U}$、观测 $o_k=h(x_k)$、动力学 $x_{k+1}=x_k+f(x_k,u_k)$（残差形式）、$t_k=\Delta t\cdot k,\ k=0..N$。<strong>推导要点</strong>：这不是随机 MDP 的期望回报最大化，而是<strong>确定性轨迹优化</strong>——动力学 $f$ 已知（白箱），损失 $l$ 可微，于是 $\mathcal{L}_\theta$ 是 $\theta$ 的确定函数，可以直接用一阶梯度下降（式 (2)）。<strong>残差形式的意义</strong>：$x_{k+1}=x_k+f(x_k,u_k)$ 的雅可比为 $I+\partial f/\partial x$，当 $\Delta t\to0$ 时逼近连续流 $\dot x=f$ 的半隐式离散化，也是后文 (D1) 中 $\partial x_j/\partial x_{j-1}$ 的来历。<strong>交叉验证</strong>：论文把 PPO 基线描述为"trained with the same reward (negative loss)"——即 reward $=-l_k$，同一目标函数两种优化器（零阶 vs 一阶），这正是图 6b 对比的数学基础。✅<strong>疑点 1（记号不严谨）</strong>：式 (1) 的 $\mathcal{L}_\theta$ 是 <strong>N 步求和</strong>，而 §3 的策略梯度公式带因子 $1/N$（即均值损失 $\frac1N\mathcal{L}_\theta$ 的梯度）。两者只差常数因子，argmin 不变，但严格说 $\partial\mathcal{L}_\theta/\partial\theta$（求和版）不应带 $1/N$——建议理解为论文在梯度处悄悄改用了均值损失。❓<strong>疑点 2</strong>：$o_k=h(x_k)$ 中深度渲染是逐像素最近表面查询，$h$ 是否可微论文未在公式层面处理（见 §3.5，代码事实：render 无反向核）。</div>
+</div>
+<hr>
+<h3>3. 无编号式 (D1)：解析策略梯度的完整推导（本文核心公式）</h3>
+<p>论文原文（第 9 页 Policy gradient from a differentiable simulation）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D1) —— 可微分仿真解析策略梯度（论文无编号式）</span>
+$$\frac{\partial\mathcal{L}_\theta}{\partial\theta}=\frac{1}{N}\sum_{k=0}^{N-1}\left(\sum_{i=0}^{k}\frac{\partial l_k}{\partial x_k}\prod_{j=i+1}^{k}\left(\frac{\partial x_j}{\partial x_{j-1}}\right)\frac{\partial x_i}{\partial\theta}+\frac{\partial l_k}{\partial u_k}\frac{\partial u_k}{\partial\theta}\right) \tag{D1}$$
+<div class="eq-note"><strong>符号</strong>：$\partial l_k/\partial x_k$ = 第 k 步损失对状态的梯度（行向量）；$\partial x_j/\partial x_{j-1}$ = 动力学雅可比（$=I+\partial f/\partial x$，由可微分仿真解析提供）；$\partial x_i/\partial\theta$ = 状态 $x_i$ 对参数的<strong>直接</strong>偏导（见 §3.2）；$\partial u_k/\partial\theta$ = 策略输出的直接偏导；$\prod_{j=i+1}^{k}$ 当 $i=k$ 时为空积 $=I$。</div>
+</div>
+<h4>3.1 第一性原理重推（逐步链式法则）</h4>
+<p><strong>第 1 步：总导数分解。</strong> 对 $\mathcal{L}_\theta=\sum_k l_k$，$l_k=l(x_k,u_k)$，$u_k=\pi_\theta(o_k)$：</p>
+$$\frac{d\mathcal{L}_\theta}{d\theta}=\sum_{k=0}^{N-1}\left[\frac{\partial l_k}{\partial x_k}\cdot\frac{dx_k}{d\theta}+\frac{\partial l_k}{\partial u_k}\cdot\frac{du_k}{d\theta}\right]$$
+<p>（这里 $\frac{dx_k}{d\theta}$ 是<strong>全导数</strong>：$x_k$ 既被更早的 $x_{k-1}$ 决定，又被 $\theta$ 经 $u_{k-1}=\pi_\theta(o_{k-1})$ 直接影响。）</p>
+<p><strong>第 2 步：状态递推链。</strong> 由 $x_k=x_{k-1}+f(x_{k-1},u_{k-1})$：</p>
+$$\frac{dx_k}{d\theta}=\frac{\partial x_k}{\partial x_{k-1}}\cdot\frac{dx_{k-1}}{d\theta}+\underbrace{\frac{\partial x_k}{\partial u_{k-1}}\frac{\partial u_{k-1}}{\partial\theta}}_{\displaystyle\equiv\ \partial x_k/\partial\theta\ (\text{直接项})}$$
+<p><strong>第 3 步：展开到 $x_0$。</strong> 初始状态 $x_0$ 由环境给定、与 $\theta$ 无关，故 $dx_0/d\theta=0$。逐层代入（对 $i\ge1$，直接项 $\partial x_i/\partial\theta=(\partial f/\partial u)(x_{i-1},u_{i-1})\cdot(\partial\pi_\theta/\partial\theta)(o_{i-1})$）：</p>
+$$\frac{dx_k}{d\theta}=\sum_{i=0}^{k}\left(\prod_{j=i+1}^{k}\frac{\partial x_j}{\partial x_{j-1}}\right)\frac{\partial x_i}{\partial\theta}$$
+<p>其中 $i=0$ 项因 $\partial x_0/\partial\theta=0$ 自动消失（论文写成 $\sum_{i=0}^{k}$，与其 $i=0$ 项为零等价）；$i=k$ 项是"$\theta\to u_{k-1}\to x_k$"的一步动力学路径。</p>
+<p><strong>第 4 步：代入第 1 步并除以 N。</strong> 即得 (D1)（带 $1/N$ 归一化，见 §2 疑点 1）。✅ 与论文印刷式逐项一致。</p>
+<h4>3.2 每项的含义（为什么是这个形状）</h4>
+<ul>
+<li><strong>直接项 $\frac{\partial l_k}{\partial u_k}\frac{\partial u_k}{\partial\theta}$</strong>：$\theta$ 经 $o_k\to u_k\to l_k$ 的<strong>零步</strong>路径——策略在当步的输出直接进入损失。</li>
+<li><strong>动力学链 $\sum_{i=0}^{k}\prod_{j=i+1}^{k}\frac{\partial x_j}{\partial x_{j-1}}\frac{\partial x_i}{\partial\theta}$</strong>：$\theta$ 在时刻 $i$ 的动作 $u_{i-1}$ 经 $x_i\to x_{i+1}\to\cdots\to x_k$ 传播到 $l_k$ 的<strong>所有历史路径之和</strong>。$\prod$ 是矩阵连乘（雅可比从左到右作用于行向量），这就是 <strong>backpropagation-through-time (BPTT)</strong> 的解析形式。</li>
+<li><strong>$\partial x_j/\partial x_{j-1}=I+\partial f/\partial x$</strong>：残差形式的好处——雅可比以单位阵为主，数值上更稳定，且与 $\Delta t\to0$ 的连续极限 $\dot x=f$ 相容。</li>
+</ul>
+<h4>3.3 与零阶方法（REINFORCE/PPO）的对比——"一阶 vs 零阶"的数学本质</h4>
+<p>PPO 的 REINFORCE 型梯度（论文引用 Schulman et al. 2017）是：</p>
+$$\nabla_\theta J\;\approx\;\mathbb{E}_{\tau\sim\pi_\theta}\left[\sum_{k}\nabla_\theta\log\pi_\theta(u_k\mid o_k)\,\hat A_k\right]$$
+<ul>
+<li><strong>零阶</strong>：动力学 $f$ 被当作黑箱，梯度只能通过采样轨迹的似然比估计——不进入动力学内部，方差大（需要 advantage $\hat A$ 减方差、clip 防步子过大），样本量以指数级随问题规模增长（论文正文：多智能体场景采样需求"grows exponentially with the number of robots"）。</li>
+<li><strong>一阶</strong>：(D1) 的每一项都是<strong>解析的偏导乘积</strong>，不含随机性、不需要基线——梯度方差远低于零阶估计（论文引 Metz et al. 与 Suh et al. 论证），因此"10% 的样本量达到 PPO 的最优奖励"（图 6b）。</li>
+<li><strong>Deep-ILC 的中间态</strong>（正文对比）：Deep-ILC 用仿真梯度<strong>训练 critic</strong>、再经 critic 更新策略——多一层函数近似误差（正文："might cause inaccurate policy updates due to critic model errors"，收敛到 −7.46 且震荡）；本文<strong>直接用仿真梯度更新策略</strong>（收敛 −5.63）。</li>
+</ul>
+<h4>3.4 数值核算</h4>
+<ul>
+<li>$N=150$ 步：$1/N=6.67\times10^{-3}$——梯度被归一化为"每步平均"，与损失量级脱钩，学习率 $\gamma=10^{-3}$ 才具有可迁移性。</li>
+<li>内层求和项数：对第 $k$ 步损失有 $k+1$ 条状态路径 + 1 条直接路径；全部 $N$ 步共 $\sum_{k=0}^{N-1}(k+2)=N(N+1)/2+N=\tfrac12N(N+3)$ 项，$N=150$ 时 = 11,475 条梯度路径——BPTT 的计算量 $O(N^2)$ 直接来自这个求和。</li>
+</ul>
+<h4>3.5 公式的隐藏假设与代码验证（诚实标注）</h4>
+<p>印刷式 (D1) 中<strong>没有</strong> $\frac{\partial l_k}{\partial u_k}\frac{\partial u_k}{\partial o_k}\frac{\partial o_k}{\partial x_k}\frac{\partial x_k}{\partial\theta}$ 这类"观测回路"项，即假设 <strong>观测生成路径不回传梯度</strong>。论文只明确说了设定速度的梯度不回传（"Its magnitude is limited to a predefined maximum speed, and its gradient is not propagated during training"），深度渲染的可微性则完全没提。代码事实给出答案：</p>
+<pre class="code-block"><code># env_cuda.py L130：目标速度方向不回传梯度
+target_v_raw = env.p_target - env.p.detach()
+# src/quadsim_kernel.cu：render 只有前向核（L318–352），无 render_backward
+#  → 深度图像 → 位置 的梯度路径在训练图中被截断</code></pre>
+<p>✅ 结论：论文公式与代码实现<strong>自洽</strong>（传感器路径 detach），但正文没有把这一假设写进公式说明——读者若照 (D1) 实现一个"深度可微渲染"，会多出一条梯度路径，梯度会不同。这是公式的<strong>隐含假设</strong>，本节明确指出。</p>
+<div class="callout warn"><div class="callout-title">本笔记第 6 节的笔误（必须更正）</div>第 6 节 Eq.(1)/(3) 把内层写成 $\sum_{i=0}^{k-1}$，<strong>漏掉了 $i=k$ 项</strong> $\frac{\partial l_k}{\partial x_k}\frac{\partial x_k}{\partial\theta}$（即 $\theta\to u_{k-1}\to x_k$ 的一步动力学路径）——若按该式实现，最近一步的动力学反馈完全丢失。论文印刷为 $\sum_{i=0}^{k}$（含 $i=k$，空积 $=I$），本文 §3.1 的推导证明 $\sum_{i=0}^{k}$ 才是正确的。</div>
+<hr>
+<h3>4. 无编号式 (D2)(D3)：点质量动力学与加速度合成</h3>
+<p>论文原文（第 9 页 Differentiable-physics simulation）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D2) —— 点质量数值积分（论文无编号式）</span>
+$$v_{k+1}=v_k+\frac{a_k+a_{k+1}}{2}\,\Delta t \tag{D2a}$$
+$$p_{k+1}=p_k+v_k\,\Delta t+\frac{1}{2}a_k\,\Delta t^2 \tag{D2b}$$
+<span class="eq-tag">Eq.(D3) —— 加速度合成（推力+扰动+阻力，论文文字"sum of thrust and air drag"）</span>
+$$a_k=\hat u_k+\mathrm{dg}_k-D(v_k),\qquad D(v)=\mu_2\,v\,\lvert v\rvert+\mu_1\,v \tag{D3}$$
+<div class="eq-note"><strong>符号</strong>：$a_k$ = 实际加速度（世界系）；$\hat u_k$ = 飞控滤波后的推力加速度（§5）；$\mathrm{dg}_k$ = 随机扰动加速度（Ornstein–Uhlenbeck 过程）；$D(v)$ = 空气阻力（$\mu_2$ 二次系数 [m⁻¹]、$\mu_1$ 线性系数 [s⁻¹]）；$v$ 为相对风速（$v-v_{\rm wind}$）。</div>
+</div>
+<h4>4.1 式 (D2) 的推导——两个二阶精度的积分器</h4>
+<p><strong>(D2a) 速度的梯形法则。</strong> 由运动学 $v(t_{k+1})=v(t_k)+\int_{t_k}^{t_{k+1}}a(t)\,dt$，对被积函数用梯形近似：</p>
+$$\int_{t_k}^{t_{k+1}}a(t)\,dt=\frac{a(t_k)+a(t_{k+1})}{2}\Delta t-\frac{\Delta t^3}{12}a''(\xi),\qquad \xi\in(t_k,t_{k+1})$$
+<p>局部截断误差 $O(\Delta t^3)$、全局误差 $O(\Delta t^2)$——<strong>二阶方法</strong>。<strong>关键实现细节</strong>：$a_{k+1}$ 中的阻力 $D(v_{k+1})$ 若用 $v_{k+1}$ 就是隐式方程；代码用<strong>旧速度</strong> $v_k$ 计算 $a_{k+1}$（<code>dynamics_kernel.cu</code> L89–131 中 drag 只依赖 $v[i]$），所以 (D2a) 是<strong>显式</strong>更新的梯形格式（"半隐式变体"，无需牛顿迭代）。</p>
+<p><strong>(D2b) 位置的精确运动学展开。</strong> 由泰勒展开 $p(t+\Delta t)=p+v\Delta t+\frac12a\Delta t^2+\frac16\dot a\Delta t^3+O(\Delta t^4)$，截断到二阶即 (D2b)。</p>
+<p><strong>两者配合的精度性质</strong>：若加速度分段常数（$a_k=a_{k+1}=a$），(D2) 精确恢复匀加速运动学 $v_{k+1}=v_k+a\Delta t$、$p_{k+1}=p_k+v_k\Delta t+\frac12a\Delta t^2$ ✅；对时变加速度整体为<strong>全局二阶</strong>。与经典<strong>半隐式欧拉</strong>（$v_{k+1}=v_k+a_k\Delta t$，$p_{k+1}=p_k+v_{k+1}\Delta t$，一阶）和 <strong>Verlet/蛙跳</strong> 相比：本文速度通道用梯形（更稳），位置通道用旧加速度（与 (D2a) 不严格"配对"——严格配对应为 $p_{k+1}=p_k+\frac12(v_k+v_{k+1})\Delta t=p_k+v_k\Delta t+\frac14(a_k+a_{k+1})\Delta t^2$），<strong>这一不配对不影响二阶精度，是论文选型时的自由度</strong>，代码与论文逐字一致。</p>
+<h4>4.2 代码交叉验证（逐行对照）</h4>
+<pre class="code-block"><code>// src/dynamics_kernel.cu L132–137（run_forward）
+p_next = p + v * ctl_dt + 0.5 * a * ctl_dt * ctl_dt;        // (D2b) ✓
+v_next = v + 0.5 * (a + a_next) * ctl_dt;                    // (D2a) ✓
+// L131：a_next = act_next + dg - a_drag_2*drag_2[0] - a_drag_1*drag_2[1] + airmode_a
+// a_drag_2 = 分量形式 |v|v（L99–106），a_drag_1 = v_rel（L106）→ 即 (D3) 的 μ2|v|v + μ1v</code></pre>
+<p>✅ 与论文印刷式一致。附加项 <code>airmode_a</code>：沿推力轴、正比于推力方向角速率 $a_v$（$=\frac{1}{\Delta t}\arccos\frac{\langle T_k,T_{k+1}\rangle}{\|T_k\|\|T_{k+1}\|}$，L113–116）× 系数 0.5（airmode_av2a）——建模 BetaFlight "airmode" 特性（姿态快速旋转时电机额外出力），论文正文未提及此附加项。</p>
+<h4>4.3 式 (D3) 的第一性原理推导</h4>
+<p><strong>二次阻力的动量通量论证</strong>：以速度 $v$ 运动的物体每 $\Delta t$ 扫过体积 $A\,v\,\Delta t$ 的空气，赋予其动量 $\rho A v\Delta t\cdot v$，故阻力 $F=\frac12\rho C_D A\,v^2$，加速度当量 $D=\frac{\rho C_D A}{2m}v^2=\mu_2 v^2$——$\mu_2$ 量纲 [m⁻¹] ✓。<strong>旋翼诱导阻力的线性项</strong>（Faessler et al. 2018，论文 ref.41）：旋翼在斜流中产生的阻力近似 $\propto v$（机体水平面内各向异性），加速度当量 $D_1=\mu_1 v$，$\mu_1$ 量纲 [s⁻¹] ✓。代码的 $\mu_1\in[0.3,0.45]$ s⁻¹ 即对应时间常数约 2–3 s 的速度衰减。</p>
+<p><strong>随机扰动 $\mathrm{dg}_k$ 的 OU 过程</strong>（代码 <code>env_cuda.py</code> L297/L311）：</p>
+$$\mathrm{dg}_{k+1}=\mathrm{dg}_k\sqrt{1-\frac{\Delta t}{4}}+0.2\,\sqrt{\frac{\Delta t}{4}}\,\mathcal N(0,1)$$
+<p>平稳分布核算：令 $\mathrm{Var}$ 不变 → $\sigma_\infty^2(1-\Delta t/4)+0.04\cdot\Delta t/4=\sigma_\infty^2\Rightarrow\sigma_\infty^2=0.04$，即平稳扰动 $\mathrm{dg}\sim\mathcal N(0,\,0.2^2)$ m/s²（≈ 2% 重力）。</p>
+<h4>4.4 疑点（诚实标注）</h4>
+<div class="callout warn"><div class="callout-title">"quadratic air drag" vs v1.0 代码</div>正文说"We also added a <strong>quadratic</strong> air drag and took the sum of thrust and air drag to calculate the acceleration"。但 v1.0 代码 <code>env_cuda.py</code> L252–254 在 reset 时把二次项系数<strong>置零</strong>（<code>self.drag_2[:,0]=0</code>），随机化的是<strong>线性</strong>系数 $[0.3,0.45]$ s⁻¹；二次项只有形式实现没有激活。可能 (a) 最终训练版与 v1.0 不同；(b) 论文表述概括不精确（"quadratic drag" 是类别名，实装以 Supplementary Note 1 的标定为准——该文件不在本工作目录）。<strong>如实指出，不替论文圆场</strong>。另外 test.py L39 的注释给出被注释掉的 z_drag 公式 $0.047=(4\times rotor\_drag\_coef\times motor\_velocity)/\sqrt{9.8}$，说明 v1.0 是从更精细模型（含旋翼诱导阻力）简化而来。</div>
+<hr>
+<h3>5. 无编号式 (D4)：飞控内环响应 $\eta(t)$ 与 EMA 离散化</h3>
+<p>论文原文（第 9 页）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D4) —— 简化飞控冲激响应（论文无编号式）</span>
+$$\eta(t)=\begin{cases}0, & t<\tau\\ \lambda\,e^{-\lambda(t-\tau)}, & t\ge\tau\end{cases} \tag{D4}$$
+<div class="eq-note"><strong>符号</strong>：$\tau$ = 飞控固定延迟；$\lambda$ = 指数平滑系数（速率常数）；滤波推力 $\hat u_k=(u\ast\eta)(t_k)$ 是期望推力序列与 $\eta$ 的卷积（论文原话："represented as the convolution between the desired thrust vector $u_k$ with the simplified flight controller impulsive response"）。</div>
+</div>
+<h4>5.1 推导——一阶系统 + 纯延迟的冲激响应</h4>
+<p><strong>第 1 步：建模。</strong> 把飞控内环近似为"纯延迟 + 一阶低通"：实际推力 $\hat u$ 满足</p>
+$$\dot{\hat u}(t)=\lambda\big(u(t-\tau)-\hat u(t)\big)$$
+<p>（时间常数 $1/\lambda$：误差越大纠得越快。）</p>
+<p><strong>第 2 步：冲激响应。</strong> 令 $u(t)=\delta(t)$，对 $t>\tau$ 解齐次方程 $\dot{\hat u}+\lambda\hat u=0$ 配初值（在 $t=\tau$ 处注入单位冲量 → $\hat u(\tau^+)=\lambda$）：</p>
+$$\hat u(t)=\lambda\,e^{-\lambda(t-\tau)}\quad(t\ge\tau),\qquad \hat u(t)=0\quad(t<\tau)$$
+<p>即 (D4)。卷积形式 $\hat u(t)=\int_0^{\infty}\eta(s)\,u(t-s)\,ds=\int_{\tau}^{\infty}\lambda e^{-\lambda(s-\tau)}u(t-s)\,ds$；频域 $H(s)=e^{-s\tau}\cdot\frac{\lambda}{s+\lambda}$（纯延迟 × 一阶低通）。$\int_0^\infty\eta(t)dt=1$ ✅（直流增益 1，稳态时 $\hat u=u$ 无静差）。</p>
+<p><strong>第 3 步：离散精确解（零阶保持采样）。</strong> 在 $u$ 分段常数（每步采样）下，连续解可<strong>精确</strong>离散化：</p>
+$$\hat u_{k+1}=e^{-\lambda\Delta t}\,\hat u_k+\big(1-e^{-\lambda\Delta t}\big)\,u_{k-m},\qquad m=\mathrm{round}(\tau/\Delta t)$$
+<p>推导：$\hat u((k+1)\Delta t)=e^{-\lambda\Delta t}\hat u(k\Delta t)+u_k\int_0^{\Delta t}\lambda e^{-\lambda s}ds$，积分项 $=1-e^{-\lambda\Delta t}$。✅</p>
+<h4>5.2 代码交叉验证与数值核算</h4>
+<pre class="code-block"><code>// src/dynamics_kernel.cu L82–86
+alpha = exp(-pitch_ctl_delay * ctl_dt);
+act_next = act_pred * (1 - alpha) + act * alpha;   // 精确 EMA 离散化 ✓
+// main_cuda.py L104–105、L131：act_lag=1 → act_buffer[t] 滞后 1 步 → τ = Δt ≈ 66.7 ms</code></pre>
+<ul>
+<li>$\lambda\sim\mathcal N(12,1.2)$ s⁻¹（pitch 通道，训练随机化）、$\Delta t=1/15$ s：$e^{-\lambda\Delta t}=e^{-0.8}=0.4493$ → 新指令权重 $1-e^{-0.8}=0.5507$，时间常数 $1/\lambda\approx83$ ms。</li>
+<li>yaw 通道另有 $\lambda_y\sim\mathcal N(6,0.6)$ s⁻¹ 的一阶滤波（<code>update_state_vec</code> 中 alpha_yaw），建模偏航跟踪的慢响应。</li>
+<li>训练时 $\Delta t$ 本身随机化 $\sim\mathcal N(1/15,0.1/15)$，即 EMA 系数也随之随机——相当于在"控制带宽"上做域随机化。</li>
+<li>物理直觉：策略必须<strong>提前约 1/15 s + 83 ms ≈ 150 ms</strong> 预判动作，否则真机跟不上——这正是仿真必须建模 $\eta(t)$ 的原因（消融外的默认配置）。</li>
+</ul>
+<div class="callout warn"><div class="callout-title">本笔记第 6 节的符号错误（必须更正）</div>第 6 节 Eq.(2) 把 (D4) 写成 $\psi(t)=\{0,\ t<\tau;\ \alpha e^{-\alpha(t-\tau)}\}$（把 $\lambda$ 改名 $\alpha$，无害但易混）；<strong>第 6 节 Eq.(3) 把时间梯度衰减写成 $e^{-\tau\cdot\Delta t}$ 是实质错误</strong>——论文里 $\tau$ 是<strong>控制延迟</strong>（本节），梯度衰减率是另一个参数 $\alpha$（§10），两者完全不同。请以本节与 §10 为准。</div>
+<hr>
+<h3>6. 无编号式 (D5)：从期望加速度到姿态与集体推力的映射</h3>
+<p>论文原文（第 9 页，文字描述）："Because a quadrotor can generate only a collective thrust in the upward direction for its body, the magnitude (length) of the thrusts defines the overall vehicle acceleration, whereas the direction of the thrust vector defines the inclination. Additionally, we aligned the yaw angle of the quadrotor with the target direction, thus establishing a unique orientation."——这段文字精确对应下面的数学：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D5) —— 集体推力与姿态重构（论文文字数学化，无编号式）</span>
+$$m\,a=T\,\hat z_B+m\,g\quad\Longrightarrow\quad \hat z_B=\frac{a-g}{\|a-g\|},\qquad \frac{T}{m}=\|a-g\| \tag{D5}$$
+$$x_B\propto \mathrm{proj}_{\perp\hat z_B}\!\big(v^{\rm des}\big),\qquad y_B=\hat z_B\times x_B$$
+<div class="eq-note"><strong>符号</strong>：$a$ = 期望世界系加速度（策略输出经滤波后）；$T$ = 集体推力；$\hat z_B$ = 机体推力轴（向上）；$v^{\rm des}$ = 期望速度方向（目标方向）；$R=[x_B,\ y_B,\ \hat z_B]$ 构成姿态旋转阵（行向量形式），用于深度相机外参与观测中的上向量。$g=(0,0,-9.80665)$。</div>
+</div>
+<h4>6.1 第一性原理推导（四旋翼力平衡）</h4>
+<p><strong>第 1 步：力平衡。</strong> 四旋翼唯一的作动方式是沿机体 $\hat z_B$ 的<strong>集体推力</strong> $T$（四个旋翼合力，无侧向分量）。牛顿第二定律（世界系）：$m a=T\hat z_B+m g$（这里 $a$ 是期望加速度——即策略让飞控实现的加速度；$g$ 是重力加速度矢量）。移项：</p>
+$$T\,\hat z_B=m(a-g)$$
+<p><strong>第 2 步：解出推力与姿态。</strong> 两边取范数：$T=m\|a-g\|$（$T\ge0$）；再归一化：$\hat z_B=\frac{a-g}{\|a-g\|}$。这就是 (D5) 第一行——<strong>给定任意期望加速度 $a$，机体轴 $\hat z_B$ 与推力 $T$ 被唯一确定</strong>（这是 Faessler 2018 微分平坦性的核心约束：四旋翼姿态 2 个自由度由加速度决定）。</p>
+<p><strong>第 3 步：偏航自由度。</strong> 绕 $\hat z_B$ 的旋转自由——用"机头对准目标方向"消除：$x_B$ 取 $v^{\rm des}$ 在 $\perp\hat z_B$ 平面上的投影并归一化，$y_B=\hat z_B\times x_B$（右手系）。(D5) 第二行。⚠️ 当 $v^{\rm des}\parallel\hat z_B$（纯升降）时投影退化——代码用前向量的 EMA 惯性 + 正交化避免除零（见 6.2）。</p>
+<h4>6.2 代码交叉验证（update_state_vec 逐行）</h4>
+<pre class="code-block"><code># env_cuda.py L258–274 / dynamics_kernel.cu L21–57
+a_thr = act - g_std                       # 推力加速度矢量 = a − g
+thrust = norm(a_thr); up_vec = a_thr/thrust        # ẑ_B = (a−g)/‖a−g‖  ✓ (D5)
+forward_vec = fwd*yaw_inertia + v_pred             # 目标方向 + 惯性
+forward_vec = normalize(forward_vec)               # 归一
+fz = -(fx*ux + fy*uy)/uz                           # 正交化到 ⊥ ẑ_B 平面（解 f·u=0）
+left_vec = cross(up_vec, forward_vec)              # y_B = ẑ_B × x_B  ✓
+R = [forward_vec, left_vec, up_vec]                # 行向量姿态阵</code></pre>
+<p>✅ 与 (D5) 一致。要点：训练中 $R$ <strong>不参与平动积分</strong>——它只做两件事：(i) 作为深度渲染的外参（论文："the orientation and position of the quadrotor (from the point-mass model) served as the extrinsic parameters for rendering the depth sensor data"）；(ii) 把上向量 $\hat z_B$ 送进策略观测（"attitude estimation"）。这就是"点质量模型"能取代刚体模型而物理上仍自洽的原因：<strong>姿态是从加速度代数重构出来的，不需要积分角速度</strong>。</p>
+<h4>6.3 数值核算（用论文硬件参数）</h4>
+<ul>
+<li><strong>悬停</strong>：$a=0$ → $\hat z_B=(0,0,1)$、$T/m=\|{-}g\|=9.807$ m/s²（推力加速度=重力加速度）✅。</li>
+<li><strong>推力重量比 TWR=3.6</strong>（Hardware set-up，注意正文另一处写 3.8，见问题清单）：最大 $T/m=3.6g=35.3$ m/s²。最大水平加速度（推力全用于水平分量，竖直分量平衡重力）：$a_h^{\max}=g\sqrt{3.6^2-1}=9.807\times3.458=33.9$ m/s²，对应倾斜角 $\theta=\arccos(1/3.6)=73.9^\circ$。</li>
+<li><strong>20 m/s 巡航</strong>：阻力加速度（$\mu_1=0.4$ s⁻¹）$D=0.4\times20=8$ m/s²——巡航时约 80% 推力在对抗阻力，说明阻力标定对高速飞行至关重要（论文 Limitations 也承认"air drag parameters require recalibration across platforms"）。</li>
+</ul>
+<hr>
+<h3>7. 无编号式 (D6)：速度匹配损失 $\mathcal{L}_v$</h3>
+<p>论文原文（第 10 页）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D6) —— 速度匹配损失（论文无编号式）</span>
+$$\mathcal{L}_v=\frac{1}{T}\sum_{k=1}^{T}\mathrm{SmoothL1}\Big(\big\|v^{\rm set}_k-\bar v_k\big\|_2,\ 0\Big) \tag{D6}$$
+<div class="eq-note"><strong>符号</strong>：$T$ = 轨迹总步数；$v^{\rm set}_k$ = 设定速度；$\bar v_k$ = 2 s 滑动平均实际速度；$\mathrm{SmoothL1}(x,0)$ = 以 0 为目标的 Smooth L1 损失。<strong>Smooth L1 定义</strong>（Girshick 2015，论文 ref.43）：$\mathrm{SmoothL1}(x)=\frac12x^2$（$|x|&lt;1$），$|x|-\frac12$（$|x|\ge1$）——小误差二次（精确）、大误差线性（鲁棒，不受个别离群帧支配），导数 $=\mathrm{clamp}(x,-1,1)$ 有界。</div>
+</div>
+<h4>7.1 各项构造与推导要点</h4>
+<ul>
+<li><strong>滑动平均</strong>：$\bar v_k=\frac{1}{30}\sum_{t=k-29}^{k}v_t$（15 Hz × 2 s = 30 步）。论文解释："The averaging enables the agent to focus on obstacle avoidance locally while tracking the desired velocity $v^{\rm set}_k$ in a longer horizon"——瞬时速度可以因避障自由起伏，2 s 平均保持"长期航速"不变，损失函数因此<strong>同时</strong>允许局部机动与全局速度跟踪。</li>
+<li><strong>设定速度</strong>：方向 = 目标位置与当前位置之差的方向；幅值 = $\min(\|p_{\rm target}-p_k\|,\ v_{\max})$（快到目标时自动减速，防止冲过目标）；"its gradient is not propagated during training"（对位置 detach，代码 L130 <code>env.p.detach()</code>）。$v_{\max}$ 训练随机化 $(0.75+2.5r)\times m_{tp}$，$m_{tp}=4$（单智能体配置）→ 上限 $\approx 3\text{–}13$ m/s。</li>
+<li><strong>数学结构</strong>：(D6) 是"误差范数的鲁棒损失"——先取 $\|\cdot\|_2$（速度差的大小），再套 SmoothL1（对大小的鲁棒化），等价于各向同性、对离群误差线性截尾的二次代价。</li>
+</ul>
+<h4>7.2 代码交叉验证与疑点</h4>
+<pre class="code-block"><code># main_cuda.py L172–177
+v_history_cum = v_history.cumsum(0)
+v_history_avg = (v_history_cum[30:] - v_history_cum[:-30]) / 30      # 2s 滑动平均 ✓
+delta_v = torch.norm(v_history_avg - target_v_history[1:1-30], 2, -1)   # ⚠️ 对齐偏移
+loss_v = F.smooth_l1_loss(delta_v, torch.zeros_like(delta_v))         # SmoothL1(·,0) ✓</code></pre>
+<div class="callout warn"><div class="callout-title">代码与公式的对齐偏移（如实指出）</div>代码把 $\bar v_t$（窗口 $[t-29,t]$ 的平均）与 <code>target_v_history[1:1-30]</code> 即 <strong>$v^{\rm set}_{t-29}$（窗口起点的目标）</strong>比较，而论文公式 (D6) 写的是<strong>同一时刻</strong> $k$。两者相差 29 步（≈1.9 s）。可能是实现细节，也可能是"用窗口起点目标约束整段平均速度"的有意设计——论文未说明，如实标注。</div>
+<hr>
+<h3>8. 无编号式 (D7)：障碍避碰损失 $\mathcal{L}_c$（本文唯一"公式/文字/代码三方不一致"的式子）</h3>
+<p>论文原文（第 10 页）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D7) —— 障碍避碰损失（论文无编号式）</span>
+$$\mathcal{L}_c=\frac{1}{T}\sum_{k=1}^{T}\Big[\,v^c_k\,\max\big(1-(d_k-r_q),\ 0\big)^2+\beta_1\ln\big(1+e^{\beta_2(r_q-d_k)}\big)\Big] \tag{D7}$$
+<div class="eq-note"><strong>符号</strong>：$d_k$ = 无人机中心到最近障碍点的距离；$r_q$ = 无人机半径；$v^c_k$ = 对该障碍点的接近速度；$\beta_1=2.5$、$\beta_2=32$（softplus 权重与陡度）。<strong>结构</strong>：第一项 = 截断二次（hinge 型距离惩罚，仅当 $d_k&lt;r_q+1$ 激活）；第二项 = softplus 屏障函数 $\ln(1+e^{x})$（连续可微的"软约束"，替代碰撞硬约束）；$v^c_k$ 按接近速度调制惩罚。⚠️ 括号归属按 fulltext.txt 文本抽取呈现（$v^c_k$ 只乘第一项）；正文文字与代码的归属不同，见 §8.4。</div>
+</div>
+<h4>8.1 第一性原理推导——为什么这样设计一个可微的碰撞损失</h4>
+<p><strong>第 1 步：把"不碰撞"写成一个可微函数。</strong> 硬约束是 $d_k\ge r_q$。直接对 $[d_k&lt;r_q]$ 求导为 0（几乎处处）——无法优化。经典做法是引入<strong>屏障函数</strong>：$B(s)=\ln(1+e^{s})$（softplus），其中 $s=\beta_2(r_q-d_k)$ 是"侵入深度"的线性缩放：远离时 $s\to-\infty$、$B\to0$（$e^s\to0$ 指数衰减）；接触时 $s=0$、$B=\ln 2$；侵入时 $s>0$、$B\approx s$（线性增长，如硬约束的"软化"）。</p>
+<p><strong>第 2 步：叠加近场二次惩罚。</strong> 屏障只在"很近"时才显著（见数值表），远距离（1 m 外）几乎无梯度 → 智能体缺少"提前让开"的信号。截断二次 $\max(1-(d_k-r_q),0)^2$ 恰好补上：在 $d_k\in[r_q,\ r_q+1]$ 提供线性梯度 $\frac{\partial}{\partial d}=-2(1-(d_k-r_q))$，把"保持 1 m 净空"变成软目标。</p>
+<p><strong>第 3 步：用接近速度调制。</strong> $v^c_k$：靠近得快惩罚重（"how fast the drone is approaching"），静止/远离时惩罚应归零（论文原话："When the drone is stationary or moving away from the obstacle, this factor will nullify the penalty"）。</p>
+<h4>8.2 数值核算（代入 $\beta_1=2.5,\ \beta_2=32$）</h4>
+<table>
+<tr><th>间隙 $d_k-r_q$ (m)</th><th>截断二次项</th><th>softplus 项 $\beta_1\ln(1+e^{32(r_q-d_k)})$</th><th>合计（$v^c_k=1$ 时）</th></tr>
+<tr><td>+1.0</td><td>0（恰好失活）</td><td>$2.5\ln(1+e^{-32})\approx 3.2\times10^{-13}$</td><td>≈ 0</td></tr>
+<tr><td>+0.5</td><td>0.25</td><td>$2.5\ln(1+e^{-16})\approx 2.8\times10^{-7}$</td><td>0.25</td></tr>
+<tr><td>+0.2</td><td>0.64</td><td>$2.5\ln(1+e^{-6.4})\approx 0.0042$</td><td>0.644</td></tr>
+<tr><td>+0.1</td><td>0.81</td><td>$2.5\ln(1+e^{-3.2})\approx 0.100$</td><td>0.910</td></tr>
+<tr class="highlight"><td>0（表面接触）</td><td>1.0</td><td>$2.5\ln 2\approx 1.733$</td><td>2.733</td></tr>
+<tr><td>−0.05（侵入 5 cm）</td><td>1.1025</td><td>$2.5\ln(1+e^{1.6})\approx 4.46$</td><td>5.56</td></tr>
+<tr><td>−0.1（侵入 10 cm）</td><td>1.21</td><td>$2.5\ln(1+e^{3.2})\approx 8.10$</td><td>9.31</td></tr>
+</table>
+<p><strong>softplus 的梯度核算</strong>：$\frac{\partial}{\partial d}\beta_1\ln(1+e^{\beta_2(r_q-d)})=-\beta_1\beta_2\,\sigma(\beta_2(r_q-d))$（$\sigma$ = sigmoid），在 $d_k=r_q$ 处 $=-2.5\times32\times0.5=-40$ m⁻¹——<strong>跨越障碍面时每侵入 1 m 损失增加 40</strong>，是真正的"墙"。二阶导 $\beta_1\beta_2^2\sigma(1-\sigma)\ge0$：softplus 项对 $d$ <strong>凸</strong> ✅（凸屏障，优化友好）。截断二次在 $d=r_q+1$ 处函数与一阶导都连续（$C^1$ 光滑）✅，在 $d=r_q$ 处二阶导不连续（无碍，梯度连续即可）。</p>
+<h4>8.3 代码交叉验证（v1.0）</h4>
+<pre class="code-block"><code># main_cuda.py L193–199
+distance = torch.norm(vec_to_pt_history, 2, -1) - env.margin        # d_k − r_q（margin≈r_q）
+with torch.no_grad():
+    v_to_pt = (-torch.diff(distance, 1, 1) * 135).clamp_min(1)      # v^c_k（见 8.4 疑点）
+loss_obj_avoidance = barrier(distance[:, 1:], v_to_pt)              # mean(v^c·max(1−(d−r_q),0)²) ✓ 第一项
+loss_collide = F.softplus(distance[:, 1:].mul(-32)).mul(v_to_pt).mean()  # softplus(32(r_q−d))·v^c ✓ β2=32</code></pre>
+<p>✅ 第一项与 (D7) 完全一致（<code>barrier = (v_to_pt*(1-x).relu().pow(2)).mean()</code>）；softplus 的 $\beta_2=32$ 一致。</p>
+<h4>8.4 三处不一致（如实列出，不圆场）</h4>
+<ol>
+<li><strong>$v^c_k$ 的作用域</strong>：印刷公式（按文本抽取）是 $v^c_k\cdot\max(\cdot)^2+\beta_1\ln(\cdot)$——$v^c_k$ <strong>只乘第一项</strong>；正文文字说"The obstacle avoidance loss is the approach speed <strong>multiplied by the sum of</strong> a truncated quadratic function and a softplus function"——乘<strong>两项之和</strong>；代码两项都乘 $v^c$。三方不一致，建议对照 page-010.png 复核括号归属。</li>
+<li><strong>"nullify" 与 clamp_min(1)</strong>：代码 $v^c_k=(-135\,\Delta d_k)_{\ge1}$（$\Delta d_k=d_{k+1}-d_k$，135=9×15 即 9×距离下降速率 m/s），<code>clamp_min(1)</code> 使<strong>静止/远离时 $v^c_k=1$ 而非 0</strong>——与正文"stationary or moving away → nullify the penalty"不符（此时 softplus 项仍≈1.73·1 的惩罚）。要么最终版改了 clamp，要么正文描述过度简化。</li>
+<li><strong>$\beta_1$ 与代码权重</strong>：代码 softplus 项权重 = <code>coef_collide</code>（默认 2.0，multi 5.0，single 7.5），二次项权重 = <code>coef_obj_avoidance</code>（默认 1.5，multi 2.0，single 3.0）——与论文 (D7) 的 $1:\beta_1=1:2.5$ 比例<strong>不完全对应</strong>（默认配置 1.5:2.0）。可能 v1.0 与投稿版超参不同，如实标注。</li>
+</ol>
+<div class="callout warn"><div class="callout-title">本笔记第 6 节的公式错误（必须更正）</div>第 6 节 Eq.(4) 把 (D7) 写成 $v_c^k\left[\max(\cdot)^2+\frac{1}{\beta_2}\ln(1+e^{2\beta_2(r_q-d_k)})\right]$——$\frac{1}{\beta_2}$ 应为 $\beta_1$、$2\beta_2$ 应为 $\beta_2$（把权重和陡度参数搞混了），且 $v^c_k$ 的括号归属与论文印刷式不同。请以本节 (D7) 为准。</div>
+<hr>
+<h3>9. 无编号式 (D8)(D9)：平滑损失与总损失</h3>
+<p>论文原文（第 10 页）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D8) —— 加速度与 jerk 平滑损失（论文无编号式）</span>
+$$\mathcal{L}_a=\frac{1}{T}\sum_{k=1}^{T}\big\|a_k\big\|_2,\qquad \mathcal{L}_j=\frac{1}{T-1}\sum_{k=1}^{T-1}\left\|\frac{a_k-a_{k+1}}{\Delta t}\right\|_2 \tag{D8}$$
+<span class="eq-tag">Eq.(D9) —— 总损失（论文无编号式）</span>
+$$\mathcal{L}=\lambda_v\mathcal{L}_v+\lambda_c\mathcal{L}_c+\lambda_a\mathcal{L}_a+\lambda_j\mathcal{L}_j,\qquad (\lambda_v,\lambda_c,\lambda_a,\lambda_j)=(1,\ 2,\ 0.01,\ 0.001) \tag{D9}$$
+<div class="eq-note"><strong>符号</strong>：$\mathcal{L}_a$ = 加速度幅值惩罚（动态可行性：限制加速度指令量级）；$\mathcal{L}_j$ = jerk 惩罚——jerk 是加速度的变化率（$\approx a_k$ 的离散差分除以 $\Delta t$），量纲 m/s³，压 jerk 让飞行更平滑（视觉更稳、执行器更友好，论文引 ref.6 的 jerk 惩罚传统）。$\lambda$ 为四项权重。</div>
+</div>
+<h4>9.1 推导与数值意义</h4>
+<ul>
+<li><strong>jerk 的物理来源</strong>：对四旋翼，推力正比于旋翼转速平方，转速变化受电机时间常数限制——约束推力变化率（≈jerk×质量）就是约束电机。视觉层面：相机角运动正比于姿态角速率，姿态由加速度决定，故 smooth $a$ ⇒ smooth 姿态 ⇒ 深度图像稳定、光流可辨。</li>
+<li><strong>权重量纲分析（诚实）</strong>：$\mathcal{L}_v$ 无量纲（SmoothL1 输出）、$\mathcal{L}_c$ 量纲 m/s（$v^c_k$×无量纲两项）、$\mathcal{L}_a$ 量纲 m/s²（或 m²/s⁴）、$\mathcal{L}_j$ 量纲 m/s³（或 m²/s⁶）——<strong>四项量纲互不相同，权重 $(1,2,0.01,0.001)$ 纯粹是工程标定值，没有物理归一化</strong>。论文未做量纲分析，如实说明。量级粗估：1 m/s 速度误差→SmoothL1≈0.5；接近障碍 1 m/s→$\mathcal{L}_c$≈0.25 m/s；典型加速度 5 m/s²→$\mathcal{L}_a$≈5；jerk 5 m/s³→$\mathcal{L}_j$≈5，加权后 $\lambda_v\mathcal{L}_v:\lambda_c\mathcal{L}_c:\lambda_a\mathcal{L}_a:\lambda_j\mathcal{L}_j\approx0.5:0.5:0.05:0.005$——速度与避障主导、平滑项弱正则，与论文意图一致。</li>
+<li><strong>总损失 = 轨迹优化的逐步损失之和</strong>：(D9) 就是式 (1) 里 $l_k$ 的具体实现（$l_k$ 把四项按步展开），也是 PPO 基线"same reward (negative loss)"的 reward 定义。</li>
+</ul>
+<h4>9.2 代码交叉验证与三处疑点</h4>
+<pre class="code-block"><code># main_cuda.py L187–191, L204–213
+jerk_history = act_buffer.diff(1, 0).mul(15)              # (act_{k+1}−act_k)/Δt，Δt=1/15
+loss_d_acc = act_buffer.pow(2).sum(-1).mean()             # Σ‖act_k‖² 平方和
+loss_d_jerk = jerk_history.pow(2).sum(-1).mean()          # Σ‖jerk‖² 平方和
+loss = 1.0*loss_v + 1.5*loss_obj_avoidance + 2.0*loss_collide + 0.01*loss_d_acc + 0.001*loss_d_jerk + ...</code></pre>
+<div class="callout warn"><div class="callout-title">印刷式与代码的三处出入（如实标注）</div><ol><li><strong>范数 vs 平方</strong>：印刷 (D8) 是 $\|\cdot\|_2$（范数），代码是<strong>平方和</strong> $\|\cdot\|^2$。文本抽取无法区分 $\|a_k\|_2$ 与 $\|a_k\|^2$（下标/上标丢失），需对 page-010.png 复核；若论文确为范数，则与代码（平方）梯度不同（$2a$ vs $a/\|a\|$）。</li><li><strong>$a_k$ vs $\mathrm{act}_k$</strong>：论文写"实际加速度 $a_k$"，代码惩罚的是<strong>指令加速度</strong> $\mathrm{act}_k$（含重力补偿后的推力指令，见 §11.4）——两者相差阻力/扰动项。</li><li><strong>jerk 差分方向</strong>：印刷式 $(a_k-a_{k+1})/\Delta t$ 是<strong>负向</strong>差分（标准应为 $(a_{k+1}-a_k)/\Delta t$），平方/范数下数值相同，属排版瑕疵；代码为正向 diff ✓。</li></ol></div>
+<hr>
+<h3>10. 无编号式 (D10)：时间梯度衰减——梯度爆炸的数学与对策</h3>
+<p>论文原文（第 10 页 Temporal gradient decay）："we multiply the gradient of $x_{t+1}$ with respect to $x_t$ by the exponential decay factor $e^{-\alpha\Delta t}$"：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D10) —— 带时间梯度衰减的策略梯度（论文无编号式）</span>
+$$\frac{\partial\mathcal{L}_\theta}{\partial\theta}=\frac{1}{N}\sum_{k=0}^{N-1}\left(\sum_{i=0}^{k}\frac{\partial l_k}{\partial x_k}\prod_{j=i+1}^{k}\left(\frac{\partial x_j}{\partial x_{j-1}}e^{-\alpha\Delta t}\right)\frac{\partial x_i}{\partial\theta}+\frac{\partial l_k}{\partial u_k}\frac{\partial u_k}{\partial\theta}\right) \tag{D10}$$
+<div class="eq-note"><strong>符号</strong>：$\alpha$ = 衰减率（s⁻¹，消融 $\in\{0.25,0.5,1,2,4\}$）；与 (D1) 的唯一差别 = 每个动力学雅可比乘 $e^{-\alpha\Delta t}$。$\alpha=0$ 退回 vanilla BPTT。</div>
+</div>
+<h4>10.1 为什么需要衰减——梯度爆炸的两条机理</h4>
+<p><strong>机理一（动力学不稳定）</strong>：BPTT 的连乘 $\prod_{j=i+1}^{k}\frac{\partial x_j}{\partial x_{j-1}}$ 对应离散系统的状态转移矩阵 $I+\frac{\partial f}{\partial x}\Delta t$。若 $f$ 的雅可比有实部为正的特征值（如策略闭环增益高、或阻力/推力耦合形成的正反馈），$\|I+A\Delta t\|^n$ 随 $n$ 指数增长——第 150 步的梯度可放大到无法训练的量级。这正是 Bengio et al. 1994（ref.45）"learning long-term dependencies"与 Metz et al. 2021（ref.36）"Gradients are not all you need"（混沌敏感性：光滑混沌系统里梯度必爆炸）指出的问题。本文点质量模型虽然是线性力学，但<strong>策略 + EMA 飞控闭环</strong>后整体系统可出现正反馈模态。</p>
+<p><strong>机理二（点质量模型自身的多项式增长）</strong>：纯运动学部分 $\frac{\partial p_{k+1}}{\partial p_k}=I$、$\frac{\partial p_{k+1}}{\partial v_k}=\Delta t\,I$、$\frac{\partial v_{k+1}}{\partial v_k}\approx I$，连乘得到上三角 $\begin{bmatrix}I&n\Delta t\\0&I\end{bmatrix}$——位置通道梯度随步数 $n$ <strong>线性</strong>增长（幂零 Jordan 块）。150 步即 150 倍，虽非指数，也足以淹没近端信号。衰减把两种增长都压掉。</p>
+<h4>10.2 衰减的数学结构——"梯度版折扣因子"</h4>
+<p>把 $e^{-\alpha\Delta t}$ 提出连乘（常数可与雅可比交换）：</p>
+$$\prod_{j=i+1}^{k}\left(\frac{\partial x_j}{\partial x_{j-1}}e^{-\alpha\Delta t}\right)=e^{-\alpha(k-i)\Delta t}\prod_{j=i+1}^{k}\frac{\partial x_j}{\partial x_{j-1}}=e^{-\alpha\,(t_k-t_i)}\prod_{j=i+1}^{k}\frac{\partial x_j}{\partial x_{j-1}}$$
+<p>即：<strong>距当前时刻 $(t_k-t_i)$ 秒的梯度信号被乘 $e^{-\alpha(t_k-t_i)}$</strong>。与 RL 的折扣回报 $\sum_t\gamma^t r_t$（$\gamma=e^{-1/\tau_{\rm horizon}}$）类比：两者都是"近未来优先"，但 RL 折扣作用于<strong>目标</strong>，本文折扣作用于<strong>梯度</strong>——效果等价于有效记忆窗 $\tau_{\rm eff}=\alpha^{-1}$ 秒。</p>
+<ul>
+<li>$\alpha=0.25$ → $\tau_{\rm eff}=4$ s；$\alpha=4$ → $\tau_{\rm eff}=0.25$ s。</li>
+<li>数值表（$\Delta t=1/15$ s）：$e^{-\alpha\Delta t}=\{0.9835,\ 0.9672,\ 0.9355,\ 0.8752,\ 0.7659\}$（对应 $\alpha=0.25,0.5,1,2,4$）。代码默认 grad_decay=0.4 → 每步 $0.4^{1/15}=0.9407$，等效 $\alpha=-\ln 0.4\approx0.92$ s⁻¹，落在消融区间内 ✅。</li>
+<li><strong>物理解释</strong>（论文原文）："the agent can learn to avoid only relatively close obstacles"——FOV 半角 27.9°–39.4°、深度有效范围约 5 m，感知范围 ≈ 1 s 航程，超过该时距的梯度只是"未来障碍的噪音"。</li>
+<li><strong>为什么不用截断</strong>（论文文字）：截断（只用前 $M$ 步）完全丢弃远期信号；衰减保留弱监督（"by emphasizing immediate objectives and filtering out potential distractions from uncertain future obstacles"），且 $\alpha$ 在 0.25–4 都大幅优于 BPTT（图 6c）——对超参不敏感。</li>
+</ul>
+<h4>10.3 代码实现差异（如实标注）</h4>
+<pre class="code-block"><code>// src/dynamics_kernel.cu L203–212（run_backward）：衰减只作用于 p、v 的对角递推路径
+d_p = d_p_next * pow(grad_decay, ctl_dt);      // p → p 路径 ✓
+d_v = d_v_next * pow(grad_decay, ctl_dt);      // v → v 路径 ✓
+d_v += ctl_dt * d_p_next;                      // p → v 交叉路径（未乘衰减）
+d_a += 0.5 * ctl_dt * ctl_dt * d_p_next;       // p → a 交叉路径（未乘衰减）
+d_a += 0.5 * ctl_dt * d_v_next;                // v → a 交叉路径（未乘衰减）</code></pre>
+<p>论文公式 (D10) 是把<strong>整个雅可比</strong>乘 $e^{-\alpha\Delta t}$（所有路径一致衰减）；代码只衰减 p→p、v→v 两条"状态递推"路径，交叉路径不衰减——<strong>方向一致、数值近似，但不严格等价</strong>。这正对应论文文字"We incorporated an exponential decay mechanism into the <strong>position and velocity</strong> gradients during backpropagation"（只提位置与速度梯度）——论文文字其实比公式更贴近代码实现。✅ 文字 ↔ 代码一致，公式是理想化写法。</p>
+<hr>
+<h3>11. 无编号式 (D11)：网络结构与数据流的数学化</h3>
+<p>论文文字规格（第 10 页 Network architecture）：深度图反演+池化至 16×12 → 卷积 32(2)、64(3)、128(3) → 展平 → 192 维投影；状态（目标速度、姿态、可选速度）同样投影到 192 维 → 逐元素相加 → GRU → 全连接输出期望推力加速度与速度估计。本文把它数学化并逐层核对（<code>model.py</code>）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D11) —— 观测变换与网络前向（论文文字数学化，无编号式）</span>
+$$x^{\rm img}=3/d-0.6\qquad(d\in[0.3,24]),\qquad x^{\rm pool}=\mathrm{MaxPool}_{4\times4}(x^{\rm img})\in\mathbb{R}^{12\times16} \tag{D11a}$$
+$$z_{\rm img}=\mathrm{Linear}_{1024\to192}\Big(\mathrm{flatten}\big(\mathrm{Conv}^{128}_{k3,s1}(\mathrm{Conv}^{64}_{k3,s1}(\mathrm{Conv}^{32}_{k2,s2}(x^{\rm pool})))\big)\Big) \tag{D11b}$$
+$$h_k=\mathrm{GRU}_{192}\Big(\mathrm{LeakyReLU}\big(z_{\rm img}+\mathrm{Linear}_{10\to192}(s_k)\big),\ h_{k-1}\Big) \tag{D11c}$$
+$$\big(a^{\rm pred}_k,\ v^{\rm pred}_k\big)=\mathrm{Linear}_{192\to6}\big(\mathrm{LeakyReLU}(h_k)\big),\qquad \mathrm{act}_k=\big(a^{\rm pred}_k-v^{\rm pred}_k-g\big)\cdot c_{\rm thr}+g \tag{D11d}$$
+<div class="eq-note"><strong>符号</strong>：$d$ = 深度图（64×48，钳位 [0.3,24] m 后反演缩放）；$s_k$ = 状态输入（10 维 odometry 版 / 7 维 odometry-free 版）；$c_{\rm thr}$ = 推力估计误差随机化（$\sim\mathcal N(1,0.01)$）；$g=(0,0,-9.80665)$。<strong>GRU 方程</strong>（Cho 2014，论文 ref.33，论文没写，本文补齐）：$r_k=\sigma(W_r x_k+U_r h_{k-1}+b_r)$、$z_k=\sigma(W_z x_k+U_z h_{k-1}+b_z)$、$\tilde h_k=\tanh(W x_k+U(r_k\odot h_{k-1})+b)$、$h_k=(1-z_k)\odot h_{k-1}+z_k\odot\tilde h_k$。</div>
+</div>
+<h4>11.1 逐层尺寸核算（代入真实张量形状）</h4>
+<table>
+<tr><th>层</th><th>输入形状</th><th>核/规格</th><th>输出形状</th><th>参数</th></tr>
+<tr><td>深度渲染</td><td>—</td><td>64×48，tan(半 FOV)=0.53/0.82</td><td>64×48</td><td>—</td></tr>
+<tr><td>反演+池化</td><td>64×48</td><td>$3/d-0.6$，MaxPool 4×4</td><td>12×16</td><td>—</td></tr>
+<tr><td>Conv1</td><td>1×12×16</td><td>32 @ k2, <strong>s2</strong></td><td>32×6×8</td><td>128</td></tr>
+<tr><td>Conv2</td><td>32×6×8</td><td>64 @ k3, s1</td><td>64×4×6</td><td>18,432</td></tr>
+<tr><td>Conv3</td><td>64×4×6</td><td>128 @ k3, s1</td><td>128×2×4</td><td>73,728</td></tr>
+<tr><td>图像投影</td><td>1024</td><td>Linear(1024→192, 无偏置)</td><td>192</td><td>196,608</td></tr>
+<tr><td>状态投影</td><td>10（或 7）</td><td>Linear(10→192)</td><td>192</td><td>2,112（7 维时 1,536）</td></tr>
+<tr><td>GRU</td><td>192</td><td>GRUCell(192,192)</td><td>192</td><td>222,336</td></tr>
+<tr><td>输出层</td><td>192</td><td>Linear(192→6, 无偏置)</td><td>6</td><td>1,152</td></tr>
+<tr class="highlight"><td>合计</td><td colspan="4">≈ <strong>514,496</strong>（odometry 版）≈ 51.4 万参数——"lightweight" 的量化证据</td></tr>
+</table>
+<p><strong>核算</strong>：Conv1 输出 $(12-2)/2+1=6$、$(16-2)/2+1=8$ → 6×8 ✓；Conv2 $(6-3)+1=4$、$(8-3)+1=6$ ✓；Conv3 → 2×4 ✓；flatten = 128×2×4 = 1024 ✓。GRU 参数 = $3\times(192\times192)\times2+6\times192=222,336$ ✓。推理 FLOPs ≈ 2×51.4 万 ≈ 1 MFLOP/前向——在 1.5 GHz Cortex-A53 上以 15 Hz 实时运行绰绰有余（论文："Thanks to the extremely lightweight network design, our whole system can run in real time"）。</p>
+<h4>11.2 两处文字-代码出入（如实标注）</h4>
+<ol>
+<li><strong>stride</strong>：论文说"All the convolution layers had a <strong>stride of 1</strong>"；代码第一层 Conv1 是 <strong>stride 2</strong>（<code>nn.Conv2d(1,32,2,2)</code>）。若三卷积全 s1，特征图为 128×7×11 = 9856 维，与 1024→192 投影<strong>不成立</strong>——所以要么"stride 1"文字有误，要么论文版本的第一层另有 2×2 池化。代码为准。</li>
+<li><strong>输入顺序</strong>：论文"16×12"指宽×高；代码张量 (B,1,12,16) 是高×宽——同一回事。</li>
+</ol>
+<h4>11.3 状态输入构成（与论文文字核对）</h4>
+<pre class="code-block"><code># main_cuda.py L134–151
+target_v  = (p_target − p).方向 × min(距离, max_speed)      # 目标速度（世界系）
+state = [local_v(3), target_v·R(3), 上向量 R[:,2](3), margin(1)]   # odometry 版 10 维
+# no_odom 时去掉 local_v → 7 维；模型输出 6 维 = [a_pred(3), v_pred(3)]</code></pre>
+<ul>
+<li>论文文字"target velocity, attitude estimation and velocity estimation (optional)" ✓ 一一对应（目标速度 3 + 姿态上向量 3 + 可选速度 3；margin 1 维是代码额外给的近障距离缓冲）。</li>
+<li>odometry-free 训练：$v^{\rm pred}_k$ 用 MSE 监督（<code>loss_v_pred = F.mse_loss(v_preds, v_history.detach())</code>，权重 2.0）——训练时"教"GRU 隐式估计速度，部署时不给速度输入也能飞（论文 Fig.4d：平均速度估计误差 0.78 m/s @ 峰值 7.74 m/s）。</li>
+<li>(D11d) 的指令合成：$\mathrm{act}_k=(a^{\rm pred}_k-v^{\rm pred}_k-g)\,c_{\rm thr}+g$——把网络输出的"期望总加速度"与"自身速度估计"相减（内部阻尼项：估计速度越大，指令越小），再经重力补偿与推力标定误差随机化（$c_{\rm thr}\sim\mathcal N(1,0.01)$）。这是"GRU state 同时输出推力与速度估计"（论文原话）的精确实现。</li>
+</ul>
+<h4>11.4 深度观测的数学性质</h4>
+<p>(D11a) 的变换 $x=3/d-0.6$：$d=5$ m 处零点、近处（$d\to0.3$）→ 9.4 大正、远处（$d\to24$）→ −0.475 饱和。反演深度把"远距离大数值"压成小数值（视差几何：深度误差与 $d^2$ 成正比，反演后近似均匀），噪声 $+\mathcal N(0,0.02^2)$ 是深度传感噪声的域随机化。FOV：tan(半 FOV)=0.53（默认）/0.82（单智能体配置）→ 水平 FOV ≈ 55.8°/78.7°。Grad-CAM 验证（论文 Fig.4e）用的损失 = $a_y^2$（体轴侧向加速度平方），可视化第二层 LeakyReLU。</p>
+<hr>
+<h3>12. 算法 / 训练流程逐行解读（论文无伪代码，按正文与代码数学化）</h3>
+<p>论文没有给出算法块（Extended Data Fig.1 是管线图，Extended Data Fig.2 是计算图），训练循环以正文描述 + <code>main_cuda.py</code> 为准。数学化如下：</p>
+<div class="formula-block">
+<span class="eq-tag">算法（补充式 A1）—— 单次训练迭代（正文步骤 + main_cuda.py L92–224）</span>
+$$\text{迭代}\ i:\quad \mathrm{reset}(\Omega_i)\ \longrightarrow\ \underbrace{\Big[\,o_k\mapsto u_k=\pi_\theta(o_k)\mapsto x_{k+1}=x_k+f(x_k,u_k)\,\Big]}_{k=0,\dots,149}\ \longrightarrow\ \mathcal{L}(\mathrm{D9})\ \longrightarrow\ \nabla_\theta\mathcal{L}\ (\mathrm{D10})\ \longrightarrow\ \theta\leftarrow\theta-\gamma\nabla_\theta\mathcal{L}$$
+$$\Omega_i=\big\{\text{64 并行环境};\ 30\text{ 球}+30\text{ 长方体}+30\text{ 圆柱}+2\text{ 横柱}\pm\text{屋顶/地面};\ v_{\max},\mu_1,v_{\rm wind},\lambda,\tau,\Delta t,c_{\rm thr},r_q,\text{FOV 全随机}\big\}$$
+<div class="eq-note"><strong>符号</strong>：$\Omega_i$ = 第 $i$ 次迭代的域随机化实例（障碍物尺寸/位置、初始位置、全部物理参数重新采样）；$\pi_\theta$ 前向 150 次共享同一 GRU 隐状态 $h_k$（序列模型）；梯度按 (D10) 衰减回传；优化器 AdamW（$\gamma=10^{-3}$，weight decay）+ 余弦退火至 $10^{-5}$，共 50,000 迭代。</div>
+</div>
+<h4>12.1 前向 rollout（逐行对应代码）</h4>
+<ol>
+<li><strong>reset</strong>（<code>env_cuda.py</code> L100–255）：随机障碍几何（球 r∈[0.4,0.6] m、长方体 0.1–0.3 m 半宽、圆柱 r∈[0.05,0.4] m，位置覆盖约 11 m×6 m×6 m 场地，50% 概率加"屋顶"大平面——即论文说的 planes/cuboids/spheres/cylinders 四类）；8 组起终点（<code>p_init</code>/<code>p_end</code> 各 8 个点，正反对调）；每轮随机 $v_{\max}=(0.75+2.5r)\times m_{tp}$；随机风、阻力、飞控延迟、推力误差、半径、相机俯仰角 10°±1°、FOV 抖动。</li>
+<li><strong>逐步仿真</strong>（L118–166）：render 深度（含相机运动扫掠 R_old→R，多智能体时其他个体渲染为球体）→ 组装状态 → 策略前向（GRU 状态跨步传递）→ (D11d) 合成指令 → 进 act_buffer（1 步延迟）→ CUDA 核步进 (D2)–(D4) 物理。</li>
+<li><strong>损失组装</strong>（L167–213）：$\mathcal{L}_v$（2 s 窗口）→ $v^{\rm pred}$ MSE → 截断二次屏障 → softplus 碰撞 → $\|\mathrm{act}\|^2$ → jerk² → 加权求和 (D9)。</li>
+</ol>
+<h4>12.2 反向传播（逐行对应代码与 (D10)）</h4>
+<p><code>loss.backward()</code> 沿 150 步计算图回传：动力学节点的梯度由<strong>自定义 CUDA 反向核</strong>（<code>run_backward</code>，手写伴随式）提供——它精确实现了 (D2)–(D4) 的伴随方程（如 L203–212 的衰减与交叉项），加上 PyTorch 自动处理 CNN/GRU 部分。手写反向核 = "analytical first-order gradients" 的工程化。衰减实现细节见 §10.3。</p>
+<h4>12.3 多智能体训练（正文第 2–3 页 + 代码）</h4>
+<ul>
+<li>每组 4 或 8 架（<code>n_drones_per_group</code> 随机），各自独立策略实例、共享隐状态、<strong>无通信</strong>；</li>
+<li>"each robot was modelled as a <strong>moving sphere</strong> in the perspectives of others"——每架在他人深度图中渲染为半径 0.1–0.15 m 的球（代码通过 <code>n_drones_per_group</code> 在渲染核中实现），且 R_old→R 扫掠给出运动线索（对应正文 GRU"capture motion cues from successive frames"）；</li>
+<li>训练后涌现"等待/跟随/退让"（正文 Fig.3c）——梯度 (D10) 的"近未来监督"使各智能体学会规避未来冲突，无需显式协调项。</li>
+<li>⚠️ 配置差异：正文说"For one training batch, there were 64 environments"；v1.0 多智能体配置 <code>multi_agent.args</code> 为 batch=256、timesteps=180。单智能体 64×150 与正文一致。</li>
+</ul>
+<h4>12.4 训练规模数值核算（亮点交叉验证）</h4>
+$$64\ \text{环境}\times150\ \text{步}=9{,}600\ \text{仿真步/迭代}\ \times\ 50{,}000\ \text{迭代}=4.8\times10^{8}\ \text{步}$$
+<p>图 6c–e 的横轴恰为 "Number of simulation steps (×10⁸)"、范围 0–5——<strong>代码默认迭代数与论文训练曲线终点精确吻合</strong> ✅（这是代码-论文一致性的强证据）。PPO 需 10× 样本 → 约 5×10⁹ 步（图 6b 相应区间）。训练时间：本文 Diff+GRU 0.8 h（RTX 4090）；PPO+GRU 17.1 h（图 6b 标注，按抽取顺序有歧义，谨慎引用）。</p>
+<hr>
+<h3>13. 数值核算汇总（全部参数代入复核）</h3>
+<table>
+<tr><th>量</th><th>计算</th><th>结果</th><th>与论文/代码</th></tr>
+<tr><td>20 m/s 时每步位移</td><td>$20\times\frac{1}{15}$</td><td>1.333 m/步</td><td>D435i 15 Hz 下每帧前进 1.3 m——高速飞行对延迟敏感的根源 ✅</td></tr>
+<tr><td>轨迹时长</td><td>$150\times\frac{1}{15}$</td><td>10 s（≈200 m @20 m/s）</td><td>与第 6 节参数表一致 ✅</td></tr>
+<tr><td>EMA 新指令权重</td><td>$1-e^{-12/15}=1-e^{-0.8}$</td><td>0.5507（旧值权重 0.4493）</td><td>代码 L82–86 ✅</td></tr>
+<tr><td>总延迟</td><td>$\tau+\frac{1}{\lambda}=\frac{1}{15}+\frac{1}{12}$</td><td>≈ 150 ms</td><td>策略须提前 150 ms 预判 ✅</td></tr>
+<tr><td>悬停推力加速度</td><td>$\|a-g\|,\ a=0$</td><td>9.807 m/s²</td><td>✅ 物理自检</td></tr>
+<tr><td>最大水平加速度（TWR 3.6）</td><td>$g\sqrt{3.6^2-1}$</td><td>33.9 m/s²（倾斜 73.9°）</td><td>✅ 与"3.6 TWR 敏捷"对应</td></tr>
+<tr><td>20 m/s 巡航阻力加速度（μ₁=0.4 s⁻¹）</td><td>$0.4\times20$</td><td>8 m/s²</td><td>阻力标定的重要性 ✅</td></tr>
+<tr><td>2 s 窗口</td><td>$2\ \text{s}\times15\ \text{Hz}$</td><td>30 步</td><td>代码 cumsum(30) ✅</td></tr>
+<tr><td>softplus @ 接触面</td><td>$2.5\ln 2$</td><td>1.733</td><td>§8.2 表 ✅</td></tr>
+<tr><td>softplus 梯度 @ 接触面</td><td>$-\beta_1\beta_2\sigma(0)$</td><td>−40 m⁻¹</td><td>§8.2 ✅</td></tr>
+<tr><td>衰减因子（α=0.25…4）</td><td>$e^{-\alpha/15}$</td><td>0.9835…0.7659</td><td>§10.2 表 ✅</td></tr>
+<tr><td>代码 grad_decay=0.4 等效 α</td><td>$-\ln 0.4$</td><td>0.916 s⁻¹（每步 0.9407）</td><td>在消融区间内 ✅</td></tr>
+<tr><td>深度反演零点</td><td>$3/d-0.6=0$</td><td>d = 5 m</td><td>5 m 内正激活 ✅</td></tr>
+<tr><td>网络参数总量</td><td>§11.1 求和</td><td>514,496 ≈ 51.4 万</td><td>US&#36;21 Mango Pi 实时 15 Hz ✅</td></tr>
+<tr><td>总仿真步数</td><td>$64\times150\times50{,}000$</td><td>4.8×10⁸</td><td>图 6c–e 横轴 0–5（×10⁸）✅✅</td></tr>
+<tr><td>损失归一化</td><td>$1/N$</td><td>$1/150=6.67\times10^{-3}$</td><td>(D1)/(D10) ✅</td></tr>
+<tr><td>OU 扰动平稳标准差</td><td>令 $\mathrm{Var}$ 不变解 $\sigma^2$</td><td>0.2 m/s² ≈ 2% g</td><td>代码 L297/L311 ✅</td></tr>
+</table>
+<hr>
+<h3>14. 交叉验证总表与问题清单（"不自圆其说"部分）</h3>
+<h4>14.1 论文公式 ↔ 官方代码 ↔ 独立推导 总表</h4>
+<table>
+<tr><th>论文</th><th>代码位置（DiffPhysDrone v1.0）</th><th>独立推导结论</th></tr>
+<tr><td>(1)(2)</td><td><code>main_cuda.py</code> L204–224（损失求和 + AdamW 步进）</td><td>✅；$1/N$ 记号不严谨（§2 疑点 1）</td></tr>
+<tr><td>(D1) 策略梯度</td><td>autograd 计算图 + 自定义反向核</td><td>✅ 链式法则重推一致；观测路径 detach 假设与代码一致（§3.5）</td></tr>
+<tr><td>(D2) 积分</td><td><code>dynamics_kernel.cu</code> L132–137</td><td>✅ 逐字一致；全局二阶精度（§4.1）</td></tr>
+<tr><td>(D3) 加速度合成</td><td><code>dynamics_kernel.cu</code> L131（+L99–116）</td><td>⚠️ 论文"quadratic drag" vs 代码训练时二次系数=0（§4.4）</td></tr>
+<tr><td>(D4) η(t)</td><td>L82–86 + <code>main_cuda.py</code> act_lag</td><td>✅ EMA 精确离散化；λ≈12 s⁻¹、τ=1 步（§5.2）</td></tr>
+<tr><td>(D5) 姿态重构</td><td><code>update_state_vec</code>（L21–57）</td><td>✅ Faessler 微分平坦构造；数值核算通过（§6.3）</td></tr>
+<tr><td>(D6) 速度损失</td><td><code>main_cuda.py</code> L172–177</td><td>✅ 结构一致；⚠️ 29 步对齐偏移（§7.2）</td></tr>
+<tr><td>(D7) 避碰损失</td><td><code>main_cuda.py</code> L193–199</td><td>⚠️ $v^c$ 作用域三方不一致；clamp_min(1) 与"nullify"矛盾（§8.4）</td></tr>
+<tr><td>(D8) 平滑损失</td><td><code>main_cuda.py</code> L187–191</td><td>⚠️ 范数 vs 平方、$a_k$ vs act、jerk 符号（§9.2）</td></tr>
+<tr><td>(D9) 总损失</td><td>L204–213</td><td>⚠️ 权重 (1,2,0.01,0.001) 对应项与代码系数布局不同（碰撞两项拆成 1.5+2.0）</td></tr>
+<tr><td>(D10) 衰减梯度</td><td><code>dynamics_kernel.cu</code> L203–212</td><td>✅ 方向一致；代码只衰减对角路径（§10.3）</td></tr>
+<tr><td>(D11) 网络</td><td><code>model.py</code> 全文</td><td>⚠️ stride 文字（1）vs 代码（首层 2）（§11.2）；参数 51.4 万核算通过</td></tr>
+</table>
+<h4>14.2 论文问题清单（按严重程度编号）</h4>
+<ol>
+<li><strong>【论文内部矛盾】推力重量比 3.8 vs 3.6</strong>：第 2 页 Results 写"Our system weighed only 0.365 kg and had a thrust-to-weight ratio of <strong>3.8</strong>"；第 10 页 Hardware set-up 写"The maximum thrust-to-weight ratio was <strong>3.6</strong>"。同一指标两个值，未解释。</li>
+<li><strong>【公式/文字/代码三方不一致】$\mathcal{L}_c$ 中 $v^c_k$ 的作用域</strong>（§8.4-1）：印刷公式（按文本抽取）只乘截断二次项；正文文字说乘"两项之和"；代码两项都乘。建议对照 page-010.png 复核印刷括号。</li>
+<li><strong>【文字 vs 代码】"nullify the penalty" 与 clamp_min(1) 矛盾</strong>（§8.4-2）：静止/远离时代码 $v^c_k=1$，softplus 惩罚不归零。</li>
+<li><strong>【文字 vs 代码】"quadratic air drag" vs 训练时二次项系数置 0</strong>（§4.4）：v1.0 代码随机化的是线性阻力 [0.3,0.45] s⁻¹；最终版可能不同（Supplementary Note 1 不在手边）。</li>
+<li><strong>【文字 vs 代码】卷积 stride</strong>（§11.2-1）：论文"All the convolution layers had a stride of 1"，代码首层 stride 2；全 s1 则 1024→192 投影不成立。</li>
+<li><strong>【公式 vs 代码】$\mathcal{L}_a,\mathcal{L}_j$ 的范数与对象</strong>（§9.2）：印刷 $\|a_k\|_2$ 范数 vs 代码 $\|\mathrm{act}_k\|^2$ 平方和；jerk 差分方向负向（平方后无影响）。</li>
+<li><strong>【记号不严谨】式 (1) 求和损失 vs 梯度公式的 $1/N$</strong>（§2）：常数因子不影响最优解，但严格记号不一致。</li>
+<li><strong>【公式的隐含假设未声明】观测回路梯度不回传</strong>（§3.5）：印刷 (D1) 不含 $\partial l/\partial u\cdot\partial u/\partial o\cdot\partial o/\partial x$ 路径；论文只说设定速度梯度不回传，深度渲染可微性完全未提（代码事实：render 无反向核）。</li>
+<li><strong>【代码 vs 正文】多智能体 batch</strong>（§12.3）：正文 64 环境；v1.0 multi_agent.args batch=256、timesteps=180。</li>
+<li><strong>【代码细节 vs 公式】$\mathcal{L}_v$ 的 29 步对齐偏移</strong>（§7.2）：代码把 $\bar v_t$ 与 $v^{\rm set}_{t-29}$ 对齐。</li>
+<li><strong>【代码细节 vs 公式】$\beta_1=2.5$ 无显式实现</strong>（§8.4-3）：代码 softplus 权重 = coef_collide（2.0/5.0/7.5），二次项权重 = coef_obj_avoidance（1.5/2.0/3.0），与论文 $1:2.5$ 比例不完全对应。</li>
+<li><strong>【本笔记第 6 节自身的笔误（本节已更正）】</strong>：(a) 策略梯度内层 $\sum_{i=0}^{k-1}$ 应为 $\sum_{i=0}^{k}$（漏 $i=k$ 一步动力学项）；(b) 衰减因子 $e^{-\tau\Delta t}$ 的 $\tau$ 应为 $\alpha$（$\tau$ 在论文中是控制延迟）；(c) $\mathcal{L}_c$ 的 $\frac{1}{\beta_2}$、$2\beta_2$ 应为 $\beta_1$、$\beta_2$；(d) $\psi(t)$ 中 $\alpha$ 应为 $\lambda$（η(t) 的平滑系数）。</li>
+<li><strong>【诚实声明：页面图像未能逐字符复核】</strong>本模型（deepseek-v4-pro）不支持图像输入，read_image 对 page-001…018.png 全部失败。本节的公式引文依据 = fulltext.txt 文本抽取 + 官方 v1.0 代码 + 正文文字三重互证；下列印刷细节建议人工对照图像复核：(i) (D7) 中 $v^c_k$ 括号归属（page-010）；(ii) (D8) 是 $\|\cdot\|_2$ 还是 $\|\cdot\|^2$（page-010）；(iii) (D1) 内层求和上界是否确为 $k$（page-009）；(iv) jerk 差分符号（page-010）；(v) 1/N 因子是否存在（page-009）。除 (i)(ii) 可能改变结论外，其余不影响本文推导的正确性判断。</li>
+</ol>
+<div class="callout tip"><div class="callout-title">总体评价（不夸大不贬低）</div>这篇论文的方法公式<strong>整体扎实</strong>：编号式 (1)(2) 与全部核心无编号式经独立重推均成立，官方代码与公式在动力学、EMA、积分、损失结构上高度吻合（最强证据 = 4.8×10⁸ 步与图 6c–e 横轴的精确吻合）。主要瑕疵集中在<strong>表述层面</strong>：$\mathcal{L}_c$ 的 $v^c_k$ 作用域三方不一致、TWR 3.8/3.6 内部矛盾、stride 与 drag 的文字-代码出入——均不影响方法结论，但影响可复现性。</div>
+<hr>
+<h3>15. 验证材料清单（可复现性附录）</h3>
+<ul>
+<li><code>_derivation_work/3-diffphys/fulltext.txt</code>：PDF 全文文本抽取（UTF-8，18 页分页标记）——本文全部"论文原文"引文的出处；p.9–10 对应 Method 全部公式。</li>
+<li><code>_derivation_work/3-diffphys/pages/page-001…018.png</code>：论文页面图像——公式视觉复核用（本模型无法读图，待人工复核清单见 §14.2-13）。</li>
+<li><code>_derivation_work/3-diffphys/code/HenryHuYu-DiffPhysDrone-5a96a9f/</code>：官方 v1.0 代码（Zenodo 10.5281/zenodo.15250256，GitHub HenryHuYu/DiffPhysDrone），本文所有"代码交叉验证"的直接依据：<code>env_cuda.py</code>（环境/随机化/GDecay）、<code>main_cuda.py</code>（训练循环/损失组装）、<code>model.py</code>（CNN+GRU）、<code>src/dynamics_kernel.cu</code>（物理前向/手写反向核）、<code>src/test.py</code>（PyTorch 等价实现断言——独立验证 CUDA 核的数学正确性）、<code>src/quadsim_kernel.cu</code>（渲染/最近点，L318–352 证实 render 无反向）、<code>configs/*.args</code>（单/多智能体超参）。</li>
+<li>数值核算（§13 表）全部可手工复算：涉及的常数（9.80665、1/15、2.5、32、0.4、12、3.6、64、150、50,000）全部来自论文正文或代码，无拟合参数。</li>
+<li>未尽事项：Supplementary Note 1（阻力/延迟标定细节，springer 静态资源 URL 已知但本会话无法解析 PDF）与最终训练版超参的核对——如需，可向父任务请求下载解析后补充本节。</li>
+</ul>
 </section>
 
 <footer>Paper Notes · Zhang, Hu, Song et al. · Nature Machine Intelligence 2025 · Differentiable Physics Vision-Based Agile Flight · MathJax + Mermaid Rendering</footer>

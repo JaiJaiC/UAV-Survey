@@ -162,6 +162,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -182,6 +185,7 @@ MathJax = {
   <a href="#flaw">Potential Flaw</a>
   <a href="#motivation">Motivation</a>
   <a href="#takeaway">Takeaways</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -772,6 +776,287 @@ flowchart LR
     <tr><td>Chaumette & Hutchinson (2006, 2007) — Visual Servo Control Parts I & II. <em>IEEE Robot. Automat. Mag.</em></td><td>视觉伺服领域的经典教程（Part I: 基本方法; Part II: 高级方法）。任何从事 IBVS 研究的必读文献。本文的虚拟相机方法可以被视为 Part II 所讨论的"advanced approaches"中"坐标系变换"策略的自然延伸。</td></tr>
     <tr><td>Henriques et al. (2015) — High-Speed Tracking with Kernelized Correlation Filters. <em>IEEE Trans. Pattern Anal. Mach. Intell.</em> 37(3), 583–596</td><td>KCF 跟踪器——本文实物实验中使用的视觉跟踪算法。KCF 以高速（数百 fps）和高成功率著称，其速度远高于相机帧率（20 fps），为 IBVS 控制器提供了低延迟的目标坐标反馈。理解 KCF 的工作原理有助于评估本文视觉感知链路的性能瓶颈。</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info"><p><strong>对象</strong>：论文 PDF（IEEE RA-L, vol. 8, no. 4, pp. 2022–2029, 2023，DOI 10.1109/LRA.2023.3245416）第 2–5 页全部 14 个编号公式（式 (1)–(14)）、无编号但构成方法核心的式子（T 矩阵、虚拟相机投影、Lyapunov 函数、控制律、充分条件等，本文编号为补充式 (D1)–(D16)），以及 Algorithm 1 伪代码。<strong>方法</strong>：本文不是复述论文文字，而是：</p><ol><li>对照 PDF 逐字符核实每个公式（本次模型无法直接查看页面栅格图，改用 PyMuPDF 字符坐标重建 + 全文文本多重互证——见第 12.1 节声明与 12.4 节人工复核清单）；</li><li>从牛顿第二定律、刚体转动运动学、针孔投影等第一性原理<strong>独立重推</strong>每个公式；</li><li>用数值脚本 <code>_derivation_work/1-ibvs/verify_final.py</code> 与 <code>verify_fix.py</code>（可复跑）验证符号约定、矩阵一致性与数值例；</li><li>与经典 IBVS 交互矩阵、Khalil《Nonlinear Systems》定理交叉验证；</li><li>明确标出论文中<strong>印刷错误、符号矛盾、推导跳跃与量纲问题</strong>（见第 12 节问题清单），绝不替论文"圆场"。</li></ol></div>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table><tr><th>公式</th><th>内容</th><th>独立验证结论</th></tr>
+<tr><td>(1)–(4)</td><td>四旋翼刚体动力学（位置/平动/姿态运动学/角动量）</td><td>✅ 正确。标准 NED 六自由度模型，(4) 等价 $J\dot\omega+\omega\times J\omega=\tau$</td></tr>
+<tr><td>T 矩阵 (D1)</td><td>欧拉角速率 ↔ 机体角速度</td><td>✅ 正确。与 ZYX 约定 $\dot R=R\,sk(\omega)$ 数值一致（误差 ~10⁻⁸）；在 $\theta=\pm90°$ 奇异</td></tr>
+<tr><td>$v_p=R_\varphi^T(e_p-O_v)$ 与 $R_\varphi$ (D2)</td><td>虚拟相机坐标变换</td><td>✅ 印刷的 $R_\varphi$ 是 $R_x(-\varphi)$（绕 Xe 反向补偿滚转），与"虚拟像面恒垂直于地面"的物理意图一致</td></tr>
+<tr><td>(5)</td><td>$v_p$ 的时间导数</td><td>⚠️ <strong>符号矛盾</strong>：推导行印成 $-sk(\dot\varphi e_x)$，但按印刷的 $R_\varphi$ 矩阵应为 $+sk(\dot\varphi e_x)$（数值验证）。$-$ 对应的是另一种约定 $R_\varphi=R_x(+\varphi)$</td></tr>
+<tr><td>(6) $J_v$</td><td>虚拟相机图像雅可比</td><td>✅ 正确（相对印刷的 $R_\varphi$）：逐元素重推误差 ~10⁻⁷；且与经典 IBVS 点特征交互矩阵在 $\omega_c=(0,0,-\dot\varphi)$ 下<strong>逐项相同</strong></td></tr>
+<tr><td>(7) 与 $V_i$、$\dot V_i$ (D4–D6)</td><td>图像误差动力学与 Lyapunov 分析</td><td>✅ 正确。$\dot V_i$ 中 $\dot\varphi$ 项恰好相消（这就是 (5) 符号矛盾"无害"的原因）</td></tr>
+<tr><td>控制器 $v_{vy}=k_1v_u,\ v_{vz}=k_2v_n$ (D7)(D8)</td><td>比例型平移控制律</td><td>✅ 代数正确；充分条件推导 (D10) 正确，但<strong>量纲不严谨</strong>（$v_x/2$ [m] 与 $v_{vx}$ [m/s] 相加）</td></tr>
+<tr><td>(8)</td><td>垂直方向位置动力学</td><td>✅ 正确。$(Re_z)_z=\cos\varphi\cos\theta$ 在 ZYX 下精确成立（数值验证）</td></tr>
+<tr><td>(9)</td><td>$e_{vz}=v_{vz}\cos\varphi$</td><td>⚠️ <strong>近似未声明</strong>：精确关系是 $e_{vz}=v_{vz}\cos\varphi-v_{vy}\sin\varphi$（按印刷 $R_\varphi$），丢弃了横向速度项</td></tr>
+<tr><td>(10)</td><td>总推力反解</td><td>❌ <strong>印刷缺项</strong>：第一项 "$v_{vz}\sin\varphi$" 缺 $\dot\varphi$，应为 $v_{vz}\dot\varphi\sin\varphi$；按印刷式括号内为 [速度]+[加速度]，量纲不一致</td></tr>
+<tr><td>(11)(12)</td><td>V 系动力学与 $\dot R_{\theta\psi}$</td><td>⚠️ <strong>约定混用 + 定义近似</strong>：按印刷 $R_\varphi$ 应为 $+sk(\dot\varphi e_x)$（(11)）与 $+$（(12)）；且印刷定义 $R_{\theta\psi}=R_\psi R_\theta$ 只在 $\varphi=0$ 等于精确的 $R_\varphi^T R$</td></tr>
+<tr><td>$\omega_3=k_\psi(\psi-\psi_d)$ (D11)</td><td>偏航控制律</td><td>⚠️ <strong>符号疑点</strong>：由 (3) 的 T，小 $\varphi$ 下 $\dot e_\psi\approx +k_\psi e_\psi/\cos\theta$——正反馈发散；正确镇定律应为 $-k_\psi(\psi-\psi_d)$（实验收敛，推断实现取负号；论文无代码可核）</td></tr>
+<tr><td>(13)(14)、$\dot e_\varphi=-k_\varphi e_\varphi$</td><td>滚转通道</td><td>✅ 正确。前馈精确抵消耦合项，误差指数收敛（时间常数 $1/k_\varphi\approx0.29$ s）</td></tr>
+<tr><td>$\omega_2$（俯仰律）</td><td>——</td><td>⚠️ <strong>推导跳跃</strong>：论文只有一句 "can be obtained"，全文<strong>无显式表达式</strong>，而 (14) 又依赖 $\omega_2$（见第 8 节，本文给出两种自洽重建）</td></tr>
+<tr><td>Algorithm 1</td><td>距离估计与停止条件</td><td>✅ 核心几何 $d=(N_e/N)d_e$ 正确（针孔宽度比例）；伪代码有若干书写不规范（见第 10 节）</td></tr>
+</table>
+<hr>
+<h3>1. 坐标系、符号约定与公式清单</h3>
+<h4>1.1 坐标系（论文第 2–3 页定义）</h4>
+<ul><li><strong>世界系</strong> $E=\{X_e,Y_e,Z_e\}$：<strong>NED（北-东-地）</strong>，$X_e$ 北、$Y_e$ 东、$Z_e$ <strong>指向下</strong>。$e_z=[0,0,1]^T$ 即"向下"的单位向量——因此重力写为 $+mg\,e_z$（$g&gt;0$）。</li>
+<li><strong>机体系</strong> $B=\{X_b,Y_b,Z_b\}$：前、右、下（forward, right, down），右手系，原点在重心。</li>
+<li><strong>相机系</strong> $C=\{X_c,Y_c,Z_c\}$：假设与 $B$ 重合（"the axes of the camera frame overlap with the axes of B"，相机固定前视）。</li>
+<li><strong>虚拟相机系</strong> $V=\{X_v,Y_v,Z_v\}$：原点与相机重合，<strong>$X_v$ 恒平行于 $X_e$</strong>（唯一几何约束）。由印刷的 $R_\varphi$ 矩阵（见 1.3）确定 $V\to E$ 的旋转为 $R_\varphi=R_x(-\varphi)$：机体右滚 $\varphi$ 增大时，虚拟相机<strong>反向旋转</strong>补偿滚转，从而虚拟图像平面（$Y_v$–$Z_v$ 平面）始终垂直于地面。这是"虚拟相机"的全部几何内容。</li>
+<li><strong>姿态约定</strong>：欧拉角 $\eta=[\varphi,\theta,\psi]^T$（滚转/俯仰/偏航），ZYX 序列：$R=R_z(\psi)R_y(\theta)R_x(\varphi)$（注意：$R_x(\varphi)$ 是标准旋转矩阵 $\begin{bmatrix}1&amp;0&amp;0\\0&amp;\cos\varphi&amp;-\sin\varphi\\0&amp;\sin\varphi&amp;\cos\varphi\end{bmatrix}$；论文印刷的 $R_\varphi$ 与它<strong>不同</strong>，见 1.3 的警告）。</li></ul>
+<div class="callout warn"><div class="callout-title">⚠️ 先记住这个关键事实（第 4/5/8 节的推导全靠它）</div><p>论文印刷的 $R_\varphi=\begin{bmatrix}1&amp;0&amp;0\\0&amp;\cos\varphi&amp;\sin\varphi\\0&amp;-\sin\varphi&amp;\cos\varphi\end{bmatrix}$ 等于 <strong>$R_x(-\varphi)$</strong>（标准旋转矩阵的反方向）。而论文式 (5)(11)(12) 的推导行用的却是 $R_\varphi=R_x(+\varphi)$ 的求导规则。两套约定在论文中并存：</p><ul><li><strong>约定 A</strong>：$R_\varphi=R_x(+\varphi)$ —— 式 (5) 的 "$-sk(\dot\varphi e_x)$"、(11) 的 "$-sk(\dot\varphi e_x)$"、(12) 的 "$-$" 全部与之自洽；</li><li><strong>约定 B</strong>：$R_\varphi=R_x(-\varphi)$ —— 印刷的 $R_\varphi$ 矩阵与印刷的 $J_v$（式 (6)）与之自洽，且物理上"反向补偿滚转"成立。</li></ul><p>最终结论：<strong>式 (5) 的中间推导行符号印错</strong>（详见第 4 节）；$J_v$、$\dot V_i$ 和全部控制律在约定 B 下自洽且正确。由于 $\dot V_i$ 中 $\dot\varphi$ 项相消，这个印刷错误不影响论文的稳定性结论。</p></div>
+<h4>1.2 符号与量纲总表</h4>
+<table><tr><th>符号</th><th>含义</th><th>单位/取值</th></tr>
+<tr><td>$\xi=[x,y,z]^T$</td><td>UAV 在 E 系中的位置</td><td>m</td></tr>
+<tr><td>$V$（分量 $e_{vx},e_{vy},e_{vz}$）</td><td>UAV 在 E 系中的线速度（$=\dot O_v$）</td><td>m/s</td></tr>
+<tr><td>$v=[v_{vx},v_{vy},v_{vz}]^T$</td><td>UAV 速度在 V 系中的分量（$v=R_\varphi^T\dot O_v$）</td><td>m/s</td></tr>
+<tr><td>$\omega=[\omega_1,\omega_2,\omega_3]^T$</td><td>机体角速度（滚转/俯仰/偏航角速率）</td><td>rad/s</td></tr>
+<tr><td>$\eta=[\varphi,\theta,\psi]^T$</td><td>欧拉角（roll/pitch/yaw）</td><td>rad</td></tr>
+<tr><td>$m,\ g$</td><td>质量、重力加速度</td><td>1.55 kg，9.8 m/s²</td></tr>
+<tr><td>$f$</td><td>总推力（标量，沿 $-Z_b$ 即向上）</td><td>N（悬停核算 $mg=15.19$ N）</td></tr>
+<tr><td>$J$</td><td>机体惯性矩阵</td><td>diag{0.029125, 0.029125, 0.055225} kg·m²</td></tr>
+<tr><td>$\tau$</td><td>外扭矩（机体分量）</td><td>N·m</td></tr>
+<tr><td>$e_p=[e_x,e_y,e_z]^T$、$v_p=[v_x,v_y,v_z]^T$</td><td>目标点 P 在 E 系 / V 系的坐标</td><td>m</td></tr>
+<tr><td>$p=[v_u,v_n]^T$</td><td>P 在虚拟图像平面的投影（横/纵）</td><td>px（像素）</td></tr>
+<tr><td>$\lambda$</td><td>相机焦距</td><td>px；由 640 px 与视场 1.047 rad 反算 $\approx 554$ px（见 11.1）</td></tr>
+<tr><td>$e_i=p-p_d$</td><td>图像误差（$p_d=[0,0]^T$ 即目标居中）</td><td>px</td></tr>
+<tr><td>$k_1,k_2,k_3,k_\psi,k_\varphi$</td><td>控制增益</td><td>6, 8, 3, 2, 3.5（论文原文 $k_\psi=2,\ k_\varphi=3.5$；note 第 6 节参数表恰好写反，本节以论文为准，见 §12.3 问题 11）</td></tr>
+<tr><td>$N_e,\ N,\ d_e,\ \bar d,\ k_d$</td><td>相机水平分辨率(640)、目标像宽、标定距离、停止阈值、阈值系数</td><td>px, px, m, m, 无量纲</td></tr>
+<tr><td>$d$</td><td>UAV 与目标沿 $X_v$ 的距离（$d=v_x$）</td><td>m</td></tr>
+<tr><td>$sk(\cdot)$</td><td>反对称矩阵算子：$sk(a)b=a\times b$</td><td>——</td></tr>
+</table>
+<h4>1.3 本文的编号约定</h4>
+<p>论文编号公式为 (1)–(14)。下列方法核心但论文<strong>未编号</strong>的式子，本文编号为补充式：</p>
+<ul><li>(D1) T 矩阵（欧拉运动学）；(D2) $v_p=R_\varphi^T(e_p-O_v)$ 与 $R_\varphi$；(D3) 针孔投影 $p=\frac{\lambda}{v_x}[v_y,v_z]^T$；(D4) $e_i=p-p_d$；(D5) $V_i=\frac12 e_i^Te_i$；(D6) $\dot V_i$ 展开式；(D7) $v_{vy}=k_1v_u,\ v_{vz}=k_2v_n$；(D8) 代入后的 $\dot V_i$；(D9) $W(e_i)=\frac12 e_i^Te_i$；(D10) 充分条件 $v_x/2+v_{vx}\le k_i\lambda$；(D11) $\omega_3=k_\psi(\psi-\psi_d)$；(D12) $e_\varphi=\varphi-\varphi_d$；(D13) $\dot e_\varphi=-k_\varphi e_\varphi$；(D14) $d=(N_e/N)d_e$；(D16) 经典 IBVS 交互矩阵（背景推导，§5）；(D17)–(D24) 本文补充推导（$\omega_2$ 两种重建、偏航误差动力学、焦距反算等，见 §8–§11）。</li></ul>
+<hr>
+<h3>2. 公式 (1)–(4)：四旋翼刚体动力学（含 T 矩阵推导）</h3>
+<p>论文原文（第 2 页，逐字符核实）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(1)–(4) —— 六自由度刚体模型（论文式号）</span>
+$$\dot\xi = V \tag{1}$$
+$$m\dot V = mg e_z - f R e_z \tag{2}$$
+$$\dot\eta = T \omega \tag{3}$$
+$$J\dot\omega = \tau - sk(\omega)J\omega \tag{4}$$
+<div class="eq-note"><strong>符号</strong>：$\xi$ 位置（m）；$V$ 速度（m/s）；$m,g$ 质量与重力加速度；$f$ 总推力（N，方向 $-Re_z$ 即"机体 z 轴的反方向"=向上，因为 $e_z$ 在 NED 中指向下）；$R:B\to E$ 旋转矩阵（无量纲、正交）；$\omega$ 机体角速度（rad/s）；$J$ 惯性矩阵（kg·m²）；$\tau$ 外扭矩（N·m）；$sk(a)b:=a\times b$。<br><strong>式 (1)</strong>：位置的导数等于速度，纯定义式。✅<br><strong>式 (2) 的第一性原理推导</strong>：牛顿第二定律（惯性系 E）：$m\ddot\xi=\sum F$。合力 = 重力 + 推力。重力在 NED 中沿 $+Z_e$（向下）大小为 $mg$，即 $mg\,e_z$。推力大小为 $f$、沿机体 $-Z_b$ 方向（旋翼升力向上）；$-Z_b$ 在 E 系的表示为 $-R\,e_z$（$e_z$ 是机体 z 轴在机体系的分量 $(0,0,1)^T$，乘 $R$ 后变到 E 系）。于是 $m\dot V=mg\,e_z-fR\,e_z$。✅ 与原文逐项一致。<br><strong>式 (4) 的第一性原理推导（欧拉方程）</strong>：角动量定理在惯性系 $\dot H|_E=\tau$，$H=J\omega$（$J$ 固连于机体，在机体系中为常矩阵）。转动参考系求导公式（transport theorem，见数学预备）：$\dot H|_E=\dot H|_B+\omega\times H=J\dot\omega+\omega\times(J\omega)$。故 $J\dot\omega+\omega\times J\omega=\tau\ \Longleftrightarrow\ J\dot\omega=\tau-sk(\omega)J\omega$（$sk(\omega)J\omega=\omega\times(J\omega)$）。✅<br><strong>式 (3) 与 T 矩阵的完整推导</strong>（见下方 (D1)，这是理解第 9 节姿态控制的钥匙）。<br><strong>物理直觉</strong>：(2) 中 $fRe_z$ 表明<strong>推力方向随姿态旋转</strong>——水平加速只能靠倾斜机体（欠驱动根源）；(4) 中 $sk(\omega)J\omega$ 是转动牵连项（角速度耦合），$J_{xx}\ne J_{zz}$ 时产生滚转-偏航耦合。</div></div>
+<h4>2.1 补充式 (D1)：T 矩阵的严格推导（ZYX 欧拉运动学）</h4>
+<p>论文原文（第 3 页，逐字符核实）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D1) —— 欧拉角速率转换矩阵（论文无编号）</span>
+$$T=\begin{bmatrix}1 & \sin\varphi\tan\theta & \cos\varphi\tan\theta\\ 0 & \cos\varphi & -\sin\varphi\\ 0 & \sin\varphi/\cos\theta & \cos\varphi/\cos\theta\end{bmatrix},\qquad \dot\eta=T\omega \tag{D1}$$
+<div class="eq-note"><strong>推导（第 1 步：角速度合成）</strong>。ZYX 序列 $R=R_z(\psi)R_y(\theta)R_x(\varphi)$ 的三次旋转分别绕 $e_z,\ e_y,\ e_x$ 进行。机体角速度（机体系分量）由三个欧拉角速率合成：<br>$$\omega=\dot\varphi\,e_x+R_x(\varphi)^T\dot\theta\,e_y+R_x(\varphi)^TR_y(\theta)^T\dot\psi\,e_z$$<br>（第一项是绕机体 x 轴的滚转；第二项把绕中间轴 $y$ 的 $\dot\theta$ 用 $R_x^T$ 旋回机体系；第三项把绕世界 z 轴的 $\dot\psi$ 用 $R_x^TR_y^T$ 旋回机体系。）<br><strong>第 2 步：逐项展开</strong>。$R_x^T\dot\theta e_y=\dot\theta(0,\cos\varphi,-\sin\varphi)^T$；$R_y^T\dot\psi e_z=\dot\psi(-\sin\theta,0,\cos\theta)^T$，再乘 $R_x^T$：$\dot\psi(-\sin\theta,\ \sin\varphi\cos\theta,\ \cos\varphi\cos\theta)^T$。相加：<br>$$\omega=\begin{bmatrix}\dot\varphi-\dot\psi\sin\theta\\ \dot\theta\cos\varphi+\dot\psi\sin\varphi\cos\theta\\ -\dot\theta\sin\varphi+\dot\psi\cos\varphi\cos\theta\end{bmatrix}$$<br><strong>第 3 步：反解 $\dot\eta$</strong>。第三行除以 $\cos\theta$：$\dot\psi=(\omega_2\sin\varphi+\omega_3\cos\varphi)/\cos\theta$；代回第二行：$\dot\theta=\omega_2\cos\varphi-\omega_3\sin\varphi$；代回第一行：$\dot\varphi=\omega_1+(\omega_2\sin\varphi+\omega_3\cos\varphi)\tan\theta$。写成矩阵即 (D1) 的 $T$。✅ 与原文逐项一致。<br><strong>数值验证</strong>：随机姿态验证 $\dot R=R\,sk(\omega)$（$\dot\eta=T\omega$ 做有限差分），300 次试验中位误差 $4.2\times10^{-8}$——T 与 ZYX 完全自洽（<code>verify_final.py</code> A 组）。<strong>奇异性</strong>：$\cos\theta=0$（$\theta=\pm90°$，机体竖直）处奇异；本场景水平追踪无碍。<strong>要点</strong>：第三行 $\dot\psi=(\omega_2\sin\varphi+\omega_3\cos\varphi)/\cos\theta$ 是第 9 节偏航律稳定性分析的钥匙。</div></div>
+<hr>
+<h3>3. 虚拟相机几何与投影方程（(D2)(D3) + 深度不可观测性背景）</h3>
+<p>论文原文（第 3 页，逐字符核实）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(D2)(D3) —— 虚拟相机变换与针孔投影（论文无编号）</span>
+$$v_p=R_\varphi^T(e_p-O_v),\qquad R_\varphi=\begin{bmatrix}1&0&0\\0&\cos\varphi&\sin\varphi\\0&-\sin\varphi&\cos\varphi\end{bmatrix} \tag{D2}$$
+$$p=\begin{bmatrix}v_u\\v_n\end{bmatrix}=\frac{\lambda}{v_x}\begin{bmatrix}v_y\\v_z\end{bmatrix} \tag{D3}$$
+<div class="eq-note"><strong>符号</strong>：$e_p$ 目标在 E 系的位置；$O_v$ 虚拟相机原点（=UAV 重心，因为 C 与 B 原点重合）；$v_p$ 目标在 V 系的坐标（$v_x$ 即深度，沿光轴 $X_v$）；$p=(v_u,v_n)^T$ 图像坐标（px），下标 u/n 分别对应 $Y_v$（右）/ $Z_v$（下）方向；$\lambda$ 焦距（px）。<br><strong>式 (D2) 的几何</strong>：$R_\varphi$ 是 $V\to E$ 的旋转（$e_p=O_v+R_\varphi v_p$）。按印刷矩阵，$R_\varphi=R_x(-\varphi)$：$X_v\parallel X_e$（第一行是 $(1,0,0)$）✓；当机体右滚（$\varphi$ 增大）时，$V$ 系绕 $X_e$ <strong>反向</strong>旋转 $-\varphi$，即虚拟相机"反向扶正"——虚拟图像平面（$Y_v$–$Z_v$）始终保持竖直（垂直于地面）。这就是"virtual image plane always perpendicular to the ground"的数学内容。<br><strong>式 (D3) 的第一性原理推导（针孔模型）</strong>：针孔相机把空间点 $(v_x,v_y,v_z)$ 投影到距光心 $\lambda$ 的像面：相似三角形给出像点横坐标 $v_u=\lambda\cdot(v_y/v_x)$、纵坐标 $v_n=\lambda\cdot(v_z/v_x)$。注意 $v_x&gt;0$ 必须成立（目标在相机前方）。✅<br><strong>深度不可观测性（重要背景，论文没有明说但 Algorithm 1 依赖它）</strong>：由 (D3)，图像坐标只确定<strong>方位比</strong> $(v_y/v_x,\ v_z/v_x)$——把 $(v_x,v_y,v_z)$ 同乘任意 $\kappa&gt;0$，$p$ 不变：<br>$$p=\frac{\lambda}{v_x}\begin{bmatrix}v_y\\v_z\end{bmatrix}=\frac{\lambda}{\kappa v_x}\begin{bmatrix}\kappa v_y\\\kappa v_z\end{bmatrix}$$<br>即单目相机<strong>无法从单点投影恢复深度 $v_x$</strong>（尺度模糊）。论文的对策是 Algorithm 1：利用"目标宽度已知 + 像素占比"恢复距离（第 10 节给出推导），这正是一个绕过不可观测性的经典工程手段。<br><strong>物理解读</strong>：$v_u,v_n\propto1/v_x$——同样的侧向偏移，目标越远图像越小、越靠近图像中心；这正是第 6 节"远距离限速"结论的根源。</div></div>
+<hr>
+<h3>4. 公式 (5)：$v_p$ 的时间导数——含一处符号矛盾</h3>
+<p>论文原文（第 3 页，逐字符核实，注意第二行开头的负号）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(5) —— 目标点在 V 系的运动学（论文式号）</span>
+$$\dot v_p=\dot R_\varphi^T(e_p-O_v)-R_\varphi^T\dot O_v=-sk(\dot\varphi e_x)R_\varphi^T(e_p-O_v)-R_\varphi^T\dot O_v=-sk(\dot\varphi e_x)v_p-v \tag{5}$$
+<div class="eq-note"><strong>符号</strong>：$\dot O_v=[e_{vx},e_{vy},e_{vz}]^T$ 是 UAV 在 E 系的速度；$v=[v_{vx},v_{vy},v_{vz}]^T=R_\varphi^T\dot O_v$ 是同一速度在 V 系的分量；$e_x=[1,0,0]^T$。<br><strong>第一性原理推导（链式法则，独立于论文）</strong>。对 (D2) 求导：<br>$$\dot v_p=\dot R_\varphi^T(e_p-O_v)+R_\varphi^T(\dot e_p-\dot O_v)$$<br>模型假设目标是静止点（"Assume that the intruder is a stationary target point P"，用于推导伺服模型），故 $\dot e_p=0$。剩下 $\dot R_\varphi^T$：印刷的 $R_\varphi=R_x(-\varphi)$，故<br>$$\dot R_\varphi=-\dot\varphi\,sk(e_x)R_x(-\varphi)=-\dot\varphi\,sk(e_x)R_\varphi\quad\Longrightarrow\quad \dot R_\varphi^T=+\dot\varphi\,sk(e_x)R_\varphi^T$$<br>（用 $sk(e_x)^T=-sk(e_x)$，且 $R_\varphi^T=R_x(+\varphi)$ 与 $sk(e_x)$ 对易——绕同一轴。）代回：<br>$$\dot v_p=+sk(\dot\varphi e_x)\,v_p-v \qquad(\text{正确形式，对应印刷的 }R_\varphi)$$<br><strong>逐项对照</strong>：论文第一行 $\dot v_p=\dot R_\varphi^T(e_p-O_v)-R_\varphi^T\dot O_v$ ✅；第二行的替换 $\dot R_\varphi^T=-sk(\dot\varphi e_x)R_\varphi^T$ ❌——<strong>对印刷的 $R_\varphi$ 而言符号应为 $+$</strong>（$-$ 对应另一种约定 $R_\varphi=R_x(+\varphi)$，那会使 $\dot R_\varphi^T=-sk(\dot\varphi e_x)R_\varphi^T$ 成立）。<br><strong>数值验证（决定性）</strong>：随机 $\varphi,\dot\varphi,e_p,v$，用有限差分直接算 $\dot v_p$，分别与 $+sk(\dot\varphi e_x)v_p-v$、$-sk(\dot\varphi e_x)v_p-v$ 比较：正确式（$+$）中位误差 $1.8\times10^{-7}$，论文式（$-$）中位误差 $6.96$（<code>verify_final.py</code> B 组）。<br><strong>为什么这是"印刷级"而非"物理级"问题</strong>：下文所有结论都建立在最终视觉伺服方程 (6) 与 $\dot V_i$ 上。(6) 的 $J_v$ 与印刷的 $R_\varphi$ 自洽（第 5 节），而 $\dot V_i$ 中 $\dot\varphi$ 项恰好相消（第 6 节），所以式 (5) 的这一符号矛盾<strong>不传染</strong>到稳定性分析与控制律。但要警惕：读者若照着 (5) 的 $-$ 号独立重推 (6)，会得到 $\dot\varphi$ 列反号的 $J_v$——两处不一致的根源就在这里。<br><strong>物理解读</strong>：$sk(\dot\varphi e_x)v_p=\dot\varphi\,e_x\times v_p$ 是"虚拟相机绕 $X_v$ 反向旋转"造成的牵连项：虚拟相机以 $-\dot\varphi$ 旋转时，静止目标在 V 系中看起来以 $+\dot\varphi$ 反向旋转（带 $-$ 号时方向相反）。目标在光轴上（$v_y=v_z=0$）时该牵连项为零——滚转不移动图像中心，与直觉一致。</div></div>
+<hr>
+<h3>5. 公式 (6)：图像雅可比 $J_v$ 的逐元素推导与经典交互矩阵交叉验证</h3>
+<p>论文原文（第 3 页，逐字符核实；矩阵为 2×4，元素顺序按字符坐标确认）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(6) —— 虚拟相机视觉伺服方程（论文式号）</span>
+$$\dot p=J_v\dot r_v,\qquad J_v=\begin{bmatrix}v_u/v_x & -\lambda/v_x & 0 & -v_n\\ v_n/v_x & 0 & -\lambda/v_x & v_u\end{bmatrix},\qquad \dot r_v=[v^T,\ \dot\varphi]^T\in\mathbb R^4 \tag{6}$$
+<div class="eq-note"><strong>符号</strong>：$\dot r_v=[v_{vx},v_{vy},v_{vz},\dot\varphi]^T$ 是 V 系中的"虚拟相机广义速度"——<strong>只含线速度与滚转角速度，不含 $\dot\theta,\dot\psi$</strong>（这是全文解耦主张的核心）。<br><strong>逐元素推导（在印刷 $R_\varphi=R_x(-\varphi)$ 约定下，用第 4 节正确形式的 (5)）</strong>。<br>第 1 步：展开 $\dot v_p=+sk(\dot\varphi e_x)v_p-v$。$sk(\dot\varphi e_x)=\dot\varphi\begin{bmatrix}0&0&0\\0&0&-1\\0&1&0\end{bmatrix}$，故 $sk(\dot\varphi e_x)v_p=\dot\varphi(0,-v_z,v_y)^T$，逐分量：<br>$$\dot v_x=-v_{vx},\qquad \dot v_y=-\dot\varphi\,v_z-v_{vy},\qquad \dot v_z=+\dot\varphi\,v_y-v_{vz}$$<br>第 2 步：对 (D3) 求导（商法则）。以 $v_u=\lambda v_y/v_x$ 为例：<br>$$\dot v_u=\lambda\frac{\dot v_y v_x-\dot v_x v_y}{v_x^2}=\frac{\lambda\dot v_y}{v_x}-\frac{\lambda v_y}{v_x}\cdot\frac{\dot v_x}{v_x}=\frac{\lambda\dot v_y}{v_x}-v_u\frac{\dot v_x}{v_x}$$<br>代入第 1 步结果与 $v_n=\lambda v_z/v_x$：<br>$$\dot v_u=\frac{\lambda(-\dot\varphi v_z-v_{vy})}{v_x}+v_u\frac{v_{vx}}{v_x}=\frac{v_u}{v_x}v_{vx}-\frac{\lambda}{v_x}v_{vy}+0\cdot v_{vz}-v_n\dot\varphi$$<br>$$\dot v_n=\frac{\lambda(+\dot\varphi v_y-v_{vz})}{v_x}+v_n\frac{v_{vx}}{v_x}=\frac{v_n}{v_x}v_{vx}+0\cdot v_{vy}-\frac{\lambda}{v_x}v_{vz}+v_u\dot\varphi$$<br>写成矩阵即论文的 $J_v$。✅ 与印刷矩阵逐元素一致。<br><strong>数值验证</strong>：随机 $\varphi,\dot\varphi,v_p,v$ 用有限差分直接算 $\dot p$ 与 $J_v\dot r_v$ 比较，300 次试验中位误差 $1.3\times10^{-7}$（<code>verify_fix.py</code> C′ 组）——印刷 $J_v$ 与印刷 $R_\varphi$ 完全自洽。<br><strong>与经典 IBVS 交互矩阵的交叉验证（本节背景推导 (D16)，教科书级对照）</strong>。经典结果（如 Chaumette–Hutchinson 教程）：点特征 $(x,y)=\frac{\lambda}{Z}(X,Y)$，相机速度 $v_c$、角速度 $\omega_c$（相机系）时<br>$$\dot x=-\frac{\lambda}{Z}v_{c,x}+\frac{x}{Z}v_{c,z}+\frac{xy}{\lambda}\omega_{c,x}-\Big(\lambda+\frac{x^2}{\lambda}\Big)\omega_{c,y}+y\,\omega_{c,z} \tag{D16a}$$
+$$\dot y=-\frac{\lambda}{Z}v_{c,y}+\frac{y}{Z}v_{c,z}+\Big(\lambda+\frac{y^2}{\lambda}\Big)\omega_{c,x}-\frac{xy}{\lambda}\omega_{c,y}-x\,\omega_{c,z} \tag{D16b}$$<br>其第一性原理推导：$\dot P=-v_c-\omega_c\times P$（目标相对相机），$P=(X,Y,Z)$，由商法则 $\dot x=\lambda(\dot XZ-\dot ZX)/Z^2=\lambda\dot X/Z-x\dot Z/Z$，把 $\dot X=-v_{c,x}-\omega_{c,y}Z+\omega_{c,z}Y$、$\dot Z=-v_{c,z}-\omega_{c,x}Y+\omega_{c,y}X$ 代入即得（y 通道同理）。<br>把本论文映射到经典记号：光轴 $\leftrightarrow X_v$（即经典 $Z\leftrightarrow v_x$，$X\leftrightarrow v_y$，$Y\leftrightarrow v_z$，$x\leftrightarrow v_u$，$y\leftrightarrow v_n$）；相机速度 $v_c=v$；虚拟相机绕光轴的角速度 $\omega_{c,z}=-\dot\varphi$（印刷 $R_\varphi$：$V\to E$ 旋转速率为 $-\dot\varphi$，这正是"反向补偿滚转"），$\omega_{c,x}=\omega_{c,y}=0$。代入 (D16)：<br>$$\dot v_u=-\frac{\lambda}{v_x}v_{vy}+\frac{v_u}{v_x}v_{vx}+v_n(-\dot\varphi)\qquad\checkmark\ J_v\text{ 第一行}$$
+$$\dot v_n=-\frac{\lambda}{v_x}v_{vz}+\frac{v_n}{v_x}v_{vx}-v_u(-\dot\varphi)\qquad\checkmark\ J_v\text{ 第二行}$$<br><strong>完全一致</strong>。结论：论文的 $J_v$ 就是标准点特征交互矩阵在"绕光轴以 $-\dot\varphi$ 反向补偿滚转的虚拟相机"下的特例——这是把本文视觉模型与教科书 IBVS 连接起来的精确对应关系，也独立确认了 $J_v$ 第四列 $[-v_n;\ +v_u]^T$ 的符号。<br><strong>物理解读</strong>：第 1 列是前向速度贡献——相机朝目标前进时像点沿径向向外发散（焦点膨胀），偏离中心越远发散越快；第 4 列是滚转牵连项——像点绕图像中心以角速度 $-\dot\varphi$ 旋转（旋转场 $(\dot v_u,\dot v_n)=-\dot\varphi(-v_n,\,v_u)$，恰与"图像保持水平"的直觉一致）；第 2/3 列表明侧向/垂向平移以 $-\lambda/v_x$ 缩放为像点速度——距离越远（$v_x$ 大）平移越"看不见"。</div></div>
+<hr>
+<h3>6. 公式 (7) 与 Lyapunov 平移控制（(D4)–(D10) 完整推导）</h3>
+<p>论文原文（第 4 页，逐字符核实）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(7)(D4)(D5) —— 误差动力学与候选 Lyapunov 函数</span>
+$$e_i=p-p_d,\qquad p_d=[0,0]^T \tag{D4}$$
+$$\dot e_i=\dot p \tag{7}$$
+$$V_i=\frac{1}{2}e_i^Te_i \tag{D5}$$
+<div class="eq-note"><strong>符号</strong>：$p_d=[0,0]^T$ 期望图像坐标——"把目标图像块控制在虚拟图像平面中心"。$e_i=[v_u,v_n]^T$（$p_d$ 恒为 0）。<br><strong>式 (7)</strong>：$p_d$ 是常向量，$\dot e_i=\dot p-\dot p_d=\dot p$。✅ 平凡但被编号。<br><strong>非自治性的说明（论文原文要点）</strong>：$\dot p=J_v\dot r_v$ 中的 $v_x(t),v_{vx}(t)$ 等随时间变化，所以系统 (7) 是<strong>非自治</strong>的——普通 Lyapunov 定理只能给出一致性结论的"一致"版本，论文正确地转向 Khalil [27] 的一致稳定性定义（Definition 4.4）与定理（Theorem 4.9），这是严谨的做法。<br><strong>式 (D5)</strong>：二次型 $V_i$ 正定、径向无界、<strong>显式不含时间</strong>（decrescent）——满足定理 4.9 对 $V$ 的要求。物理含义：$V_i$ 是"图像误差的平方能量"。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(D6)(D7)(D8) —— $\dot V_i$ 展开与比例控制律（论文无编号）</span>
+$$\dot V_i=e_i^T\dot p=v_u\dot v_u+v_n\dot v_n=\frac{v_{vx}v_u^2}{v_x}-\frac{\lambda v_{vy}v_u}{v_x}+\frac{v_{vx}v_n^2}{v_x}-\frac{\lambda v_{vz}v_n}{v_x} \tag{D6}$$
+$$v_{vy}=k_1v_u,\qquad v_{vz}=k_2v_n \tag{D7}$$
+$$\dot V_i=-\frac{v_u^2(k_1\lambda-v_{vx})}{v_x}-\frac{v_n^2(k_2\lambda-v_{vx})}{v_x} \tag{D8}$$
+<div class="eq-note"><strong>(D6) 的逐步展开</strong>：把 (6) 的两行代入 $\dot V_i=v_u\dot v_u+v_n\dot v_n$：<br>$$v_u\dot v_u=\frac{v_{vx}v_u^2}{v_x}-\frac{\lambda v_{vy}v_u}{v_x}-\underbrace{v_uv_n\dot\varphi}_{\text{来自第 4 列}},\qquad v_n\dot v_n=\frac{v_{vx}v_n^2}{v_x}-\frac{\lambda v_{vz}v_n}{v_x}+\underbrace{v_uv_n\dot\varphi}_{\text{来自第 4 列}}$$<br><strong>两项恰好相消</strong>——这就是第 4 节说"式 (5) 的符号矛盾不影响结论"的数学原因：无论 $\dot\varphi$ 列取 $\pm$，$\dot V_i$ 都相同（数值验证：$\dot V_i$ 与印刷式一致，中位误差 $5\times10^{-7}$，<code>verify_fix.py</code> D′ 组）。直觉：绕光轴的旋转不改变"误差到中心的平方距离"的一阶变化（旋转场切于圆）。<br><strong>(D7) 的设计逻辑</strong>：把 $v_{vy},v_{vz}$ 当作虚拟控制输入，取<strong>比例律</strong> $v_{vy}=k_1v_u,\ v_{vz}=k_2v_n$（$k_1,k_2&gt;0$）。（对照经典 IBVS：教科书常用 $\dot r_v=J_v^+(-\lambda_p e_i)$ 的<strong>伪逆/阻尼最小二乘反演</strong>；本文的 2×4 点特征雅可比无法直接伪逆解出 4 维广义速度，因此改走<strong>逐通道 Lyapunov 设计</strong>——这是本文与教科书 IBVS 的关键分叉，也是"伪逆"在全文缺席的原因。）代入 (D6) 得 (D8)：若 $v_x&gt;0$（目标在前）且 $k_i\lambda&gt;v_{vx}$，则 $\dot V_i$ 负定。<br><strong>注意（诚实标注）</strong>：$v_{vy},v_{vz}$ 是"虚拟控制"——四旋翼没有直接产生横向/垂向速度的执行器。$v_{vz}$ 随后由推力 $f$ 实现（第 7 节），但 <strong>$v_{vy}$ 的实现路径论文从未给出</strong>（滚转目标 $\varphi_d=0$ 不产生横向力、偏航目标 $\psi_d=0$ 只对正机头），详见第 8 节问题 7。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(D9)(D10) —— 一致稳定性充分条件（论文无编号）</span>
+$$W(e_i)=\frac{1}{2}e_i^Te_i=\frac{1}{2}(v_u^2+v_n^2) \tag{D9}$$
+$$\frac{v_x}{2}+v_{vx}\le k_1\lambda,\qquad \frac{v_x}{2}+v_{vx}\le k_2\lambda \tag{D10}$$
+<div class="eq-note"><strong>目标</strong>：找条件使 $\dot V_i\le -W(e_i)$（$W$ 正定），由 Khalil 定理 4.9 得到一致渐近稳定（论文表述为 uniform stability；实际得到的是更强的 UAS）。论文明确说明 $W=\frac12e_i^Te_i$ 不是唯一选择。<br><strong>推导（配平方 / 分离变量，逐步）</strong>。要求<br>$$-\frac{v_u^2(k_1\lambda-v_{vx})}{v_x}-\frac{v_n^2(k_2\lambda-v_{vx})}{v_x}\le -\frac{1}{2}(v_u^2+v_n^2)$$<br>两边乘 $v_x$（$v_x&gt;0$，目标必须在相机前方——隐含且必要的假设）并移项：<br>$$v_u^2\Big(k_1\lambda-v_{vx}-\frac{v_x}{2}\Big)+v_n^2\Big(k_2\lambda-v_{vx}-\frac{v_x}{2}\Big)\ge 0$$<br>由于 $v_u^2,v_n^2\ge0$，<strong>充分条件</strong>是两个括号各自非负，即 (D10)。✅ 与原文一致（原文直接给出该条件）。<br><strong>物理解读（论文原文的直觉，严格化）</strong>：$k_i\lambda$ 是"闭环等效增益"（把速度误差 $v_{vy}=k_1v_u$ 换算到 $\dot V_i$ 的系数）；(D10) 表明<strong>前飞速度 $v_{vx}$ 与距离 $v_x$ 之间存在权衡</strong>：距离越远，允许的前飞速度越小。原因：远处目标像点小、同样的误差对应更大的物理偏移，且高速前飞时特征更易漂出视场（feature loss [28]）。这正是 Algorithm 1 在近距离才允许前飞的"调度"依据。<br><strong>数值核算（用论文参数）</strong>：$\lambda=554$ px（第 11.1 节反算）、$k_1=6,\ k_2=8$，则 $k_1\lambda=3326,\ k_2\lambda=4434$（量纲为 m/s 见下）。仿真初始 $v_x=20$ m、前飞 $v_{vx}=5$ m/s：$v_x/2+v_{vx}=15\ll k_i\lambda$，条件<strong>轻易满足</strong>；接近目标时 $v_x$ 减小，条件更容易满足——充分条件沿整条接近轨迹都成立。<br><strong>⚠️ 量纲问题（诚实标注，深化见 §11.4）</strong>：(D10) 左边 $v_x/2$ 的单位是 <strong>m</strong>、$v_{vx}$ 是 <strong>m/s</strong>、右边 $k_i\lambda$ 是 m/s——量纲不一致；根源是 $W$（px²）与 $\dot V_i$（px²/s）差一个时间因子。若改读归一化坐标（$\lambda=1$），条件在论文自身参数下不成立（$15\not\le6,8$）——但 (D10) 只是<strong>充分条件</strong>，不满足只意味着该 Lyapunov–W 论证失效，收敛仍由 $\dot V_i\lt0$ 保证（§11.4）。建议把 (D10) 理解为方向性结论"远处限速"，不要当精确边界。<br><strong>Khalil 论证收尾</strong>：$V_i$ 正定且与 $t$ 无关（decrescent）；在 (D10) 下 $\dot V_i\le -W(e_i)$、$W$ 正定 → 定理 4.9 给出 $e_i$ 的一致渐近稳定。论证链完整，✅ 未发现实质问题（除上述量纲注记）。</div></div>
+<hr>
+<h3>7. 公式 (8)(9)(10)：推力反解</h3>
+<div class="formula-block"><span class="eq-tag">Eq.(8) —— Ze 方向位置动力学（论文式号）</span>
+$$\dot e_{vz}=g-\frac{f}{m}\cos\varphi\cos\theta \tag{8}$$
+<div class="eq-note"><strong>推导（第一性原理，逐项）</strong>：取 (2) 的第三分量：$\dot e_{vz}=g-\frac fm(Re_z)_z$。展开 $(Re_z)_z$（ZYX，$R=R_zR_yR_x$）：$R_xe_z=(0,\sin\varphi,\cos\varphi)^T$；$R_yR_xe_z=(\sin\varphi\sin\theta,\ \sin\varphi,\ \cos\varphi\cos\theta)^T$；$R_z$ 不改变 z 分量，故 $(Re_z)_z=\cos\varphi\cos\theta$。✅ 数值验证：随机姿态下 $(Re_z)_z=\cos\varphi\cos\theta$ 全部成立（<code>verify_final.py</code> F 组）。<br><strong>物理解读</strong>：$f\cos\varphi\cos\theta$ 是推力的<strong>垂直分量</strong>——机体倾斜（$\varphi$ 或 $\theta\ne0$）时同样推力提供的升力分量按余弦衰减。悬停（$\varphi=\theta=0$，$\dot e_{vz}=0$）：$f=mg=1.55\times9.8=15.19$ N ✓。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(9) —— E 系与 V 系垂向速度的关系（论文式号）</span>
+$$e_{vz}=v_{vz}\cos\varphi \tag{9}$$
+<div class="eq-note"><strong>精确关系（第一性原理）</strong>：$V=\dot O_v=R_\varphi v$（速度向量变换）。取 z 分量：<br>$$e_{vz}=(R_\varphi v)_z=\big(R_x(-\varphi)\,v\big)_z=-\sin\varphi\cdot v_{vy}+\cos\varphi\cdot v_{vz}=v_{vz}\cos\varphi-v_{vy}\sin\varphi$$<br>论文的 (9) <strong>丢弃了 $-v_{vy}\sin\varphi$ 项</strong>。⚠️ <strong>近似未声明</strong>；仅在 $v_{vy}=0$ 或 $\varphi=0$ 时严格成立。<br><strong>为何近似"自洽"（重要观察）</strong>：由 (D7)，$v_{vy}=k_1v_u$，而控制目标是 $v_u\to0$；随误差收敛 $v_{vy}\to0$，(9) 的误差自动消失——<strong>用近似推导出控制律，控制律收敛后近似变精确</strong>，这是自举式的设计，也是它在实验里不露马脚的原因。但过渡过程中 (9) 是有误差的（数值验证：随机条件下中位偏差 0.45，<code>verify_final.py</code> G 组），且 (10) 由它导出，误差会传递（见下）。</div></div>
+<div class="formula-block"><span class="eq-tag">Eq.(10) —— 总推力反解（论文式号；印刷缺 $\dot\varphi$）</span>
+$$f=\frac{m}{\cos\varphi\cos\theta}\big[v_{vz}\sin\varphi+k_3(v_{vz}-k_2v_n)\cos\varphi+g\big] \tag{10 原文}$$
+$$f=\frac{m}{\cos\varphi\cos\theta}\big[g+k_3(v_{vz}-k_2v_n)\cos\varphi+v_{vz}\dot\varphi\sin\varphi\big] \tag{10 应为}$$
+<div class="eq-note"><strong>推导（按论文自述"using (8) and the time-derivative of (9)"，逐步展开）</strong>。<br>第 1 步：对 (9) 求导（用论文的近似形式 $e_{vz}=v_{vz}\cos\varphi$）：<br>$$\dot e_{vz}=\dot v_{vz}\cos\varphi-v_{vz}\dot\varphi\sin\varphi$$<br>第 2 步：把 (8) 代入左边，并令期望垂直速度闭环为一阶误差动力学 $\dot v_{vz}=-k_3(v_{vz}-k_2v_n)$（即 $v_{vz}$ 跟踪期望速度 $k_2v_n$，$k_3&gt;0$ 为跟踪增益；这是 backstepping 风格的"速度层"设计，论文用一句话带过）：<br>$$g-\frac{f}{m}\cos\varphi\cos\theta=-k_3(v_{vz}-k_2v_n)\cos\varphi-v_{vz}\dot\varphi\sin\varphi$$<br>第 3 步：解出 $f$：<br>$$f=\frac{m}{\cos\varphi\cos\theta}\big[g+k_3(v_{vz}-k_2v_n)\cos\varphi+v_{vz}\dot\varphi\sin\varphi\big]$$<br><strong>与原文逐项对照</strong>：结构一致，但原文第一项印作 "$v_{vz}\sin\varphi$"，<strong>少了 $\dot\varphi$</strong>（正确项为 $v_{vz}\dot\varphi\sin\varphi$）。判定为印刷缺项的证据：(i) 原文第二行自己写着 "using (8) and the <strong>time-derivative</strong> of (9)"——(9) 求导必然产生 $v_{vz}\dot\varphi\sin\varphi$；(ii) <strong>量纲</strong>：按印刷式，括号内是 $[v_{vz}\sin\varphi]$（m/s）$+k_3(v_{vz}-k_2v_n)\cos\varphi$（m/s）$+g$（m/s²），速度与加速度相加<strong>量纲不一致</strong>；补上 $\dot\varphi$（rad/s）后三项都是 m/s²；(iii) PDF 字符坐标核实：式 (10) 行（y≈398–402）在 $v_{vz}$ 与 $\sin\varphi$ 之间<strong>没有任何导数点字符</strong>（导数点在本文档中是可抽取的独立字符，如式 (8) 的 $\dot e_{vz}$），故是印刷遗漏而非文本抽取丢失。<br><strong>三项的物理解读</strong>：① $g$——重力补偿（悬停主项）；② $k_3(v_{vz}-k_2v_n)\cos\varphi$——垂直速度误差阻尼（把 $v_{vz}$ 推向期望 $k_2v_n$，经 $\cos\varphi$ 投影回 E 系）；③ $v_{vz}\dot\varphi\sin\varphi$——<strong>滚转牵连修正</strong>：机体滚转时 V 系与 E 系的垂向速度互相"泄漏"，这项补偿 (9) 因滚转速率产生的速度换算误差。增益语义：$k_2=8$ 把图像纵误差 $v_n$ 映射为期望垂向速度 $k_2v_n$；$k_3=3$ 是速度跟踪带宽；$k_3\lt k_2$ 与"内环快于外环"的时标分离惯例一致。<br><strong>数值核算</strong>：见 §11.5（悬停 $f=mg=15.19$ N ✓；追踪工况印刷式 19.47 N vs 补 $\dot\varphi$ 后 19.31 N，差 0.16 N ≈ 0.8%）。</div></div>
+<hr>
+<h3>8. 公式 (11)(12) 与"消失的"俯仰律 $\omega_2$：约定混用与全文最大推导跳跃</h3>
+<p>论文原文（第 4 页，逐字符核实；注意两处 <code>−sk</code> 的负号与 "Utilizing $\dot R=R\,sk(\omega)$" 引理）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(11)(12) —— V 系平动动力学与 $R_{\theta\psi}$ 运动学（论文式号）</span>
+$$\dot v=-sk(\dot\varphi e_x)v-R_{\theta\psi}e_z\frac{f}{m}+ge_z \tag{11}$$
+$$R_{\theta\psi}=R_\psi R_\theta,\qquad \dot R_{\theta\psi}=R_{\theta\psi}sk(\omega)-sk(\dot\varphi e_x)R_{\theta\psi} \tag{12}$$
+<div class="eq-note"><strong>符号</strong>：$v=[v_{vx},v_{vy},v_{vz}]^T$ 是 UAV 速度在 V 系的分量（m/s）；$R_{\theta\psi}:=R_\psi R_\theta$（原文定义，无量纲正交阵）；其余符号同前。<br><strong>式 (11) 的第一性原理推导（独立重推，见正确形式）</strong>。<br>第 1 步：$v=R_\varphi^T\dot O_v=R_\varphi^T V$。对时间求导（用第 4 节已证实的 $\dot R_\varphi^T=sk(\dot\varphi e_x)R_\varphi^T$，即印刷 $R_\varphi$ 对应的<strong>正确符号</strong>）：<br>$$\dot v=\dot R_\varphi^T V+R_\varphi^T\dot V=sk(\dot\varphi e_x)v+R_\varphi^T\Big(ge_z-\frac{f}{m}Re_z\Big)$$<br>第 2 步：展开重力项。印刷 $R_\varphi=R_x(-\varphi)\Rightarrow R_\varphi^Te_z=R_x(\varphi)e_z=(0,-\sin\varphi,\cos\varphi)^T$。于是与印刷 $R_\varphi$ 自洽的正确形式为<br>$$\dot v=sk(\dot\varphi e_x)v+g\begin{pmatrix}0\\-\sin\varphi\\\cos\varphi\end{pmatrix}-\frac{f}{m}\underbrace{R_\varphi^TR\,e_z}_{=:R_{\theta\psi}e_z} \tag{11 应为}$$<br>第 3 步：与印刷 (11) 逐项对照：<br><table><tr><th>项</th><th>印刷 (11)</th><th>正确形式</th><th>差异</th></tr><tr><td>牵连项</td><td>$-sk(\dot\varphi e_x)v$</td><td>$+sk(\dot\varphi e_x)v$</td><td>符号（约定 A/B 混用，同式 (5)）</td></tr><tr><td>重力</td><td>$g e_z$</td><td>$g(0,-\sin\varphi,\cos\varphi)^T$</td><td>横向差 $g\sin\varphi$，垂直差 $g(1-\cos\varphi)$——<strong>O(φ) 未声明近似</strong></td></tr><tr><td>推力方向</td><td>$R_{\theta\psi}e_z,\ R_{\theta\psi}:=R_\psi R_\theta$</td><td>$R_\varphi^TR\,e_z$</td><td>$R_\psi R_\theta$ 只是 $R_\varphi^TR$ 的 $\varphi=0$ 特例（数值验证见下）</td></tr></table><br><strong>数值验证（verify_final.py E 组）</strong>：随机 $\varphi\in[-0.5,0.5],\theta\in[-0.4,0.4],\psi$：印刷推力方向 $R_\psi R_\theta e_z$ 与精确 $R_x(-\varphi)Re_z$ 的中位偏差 <strong>0.215</strong>；式 (12) 用印刷定义 $R_{\theta\psi}=R_\psi R_\theta$ 与印刷右端核对，中位误差 <strong>0.515</strong>（只在 $\varphi=0$ 精确）；改用精确定义 $R_{\theta\psi}:=R_\varphi^TR$ 且右端取 $+sk(\dot\varphi e_x)$，中位误差骤降到 <strong>5.27×10⁻⁸</strong>。即<strong>印刷 (12) 的 $-$ 号与印刷 $R_\varphi$ 不自洽</strong>。<br><strong>式 (12) 的两个版本</strong>（推导：$\dot R_{\theta\psi}=\dot R_\varphi^TR+R_\varphi^T\dot R$，代入 $\dot R_\varphi^T=\mp sk(\dot\varphi e_x)R_\varphi^T$ 与引理 $\dot R=R\,sk(\omega)$ 即得）：约定 A（$R_\varphi=R_x(+\varphi)$）：$\dot R_{\theta\psi}=R_{\theta\psi}sk(\omega)-sk(\dot\varphi e_x)R_{\theta\psi}$——印刷式 ✅；约定 B（$R_\varphi=R_x(-\varphi)$，印刷矩阵）：$\dot R_{\theta\psi}=R_{\theta\psi}sk(\omega)+sk(\dot\varphi e_x)R_{\theta\psi}$——<strong>印刷式应为 $+$</strong>。<br><strong>物理解读</strong>：(11) 想表达"滚转补偿后的平面动力学"——在 V 系里看，推力方向只由俯仰/偏航决定、重力恒竖直向下。真实动力学多出 O(φ) 修正：$\varphi=0.2$ rad 时未建模横向加速度 $g\sin\varphi\approx1.95$ m/s²，与典型横向机动加速度同量级，<strong>不可忽略</strong>。论文没有声明小滚转假设——这是 (11) 作为"设计模型"与真实 (2) 之间的隐藏误差。</div></div>
+<h4>8.1 式 (12) 的判定（小结）</h4>
+<p>印刷 (12) 的 $-$ 号自洽于约定 A；印刷的 $R_\varphi$ 矩阵与 $J_v$（式 (6)）自洽于约定 B——论文在 (5)(11)(12) 用 A、在 $R_\varphi$ 矩阵与 (6) 用 B，<strong>两套约定并存</strong>。又：印刷定义 $R_{\theta\psi}=R_\psi R_\theta$ 在 ZYX 标准 $R=R_z(\psi)R_y(\theta)R_x(\varphi)$ 下不等于 $R_\varphi^T R=R_x(\varphi)R_\psi R_\theta R_x(\varphi)$，误差 O(φ)（E 组 0.515）。</p>
+<h4>8.2 全文最大推导跳跃：$\omega_2$ 从未给出</h4>
+<div class="callout warn"><div class="callout-title">⚠️ 先摆事实：论文唯一的交代是一句话</div><p>第 4 页原文："<strong>By combining (10), (11) and (12), $\omega_2$ can be obtained.</strong>"——此后全文（含仿真设置、实验、附录）<strong>再也没有出现 $\omega_2$ 的任何表达式</strong>。而式 (14) 的滚转律显式依赖 $\omega_2$；俯仰通道又是四旋翼前飞/纵向机动的唯一执行通道。这是全文最大的推导跳跃。下面给出两种自洽重建（<strong>均为本文补充，非论文原文</strong>），并说明为何作者大概率不愿打印它。</p></div>
+<h4>8.3 重建 A：侧向通道反步反解（基于印刷 (11)）</h4>
+<div class="formula-block"><span class="eq-tag">Eq.(D17)–(D21) —— $\omega_2$ 重建 A：把 $v_{vy}\to k_1v_u$ 的误差动力学反解成 $\omega_2$（本文补充）</span>
+$$\dot v_{vy}=\dot\varphi\,v_{vz}-\frac{f}{m}\sin\psi\sin\theta \tag{D17}$$
+$$\sin\psi\sin\theta=\sigma(t):=\frac{m}{f}\Big[\dot\varphi\,v_{vz}-k_1\dot v_u+k_4\big(v_{vy}-k_1v_u\big)\Big] \tag{D18}$$
+$$\dot\sigma=\frac{m}{f}\Big[\ddot\varphi v_{vz}+\dot\varphi\dot v_{vz}-k_1\ddot v_u+k_4\big(\dot v_{vy}-k_1\dot v_u\big)\Big]-\frac{\dot f}{f}\sigma \tag{D19}$$
+$$\dot\sigma=\omega_2\Big[\frac{\sin\varphi\cos\psi\sin\theta}{\cos\theta}+\cos\varphi\sin\psi\cos\theta\Big]+\omega_3\Big[\frac{\cos\varphi\cos\psi\sin\theta}{\cos\theta}-\sin\varphi\sin\psi\cos\theta\Big] \tag{D20}$$
+$$\omega_2=\frac{\dot\sigma-\omega_3\Big[\dfrac{\cos\varphi\cos\psi\sin\theta}{\cos\theta}-\sin\varphi\sin\psi\cos\theta\Big]}{\dfrac{\sin\varphi\cos\psi\sin\theta}{\cos\theta}+\cos\varphi\sin\psi\cos\theta} \tag{D21}$$
+<div class="eq-note"><strong>第 1 步（(D17)：侧向通道方程）</strong>。取印刷 (11) 的第二分量：$-sk(\dot\varphi e_x)v=-\dot\varphi\,e_x\times v=-\dot\varphi(0,-v_{vz},v_{vy})^T$，第二分量为 $+\dot\varphi v_{vz}$；$(R_\psi R_\theta e_z)_y=\sin\psi\sin\theta$（$R_\psi R_\theta e_z=(c\psi s\theta,\ s\psi s\theta,\ c\theta)^T$）。故 $\dot v_{vy}=\dot\varphi v_{vz}-(f/m)\sin\psi\sin\theta$。<br><strong>第 2 步（(D18)：误差动力学）</strong>。虚拟控制目标 $v_{vy}=k_1v_u$（(D7)）。定义 $z:=v_{vy}-k_1v_u$，令 $\dot z=-k_4z$（$k_4\gt0$ 新增益）：$\dot v_{vy}-k_1\dot v_u=-k_4(v_{vy}-k_1v_u)$。与 (D17) 联立、移项即得 $\sin\psi\sin\theta=\sigma(t)$——<strong>侧向控制把"期望侧向力"压成了姿态乘积 $\sin\psi\sin\theta$ 的一条轨迹约束</strong>。<br><strong>第 3 步（(D19)：对约束求导）</strong>。$\sigma=(m/f)A\Rightarrow\dot\sigma=(m/f)\dot A-( \dot f/f)\sigma$，其中 $A=\dot\varphi v_{vz}-k_1\dot v_u+k_4(v_{vy}-k_1v_u)$。$A$ 中出现的 $\dot v_{vz},\dot v_{vy}$ 由 (11)（第三/第二分量）、$\dot v_u$ 由 (6) 第一行、$\ddot v_u$ 继续对 (6) 求导——<strong>全部是状态与已知信号的函数</strong>（表达式冗长，此处不展开，但闭式存在）。<br><strong>第 4 步（(D20)(D21)：把 $\omega_2$ 挖出来）</strong>。对 (D18) 左边求导：$\frac{d}{dt}\sin\psi\sin\theta=\dot\psi\cos\psi\sin\theta+\dot\theta\sin\psi\cos\theta$；代入 T 矩阵（(D1)）第二、三行 $\dot\theta=\omega_2\cos\varphi-\omega_3\sin\varphi$、$\dot\psi=(\omega_2\sin\varphi+\omega_3\cos\varphi)/\cos\theta$，整理即 (D20)；解出 $\omega_2$ 得 (D21)。<br><strong>物理直觉与要害</strong>：分母 $\frac{\sin\varphi\cos\psi\sin\theta}{\cos\theta}+\cos\varphi\sin\psi\cos\theta$ 在 $\psi=\theta=0$（设计的平衡点：机头朝北、机身水平）时<strong>为零</strong>——侧向控制权限在目标正前方时消失，横向通道只能靠瞬态姿态"蹭"。这精确呼应第 8.4 节的结构性结论，也是"任意目标"表述过强的数学根源。</div></div>
+<h4>8.4 重建 B：俯仰角 backstepping（更接近工程实现）</h4>
+<div class="formula-block"><span class="eq-tag">Eq.(D22) —— $\omega_2$ 重建 B：期望俯仰 + 一阶内环（本文补充）</span>
+$$\theta_d:=\arcsin\frac{\sigma}{\sin\psi}\qquad\Big(|\sigma/\sin\psi|\le1,\ \psi\ne0\Big)$$
+$$\omega_2=\frac{\dot\theta_d-k_\theta(\theta-\theta_d)+\omega_3\sin\varphi}{\cos\varphi} \tag{D22}$$
+<div class="eq-note">把 (D18) 的约束 $\sin\psi\sin\theta=\sigma$ 反解成期望俯仰角 $\theta_d$；再用 T 矩阵第二行 $\dot\theta=\omega_2\cos\varphi-\omega_3\sin\varphi$ 构造一阶内环 $\dot\theta-\dot\theta_d=-k_\theta(\theta-\theta_d)$（$k_\theta\gt0$ 新增益），解出 (D22)。<br><strong>诚实结论</strong>：两种重建都必须引入新增益（$k_4$ 或 $k_\theta$，论文没给）、都带除法奇异性（分母含 $\sin\psi\cos\varphi$ 或 $c\theta$ 等），且<strong>都无法与论文或代码对证（论文未开源代码）</strong>。这很可能就是作者把 $\omega_2$ 压成一句话的原因。读者复现时务必自己补齐这一环，并警惕 (D21)/(D22) 分母近零时的数值病态。</div></div>
+<h4>8.5 结构性结论：横向与前飞两个通道"无执行器"</h4>
+<div class="callout danger"><div class="callout-title">🔴 组合缺陷：φd=0 + ψd=0 + ω2 缺失 ⇒ 持续横向/前飞速度没有产生机制</div><p>由 §7 的展开 $Re_z=(c\psi c\varphi s\theta+s\psi s\varphi,\ s\psi c\varphi s\theta-c\psi s\varphi,\ c\varphi c\theta)^T$：</p><ul><li><strong>横向推力</strong> $-(f/m)(Re_z)_y=-(f/m)(\sin\psi\cos\varphi\sin\theta-\cos\psi\sin\varphi)$。滚转律 (14) 与偏航律把 $\varphi,\psi$ 都驱动到 0，稳态横向推力 → 0——<strong>持续侧向速度在稳态不可维持</strong>，侧向跟踪只能靠瞬态姿态误差。</li><li><strong>前飞推力</strong>：仿真设定"forward flight speed 5.0 m/s"，但 $v_{vx}$ 没有对应控制律——前飞需持续俯仰角（$(Re_z)_x=c\psi c\varphi s\theta+s\psi s\varphi$ 需 $\theta\ne0$ 或 $\varphi\ne0$），而 $\varphi_d=0$、$\omega_2$ 缺失。最可能是由 PX4 外环或离线调度实现，<strong>论文未说明</strong>。</li><li><strong>推论</strong>："arbitrary flight targets" 的实际适用前提是<strong>目标大体沿 $X_e$ 方向飞行且侧向偏差有界</strong>（仿真三条轨迹：直线/正弦幅值 5 m/螺旋半径 5 m，主方向均沿 $X_e$；实验目标做左右往返机动）。对环绕飞行、大角度转向目标，该方案在原理上无法保持（有限视场 + 无横向执行能力）。</li></ul></div>
+<hr>
+<h3>9. 公式 (13)(14)：滚转通道与偏航律——前馈解耦正确，偏航律符号存疑</h3>
+<p>论文原文（第 4–5 页，逐字符核实；(14) 三处负号均已确认）：</p>
+<div class="formula-block"><span class="eq-tag">Eq.(13)(14)(D11)(D12)(D13) —— 滚转/偏航通道（论文式号 + 补充式）</span>
+$$\dot\varphi=\omega_1+\sin\varphi\tan\theta\,\omega_2+\cos\varphi\tan\theta\,\omega_3 \tag{13}$$
+$$\omega_1=-\sin\varphi\tan\theta\,\omega_2-\cos\varphi\tan\theta\,\omega_3-k_\varphi e_\varphi \tag{14}$$
+$$e_\varphi=\varphi-\varphi_d,\qquad \varphi_d=0 \tag{D12}$$
+$$\omega_3=k_\psi(\psi-\psi_d),\qquad \psi_d=0 \tag{D11}$$
+$$\dot e_\varphi=-k_\varphi e_\varphi \tag{D13}$$
+<div class="eq-note"><strong>式 (13) 的来源</strong>：T 矩阵（(D1)）第一行 $\dot\varphi=\omega_1+\omega_2\sin\varphi\tan\theta+\omega_3\cos\varphi\tan\theta$。✅ 逐字符一致。<br><strong>式 (14)→(D13) 的代入（逐步）</strong>：把 (14) 代入 (13)：<br>$$\dot\varphi=\big[-\sin\varphi\tan\theta\,\omega_2-\cos\varphi\tan\theta\,\omega_3-k_\varphi e_\varphi\big]+\sin\varphi\tan\theta\,\omega_2+\cos\varphi\tan\theta\,\omega_3=-k_\varphi e_\varphi$$<br>前两项<strong>精确抵消</strong>（不是小角度近似）——(14) 的前馈把 $\omega_2,\omega_3$ 经 $\tan\theta$ 的陀螺耦合完全解耦，这是本论文控制设计里最干净的一步。因 $\varphi_d=0$，$\dot e_\varphi=\dot\varphi-\dot\varphi_d=-k_\varphi e_\varphi$，解为<br>$$e_\varphi(t)=\varphi(0)\,e^{-k_\varphi t}\qquad\text{（指数收敛，时间常数 }1/k_\varphi\text{）}$$<br><strong>数值核算</strong>：论文 $k_\varphi=3.5$（note 第 6 节参数表把 $k_\psi$ 与 $k_\varphi$ 写反，见 §12.3 问题 11；本节以论文为准）→ $\tau=1/3.5=0.286$ s、5τ=1.43 s；相机 20 fps（50 ms/帧）、PX4 内环 100–250 Hz，滚转环带宽（3.5 rad/s）远低于执行器带宽，离散实现无虞 ✅。<br><strong>代价</strong>：(14) 显式依赖 $\omega_2$ 与 $\omega_3$——第 8 节的 $\omega_2$ 缺口在此传导：<strong>没有 $\omega_2$，(14) 作为指令不可执行</strong>。</div></div>
+<h4>9.1 偏航律 $\omega_3=k_\psi(\psi-\psi_d)$：按论文自身运动学是正反馈</h4>
+<div class="formula-block"><span class="eq-tag">Eq.(D23) —— 偏航误差动力学（由 (3)/T 第三行严格导出）</span>
+$$\dot\psi=\frac{\omega_2\sin\varphi+\omega_3\cos\varphi}{\cos\theta}\qquad(\text{T 第三行})$$
+$$\dot e_\psi=\frac{\omega_2\sin\varphi+k_\psi e_\psi\cos\varphi}{\cos\theta}\ \approx\ \frac{k_\psi}{\cos\theta}\,e_\psi\qquad(|\varphi|\text{ 小}) \tag{D23}$$
+<div class="eq-note"><strong>推导</strong>：T 矩阵第三行（§2.1 (D1)）即 $\dot\psi=(\omega_2\sin\varphi+\omega_3\cos\varphi)/\cos\theta$；代入 (D11) 与 $\psi_d=0$（$\dot e_\psi=\dot\psi$）得 (D23)。小 $|\varphi|$ 下 $\dot e_\psi\approx(k_\psi/\cos\theta)\,e_\psi$——<strong>正反馈，指数发散</strong>：<br>$$e_\psi(t)\approx e_\psi(0)\exp\Big(\frac{k_\psi}{\cos\theta}\,t\Big)$$<br><strong>数值核算</strong>：$k_\psi=2,\ \theta=0.3$：增长率 $2/\cos 0.3=2.09$ s⁻¹（翻倍时间 0.33 s）；$e_\psi(0)=0.5$ rad 时 $\dot e_\psi(0)=1.05$ rad/s（verify_final.py H 组）。<br><strong>正确镇定律应为</strong> $\omega_3=-k_\psi(\psi-\psi_d)$（此时 $\tau=\cos\theta/(k_\psi\cos\varphi)\approx0.48$ s）。</div></div>
+<div class="callout danger"><div class="callout-title">🔴 符号疑点（无法终审，如实说明）</div><p>印刷的 $\omega_3=k_\psi(\psi-\psi_d)$ 在论文自身的运动学 (3)（T 矩阵已数值验证，A 组 4.24×10⁻⁸）下构成正反馈。但仿真与实验的偏航误差都收敛（Fig. 4(c)/13(c)），因此推断<strong>实际实现取了相反符号</strong>（或实现里 $\psi$ 定义相反——但 T 矩阵与 (8) 都只支持 ZYX 约定，无法为印刷符号辩护）。论文未开源代码，无法终审。<strong>读者复现时务必核对实现中 $\omega_3$ 的符号</strong>——照抄印刷式会让偏航通道指数发散。</p></div>
+<h4>9.2 耦合影响说明与 $\psi_d=0$ 的物理含义</h4>
+<ul><li><strong>发散传导路径</strong>：若 $\omega_3$ 按印刷式发散，(14) 的前馈项 $-\cos\varphi\tan\theta\,\omega_3$ 会把发散传导进 $\omega_1$ 指令；但滚转内环若完美执行 (14)，该项恰好被抵消——发散集中在 $\psi$（直接）与 $\theta$（经 T 第三行的 $\omega_2\sin\varphi$ 与 $\omega_2$ 重建中的 $\psi$ 依赖）。</li>
+<li><strong>$\psi_d=0$ 的物理含义</strong>：机头水平投影恒指向 $X_e$（北）。前视相机水平半视场 $\approx30°$（FOV 1.047 rad 的一半），因此<strong>目标必须始终大体位于 UAV 北方</strong>才能留在视场——与 §8.5 的适用边界互相印证。</li>
+<li><strong>"改进图像误差项"的数学内容</strong>：真实像面点特征交互矩阵有 6 列（平移 3 + 旋转 3，见 §5 (D16)）；虚拟像面 $J_v$ 只有 4 列——<strong>没有 $\dot\theta,\dot\psi$ 列</strong>，UAV 俯仰/偏航机动造成的图像运动不会进入虚拟像面误差信号：控制器不再"追着自己的姿态抖动"。消融实验（Fig. 9/Table I：中位数 −22.37%、IQR −35.10%）正是这一数学事实的统计表现。</li></ul>
+<hr>
+<h3>10. Algorithm 1：距离估计与停止条件——逐行解读 + 针孔几何推导</h3>
+<p>论文原文（第 3 页，逐字符核实）：</p>
+<pre class="code-block"><code>Algorithm 1: Distance Estimation And Stop Condition Judgment Algorithm.
+Input:  Camera horizontal resolution Ne,
+        Maximum number of horizontal pixels of the target image N,
+        Constant parameters de and kd
+Output: Distance d, Forward tracking velocity vvx
+ 1: while N &gt; 0 do
+ 2:   if d ← (Ne/N)de, d̄ ← kd de                    ▷ Distance estimation
+ 3:   while vvx &gt; 0
+ 4:     if d &gt; d̄ then
+ 5:       vvx ← vvx                                  ▷ Continue tracking
+ 6:     else
+ 7:       vvx ← 0                                    ▷ Stop approaching
+ 8:     end if
+ 9:   end while
+10: end while</code></pre>
+<h4>10.1 距离公式 $d=(N_e/N)d_e$ 的第一性原理推导（针孔宽度比）</h4>
+<div class="formula-block"><span class="eq-tag">Eq.(D14) —— 单目测距（论文 Algorithm 1 的核心）</span>
+$$N=\frac{\lambda W}{d},\qquad N_e=\frac{\lambda W}{d_e}\quad\Longrightarrow\quad \frac{N}{N_e}=\frac{d_e}{d}\quad\Longrightarrow\quad d=\frac{N_e}{N}d_e \tag{D14}$$
+<div class="eq-note"><strong>推导</strong>：设目标物理宽度 $W$（仿真中两架四旋翼长宽 0.47 m；若 N 取水平像素，则 $W$ 为水平跨度），相机焦距 $\lambda$（px）。针孔模型下距离 $d$ 处像宽 $N=\lambda W/d$（严格式 $N=2\lambda\tan\frac{W}{2d}\approx\lambda W/d$，远场 $W\ll d$ 时等价）。标定距离 $d_e$（"整个相机视场刚好被目标图像占据"时的距离，地面实测）处 $N_e=\lambda W/d_e$。两式相除消去未知的 $\lambda W$ 即得 (D14)。<br><strong>自洽性检查</strong>：$d=d_e\Leftrightarrow N=N_e$（标定点是不动点）✅。<br><strong>与第 3 节深度不可观测性的呼应</strong>：单目点投影无法恢复深度（尺度模糊），(D14) 用"<strong>已知目标尺寸 $W$ + 像素占比 $N/N_e$</strong>"绕过了不可观测性——这正是论文引言所说 "based on the idea of monocular camera distance estimation" 的工程实质。代价：$d$ 的精度依赖 $W$ 的准确性（见 10.3）。</div></div>
+<h4>10.2 逐行解读</h4>
+<ul><li><strong>输入</strong>：$N_e$ 相机水平分辨率（论文 640 px）；$N$ 目标图像块的水平像素数（KCF 跟踪框宽度，实时获取）；$d_e$ 标定距离（地面测试测得）；$k_d$ 人工设定的阈值系数（无量纲）。</li>
+<li><strong>输出</strong>：距离 $d$（$=v_x$，沿光轴 $X_v$ 的距离，m）与前飞速度 $v_{vx}$（m/s）。</li>
+<li><strong>Line 1 <code>while N &gt; 0</code></strong>：目标在视野内即持续处理（逐帧语义）。注意这是<strong>非标准伪代码</strong>：$N\gt0$ 恒真的情况下外层循环没有退出机制，实际语义是"每帧执行一次"。</li>
+<li><strong>Line 2</strong>：距离估计 $d\leftarrow(N_e/N)d_e$；停止阈值 $\bar d\leftarrow k_d d_e$。</li>
+<li><strong>Line 3–9</strong>：前飞期间（$v_{vx}\gt0$）持续判断：$d\gt\bar d$ 保持 $v_{vx}$（继续接近）；否则 $v_{vx}\leftarrow0$（停止接近）。动机（论文原文）：实时估计 $x$ 方向距离可避免"先接近再远离目标"的过冲，保证监视/拦截任务的距离控制。</li></ul>
+<h4>10.3 数值核算与伪代码问题</h4>
+<p><strong>数值核算（$N_e=640$、$d_e=30$ m 假设——论文未给 $d_e,k_d$，表为示例）</strong>：</p>
+<table><tr><th>$d$ [m]</th><th>10</th><th>15</th><th>30</th><th>60</th><th>120</th></tr><tr><td>$N=N_ed_e/d$ [px]</td><td>1920</td><td>1280</td><td>640</td><td>320</td><td>160</td></tr></table>
+<p>要点：$d=10$ m 时 $N=1920$ px 已远超整幅宽度（640）——目标像"溢出"视场，说明 $\bar d$ 必然大于"充满视场"的距离；实验最终距离 10.30 m（Fig. 13(b)）提示 $\bar d\approx10$ m 量级，对应 $k_d\approx0.34$（<strong>推断，论文未给 $k_d,d_e$</strong>）。</p>
+<div class="callout warn"><div class="callout-title">⚠️ Algorithm 1 的问题清单（如实标注）</div><ol><li><strong>除零</strong>：$N=0$（目标丢失/检测失败）时 $(N_e/N)d_e$ 无定义；`while N &gt; 0` 的循环条件形同虚设（不防护除零）。</li><li><strong>无退出/帧同步语义</strong>：两重 while 无法自然终止；$d\gt\bar d$ 分支里 `vvx ← vvx` 是恒等操作（可读性差）；$d\le\bar d$ 后 $v_{vx}=0$ 使内层退出但外层立即重入。</li><li><strong>距离估计对目标朝向敏感</strong>：四旋翼目标的投影宽度随其偏航角变化（0.47 m 机架正面/侧面对齐时不同），翻滚时误差更大——(D14) 的 $W$ 实际上不是常数。</li><li><strong>角色是"调度器"而非控制器</strong>：算法只输出距离与前飞许可，不参与任何控制律代数；它与 §6 的充分条件 (D10)（"远处限速"）构成工程对应——(D10) 给出连续限速的理论理由，Algorithm 1 给出 0/1 开关实现。</li><li><strong>前飞速度 $v_{vx}$ 由谁产生未说明</strong>：四旋翼没有水平方向执行器，5.0 m/s 前飞需要持续俯仰角，而 $\omega_2$ 缺失（§8.5）——该算法的"输出 $v_{vx}$"在论文控制架构中没有对应的实现环节。</li></ol></div>
+<hr>
+<h3>11. 数值核算与参数反算总表</h3>
+<p>本节把论文给出的全部参数代入各公式核算，并说明与实验观测的吻合程度。所有计算可用 <code>_derivation_work/1-ibvs/verify_final.py</code>（K 组）与手算复核。</p>
+<h4>11.1 焦距反算：$\lambda=554.3$ px（含假设声明）</h4>
+<div class="formula-block"><span class="eq-tag">Eq.(D24) —— 由分辨率与视场反算焦距（本文补充）</span>
+$$\lambda=\frac{N_e/2}{\tan(\text{FOV}/2)}=\frac{320}{\tan(1.047/2)}=\frac{320}{0.57735}=554.3\ \text{px} \tag{D24}$$
+<div class="eq-note">论文第 5 页："camera can take images in 640×480 resolution… and its field of view is 1.047 rad"。<strong>假设 1.047 rad 是水平视场</strong>（论文未指明方向）：半视场 0.5235 rad，水平 320 px 对应 $\lambda\tan(0.5235)$，故 (D24)。<br><strong>敏感性（诚实标注）</strong>：若 1.047 rad 是垂直视场，$\lambda=240/0.577=415.7$ px；若是对角线视场，$\lambda=400/0.577=692.8$ px。三种读法相差 ±25%——凡涉及 $\lambda$ 的数值（如 (D10) 的 $k_i\lambda$、§11.4 的命令核算）都以此为误差源。建议人工复核 page-005 对应文字。</div></div>
+<h4>11.2 悬停推力核算</h4>
+<p>由 (8) 令 $\varphi=\theta=0,\ \dot e_{vz}=0$：$f=mg=1.55\times9.8=\mathbf{15.19\ N}$ ✅。对应论文参数 $m=1.55$ kg、$g=9.8$ m/s²（1.55 kg 级四旋翼悬停油门典型值量级相符）。</p>
+<h4>11.3 闭环时间常数核算（三通道时标分离检查）</h4>
+<p>滚转：$1/k_\varphi=0.286$ s（(D13)，$k_\varphi=3.5$），远慢于 PX4 内环（~4–10 ms）✅。偏航（修正符号 $-k_\psi$）：$\cos\theta/(k_\psi\cos\varphi)=0.478$ s（$\theta=0.3,\varphi=0,k_\psi=2$）✅。平移（归一化读数，见 11.4）：u 通道 $v_x/(k_1-v_{vx})=20$ s、n 通道 $v_x/(k_2-v_{vx})=6.7$ s（$v_x=20,v_{vx}=5$）——与实验"数十秒收敛"（Fig. 4(b)/13(b)）吻合 ✅。</p>
+<h4>11.4 图像坐标单位的两种读法（全文最需要警惕的参数-理论错配，§6 量纲注记的深化）</h4>
+<table><tr><th>读数</th><th>$\lambda$</th><th>$k_1\lambda$</th><th>1 m 侧偏 @20 m 的 $v_u$</th><th>指令 $v_{vy}=k_1v_u$</th><th>闭环 $\tau_u$</th><th>(D10) 在 $v_x=20,v_{vx}=5$ 下</th></tr>
+<tr><td>像素读数</td><td>554.3 px</td><td>3326 m/s</td><td>27.7 px</td><td><strong>166 m/s（荒谬）</strong></td><td>6 ms</td><td>$15\le3326$ ✅ 满足</td></tr>
+<tr><td>归一化读数</td><td>1（无量纲）</td><td>6 m/s</td><td>0.05</td><td><strong>0.3 m/s（合理）</strong></td><td>20 s</td><td>$15\le6$ ❌ <strong>违反</strong></td></tr></table>
+<div class="callout warn"><div class="callout-title">⚠️ 两种读数互相矛盾，论文未声明单位</div><p>论文从未说明 $v_u,v_n$ 的单位（px 还是归一化坐标）。(D3) 写 $p=(\lambda/v_x)[v_y,v_z]^T$，若 $\lambda$ 取 11.1 的 554.3 px，则 $p$ 是像素：此时 1 m 侧偏 @20 m 给出 $v_u=27.7$ px，控制律 $v_{vy}=k_1v_u$ 输出 <strong>166 m/s</strong> 的横向速度指令——物理荒谬；而 (D10) 恰好满足。若把 $p$ 读作归一化坐标（$u=v_y/v_x$，$\lambda\equiv1$），则指令 0.3 m/s 合理、闭环时间常数 20 s 与实验时间尺度吻合——<strong>但此时论文引用的充分条件 (D10) 在论文自己给的参数下不成立（$15\not\le6,8$）</strong>，即 "定理 4.9 + $W=\tfrac12e_i^Te_i$" 的论证链不闭合。唯一自洽的解读：归一化坐标 + 承认 (D10) 只是过度保守的充分条件（$V_i$ 收敛仍由 $\dot V_i\lt0$ 保证，因为 $k_1,k_2\gt v_{vx}$）。<strong>结论：本文的稳定性论证与数值参数之间存在未言明的单位/量级错配，读者复现时不要照抄 (D10) 做参数整定。</strong></p></div>
+<h4>11.5 式 (10) 的数值修正核算</h4>
+<p>工况：$v_{vz}=1$ m/s、$v_n=0.05$（归一化）、$\varphi=0.2$、$\theta=0.3$、$\dot\varphi=0.5$ rad/s、$m=1.55$。先算公共因子：$\cos\varphi\cos\theta=0.9363$，$m/(\cos\varphi\cos\theta)=1.6554$，$k_3(v_{vz}-k_2v_n)\cos\varphi=3(1-0.4)\times0.9801=1.7642$。于是</p>
+$$f_{\text{印刷}}=1.6554\times\big[\underbrace{v_{vz}\sin\varphi}_{0.1987\ \text{m/s（量纲错）}}+1.7642+9.8\big]=1.6554\times11.7629=\mathbf{19.47\ N}$$
+$$f_{\text{修正}}=1.6554\times\big[\underbrace{v_{vz}\dot\varphi\sin\varphi}_{0.0994\ \text{m/s}^2}+1.7642+9.8\big]=1.6554\times11.6636=\mathbf{19.31\ N}$$
+<p>两者差 0.16 N（≈0.84%）——$\dot\varphi$ 项在典型机动下是小修正但非零；悬停时（$v_{vz}=v_n=0,\varphi=0$）两式都回到 15.19 N ✓。</p>
+<h4>11.6 偏航通道核算（印刷律 vs 修正律）</h4>
+<p>印刷律 $e_\psi(t)\approx e_\psi(0)e^{2.09\,t}$（增长率 2.09 s⁻¹，翻倍 0.33 s；$e_\psi(0)=0.5$ rad 时 $\dot e_\psi(0)=1.05$ rad/s——verify_final.py H 组）。修正律 $\omega_3=-k_\psi e_\psi$：$\tau=\cos\theta/(k_\psi\cos\varphi)=0.48$ s（§11.3）。实验偏航误差收敛（Fig. 13(c)）只能由修正律解释。</p>
+<h4>11.7 充分条件 (D10) 的像素读数核算（verify_final.py K 组，仅供量级参考）</h4>
+<p>$v_x=5,20,30$ m（$v_{vx}=5$ m/s）时 $k_1\lambda-v_x/2-v_{vx}=3318.3,\ 3310.8,\ 3305.8$；$k_2\lambda-v_x/2-v_{vx}=4426.9,\ 4419.4,\ 4414.4$——像素读数下条件余量极大（再次说明像素读数让 (D10) 失去"约束"意义，见 11.4 的结论）。</p>
+<h4>11.8 实验统计数字核查（诚实说明）</h4>
+<ul><li><strong>22.37% / 35.10%</strong>：Table I 三次消融实验（直线/平面/3D）的中位数平均降幅与 IQR 平均降幅。原始轨迹/图像误差数据<strong>未公开</strong>，无法独立复算；只能核对文字自洽（"reduced by 22.37% on average" 与 "35.10% on average" 与 Table I 行文一致）✅。</li>
+<li><strong>10.30 m vs 20.83 m</strong>：Fig. 13(b) 实物对比实验 50 s 后的距离误差（本文 vs [23]）。同样无原始数据；10.30 m 与 §10.3 的 $\bar d\approx10$ m 推断互相印证（本文方法的稳态距离受 Algorithm 1 阈值控制，属设计使然，不是"没追上"）。</li>
+<li><strong>接近速率粗算</strong>：UAV 前飞 5.0 m/s，目标 4.0/4.5/4.6 m/s → 相对接近 0.4–1.0 m/s；初始 20 m 距离收敛到 0–10 m 需 10–50 s，与 Fig. 4(b)（t=44 s 开始追踪、数十秒收敛）数量级吻合 ✅。</li></ul>
+<hr>
+<h3>12. 交叉验证总表与问题清单</h3>
+<h4>12.1 核实方法说明（诚实声明）</h4>
+<div class="callout info"><p><strong>声明</strong>：本次执行的模型<strong>无法直接查看页面栅格图像</strong>（page-001…008.png）。全部公式核实通过三重文本路径完成，关键结论均已逐字符确认：① <code>extract_words.py</code>（PyMuPDF）按字符坐标重建版面（<code>words.txt</code>）——$R_\varphi$、(5)、(6)、$J_v$、(8)(9)(10)、(11)(12)、$\omega_3$、(13)(14) 的矩阵元素、上下标与正负号均已逐字符核实；② <code>fulltext.txt</code> 全文交叉对照；③ <code>verify_final.py</code>（A–K 组）与 <code>verify_fix.py</code>（C′ D′ 组）数值独立重推（注：verify_final.py C/D 组有一处把 V 系坐标误当 E 系坐标的笔误，产出假阴性，已由 verify_fix.py 修正）。字符坐标无法还原的只剩分式横线、大括号等版面样式——不影响数学结论，建议按 12.4 清单人工复核一遍页面图像。</p></div>
+<h4>12.2 交叉验证总表（数值出处见各节与脚本组）</h4>
+<table><tr><th>公式</th><th>独立验证结论</th></tr>
+<tr><td>(1)–(4) 六自由度模型</td><td>✅ 标准 NED 模型，独立重推一致（A 组）</td></tr>
+<tr><td>T 矩阵 (D1)</td><td>✅ 与 ZYX 精确自洽（4.2×10⁻⁸）；$\theta=\pm90°$ 奇异（本场景无碍）</td></tr>
+<tr><td>$R_\varphi$、$v_p$ (D2)</td><td>✅ $R_\varphi=R_x(-\varphi)$；$X_v\parallel X_e$；虚拟像面恒竖直</td></tr>
+<tr><td>(5)</td><td>❌ <strong>中间行符号印错</strong>：对印刷 $R_\varphi$ 应为 $+sk$（B 组 1.8×10⁻⁷ vs 6.96）</td></tr>
+<tr><td>(D3) 投影式、(6) $J_v$</td><td>✅ C′ 组 1.25×10⁻⁷；= 经典交互矩阵 (D16) 在 $\omega_c=(0,0,-\dot\varphi)$ 下的特例</td></tr>
+<tr><td>(7)、$V_i$、$\dot V_i$ (D5)(D6)</td><td>✅ D′ 组 5.1×10⁻⁷；$\dot\varphi$ 项相消 ⇒ 式 (5) 的错误不传染</td></tr>
+<tr><td>(D7)(D8) 控制律与代入</td><td>✅ 代数正确（D′ 组）</td></tr>
+<tr><td>(D10) 充分条件</td><td>⚠️ 量纲不一致；归一化读数下在论文自身参数处不成立（§11.4）</td></tr>
+<tr><td>(8)</td><td>✅ $(Re_z)_z=\cos\varphi\cos\theta$ 精确成立（F 组全试验通过）</td></tr>
+<tr><td>(9)</td><td>⚠️ 缺 $-v_{vy}\sin\varphi$（G 组中位 0.446；未声明近似，收敛后自愈）</td></tr>
+<tr><td>(10)</td><td>❌ <strong>首项缺 $\dot\varphi$</strong>（$v_{vz}\sin\varphi\to v_{vz}\dot\varphi\sin\varphi$；量纲 + 字符坐标双证据）</td></tr>
+<tr><td>(11)(12)</td><td>⚠️ 约定混用；$R_{\theta\psi}=R_\psi R_\theta$ 仅为 $R_\varphi^TR$ 的 $\varphi=0$ 特例（E 组 0.515 vs 5.3×10⁻⁸）</td></tr>
+<tr><td>$\omega_3=k_\psi(\psi-\psi_d)$ (D11)</td><td>❌ <strong>正反馈</strong>（H 组 2.09 s⁻¹）；正确律应为 $-k_\psi(\psi-\psi_d)$</td></tr>
+<tr><td>(13)(14) 与 $\dot e_\varphi=-k_\varphi e_\varphi$</td><td>✅ 前馈精确抵消耦合；指数收敛（τ=0.286 s）</td></tr>
+<tr><td>Algorithm 1 核心式 $d=(N_e/N)d_e$ (D14)</td><td>✅ 几何正确（I 组）；伪代码书写问题见 §10.3</td></tr>
+<tr><td>$\omega_2$（俯仰律）</td><td>⚠️ <strong>全文无显式表达式</strong>（§8.3 两种重建为本文补充）</td></tr></table>
+<h4>12.3 问题清单（按严重程度排序）</h4>
+<ol><li><strong>【印刷错误·式 (5)】</strong>中间推导行 $-sk(\dot\varphi e_x)R_\varphi^T$ 应为 $+sk(\dot\varphi e_x)R_\varphi^T$（对印刷的 $R_\varphi=R_x(-\varphi)$）。数值决定性（B 组：1.8×10⁻⁷ vs 6.96）。危害受限：$\dot V_i$ 中 $\dot\varphi$ 项相消、$J_v$ 用正确约定，故不传染到稳定性结论；但按 (5) 的 $-$ 号独立重推 (6) 会得到第四列反号的 $J_v$。</li>
+<li><strong>【印刷错误·式 (10)】</strong>括号首项 $v_{vz}\sin\varphi$ 缺 $\dot\varphi$（应为 $v_{vz}\dot\varphi\sin\varphi$）。三重证据：原文自述 "using (8) and the <strong>time-derivative</strong> of (9)"；量纲（0.199 m/s 与 9.8 m/s² 相加）；字符坐标（$v_{vz}$ 与 $\sin\varphi$ 间无导数点字符）。</li>
+<li><strong>【稳定性错误·偏航律】</strong>印刷 $\omega_3=k_\psi(\psi-\psi_d)$ 在论文自身运动学下是<strong>正反馈</strong>（增长率 $k_\psi/\cos\theta=2.09$ s⁻¹）。实验收敛 ⇒ 推断实现取反号；论文无代码，无法终审。复现者务必核对符号。</li>
+<li><strong>【符号约定混用·(11)(12)】</strong>印刷 $-$ 号与印刷 $R_\varphi$ 不自洽（自洽于另一约定 $R_\varphi=R_x(+\varphi)$）；$R_{\theta\psi}=R_\psi R_\theta$ 只是 $R_\varphi^TR$ 的 $\varphi=0$ 特例（E 组 0.515）；(11) 的重力 $ge_z$ 应为 $g(0,-\sin\varphi,\cos\varphi)^T$（横向误差 $g\sin\varphi$，$\varphi=0.2$ 时 ≈1.95 m/s²）。均未声明小滚转假设。</li>
+<li><strong>【推导跳跃·$\omega_2$】</strong>"By combining (10), (11) and (12), $\omega_2$ can be obtained"——全文无显式表达式，而 (14) 依赖它。§8.3 的两种重建均需新增益与除法奇异性，可能与作者未打印的原因相关。</li>
+<li><strong>【未声明近似·式 (9)】</strong>$e_{vz}=v_{vz}\cos\varphi$ 丢弃了 $-v_{vy}\sin\varphi$（G 组中位 0.446）。收敛后自动精确（自举式设计），过渡过程有误差，且 (10) 继承该误差。</li>
+<li><strong>【控制通道缺失】</strong>虚拟控制 $v_{vy}=k_1v_u$ 的实现路径从未给出（$\varphi_d=0$ 且 $\psi_d=0$ ⇒ 稳态横向推力 → 0）；前飞速度 $v_{vx}=5$ m/s 的产生机制也未建模。"arbitrary flight targets" 表述过强——实际适用前提是目标大体沿 $X_e$ 飞行且侧偏有界（§8.5）。</li>
+<li><strong>【理论覆盖不足】</strong>伺服模型建立在 "stationary target point P" 假设上：式 (5)(6) 不含目标速度；对运动目标 $e_i\to0$ 无理论保证（缺 ISS/扰动分析），实验呈有界残余误差。论文只用"UAV 速度恒快于目标"的直觉性假设过渡。</li>
+<li><strong>【量纲/参数错配·(D10)】</strong>$v_x/2$ [m] 与 $v_{vx}$ [m/s] 相加；且唯一物理自洽的归一化读数下，条件在论文自身参数处不成立（§11.4）——定理 4.9 的应用不闭合（收敛仍由 $\dot V_i\lt0$ 保证）。</li>
+<li><strong>【伪代码问题·Algorithm 1】</strong>$N=0$ 除零无防护、无帧同步/退出语义、距离估计对目标朝向敏感；$k_d,d_e$ 未给数值（10.30 m 实验距离 ⇒ $\bar d\approx10$ m、$k_d\approx0.34$ 为本文推断）。</li>
+<li><strong>【note 自身参数表错误】</strong>本 note 第 6 节把 $k_\psi$ 与 $k_\varphi$ 写反（note：$k_\psi=3.5,k_\varphi=2$；论文：$k_\psi=2,k_\varphi=3.5$）——读 note 时以论文为准。</li>
+<li><strong>【统计数字不可独立复核】</strong>22.37% / 35.10% / 10.30 m / 20.83 m 依赖未公开原始数据；本文只核对了文字自洽性。</li></ol>
+<p><strong>正面结论（不硬凑问题）</strong>：除上述各项外，式 (1)–(4)、(6)、(8)、(13)(14)、T 矩阵、$V_i/\dot V_i$、(D8) 与充分条件的<strong>代数推导</strong>、Algorithm 1 的几何核心，独立重推与数值验证全部一致——<strong>未发现实质问题</strong>。</p>
+<h4>12.4 建议人工复核清单（页面图像最后一道保险）</h4>
+<table><tr><th>页面</th><th>需复核内容</th><th>重点</th></tr>
+<tr><td>page-002.png</td><td>(1)–(4) 与符号定义</td><td>$R:B\to E$、$e_z$ 方向</td></tr>
+<tr><td>page-003.png</td><td>T 矩阵、$R_\varphi$、式 (5) 三个等号行、投影式、$J_v$ 与 (6)</td><td>(5) 的 <code>−sk</code>、$J_v$ 第四列 $[-v_n;\ +v_u]$</td></tr>
+<tr><td>page-004.png</td><td>(7)、(8)、(9)、(10)、(11)、(12)、$\omega_3=k_\psi(\psi-\psi_d)$</td><td>(10) 首项 $v_{vz}\sin\varphi$ 前确无 $\dot\varphi$；(11)(12) 的 <code>−sk</code></td></tr>
+<tr><td>page-005.png</td><td>(13)、(14)、$\dot e_\varphi=-k_\varphi e_\varphi$</td><td>(14) 三处负号</td></tr></table>
+<p>说明：以上内容均已通过 PyMuPDF 字符坐标核实（<code>words.txt</code>），人工复核仅作为最后保险。</p>
+<hr>
+<h3>13. 验证材料清单（全部可复跑）</h3>
+<ul><li><code>_derivation_work/1-ibvs/fulltext.txt</code>：PDF 全文文本抽取（按页标记，UTF-8）。</li>
+<li><code>_derivation_work/1-ibvs/extract_words.py</code> + <code>words.txt</code>：PyMuPDF 逐字符坐标抽取，本文所有"逐字符核实"的依据。</li>
+<li><code>_derivation_work/1-ibvs/verify_final.py</code>：A–K 组数值验证（A ZYX 运动学；B 式 (5) 符号判定；C/D 见下注；E 式 (11)(12)；F 式 (8)；G 式 (9)；H 偏航律；I Algorithm 1；J 式 (10) 量纲；K 充分条件与 λ 反算）。<strong>注</strong>：C/D 组有坐标系框架笔误（V 系坐标当 E 系坐标），产出 C: False、D: 1.15e7 假阴性，已由 verify_fix.py 修正。</li>
+<li><code>_derivation_work/1-ibvs/verify_fix.py</code>：C′/D′ 组（修正版）：$J_v$ 中位误差 1.25×10⁻⁷、$\dot V_i$ 中位误差 5.14×10⁻⁷。</li>
+<li><code>_derivation_work/1-ibvs/pages/page-001…008.png</code>：页面栅格图像（本次模型无法查看，供人工复核，见 12.4）。</li>
+<li>本片段 <code>derivation_fragment.html</code>、插入脚本 <code>_derivation_work/insert_fragment.py</code>、标签检查 <code>_derivation_work/check_tags.py</code>、备份 <code>note.html.bak</code>。</li>
+<li>运行环境：<code>C:\Users\12960\.dsh\dsh-runtimes\dsh-plugin-desktop-primary-runtime\dependencies\python\python.exe</code>（numpy + pymupdf）。</li></ul>
 </section>
 
 <footer>📄 Paper Notes · Wang, Qin et al. · IEEE RA-L 2023 · Image-Based Visual Servoing of Quadrotors to Arbitrary Flight Targets · MathJax + Mermaid Rendering</footer>

@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">缺陷与扩展</a>
   <a href="#motivation">推导动机</a>
   <a href="#takeaway">要点总结</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -1484,6 +1488,696 @@ flowchart LR
     若要在自己的研究里用起 DiffAero：<strong>① 先读 [15] SHAC</strong>（理解"为什么短视界 + 终端价值"）→ <strong>② 再读 [14] NMI 2025</strong>（理解"为什么质点模型 + 可微物理能做真实飞行"）→ <strong>③ 然后精读本文第 III 节与 <code>dynamics/pointmass.py</code></strong>（理解"可微"在代码里到底是什么）→ <strong>④ 最后对照 [12] Aerial Gym</strong>（理解工程取舍的另一端）。这个顺序能避免"一上来就陷进 FPS 数字"的误区。
   </div>
 </section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+
+<div class="callout info">
+<div class="callout-title">📌 本节的对象、范围与核实方法</div>
+<p><strong>对象</strong>：<code>DiffAero_arXiv2509.10247.pdf</code>（本地 PDF，8 页，IEEE RA-L letter）第 3–5 页「III. The DiffAero Simulation Framework」的全部 <strong>6 个编号公式 Eq.(1)–(6)</strong>，及 §III 无编号正文公式（策略分布 $a_t\sim\mathcal{N}(\mu_\theta(o_t),\sigma_\theta(o_t))$、TD-λ 描述、姿态反解规则）与代码核心公式（角速率控制器、EDM 扩散去噪器）。<strong>论文无伪代码块</strong>（letter 无 Algorithm 环境），第 9 节把 §III-E / §IV-D 的文字描述还原为可执行伪代码并逐行对照代码。</p>
+<p><strong>方法</strong>（与 Neuralplane 附录 A 同标准，四重核实）：</p>
+<ol>
+<li><strong>PDF 字符坐标级核实</strong>：用 PyMuPDF 按渲染坐标逐行重建公式（脚本 <code>_derivation_work/diffaero/extract_formulas.py</code>，输出 <code>formula_pages.txt</code>），6 个公式的下标、上标、符号均逐字符确认（见各节"原文"框）。</li>
+<li><strong>第一性原理独立重推</strong>：牛顿–欧拉方程、Hamilton 四元数代数、ZOH 离散化、数值格式的阶与稳定性、策略梯度与 GAE、EDM 扩散预条件——全部从定义出发推导，不抄论文。</li>
+<li><strong>本地代码逐行交叉验证</strong>：仓库 <code>1.Paper/Diffaero/</code>（上游 commit <code>291ea14</code>，2025-12-18），重点 <code>dynamics/</code>、<code>algo/</code>、<code>env/</code>、<code>cfg/</code>。</li>
+<li><strong>独立数值验证</strong>：脚本 <code>_derivation_work/diffaero/verify_diffaero.py</code>（只依赖 numpy，可复跑），输出见第 12 节。所有结论标注 ✅/⚠️/❌，<strong>不一致处如实列出，不替论文圆场</strong>。</li>
+</ol>
+</div>
+
+<hr>
+
+<h3>0. 结论速览（先给最重要的判断）</h3>
+
+<table>
+<tr><th style="width:12%;">公式</th><th style="width:34%;">内容</th><th style="width:54%;">与第一性原理 / 代码对照的结论</th></tr>
+<tr><td>(1)</td><td>全四旋翼动力学：平动 + 四元数运动学 + 欧拉方程</td><td>✅ 物理正确，与代码 <code>quadrotor.py:111-142</code> 一致。但 $c,D$ 未写质量归一化（量纲不闭合）；体轴 z 向下（论文）与 z 向上（代码）是镜像约定</td></tr>
+<tr><td>(2)</td><td>简化四旋翼动力学（去角速率环）</td><td>✅ $\dot R=R[\omega]_\times$ 无误；⚠️ 论文列为 4 模型之一但<strong>代码未实现</strong>（README TODO）；$c$ 在 (1) 是标量、(2) 是向量</td></tr>
+<tr><td>(3)</td><td>连续质点动力学（$\dot a=\lambda(u-a)$）</td><td>✅ 正确。代码离散系数 $\frac{1-e^{-\lambda\Delta t}}{\Delta t}=2.4905$，与 $\lambda=2.6$ 差 4.2%（ZOH 精确离散的代价，已核算）</td></tr>
+<tr><td>(4)</td><td>离散质点动力学（梯形格式）</td><td>✅ 格式正确（恒定加速度精确、全局二阶，已验证）。⚠️ 与代码有三处实质差异：论文用未来指令 $u_{t+1}$，代码用滤波状态（滞后一步）；代码多出重力、阻力、迟滞</td></tr>
+<tr><td>(5)</td><td>BPTT 状态对动作的雅可比链</td><td>✅ 正确（有限差分验证）。注意乘积链上有代码的 <code>GradientDecay</code> 衰减 $e^{-\alpha\Delta t}$</td></tr>
+<tr><td>(6)</td><td>SHA2C 策略损失（$R_{\text{ctrl}}$ 一阶 + $V_\phi$ 终端自举）</td><td>✅ 与代码 <code>SHAC.py:288-306</code> 逐项一致（以 $\ell_{\text{ctrl}}=-R_{\text{ctrl}}$ 代入）。⚠️ 论文说 $R_{\text{goal}}$ 是"二值标志"，代码实为 $2-0.001\,\text{jerk}-1\cdot\text{arrive}-50\cdot\text{collision}$</td></tr>
+<tr><td>无编号</td><td>角速率控制器（"geometric controller [28]"）</td><td>⚠️ 代码是 P 型角速率跟踪 + 陀螺前馈，<strong>不是</strong> Lee 的 SE(3) 几何控制器；且控制器把 $\omega$ 当世界系、动力学当机体系——系别冲突</td></tr>
+<tr><td>无编号</td><td>EDM 扩散去噪器（DreamerV3 世界模型）</td><td>✅ 代码 <code>dreamerv3/models/diffusion/</code> 是标准 Karras EDM 预条件（已验证训练目标方差=1）；<strong>论文只字未提</strong></td></tr>
+</table>
+
+<hr>
+
+<h3>1. 坐标系、符号约定与量纲总表</h3>
+
+<h4>1.1 三个坐标系（由代码反推，论文未明说）</h4>
+<ul>
+<li><strong>世界系</strong>：<code>base_dynamics.py:25</code> 写死 $G_{\text{vec}}=[0,0,-g]$，即 <strong>z 轴向上、重力 $-9.81\,\hat z$</strong>（ENU/FLU 风格）。与 Neuralplane 附录的 NED（z 向下）<strong>相反</strong>。</li>
+<li><strong>机体系</strong>：x 向前、z 沿推力轴（螺旋桨推力沿 $+z_B$，<code>quadrotor.py:130</code>）。$R$ 的列 = 机体轴单位向量在世界系的坐标（<code>base_dynamics.py:108-110</code>），即 $R:$ 体→世界。</li>
+<li><strong>局部系（local frame）</strong>：只保留偏航的中间系 $R_z=R_z(\psi)$（<code>base_dynamics.py:113-123</code>）。论文 §IV-D"观测与动作定义在局部系、丢弃俯仰滚转"即指此。</li>
+</ul>
+<h4>1.2 符号与量纲总表</h4>
+<table>
+<tr><th>符号</th><th>含义</th><th>单位 / 默认值（<code>cfg/dynamics/*.yaml</code>）</th></tr>
+<tr><td>$\mathbf p,\mathbf v$</td><td>世界系位置、速度</td><td>m、m/s</td></tr>
+<tr><td>$\mathbf q$（代码 <code>q_xyzw</code>）</td><td>姿态四元数，<strong>实部在末位</strong>（代码存储）；论文式 (1) 写作 $\mathbf q=[q_0;\mathbf q_v]$ 实部在前——同一数学、两种存储</td><td>无（单位化）</td></tr>
+<tr><td>$\boldsymbol\omega$</td><td>机体系角速度（动力学文件的约定）</td><td>rad/s（限幅 $\pm3.14$ rad/s）</td></tr>
+<tr><td>$\mathbf g$</td><td>重力加速度向量，代码 $=[0,0,-9.81]$</td><td>m/s²</td></tr>
+<tr><td>$\mathbf z_B$</td><td>机体 z 轴单位向量（推力方向）</td><td>无</td></tr>
+<tr><td>$c$</td><td>式 (1)：集合推力（论文字面 N；<strong>方程要求 m/s²，必须理解为 $T/m$</strong>）；式 (2)：体轴推力向量——<strong>同符号两含义</strong></td><td>见 §2.6</td></tr>
+<tr><td>$D$</td><td>线性阻力矩阵（代码为力/速度，kg/s：<code>fdrag=RDR^{\top}v</code> 后还要除 $m$；论文式把它直接写进 $\dot v$，即暗中已除 $m$）</td><td>代码默认 $D_{xy}=0.6,\ D_z=0.6$（quad）；质点模型 $d=0.375$ s⁻¹（已归一化）</td></tr>
+<tr><td>$J$</td><td>惯量矩阵（对角）</td><td>kg·m²；默认 $J_{xy}=0.01,\ J_z=0.02$</td></tr>
+<tr><td>$\boldsymbol\tau$</td><td>机体三轴力矩（由控制器生成）</td><td>N·m</td></tr>
+<tr><td>$\mathbf a,\mathbf u$（式 (3)(4)）</td><td>实际推力加速度（状态）、期望加速度指令（动作）</td><td>m/s²；动作域 $xy\in[-20,20]$、$z\in[0,40]$</td></tr>
+<tr><td>$d$（式 (3)）</td><td>归一化阻力系数</td><td>s⁻¹；默认 $0.375$（随机化 $[0.3,0.45]$）</td></tr>
+<tr><td>$\lambda$（式 (3)）</td><td>控制迟滞因子（一阶低通速率常数）</td><td>s⁻¹；默认 $2.6$（随机化 $[2.5,2.7]$）→ 时间常数 $\tau=1/\lambda\approx0.385$ s</td></tr>
+<tr><td>$\Delta t$</td><td>仿真步长</td><td>s；所有任务 <code>dt=0.0333</code>（≈1/30 s，即 30 Hz）</td></tr>
+<tr><td>$m$</td><td>质量（quad 模型）</td><td>kg；默认 1.0（随机化 $[0.8,1.2]$）</td></tr>
+<tr><td>$\gamma,\lambda_{\text{GAE}}$</td><td>折扣因子、GAE 参数</td><td>0.99 / 0.95（<code>cfg/algo/sha2c.yaml</code>）</td></tr>
+</table>
+<div class="callout warn">
+<div class="callout-title">⚠️ 读本节前先记住的三件事</div>
+<ol>
+<li><strong>世界系 z 向上</strong>（重力 $=-9.81\,\hat z$）——与 Neuralplane 的 NED 相反，套用惯性导航直觉时注意。</li>
+<li>论文式 (1)(2) 的体轴约定是 <strong>z 向下</strong>（推力项写作 $-c\,\mathbf z_B$，风格来自 [27][29] 的 NED 模型）；<strong>代码是 z 向上</strong>（$+T/m\cdot\mathbf z_B$）。两者物理等价、镜像约定（§2.6 详析）。</li>
+<li>论文所有动力学方程<strong>把质量除掉了</strong>（$c=T/m$、$D=D_{\text{force}}/m$），但文字仍称 $c$ 为"thrust"、$D$ 为"drag matrix"——按字面量纲不闭合。</li>
+</ol>
+</div>
+
+<hr>
+
+<h3>2. 公式 (1)：全四旋翼动力学（牛顿–欧拉 + 四元数运动学）</h3>
+
+<h4>2.1 论文原文（已按 PDF 字符坐标核实）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 全四旋翼动力学（PDF 第 3 页，引用 [27]）</span>
+$$
+\begin{cases}
+\dot{\mathbf p}=\mathbf v\\[2pt]
+\dot{\mathbf v}=\mathbf g-c\,\mathbf z_B-R\,D\,R^{\top}\mathbf v\\[2pt]
+\dot{\mathbf q}=\dfrac12\,\mathbf q\odot\begin{bmatrix}0\\ \boldsymbol\omega\end{bmatrix}\\[2pt]
+\dot{\boldsymbol\omega}=J^{-1}\big(\boldsymbol\tau-\boldsymbol\omega\times J\boldsymbol\omega\big)
+\end{cases}
+$$
+<div class="eq-note">
+PDF 字符坐标核实（<code>formula_pages.txt</code> L453/465-476）：<code>v̇ = g − c z<sub>B</sub> − RDR⊤v</code>、<code>q̇ = 1/2 q ⊙ [0; ω]</code>（列向量 $\begin{bmatrix}0\\\boldsymbol\omega\end{bmatrix}$ 已确认）、<code>ω̇ = J⁻¹(τ − ω × Jω)</code>。渲染层与文本抽取完全一致，<strong>未发现印刷错误</strong>。
+</div>
+</div>
+
+<h4>2.2 状态与符号</h4>
+<ul>
+<li>状态（<code>quadrotor.py:13-20</code>）：13 维 $[\mathbf p\,(3),\ \mathbf q\,(4),\ \mathbf v\,(3),\ \boldsymbol\omega\,(3)]$，四元数存 xyzw（实部最后）。</li>
+<li>动作（<code>quadrotor.py:15</code>）：4 维 $[T_{\text{norm}},\ p_d,\ q_d,\ r_d]$ = 归一化推力 + 期望角速率；$\boldsymbol\tau$ 由 <code>RateController</code> 生成（§8-D1）。论文称 $\boldsymbol\omega$ 为 body-frame 角速度 ✓（与 $\dot{\mathbf q}=\tfrac12 q\odot[0;\omega]$ 的右乘形式配套，§2.4）。</li>
+</ul>
+
+<h4>2.3 推导 ①：$\dot{\mathbf p}=\mathbf v$ 与 $\dot{\mathbf v}=\mathbf g-c\,\mathbf z_B-RDR^{\top}\mathbf v$</h4>
+<p><strong>第一步：牛顿第二定律（惯性系）</strong>。质量为 $m$ 的机体受三个力：重力 $m\mathbf g$（$\mathbf g=[0,0,-9.81]^{\top}$）、螺旋桨合力 $T\,\mathbf z_B$（沿机体 z 轴，$T$ 为总推力标量，$T>0$）、气动阻力 $\mathbf F_{\text{drag}}$：</p>
+$$
+m\dot{\mathbf v}=m\mathbf g+T\,\mathbf z_B+\mathbf F_{\text{drag}}\tag{D-2.3a}
+$$
+<p><strong>第二步：阻力模型</strong>。阻力与<strong>机体系速度</strong>成正比（线性阻力，低速合理）：体轴系中 $\mathbf F_{\text{drag}}^{(B)}=-D\,\mathbf v^{(B)}$，$D=\operatorname{diag}(D_{xy},D_{xy},D_z)>0$ 是体轴阻尼矩阵。变换到世界系：</p>
+$$
+\mathbf F_{\text{drag}}=R\,\mathbf F_{\text{drag}}^{(B)}=-R\,D\,R^{\top}\mathbf v
+\tag{D-2.3b}
+$$
+<p>（用到 $\mathbf v^{(B)}=R^{\top}\mathbf v$，因为 $R$ 是体→世界的旋转矩阵。）<strong>第三步：两边除以 $m$</strong>：</p>
+$$
+\dot{\mathbf v}=\mathbf g+\frac{T}{m}\,\mathbf z_B-\frac{R\,D\,R^{\top}}{m}\mathbf v
+\tag{D-2.3c}
+$$
+<p>与论文 $\dot{\mathbf v}=\mathbf g-c\,\mathbf z_B-RDR^{\top}\mathbf v$ 对照：<strong>当且仅当 $c\equiv T/m$（质量归一化推力，m/s²）且 $D$ 重解读为 $D_{\text{force}}/m$（s⁻¹）时逐项一致</strong>。论文文字说 "c and τ represent collective rotor thrust and torque"（fulltext L448-449），按字面 $c$ 是力（N），则 $-c\,\mathbf z_B$ 量纲为 N、$\dot{\mathbf v}$ 为 m/s²——<strong>式 (1) 的 $c,D$ 必须按"已除以质量"理解，论文未注明</strong>（问题清单 #2）。</p>
+<p><strong>符号约定辨析（易错点）</strong>：论文推力项 $-c\,\mathbf z_B$（负号）、代码 $+T/m\cdot\mathbf z_B$（<code>quadrotor.py:130-133</code>）不矛盾：论文沿袭 [27] 的 NED 约定（体轴 $\mathbf z_B$ <strong>向下</strong>，推力朝上即 $-c\mathbf z_B$）；代码 $\mathbf z_B$ <strong>朝上</strong>（FLU）。悬停校核：论文 $c=g=9.81$ m/s²；代码 <code>thrust = a₀·g·m</code>（<code>controller.py:102</code>），$a_0=1$ 时 $T/m=g$，完全对应 ✓。</p>
+
+<h4>2.4 推导 ②：$\dot{\mathbf q}=\tfrac12\mathbf q\odot[0;\boldsymbol\omega]^{\top}$（四元数运动学的完整推导）</h4>
+<p><strong>约定</strong>：Hamilton 四元数 $q=(q_0,\mathbf q_v)$，旋转公式 $\mathbf v_{\text{world}}=q\otimes\mathbf v_{\text{body}}\otimes q^{*}$（即 $R(q)$ 体→世界，与代码 <code>quat_rotate</code> 一致）。乘法规则：</p>
+$$
+(s_1,\mathbf v_1)\otimes(s_2,\mathbf v_2)=\big(s_1s_2-\mathbf v_1\cdot\mathbf v_2,\ s_1\mathbf v_2+s_2\mathbf v_1+\mathbf v_1\times\mathbf v_2\big)
+$$
+<p><strong>第一步：从 $\dot R=R[\omega]_\times$ 反推 $\dot q$</strong>。$R(q)=(q_0^2-\|\mathbf q_v\|^2)I+2\mathbf q_v\mathbf q_v^{\top}+2q_0[\mathbf q_v]_\times$（逐元素展开见 Neuralplane 附录 §4.2）。对 $\mathbf v_{\text{world}}=R\,\mathbf v_{\text{body}}$ 求导（$\mathbf v_{\text{body}}$ 固连）：</p>
+$$
+\dot R=R\,[\boldsymbol\omega_B]_\times,\qquad [\boldsymbol\omega_B]_\times=\begin{bmatrix}0&-\omega_z&\omega_y\\ \omega_z&0&-\omega_x\\ -\omega_y&\omega_x&0\end{bmatrix}
+\tag{D-2.4a}
+$$
+<p>（$\dot{\mathbf v}_{\text{world}}=\boldsymbol\omega_{\text{world}}\times R\mathbf v_{\text{body}}=R(\boldsymbol\omega_B\times\mathbf v_{\text{body}})=R[\boldsymbol\omega_B]_\times\mathbf v_{\text{body}}$，$\omega$ 为机体系分量。）</p>
+<p><strong>第二步：四元数导数应取什么形式</strong>。设 $\dot q=\tfrac12\,q\otimes(0,\boldsymbol\omega_B)$（右乘）。按乘法规则展开 $q\otimes(0,\boldsymbol\omega_B)=\big(-\mathbf q_v\cdot\boldsymbol\omega_B,\ q_0\boldsymbol\omega_B+\mathbf q_v\times\boldsymbol\omega_B\big)$，写成 $q=[q_0,q_x,q_y,q_z]^{\top}$ 的线性变换：</p>
+$$
+\dot{\mathbf q}=\frac12
+\begin{bmatrix}
+0&-\omega_x&-\omega_y&-\omega_z\\
+\omega_x&0&\omega_z&-\omega_y\\
+\omega_y&-\omega_z&0&\omega_x\\
+\omega_z&\omega_y&-\omega_x&0
+\end{bmatrix}
+\begin{bmatrix}q_0\\q_x\\q_y\\q_z\end{bmatrix}
+\tag{D-2.4b}
+$$
+<p><strong>第三步：验证自洽性（关键）</strong>。按 (D-2.4b) 演化的 $R(t)$ 必须满足 $\dot R=R[\omega]_\times$，否则式 (1) 的 $q̇$ 与 $\omega$ 约定互相矛盾。数值验证（<code>verify_diffaero.py</code>）：随机四元数 + 随机 $\omega$，$q\otimes[0;\omega]$ 与矩阵形式逐位相同、小步积分后 $\dot R$ 的有限差分与 $R[\omega]_\times$ 一致（均 True）。✅ <strong>代码对应物</strong>：<code>quadrotor.py:137</code> 的 <code>q_dot = 0.5*quat_mul(q, cat(w,0))</code> 即实部末位的同一右乘，每步积分后重归一化（<code>quadrotor.py:146-147</code>）。</p>
+
+<h4>2.5 推导 ③：$\dot{\boldsymbol\omega}=J^{-1}(\boldsymbol\tau-\boldsymbol\omega\times J\boldsymbol\omega)$（欧拉方程）</h4>
+<p><strong>第 1 步：转动参考系中的角动量定理</strong>。机体系下角动量 $\mathbf H=J\boldsymbol\omega$。角动量定理在惯性系成立，而机体系以 $\boldsymbol\omega$ 转动，故：</p>
+$$
+\left.\frac{d\mathbf H}{dt}\right|_{\text{惯性}}=\left.\frac{d\mathbf H}{dt}\right|_{\text{机体}}+\boldsymbol\omega\times\mathbf H
+=J\dot{\boldsymbol\omega}+\boldsymbol\omega\times J\boldsymbol\omega=\boldsymbol\tau
+\tag{D-2.5a}
+$$
+<p><strong>第 2 步：解出 $\dot{\boldsymbol\omega}$</strong>。移项左乘 $J^{-1}$ 即得论文第四行：</p>
+$$
+J\dot{\boldsymbol\omega}=\boldsymbol\tau-\boldsymbol\omega\times J\boldsymbol\omega
+\quad\Longrightarrow\quad
+\dot{\boldsymbol\omega}=J^{-1}\big(\boldsymbol\tau-\boldsymbol\omega\times J\boldsymbol\omega\big)\ \checkmark
+\tag{D-2.5b}
+$$
+<p><strong>第 3 步：代码逐行核对</strong>（<code>quadrotor.py:121-124</code>）：</p>
+<pre class="code-block"><code>M = torque - torch.cross(w, torch.matmul(self._J, w.unsqueeze(-1)).squeeze(-1), dim=-1)
+w_dot = torch.matmul(self._J_inv, M.unsqueeze(-1)).squeeze(-1)</code></pre>
+<p>即 $M=\boldsymbol\tau-\boldsymbol\omega\times J\boldsymbol\omega$、$\dot\omega=J^{-1}M$，逐项一致 ✅。$J$ 为对角阵（<code>quadrotor.py:84-89</code>）：$J=\operatorname{diag}(J_{xy},J_{xy},J_z)$，$J^{-1}=\operatorname{diag}(J_{xy}^{-1},J_{xy}^{-1},J_z^{-1})$。</p>
+
+<h4>2.6 量纲核算与符号冲突</h4>
+<table>
+<tr><th style="width:30%;">项</th><th style="width:36%;">论文式 (1)</th><th style="width:34%;">代码（<code>quadrotor.py</code>）</th></tr>
+<tr><td>推力加速度</td><td>$-c\,\mathbf z_B$（$c$ 按文本=N）</td><td>$+\dfrac{T}{m}\,\mathbf z_B$，$T=a_0\cdot g\cdot m$（<code>controller.py:102</code>、<code>quadrotor.py:130</code>）</td></tr>
+<tr><td>阻力加速度</td><td>$-RDR^{\top}\mathbf v$（$D$ 按文本=阻尼矩阵）</td><td>$-\dfrac{1}{m}\,RDR^{\top}\mathbf v$（<code>quadrotor.py:127,133</code>）</td></tr>
+<tr><td>重力</td><td>$\mathbf g$</td><td><code>_G_vec = [0,0,-9.81]</code></td></tr>
+</table>
+<ul>
+<li><strong>量纲结论</strong>：式 (1) 只有在 $c=T/m$（m/s²）与 $D\leftarrow D/m$（s⁻¹）时量纲闭合（问题清单 #2）。</li>
+<li><strong>数值校核</strong>：$m=1$ kg（默认）时二者数值完全相同；质量随机化到 $[0.8,1.2]$ 时论文记号才产生 20% 歧义——代码显式除 $m$，无歧义。悬停：$a_0=1\Rightarrow T=9.81$ N，$v̇=0$ ✓；最大推力 $a_0\in[0,5]\Rightarrow T_{\max}=49.05$ N≈5g（<code>verify_diffaero.py</code> 均 True）。注意 <code>quad.yaml</code> 的 <code>max_T: 4.179</code> 只进渲染限位 <code>_U_lb/_U_ub</code>，<strong>不参与动作限幅</strong>（真实限幅在控制器 <code>min/max_normed_thrust</code>）。</li>
+</ul>
+
+<h4>2.7 交叉验证：与 <code>controller.py</code> 的 ω 系别不一致（重要发现）</h4>
+<p>动力学文件把 $\boldsymbol\omega$ 当<strong>机体系</strong>：$\dot\omega=J^{-1}(\tau-\omega\times J\omega)$ 中 $J$ 是体轴惯量、$\omega\times J\omega$ 要求 $\omega$ 与 $J$ 同系；$q̇=\tfrac12 q\otimes[0;\omega]$ 的右乘形式同样要求 $\omega$ 为机体系（§2.4 已验证）。但控制器（<code>controller.py:93</code>）：</p>
+<pre class="code-block"><code>desired_angvel_b = action[:, 1:]
+actual_angvel_b = torch.bmm(R_i2b, w.unsqueeze(-1)).squeeze(-1)   # R_i2b = R^T (世界→机体)
+angvel_err = desired_angvel_b - actual_angvel_b</code></pre>
+<p>把状态 $\boldsymbol\omega$ 先乘 $R^{\top}$ 再与期望体轴角速率比较——即<strong>控制器把 $\omega$ 当作世界系分量</strong>。数值验证：随机倾斜姿态下 $\|R^{\top}\omega-\omega\|$ 明显非零（$\|\mathbf q_v\|=0.416$ 时差 $1.397$），仅近悬停（$R\approx I$）时二者一致。这是 <code>controller.py</code> 与 <code>quadrotor.py</code> 真实的<strong>系别约定冲突</strong>：论文式 (1) 本身自洽（机体系），问题出在代码内部（问题清单 #4）。对训练影响有限（位置控制/避障多在近悬停附近），但"大姿态机动 + quad 动力学"的复现必踩。</p>
+
+
+<hr>
+
+<h3>3. 公式 (2)：简化四旋翼动力学（保留姿态、去角速率环）</h3>
+
+<h4>3.1 论文原文（已核实）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 简化四旋翼动力学（PDF 第 3 页，引用 [29] Heeg et al. ICRA 2025）</span>
+$$
+\begin{cases}
+\dot{\mathbf p}=\mathbf v\\[2pt]
+\dot{\mathbf v}=R\,\mathbf c+\mathbf g\\[2pt]
+\dot R=R\,[\boldsymbol\omega]_\times
+\end{cases}
+$$
+<div class="eq-note">
+PDF 字符坐标核实（<code>formula_pages.txt</code> L422-424）：<code>ṗ = v</code>、<code>v̇ = R c + g</code>、<code>Ṙ = R [ω]×</code>；正文定义 "where [·]× denotes the skew-symmetric matrix operator"。
+</div>
+</div>
+
+<h4>3.2 推导与物理含义</h4>
+<p><strong>$\dot R=R[\omega]_\times$ 的推导已在 §2.4 给出</strong>（体→世界旋转矩阵的运动学，机体系角速度 $\omega$），此处直接引用。式 (2) 与式 (1) 的关系是<strong>删掉第三、四行的"角速率环"</strong>：</p>
+$$
+\underbrace{\dot{\boldsymbol\omega}=J^{-1}(\tau-\omega\times J\omega)}_{\text{式 (1) 第四行，被删除}}
+\qquad\Longrightarrow\qquad
+\omega \text{ 直接成为控制输入}
+$$
+<ul>
+<li><strong>动作语义</strong>：式 (1) 的动作是 $[T,\ p_d,q_d,r_d]$（期望角速率，经控制器变 $\tau$）；式 (2) 的动作是"机体角速率 $\omega$ + 集合推力"直接输入，<strong>等价于假设内环角速率控制器瞬时理想</strong>（$\omega=\omega_d$ 精确成立）。</li>
+<li><strong>保留了什么</strong>：姿态动力学（倾斜—加速耦合）仍在——$R$ 决定推力方向；丢掉的是最"刚"的旋转动力学，即 [29] 的"保姿态、去内环"分层思想。</li>
+<li><strong>$\mathbf c$ 的记号冲突（论文没有处理）</strong>：式 (1) 的 $c$ 是<strong>标量</strong>（沿 $\mathbf z_B$ 的推力），式 (2) 的 $\mathbf c$ 是<strong>向量</strong>（$R\mathbf c$ 要求体轴三向量 $(0,0,c)$）。同一符号、同一节两种含义，且都没写质量归一化（问题清单 #3、#2）。</li>
+</ul>
+
+<h4>3.3 代码交叉验证：⚠️ 模型根本不存在</h4>
+<p><strong>论文把式 (2) 算作"四个动力学模型"之一</strong>（§III-A "implementing four dynamics models"、摘要 "supports multiple dynamics models"），但本地仓库：</p>
+<ul>
+<li><code>cfg/dynamics/</code> 只有 <code>quad.yaml / pmc.yaml / pmd.yaml</code> 三个模型配置，<strong>没有 simple.yaml</strong>；</li>
+<li>全库 grep <code>simplified|Simple|simple_quad</code> <strong>零匹配</strong>（除 README 文字）；</li>
+<li>README 的 TODO-List 第一条明写 "<strong>Add simplified quadrotor dynamics model</strong>"，Feature 表也只列 3 个动力学模型。</li>
+</ul>
+<p>即：<strong>式 (2) 是"论文有、代码无"的声明性内容</strong>。结论速览表给 ⚠️ 而非 ❌，是因为式 (2) 的数学本身无错（$\dot R=R[\omega]_\times$ 已验证），错的是"已实现四个模型"的声明（问题清单 #1）。</p>
+
+<hr>
+
+<h3>4. 公式 (3)：连续时间质点动力学（一阶迟滞滤波器）</h3>
+
+<h4>4.1 论文原文（已核实）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 连续时间质点动力学（PDF 第 3 页）</span>
+$$
+\begin{cases}
+\dot{\mathbf p}=\mathbf v\\[2pt]
+\dot{\mathbf v}=\mathbf a+\mathbf g-d\,\mathbf v\\[2pt]
+\dot{\mathbf a}=\lambda\,(\mathbf u-\mathbf a)
+\end{cases}
+$$
+<div class="eq-note">
+PDF 字符坐标核实（<code>formula_pages.txt</code> L450-452）：<code>ṗ = v</code>、<code>v̇ = a + g − d v</code>、<code>ȧ = λ(u − a)</code>；正文定义："a represents the acceleration of the quadrotor in the world frame, d is the drag coefficient, and λ is the control latency factor"。
+</div>
+</div>
+
+<h4>4.2 推导 ①：第三行是一阶低通，时间常数 $\tau=1/\lambda$</h4>
+<p>$\dot{\mathbf a}=\lambda(\mathbf u-\mathbf a)$ 的通解（$\mathbf u$ 视为输入，零输入响应）：</p>
+$$
+\frac{d}{dt}(\mathbf a-\mathbf u)=-\lambda(\mathbf a-\mathbf u)
+\quad\Longrightarrow\quad
+(\mathbf a-\mathbf u)(t)=(\mathbf a-\mathbf u)(0)\,e^{-\lambda t}
+$$
+<p>即 $\mathbf a$ 以速率 $\lambda$ <strong>指数收敛</strong>到指令 $\mathbf u$，时间常数 $\tau=1/\lambda$。默认 $\lambda=2.6$ s⁻¹ → $\tau=0.385$ s（63% 响应）。<strong>这是全框架最重要的建模取舍</strong>：用一个标量把"电机 + 桨 + 内环姿态控制器"的全部延迟打包成一阶环节——保留真实系统最关键的相位滞后（决定闭环能否稳定），又让梯度平滑（指数收敛无开关、无饱和）。随机化区间 $[2.5,2.7]$ 对应 $\tau\in[0.37,0.40]$ s，论文 §IV-D 说该区间"empirically calibrated to match the dynamics of the real quadrotor [36]"。</p>
+
+<h4>4.3 推导 ②：代码的离散化系数 $(1-e^{-\lambda\Delta t})/\Delta t$ 从哪来（零阶保持精确离散）</h4>
+<p><strong>第 1 步：零阶保持（ZOH）</strong>——一步 $\Delta t$ 内指令 $\mathbf u$ 保持常数，解 $\dot a=\lambda(u-a)$：</p>
+$$
+a(t+\Delta t)=\underbrace{e^{-\lambda\Delta t}}_{\text{收缩因子}}\,a(t)+\underbrace{\big(1-e^{-\lambda\Delta t}\big)}_{\text{lerp 系数}}\,u(t)
+$$
+<p>这正是代码 <code>pmd</code> 的 <code>next_a = torch.lerp(a_thrust, a_thrust_cmd, 1-exp(-lmbda*dt))</code>（<code>pointmass.py:196-198</code>）。数值验证（<code>Eq(3) ZOH discretization exact: True</code>）：$a_0=1.23, u=4.56$ 时解析解与 lerp 逐位相同。</p>
+<p><strong>第 2 步：连续模型（<code>pmc</code>）为什么用 $(1-e^{-\lambda\Delta t})/\Delta t$</strong>。pmc 仍以 $\dot a=f_{\lambda}(u-a)$ 跑 RK4/Euler，系数取（<code>pointmass.py:124,127</code>）：</p>
+$$
+f_{\lambda}=\frac{1-e^{-\lambda\Delta t}}{\Delta t}
+$$
+<p>理由：一步 Euler 增量 $f_\lambda(u-a)\Delta t$ 恰好等于 ZOH 精确解——<strong>"连续形式 + 一步 Euler"与"精确离散"一致</strong>；且 $\lambda\to0$ 时 $f_\lambda\to\lambda$（泰勒展开 $=\lambda-\tfrac12\lambda^2\Delta t+O(\Delta t^2)$）。<strong>数值核算</strong>：$\lambda=2.6,\Delta t=1/30$ 时 $f_\lambda=2.4905$，比名义 $\lambda$ 低 4.21%——照论文 $\lambda=2.6$ 直接写 $\dot a=2.6(u-a)$ 做 Euler，等效 $\tau$ 会比精确离散短 4%（"离散化引起的有效参数漂移"）。</p>
+
+<h4>4.4 第一、二行的物理解读与"阻力挂在哪"的微妙差异</h4>
+<p>$\dot{\mathbf v}=\mathbf a+\mathbf g-d\mathbf v$：实际加速度 = 推力加速度（状态 $\mathbf a$）+ 重力 + 线性阻力（$d=0.375$ s⁻¹ 已质量归一化，随机化 $[0.3,0.45]$）。代码对应（<code>pointmass.py:120-130</code>）：</p>
+<pre class="code-block"><code>p_dot = v
+fdrag = -D * v
+v_dot = a_thrust + G_vec + fdrag                       # = a + g - d v  ✓
+a_dot = control_delay_factor * (a_thrust_cmd - a_thrust)</code></pre>
+<p>逐项一致 ✅。<strong>注意与 pmd 的差别</strong>：pmc 把阻力放在 $\dot v$（作为外力），pmd 放在 $a$ 的更新里（<code>next_a = lerp(...) - D*v</code>）——$a$ 在 pmc 是纯推力加速度、在 pmd 是"推力+阻力"合加速度，<strong>语义不一致</strong>（问题清单 #5 的一部分）。<strong>初始条件</strong>：重置时 $a_{\text{thrust},z}=9.8$ m/s²（<code>obstacle_avoidance.py:276</code>、<code>position_control.py:188</code>）——从悬停推力出发避免起步坠落（悬停要求 $a_z=g$ ✓）。</p>
+
+<hr>
+
+<h3>5. 公式 (4)：离散时间质点动力学（梯形 / 半隐式格式）</h3>
+
+<h4>5.1 论文原文（已核实）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4) —— 离散时间质点动力学（PDF 第 4 页，"Following [14]"）</span>
+$$
+\mathbf p_{t+1}=\mathbf p_t+\mathbf v_t\,\Delta t+\tfrac12\,\mathbf u_t\,\Delta t^{2},
+\qquad
+\mathbf v_{t+1}=\mathbf v_t+\tfrac12\,\big(\mathbf u_t+\mathbf u_{t+1}\big)\Delta t
+$$
+<div class="eq-note">
+PDF 字符坐标核实（<code>formula_pages.txt</code> L492-500）：<code>p_{t+1} = p_t + v_t ∆t + ½ u_t ∆t²</code>；<code>v_{t+1} = v_t + ½ (u_t + u_{t+1}) ∆t</code>——<strong>第二式确认用未来指令 $u_{t+1}$</strong>（坐标 y 排序确认下标 +1 挂在 u 上）。这是全文最值得注意的细节（§5.4）。
+</div>
+</div>
+
+<h4>5.2 推导 ①：格式的由来与性质（独立分析，论文没写）</h4>
+<p><strong>第一式</strong>是"恒定加速度 $u_t$ 下的精确泰勒展开"：$\mathbf p(t+\Delta t)=\mathbf p+\dot{\mathbf p}\Delta t+\tfrac12\ddot{\mathbf p}\Delta t^2+O(\Delta t^3)$，取 $\dot p=v_t$、$\ddot p=u_t$ 截断即得。<strong>第二式</strong>是速度更新的<strong>梯形法则</strong>（$\int_t^{t+\Delta t}u\,d\tau\approx\tfrac{\Delta t}{2}(u_t+u_{t+1})$）。性质（独立分析，论文没写）：</p>
+<ul>
+<li><strong>对恒定加速度精确</strong>（验证 <code>Eq(4) exact for constant u: True</code>）。</li>
+<li><strong>全局二阶收敛</strong>：对 $u(t)=\sin t$ 实测，$\Delta t=0.1,0.05,0.025$ 误差比给出收敛阶 <code>2.00 / 2.00</code>（位置、速度均二阶）✅。</li>
+<li><strong>稳定性</strong>：零输入转移矩阵 $\begin{bmatrix}1&\Delta t\\0&1\end{bmatrix}$，特征值 1（二重）→ <strong>边缘稳定</strong>（无阻力时速度不衰减、位置线性漂移，与物理一致）；加阻力后谱半径 $&lt;1$ 收缩。无振荡、无条件稳定。</li>
+<li><strong>梯度性质</strong>：$\partial\mathbf p_{t+1}/\partial\mathbf u_t=\tfrac12\Delta t^2 I$、$\partial\mathbf v_{t+1}/\partial\mathbf u_t=\tfrac12\Delta t I$ 都是<strong>常数矩阵</strong>——与式 (1) 中 $\partial v̇/\partial\omega$ 依赖姿态形成鲜明对比。</li>
+</ul>
+
+<h4>5.3 推导 ②：$u_{t+1}$ 的"未来依赖"意味着什么</h4>
+<p>第二式要算 $t$ 步转移却需要<strong>下一步的动作</strong> $u_{t+1}$——这是<strong>半隐式（semi-implicit）格式</strong>。在"动力学一步 = 一个 action"的 Gym 式接口里 $u_{t+1}$ 此刻不存在，除非缓存动作延迟半步或改用预测/滤波值。<strong>论文完全没有解释这一实现细节</strong>（问题清单 #5）。[14] 的原型里该格式出现在"已知整条参考轨迹"的批处理语境，无此矛盾；搬进交互式接口必须改造。</p>
+
+<h4>5.4 代码交叉验证：论文式 vs <code>discrete_point_mass_dynamics</code> 的三处实质差异</h4>
+<p>代码（<code>pointmass.py:194-199</code>，world 版本）：</p>
+<pre class="code-block"><code>next_p = p + dt * (v + 0.5 * (a_thrust + G_vec) * dt)
+control_delay_factor = 1 - torch.exp(-lmbda*dt)
+next_a = torch.lerp(a_thrust, a_thrust_cmd, control_delay_factor) - D * v
+next_v = v + dt * (0.5 * (a_thrust + next_a) + G_vec)</code></pre>
+<p>逐项对照（设 $G=0, D=0$，$\lambda\to\infty$ 使 <code>lerp</code> 退化为"$a$ 瞬时等于指令"）：</p>
+<table>
+<tr><th style="width:22%;">项</th><th style="width:39%;">论文 Eq.(4)</th><th style="width:39%;">代码（退化极限）</th></tr>
+<tr><td>位置冲量项</td><td>$\tfrac12\,\mathbf u_t\,\Delta t^2$（<strong>当前</strong>指令）</td><td>$\tfrac12\,\mathbf a_{t}\,\Delta t^2$，且 $\mathbf a_t=\mathbf u_{t-1}$（<strong>上一拍</strong>滤波值，滞后一步）</td></tr>
+<tr><td>速度梯形</td><td>$\tfrac12(\mathbf u_t+\mathbf u_{t+1})\Delta t$（当前+<strong>未来</strong>）</td><td>$\tfrac12(\mathbf a_t+\mathbf a_{t+1})\Delta t$，$a_{t+1}=\text{lerp}(a_t,u_t,1-e^{-\lambda\Delta t})$（当前+<strong>滤波当前</strong>）</td></tr>
+<tr><td>重力 / 阻力 / 迟滞</td><td>无</td><td>多出 $\tfrac12 G\Delta t^2$、$G\Delta t$、$-D\mathbf v$、一阶迟滞</td></tr>
+</table>
+<p><strong>数值验证</strong>（$u_{t-1}=3, u_t=4, u_{t+1}=5$，$\Delta t=1/30$）：代码位置冲量 $0.5\cdot u_{t-1}\Delta t^2=0.00167$ vs 论文 $0.5\cdot u_t\Delta t^2=0.00222$，速度更新 $0.5(u_{t-1}+u_t)$ vs $0.5(u_t+u_{t+1})$——<strong>判定 False（不一致），代码整体滞后一个时间步</strong>。结论：论文 Eq.(4) 是"理想化的 [14] 格式"，代码是"带物理修正 + 迟滞滤波 + 滞后一步"的实用版；$G=D=0,\lambda\to\infty$ 且 $u$ 缓变时二者渐近等价（差 $\dot u\Delta t$ 一阶小量），但<strong>不是同一个格式</strong>。复现以代码为准；论文式的作用是交代谱系（问题清单 #5）。</p>
+
+<hr>
+
+<h3>6. 公式 (5)：BPTT 的雅可比链式法则与 <code>GradientDecay</code></h3>
+
+<h4>6.1 论文原文（已核实）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5) —— 状态对历史动作的梯度（PDF 第 4 页）</span>
+$$
+\frac{\partial \mathbf s_{t_2}}{\partial \mathbf a_{t_1}}
+=\frac{\partial \mathbf s_{t_1+1}}{\partial \mathbf a_{t_1}}
+\prod_{t=t_1+1}^{t_2-1}\frac{\partial \mathbf s_{t+1}}{\partial \mathbf s_{t}},
+\qquad t_2>t_1
+$$
+<div class="eq-note">
+PDF 字符坐标核实（<code>formula_pages.txt</code> L513-529）：首项 $\partial s_{t_1+1}/\partial a_{t_1}$，连乘 $t=t_1+1\ldots t_2-1$，上下标确认无误。
+</div>
+</div>
+
+<h4>6.2 严格推导（多元链式法则的平凡展开）</h4>
+<p>状态递推 $\mathbf s_{t+1}=f_t(\mathbf s_t,\mathbf a_t)$。从 $\mathbf s_{t_1+1}=f_{t_1}(\mathbf s_{t_1},\mathbf a_{t_1})$ 到 $\mathbf s_{t_2}$，把每一步的依赖展开：</p>
+$$
+\frac{\partial \mathbf s_{t_2}}{\partial \mathbf a_{t_1}}
+=\underbrace{\frac{\partial \mathbf s_{t_2}}{\partial \mathbf s_{t_2-1}}}_{t_2-1}\,
+\underbrace{\frac{\partial \mathbf s_{t_2-1}}{\partial \mathbf s_{t_2-2}}}_{t_2-2}\ \cdots\
+\underbrace{\frac{\partial \mathbf s_{t_1+2}}{\partial \mathbf s_{t_1+1}}}_{t_1+1}\,
+\frac{\partial \mathbf s_{t_1+1}}{\partial \mathbf a_{t_1}}
+$$
+<p>（每步都是多元链式法则：$\mathbf s_{t+1}$ 只经 $\mathbf s_t$ 依赖 $\mathbf a_{t_1}$，逐层代入。）与论文式对照：首项是动作的<strong>直接</strong>灵敏度，连乘覆盖 $t=t_1+1$ 到 $t_2-1$ 共 $(t_2-t_1-1)$ 个单步状态雅可比，总链长 $t_2-t_1$ 个因子 ✓。数值验证：三层随机线性映射的链乘积与中心差分逐位一致（<code>Eq(5) chain product == finite difference: True</code>）。<strong>维度核算</strong>：$\partial\mathbf s_{t+1}/\partial\mathbf s_t\in\mathbb R^{n_s\times n_s}$（pmc/pmd $n_s=9$、quad $n_s=13$），$\partial\mathbf s_{t_1+1}/\partial\mathbf a_{t_1}\in\mathbb R^{n_s\times n_a}$（$n_a=3$ 或 4）。PyTorch 无需显式构造——只要 <code>dynamics.step()</code> 不 detach，autograd 反向时即按上式从右到左累乘。</p>
+
+<h4>6.3 梯度爆炸/消失的病态与代码的解药：<code>GradientDecay</code></h4>
+<p>链乘积的范数由单步雅可比的谱半径决定：$\|\partial\mathbf s_{t_2}/\partial\mathbf a_{t_1}\|\sim\rho(J_f)^{t_2-t_1}$。式 (1) 的 quad 模型含姿态耦合（$\partial v̇/\partial\omega\propto$ 姿态相关项），$\rho$ 可大于 1 → 爆炸；长链 $T=32$ 步下即使 $\rho\approx1$，连乘也会累积数值噪声。代码在<strong>每次状态更新</strong>处插入一个自定义 autograd 函数（<code>base_dynamics.py:181-192</code>）：</p>
+<pre class="code-block"><code>class GradientDecay(autograd.Function):
+    def forward(ctx, state, alpha, dt):
+        ctx.save_for_backward(torch.tensor(-alpha * dt, device=state.device).exp())
+        return state                                   # 前向：恒等
+    def backward(ctx, grad_state):
+        grad_state = grad_state * ctx.saved_tensors[0] # 反向：乘 e^{-alpha*dt}
+        return grad_state, None, None</code></pre>
+<p><strong>数学含义</strong>：前向不动状态，反向把穿过该节点的梯度乘以 $e^{-\alpha\Delta t}$。效果是在式 (5) 的每个因子 $\partial\mathbf s_{t+1}/\partial\mathbf s_t$ 上再乘一个标量衰减，即有效链变成：</p>
+$$
+\Big(\frac{\partial \mathbf s_{t_2}}{\partial \mathbf a_{t_1}}\Big)_{\text{effective}}
+=\frac{\partial \mathbf s_{t_1+1}}{\partial \mathbf a_{t_1}}\prod_{t=t_1+1}^{t_2-1}\Big[e^{-\alpha\Delta t}\,\frac{\partial \mathbf s_{t+1}}{\partial \mathbf s_t}\Big]
+=e^{-\alpha(t_2-t_1)\Delta t}\cdot\frac{\partial \mathbf s_{t_2}}{\partial \mathbf a_{t_1}}
+$$
+<p>即把 BPTT 的"记忆长度"软截断到 $\sim 1/\alpha$ 步（$e^{-1}\approx37\%$ 处）。<strong>数值核算</strong>：$\Delta t=0.0333$ 时单步衰减 $e^{-0.0333}=0.9672$（$\alpha=1$，pmc/quad）与 $e^{-0.0667}=0.9356$（$\alpha=2$，pmd）；rollout $T=32$ 步后总衰减 $0.3445$（$\alpha=1$）与 $0.1187$（$\alpha=2$）。<strong>论文正文完全没有讨论 $\alpha$</strong>（只在配置里）——它是"论文之外、复现之内"的头号隐藏超参（问题清单 #6）。</p>
+
+<hr>
+
+<h3>7. 公式 (6)：SHA2C 策略损失（双奖励 + 终端价值自举）</h3>
+
+<h4>7.1 论文原文（已核实）与符号表</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(6) —— SHA2C 的 actor 损失（PDF 第 5 页）</span>
+$$
+L(\theta)=-\frac{1}{NT}\sum_{i=1}^{N}\Bigg[\Big(\sum_{t=0}^{T-1}\gamma^{t}R_{\text{ctrl}}\big(\mathbf s^{i}_{t},\mathbf a^{i}_{t}\big)\Big)+\gamma^{T}V_{\phi}\big(\mathbf s^{i}_{T}\big)\Bigg]
+$$
+<div class="eq-note">
+PDF 字符坐标核实（<code>formula_pages.txt</code> L704-724）：$L(\theta)=-\frac{1}{NT}$，方括号内先 $\sum_{t=0}^{T-1}\gamma^t R_{\text{ctrl}}(s^i_t,a^i_t)$ 再加 $\gamma^T V_\phi(s^i_T)$，上下标均确认。正文另写 $a_t\sim\mathcal N(\mu_\theta(o_t),\sigma_\theta(o_t))$ 与 critic 更新："MSE loss … value targets bootstrapped using the k-step return of the goal reward $R_{\text{goal}}$ from time $t$ through TD-λ"。
+</div>
+</div>
+<table>
+<tr><th>符号</th><th>含义 / 代码对应</th></tr>
+<tr><td>$N, T$</td><td>并行环境数、rollout 长度 = <code>n_envs=1024</code>、<code>l_rollout=32</code>（<code>config_train.yaml:19</code>、<code>sha2c.yaml:4</code>）</td></tr>
+<tr><td>$R_{\text{ctrl}}(\mathbf s,\mathbf a)$</td><td>稠密、可微的局部控制奖励 → 代码里的 <code>total_loss</code>（<code>obstacle_avoidance.py:193-200</code>，见 §7.4）</td></tr>
+<tr><td>$V_\phi(\mathbf s)$</td><td>价值网络：MLP [256,128]，输入 247 维全状态（<code>sha2c.yaml:16-18</code>、<code>obstacle_avoidance.py:45</code>）</td></tr>
+<tr><td>$\pi_\theta$</td><td>策略网络：RCNN（CNN+GRU 512+MLP [256,128]），输入 9 维标量 + 16×9 深度（<code>rcnn.yaml</code>）</td></tr>
+<tr><td>$\gamma, \lambda$</td><td>0.99 / 0.95（GAE）</td></tr>
+</table>
+
+<h4>7.2 推导 ①：从"可微损失"到论文记号（符号约定的精确对应）</h4>
+<p>论文式 (6) 是<strong>要最小化</strong>的损失：最小化 $L(\theta)$ ⇔ 最大化 $\sum_t\gamma^t R_{\text{ctrl}}+\gamma^T V_\phi(s_T)$。代码里（<code>SHAC.py:288-306</code> 的 <code>SHA2C.record_loss</code>）：</p>
+<pre class="code-block"><code>self.cumulated_loss = self.cumulated_loss + self.rollout_gamma * loss   # loss = 环境的可微惩罚 ℓ_ctrl
+cumulated_loss = self.cumulated_loss[reset].sum()                       # Σ_t γ^t ℓ_ctrl
+next_value = self.agent.get_value(env_info["next_state_before_reset"])  # V_φ(s_T)，在线 critic
+terminal_value = (self.rollout_gamma * self.discount * next_value)[truncated].sum()
+self.actor_loss = self.actor_loss + cumulated_loss - terminal_value     # 注意：减号</code></pre>
+<p>令环境返回的<strong>可微惩罚</strong> $\ell_{\text{ctrl}}(\mathbf s,\mathbf a)\equiv-R_{\text{ctrl}}(\mathbf s,\mathbf a)$（同一物理量、"越小越好"的写法），则代码最小化的量（除以 $NT$、忽略熵项）为：</p>
+$$
+\frac{1}{NT}\sum_{i}\Big[\sum_t \gamma^t\,\ell_{\text{ctrl}}(\mathbf s^i_t,\mathbf a^i_t)-\gamma^{T}V_\phi(\mathbf s^i_T)\Big]
+=\frac{1}{NT}\sum_{i}\Big[-\sum_t\gamma^t R_{\text{ctrl}}-\gamma^{T}V_\phi(\mathbf s^i_T)\Big]
+=L(\theta)\ \checkmark
+$$
+<p><strong>逐项一致</strong>（数值验证 <code>Eq(6) code actor_loss/(NT) == paper L(theta): True</code>）。四个易漏的实现细节：</p>
+<ol>
+<li><strong>终端价值符号</strong>：代码"累加 $\ell$、<strong>减去</strong> $V$"——$V$ 拟合奖励 $R_{\text{goal}}$（越大越好）、$\ell$ 是惩罚（越小越好），同处一个损失必须反号；这正是论文把 $R_{\text{ctrl}}$ 写成"奖励"却要最小化 $L(\theta)$ 的原因。</li>
+<li><strong>$\gamma^T$ 从哪来</strong>：<code>rollout_gamma</code> 从 1 起每步乘 $\gamma$（reset 归 1），截断时 <code>rollout_gamma·discount·V</code> 恰为 $\gamma^T V_\phi(s_T)$ ✓。</li>
+<li><strong>终端价值只在截断处加</strong>：撞障碍等<strong>终止</strong>轨迹不加 $V$（约定 $V(\text{终止态})=0$）；"rollout 结束"被强制视为截断（<code>last_step=True</code> 时 <code>reset=truncated=1</code>），保证每条轨迹恰好贡献一次 $\gamma^{T_i}V$。</li>
+<li><strong>用在线 critic 而非目标网络</strong>：<code>record_loss</code> 直接调 <code>self.agent.get_value(...)</code> 并断言 <code>requires_grad==True</code>（<code>SHAC.py:298</code>）——终端值要参与对 $\theta$ 的反传。对照：SHAC 用 <code>_critic_target</code>（detach），其终端值只进"零阶"部分。</li>
+</ol>
+
+<h4>7.3 推导 ②：critic 目标 = GAE(λ)（论文说 "k-step return through TD-λ"）</h4>
+<p>论文用一句话带过 critic 更新，代码是标准 GAE（<code>SHAC.py:93-107</code>）：</p>
+$$
+\delta_t=r_t+\gamma V_\phi(s_{t+1})\cdot\mathbb{1}_{\neg\text{term}}-V_\phi(s_t),\qquad
+\hat A_t=\sum_{l=0}^{T-t-1}(\gamma\lambda)^l\,\delta_{t+l}\cdot\prod_{j}\mathbb{1}_{\neg\text{reset}}
+$$
+<p>递推形式即代码：<code>advantages[t] = lastgaelam = delta + gamma*lmbda*nextnonreset*lastgaelam</code>，目标值 <code>target_values = advantages + values</code>（GAE 恒等式 $A_t=G_t^{\lambda}-V(s_t)$），MSE 在 8 个小批量回归。$\lambda=0.95$ 介于单步 TD 与 Monte-Carlo 之间。<strong>与论文文字的差异</strong>：论文说 critic 用 "$R_{\text{goal}}$ 的 k-step return through TD-λ"，代码：① 是 GAE(λ)（λ-return 族，非固定 k 步截断——等价表述）；② 实际进 GAE 的 <code>reward</code> 并非"纯二值成功/失败"（见 §7.4，问题清单 #7）。</p>
+
+<h4>7.4 推导 ③：$R_{\text{ctrl}}$ 与 $R_{\text{goal}}$ 的代码真身（<code>obstacle_avoidance.py:160-254</code>）</h4>
+<p>环境每步返回 <code>(loss, reward)</code> 两个信号——这正是"双奖励"接口的落地：</p>
+$$
+\ell_{\text{ctrl}}=\underbrace{2\,l_{\text{vel}}+l_{z}+5\,l_{\text{oa}}+0.01\,l_{\text{jerk}}+5\,l_{\text{pos}}+0\,l_{\text{collision}}}_{\text{loss\_weights.pointmass（oa.yaml:25-32）}}\ \ (\text{进一阶梯度})
+$$
+$$
+R_{\text{goal}}\!:\ \text{reward}=2-0.001\,l_{\text{jerk}}-1\cdot l_{\text{arrive}}-50\cdot l_{\text{collision}}\ \ (\text{reward\_weights, SHA2C 档; 全部 <code>.detach()</code>，进零阶})
+$$
+<p>其中 $l_{\text{pos}}=1-e^{-\|\mathbf p-\mathbf p^*\|}$（0.5 m 内为到达）、$l_{\text{arrive}}=1-\mathbb{1}[\|\mathbf p-\mathbf p^*\|&lt;0.5]$、$l_{\text{collision}}=\mathbb{1}[\text{碰撞}]$、$l_{\text{jerk}}=\|\mathbf a_{\text{thrust}}-\mathbf u\|^2+5(\|\mathbf a_{\text{thrust}}\|-\|\mathbf u\|)^2$、$l_{\text{vel}}=\text{smooth}_{\ell_1}(\|\mathbf v_{\text{ema}}-\mathbf v_{\text{target}}\|)$、$l_{\text{oa}}$ 为"接近速度 × 危险指数"的避障势（$e^{-(d_{\text{表面}}-0.2)}$，膨胀 0.2 m）。<strong>关键观察</strong>：</p>
+<ul>
+<li>两套权重<strong>独立可调</strong>（论文："The weights … were tuned separately"），reward 显式 <code>.detach()</code>——零阶信号绝不污染一阶梯度。</li>
+<li>论文称 $R_{\text{goal}}$ 为 "binary success and failure flags"：代码 SHA2C 档确实把密度压到最低（vel/z/oa/pos 全 0），但还剩常数 2 与 $0.001\,l_{\text{jerk}}$——<strong>近似二值、非纯二值</strong>（问题清单 #7）。</li>
+<li><strong>自洽性校核</strong>：碰撞时 reward $=2-50=-48$（远小于常规 ±2 区间）→ critic 学到"碰撞 = 灾难"，与图 7 中 SHA2C 避障成功率优势吻合。</li>
+</ul>
+
+<h4>7.5 SHA2C 与 SHAC 的三处结构性差异（读代码必懂）</h4>
+<table>
+<tr><th style="width:22%;"></th><th style="width:39%;">SHAC（<code>SHAC.py:21-242</code>）</th><th style="width:39%;">SHA2C（<code>SHAC.py:244-379</code>）</th></tr>
+<tr><td>actor 损失</td><td>$\sum\gamma^t(\ell/10)+\gamma^{T}V_{\text{target}}$——$V$ 拟合<strong>同一个 $\ell$（损失）的值函数</strong>，同号相加；<code>loss/10</code> 是源码注释明说的防发散缩放（"divide by 10 to avoid instability"）</td><td>$\sum\gamma^t\ell_{\text{ctrl}}-\gamma^{T}V_\phi$——$V$ 拟合<strong>奖励</strong> $R_{\text{goal}}$，反号相减</td></tr>
+<tr><td>critic 输入</td><td>观测 $o_t$（对称 actor-critic）</td><td>247 维全状态 $s_t$（<strong>非对称</strong>：critic 用特权信息）</td></tr>
+<tr><td>目标网络</td><td>有（<code>target_update_rate: 0.005</code> 软更新）</td><td>无（<code>sha2c.yaml</code> 的 <code>target_update_rate: 1.0</code> 是<strong>死配置</strong>——<code>SHA2C.update_critic</code> 根本没有目标网络）</td></tr>
+</table>
+<p><strong>直观</strong>：SHAC 的 $V$ 是"惩罚的期望和"（把不可微的长期惩罚打包）；SHA2C 用<strong>两套信号 + 非对称 critic</strong> 把"短期可微"与"长期目标"彻底解耦——这正是论文的算法贡献点，也是其与"SHAC 改版"的最小差异集。</p>
+
+
+<hr>
+
+<h3>8. 无编号核心公式（D1–D7）：方法核心但论文未编号</h3>
+
+<h4>8.1 (D1) 角速率控制器 = 逆动力学 + P 反馈（论文称之为 "geometric controller [28]"）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D1) —— RateController 的力矩生成律（<code>dynamics/controller.py:82-103</code>）</span>
+$$
+\boldsymbol\tau=J\,K_{\omega}\big(\boldsymbol\omega_d-\boldsymbol\omega_b\big)+\boldsymbol\omega_b\times J\boldsymbol\omega_b,
+\qquad
+T=a_0\cdot T_{\text{ratio}}\cdot g\cdot m
+$$
+<div class="eq-note">
+<strong>推导（逆动力学）</strong>：对体轴角速率做 P 控制，取期望角加速度 $\dot\omega_d=K_\omega(\omega_d-\omega_b)$（<code>K_angvel=[1,1,1]</code> s⁻¹），代入欧拉方程 $\tau=J\dot\omega+\omega\times J\omega$ 得力矩律；$\omega_b\times J\omega_b$ 是<strong>陀螺前馈</strong>。推力：$T=a_0\cdot g\cdot m$（悬停 $a_0=1\Rightarrow T=mg$）。<br>
+<strong>⚠️ 与论文描述不符的三点</strong>：① 论文说 "use the geometric controller [28]"——[28] 是 Lee 的完整 SE(3) 几何控制器（SO(3) 姿态误差反馈），代码只是<strong>角速率环 P 控制 + 陀螺前馈</strong>（问题清单 #8）；② 陀螺前馈被钳制在模长 100（<code>controller.py:98-99</code>：<code>cross.div_(max(norm/100, 1))</code>），论文未提；③ 更严重的系别冲突见 §2.7（问题清单 #4）。
+</div>
+</div>
+
+<h4>8.2 (D2) 动作重标定：tanh 输出 → 物理动作域</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D2) —— <code>env.rescale_action</code>（<code>base_env.py:154-155</code>）</span>
+$$
+\mathbf u=\mathbf u_{\min}+\frac{\mathbf u_{\max}-\mathbf u_{\min}}{2}\,\big(\tanh(\cdot)+1\big)
+$$
+<div class="eq-note">
+策略输出经 <code>tanh</code> 压到 $(-1,1)$ 后线性映射到动作域：quad 为 $[0,5]\times[-3.14,3.14]^3$（归一化推力 + 角速率）；pmc/pmd 为 $[-20,20]^2\times[0,40]$ m/s²。注意 z 方向加速度下限为 0——<strong>不允许指令"向下加速"超过重力</strong>，符合旋翼物理。
+</div>
+</div>
+
+<h4>8.3 (D3) 点质量模型的姿态反解 <code>point_mass_quat</code>（三步几何构造）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D3) —— 姿态反解（<code>dynamics/pointmass.py:238-280</code>，论文 §III-B 的文字描述）</span>
+$$
+\mathbf q=\mathbf q_{\text{yaw}}\otimes\mathbf q_{\text{pitch-roll}},\qquad
+\mathbf q_{\text{yaw}}=\Big(0,0,\sin\tfrac{\psi}{2},\cos\tfrac{\psi}{2}\Big),\qquad
+\psi=\operatorname{atan2}(\bar v_y,\bar v_x)
+$$
+$$
+\mathbf q_{\text{pitch-roll}}=\Big(\hat{\mathbf n}\sin\tfrac{\theta}{2},\ \cos\tfrac{\theta}{2}\Big),\qquad
+\hat{\mathbf n}\propto \mathbf e_3\times \mathbf u_{\text{up}},\qquad
+\theta=\operatorname{atan2}\big(\|\mathbf u_{\text{up},xy}\|,\ u_{\text{up},z}\big),\qquad
+\mathbf u_{\text{up}}=\frac{\mathbf a_{\text{thrust}}}{\|\mathbf a_{\text{thrust}}\|}
+$$
+<div class="eq-note">
+<strong>推导</strong>：① 螺旋桨力沿机体 z 轴 ⇒ 机体 z 在世界系的方向 $=\hat{\mathbf a}_{\text{thrust}}$（<strong>定死两个旋转自由度</strong>）；② 剩余偏航自由度取"速度 EMA 水平投影方向" $\psi=\operatorname{atan2}(\bar v_y,\bar v_x)$（机头朝运动方向，不侧滑）；③ 合成：先把 $\mathbf e_3$ 转到偏航系内的 $\mathbf u_{\text{up}}$（绕 $\mathbf e_3\times\mathbf u_{\text{up}}$ 的最小旋转），再左乘偏航旋转。<strong>数值验证</strong>：随机 $\mathbf a$、随机朝向，$R(\mathbf q)\,\mathbf e_3=\hat{\mathbf a}$ 逐位成立（<code>D3 point_mass_quat: True</code>）。<strong>工程要点</strong>：整个构造在 <code>torch.no_grad()</code> 里（<code>pointmass.py:105-107</code>）——姿态是"渲染/IMU/部署的装饰品"，<strong>不参与梯度</strong>；论文 §III-B 承认其副作用（室内乱环境"原地转向观察"表达不了）。
+</div>
+</div>
+
+<h4>8.4 (D4) 目标速度的构造：<code>target_vel</code>（"一秒到达、封顶限速"）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D4) —— 目标速度（<code>base_env.py:96-100</code>）</span>
+$$
+\mathbf v_{\text{target}}=\frac{\mathbf p^*-\mathbf p}{\max\Big(\frac{\|\mathbf p^*-\mathbf p\|}{v_{\max}},\ 1\Big)}
+=\begin{cases}
+\mathbf p^*-\mathbf p, & \|\mathbf p^*-\mathbf p\|\le v_{\max}\\
+v_{\max}\,\widehat{\mathbf p^*-\mathbf p}, & \text{否则}
+\end{cases}
+$$
+<div class="eq-note">
+<strong>推导（分段讨论）</strong>：分母 = 1 时 $\mathbf v_{\text{target}}=\mathbf p^*-\mathbf p$——"若以该速度飞，一秒到达目标"；距离超 $v_{\max}$ 时分母放大，速度封顶 $v_{\max}\cdot\hat{\mathbf r}$。<strong>所以目标速度就是"min(距离, $v_{\max}$)·方向"</strong>。$v_{\max}$ 每回合随机化：避障任务 $[3,6]$ m/s（<code>oa.yaml:18-19</code>）、竞速 $[5,10]$ m/s（<code>racing.yaml:16-17</code>）——这同时实现了"速度上限域随机化"。它进入观测（<code>obstacle_avoidance.py:87</code> 的 <code>target_vel</code>）与损失（$l_{\text{vel}}$）。
+</div>
+</div>
+
+<h4>8.5 (D5) IMU 的噪声与漂移模型（随机游走 + 白噪声的标度论证）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D5) —— IMU 模型（<code>utils/sensor.py:360-485</code>）</span>
+$$
+\mathbf b_{k+1}=\mathbf b_k+\sigma_{\text{drift}}\sqrt{\Delta t}\;\mathbf n_k,\qquad
+\tilde{\boldsymbol\omega}_k=\boldsymbol\omega_k+\mathbf b_k+\frac{\sigma_{\text{noise}}}{\sqrt{\Delta t}}\,\mathbf n'_k
+$$
+$$
+\boldsymbol\theta^{\text{pose}}_{k+1}=\boldsymbol\theta^{\text{pose}}_{k}+\big(\mathbf b^{\text{gyro}}_k+\boldsymbol\eta_k\big)\Delta t,\qquad
+\mathbf q_{\text{measured}}=\mathbf q_{\text{true}}\otimes \mathbf q(\boldsymbol\theta^{\text{pose}})
+$$
+<div class="eq-note">
+<strong>标度论证</strong>：漂移是<strong>随机游走</strong>——$n$ 步后方差 $\propto n\Delta t\,\sigma_{\text{drift}}^2$（与时长成正比）⇒ 单步增量取 $\sigma_{\text{drift}}\sqrt{\Delta t}$；白噪声离散样本方差 $=\sigma_{\text{noise}}^2/\Delta t$（功率谱密度在带宽 $1/\Delta t$ 内的积分）⇒ 单样本取 $\sigma_{\text{noise}}/\sqrt{\Delta t}$。<strong>两者 $\sqrt{\Delta t}$ 幂次相反，是抄代码时最容易搞错的一对</strong>。<br>
+默认值（<code>cfg/env/imu/default_imu.yaml</code>）：$\sigma_{\text{acc}}^{\text{drift}}=0.1356$、$\sigma_{\text{acc}}^{\text{noise}}=0.1569$、$\sigma_{\text{gyro}}^{\text{drift}}=1.435\times10^{-3}$、$\sigma_{\text{gyro}}^{\text{noise}}=2.443\times10^{-2}$，安装误差 ±2°（<code>sensor.py:372</code>）。姿态漂移积分进 $\boldsymbol\theta^{\text{pose}}$ 后以四元数扰动挂在真值上——<code>q_measured</code> 是"带漂移的真值"，让里程计型策略承受与实机同量级的漂移。
+</div>
+</div>
+
+<h4>8.6 (D6) EDM 扩散去噪器（代码里的 DreamerV3 世界模型；论文只字未提）</h4>
+<div class="callout idea">
+<div class="callout-title">💡 为什么本节要讲它</div>
+论文把 DreamerV3 仅作为基线列出，<strong>正文没有任何扩散公式</strong>；但仓库 <code>algo/dreamerv3/models/diffusion/</code> 有一个完整的 Karras EDM 扩散世界模型（对下一帧观测做去噪生成）。任务要求覆盖"扩散模型/代理模型（如适用）"，故按"代码内有、论文外扩"处理，编号 D6，<strong>本小节结论全部来自代码而非论文</strong>。
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D6) —— EDM 预条件去噪器（<code>denoiser.py:52-73</code>）</span>
+$$
+D_\theta(\mathbf x;\sigma)=\underbrace{\frac{\sigma_{\text{data}}^2}{\sigma^2+\sigma_{\text{data}}^2}}_{c_{\text{skip}}}\,\mathbf x
++\underbrace{\frac{\sigma\,\sigma_{\text{data}}}{\sqrt{\sigma^2+\sigma_{\text{data}}^2}}}_{c_{\text{out}}}\,F_\theta\Big(\underbrace{\frac{\mathbf x}{\sqrt{\sigma^2+\sigma_{\text{data}}^2}}}_{c_{\text{in}}\,\mathbf x};\ \underbrace{\tfrac14\ln\sigma}_{c_{\text{noise}}}\Big)
+$$
+$$
+\mathcal L_{\text{denoise}}=\Big\|F_\theta(\cdot)-\frac{\mathbf x_{\text{clean}}-c_{\text{skip}}\,\mathbf x_{\text{noisy}}}{c_{\text{out}}}\Big\|^2,\qquad
+\sigma\sim\text{LogNormal}(\mu,s),\ \sigma\in[\sigma_{\min},\sigma_{\max}]
+$$
+<div class="eq-note">
+<strong>预条件的推导逻辑（Karras et al. 2022）</strong>：① $c_{\text{in}}$ 使网络输入方差≈1（$c_{\text{in}}^2(\sigma^2+\sigma_{\text{data}}^2)=1$）；② 训练目标方差≈1：$\operatorname{Var}\!\big[(\mathbf x_{\text{clean}}-c_{\text{skip}}\mathbf x_{\text{noisy}})/c_{\text{out}}\big]=1$ 解出 $c_{\text{out}}=\sigma\sqrt{c_{\text{skip}}}$（<strong>已数值验证</strong>：<code>D6 EDM training target Var == 1: True (var=1.0039)</code>）；③ 极限行为 $\sigma\to0$：$c_{\text{skip}}\to1,c_{\text{out}}\to0$（恒等）；$\sigma\to\infty$：$c_{\text{skip}}\to0,c_{\text{out}}\to\sigma_{\text{data}}$（纯去噪）（均验证 True）。<br>
+<strong>采样（<code>diffusion_sampler.py:30-58</code>）</strong>：$\sigma$ 从 $\sigma_{\max}=5$ 到 $\sigma_{\min}=2\times10^{-3}$ 的几何阶梯 $\sigma_i=(\sigma_{\max}^{1/\rho}+\tfrac{i}{N-1}(\sigma_{\min}^{1/\rho}-\sigma_{\max}^{1/\rho}))^{\rho}$（$\rho=7$），沿 ODE $\mathrm d\mathbf x/\mathrm d\sigma=(\mathbf x-D_\theta)/\sigma$ 用 Euler 或 Heun 积分；<code>s_churn=0</code>（纯 ODE）。最后 <code>denoise()</code> 把输出<strong>量化到 8-bit</strong>（<code>denoiser.py:60-65</code>）——模仿真实相机量化，缩小与真实观测的分布差距。
+</div>
+</div>
+
+<h4>8.7 (D7) 解析光线求交（深度相机 / LiDAR 的可微渲染核心）</h4>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D7) —— 三类基元的解析求交（<code>utils/sensor.py</code>；详细推导见本笔记 §7.3）</span>
+$$
+\text{球：}\quad t=\langle \mathbf c-\mathbf o,\hat{\mathbf d}\rangle-\sqrt{r^{2}-\|\mathbf c-\mathbf o\|^{2}+\langle\mathbf c-\mathbf o,\hat{\mathbf d}\rangle^{2}}
+$$
+$$
+\text{立方体（slab）：}\quad t_{\text{in}}=\max_k\min(t_k^{\min},t_k^{\max}),\quad t_{\text{out}}=\min_k\max(t_k^{\min},t_k^{\max}),\quad t_k^{\min/\max}=\frac{b_k^{\min/\max}-o_k}{d_k}
+$$
+$$
+\text{地面：}\quad t=\frac{z_g-o_z}{d_z}\ \ (\text{iff } (o_z-z_g)d_z<0)
+$$
+<div class="eq-note">
+<strong>推导要点</strong>：光线 $\mathbf o+t\hat{\mathbf d}$。球：代入 $\|\mathbf o+t\hat{\mathbf d}-\mathbf c\|^2=r^2$ 的二次方程，判别式 $\Delta>0$ 时较小正根即上式（<code>sensor.py:24-54</code>）；slab：逐轴进入/离开参数，"最晚进入 ≤ 最早离开"（<code>sensor.py:57-97</code>）；地面：单次除法 + 符号判定（<code>sensor.py:100-121</code>）。<strong>非光滑警告</strong>：深度是所有基元 <code>min</code> 的合成——<code>min</code> 切换处不可微，"深度对姿态的梯度"在障碍边缘是<strong>次梯度</strong>（完整推导见本笔记 §7.3）。
+</div>
+</div>
+
+<hr>
+
+<h3>9. 算法流程逐行解读（论文无伪代码，本节把 §III-E / §IV-D 文字还原为算法）</h3>
+
+<h4>9.1 (A1) SHA2C 的一个更新轮次（对照 <code>algo/SHAC.py:328-364</code> 逐行）</h4>
+<pre class="code-block"><code>输入：策略 πθ（RCNN），价值 Vφ（MLP[256,128]）；超参 N=1024, T=32, γ=0.99, λ=0.95, β=0.01
+
+1  buffer.clear(); actor_loss=0; rollout_gamma=1
+2  for t = 0..T-1:                                       # SHAC.py:333-353
+3      a ← πθ(o_t)                                        # L334
+4      state_t ← env.get_state()                          # L335 247 维全状态（特权信息）
+5      V_t ← Vφ(state_t)（no_grad）                        # L336-337
+6      o_{t+1}, (ℓ_ctrl, R_goal), term, info ← env.step(rescale(a), next_state_before_reset=True)
+7                                                        # L338 ℓ_ctrl 可微、R_goal 已 detach
+8      cumulated_loss += rollout_gamma * ℓ_ctrl           # L293
+9      cumulated ← cumulated_loss[reset].sum()            # L294 轨迹结束结算 Σγᵗℓ
+10     V_T ← Vφ(info.next_state_before_reset)             # L296 在线 critic，requires_grad
+11     terminal ← (rollout_gamma * γ * V_T)[truncated].sum()  # L297 γᵀV(s_T)
+12     actor_loss += cumulated − terminal                 # L300 注意减号（§7.2）
+13     entropy_loss −= entropy.sum()                      # L302
+14     buffer.add(obs=state_t, loss=R_goal, value=V_t, ...)  # L340-348 loss 字段存 R_goal（给 critic）
+16     rollout_gamma ← where(reset, 1, rollout_gamma*γ)   # L304
+17     reset 掉的 env 立即重置                              # L349
+18 Â, V̂ ← bootstrap_gae()                                  # L357 = SHAC.py:93-107 的 GAE(λ)
+19 actor_loss ← actor_loss/(N·T) + β·entropy/(N·T); 反传; clip(1.0); Adam  # L358, update_actor
+20 Vφ ← argmin MSE(Vφ(state), V̂)（8 小批量; clip 10.0）     # L359, update_critic L308-325
+21 detach（RNN 隐状态）                                     # L360</code></pre>
+<p><strong>梯度流核对</strong>：第 6 行 <code>env.step</code> 内 <code>dynamics.step(action)</code> 不断图，$\ell_{\text{ctrl}}$ 依赖 $\mathbf a_t$ → 状态 → 动作 → 策略参数，第 19 步 <code>backward()</code> 把梯度送回 $\pi_\theta$ 并穿过 $T=32$ 步动力学（每步叠加 §6.3 的 $e^{-\alpha\Delta t}$ 衰减）——与论文 Eq.(6) 的"一阶梯度"声明完全对应。</p>
+
+<h4>9.2 (A2) BPTT / APG（对照 <code>algo/APG.py:54-69</code>）</h4>
+<pre class="code-block"><code>for t = 0 .. T-1:                          # APG.py:55-65
+    a_t ← actor(o_t)                        # 确定性（apg）或高斯采样（apg_sto）
+    o_{t+1}, (ℓ_t, ·), ·, · ← env.step(rescale(a_t))
+    actor_loss += ℓ_t.mean()                # L38: 先对 N 个环境取均值再累加
+    entropy_loss −= H[π(.|o_t)].mean()      # 仅 apg_sto（L129）
+actor_loss ← (actor_loss + β·entropy_loss)/T ; backward(); clip(1.0); Adam  # L42-48, 131-145</code></pre>
+<p>与论文 Eq.(5) 的关系：APG 是"把式 (5) 的链式法则交给 autograd 执行"的最朴素算法——无 critic、无折扣、无终端自举，$T$ 步 $\ell_t$ 累加后一次反传。确定性变体 <code>apg</code> 无熵项；<code>apg_sto</code> 熵系数 $\beta=0.03$（<code>apg_sto.yaml</code>）。归一化：<code>mean()</code> 在 rollout 内先做（$\frac1T\sum_t\frac1N\sum_i\ell^i_t$），与 $\frac{1}{NT}\sum_{t,i}$ 数学相同。</p>
+
+<h4>9.3 (A3) PPO（对照 <code>algo/PPO.py:147-176</code>）</h4>
+<pre class="code-block"><code>with no_grad: 采样 T=16 步（存 obs/sample/logprob/reward/value/next_value）  # L151-170
+Â, V̂ ← GAE(λ=0.95)（L172 → bootstrap）
+repeat 4 epochs（n_epoch=4）:                # L173-174
+    Â ← (Â − mean)/std（norm_adv）            # L82-83
+    L_CLIP = mean max(−Â·ρ, −Â·clip(ρ, 0.8, 1.2))        # L106-108
+    L_V    = 0.5·mean max((V−V̂)², (V_clip−V̂)²)           # L114-120（clip_value_loss）
+    loss   = L_CLIP + 2·L_V + 0.01·(−H)                  # L124
+    backward(); 梯度裁剪; Adam(lr=2.6e-3)</code></pre>
+<p>对照论文："PPO 的梯度不穿过动力学"——<code>Â</code> 是零阶标量，$\nabla_\theta$ 只经 $\log\pi_\theta$ 路径。竞速任务 PPO 反超所有可微算法的直接原因也在此：竞速的可微损失里<strong>没有进度项</strong>（<code>racing.yaml:26-32</code> <code>loss_weights.pointmass.progress: 0</code>），而 PPO 的 reward 里有 <code>progress: 1</code>（<code>racing.yaml:39-48</code>）——论文 §IV-B 自述"failed to design an effective differentiable reward signal"，代码层面就是这两个权重之差。</p>
+
+<h4>9.4 (A4) DreamerV3 世界模型（<code>algo/dreamerv3/</code>，基线，简要）</h4>
+<p>走"隐状态世界模型 + 想象中训练"路线（<code>world.py</code>、<code>state_predictor.py</code>），观测预测器即 §8.6 的 EDM 扩散去噪器——不需要环境可微、交互数据少但更新次数多（论文 Fig. 7 注："DreamerV3 needs far more updates and fewer data"）。它在 Fig. 7 的作用是给"可微路线的数据效率"提供上界参照。</p>
+
+<hr>
+
+<h3>10. 交叉验证总表（论文 ↔ 代码 ↔ 独立数值验证）与数值核算清单</h3>
+
+<h4>10.1 总表</h4>
+<table>
+<tr><th style="width:11%;">论文</th><th style="width:42%;">代码位置</th><th style="width:47%;">独立验证结论</th></tr>
+<tr class="highlight"><td>(1) 平动/四元数/欧拉</td><td><code>dynamics/quadrotor.py:111-142</code>；控制器 <code>controller.py:82-103</code></td><td>✅ 逐项一致（推力/阻力量纲记号见问题 #2）；$q\otimes[0;\omega]$ 矩阵形式与 $\dot R=R[\omega]_\times$ 数值验证 True</td></tr>
+<tr><td>(2) 简化动力学</td><td>—（未实现；README TODO）</td><td>✅ 数学正确；⚠️ 论文"四个模型"声明与代码不符</td></tr>
+<tr><td>(3) 连续质点</td><td><code>pointmass.py:110-151</code>（world/local 两版）</td><td>✅ 逐项一致；ZOH 精确离散验证 True；系数 2.4905 vs 2.6（−4.2%）</td></tr>
+<tr><td>(4) 离散质点</td><td><code>pointmass.py:182-222</code></td><td>⚠️ 与论文式不等价（滞后一步 + 多出 G/D/λ）；格式本身二阶精确验证 True</td></tr>
+<tr><td>(5) 雅可比链</td><td>PyTorch autograd（不 detach 即隐式实现）；<code>base_dynamics.py:33-36,181-192</code></td><td>✅ 链乘积=有限差分 True；叠加 $e^{-\alpha\Delta t}$ 衰减（32 步后 0.344/0.119）</td></tr>
+<tr><td>(6) SHA2C 损失</td><td><code>algo/SHAC.py:244-379</code>；双奖励 <code>obstacle_avoidance.py:160-254</code>；配置 <code>cfg/algo/sha2c.yaml</code>、<code>cfg/env/oa.yaml</code></td><td>✅ 以 $\ell=-R_{\text{ctrl}}$ 代入后与代码逐项一致（数值 True）；⚠️ $R_{\text{goal}}$ 非纯二值（见 #7）</td></tr>
+<tr><td>D1 控制器</td><td><code>controller.py</code></td><td>⚠️ 非 [28] 几何控制器；⚠️ $\omega$ 系别与动力学冲突（数值验证 $\|R^{\top}\omega-\omega\|\neq0$）</td></tr>
+<tr><td>D3 姿态反解</td><td><code>pointmass.py:238-280</code></td><td>✅ $R(\mathbf q)\mathbf e_3=\hat{\mathbf a}$ 数值 True；在 no_grad 中</td></tr>
+<tr><td>D6 EDM 扩散</td><td><code>algo/dreamerv3/models/diffusion/*</code></td><td>✅ 训练目标方差=1、极限行为、理想去噪恒等均数值验证 True（论文未提及）</td></tr>
+</table>
+
+<h4>10.2 论文数字 ↔ 代码/核算 对照清单</h4>
+<table>
+<tr><th>论文说法</th><th>代码/核算</th><th>结论</th></tr>
+<tr><td>摘要："1.8× and 9.6× speedups … compared to Aerial Gym"</td><td>Table I：$3.4\times10^6/1.9\times10^6=1.79$；$9.6\times10^4/1\times10^4=9.6$</td><td>✅ 精确吻合</td></tr>
+<tr><td>§IV-D："trained … in 1,024 environments in parallel"</td><td><code>config_train.yaml:19</code> <code>n_envs: 1024</code></td><td>✅</td></tr>
+<tr><td>§IV-D："downsampled to 16 × 9 pixels"</td><td><code>camera.yaml: width:16, height:9</code>；FOV 86°、max_dist 5.0</td><td>✅</td></tr>
+<tr><td>§III-E："value network V<sub>φ</sub> digests the full simulator state with an MLP"</td><td>247 = 13 + 16×9 + 30×3（<code>obstacle_avoidance.py:45</code>）；MLP [256,128]</td><td>✅</td></tr>
+<tr><td>§III-E："policy network π<sub>θ</sub> adopts a recurrent and convolution architecture"</td><td><code>rcnn.yaml</code>：CNN[1→8→16→8→8]（stride 1,2,1,2）+ GRU 512 + MLP[256,128]</td><td>✅</td></tr>
+<tr><td>§IV-B：竞速任务"failed to design an effective differentiable reward"</td><td><code>racing.yaml</code>：可微损失 <code>progress: 0</code>，RL 奖励 <code>progress: 1, collision: 10</code></td><td>✅ 代码层面印证</td></tr>
+<tr><td>§IV-D：随机化 d、λ、动作范围</td><td><code>pmc.yaml</code>：D∈[0.3,0.45]、λ∈[2.5,2.7]、max_acc xy∈[10,20]、z∈[25,40]；<strong>但 pmd 的 λ 配置 <code>enabled: False</code>（不随机化，固定 2.6）</strong></td><td>⚠️ 对 pmc 成立；pmd 例外</td></tr>
+<tr><td>步长 / 回合 / 到达判定</td><td><code>dt=0.0333</code>、避障 <code>max_time: 30</code> → <code>max_steps=900</code>；$\|\mathbf p-\mathbf p^*\|&lt;0.5$ m 且驻留 5 s 才算成功（<code>base_env.py:115-120</code>）</td><td>✅（900 已核算；阈值论文未写）</td></tr>
+</table>
+
+<hr>
+
+<h3>11. 问题清单（按严重程度排序，全部有据可查）</h3>
+<ol>
+<li><strong>【声明与实现不符】Eq.(2) 简化四旋翼动力学：论文说"四个动力学模型"，代码只有 3 个</strong>（§3.3）。<code>cfg/dynamics/</code> 无 simple 配置、全库无实现、README TODO-List 第一条待办即此；论文 Fig. 8 也只画了 3 条曲线。</li>
+<li><strong>【量纲/记号】Eq.(1) 的 $c$ 与 $D$ 未写质量归一化</strong>（§2.3/2.6）：文字定义 $c$="collective rotor thrust"（N），方程要求 $c=T/m$（m/s²）；$D$ 同理需 $D/m$。$m=1$ kg（默认）时数值无差，随机化到 $[0.8,1.2]$ 时按论文记号差 20%。代码显式除 $m$，无歧义。</li>
+<li><strong>【记号冲突】$c$ 在 Eq.(1) 是标量、在 Eq.(2) 是向量</strong>（§3.2）：同一节两个定义，论文未区分。</li>
+<li><strong>【代码内部不一致（非论文）】$\omega$ 的系别冲突</strong>（§2.7）：<code>quadrotor.py</code> 把 $\omega$ 当机体系（欧拉方程 + $q̇$），<code>controller.py:93</code> 当世界系（乘 $R^{\top}$ 才与期望体轴角速率比较）。近悬停无碍，大姿态错误——数值验证 $\|R^{\top}\omega-\omega\|\neq0$。</li>
+<li><strong>【论文式与代码实现不等价】Eq.(4)</strong>（§5.4）：论文用<strong>未来指令</strong> $u_{t+1}$（半隐式，交互式接口无法一步算出，论文未解释）；代码用<strong>上一拍滤波状态</strong> $a_t$（滞后一步），且多出重力、阻力、迟滞。两者"同谱系、不同格式"。</li>
+<li><strong>【论文未提的隐藏超参】<code>alpha</code> 梯度衰减</strong>（§6.3）：决定 BPTT 有效记忆长度（$e^{-\alpha\Delta t}$/步，32 步后 0.344/0.119），论文正文零讨论（配置里 pmc/quad=1.0、pmd=2.0）。同类还有 SHAC 代码的 <code>loss/10</code> 经验缩放（源码注释 "divide by 10 to avoid instability"，<code>SHAC.py:182</code>）。</li>
+<li><strong>【描述与实现的小偏差】$R_{\text{goal}}$ 与 critic 更新</strong>（§7.3/7.4）：论文说 $R_{\text{goal}}$ 是"binary success and failure flags"、critic 用"k-step return … through TD-λ"；代码 SHA2C 档 reward $=2-0.001\,l_{\text{jerk}}-1\cdot l_{\text{arrive}}-50\cdot l_{\text{collision}}$（近似二值但含常数与 jerk 小项），critic 实现为 GAE(λ=0.95)。方向一致，措辞需打折。</li>
+<li><strong>【描述与实现不符】"geometric controller [28]"</strong>（§8.1）：代码是 P 型角速率控制器 + 陀螺前馈（前馈钳制模长 100），不是 Lee 的 SE(3) 几何控制器；论文 §III-A 的引用易让读者误以为是 [28] 原算法。</li>
+<li><strong>【配置层面的适用范围问题】pmd 的 $\lambda$ 不随机化</strong>（§10.2）：论文 §IV-D 说"d、λ 和动作范围每回合随机化"——对部署用的 pmc 成立（<code>enabled: True</code>）；<code>pmd.yaml</code> 里 <code>lmbda.enabled: False</code>（固定 2.6）。论文表述未区分模型。</li>
+<li><strong>【未发现印刷错误】</strong>：Eq.(1)–(6) 已按 PDF 字符坐标逐字核实，与文本抽取一致，<strong>无 Neuralplane 式 (15) 那种印刷错误</strong>；上述问题均为"声明/记号/实现"层面不一致。</li>
+</ol>
+
+<hr>
+
+<h3>12. 可复现性附录</h3>
+<p><strong>本节的验证材料（全部在本工作目录，可复跑）</strong>：</p>
+<ul>
+<li><code>_derivation_work/diffaero/extract_formulas.py</code>：用 PyMuPDF 按渲染坐标重建 8 页逐行文本（span 带 y 坐标与字号，用于区分上/下标）；输出 <code>formula_pages.txt</code>。Eq.(1)–(6) 的"已核实"结论来自该输出。</li>
+<li><code>_derivation_work/diffaero/verify_diffaero.py</code>：只依赖 numpy 的独立数值验证（四元数运动学、ZOH 离散、式 (4) 格式阶数、式 (5) 链式法则、式 (6) 符号映射、EDM 预条件、控制器系别冲突、数字核算）。输出摘要（<code>verify_output.txt</code>）：</li>
+</ul>
+<pre class="code-block"><code>Eq(1) qdot matrix form  M q == q (x) [0;w]: True
+Eq(1) kinematics Rdot == R[w]x (finite diff): True
+Eq(3) ZOH discretization exact: True | factor=(1-e^-ldt)/dt=2.4905 vs lambda=2.6 (rel.err 4.211%)
+Eq(4) code (linf) == paper scheme [expect False: code uses u_{t-1}]: False | code p kick=0.5*u_prev*dt^2=0.00167 vs paper 0.5*u_t*dt^2=0.00222; code v+=0.5*(u_prev+u_cur)dt vs paper 0.5*(u_t+u_next)dt
+Eq(4) exact for constant u: True
+Eq(4) global 2nd-order convergence: True | orders 2.00, 2.00
+Eq(5) chain product == finite difference (state & action Jacobian): True
+Eq(6) code actor_loss/(NT) == paper L(theta) [with l=-R_ctrl]: True
+D6 EDM training target Var[(x-c_skip*x_noisy)/c_out] == 1: True | var=1.0039
+D6 EDM limits sigma->0: c_skip->1, c_out->0: True
+D6 EDM limits sigma->inf: c_skip->0, c_out->sigma_data: True
+D6 ideal denoiser F=(x-c_skip x)/c_out => D(x)=x: True
+controller vs dynamics omega frame mismatch [expect NOT equal when tilted]: True | ||R^T w - w|| = 1.3970 at attitude ||q_vec||=0.416 (0 = identity attitude)
+D3 point_mass_quat: R(q) e3 == normalize(a): True
+Table I 1.8x physics: True | 3.4e6/1.9e6=1.789
+Table I 9.6x depth: True | 9.6e4/1e4=9.6
+state_dim 247 = 13+144+90: True | 247
+max_steps = int(30/0.0333): True | 900
+grad decay 32 steps: alpha=1: True | e^-0.0333=0.9672, ^32=0.3445
+grad decay 32 steps: alpha=2: True | e^-0.0667=0.9356, ^32=0.1187
+hover thrust a0=1 -> T=mg: True | T=9.81 N (m=1)
+max thrust 5g: True | T_max=49.05 N
+tau = 1/lambda: True | 0.3846 s
+camera pixels: True</code></pre>
+<ul>
+<li><strong>诚实声明</strong>：① 本会话模型不支持直接读 PNG 页面图像；公式核实通道改为"PDF 文本层 + 渲染坐标重建"（<code>extract_formulas.py</code>），对 arXiv 源码 PDF 与读图等效（字符坐标能区分上下标），是 Neuralplane 附录核实印刷错误时的同款方法。② 本节的"数值验证"是<strong>离线代数/有限差分核算</strong>（numpy），未在 GPU 复跑训练；训练流程结论来自代码静态对照。③ 图 6/图 7 的性能数字无法离线复现，未纳入验证范围，只做了 Table I 比值的算术核对。</li>
+</ul>
+
+</section>
+
 
 <footer>📄 Paper Notes · FlyingBit Aero (flyingbitac) · arXiv 2509.10247 (2025) · Diffaero — DiffAero — A GPU-Accelerated Differentiable Simulation Framework for Efficient Quadrotor Policy Learning · MathJax + Mermaid Rendering</footer>
 

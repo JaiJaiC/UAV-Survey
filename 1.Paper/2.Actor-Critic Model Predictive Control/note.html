@@ -161,6 +161,9 @@ MathJax = {
   .cmp-col  { flex: 1; min-width: 260px; border: 1px solid var(--border); border-radius: 8px; padding: 16px; background: #fafbfc; }
   .cmp-col h4 { margin-top: 0; }
   footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px; }
+pre.code-block { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 18px; overflow-x:auto; font-size:12.5px; line-height:1.6; margin:12px 0; }
+pre.code-block code { background:none; border:none; padding:0; font-size:12.5px; }
+hr { border:none; border-top:1px dashed #e2e8f0; margin:18px 0; }
 </style>
 <link rel="stylesheet" href="../../assets/site-ui.css">
 <script src="../../assets/site-ui.js" defer></script>
@@ -181,6 +184,7 @@ MathJax = {
   <a href="#flaw">Potential Flaw</a>
   <a href="#motivation">Motivation</a>
   <a href="#takeaway">Takeaways</a>
+  <a href="#formula-derivation" style="background:#fef3c7;color:#92400e;font-weight:700;border:1px solid #f59e0b;border-radius:6px;">🧮 公式算法推导</a>
 </nav>
 
 <div class="container">
@@ -800,6 +804,467 @@ flowchart LR
     <tr><td>Pineda et al. (2022) — Theseus: A Library for Differentiable Nonlinear Optimization. <em>NeurIPS</em></td><td>开源可微非线性优化库——为 diffMPC 的高效 GPU 并行实现提供了工程基础。Theseus 和 PyPose 等库的发展正在降低"可微优化+深度学习"的技术门槛——将 AC-MPC 迁移到 Theseus 可能显著加速训练和推理</td></tr>
     <tr><td>Karkus et al. (2023) — DiffStack: A Differentiable and Modular Control Stack. <em>CoRL</em></td><td>展示了"可微分模块组合"的更宏大愿景——将感知、预测、规划、控制全部做成可微模块串联训练。AC-MPC 可视为此范式在"RL 训练"下的特例。将 AC-MPC 的 Cost Map 前增加可微感知模块是实现"从像素到控制"的关键路径</td></tr>
   </table>
+</section>
+
+<!-- ═══════════════ 12. 公式与算法严格推导 ═══════════════ -->
+<section id="formula-derivation">
+<h2>12. 公式与算法严格推导</h2>
+<div class="callout info">
+<p><strong>对象</strong>：<code>fulltext.txt</code> 所载论文《Actor-Critic Model Predictive Control》（Romero, Song, Scaramuzza，IEEE ICRA 2024；arXiv:2306.09852v5）全文 8 页。 <strong>公式范围</strong>：正文全部 5 个编号公式（式 (1)–(5)）+ 全部 1 个算法（Algorithm 1）+ 方法核心但未编号的 5 组公式（本文补编号 (D1)–(D5)：神经代价映射、优势函数、reward-to-go、观测空间、Critic 回归）。 <strong>方法</strong>：本文不复述论文文字，而是：</p>
+<ol>
+<li>从最优控制的第一性原理（拉格朗日函数与 KKT 条件、离散伴随方程、动态规划）与强化学习的第一性原理（策略梯度定理、贝尔曼方程、TD 误差）<strong>独立重推</strong>每个公式，写出全部中间步骤；</li>
+<li>把论文引而不证、但整个方法赖以成立的核心——可微 MPC [26] 的 iLQR/Riccati 不动点与隐式微分——补全为<strong>显式公式</strong>（第 2.5–2.6 节，含闭式梯度实例）；</li>
+<li>用论文内部数值<strong>交叉核算</strong>：$2T(n+m)=2\times2\times17=68$、观测 $12+12\times2=36$、风扰 $11.5\,\mathrm{N}=1.5\times$ 重量 ⇒ $m\approx0.78\,\mathrm{kg}$ 等（见各节与第 10 节总表）；</li>
+<li>明确标出论文中<strong>符号冲突、未定义量与推导跳跃</strong>（第 11 节问题清单 P-1…P-12），绝不替论文"圆场"。</li>
+</ol>
+</div>
+<div class="callout warn">
+<p><strong>诚实声明（验证手段）</strong>：公式原文以 PDF 文本层抽取（<code>fulltext.txt</code>）逐字符核对并做了数值交叉验证；本会话所用模型<strong>不支持图像输入</strong>，未能对 <code>pages/*.png</code> 做像素级复核——请以页面图像为最终权威，若有出入请回告我修正。</p>
+</div>
+<hr>
+<h3>预备. 公式地图与符号约定</h3>
+<h4>预备.1 论文公式地图（8 页内的全部数学对象）</h4>
+<table>
+<tr><th>编号</th><th>内容</th><th>位置</th><th>本文节</th></tr>
+<tr><td>式 (1)</td><td>一般最优控制问题（MPC 的数学定义）</td><td>p.2 §III-A</td><td>第 1 节</td></tr>
+<tr><td>式 (2)</td><td>二次 MPC 代价（QP 形式）</td><td>p.2–3 §III-B</td><td>第 2 节</td></tr>
+<tr><td>式 (3)</td><td>策略梯度定理（actor-critic 形式，1 步 TD 优势）</td><td>p.3 §III-C</td><td>第 3 节</td></tr>
+<tr><td>式 (4)</td><td>AC-MPC 随机策略（高斯于 MPC 解之上）</td><td>p.3 §III-D</td><td>第 4 节</td></tr>
+<tr><td>式 (5)</td><td>门进度奖励</td><td>p.4 §IV-A.2</td><td>第 5 节</td></tr>
+<tr><td>Algorithm 1</td><td>AC-MPC 训练循环（PPO + diffMPC）</td><td>p.3 §III-D</td><td>第 9 节</td></tr>
+<tr><td>(D1)</td><td>神经代价映射 $Q(s_k)=\mathrm{diag}(\cdots),\ p(s_k)=[\cdots]$，输出维数 $2T(n+m)$，取值 $[0.1,10^5]$</td><td>p.3 §III-E</td><td>第 6 节</td></tr>
+<tr><td>(D2)(D5)</td><td>优势函数 $A=r+\gamma V(s')-V(s)$、reward-to-go $\hat R_k=\sum_{t\ge k}\gamma^{t-k}r_t$（Algorithm 1 的数学化）</td><td>p.3 §III-C / Alg.1</td><td>第 7 节</td></tr>
+<tr><td>(D3)(D4)</td><td>观测空间（$\delta p_i\in\mathbb R^{12}$、$N=2$）与 Critic 的 MSE 回归</td><td>p.3–4 §IV-A.1 / Alg.1</td><td>第 8 节</td></tr>
+</table>
+<h4>预备.2 符号、量纲与文中取值</h4>
+<table>
+<tr><th>符号</th><th>含义</th><th>量纲/单位</th><th>文中取值（或出处）</th></tr>
+<tr><td>$x_k$</td><td>系统状态（四旋翼动力学状态）</td><td>位置 m、姿态无、速度 m/s、角速率 rad/s</td><td>论文未给维数；与 [14] 相同，13 维（疑点 P-8）</td></tr>
+<tr><td>$u_k$</td><td>控制输入</td><td>推力 N、角速率 rad/s</td><td>模态 = 集体推力 + 体角速率，4 维</td></tr>
+<tr><td>$s_k$</td><td>观测（<strong>≠ 状态</strong>，含门角点相对信息）</td><td>—</td><td>36 维（§IV-A.1，第 8 节核算）</td></tr>
+<tr><td>$J(x),\,J_Q(x)$</td><td>总代价 / 二次代价（$f$：离散动力学，与 [14] 相同、论文未展开，P-8）</td><td>奖励单位</td><td>式 (1)(2)</td></tr>
+<tr><td>$N$（§III-E 记 $T$）</td><td>MPC 时域长度（式 (1)(2)）</td><td>步数（无）</td><td>主干 $N=2$；消融 5, 10, 50（P-1：一符多用）</td></tr>
+<tr><td>$Q_k,\ p_k$</td><td>第 $k$ 步二次/线性权重（Cost Map 输出）</td><td>1/单位²、1/单位</td><td>对角化；$\in[0.1,10^5]$</td></tr>
+<tr><td>$\pi_\theta,\ V_\omega,\ A_\omega$</td><td>策略 / 价值 / 优势（参数 $\theta,\omega$）</td><td>—</td><td>式 (3)</td></tr>
+<tr><td>$\gamma,\ \Sigma$</td><td>折扣因子 / 探索噪声协方差</td><td>无 / 同 $u^2$</td><td><strong>8 页均未定义</strong>（P-5/P-6）</td></tr>
+<tr><td>$\mathrm{diffMPC}(x,Q,p)$</td><td>可微 MPC：以 $x$ 为初值、$Q,p$ 为代价参数解 QP，取首项输出</td><td>同 $u$</td><td>式 (4)；求解器 = [26] 的 iLQR 不动点</td></tr>
+<tr><td>$g_k,\ p_k,\ \omega_k,\ b$</td><td>门中心 / 飞行器位置 / 体角速率 / 惩罚系数（位置 $p_k$ 与代价 $p_k$ 撞符号，P-9）</td><td>m / m / rad·s⁻¹ / 奖励/角速率</td><td>式 (5)；$b=0.01$</td></tr>
+<tr><td>$n,\ m$</td><td>状态/输入维数</td><td>无</td><td>$n=13$（[14]）、$m=4$</td></tr>
+</table>
+<h4>预备.3 三条记号约定（后文推导全靠它）</h4>
+<ul>
+<li><strong>状态 $x$ 与观测 $s$ 是两回事</strong>：MPC 的动力学用状态 $x_k$（13 维量级），代价参数网络与 Critic 吃观测 $s_k$（36 维）。式 (4) 的 $\mathrm{diffMPC}(x_k,Q(s_k),p(s_k))$ 中两套符号并存，务必分清。</li>
+<li><strong>$Q/p$ 的双重身份</strong>：式 (2) 里 $Q_k,p_k$ 按下标 $k$（时域步）索引；§III-E 里 $Q(s_k),p(s_k)$ 是观测的函数。二者是同一个量——每个时刻由 Cost Map 输出一遍、铺满整个时域（各步共享同一网络）。</li>
+<li><strong>论文式 (3) 是策略梯度定理，不是 PPO-clip</strong>：PPO-clip 目标只以文字形式出现在 Algorithm 1（"e.g., PPO-clip objective"）。本笔记第 6 节把式 (3) 标注为 PPO-clip 目标是不准确的——第 3.4 节给出两者在 $\theta=\theta_{\mathrm{old}}$ 处严格相等的推导，第 11 节列为问题 N-1。</li>
+</ul>
+<hr>
+<h3>0. 结论速览（先给最重要的判断）</h3>
+<table>
+<tr><th>公式</th><th>内容</th><th>结论</th></tr>
+<tr><td>式 (1)</td><td>一般 OCP：$\pi(x)=\arg\min_u J(x)$ s.t. 动力学 + 输入约束</td><td>✅ 正确（滚动时域 MPC 标准形式）；⚠️ 记号松散：argmin 变量实为序列 $u_{0:N-1}$、$u_N$ 未定义（P-2/P-4）</td></tr>
+<tr><td>式 (2)</td><td>QP 代价 $\sum_{k=0}^{N}\big(z_k^TQ_kz_k+p_kz_k\big)$</td><td>✅ 正确，是跟踪 MPC 的等价重参数化（$p=-2Qx^{\mathrm{ref}}$，2.2 节）；⚠️ 上界 $u_N$ 未定义、$p_k$ 缺转置（P-2/P-3）</td></tr>
+<tr><td>式 (3)</td><td>策略梯度定理（1 步 TD 优势）</td><td>✅ 与 [41] 一致，3.1 节六步重推；⚠️ 与 Algorithm 1 的 PPO-clip/reward-to-go 有未说明落差（P-5）</td></tr>
+<tr><td>式 (4)</td><td>$u_k\sim\mathcal N\{\mathrm{diffMPC}(x_k,Q(s_k),p(s_k)),\Sigma\}$</td><td>✅ 正确；部署确定性输出 = 高斯众数 = MPC 解（4.2 节）；⚠️ $\Sigma$ 未定义（P-6）</td></tr>
+<tr><td>式 (5)</td><td>$r(k)=\|g_k-p_{k-1}\|-\|g_k-p_k\|-b\|\omega_k\|$</td><td>✅ 正确；5.1 节给出精确几何恒等式（≈ 位移在指向门方向的投影）；⚠️ "稀疏"用词矛盾（P-7）</td></tr>
+<tr><td>(D1)</td><td>对角 $Q$、$p$ 参数化、$2T(n+m)$ 维、$[0.1,10^5]$</td><td>✅ $2\times2\times17=68$ ✓；对角化压缩 5×（6.1 节）；⚠️ sigmoid 映射公式未给、Q/R 记号混用（P-10/P-11）</td></tr>
+<tr><td>(D2)(D5)</td><td>优势 $A=r+\gamma V(s')-V(s)$、reward-to-go $\hat R_k$</td><td>✅ 贝尔曼方程标准派生（7 节）；⚠️ $\gamma$ 未给、GAE 与否未说明（P-5）</td></tr>
+<tr><td>(D3)</td><td>观测 $12+12N$ 维、$N=2$</td><td>✅ $3+9=12$、$12+12\times2=36$ ✓；⚠️ $N$ 再次复用（P-1）</td></tr>
+<tr><td>Algorithm 1</td><td>PPO + diffMPC 训练循环</td><td>✅ 结构自洽（9 节逐行数学化）；⚠️ 优势估计器二义（P-5）</td></tr>
+</table>
+<hr>
+<h3>1. 公式 (1)：一般最优控制问题与滚动时域策略</h3>
+<p>论文原文（p.2，§III-A Preliminaries）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(1) —— 一般最优控制问题（论文式 (1)）</span>
+$$\pi(x)=\arg\min_{u}\;J(x)\quad\text{subject to}\quad x_0=x,\qquad x_{k+1}=f(x_k,u_k),\qquad u_k\in\mathcal U \tag{1}$$
+<p style="font-size:12.5px;color:#64748b;">随文说明（原文）：$k$ 对 $x_k$ 取 $0$ 到 $N$、对 $u_k$ 取 $0$ 到 $N-1$。</p>
+<div class="eq-note">
+<strong>$\pi(x)$</strong> = 策略：状态到最优输入的映射 &nbsp;|&nbsp; <strong>$J(x)$</strong> = 以 $x$ 为初值的总代价 &nbsp;|&nbsp; <strong>$f:\mathcal X\times\mathcal U\to\mathcal X$</strong> = 离散动力学（四旋翼，与 [14] 相同） &nbsp;|&nbsp; <strong>$\mathcal U$</strong> = 输入约束集——§III-D 明说该可微 MPC "supports input constraints but not state constraints"，故式 (1) 中只有 $u_k\in\mathcal U$、无状态约束 &nbsp;|&nbsp; <strong>$N$</strong> = 时域长度（主干实验 $N=2$）。
+</div>
+</div>
+<h4>1.1 第一性原理重推：从"全时域最优控制"到"滚动时域 MPC"</h4>
+<p><strong>第 1 步（最一般形式）</strong>。离散时间最优控制的标准写法（如 Borrelli, Bemporad &amp; Morari《Predictive Control》）是把代价显式写成逐段代价之和：</p>
+$$J(x_0;\ u_{0:N-1})=\sum_{k=0}^{N-1}\ell(x_k,u_k)+\ell_N(x_N),\qquad x_{k+1}=f(x_k,u_k),\quad u_k\in\mathcal U \tag{展开式 A}$$
+<p>论文把整条代价链缩写为 $J(x)$（只显式写出对初值的依赖），并把 $\arg\min$ 的变量缩写成单个 $u$——实际优化变量是<strong>整个序列</strong> $u_{0:N-1}$。这就是式 (1) 与展开式 A 的对应关系（缩写造成的歧义见 1.5 疑点）。</p>
+<p><strong>第 2 步（滚动时域）</strong>。MPC 不是只解一次，而是每个采样时刻都解一遍、只执行第一步（receding horizon）：</p>
+$$u^*_{0:N-1}(x_t)=\arg\min_{u_{0:N-1}}\;J(x_t;\ u_{0:N-1}),\qquad \pi_{\mathrm{MPC}}(x_t)=u^*_0(x_t) \tag{展开式 B}$$
+<p>因此式 (1) 定义的 $\pi(x)$ <strong>不是显式函数，而是由优化问题隐式定义的</strong>：给定 $x$，先解一个含动力学约束的最优控制问题，再取解序列的首元素。这正是 AC-MPC 与"显式映射 Actor"（AC-MLP：观测直接前馈出动作）的根本区别，也是"online replanning"能力的来源。</p>
+<p><strong>第 3 步（KKT 条件——解的一阶必要刻画，第 2.6 节的伏笔）</strong>。把动力学与输入上下界写成拉格朗日函数（$\lambda_k$ 为动力学乘子；$\mu_k\ge0$、$\bar\mu_k\ge0$ 分别为下界/上界约束 $u_{\min}\le u_k\le u_{\max}$ 的乘子）：</p>
+$$\mathcal L=\sum_{k=0}^{N-1}\Big[\ell_k(x_k,u_k)+\lambda_{k+1}^T\big(f(x_k,u_k)-x_{k+1}\big)+\mu_k^T(u_{\min}-u_k)+\bar\mu_k^T(u_k-u_{\max})\Big]+\ell_N(x_N)$$
+<p>对 $u_k$ 求偏导置零（梯度按列向量约定，$\partial(a^Tb)/\partial b=a$）：</p>
+$$\frac{\partial\ell_k}{\partial u_k}+\Big(\frac{\partial f}{\partial u_k}\Big)^T\lambda_{k+1}-\mu_k+\bar\mu_k=0 \tag{KKT-1}$$
+<p>对 $x_k$ 求偏导置零（注意 $-\lambda_k^T x_k$ 来自第 $k-1$ 步的动力学项），得到<strong>离散伴随（co-state）方程</strong>：</p>
+$$\lambda_k=\frac{\partial\ell_k}{\partial x_k}+\Big(\frac{\partial f}{\partial x_k}\Big)^T\lambda_{k+1}\quad(k\le N-1),\qquad \lambda_N=\frac{\partial\ell_N}{\partial x_N} \tag{KKT-2}$$
+<p>再补上互补松弛 $\mu_k\odot(u_{\min}-u_k)=0$、$\bar\mu_k\odot(u_k-u_{\max})=0$ 与原始可行性，即得该约束 OCP 的完整 KKT 系统（离散 Pontryagin 极小值原理的约束形式）。<strong>关键伏笔</strong>：可微 MPC [26] 的反向传播正是在这套 KKT 方程组上做隐式微分（第 2.6 节）——式 (1) 不只是"MPC 的定义"，它同时定义了训练时梯度要穿过的那个"隐函数"。</p>
+<h4>1.2 物理/几何直觉</h4>
+<p>式 (1) 把"控制"变成"预测 + 优化"：先让动力学在时域内展开 $N$ 步，再挑代价最小的可行序列（$N$ 越大看得越远、求解越贵，表 II：$N=2\to13.5$ ms、$N=50\to210$ ms）。只执行 $u_0^*$ 是因为下一时刻会拿到新状态（可能含扰动），旧序列已不再最优——滚动重规划把开环序列改造成闭环反馈（风扰实验 83.33% vs 6.5% 即此机制）。</p>
+<h4>1.3 交叉验证</h4>
+<ul>
+<li><strong>与式 (2)</strong>：式 (2) 是式 (1) 中 $J$ 的一个具体 QP 实例（$J=J_Q$，逐段代价 $\ell_k=z_k^TQ_kz_k+p_kz_k$）——式 (1) 是"框架"，式 (2) 是"实例"。</li>
+<li><strong>与 Algorithm 1 / §III-D 自述</strong>：Algorithm 1 第 2 行的 $\mathrm{diffMPC}(x_k,Q(s_k),p(s_k))$ 就是每步重解式 (1) 并取首项；§III-D 明说该 MPC 只支持输入约束 ⇒ 式 (1) 中只有 $u_k\in\mathcal U$——两处一致 ✓。</li>
+</ul>
+<h4>1.4 疑点标注</h4>
+<ul>
+<li><strong>P-4</strong>：$\arg\min_u J(x)$ 中 $u$ 实为序列 $u_{0:N-1}$；$J$ 应写 $J(x_{0:N},u_{0:N-1})$。同段把 $J$ 的类型署为 $J:\mathcal X\to\mathbb R_+$，也与"代价依赖整条轨迹"不符。属常见缩写，但配合隐式策略 $\pi(x)$ 的定义易生歧义。</li>
+<li><strong>P-2</strong>：按随文说明，$u_k$ 只定义到 $k=N-1$，因此式 (2) 的求和上界 $k=N$（含 $u_N$）在式 (1) 的约定下无定义——详见第 2 节。</li>
+<li><strong>P-8（背景性）</strong>：$f$ 的具体形式（四旋翼 13 维动力学）全文从未给出，只写 "same as in [14]"——读者无法仅凭本文复现 MPC 内部模型。</li>
+</ul>
+<hr>
+<h3>2. 公式 (2)：二次 MPC 代价——从 QP 到 Riccati 全链路</h3>
+<p>论文原文（p.2–3，§III-B General Quadratic MPC formulation）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(2) —— 一般二次 MPC 代价（论文式 (2)）</span>
+$$J_Q(x)=\sum_{k=0}^{N}\begin{bmatrix}x_k\\u_k\end{bmatrix}^{T}Q_k\begin{bmatrix}x_k\\u_k\end{bmatrix}+p_k\begin{bmatrix}x_k\\u_k\end{bmatrix} \tag{2}$$
+<div class="eq-note">
+<strong>$J_Q(x)$</strong> = 二次代价（以初态 $x$ 为参数） &nbsp;|&nbsp; <strong>$z_k=[x_k;u_k]$</strong> = 第 $k$ 步状态-输入增广向量（维数 $n+m$） &nbsp;|&nbsp; <strong>$Q_k$</strong> = 第 $k$ 步二次权重矩阵（§III-E 约束为对角阵） &nbsp;|&nbsp; <strong>$p_k$</strong> = 第 $k$ 步线性项系数（向量） &nbsp;|&nbsp; <strong>$N$</strong> = 时域。论文动机：非线优化要实时求解太难，把代价近似成 QP（配合 [26] 的 iLQR 求解器可毫秒级求解），并直接"search for the matrix coefficients"——即 $Q_k,p_k$ 由 Cost Map 输出（(D1)）。
+</div>
+</div>
+<h4>2.1 重推 1：块分解（先看清 $z_k$ 里装了什么）</h4>
+<p>按 §III-E 的对角约束，$Q_k$ 取分块 $\mathrm{blkdiag}(Q_{x,k},\,Q_{u,k})$（状态块/输入块各自对角，交叉块为零），$p_k=[p_{x,k};p_{u,k}]$，则：</p>
+$$\begin{aligned}
+z_k^TQ_kz_k+p_k^Tz_k
+&=\begin{bmatrix}x_k\\u_k\end{bmatrix}^T\begin{bmatrix}Q_{x,k}&0\\0&Q_{u,k}\end{bmatrix}\begin{bmatrix}x_k\\u_k\end{bmatrix}+\begin{bmatrix}p_{x,k}\\p_{u,k}\end{bmatrix}^T\begin{bmatrix}x_k\\u_k\end{bmatrix}\\
+&=x_k^TQ_{x,k}x_k+u_k^TQ_{u,k}u_k+p_{x,k}^Tx_k+p_{u,k}^Tu_k
+\end{aligned}$$
+<p>即：$Q_k$ 的<strong>状态对角块</strong>惩罚状态偏离零点，<strong>输入对角块</strong>惩罚输入幅值（注：§III-E 把输入块改叫 $R$，见疑点 P-11），$p$ 的两个块分别给状态和输入一个线性"吸引/排斥"方向。</p>
+<h4>2.2 重推 2：与跟踪 MPC 的等价——"学 $(Q,p)$ = 学隐式参考"（全文最重要的等价关系）</h4>
+<p>标准跟踪 MPC 的逐段代价是（对参考状态 $x_k^{\mathrm{ref}}$、参考输入 $u_k^{\mathrm{ref}}$）：</p>
+$$\begin{aligned}
+\ell_k&=\big(x_k-x_k^{\mathrm{ref}}\big)^TQ_{x,k}\big(x_k-x_k^{\mathrm{ref}}\big)+\big(u_k-u_k^{\mathrm{ref}}\big)^TQ_{u,k}\big(u_k-u_k^{\mathrm{ref}}\big)\\
+&=x_k^TQ_{x,k}x_k+\underbrace{-2\big(x_k^{\mathrm{ref}}\big)^TQ_{x,k}x_k}_{\text{一次项}}+\underbrace{\big(x_k^{\mathrm{ref}}\big)^TQ_{x,k}x_k^{\mathrm{ref}}}_{\text{与 }u\text{ 无关的常数，对 }\arg\min\text{ 无影响，可丢}}+(\text{输入部分同理})
+\end{aligned}$$
+<p>对照式 (2) 的线性项，逐项相等给出：</p>
+$$p_{x,k}=-2\,Q_{x,k}\,x_k^{\mathrm{ref}},\qquad p_{u,k}=-2\,Q_{u,k}\,u_k^{\mathrm{ref}} \tag{隐式参考}$$
+<p>反过来解出参考：</p>
+$$x_k^{\mathrm{ref}}=-\tfrac12 Q_{x,k}^{-1}p_{x,k},\qquad u_k^{\mathrm{ref}}=-\tfrac12 Q_{u,k}^{-1}p_{u,k}$$
+<p><strong>结论</strong>：在二次代价里"学习 $Q$ 和 $p$"与"学习一个加权跟踪参考"<strong>完全等价</strong>——$p$ 蕴含目标（参考轨迹），$Q$ 蕴含"多么用力地朝它靠"。论文的两句原话由此获得数学实质：① "we directly learn a map from observations to cost"；② "without suffering from the dependency on a feasible trajectory"——不需要显式可飞轨迹，Cost Map 输出的 $p$ 已经隐式携带了目标，且这个"目标"无需动力学可行（MPC 自会给出可行逼近）。第 2.6 节还将证明：$p$ 只移动解的"前馈项"而不改变反馈增益——<strong>目标选择与反馈鲁棒性被彻底解耦</strong>。</p>
+<h4>2.3 重推 3：动力学压缩（condensing）成标准 QP</h4>
+<p>可微 MPC [26] 的处理方式是：对非线性动力学先 iLQR 线性化，得到线性时变（LTV）模型 $x_{k+1}=A_kx_k+B_ku_k$。定义状态转移矩阵 $\Phi_{k,j}=A_{k-1}A_{k-2}\cdots A_j$（$k&gt;j$，$\Phi_{j,j}=I$），则状态可由输入序列显式表出：</p>
+$$x_k=\Phi_{k,0}\,x_0+\sum_{j=0}^{k-1}\Phi_{k,j+1}\,B_j\,u_j \tag{状态显式解}$$
+<p>代入式 (2) 并按 $z=(u_0,u_1,\dots,u_{N-1})$ 整理（$J_Q$ 按论文惯例不带 $\tfrac12$，故写成 $z^T\bar H z+\bar g^Tz$）：</p>
+$$J_Q(z)=z^T\bar H\,z+\bar g^Tz+\mathrm{const}$$
+$$\bar H_{ij}=\sum_{k>\max(i,j)}^{N}B_i^T\Phi_{k,i+1}^TQ_{x,k}\Phi_{k,j+1}B_j+\mathbf{1}_{\{i=j\}}\,Q_{u,i} \tag{H 结构}$$
+$$\bar g_i=\sum_{k=i+1}^{N}B_i^T\Phi_{k,i+1}^T\Big(2\,Q_{x,k}\Phi_{k,0}\,x_0+p_{x,k}\Big)+p_{u,i} \tag{g 结构}$$
+<p><strong>三个要点</strong>（第 2 节的"硬核"结论）：</p>
+<ul>
+<li>① $Q_k$ 对角（即 $Q_{x,k}$ 对角）<strong>不意味着 $\bar H$ 对角</strong>：$i\ne j$ 时 $\bar H_{ij}=\sum_k B_i^T\Phi^TQ\Phi B_j\ne0$——时域耦合由<strong>动力学</strong>传递。所以"Q 对角化"降的是<strong>参数空间</strong>（第 6 节），不是 QP 的结构；QP 的稠密耦合要靠 Riccati 递推来高效利用（2.5 节）。</li>
+<li>② $\bar H$ 与 $x_0$ <strong>无关</strong>，只有 $\bar g$ 随 $x_0$ 变——每次滚动重规划只需更新 $\bar g$，$\bar H$ 的分解（Cholesky/Karush–Kuhn–Tucker 因子）可复用。这是可微 MPC 能实时的一个原因。</li>
+<li>③ 末端 $k=N$ 处 $u_N$ 未定义（式 (1) 的约定），上式已按"终端块只含 $x_N$"处理——论文打印的式 (2) 却把 $u_N$ 写进了求和，见疑点 P-2。</li>
+</ul>
+<h4>2.4 重推 3'：解的唯一性与正定要求（为什么 sigmoid 下限必须大于 0）</h4>
+<p>对任意 $z\ne0$，存在某个 $i$ 使 $u_i\ne0$，于是（用到 2.1 的块分解）：</p>
+$$z^T\bar Hz=\sum_{k=0}^{N}x_k^TQ_{x,k}x_k+\sum_{k=0}^{N-1}u_k^TQ_{u,k}u_k\;\ge\;\sum_{k=0}^{N-1}u_k^TQ_{u,k}u_k\;>\;0\quad(\text{当 }Q_{u,k}\succ0)$$
+<p>即：<strong>输入权重正定 $Q_{u,k}\succ0$ ⇒ 压缩 Hessian $\bar H\succ0$ ⇒ 严格凸 ⇒ QP 有唯一全局最优</strong>。状态块只需半正定（$Q_{x,k}\succeq0$）。这精确解释了 §III-E 的两句原话："positive semi-definiteness of the Q matrix and the positive definiteness of the R matrix"——输入块（论文称 R）正定才是解唯一的<strong>充要</strong>条件。而 Cost Map 的 sigmoid 下限 0.1 使<strong>所有</strong>对角元都严格大于 0，即实际实现比论文声称的还要"更正定"（状态块也严格正定了）。</p>
+<h4>2.5 重推 4：LQR/Riccati 后向递推——diffMPC 的求解器核心（论文引而不证的部分）</h4>
+<p>论文 §II 明说可微 MPC [26] 是 "analytically differentiating through the fixed point of a nonlinear iLQR solver [40]"。这一段把该"不动点"补全为显式公式（Li &amp; Todorov [40] 的 LQ 情形）。<strong>记号约定</strong>：本小节按教材惯例把代价写成 $\tfrac12$ 归一化形式（即下文 $Q,p$ 对应式 (2) 的 $2Q,p$ 再归一；结论只依赖结构、不依赖归一化）。终端值函数取 $V_N(x)=\tfrac12 x^TQ_{x,N}x+p_{x,N}^Tx$（与式 (2) 的终端项一致）。</p>
+<p><strong>动态规划一步</strong>：$V_k(x)=\min_u\big[\ell_k(x,u)+V_{k+1}(A_kx+B_ku)\big]$。设 $V_{k+1}(y)=\tfrac12 y^TP_{k+1}y+q_{k+1}^Ty+\mathrm{const}$，代入并合并同类项：</p>
+$$\begin{aligned}
+V_k(x)=\min_u\Big[&\tfrac12 u^T\underbrace{\big(Q_{u,k}+B_k^TP_{k+1}B_k\big)}_{Q_{uu,k}}u+u^T\big(B_k^TP_{k+1}A_kx+p_{u,k}+B_k^Tq_{k+1}\big)\\
+&+\tfrac12x^T\big(Q_{x,k}+A_k^TP_{k+1}A_k\big)x+x^T\big(p_{x,k}+A_k^Tq_{k+1}\big)+\mathrm{const}\Big]
+\end{aligned}$$
+<p>括号内是关于 $u$ 的无约束二次型（$Q_{uu,k}\succ0$ 由 2.4 节保证可逆）。令其对 $u$ 的梯度为零：</p>
+$$Q_{uu,k}\,u+\big(B_k^TP_{k+1}A_kx+p_{u,k}+B_k^Tq_{k+1}\big)=0$$
+<p>解出最优控制律（反馈增益 $K_k$ + 前馈项 $k_k$），并把 $\min_u$ 的值代回得到 Riccati 递推：</p>
+$$u_k^*(x)=K_kx+k_k,\qquad K_k=-Q_{uu,k}^{-1}B_k^TP_{k+1}A_k,\qquad k_k=-Q_{uu,k}^{-1}\big(p_{u,k}+B_k^Tq_{k+1}\big) \tag{Riccati-增益}$$
+$$P_k=Q_{x,k}+A_k^TP_{k+1}A_k-A_k^TP_{k+1}B_k\,Q_{uu,k}^{-1}\,B_k^TP_{k+1}A_k \tag{Riccati-P}$$
+$$q_k=p_{x,k}+A_k^Tq_{k+1}-A_k^TP_{k+1}B_k\,Q_{uu,k}^{-1}\big(p_{u,k}+B_k^Tq_{k+1}\big) \tag{Riccati-q}$$
+<p>算法：从 $k=N-1$ 到 $0$ 后向递推 $(P_k,q_k)$，再前向代入 $x_{k+1}=A_kx_k+B_ku_k$ 即得 QP 全局解。<strong>这就是 diffMPC 的 forward</strong>（输入约束的线搜索/投影版本见 [26]，结构相同）。注意两个干净的分离：</p>
+<ul>
+<li>$P_k,K_k$ <strong>只依赖 $Q$</strong>（二次权重），与 $p$ 无关——$Q$ 决定"反馈刚度"（闭环怎么抵抗扰动）；</li>
+<li>$q_k,k_k$ <strong>只依赖 $p$</strong>（线性权重）——$p$ 决定"往哪走"（前馈目标）。</li>
+</ul>
+<p>这就是 2.2 节"目标与鲁棒性解耦"在求解器层面的结构证据，也是 AC-MPC 分布外（风扰）鲁棒的数学根源：风扰改变状态，反馈项 $K_kx_k$ 自动修正；而"目标"信息只存在于 $p$，不受扰动污染。</p>
+<h4>2.6 重推 5：隐式微分——QP 解对 $(Q,p)$ 的梯度（可微 MPC 的 backward，训练的关键）</h4>
+<p>训练需要 $\partial u^*/\partial(Q,p)$。QP 的解由其不动点条件刻画：无约束情形 $F(u^*;\theta)=\nabla_uJ_Q(u^*;\theta)=0$（$\theta=(Q,p)$），有约束情形 $F$ 取 KKT 残差向量。对隐式方程 $F(u^*(\theta);\theta)=0$ 两边对 $\theta$ 求全微分：</p>
+$$\frac{\partial F}{\partial u^*}\frac{du^*}{d\theta}+\frac{\partial F}{\partial\theta}=0\quad\Longrightarrow\quad \frac{du^*}{d\theta}=-\Big(\frac{\partial F}{\partial u^*}\Big)^{-1}\frac{\partial F}{\partial\theta} \tag{IFT}$$
+<p>无约束时 $\partial F/\partial u^*=\bar H$（2.3 节）、$\partial F/\partial\theta=\nabla^2_{u\theta}J_Q$；有约束时系数矩阵是 KKT 矩阵（对盒约束带符号化的互补项，见 [26]）。<strong>效率要点</strong>：该线性系统与 QP 正解共用同一因子分解——[26] 的核心贡献就是发现 LQ 情形下这次"梯度反解"等价于沿 Riccati 递推再做一遍<strong>伴随传播</strong>，复杂度与一次正解同级（后向 Riccati 递推天然是前向 QP 的伴随）。这也解释了表 II 里"训练比 AC-MLP 慢 ~33 倍"（每次迭代正、反各解一遍 QP）。</p>
+<p><strong>闭式实例（把"QP 与学习的耦合"落到实处）</strong>：对 2.5 节的前馈项直接求导：</p>
+$$\frac{\partial k_k}{\partial p_{u,k}}=-Q_{uu,k}^{-1},\qquad \frac{\partial k_k}{\partial q_{k+1}}=-Q_{uu,k}^{-1}B_k^T$$
+<p>再沿 Riccati-q 递推把 $q_{k+1}$ 对 $p_x$ 的依赖链式展开，即可求出 $\partial u^*/\partial p_x$ 的全部分量。<strong>结论：学习 $p$ 把 MPC 解的前馈项 $k_k$ 沿梯度方向平移——数学上就是移动 2.2 节的隐式参考 $x^{\mathrm{ref}}$；而反馈增益 $K_k$ 完全不受 $p$ 影响</strong>。一句话：Cost Map 学"目标"，Riccati 学"动力学"，两者在梯度上互不污染。</p>
+<h4>2.7 数值核算</h4>
+<ul>
+<li>§III-E 输出维数 $2T(n+m)$：每步 $Q$ 对角元 $n+m$ 个 + $p$ 分量 $n+m$ 个 = $2(n+m)$；$T=2,n=13,m=4$ ⇒ $2\times2\times17=68$ ✓（与本笔记第 6 节一致；计数细节见 6.1 节）。</li>
+<li>对角化收益：稠密对称 $Q_k$ 需 $(n+m)(n+m+1)/2=153$ 项/步 ⇒ 2 步 340 项 vs 68 项，<strong>压缩 5 倍</strong> ✓；sigmoid 区间 $[0.1,10^5]$ 给出权重条件数上界 $\kappa\le10^6$（6.3 节）。</li>
+</ul>
+<h4>2.8 疑点标注</h4>
+<ul>
+<li><strong>P-2</strong>：式 (2) 求和上界 $k=N$ 但 $u_N$ 未定义（式 (1) 约定 $u$ 只到 $N-1$）。标准写法应把输入项只求到 $N-1$、终端只留 $x_N^TQ_Nx_N+p_N^Tx_N$。论文未说明（可能隐含 $Q_N$ 的输入块为零，但打印形式没有体现）。</li>
+<li><strong>P-3</strong>：$p_k\begin{bmatrix}x_k\\u_k\end{bmatrix}$ 应为 $p_k^T\begin{bmatrix}x_k\\u_k\end{bmatrix}$（行向量乘列向量）；除非 $p_k$ 隐式定义为行向量。打印/记号不严谨。</li>
+<li><strong>P-1</strong>：时域在式 (2) 里叫 $N$、在 §III-E 里又叫 $T$（$2T(n+m)$、$\forall k\in0,\dots,T$）——同一量两个记号，且 $N$ 还与"门数"（§IV-A.1）和"轨迹批量数"（式 (3)）撞车。</li>
+</ul>
+<hr>
+<h3>3. 公式 (3)：策略梯度定理——六步重推、TD 优势与 PPO-clip 对接</h3>
+<p>论文原文（p.3，§III-C Actor-Critic Reinforcement Learning）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(3) —— 策略梯度定理（actor-critic 形式）（论文式 (3)）</span>
+$$\nabla_\theta J(\pi_\theta)=\frac{1}{N}\sum_{i=1}^{N}\sum_{k=1}^{T}\nabla_\theta\log\pi_\theta\big(a_k^i\mid s_k^i\big)\,A_\omega\big(s_k^i,a_k^i\big) \tag{3}$$
+$$A(s_k,a_k)=r(s_k,a_k)+\gamma V_\omega(s_{k+1})-V_\omega(s_k) \tag{D2}$$
+<div class="eq-note">
+<strong>$\theta$</strong> = 策略（Cost Map + diffMPC 整体）的参数 &nbsp;|&nbsp; <strong>$\pi_\theta$</strong> = 策略 &nbsp;|&nbsp; <strong>$J(\pi_\theta)$</strong> = 期望回报（$J(\theta)=\mathbb E[\sum_t\gamma^t r_t]$ 的缩写） &nbsp;|&nbsp; <strong>$s_k^i,a_k^i$</strong> = 第 $i$ 条轨迹第 $k$ 步的观测与动作 &nbsp;|&nbsp; <strong>$N$</strong> = 轨迹批量数（<strong>第三个含义的 $N$</strong>，疑点 P-1）、<strong>$T$</strong> = 轨迹长度 &nbsp;|&nbsp; <strong>$A_\omega(s_k,a_k)$</strong> = 由 Critic $V_\omega$ 估计的优势（1 步 TD，式 (D2)）。论文原话：该定理引自策略梯度定理 [41]（Sutton 等 1999）。
+</div>
+</div>
+<h4>3.1 六步完整重推：从贝尔曼方程到式 (3)</h4>
+<p><strong>第 1 步（目标与记号）</strong>。设 $J(\theta)=\mathbb E_{s_0\sim\mu}[V^{\pi_\theta}(s_0)]$，其中 $V^\pi(s)=\mathbb E\big[\sum_{t\ge0}\gamma^t r_t\mid s_0=s\big]$，$Q^\pi(s,a)=\mathbb E\big[\sum_t\gamma^t r_t\mid s_0=s,a_0=a\big]$。由定义 $V^\pi(s)=\sum_a\pi_\theta(a|s)Q^\pi(s,a)$。</p>
+<p><strong>第 2 步（对 $V^\pi$ 求梯度，积法则）</strong>：</p>
+$$\nabla_\theta V^\pi(s)=\sum_a\Big[\nabla_\theta\pi_\theta(a|s)\,Q^\pi(s,a)+\pi_\theta(a|s)\,\nabla_\theta Q^\pi(s,a)\Big] \tag{PG-1}$$
+<p><strong>第 3 步（把 $\nabla_\theta Q^\pi$ 递推展开）</strong>。贝尔曼期望方程 $Q^\pi(s,a)=r(s,a)+\gamma\sum_{s'}P(s'|s,a)V^\pi(s')$ 两边求梯度：</p>
+$$\nabla_\theta Q^\pi(s,a)=\gamma\sum_{s'}P(s'|s,a)\,\nabla_\theta V^\pi(s') \tag{PG-2}$$
+<p>把 PG-2 代回 PG-1 并沿状态序列展开（$P^\pi$ 为策略下的转移概率），得到（$\eta(s)$ 为折扣状态访问分布）：</p>
+$$\nabla_\theta V^\pi(s)=\sum_{s'}\eta(s'|s)\sum_{a'}\nabla_\theta\pi_\theta(a'|s')\,Q^\pi(s',a')\quad\text{其中}\quad \eta(s'|s)=\sum_{t\ge0}\gamma^t\,\Pr(s_t=s'\mid s_0=s,\pi)$$
+<p>对初始分布 $\mu$ 取期望：</p>
+$$\nabla_\theta J(\theta)=\sum_{s}\eta(s)\sum_a\nabla_\theta\pi_\theta(a|s)\,Q^\pi(s,a),\qquad \eta(s)=\mathbb E_{s_0\sim\mu}[\eta(s|s_0)] \tag{PG-3}$$
+<p><strong>第 4 步（基线不变性——为什么可以换成优势）</strong>。对任意只依赖状态的基线 $b(s)$：</p>
+$$\sum_a\nabla_\theta\pi_\theta(a|s)\,b(s)=b(s)\,\nabla_\theta\sum_a\pi_\theta(a|s)=b(s)\,\nabla_\theta 1=0$$
+<p>故 PG-3 中 $Q^\pi$ 可换成 $A^\pi=Q^\pi-V^\pi$ 而不改变期望值：$\nabla_\theta J=\sum_s\eta(s)\sum_a\nabla_\theta\pi_\theta(a|s)A^\pi(s,a)$。</p>
+<p><strong>第 5 步（用 Critic 近似 + 对数技巧）</strong>。用可微分的 $\nabla_\theta\pi=\pi\,\nabla_\theta\log\pi$，并把真值 $A^\pi$ 换成 Critic 的估计 $A_\omega$（这就是 "actor-critic" 一词的含义；$A^\pi$ 未知，用 $V_\omega$ 构造，见 3.2）：</p>
+$$\nabla_\theta J(\theta)=\mathbb E_{s\sim\eta,\,a\sim\pi_\theta}\Big[\nabla_\theta\log\pi_\theta(a|s)\,A_\omega(s,a)\Big] \tag{PG-4}$$
+<p><strong>第 6 步（蒙特卡洛采样）</strong>。用 $N$ 条长度 $T$ 的轨迹、以 $(s_k^i,a_k^i)$ 处取值做经验平均：</p>
+$$\nabla_\theta J(\pi_\theta)\approx\frac{1}{N}\sum_{i=1}^{N}\sum_{k=1}^{T}\nabla_\theta\log\pi_\theta\big(a_k^i\mid s_k^i\big)\,A_\omega\big(s_k^i,a_k^i\big)\quad\checkmark\ \text{式 (3)}$$
+<p>六步全部闭合，与论文式 (3) 完全一致；这正是论文所引 [41]（Sutton, McAllester, Singh &amp; Mansour 1999）"policy gradient with function approximation" 的标准结论。</p>
+<h4>3.2 式 (D2) 的来源：1 步 TD 优势（贝尔曼方程的样本版）与 GAE 推广</h4>
+<p>贝尔曼期望方程 $Q^\pi(s,a)=r(s,a)+\gamma\mathbb E_{s'\sim P}[V^\pi(s')]$。用 Critic $V_\omega$ 近似真值 $V^\pi$、用观测到的后继状态 $s_{k+1}$ 近似期望，即得式 (D2)：</p>
+$$A(s_k,a_k)\approx r(s_k,a_k)+\gamma V_\omega(s_{k+1})-V_\omega(s_k)$$
+<p>性质：<strong>有偏</strong>（$V_\omega\ne V^\pi$）但<strong>低方差</strong>（只用一步真实奖励）。GAE 把它推广成多步 TD 误差的指数加权：</p>
+$$\hat A_k^{\mathrm{GAE}}=\sum_{l=0}^{\infty}(\gamma\lambda)^l\,\delta_{k+l},\qquad \delta_t=r_t+\gamma V_\omega(s_{t+1})-V_\omega(s_t)$$
+<p>两个极限：$\lambda=0$ ⇒ $\hat A_k=\delta_k$ = 式 (D2)（即论文式 (3) 所用的优势）；$\lambda=1$ ⇒ $\hat A_k=\sum_{l\ge0}\gamma^l r_{k+l}-V_\omega(s_k)=\hat R_k-V_\omega(s_k)$（reward-to-go 减基线）。<strong>这说明 Algorithm 1 第 3 行 "Compute reward-to-go $\hat R_k$" 与第 4 行 "advantage estimates $\hat A_k$ based on $V(s_k)$" 恰好分别是 GAE 在 $\lambda=1$ 端的两个组成部分</strong>——论文究竟用哪种 $\lambda$（0、1 或中间值）没有说明（疑点 P-5）。</p>
+<h4>3.3 高斯策略的 log 梯度与"在 MPC 轨道上学习"（QP 与学习的耦合链，全文最核心的一条式子）</h4>
+<p>本方法策略为高斯：$\pi_\theta(a|s)=\mathcal N(\mu_\theta(s),\Sigma)$，$\mu_\theta(s)=\mathrm{diffMPC}(x,Q_\psi(s),p_\psi(s))$（$\psi$ = Cost Map 参数，$\theta=(\psi,\Sigma)$）。对数密度：</p>
+$$\log\pi_\theta(a|s)=-\tfrac12(a-\mu_\theta)^T\Sigma^{-1}(a-\mu_\theta)-\tfrac12\log|2\pi\Sigma|$$
+<p>对 $\psi$ 求梯度（$\Sigma$ 视为当前固定），再用链式法则穿过 diffMPC：</p>
+$$\nabla_\psi\log\pi_\theta(a\mid s)=(a-\mu_\theta)^T\Sigma^{-1}\,\nabla_\psi\mu_\theta
+=(a-u_0^*)^T\Sigma^{-1}\;\underbrace{\frac{\partial u_0^*}{\partial(Q,p)}}_{\text{2.6 节：diffMPC backward}}\;\underbrace{\frac{\partial(Q,p)}{\partial\psi}}_{\text{Cost Map MLP 反向}} \tag{耦合链}$$
+<p><strong>解读</strong>：式 (3) 说"按优势加权提高好动作的概率"；耦合链说"提高概率"在这里具体表现为——把 MPC 的解 $u_0^*$ 沿 $a-u_0^*$ 方向（优势 $A&gt;0$ 时）移动，移动量由协方差 $\Sigma^{-1}$ 加权。把 2.6 节的闭式梯度代入，得单步更新的<strong>一阶效果</strong>（$\alpha$ 为学习率）：</p>
+$$\Delta u_0^*\approx\alpha\,\Sigma^{-1}\big(a-u_0^*\big)\,\hat A(s,a)$$
+<p>即：<strong>actor 的梯度下降是在"MPC 的解轨迹"（由 Riccati 递推定义的流形）上进行的</strong>——每一步都先把当前 $Q,p$ 代进 QP 求 $u_0^*$，再沿优势方向平移解；平移通过 $p$（隐式参考，2.2/2.6 节）实现，反馈增益 $K_k$ 不被优势信号直接污染。这正是"actor 用梯度下降在 MPC 轨道上学习"的严格含义，也是论文标题 "Actor-Critic MPC" 里 actor 与 MPC 的真正耦合点。</p>
+<h4>3.4 与 PPO-clip 的严格对接（修正本笔记第 6 节的标注）</h4>
+<p>Algorithm 1 说 "Update the cost map by policy gradient (e.g., PPO-clip objective)"——即实际更新用 PPO-clip，而式 (3) 是"策略梯度"的定理形式。两者关系如下。PPO-clip 目标（Schulman et al. 2017）：</p>
+$$L^{\mathrm{CLIP}}(\theta)=\hat{\mathbb E}\Big[\min\big(r_k(\theta)\hat A_k,\ \mathrm{clip}(r_k(\theta),1-\varepsilon,1+\varepsilon)\hat A_k\big)\Big],\qquad r_k(\theta)=\frac{\pi_\theta(a_k|s_k)}{\pi_{\theta_{\mathrm{old}}}(a_k|s_k)}$$
+<p>在 $\theta=\theta_{\mathrm{old}}$ 处：$r_k=1$，$\mathrm{clip}$ 无效，$\min$ 取第一支，于是</p>
+$$\nabla_\theta L^{\mathrm{CLIP}}\Big|_{\theta_{\mathrm{old}}}=\hat{\mathbb E}\Big[\nabla_\theta r_k\cdot\hat A_k\Big]=\hat{\mathbb E}\Big[r_k\,\nabla_\theta\log\pi_\theta(a_k|s_k)\cdot\hat A_k\Big]=\hat{\mathbb E}\Big[\nabla_\theta\log\pi_\theta\cdot\hat A_k\Big]$$
+<p>最后一式正是式 (3) 的期望形式。<strong>结论：式 (3)（论文）是 PPO-clip 目标在 $\theta_{\mathrm{old}}$ 处的一阶线性化</strong>；二者不矛盾，但"式 (3) = PPO-clip"的等号不成立——本笔记第 6 节把式 (3) 直接标注为 "PPO-Clipped 策略梯度目标函数" 是不准确的（问题 N-1）。</p>
+<h4>3.5 交叉验证与疑点</h4>
+<ul>
+<li>与 [41]（论文所引）一致：式 (3) 即 Sutton 等 1999 定理 1 的 Critic 近似版 ✅；式 (4) 的高斯策略使 3.3 节的 log 梯度直接适用 ✅。</li>
+<li>与 Algorithm 1 一致但有落差：第 4 行对应式 (D2)/GAE，第 3 行 reward-to-go 对应 $\lambda=1$ 分支——二者并存的含义模糊（<strong>P-5</strong>：8 页正文未给 $\gamma,\lambda,\varepsilon$ 数值、未说明是否用 GAE、未说明 $\Sigma$ 结构；本笔记第 6 节的 $\gamma=0.99,\lambda=0.95,\varepsilon=0.2$ 在本文 PDF 查无出处）。</li>
+<li><strong>P-1</strong>：式 (3) 的 $N$（轨迹批量）与时域 $N$、门数 $N$ 三处撞符号。</li>
+</ul>
+<hr>
+<h3>4. 公式 (4)：训练/部署双重身份的高斯策略</h3>
+<p>论文原文（p.3，§III-D）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(4) —— AC-MPC 的随机策略（论文式 (4)）</span>
+$$u_k\sim\mathcal N\big\{\mathrm{diffMPC}(x_k,Q(s_k),p(s_k)),\ \Sigma\big\} \tag{4}$$
+<div class="eq-note">
+<strong>$\mathcal N\{\mu,\Sigma\}$</strong> = 均值为 $\mu$、协方差为 $\Sigma$ 的高斯分布 &nbsp;|&nbsp; <strong>$\mathrm{diffMPC}(x_k,Q(s_k),p(s_k))$</strong> = 以当前状态 $x_k$ 为初值、以 Cost Map 在观测 $s_k$ 处输出的 $Q,p$ 为代价参数解 QP（第 2 节），输出最优序列取首项 $u_0^*$ &nbsp;|&nbsp; <strong>$\Sigma$</strong> = 探索噪声协方差，论文只说 "the variance is controlled by the PPO algorithm"。原文随即说明：训练时从该高斯采样（探索），部署时直接使用 MPC 输出（确定性）。
+</div>
+</div>
+<h4>4.1 重推 1：为什么把高斯"架"在 MPC 解之上（而不是别的分布）</h4>
+<p>高斯熵 $H=\tfrac12\log\big((2\pi e)^{m}|\Sigma|\big)$ <strong>与均值 $\mu$ 无关</strong>：探索强度只由 $\Sigma$ 决定，"利用"（diffMPC 均值）与"探索"（方差）干净分离。噪声加在动作空间而非代价参数空间，保证探索到的动作总是"接近最优且动力学可行"。</p>
+<h4>4.2 重推 2：部署时确定性输出 = 高斯众数（mode）</h4>
+<p>高斯密度 $\pi(a|s)\propto\exp\big(-\tfrac12(a-\mu)^T\Sigma^{-1}(a-\mu)\big)$ 的指数部分是 $a$ 的二次型，其唯一极小点在 $a=\mu$（$\Sigma^{-1}\succ0$）。所以：</p>
+$$\arg\max_a \pi_\theta(a\mid s)=\mu_\theta(s)=\mathrm{diffMPC}(x,Q(s),p(s))$$
+<p>即论文 "during deployment the output from the MPC is used directly on the system" 在数学上就是<strong>取策略的众数（贪婪/确定性化）</strong>——不是另起炉灶的规则，而是同一策略的极限。也说明部署阶段丢掉的是探索（$\Sigma$ 的作用），保留的是全部利用能力。</p>
+<h4>4.3 重推 3：重要性比率的代数（PPO 需要的量）</h4>
+<p>若新旧策略共享 $\Sigma$（只更新均值 $\mu$，这正是"Cost Map 更新 + $\Sigma$ 单独调"的常见做法），归一化常数抵消：</p>
+$$\frac{\pi_\theta(a\mid s)}{\pi_{\theta_{\mathrm{old}}}(a\mid s)}=\exp\Big(-\tfrac12\big[(a-\mu_\theta)^T\Sigma^{-1}(a-\mu_\theta)-(a-\mu_{\mathrm{old}})^T\Sigma^{-1}(a-\mu_{\mathrm{old}})\big]\Big)$$
+<p>比率只依赖均值差 $\mu_\theta-\mu_{\mathrm{old}}$，而 $\mu=\mathrm{diffMPC}(x,Q_\psi(s),p_\psi(s))$ 又是 $\psi$ 的（隐式）函数——于是 $r_k(\theta)$ 对 $\theta$ 的梯度也必然穿过 3.3 节的耦合链。<strong>这正是"每个 forward/backward pass 都要解一次优化问题"的原因</strong>（论文 §III-D 原话）：$r_k$、$\nabla_\theta\log\pi$ 都需要 $\mu_\theta=u_0^*$，而 $u_0^*$ 只能靠解 QP 得到。</p>
+<h4>4.4 $\Sigma$ 的调节（与 PPO 的接口）</h4>
+<p>$\Sigma$ 作为策略参数的梯度为 $\nabla_{\Sigma^{-1}}\log\pi=\tfrac12(\Sigma-(a-\mu)(a-\mu)^T)$（期望意义下为零——方差参数自动匹配样本协方差）。论文只说 "variance is controlled by the PPO algorithm"，未说明 $\Sigma$ 是对角、标量倍单位阵还是状态依赖（P-6）。</p>
+<h4>4.5 交叉验证（与表 II）</h4>
+<p>部署 = 每步一次 QP 正解（表 II：13.5 ms @ N=2）；训练 = 正解 + 反向再解一次（2.6 节）——与 §III-D "for every backward and forward pass … solve an optimization problem" 逐字对应 ✓。</p>
+<hr>
+<h3>5. 公式 (5)：门进度奖励的几何推导与数值核算</h3>
+<p>论文原文（p.4，§IV-A.2 Rewards）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(5) —— 门进度奖励（论文式 (5)）</span>
+$$r(k)=\|g_k-p_{k-1}\|-\|g_k-p_k\|-b\|\omega_k\|,\qquad b=0.01 \tag{5}$$
+<p style="font-size:12.5px;color:#64748b;">随文：碰撞 $r(k)=-10.0$；过门 $r(k)\mathrel{+}=10.0$；完赛 $r(k)\mathrel{+}=10.0$。</p>
+<div class="eq-note">
+<strong>$g_k$</strong> = 当前目标门中心的三维位置 &nbsp;|&nbsp; <strong>$p_k,p_{k-1}$</strong> = 飞行器当前/上一时刻位置（<strong>注意与式 (2) 的代价线性项 $p_k$ 撞符号</strong>，疑点 P-9） &nbsp;|&nbsp; <strong>$\omega_k$</strong> = 体角速率（向量） &nbsp;|&nbsp; <strong>$b=0.01$</strong> = 角速率惩罚系数。目标：直接最大化向下一门中心的推进。
+</div>
+</div>
+<h4>5.1 重推：进度项的精确几何恒等式与一阶展开</h4>
+<p>记 $a=p_{k-1}-g$（门到上一步位置的向量）、$\tilde b=p_k-g$、位移 $\Delta p=p_k-p_{k-1}=\tilde b-a$，并记距离 $d_{k-1}=\|a\|$、$d_k=\|\tilde b\|$。用平方差恒等式：</p>
+$$\|g-p_{k-1}\|-\|g-p_k\|=\frac{\|a\|^2-\|\tilde b\|^2}{\|a\|+\|\tilde b\|}=\frac{\|a\|^2-\|a+\Delta p\|^2}{d_{k-1}+d_k}$$
+<p>展开 $\|a+\Delta p\|^2=\|a\|^2+2a^T\Delta p+\|\Delta p\|^2$，并代入指向门的单位向量 $\hat e=-a/\|a\|=(g-p_{k-1})/d_{k-1}$：</p>
+$$r_{\mathrm{progress}}=\frac{2\,d_{k-1}\,\hat e^T\Delta p-\|\Delta p\|^2}{d_{k-1}+d_k} \tag{精确恒等式}$$
+<p><strong>一阶展开</strong>（步长 $d_{k-1}-d_k\ll d_{k-1}$ 时 $d_k\approx d_{k-1}$）：</p>
+$$r_{\mathrm{progress}}\approx\hat e^T\Delta p$$
+<p>即<strong>位移向量在"指向门中心的单位方向"上的投影</strong>：向门移动取正（奖励），背离取负（惩罚），垂直于门方向的侧移不计贡献。这与论文 "encourage fast flight … maximize progress toward the center of the next gate" 的文字完全吻合 ✓。这个"投影式进度"正是每个时间步都非零的<strong>稠密信号</strong>——它保证了 Critic 的 TD 学习（式 (D2)）每一步都有信息可学，从而支撑 Fig. 2 中价值函数高值区域随过门"跳变"的模式切换。</p>
+<h4>5.2 量级核算（把 $b=0.01$ 与 $11.5$ N 放回物理世界）</h4>
+<ul>
+<li><strong>$b\|\omega_k\|$ 的量级</strong>：体角速率 $1$–$5$ rad/s ⇒ 每步惩罚 $0.01$–$0.05$；进度项约 $0.2$/步（10 m/s、20 ms 周期 ⇒ $\|\Delta p\|\approx0.2$ m）⇒ 极端机动时惩罚最多约为进度的 25%——$b=0.01$ 是"只正则不平庸"的量级 ✓。</li>
+<li><strong>风扰核算</strong>：$11.5$ N $=1.5\times$ 重量 ⇒ $m\approx11.5/1.5/9.81\approx0.78$ kg——与 4 英寸竞速机（[14] "4s drone"）量级一致 ✓；风扰区间 $z\in[8,10]$ m 正是 AC-MPC 以 83.33% 成功率（vs AC-MLP 6.5%）发挥在线重规划之力的区段。</li>
+<li><strong>稀疏项尺度</strong>：±10 事件 vs 每步 0.2 的进度——几百步 episode 中两者同量级，共同塑造 Critic 的 $V$（Fig. 2 中高价值区贴在下一门上）✓。</li>
+</ul>
+<h4>5.3 疑点标注</h4>
+<ul>
+<li><strong>P-7</strong>：§IV-B 说 "Given the sparse nature of the reward terms (see Section IV-A.2)"，但式 (5) 是<strong>逐步稠密</strong>的进度奖励；真正稀疏的只有 ±10 事件项。措辞不当（把事件项当成了全部奖励），非数学错误。</li>
+<li><strong>P-12</strong>：表 I 对成功率 0% 的 MPC（Vertical Wind 列）仍报平均速度 6.44 m/s——坠毁轨迹的速度如何计入平均、是否剔除碰撞后的步数，论文未说明。</li>
+<li><strong>P-9</strong>：位置 $p_k$（式 (5)）与代价线性项 $p_k$（式 (2)/(D1)）同一符号，跨节撞车。</li>
+</ul>
+<hr>
+<h3>6. 补充式 (D1)：神经代价映射——接口、参数计数与 sigmoid 限幅</h3>
+<p>论文原文（p.3，§III-E Neural Cost Map，无编号）：</p>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D1) —— 神经代价映射的接口（论文无编号式）</span>
+$$Q(s_k)=\mathrm{diag}\big(Q(s_k)_{x_1},\ldots,Q(s_k)_{x_n},\ R(s_k)_{u_1},\ldots,R(s_k)_{u_m}\big),\qquad p(s_k)=\big[p(s_k)_{x_1},\ldots,p(s_k)_{x_n},p(s_k)_{u_1},\ldots,p(s_k)_{u_m}\big],\quad \forall k\in0,\dots,T \tag{D1}$$
+<div class="eq-note">
+<strong>对角约束</strong>：$Q(s_k)$ 强制为对角阵（论文原话 "we constrain the $Q(s_k)$ matrix to be diagonal"，目的是 "reduce the dimensionality of the learnable parameter space"） &nbsp;|&nbsp; <strong>$Q_{x_1}\ldots$</strong> = 状态对角权重，<strong>$R_{u_1}\ldots$</strong> = 输入对角权重（此处突然把输入块改叫 $R$，见 P-11） &nbsp;|&nbsp; <strong>$p(s_k)$</strong> = 线性项 &nbsp;|&nbsp; <strong>输出维数</strong>：$2T(n_{\mathrm{state}}+n_{\mathrm{input}})$ &nbsp;|&nbsp; <strong>取值</strong>：末层 sigmoid，上下限同为 $0.1$ 与 $100000.0$ &nbsp;|&nbsp; <strong>网络</strong>：2 隐层 × 512 宽 + ReLU + sigmoid 末层；Critic 同为 2×512+ReLU、标量输出。
+</div>
+</div>
+<h4>6.1 参数计数核算（与 68 维对上）</h4>
+<p>每步：$Q_k$ 对角元 $n+m$ 个 + $p_k$ 分量 $n+m$ 个 = $2(n+m)$ 个；$T$ 步共 $2T(n+m)$。代入 $T=2$、$n=13$、$m=4$：</p>
+$$2T(n+m)=2\times2\times(13+4)=68\quad\checkmark$$
+<p>与本笔记第 6 节 "Cost Map 从 36 维观测映射到 68 维 MPC 参数" 一致 ✓。对照稠密参数化：对称 $Q_k$ 需 $(n+m)(n+m+1)/2=153$ 项/步，2 步共 $153\times2+17\times2=340$ vs 68 ⇒ <strong>对角化把可学习参数压缩了 5 倍</strong>，且每步只多 17 个标量，随 $T$ 线性增长。</p>
+<h4>6.2 对角化的代价与收益（诚实的取舍分析）</h4>
+<ul>
+<li><strong>收益</strong>：参数少、方差低、QP 结构规则（2.4 节正定性按对角元直接检查）。</li>
+<li><strong>代价</strong>：丧失状态间交叉权重建模（如"位置×速度"乘积型代价）；好在时域耦合由动力学传递（2.3 节），QP 仍能表达丰富轨迹。</li>
+<li><strong>精确观察</strong>：sigmoid 下限 0.1 使 $Q\succ0$ 严格正定——比论文文字 "PSD of Q" 更强；输入块 $R\succ0$ 才是解唯一的充要条件（2.4 节）。</li>
+</ul>
+<h4>6.3 sigmoid 限幅的数学（论文没给映射公式，这里补全两种标准实现）</h4>
+<p>标准 sigmoid $\sigma(z)\in(0,1)$。要把输出压到 $[0.1,10^5]$，常见的两种做法：</p>
+$$y=0.1+(100000-0.1)\,\sigma(z)\qquad\text{(线性缩放)}$$
+$$y=\exp\big(\ln 0.1+(\ln 100000-\ln 0.1)\,\sigma(z)\big)\qquad\text{(对数缩放)}$$
+<p>论文只给了上下界、没给缩放方式（疑点 P-10）。两个界各自的数学作用：</p>
+<ul>
+<li><strong>下限 0.1</strong>：保证 $\bar H\succ0$ ⇒ QP 唯一解（2.4 节），防权重为 0 时代价退化。</li>
+<li><strong>上限 $10^5$</strong>：论文原话——不加会观察到系数 "grow to infinity"；量化：权重比上界 $10^6$ ⇒ 条件数有界 ⇒ Riccati/QP 分解数值稳定。</li>
+</ul>
+<h4>6.4 疑点标注</h4>
+<ul>
+<li><strong>P-10</strong>：sigmoid→$[0.1,10^5]$ 的映射公式（线性/对数/仿射）未给出。</li>
+<li><strong>P-11</strong>：式 (2) 里整块矩阵都叫 $Q_k$；§III-E 的 (D1) 突然把输入对角块叫 $R(s_k)_{u_j}$——$R$ 只出现这一次、无正式定义（含义可推知为输入权重，但记号不统一）。</li>
+<li><strong>P-1</strong>：(D1) 用 $T$ 记时域（$2T(n+m)$、$\forall k\in0,\dots,T$），式 (2) 用 $N$——同一量两个记号。</li>
+</ul>
+<hr>
+<h3>7. 补充式 (D2)(D5)：优势函数与 reward-to-go 的严格关系</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D2)(D5) —— 优势函数与 reward-to-go（论文无编号式，Algorithm 1 的数学化）</span>
+$$A(s_k,a_k)=r(s_k,a_k)+\gamma V_\omega(s_{k+1})-V_\omega(s_k) \tag{D2}$$
+$$\hat R_k=\sum_{t\ge k}\gamma^{t-k}\,r_t \tag{D5}$$
+<div class="eq-note">
+(D2) 在 §III-C 随式 (3) 给出；(D5) 是 Algorithm 1 第 3 行 "Compute reward-to-go $\hat R_k$" 的标准数学形式。二者通过 GAE 的 $\lambda$ 极限互相联系（7.1 节）。
+</div>
+</div>
+<h4>7.1 重推：从贝尔曼方程到 (D2)，再到 (D5)</h4>
+<p><strong>(D2) 的来源</strong>已在 3.2 节推出：贝尔曼期望方程 $Q^\pi(s,a)=r+\gamma\mathbb E[V^\pi(s')]$ 的样本版。它衡量"这一步真实收益 + 后继状态的期望价值"超出"当前状态平均价值"多少——优势为正说明这个动作比平均好。</p>
+<p><strong>(D5) 的来源</strong>：$V^\pi(s_k)$ 的<strong>蒙特卡洛</strong>估计是 $\hat R_k=\sum_{t\ge k}\gamma^{t-k}r_t$，于是 MC 版优势 $\hat A_k^{\mathrm{MC}}=\hat R_k-V_\omega(s_k)$。对照 3.2 节的 GAE 公式验证两端：$\lambda=0$ ⇒ $\delta_k$=(D2)；$\lambda=1$ ⇒ $\sum_l\gamma^l\delta_{k+l}=\hat R_k-V_\omega(s_k)$（望远镜求和，中间项两两抵消）= MC 优势 ✓。<strong>于是 Algorithm 1 可精确翻译为</strong>：第 3 行算 (D5)、第 4 行用它（$\lambda=1$ 端）或式 (D2)（$\lambda=0$ 端）构造优势——论文未指明 $\lambda$（P-5），但两行合起来恰好覆盖 GAE 谱两端，逻辑自洽。</p>
+<h4>7.2 交叉验证</h4>
+<ul>
+<li>式 (3) 的 $A_\omega$ 与式 (D2) 逐符号一致 ✓；Algorithm 1 第 4 行与 (D2) 的 $V_\omega(s_k),V_\omega(s_{k+1})$ 依赖一致 ✓。</li>
+<li><strong>P-5</strong>：$\gamma$ 数值全文未给（本笔记第 6 节写 0.99，出处不在本文 PDF）。</li>
+</ul>
+<hr>
+<h3>8. 补充式 (D3)(D4)：观测空间与 Critic 回归的核算</h3>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D3) —— 观测空间（论文无编号式，§IV-A.1）</span>
+$$o_t^{\mathrm{quad}}=[v_t,\ R_t]\in\mathbb R^{12},\qquad o_t^{\mathrm{track}}=[\delta p_1,\ldots,\delta p_i,\ldots],\quad \delta p_i\in\mathbb R^{12},\quad i\in\{1,\ldots,N\},\quad N=2 \tag{D3}$$
+<div class="eq-note">
+<strong>$v_t$</strong> = 线速度（3 维）、<strong>$R_t$</strong> = 旋转矩阵（9 维，$3+9=12$ ✓） &nbsp;|&nbsp; <strong>$\delta p_i$</strong> = 飞行器中心与下一目标门 $i$ 四角点的相对位置（3 维 × 4 角 = 12 维 ✓） &nbsp;|&nbsp; <strong>$N$</strong> = 纳入观测的未来门数（<strong>第四个含义</strong>，P-1），取 2 &nbsp;|&nbsp; <strong>归一化</strong>：每训练迭代用观测的均值与标准差做标准化。
+</div>
+</div>
+<div class="formula-block">
+<span class="eq-tag">Eq.(D4) —— Critic 的 MSE 回归（Algorithm 1 第 5 行的数学化）</span>
+$$\omega\leftarrow\arg\min_{\omega}\ \mathbb E\Big[\big\|V_\omega(s_k)-\hat R_k\big\|^2\Big] \tag{D4}$$
+<div class="eq-note">
+<strong>$V_\omega$</strong> = Critic 网络（2×512+ReLU，标量输出） &nbsp;|&nbsp; <strong>$\hat R_k$</strong> = 回归目标（(D5) 的 reward-to-go）。即论文 Algorithm 1 的 "Fit value function by regression on mean-squared error"。
+</div>
+</div>
+<h4>8.1 观测维数核算</h4>
+<p>核算：$\dim o^{\mathrm{quad}}=3+9=12$ ✓；$\dim o^{\mathrm{track}}=12\times2=24$ ✓；总观测 $12+24=36$ 维 ✓（与本笔记第 6 节一致）。分工：36 维观测喂 Cost Map/Critic（"看"门），diffMPC 只吃 13 维状态（"知道"动力学）——式 (4) 括号内 $Q(s_k)$ 与 $x_k$ 不同，根源在此。</p>
+<h4>8.2 (D4) 的一阶条件与梯度</h4>
+<p>MSE 梯度 $\nabla_\omega\mathbb E[\|V_\omega(s_k)-\hat R_k\|^2]=2\mathbb E[(V_\omega(s_k)-\hat R_k)\nabla_\omega V_\omega(s_k)]$——Critic 不穿过 diffMPC，梯度路径独立于 QP；"Critic 管长期、MPC 管短期"的两时间尺度在计算图上体现为：两条梯度流只在优势 $\hat A$ 处汇合（3.3 节）。</p>
+<h4>8.3 归一化细节</h4>
+<p>归一化：$\tilde o=(o-\mu)/\sigma$，$\mu,\sigma$ 为每迭代的观测均值/标准差（论文未说明是滑动平均还是当批统计——小疑点，不列入问题清单）。</p>
+<hr>
+<h3>9. 算法 Algorithm 1：逐行数学化与复杂度核算</h3>
+<p>论文原文（p.3，§III-D）：</p>
+<pre class="code-block"><code>Algorithm 1: Actor-Critic Model Predictive Control
+Input: initial neural cost map, initial value function V
+  for i = 0, 1, 2, · · · do
+    Collect set of trajectories Di{τ} with uk ∼ N{diffMPC(xk, Q(sk), p(sk)), Σ}
+    Compute reward-to-go R̂k
+    Compute advantage estimates Âk based on value function V (sk)
+    Update the cost map by policy gradient (e.g., PPO-clip objective) and diffMPC backward [26]
+    Fit value function by regression on mean-squared error
+  end for
+Output: Learned cost map</code></pre>
+<h4>9.1 逐行数学化</h4>
+<table>
+<tr><th>行</th><th>数学化</th><th>对应的本文推导</th></tr>
+<tr><td>Input</td><td>Cost Map $\psi_0$（2×512+sigmoid）、Critic $\omega_0$（2×512）随机初始化；动力学 $f$ 固定（[14]）</td><td>(D1)</td></tr>
+<tr><td>第 2 行</td><td>$a_k=u_0^*(x_k)+\varepsilon_k,\ \varepsilon_k\sim\mathcal N(0,\Sigma)$，$u_0^*=\mathrm{diffMPC}(x_k,Q_{\psi}(s_k),p_{\psi}(s_k))$（每步解一次 QP，第 2 节）</td><td>式 (4)、2.5 节</td></tr>
+<tr><td>第 3 行</td><td>$\hat R_k=\sum_{t\ge k}\gamma^{t-k}r_t$</td><td>(D5)</td></tr>
+<tr><td>第 4 行</td><td>$\hat A_k=\hat R_k-V_\omega(s_k)$（MC 端）或 $r_k+\gamma V_\omega(s_{k+1})-V_\omega(s_k)$（TD 端，式 (D2)）；GAE 为两者插值——论文未指明（P-5）</td><td>(D2)(D5)</td></tr>
+<tr><td>第 5 行</td><td>$\psi\leftarrow\psi+\alpha\nabla_\psi L^{\mathrm{CLIP}}$，梯度经 3.3 节耦合链 $\partial\log\pi/\partial u_0^*\times\partial u_0^*/\partial(Q,p)\times\partial(Q,p)/\partial\psi$，中间项 = diffMPC backward（2.6 节 IFT）</td><td>式 (3)、2.6/3.3 节</td></tr>
+<tr><td>第 6 行</td><td>$\omega\leftarrow\omega-\alpha\nabla_\omega\mathbb E\|V_\omega(s_k)-\hat R_k\|^2$</td><td>(D4)</td></tr>
+<tr><td>Output</td><td>只输出学好的 Cost Map——部署时 Critic 与 $\Sigma$ 全部丢弃</td><td>式 (4)</td></tr>
+</table>
+<h4>9.2 复杂度核算（表 II 交叉验证）</h4>
+<ul>
+<li><strong>训练</strong>：每步 QP 正解 + 反向伴随各一次（$O(N(n+m)^3)$ 级）⇒ AC-MPC 11.5 h vs AC-MLP 21 min ≈ <strong>33 倍</strong> ✓。</li>
+<li><strong>推理</strong>：$N=2$：13.5 ms（QP ≈13 ms + Cost Map ≈0.5 ms）；$N=5,10,50$：37.5 / 69.9 / 210.3 ms——小 $N$ 下每步约 7 ms、近似线性 ✓；$N=50$ 的 210 ms 已超 50 Hz 周期（20 ms）一个量级 ⇒ 表 II 训练时间标 "−" 自洽 ✓（±14.5/22/22.4 ms 的方差来自 QP 线搜索步数不固定，是 iLQR 类求解器典型特征）。</li>
+</ul>
+<h4>9.3 与式 (1)–(5)、(D1)–(D5) 的对应关系</h4>
+<p>第 2–6 行依次对应式 (4)、(D5)、(D2)、式 (3)+耦合链、(D4)；"解 QP"= 式 (1) 的滚动时域实例（式 (2)）。<strong>全部 10 个数学对象在 Algorithm 1 中闭环</strong>，没有任何一行超出前述公式体系。</p>
+<hr>
+<h3>10. 交叉验证总表</h3>
+<h4>10.1 论文公式 ↔ 内部数值 ↔ 外部文献 总表</h4>
+<table>
+<tr><th>论文</th><th>内部数值核算</th><th>外部文献对照</th><th>结论</th></tr>
+<tr><td>式 (1)</td><td>与式 (2)、Algorithm 1 自洽</td><td>Borrelli 等教科书标准形式；离散伴随方程独立重推一致</td><td>✅（P-2/P-4）</td></tr>
+<tr><td>式 (2)</td><td>$2T(n+m)=68$ ✓；压缩 5× ✓；$\kappa\le10^6$ ✓</td><td>跟踪 MPC 展开 ⇒ $p=-2Qx^{\mathrm{ref}}$（2.2 节独立推导）</td><td>✅（P-2/P-3）</td></tr>
+<tr><td>式 (3)</td><td>与 Algorithm 1、式 (4) 自洽</td><td>Sutton 等 1999 [41] 六步重推逐式一致（3.1 节）</td><td>✅（P-5）</td></tr>
+<tr><td>式 (4)</td><td>表 II：13.5 ms@N=2 = QP 13 + MLP 0.5 ms ✓</td><td>高斯众数=均值 ⇒ 部署确定性输出 = 贪婪化（4.2 节独立证明）</td><td>✅（P-6）</td></tr>
+<tr><td>式 (5)</td><td>惩罚 ≤ 25% 进度（5.2 节）；$11.5$ N$=1.5mg$ ⇒ $m\approx0.78$ kg ✓</td><td>精确几何恒等式 + 一阶投影展开（5.1 节）</td><td>✅（P-7/P-12）</td></tr>
+<tr><td>(D1)(D3)</td><td>68 维 ✓；$3+9=12$、$12+12\times2=36$ ✓</td><td>正定性 ⇒ 唯一解（2.4 节）</td><td>✅（P-10/P-11）</td></tr>
+<tr><td>(D2)(D5)</td><td>GAE 两端 $\lambda=0/1$ 分别还原 (D2)/MC 优势（7.1 节望远镜求和）✓</td><td>贝尔曼方程样本版 + MC 估计（Sutton &amp; Barto）</td><td>✅（P-5）</td></tr>
+<tr><td>Algorithm 1</td><td>表 II 训练 11.5h≈21min×33 ✓；N=50 无训练时间自洽 ✓</td><td>Amos 等 [26]、Li &amp; Todorov [40]、Schulman 等 2017</td><td>✅（P-5）</td></tr>
+</table>
+<h4>10.2 两处需要读者亲自复核的点（诚实标注）</h4>
+<ul>
+<li><strong>文本层 vs 页面图像</strong>：5 个编号公式出自 PDF 文本层抽取，未经像素级复核（本会话模型无图像输入）；公式结构简单且数值自洽，风险低，正式引用前请对照 <code>pages/page-002…004.png</code> 复核。</li>
+<li><strong>$n=13,m=4$</strong>：$m=4$ 出自本文（"collective thrust and body rates"）；$n=13$ 出自 [14]（本 PDF 未写）——若 [14] 维数不同，68 的分解会变，但 $2T(n+m)$ 公式本身不受影响。</li>
+</ul>
+<hr>
+<h3>11. 问题清单（按严重程度）</h3>
+<h4>11.1 论文自身的问题（P 系列）</h4>
+<ol>
+<li><strong>【符号冲突·中】P-1：$N$ 一符四用</strong>——式 (1)(2) 的时域长度、式 (3) 的轨迹批量数、§IV-A.1 的未来门数（$N=2$）、外加 §III-E 把时域改叫 $T$（$2T(n+m)$）。四处恰好多为 2，极易误读。</li>
+<li><strong>【记号缺陷·中】P-2：式 (2) 求和上界含未定义的 $u_N$</strong>——式 (1) 约定输入只到 $k=N-1$，式 (2) 却对 $k=0..N$ 求和且含 $u_N$。标准写法应输入项只到 $N-1$、终端只留 $x_N$ 项。</li>
+<li><strong>【记号缺陷·轻】P-3：式 (2) 的 $p_k$ 缺转置</strong>——$p_k[x_k;u_k]$ 应为 $p_k^T[x_k;u_k]$（除非 $p_k$ 隐式为行向量）。</li>
+<li><strong>【记号缺陷·轻】P-4：式 (1) 的 argmin 变量与 $J$ 的类型</strong>——$u$ 实为序列 $u_{0:N-1}$；$J:\mathcal X\to\mathbb R_+$ 的署名与"代价依赖整条轨迹"不符。</li>
+<li><strong>【信息缺失·中】P-5：RL 超参数与优势估计器未定义</strong>——8 页正文没有 $\gamma,\lambda,\varepsilon$ 的数值、未说明是否用 GAE；Algorithm 1 同时写 "reward-to-go" 与 "advantage based on $V$"（7.1 节证明二者是 GAE 谱的两端）。本笔记第 6 节的 $\gamma=0.99,\lambda=0.95,\varepsilon=0.2$ 在本文 PDF 中查无出处。</li>
+<li><strong>【信息缺失·轻】P-6：$\Sigma$ 未定义</strong>——式 (4) 的协方差是对角/标量倍单位阵/状态依赖，论文未说明。</li>
+<li><strong>【措辞矛盾·轻】P-7："sparse nature of the reward terms"</strong>——式 (5) 是逐步稠密奖励，稀疏的只是 ±10 事件项。</li>
+<li><strong>【信息缺失·中】P-8：动力学模型全文缺失</strong>——$f$ 只写 "same as in [14]"；13 维状态、单电机推力限幅模型均需到 [14] 查证。读者无法仅凭本文复现 MPC 内部模型。（不是错误，是文档缺口。）</li>
+<li><strong>【符号冲突·轻】P-9：位置 $p_k$ 与代价线性项 $p_k$</strong>——式 (5) 与式 (2)/(D1) 跨节撞车。</li>
+<li><strong>【信息缺失·轻】P-10：sigmoid→$[0.1,10^5]$ 的映射公式未给</strong>——线性/对数缩放未说明（6.3 节补了两种标准实现）。</li>
+<li><strong>【记号混乱·轻】P-11：Q/R 混用</strong>——式 (2) 整块叫 $Q_k$，§III-E 的 (D1) 输入对角块突然叫 $R(s_k)_{u_j}$，$R$ 无正式定义。</li>
+<li><strong>【报告口径·轻】P-12：表 I 对 0% 成功率的 MPC 仍报平均速度</strong>——Vertical Wind 列 MPC 成功率 0.0% 却报 $v=6.44$ m/s，坠毁轨迹如何计入未说明。</li>
+</ol>
+<h4>11.2 本笔记既有第 6 节需要修正的点（N 系列）</h4>
+<ol>
+<li><strong>N-1</strong>：第 6 节把论文式 (3) 标注为 "PPO-Clipped 策略梯度目标函数"——论文式 (3) 是<strong>策略梯度定理</strong>（1 步 TD 优势）；PPO-clip 只在 Algorithm 1 以文字出现。两者在 $\theta_{\mathrm{old}}$ 处一阶相等（本文 3.4 节证明），但不能把式 (3) 的编号安在 PPO-clip 目标上。</li>
+<li><strong>N-2</strong>：第 6 节的 $\gamma=0.99$、$\lambda=0.95$、$\varepsilon=0.2$ 在本文 8 页 PDF 文本层查无出处（见 P-5），建议标注"来自 arXiv 版/作者实现，待核"。</li>
+<li><strong>N-3</strong>：第 6 节 "四旋翼 13 维非线性离散动力学模型"——13 维出自 [14]，本文 PDF 未写（P-8）；建议注明出处。</li>
+</ol>
+<hr>
+<h3>12. 验证材料清单</h3>
+<h4>12.1 本次已完成</h4>
+<ul>
+<li><code>_derivation_work/2-acmpc/fulltext.txt</code>：PDF 文本层全文，本推导所有引文按页、按行核对（式 (1)–(5) 见 p.2–4；Algorithm 1 与 §III-E 见 p.3）。</li>
+<li><strong>数值核算</strong>（已在正文给出）：68 维、5× 压缩、$\kappa\le10^6$、36 维观测、$m\approx0.78$ kg、表 II 33×/线性推理。</li>
+<li><strong>外部文献对照</strong>：Sutton 等 1999 [41]、Amos 等 2018 [26]（本文补全 Riccati 显式公式）、Li &amp; Todorov 2004 [40]、Schulman 等 2017、Borrelli 等。</li>
+</ul>
+<h4>12.2 待办（留给你）</h4>
+<ul>
+<li><strong>像素级复核</strong>：本会话模型无图像输入，<code>pages/page-001…008.png</code> 未亲读——建议用支持视觉的会话把式 (1)–(5) 与页面图像比对（预计一致；有出入请回告）。</li>
+<li><strong>到 [14] 核实</strong>：四旋翼 13 维状态定义、单电机推力限幅模型、50 Hz 控制频率（本文推理时间核算所用，本 PDF 未直接给出）。</li>
+<li><strong>到 arXiv 完整版核实</strong>：$\gamma,\lambda,\varepsilon,\Sigma$ 的具体取值与 GAE 用法（8 页会议版未包含）。</li>
+</ul>
 </section>
 
 <footer>📄 Paper Notes · Romero, Song, Scaramuzza · IEEE ICRA 2024 · Actor-Critic Model Predictive Control · MathJax + Mermaid Rendering</footer>
